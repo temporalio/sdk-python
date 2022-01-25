@@ -7,7 +7,7 @@ from pathlib import Path
 
 base_dir = Path(__file__).parent.parent
 codegen_dir = base_dir / "temporalio" / "proto"
-proto_dir = base_dir / "sdk-core" / "protos"
+proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
 api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
 proto_paths = proto_dir.glob("**/*.proto")
