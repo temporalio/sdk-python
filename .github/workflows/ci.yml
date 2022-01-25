@@ -1,0 +1,33 @@
+name: Continuous Integration
+on: # rebuild any PRs and main branch changes
+  pull_request:
+  push:
+    branches:
+      - main
+      - "releases/*"
+
+jobs:
+  # Build and test the project
+  build-lint-test:
+    strategy:
+      fail-fast: true
+      matrix:
+        python: ["3.9"]
+        os: [ubuntu-latest] # TODO:, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Print build information
+        run: "echo head_ref: ${{ github.head_ref }}, ref: ${{ github.ref }}, os: ${{ matrix.os }}, python: ${{ matrix.python }}"
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install --upgrade wheel poetry poethepoet
+      - run: poetry install
+      - run: poe lint
+      - run: poe build
