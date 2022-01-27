@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import collections
 import os
 import re
 import shutil
@@ -27,16 +28,21 @@ fix_sdk_import = partial(
     re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
 )
 
+find_message_re = re.compile(r"_sym_db\.RegisterMessage\(([^\)\.]+)\)")
+find_enum_re = re.compile(r"DESCRIPTOR\.enum_types_by_name\['([^']+)'\] =")
+find_class_re = re.compile(r"\nclass ([^\(\:]+)")
+find_def_re = re.compile(r"\ndef ([^\(\:]+)")
+
 
 def fix_generated_output(base_path: Path):
     """Fix the generated protoc output
 
-    - protoc doesn't generate __init__.py files
+    - protoc doesn't generate __init__.py files nor re-export the types we want
     - protoc doesn't generate the correct import paths
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
 
-    (base_path / "__init__.py").touch()
+    imports = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():
             fix_generated_output(p)
@@ -46,8 +52,17 @@ def fix_generated_output(base_path: Path):
                 content = fix_api_import(content)
                 content = fix_dependency_import(content)
                 content = fix_sdk_import(content)
+                imports[p.stem] += find_message_re.findall(content)
+                imports[p.stem] += find_enum_re.findall(content)
+                imports[p.stem] += find_class_re.findall(content)
+                imports[p.stem] += find_def_re.findall(content)
             with p.open("w") as f:
                 f.write(content)
+    # Write init
+    with (base_path / "__init__.py").open("w") as f:
+        for stem, messages in imports.items():
+            for message in messages:
+                f.write(f"from .{stem} import {message}\n")
 
 
 if __name__ == "__main__":

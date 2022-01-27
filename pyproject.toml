@@ -13,7 +13,6 @@ documentation = "https://docs.temporal.io/docs/python"
 
 [tool.poetry.dependencies]
 grpcio = "^1.43.0"
-mypy = "^0.931"
 python = "^3.7"
 types-protobuf = "^3.19.6"
 
@@ -29,11 +28,8 @@ pytest-asyncio = "^0.17.2"
 build = ["gen-protos", "test"]
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-protos = "python scripts/gen-protos.py"
-lint = "black --check ."
-
-[tool.poe.tasks.test]
-cmd = "pytest"
-env = { PYTHONDONTWRITEBYTECODE = "1" }
+lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}]
+test = "pytest"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

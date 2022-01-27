@@ -4,22 +4,19 @@ from concurrent import futures
 import grpc
 
 import temporalio
-import temporalio.api.workflowservice.v1.request_response_pb2
-import temporalio.api.workflowservice.v1.service_pb2_grpc
+import temporalio.api.workflowservice.v1
 
 
-class SimpleServer(
-    temporalio.api.workflowservice.v1.service_pb2_grpc.WorkflowServiceServicer
-):
+class SimpleServer(temporalio.api.workflowservice.v1.WorkflowServiceServicer):
     async def CountWorkflowExecutions(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
+        request: temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest,
         context: grpc.aio.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse:
+    ) -> temporalio.api.workflowservice.v1.CountWorkflowExecutionsResponse:
         logging.info("Server RPC called")
         assert request.namespace == "my namespace"
         assert request.query == "my query"
-        return temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse(
+        return temporalio.api.workflowservice.v1.CountWorkflowExecutionsResponse(
             count=123
         )
 
@@ -30,7 +27,7 @@ async def test_python_grpc_stub():
     # Start server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     server = grpc.aio.server()
-    temporalio.api.workflowservice.v1.service_pb2_grpc.add_WorkflowServiceServicer_to_server(
+    temporalio.api.workflowservice.v1.add_WorkflowServiceServicer_to_server(
         SimpleServer(), server
     )
     listen_addr = "[::]:50051"
@@ -40,11 +37,9 @@ async def test_python_grpc_stub():
     await server.start()
 
     async with grpc.aio.insecure_channel("localhost:50051") as channel:
-        stub = temporalio.api.workflowservice.v1.service_pb2_grpc.WorkflowServiceStub(
-            channel
-        )
+        stub = temporalio.api.workflowservice.v1.WorkflowServiceStub(channel)
         response = await stub.CountWorkflowExecutions(
-            temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest(
+            temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest(
                 namespace="my namespace", query="my query"
             )
         )
