@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
-import sys
-import subprocess
+import os
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 from functools import partial
 from pathlib import Path
 
 base_dir = Path(__file__).parent.parent
-codegen_dir = base_dir / "temporalio" / "proto"
 proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
 api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
 proto_paths = proto_dir.glob("**/*.proto")
 
-fix_import = partial(
-    re.compile(r"^from (temporal|dependencies)\.").sub, r"from temporalio.proto.\1."
+api_out_dir = base_dir / "temporalio" / "api"
+sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
+
+fix_api_import = partial(
+    re.compile(r"from temporal\.api\.").sub, r"from temporalio.api."
+)
+fix_dependency_import = partial(
+    re.compile(r"from dependencies\.").sub, r"from temporalio.api.dependencies."
+)
+fix_sdk_import = partial(
+    re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
 )
 
 
@@ -31,23 +42,38 @@ def fix_generated_output(base_path: Path):
             fix_generated_output(p)
         else:
             with p.open(encoding="utf8") as f:
-                fixed_content = "".join(fix_import(l) for l in f)
+                content = f.read()
+                content = fix_api_import(content)
+                content = fix_dependency_import(content)
+                content = fix_sdk_import(content)
             with p.open("w") as f:
-                f.write(fixed_content)
+                f.write(content)
 
 
 if __name__ == "__main__":
     print("Generating protos...", file=sys.stderr)
-    subprocess.check_call(
-        [
-            sys.executable,
-            "-mgrpc_tools.protoc",
-            f"--proto_path={api_proto_dir}",
-            f"--proto_path={core_proto_dir}",
-            f"--python_out={codegen_dir}",
-            f"--grpc_python_out={codegen_dir}",
-            *map(str, proto_paths),
-        ]
-    )
-    fix_generated_output(codegen_dir)
+    with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
+        temp_dir = Path(temp_dir)
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-mgrpc_tools.protoc",
+                f"--proto_path={api_proto_dir}",
+                f"--proto_path={core_proto_dir}",
+                f"--python_out={temp_dir}",
+                f"--grpc_python_out={temp_dir}",
+                *map(str, proto_paths),
+            ]
+        )
+        # Apply import fixes before moving code
+        fix_generated_output(temp_dir)
+        # Move protos
+        for p in (temp_dir / "temporal" / "api").iterdir():
+            shutil.rmtree(api_out_dir / p.name, ignore_errors=True)
+            p.replace(api_out_dir / p.name)
+        shutil.rmtree(api_out_dir / "dependencies", ignore_errors=True)
+        (temp_dir / "dependencies").replace(api_out_dir / "dependencies")
+        for p in (temp_dir / "temporal" / "sdk" / "core").iterdir():
+            shutil.rmtree(sdk_out_dir / p.name, ignore_errors=True)
+            p.replace(sdk_out_dir / p.name)
     print("Done", file=sys.stderr)

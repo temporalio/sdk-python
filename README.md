@@ -9,13 +9,19 @@
   - [`poetry`](https://github.com/python-poetry/poetry) `pipx install poetry`
   - [`poe`](https://github.com/nat-n/poethepoet) `pipx install poethepoet`
 
+- Use a local virtual env environment (helps IDEs and Windows):
+
+  ```bash
+  poetry config virtualenvs.in-project true
+  ```
+
 - Install the package dependencies
 
   ```bash
   poetry install
   ```
 
-- Build the project (only generate the protos for now)
+- Build the project
 
   ```bash
   poe build
