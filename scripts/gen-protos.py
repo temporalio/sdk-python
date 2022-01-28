@@ -8,6 +8,7 @@ import sys
 import tempfile
 from functools import partial
 from pathlib import Path
+from typing import Mapping
 
 base_dir = Path(__file__).parent.parent
 proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
@@ -42,7 +43,7 @@ def fix_generated_output(base_path: Path):
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
 
-    imports = collections.defaultdict(list)
+    imports: Mapping[str, list[str]] = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():
             fix_generated_output(p)
@@ -52,10 +53,12 @@ def fix_generated_output(base_path: Path):
                 content = fix_api_import(content)
                 content = fix_dependency_import(content)
                 content = fix_sdk_import(content)
-                imports[p.stem] += find_message_re.findall(content)
-                imports[p.stem] += find_enum_re.findall(content)
-                imports[p.stem] += find_class_re.findall(content)
-                imports[p.stem] += find_def_re.findall(content)
+                # Only use .py files to determine imports, not pyi ones
+                if p.suffix == ".py":
+                    imports[p.stem] += find_message_re.findall(content)
+                    imports[p.stem] += find_enum_re.findall(content)
+                    imports[p.stem] += find_class_re.findall(content)
+                    imports[p.stem] += find_def_re.findall(content)
             with p.open("w") as f:
                 f.write(content)
     # Write init
@@ -67,8 +70,8 @@ def fix_generated_output(base_path: Path):
 
 if __name__ == "__main__":
     print("Generating protos...", file=sys.stderr)
-    with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
-        temp_dir = Path(temp_dir)
+    with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir_raw:
+        temp_dir = Path(temp_dir_raw)
         subprocess.check_call(
             [
                 sys.executable,
@@ -77,6 +80,8 @@ if __name__ == "__main__":
                 f"--proto_path={core_proto_dir}",
                 f"--python_out={temp_dir}",
                 f"--grpc_python_out={temp_dir}",
+                f"--mypy_out={temp_dir}",
+                f"--mypy_grpc_out={temp_dir}",
                 *map(str, proto_paths),
             ]
         )

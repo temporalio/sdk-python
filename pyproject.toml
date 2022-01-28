@@ -15,12 +15,14 @@ documentation = "https://docs.temporal.io/docs/python"
 grpcio = "^1.43.0"
 python = "^3.7"
 types-protobuf = "^3.19.6"
+typing-extensions = "^4.0.1"
 
 [tool.poetry.dev-dependencies]
 black = "^21.12b0"
 grpcio-tools = "^1.43.0"
 isort = "^5.10.1"
 mypy = "^0.931"
+mypy-protobuf = "^3.2.0"
 pytest = "^6.2.5"
 pytest-asyncio = "^0.17.2"
 
@@ -28,7 +30,8 @@ pytest-asyncio = "^0.17.2"
 build = ["gen-protos", "test"]
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-protos = "python scripts/gen-protos.py"
-lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}]
+lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types"]
+lint-types = "mypy ."
 test = "pytest"
 
 [tool.pytest.ini_options]
@@ -37,6 +40,14 @@ asyncio_mode = "auto"
 [tool.isort]
 profile = "black"
 skip_gitignore = true
+
+[tool.mypy]
+ignore_missing_imports = true
+exclude = [
+  # Ignore generated code
+  'temporalio/api',
+  'temporalio/bridge/proto',
+]
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
