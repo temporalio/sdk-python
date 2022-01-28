@@ -1,0 +1,2 @@
+class WorkflowExecution:
+    pass

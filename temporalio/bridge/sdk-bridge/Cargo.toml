@@ -1,0 +1,18 @@
+[package]
+name = "temporal-sdk-core-bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "temporal_sdk_core_bridge"
+crate-type = ["cdylib"]
+
+[dependencies]
+tokio = "1.15"
+prost = "0.9"
+prost-types = "0.9"
+temporal-sdk-core = { version = "0.1.0", path = "../sdk-core/core" }
+temporal-sdk-core-api = { version = "0.1.0", path = "../sdk-core/core-api" }
+temporal-sdk-core-protos = { version = "0.1.0", path = "../sdk-core/sdk-core-protos" }
+pyo3 = { version = "0.15", features = ["extension-module"] }
+pyo3-asyncio = { version = "0.15", features = ["tokio-runtime"] }
