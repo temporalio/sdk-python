@@ -25,18 +25,15 @@ async def test_python_grpc_stub():
     """Make sure pure Python gRPC client works."""
 
     # Start server
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     server = grpc.aio.server()
     temporalio.api.workflowservice.v1.add_WorkflowServiceServicer_to_server(
         SimpleServer(), server
     )
-    listen_addr = "[::]:50051"
-    server.add_insecure_port(listen_addr)
-
-    logging.info("Starting server on %s", listen_addr)
+    port = server.add_insecure_port("[::]:0")
+    logging.info("Starting server on %s", port)
     await server.start()
 
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
         stub = temporalio.api.workflowservice.v1.WorkflowServiceStub(channel)
         response = await stub.CountWorkflowExecutions(
             temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest(
