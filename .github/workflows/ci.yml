@@ -13,7 +13,7 @@ jobs:
       fail-fast: true
       matrix:
         python: ["3.9"]
-        os: [ubuntu-latest] # TODO:, macos-latest, windows-latest]
+        os: [ubuntu-latest] # TODO: macos-latest, windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Print build information
