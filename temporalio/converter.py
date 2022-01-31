@@ -1,6 +1,7 @@
 """Base converter and default implementations for conversion to/from values/payloads."""
 
 import dataclasses
+import inspect
 import json
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Tuple, Type
@@ -12,8 +13,52 @@ import google.protobuf.symbol_database
 import temporalio.api.common.v1
 
 
+class DataConverter(ABC):
+    """Base converter to/from multiple payloads/values."""
+
+    @abstractmethod
+    async def encode(self, values: list[Any]) -> list[temporalio.api.common.v1.Payload]:
+        """Encode values into payloads.
+
+        Args:
+            values: Values to be converted.
+
+        Returns:
+            Converted payloads. Note, this does not have to be the same number
+            as values given, but at least one must be present.
+
+        Raises:
+            Exception: Any issue during conversion.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def decode(
+        self,
+        payloads: list[temporalio.api.common.v1.Payload],
+        type_hints: Optional[list[Type]],
+    ) -> list[Any]:
+        """Decode payloads into values.
+
+        Args:
+            payloads: Payloads to convert to Python values.
+            type_hints: Types that are expected if any. This may not have any
+                types if there are no annotations on the target. If this is
+                present, it must have the exact same length as payloads even if
+                the values are just "object".
+
+        Return:
+            Collection of Python values. Note, this does not have to be the same
+            number as values given, but at least one must be present.
+
+        Raises:
+            Exception: Any issue during conversion.
+        """
+        raise NotImplementedError
+
+
 class PayloadConverter(ABC):
-    """Base converter to/from values/payloads."""
+    """Base converter to/from single payload/value."""
 
     @abstractmethod
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
@@ -29,12 +74,16 @@ class PayloadConverter(ABC):
 
     @abstractmethod
     async def decode(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
     ) -> Tuple[Any, bool]:
         """Decode a single payload to a Python value if able.
 
         Args:
             payload: Payload to convert to Python value.
+            type_hints: Type that is expected if any. This may not have a type
+                if there are no annotations on the target.
 
         Return:
             A tuple with the first value as the Python value and the second as
@@ -45,127 +94,80 @@ class PayloadConverter(ABC):
         """
         return (None, False)
 
-    async def encode_multiple(
-        self, values: list[Any]
-    ) -> Optional[temporalio.api.common.v1.Payloads]:
-        """Encode multiple values into payloads if able.
 
-        Values are expected to be of a common payload type/encoding. The default
-        implementation makes one payload for each value but subclasses may alter
-        that.
+class CompositeDataConverter(DataConverter):
+    """Composite data converter that delegates to a list of payload converters.
 
-        Args:
-            values: List of values to convert.
-        """
-        payloads = []
-        for value in values:
-            payload = await self.encode(value)
-            # Return if any payloads cannot be converted
-            if payload is None:
-                return None
-            payloads.append(payload)
-        return temporalio.api.common.v1.Payloads(payloads=payloads)
-
-    async def decode_multiple(
-        self, payloads: temporalio.api.common.v1.Payloads
-    ) -> Tuple[list[Any], bool]:
-        """Decode multiple payloads into Python values if able.
-
-        Payloads are expected to be of a common type/encoding. The default
-        implementation makes value for each payload but subclasses may alter
-        that.
-
-        Args:
-            payloads: Payloads to convert to Python values.
-
-        Return:
-            A tuple with the first value as a collection of Python values and
-            the second as whether it could be converted or not. If the payloads
-            can be converted, they are the first values of the tuple and the
-            second value is True. If the payloads cannot be converted, the first
-            value is undefined and the second value is False.
-        """
-        values = []
-        for payload in payloads.payloads:
-            value, ok = await self.decode(payload)
-            # Return if any values cannot be converted
-            if not ok:
-                return ([], False)
-            values.append(value)
-        return (values, True)
-
-
-class CompositePayloadConverter(PayloadConverter):
-    """Composite converter that delegates to a list of converters.
-
-    Encoding/decoding are attempted on each converter successively until it
-    succeeds.
+    Encoding/decoding are attempted on each payload converter successively until
+    it succeeds.
 
     Attributes:
-        converters: List of converters to delegate to, in order.
+        converters: List of payload converters to delegate to, in order.
     """
 
     converters: list[PayloadConverter]
 
     def __init__(self, *converters: PayloadConverter) -> None:
-        """Initializes the converter.
+        """Initializes the data converter.
 
         Args:
-            converters: Converters to delegate to, in order.
+            converters: Payload converters to delegate to, in order.
         """
         self.converters = list(converters)
 
-    async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
-        """Encode value trying each converter. See base class."""
-        for converter in self.converters:
-            payload = await converter.encode(value)
-            if payload is not None:
-                return payload
-        return None
+    async def encode(self, values: list[Any]) -> list[temporalio.api.common.v1.Payload]:
+        """Encode values trying each converter.
+
+        See base class. Always returns the same number of payloads as values.
+        """
+        payloads = []
+        for index, value in enumerate(values):
+            # We intentionally attempt these serially just in case a stateful
+            # converter may rely on the previous values
+            payload = None
+            for converter in self.converters:
+                payload = await converter.encode(value)
+                if payload is not None:
+                    break
+            if payload is None:
+                raise RuntimeError(
+                    f"Value at index {index} of type {type(value)} could not be converted"
+                )
+            payloads.append(payload)
+        return payloads
 
     async def decode(
-        self, payload: temporalio.api.common.v1.Payload
-    ) -> Tuple[Any, bool]:
-        """Decode payload trying each converter. See base class."""
-        for converter in self.converters:
-            value, ok = await converter.decode(payload)
-            if ok:
-                return (value, True)
-        return (None, False)
+        self,
+        payloads: list[temporalio.api.common.v1.Payload],
+        type_hints: Optional[list[Type]],
+    ) -> list[Any]:
+        """Decode values trying each converter.
 
-    async def encode_multiple(
-        self, values: list[Any]
-    ) -> Optional[temporalio.api.common.v1.Payloads]:
-        """Encode multiple values trying each converter. See base class.
-
-        Note, this attempts full encode_multiple calls on the delegated
-        converter. It does not allow different converters to encode different
-        values. A single converter must be able to convert them all at once.
+        See base class. Always returns the same number of values as payloads.
         """
-        for converter in self.converters:
-            payloads = await converter.encode_multiple(values)
-            if payloads is not None:
-                return payloads
-        return None
-
-    async def decode_multiple(
-        self, payloads: temporalio.api.common.v1.Payloads
-    ) -> Tuple[list[Any], bool]:
-        """Decode multiple payloads trying each converter. See base class.
-
-        Note, this attempts full decode_multiple calls on the delegated
-        converter. It does not allow different converters to decode different
-        payloads. A single converter must be able to convert them all at once.
-        """
-        for converter in self.converters:
-            values, ok = await converter.decode_multiple(payloads)
-            if ok:
-                return (values, True)
-        return ([], False)
+        values = []
+        for index, payload in enumerate(payloads):
+            type_hint = None
+            if type_hints is not None:
+                type_hint = type_hints[index]
+            # We intentionally attempt these serially just in case a stateful
+            # converter may rely on the previous values
+            ok = False
+            for converter in self.converters:
+                value, ok = await converter.decode(payload, type_hint)
+                if ok:
+                    break
+            if not ok:
+                encoding = payload.metadata.get("encoding", b"<unknown>").decode()
+                raise RuntimeError(
+                    f"Payload at index {index} with encoding '{encoding}' could not be converted"
+                )
+            values.append(value)
+        return values
 
 
 class BinaryNullPayloadConverter(PayloadConverter):
-    """Converter for binary/null payloads supporting None values."""
+    """Converter for 'binary/null' payloads supporting None values."""
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
@@ -176,13 +178,15 @@ class BinaryNullPayloadConverter(PayloadConverter):
         return None
 
     async def decode(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
     ) -> Tuple[Any, bool]:
         return (None, payload.metadata["encoding"] == b"binary/null")
 
 
 class BinaryPlainPayloadConverter(PayloadConverter):
-    """Converter for binary/plain payloads supporting bytes values."""
+    """Converter for 'binary/plain' payloads supporting bytes values."""
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
@@ -193,7 +197,9 @@ class BinaryPlainPayloadConverter(PayloadConverter):
         return None
 
     async def decode(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
     ) -> Tuple[Any, bool]:
         """See base class."""
         return (payload.data, payload.metadata["encoding"] == b"binary/plain")
@@ -203,7 +209,7 @@ _sym_db = google.protobuf.symbol_database.Default()
 
 
 class JSONProtoPayloadConverter(PayloadConverter):
-    """Converter for json/protobuf payloads supporting protobuf Message values."""
+    """Converter for 'json/protobuf' payloads supporting protobuf Message values."""
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
@@ -225,7 +231,9 @@ class JSONProtoPayloadConverter(PayloadConverter):
         return None
 
     async def decode(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
     ) -> Tuple[Any, bool]:
         """See base class."""
         if payload.metadata["encoding"] == b"json/protobuf":
@@ -237,7 +245,7 @@ class JSONProtoPayloadConverter(PayloadConverter):
 
 
 class BinaryProtoPayloadConverter(PayloadConverter):
-    """Converter for binary/protobuf payloads supporting protobuf Message values."""
+    """Converter for 'binary/protobuf' payloads supporting protobuf Message values."""
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
@@ -252,7 +260,9 @@ class BinaryProtoPayloadConverter(PayloadConverter):
         return None
 
     async def decode(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
     ) -> Tuple[Any, bool]:
         """See base class."""
         if payload.metadata["encoding"] == b"binary/protobuf":
@@ -264,17 +274,16 @@ class BinaryProtoPayloadConverter(PayloadConverter):
 
 
 class JSONPlainPayloadConverter(PayloadConverter):
-    """Converter for json/plain payloads supporting common Python values.
+    """Converter for 'json/plain' payloads supporting common Python values.
 
     This supports all values that :py:func:`json.dump` supports and also adds
     encoding support for :py:mod:`dataclasses` by converting them using
-    :py:func:`dataclasses.asdict`. Note that on decode they come back as dict as
-    well and the caller must convert back to a data class.
+    :py:func:`dataclasses.asdict`. Note that on decode, if there is a type hint,
+    it will be used to construct the data class.
     """
 
     _encoder: Optional[Type[json.JSONEncoder]]
     _decoder: Optional[Type[json.JSONDecoder]]
-    _dataclass_asdict: bool
     _encoding: bytes
 
     def __init__(
@@ -282,26 +291,23 @@ class JSONPlainPayloadConverter(PayloadConverter):
         *,
         encoder: Optional[Type[json.JSONEncoder]] = None,
         decoder: Optional[Type[json.JSONDecoder]] = None,
-        dataclass_asdict: bool = True,
-        encoding: str = "json/plain"
+        encoding: str = "json/plain",
     ) -> None:
         """Initialize a JSON data converter.
 
         Args:
             encoder: Custom encoder class object to use.
             decoder: Custom decoder class object to use.
-            dataclass_asdict: Whether to support data class encoding.
             encoding: Encoding name to use.
         """
         super().__init__()
         self._encoder = encoder
         self._decoder = decoder
-        self._dataclass_asdict = dataclass_asdict
         self._encoding = encoding.encode()
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        if self._dataclass_asdict and dataclasses.is_dataclass(value):
+        if dataclasses.is_dataclass(value):
             value = dataclasses.asdict(value)
         # We swallow JSON encode error and just return None
         try:
@@ -315,28 +321,39 @@ class JSONPlainPayloadConverter(PayloadConverter):
             return None
 
     async def decode(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
     ) -> Tuple[Any, bool]:
         """See base class."""
         if payload.metadata["encoding"] == self._encoding:
             # We do not swallow JSON decode errors since we expect success due
             # to already-matched encoding
-            return (json.loads(payload.data, cls=self._decoder), True)
+            obj = json.loads(payload.data, cls=self._decoder)
+            # If the object is a dict and the type hint is present for a data
+            # class, we instantiate the data class with the value
+            if (
+                isinstance(obj, dict)
+                and inspect.isclass(type_hint)
+                and dataclasses.is_dataclass(type_hint)
+            ):
+                obj = type_hint(**obj)
+            return (obj, True)
         return (None, False)
 
 
 # TODO(cretz): Should this be a var that can be changed instead? If so, can it
 # be replaced _after_ client creation? We'd just have to fallback to this
 # default at conversion time instead of instantiation time.
-def default() -> CompositePayloadConverter:
+def default() -> CompositeDataConverter:
     """Default converter compatible with other Temporal SDKs.
 
     This handles None, bytes, all protobuf message types, and any type that
     :py:func:`json.dump` accepts. In addition, this supports encoding
-    :py:mod:`dataclasses` but not decoding them, so decoded data classes appear
-    as dicts which may need to be converted to data classes by users.
+    :py:mod:`dataclasses` and also decoding them provided the data class is in
+    the type hint.
     """
-    return CompositePayloadConverter(
+    return CompositeDataConverter(
         BinaryNullPayloadConverter(),
         BinaryPlainPayloadConverter(),
         JSONProtoPayloadConverter(),

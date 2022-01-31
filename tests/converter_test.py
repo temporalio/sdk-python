@@ -1,33 +1,40 @@
 from dataclasses import dataclass
 
+import pytest
+
 import temporalio.api.common.v1
 import temporalio.converter
 
 
 async def test_default():
     async def assert_payload(
-        input, expected_encoding, expected_data, *, expected_decoded_input=None
+        input,
+        expected_encoding,
+        expected_data,
+        *,
+        expected_decoded_input=None,
+        type_hint=None
     ):
-        payload = await temporalio.converter.default().encode(input)
-        # Only check none if that's the expected encoding
-        if expected_encoding is None:
-            assert payload is None
-            return
+        payloads = await temporalio.converter.default().encode([input])
         # Check encoding and data
+        assert len(payloads) == 1
         if isinstance(expected_encoding, str):
             expected_encoding = expected_encoding.encode()
-        assert payload.metadata["encoding"] == expected_encoding
+        assert payloads[0].metadata["encoding"] == expected_encoding
         if isinstance(expected_data, str):
             expected_data = expected_data.encode()
-        assert payload.data == expected_data
+        assert payloads[0].data == expected_data
         # Decode and check
-        actual_input, ok = await temporalio.converter.default().decode(payload)
-        assert ok
+        actual_inputs = await temporalio.converter.default().decode(
+            payloads, [type_hint]
+        )
+        assert len(actual_inputs) == 1
         if expected_decoded_input is None:
             expected_decoded_input = input
-        assert actual_input == expected_decoded_input
-        return payload
+        assert actual_inputs[0] == expected_decoded_input
+        return payloads[0]
 
+    # Basic types
     await assert_payload(None, "binary/null", "")
     await assert_payload(b"some binary", "binary/plain", "some binary")
     payload = await assert_payload(
@@ -47,16 +54,21 @@ async def test_default():
     await assert_payload(True, "json/plain", "true")
     await assert_payload(False, "json/plain", "false")
 
-    class NonSerializableClass:
-        pass
+    # Unknown type
+    with pytest.raises(RuntimeError) as excinfo:
 
-    await assert_payload(NonSerializableClass(), None, None)
+        class NonSerializableClass:
+            pass
+
+        await assert_payload(NonSerializableClass(), None, None)
+    assert "could not be converted" in str(excinfo.value)
 
     @dataclass
     class MyDataClass:
         foo: str
         bar: int
 
+    # Data class without type hint is just dict
     await assert_payload(
         MyDataClass(foo="somestr", bar=123),
         "json/plain",
@@ -64,10 +76,18 @@ async def test_default():
         expected_decoded_input={"foo": "somestr", "bar": 123},
     )
 
+    # Data class with type hint reconstructs the class
+    await assert_payload(
+        MyDataClass(foo="somestr", bar=123),
+        "json/plain",
+        '{"bar":123,"foo":"somestr"}',
+        type_hint=MyDataClass,
+    )
+
 
 async def test_binary_proto():
     # We have to test this separately because by default it never encodes
-    # anything
+    # anything since JSON proto takes precedence
     conv = temporalio.converter.BinaryProtoPayloadConverter()
     proto = temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
     payload = await conv.encode(proto)
@@ -79,19 +99,3 @@ async def test_binary_proto():
     decoded, ok = await conv.decode(payload)
     assert ok
     assert decoded == proto
-
-
-async def test_multiple():
-    payloads = await temporalio.converter.default().encode_multiple(
-        [{"foo": "bar"}, {"baz": "qux"}]
-    )
-    assert len(payloads.payloads) == 2
-    assert payloads.payloads[0].metadata["encoding"] == b"json/plain"
-    assert payloads.payloads[0].data == b'{"foo":"bar"}'
-    assert payloads.payloads[1].metadata["encoding"] == b"json/plain"
-    assert payloads.payloads[1].data == b'{"baz":"qux"}'
-    values, ok = await temporalio.converter.default().decode_multiple(payloads)
-    assert ok
-    assert len(values) == 2
-    assert values[0] == {"foo": "bar"}
-    assert values[1] == {"baz": "qux"}
