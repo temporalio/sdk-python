@@ -61,7 +61,7 @@ async def test_default():
             pass
 
         await assert_payload(NonSerializableClass(), None, None)
-    assert "could not be converted" in str(excinfo.value)
+    assert "has no known converter" in str(excinfo.value)
 
     @dataclass
     class MyDataClass:
@@ -96,6 +96,5 @@ async def test_binary_proto():
         payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
     )
     assert payload.data == proto.SerializeToString()
-    decoded, ok = await conv.decode(payload)
-    assert ok
+    decoded = await conv.decode(payload)
     assert decoded == proto

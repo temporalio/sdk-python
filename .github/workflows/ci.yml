@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python: ["3.9"]
+        python: ["3.7", "3.10"]
         os: [ubuntu-latest] # TODO: macos-latest, windows-latest
     runs-on: ${{ matrix.os }}
     steps:

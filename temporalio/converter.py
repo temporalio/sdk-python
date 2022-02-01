@@ -4,7 +4,7 @@ import dataclasses
 import inspect
 import json
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Tuple, Type
+from typing import Any, List, Mapping, Optional, Type
 
 import google.protobuf.json_format
 import google.protobuf.message
@@ -17,7 +17,7 @@ class DataConverter(ABC):
     """Base converter to/from multiple payloads/values."""
 
     @abstractmethod
-    async def encode(self, values: list[Any]) -> list[temporalio.api.common.v1.Payload]:
+    async def encode(self, values: List[Any]) -> List[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
         Args:
@@ -35,9 +35,9 @@ class DataConverter(ABC):
     @abstractmethod
     async def decode(
         self,
-        payloads: list[temporalio.api.common.v1.Payload],
-        type_hints: Optional[list[Type]],
-    ) -> list[Any]:
+        payloads: List[temporalio.api.common.v1.Payload],
+        type_hints: Optional[List[Type]],
+    ) -> List[Any]:
         """Decode payloads into values.
 
         Args:
@@ -60,6 +60,12 @@ class DataConverter(ABC):
 class PayloadConverter(ABC):
     """Base converter to/from single payload/value."""
 
+    @property
+    @abstractmethod
+    def encoding(self) -> str:
+        """Encoding for the payload this converter works with."""
+        raise NotImplementedError
+
     @abstractmethod
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """Encode a single value to a payload or None.
@@ -69,16 +75,21 @@ class PayloadConverter(ABC):
 
         Returns:
             Payload of the value or None if unable to convert.
+
+        Raises:
+            TypeError: Value is not the expected type.
+            ValueError: Value is of the expected type but otherwise incorrect.
+            RuntimeError: General error during encoding.
         """
-        return None
+        raise NotImplementedError
 
     @abstractmethod
     async def decode(
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
-    ) -> Tuple[Any, bool]:
-        """Decode a single payload to a Python value if able.
+    ) -> Any:
+        """Decode a single payload to a Python value or raise exception.
 
         Args:
             payload: Payload to convert to Python value.
@@ -86,13 +97,14 @@ class PayloadConverter(ABC):
                 if there are no annotations on the target.
 
         Return:
-            A tuple with the first value as the Python value and the second as
-            whether it could be converted or not. If the payload can be
-            converted, it is the first value of the tuple and the second value
-            is True. If the payload cannot be converted, the first value is
-            undefined and the second value is False.
+            The decoded value from the payload. Since the encoding is checked by
+            the caller, this should raise an exception if the payload cannot be
+            converted.
+
+        Raises:
+            RuntimeError: General error during decoding.
         """
-        return (None, False)
+        raise NotImplementedError
 
 
 class CompositeDataConverter(DataConverter):
@@ -105,7 +117,7 @@ class CompositeDataConverter(DataConverter):
         converters: List of payload converters to delegate to, in order.
     """
 
-    converters: list[PayloadConverter]
+    converters: Mapping[bytes, PayloadConverter]
 
     def __init__(self, *converters: PayloadConverter) -> None:
         """Initializes the data converter.
@@ -113,67 +125,77 @@ class CompositeDataConverter(DataConverter):
         Args:
             converters: Payload converters to delegate to, in order.
         """
-        self.converters = list(converters)
+        # Insertion order preserved here
+        self.converters = {c.encoding.encode(): c for c in converters}
 
-    async def encode(self, values: list[Any]) -> list[temporalio.api.common.v1.Payload]:
+    async def encode(self, values: List[Any]) -> List[temporalio.api.common.v1.Payload]:
         """Encode values trying each converter.
 
         See base class. Always returns the same number of payloads as values.
+
+        Raises:
+            RuntimeError: No known converter
         """
         payloads = []
         for index, value in enumerate(values):
             # We intentionally attempt these serially just in case a stateful
             # converter may rely on the previous values
             payload = None
-            for converter in self.converters:
+            for converter in self.converters.values():
                 payload = await converter.encode(value)
                 if payload is not None:
                     break
             if payload is None:
                 raise RuntimeError(
-                    f"Value at index {index} of type {type(value)} could not be converted"
+                    f"Value at index {index} of type {type(value)} has no known converter"
                 )
             payloads.append(payload)
         return payloads
 
     async def decode(
         self,
-        payloads: list[temporalio.api.common.v1.Payload],
-        type_hints: Optional[list[Type]],
-    ) -> list[Any]:
+        payloads: List[temporalio.api.common.v1.Payload],
+        type_hints: Optional[List[Type]],
+    ) -> List[Any]:
         """Decode values trying each converter.
 
         See base class. Always returns the same number of values as payloads.
+
+        Raises:
+            KeyError: Unknown payload encoding
+            RuntimeError: Error during decode
         """
         values = []
         for index, payload in enumerate(payloads):
+            encoding = payload.metadata.get("encoding", b"<unknown>")
+            converter = self.converters.get(encoding)
+            if converter is None:
+                raise KeyError(f"Unknown payload encoding {encoding.decode()}")
             type_hint = None
             if type_hints is not None:
                 type_hint = type_hints[index]
-            # We intentionally attempt these serially just in case a stateful
-            # converter may rely on the previous values
-            ok = False
-            for converter in self.converters:
-                value, ok = await converter.decode(payload, type_hint)
-                if ok:
-                    break
-            if not ok:
-                encoding = payload.metadata.get("encoding", b"<unknown>").decode()
+            try:
+                values.append(await converter.decode(payload, type_hint))
+            except RuntimeError as err:
                 raise RuntimeError(
-                    f"Payload at index {index} with encoding '{encoding}' could not be converted"
-                )
-            values.append(value)
+                    f"Payload at index {index} with encoding {encoding.decode()} could not be converted"
+                ) from err
         return values
 
 
 class BinaryNullPayloadConverter(PayloadConverter):
     """Converter for 'binary/null' payloads supporting None values."""
 
+    @property
+    def encoding(self) -> str:
+        """See base class."""
+        return "binary/null"
+
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
         if value is None:
             return temporalio.api.common.v1.Payload(
-                metadata={"encoding": b"binary/null"}
+                metadata={"encoding": self.encoding.encode()}
             )
         return None
 
@@ -181,18 +203,25 @@ class BinaryNullPayloadConverter(PayloadConverter):
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
-    ) -> Tuple[Any, bool]:
-        return (None, payload.metadata["encoding"] == b"binary/null")
+    ) -> Any:
+        if len(payload.data) > 0:
+            raise RuntimeError("Expected empty data set for binary/null")
+        return None
 
 
 class BinaryPlainPayloadConverter(PayloadConverter):
     """Converter for 'binary/plain' payloads supporting bytes values."""
 
+    @property
+    def encoding(self) -> str:
+        """See base class."""
+        return "binary/plain"
+
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
         if isinstance(value, bytes):
             return temporalio.api.common.v1.Payload(
-                metadata={"encoding": b"binary/plain"}, data=value
+                metadata={"encoding": self.encoding.encode()}, data=value
             )
         return None
 
@@ -200,9 +229,9 @@ class BinaryPlainPayloadConverter(PayloadConverter):
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
-    ) -> Tuple[Any, bool]:
+    ) -> Any:
         """See base class."""
-        return (payload.data, payload.metadata["encoding"] == b"binary/plain")
+        return payload.data
 
 
 _sym_db = google.protobuf.symbol_database.Default()
@@ -210,6 +239,11 @@ _sym_db = google.protobuf.symbol_database.Default()
 
 class JSONProtoPayloadConverter(PayloadConverter):
     """Converter for 'json/protobuf' payloads supporting protobuf Message values."""
+
+    @property
+    def encoding(self) -> str:
+        """See base class."""
+        return "json/protobuf"
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
@@ -223,7 +257,7 @@ class JSONProtoPayloadConverter(PayloadConverter):
             )
             return temporalio.api.common.v1.Payload(
                 metadata={
-                    "encoding": b"json/protobuf",
+                    "encoding": self.encoding.encode(),
                     "messageType": value.DESCRIPTOR.full_name.encode(),
                 },
                 data=json_str.encode(),
@@ -234,25 +268,32 @@ class JSONProtoPayloadConverter(PayloadConverter):
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
-    ) -> Tuple[Any, bool]:
+    ) -> Any:
         """See base class."""
-        if payload.metadata["encoding"] == b"json/protobuf":
-            # This raises error if not found
-            value = _sym_db.GetSymbol(payload.metadata["messageType"].decode())()
-            google.protobuf.json_format.Parse(payload.data, value)
-            return (value, True)
-        return (None, False)
+        message_type = payload.metadata.get("messageType", b"<unknown>").decode()
+        try:
+            value = _sym_db.GetSymbol(message_type)()
+            return google.protobuf.json_format.Parse(payload.data, value)
+        except KeyError as err:
+            raise RuntimeError(f"Unknown Protobuf type {message_type}") from err
+        except google.protobuf.json_format.ParseError as err:
+            raise RuntimeError("Failed parsing") from err
 
 
 class BinaryProtoPayloadConverter(PayloadConverter):
     """Converter for 'binary/protobuf' payloads supporting protobuf Message values."""
+
+    @property
+    def encoding(self) -> str:
+        """See base class."""
+        return "binary/protobuf"
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
         if isinstance(value, google.protobuf.message.Message):
             return temporalio.api.common.v1.Payload(
                 metadata={
-                    "encoding": b"binary/protobuf",
+                    "encoding": self.encoding.encode(),
                     "messageType": value.DESCRIPTOR.full_name.encode(),
                 },
                 data=value.SerializeToString(),
@@ -263,14 +304,17 @@ class BinaryProtoPayloadConverter(PayloadConverter):
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
-    ) -> Tuple[Any, bool]:
+    ) -> Any:
         """See base class."""
-        if payload.metadata["encoding"] == b"binary/protobuf":
-            # This raises error if not found
-            value = _sym_db.GetSymbol(payload.metadata["messageType"].decode())()
+        message_type = payload.metadata.get("messageType", b"<unknown>").decode()
+        try:
+            value = _sym_db.GetSymbol(message_type)()
             value.ParseFromString(payload.data)
-            return (value, True)
-        return (None, False)
+            return value
+        except KeyError as err:
+            raise RuntimeError(f"Unknown Protobuf type {message_type}") from err
+        except google.protobuf.message.DecodeError as err:
+            raise RuntimeError("Failed parsing") from err
 
 
 class JSONPlainPayloadConverter(PayloadConverter):
@@ -284,7 +328,7 @@ class JSONPlainPayloadConverter(PayloadConverter):
 
     _encoder: Optional[Type[json.JSONEncoder]]
     _decoder: Optional[Type[json.JSONDecoder]]
-    _encoding: bytes
+    _encoding: str
 
     def __init__(
         self,
@@ -303,7 +347,12 @@ class JSONPlainPayloadConverter(PayloadConverter):
         super().__init__()
         self._encoder = encoder
         self._decoder = decoder
-        self._encoding = encoding.encode()
+        self._encoding = encoding
+
+    @property
+    def encoding(self) -> str:
+        """See base class."""
+        return self._encoding
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
@@ -312,7 +361,7 @@ class JSONPlainPayloadConverter(PayloadConverter):
         # We swallow JSON encode error and just return None
         try:
             return temporalio.api.common.v1.Payload(
-                metadata={"encoding": self._encoding},
+                metadata={"encoding": self._encoding.encode()},
                 data=json.dumps(
                     value, cls=self._encoder, separators=(",", ":"), sort_keys=True
                 ).encode(),
@@ -324,11 +373,9 @@ class JSONPlainPayloadConverter(PayloadConverter):
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
-    ) -> Tuple[Any, bool]:
+    ) -> Any:
         """See base class."""
-        if payload.metadata["encoding"] == self._encoding:
-            # We do not swallow JSON decode errors since we expect success due
-            # to already-matched encoding
+        try:
             obj = json.loads(payload.data, cls=self._decoder)
             # If the object is a dict and the type hint is present for a data
             # class, we instantiate the data class with the value
@@ -338,8 +385,9 @@ class JSONPlainPayloadConverter(PayloadConverter):
                 and dataclasses.is_dataclass(type_hint)
             ):
                 obj = type_hint(**obj)
-            return (obj, True)
-        return (None, False)
+            return obj
+        except json.JSONDecodeError as err:
+            raise RuntimeError("Failed parsing") from err
 
 
 # TODO(cretz): Should this be a var that can be changed instead? If so, can it

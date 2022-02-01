@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import collections
-import os
 import re
 import shutil
 import subprocess
@@ -8,7 +7,7 @@ import sys
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import Mapping
+from typing import List, Mapping
 
 base_dir = Path(__file__).parent.parent
 proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
@@ -43,7 +42,7 @@ def fix_generated_output(base_path: Path):
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
 
-    imports: Mapping[str, list[str]] = collections.defaultdict(list)
+    imports: Mapping[str, List[str]] = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():
             fix_generated_output(p)
