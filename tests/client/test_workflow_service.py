@@ -3,16 +3,15 @@ import uuid
 import temporalio.api.common.v1
 import temporalio.api.taskqueue.v1
 import temporalio.api.workflowservice.v1
-import temporalio.bridge.client
+import temporalio.client
 import temporalio.converter
 
 
-async def test_bridge_client():
-    opts = temporalio.bridge.client.ClientOptions(target_url="http://localhost:7233")
-    client = await temporalio.bridge.client.Client.connect(opts)
+async def test_simple():
+    service = await temporalio.client.WorkflowService.connect("http://localhost:7233")
     task_queue = f"my-task-queue-{uuid.uuid4()}"
     workflow_id = f"my-workflow-{uuid.uuid4()}"
-    resp = await client.start_workflow_execution(
+    resp = await service.start_workflow_execution(
         temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest(
             namespace="default",
             workflow_id=workflow_id,

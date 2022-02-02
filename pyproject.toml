@@ -28,7 +28,7 @@ pytest = "^6.2.5"
 pytest-asyncio = "^0.17.2"
 
 [tool.poe.tasks]
-build = ["gen-protos", "build-bridge", "test"]
+build = ["gen-protos", "build-bridge"]
 build-bridge = "python scripts/build-bridge.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-protos = "python scripts/gen-protos.py"

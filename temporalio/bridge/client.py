@@ -54,20 +54,7 @@ class Client:
     def __init__(self, ref: temporal_sdk_bridge.ClientRef):
         self._ref = ref
 
-    async def start_workflow_execution(
-        self,
-        req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
-        *,
-        retry: bool = False,
-    ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
-        return await self.__rpc_call(
-            "start_workflow_execution",
-            req,
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-            retry=retry,
-        )
-
-    async def __rpc_call(
+    async def rpc_call(
         self,
         rpc: str,
         req: google.protobuf.message.Message,
