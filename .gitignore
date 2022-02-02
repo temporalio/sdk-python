@@ -3,4 +3,5 @@ temporalio/api/*
 !temporalio/api/__init__.py
 temporalio/bridge/proto/*
 !temporalio/bridge/proto/__init__.py
+temporalio/bridge/target/
 __pycache__

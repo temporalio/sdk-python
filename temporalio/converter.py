@@ -247,7 +247,10 @@ class JSONProtoPayloadConverter(PayloadConverter):
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        if isinstance(value, google.protobuf.message.Message):
+        if (
+            isinstance(value, google.protobuf.message.Message)
+            and value.DESCRIPTOR is not None
+        ):
             # We have to convert to dict then to JSON because MessageToJson does
             # not have a compact option removing spaces and newlines
             json_str = json.dumps(
@@ -290,7 +293,10 @@ class BinaryProtoPayloadConverter(PayloadConverter):
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        if isinstance(value, google.protobuf.message.Message):
+        if (
+            isinstance(value, google.protobuf.message.Message)
+            and value.DESCRIPTOR is not None
+        ):
             return temporalio.api.common.v1.Payload(
                 metadata={
                     "encoding": self.encoding.encode(),

@@ -21,13 +21,15 @@ typing-extensions = "^4.0.1"
 black = "^21.12b0"
 grpcio-tools = "^1.43.0"
 isort = "^5.10.1"
+maturin = "^0.12.6"
 mypy = "^0.931"
 mypy-protobuf = "^3.2.0"
 pytest = "^6.2.5"
 pytest-asyncio = "^0.17.2"
 
 [tool.poe.tasks]
-build = ["gen-protos", "test"]
+build = ["gen-protos", "build-bridge", "test"]
+build-bridge = "python scripts/build-bridge.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-protos = "python scripts/gen-protos.py"
 lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types"]
