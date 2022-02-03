@@ -18,15 +18,19 @@ proto_paths = proto_dir.glob("**/*.proto")
 api_out_dir = base_dir / "temporalio" / "api"
 sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
 
-fix_api_import = partial(
-    re.compile(r"from temporal\.api\.").sub, r"from temporalio.api."
-)
-fix_dependency_import = partial(
-    re.compile(r"from dependencies\.").sub, r"from temporalio.api.dependencies."
-)
-fix_sdk_import = partial(
-    re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
-)
+py_fixes = [
+    partial(re.compile(r"from temporal\.api\.").sub, r"from temporalio.api."),
+    partial(
+        re.compile(r"from dependencies\.").sub, r"from temporalio.api.dependencies."
+    ),
+    partial(
+        re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
+    ),
+]
+
+pyi_fixes = [
+    partial(re.compile(r"temporal\.api\.").sub, r"temporalio.api."),
+]
 
 find_message_re = re.compile(r"_sym_db\.RegisterMessage\(([^\)\.]+)\)")
 find_enum_re = re.compile(r"DESCRIPTOR\.enum_types_by_name\['([^']+)'\] =")
@@ -46,18 +50,20 @@ def fix_generated_output(base_path: Path):
     for p in base_path.iterdir():
         if p.is_dir():
             fix_generated_output(p)
-        else:
+        elif p.suffix == ".py" or p.suffix == ".pyi":
             with p.open(encoding="utf8") as f:
                 content = f.read()
-                content = fix_api_import(content)
-                content = fix_dependency_import(content)
-                content = fix_sdk_import(content)
-                # Only use .py files to determine imports, not pyi ones
                 if p.suffix == ".py":
+                    for fix in py_fixes:
+                        content = fix(content)
+                    # Only use .py files to determine imports, not pyi ones
                     imports[p.stem] += find_message_re.findall(content)
                     imports[p.stem] += find_enum_re.findall(content)
                     imports[p.stem] += find_class_re.findall(content)
                     imports[p.stem] += find_def_re.findall(content)
+                else:
+                    for fix in pyi_fixes:
+                        content = fix(content)
             with p.open("w") as f:
                 f.write(content)
     # Write init
@@ -84,7 +90,7 @@ if __name__ == "__main__":
                 *map(str, proto_paths),
             ]
         )
-        # Apply import fixes before moving code
+        # Apply fixes before moving code
         fix_generated_output(temp_dir)
         # Move protos
         for p in (temp_dir / "temporal" / "api").iterdir():

@@ -4,7 +4,7 @@ import dataclasses
 import inspect
 import json
 from abc import ABC, abstractmethod
-from typing import Any, List, Mapping, Optional, Type
+from typing import Any, Iterable, List, Mapping, Optional, Type
 
 import google.protobuf.json_format
 import google.protobuf.message
@@ -17,7 +17,9 @@ class DataConverter(ABC):
     """Base converter to/from multiple payloads/values."""
 
     @abstractmethod
-    async def encode(self, values: List[Any]) -> List[temporalio.api.common.v1.Payload]:
+    async def encode(
+        self, values: Iterable[Any]
+    ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
         Args:
@@ -35,8 +37,8 @@ class DataConverter(ABC):
     @abstractmethod
     async def decode(
         self,
-        payloads: List[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]],
+        payloads: Iterable[temporalio.api.common.v1.Payload],
+        type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode payloads into values.
 
@@ -128,7 +130,9 @@ class CompositeDataConverter(DataConverter):
         # Insertion order preserved here
         self.converters = {c.encoding.encode(): c for c in converters}
 
-    async def encode(self, values: List[Any]) -> List[temporalio.api.common.v1.Payload]:
+    async def encode(
+        self, values: Iterable[Any]
+    ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values trying each converter.
 
         See base class. Always returns the same number of payloads as values.
@@ -154,8 +158,8 @@ class CompositeDataConverter(DataConverter):
 
     async def decode(
         self,
-        payloads: List[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]],
+        payloads: Iterable[temporalio.api.common.v1.Payload],
+        type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode values trying each converter.
 
