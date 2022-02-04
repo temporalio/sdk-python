@@ -2,6 +2,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::time::Duration;
+use temporal_client::WorkflowService;
 use tonic;
 
 #[pymodule]
@@ -11,9 +12,13 @@ fn temporal_sdk_bridge(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
+type Client = temporal_client::RetryGateway<
+    temporal_client::ConfiguredClient<temporal_client::WorkflowServiceClientWithMetrics>,
+>;
+
 #[pyclass]
 pub struct ClientRef {
-    retry_client: std::sync::Arc<temporal_client::RetryGateway<temporal_client::ServerGateway>>,
+    retry_client: Client,
 }
 
 #[derive(FromPyObject)]
@@ -52,9 +57,9 @@ fn new_client(py: Python, opts: ClientOptions) -> PyResult<&PyAny> {
     let opts: temporal_client::ServerGatewayOptions = opts.try_into()?;
     pyo3_asyncio::tokio::future_into_py(py, async move {
         Ok(ClientRef {
-            retry_client: std::sync::Arc::new(opts.connect(None).await.map_err(|err| {
+            retry_client: opts.connect_no_namespace(None).await.map_err(|err| {
                 PyRuntimeError::new_err(format!("Failed client connect: {}", err))
-            })?),
+            })?,
         })
     })
 }
@@ -68,15 +73,119 @@ impl ClientRef {
         retry: bool,
         req: Vec<u8>,
     ) -> PyResult<&'p PyAny> {
-        let retry_client = self.retry_client.clone();
+        let mut retry_client = self.retry_client.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let bytes = match rpc.as_str() {
+                "count_workflow_executions" => {
+                    rpc_call!(retry_client, retry, count_workflow_executions, req)
+                }
+                "deprecate_namespace" => rpc_call!(retry_client, retry, deprecate_namespace, req),
+                "describe_namespace" => rpc_call!(retry_client, retry, describe_namespace, req),
+                "describe_task_queue" => rpc_call!(retry_client, retry, describe_task_queue, req),
+                "describe_workflow_execution" => {
+                    rpc_call!(retry_client, retry, describe_workflow_execution, req)
+                }
+                "get_cluster_info" => rpc_call!(retry_client, retry, get_cluster_info, req),
+                "get_search_attributes" => {
+                    rpc_call!(retry_client, retry, get_search_attributes, req)
+                }
                 "get_workflow_execution_history" => {
                     rpc_call!(retry_client, retry, get_workflow_execution_history, req)
+                }
+                "list_archived_workflow_executions" => {
+                    rpc_call!(retry_client, retry, list_archived_workflow_executions, req)
+                }
+                "list_closed_workflow_executions" => {
+                    rpc_call!(retry_client, retry, list_closed_workflow_executions, req)
+                }
+                "list_namespaces" => rpc_call!(retry_client, retry, list_namespaces, req),
+                "list_open_workflow_executions" => {
+                    rpc_call!(retry_client, retry, list_open_workflow_executions, req)
+                }
+                "list_task_queue_partitions" => {
+                    rpc_call!(retry_client, retry, list_task_queue_partitions, req)
+                }
+                "list_workflow_executions" => {
+                    rpc_call!(retry_client, retry, list_workflow_executions, req)
+                }
+                "poll_activity_task_queue" => {
+                    rpc_call!(retry_client, retry, poll_activity_task_queue, req)
+                }
+                "poll_workflow_task_queue" => {
+                    rpc_call!(retry_client, retry, poll_workflow_task_queue, req)
+                }
+                "query_workflow" => rpc_call!(retry_client, retry, query_workflow, req),
+                "record_activity_task_heartbeat" => {
+                    rpc_call!(retry_client, retry, record_activity_task_heartbeat, req)
+                }
+                "record_activity_task_heartbeat_by_id" => rpc_call!(
+                    retry_client,
+                    retry,
+                    record_activity_task_heartbeat_by_id,
+                    req
+                ),
+                "register_namespace" => rpc_call!(retry_client, retry, register_namespace, req),
+                "request_cancel_workflow_execution" => {
+                    rpc_call!(retry_client, retry, request_cancel_workflow_execution, req)
+                }
+                "reset_sticky_task_queue" => {
+                    rpc_call!(retry_client, retry, reset_sticky_task_queue, req)
+                }
+                "reset_workflow_execution" => {
+                    rpc_call!(retry_client, retry, reset_workflow_execution, req)
+                }
+                "respond_activity_task_canceled" => {
+                    rpc_call!(retry_client, retry, respond_activity_task_canceled, req)
+                }
+                "respond_activity_task_canceled_by_id" => rpc_call!(
+                    retry_client,
+                    retry,
+                    respond_activity_task_canceled_by_id,
+                    req
+                ),
+                "respond_activity_task_completed" => {
+                    rpc_call!(retry_client, retry, respond_activity_task_completed, req)
+                }
+                "respond_activity_task_completed_by_id" => rpc_call!(
+                    retry_client,
+                    retry,
+                    respond_activity_task_completed_by_id,
+                    req
+                ),
+                "respond_activity_task_failed" => {
+                    rpc_call!(retry_client, retry, respond_activity_task_failed, req)
+                }
+                "respond_activity_task_failed_by_id" => {
+                    rpc_call!(retry_client, retry, respond_activity_task_failed_by_id, req)
+                }
+                "respond_query_task_completed" => {
+                    rpc_call!(retry_client, retry, respond_query_task_completed, req)
+                }
+                "respond_workflow_task_completed" => {
+                    rpc_call!(retry_client, retry, respond_workflow_task_completed, req)
+                }
+                "respond_workflow_task_failed" => {
+                    rpc_call!(retry_client, retry, respond_workflow_task_failed, req)
+                }
+                "scan_workflow_executions" => {
+                    rpc_call!(retry_client, retry, scan_workflow_executions, req)
+                }
+                "signal_with_start_workflow_execution" => rpc_call!(
+                    retry_client,
+                    retry,
+                    signal_with_start_workflow_execution,
+                    req
+                ),
+                "signal_workflow_execution" => {
+                    rpc_call!(retry_client, retry, signal_workflow_execution, req)
                 }
                 "start_workflow_execution" => {
                     rpc_call!(retry_client, retry, start_workflow_execution, req)
                 }
+                "terminate_workflow_execution" => {
+                    rpc_call!(retry_client, retry, terminate_workflow_execution, req)
+                }
+                "update_namespace" => rpc_call!(retry_client, retry, update_namespace, req),
                 _ => return Err(PyValueError::new_err(format!("Unknown RPC call {}", rpc))),
             }?;
             let bytes: &[u8] = &bytes;
@@ -107,34 +216,13 @@ where
     }
 }
 
-fn clone_tonic_req<T: Clone>(req: &tonic::Request<T>) -> tonic::Request<T> {
-    tonic::Request::new(req.get_ref().clone())
-}
-
 #[macro_export]
 macro_rules! rpc_call {
     ($retry_client:ident, $retry:ident, $call_name:ident, $req:ident) => {
         if $retry {
-            // TODO(cretz): I wouldn't have to clone this if call_with_retry
-            // allowed error types other than tonic statuses
-            let req = rpc_req($req)?;
-            let fact = || {
-                let req = clone_tonic_req(&req);
-                let mut raw_client = $retry_client.get_client().raw_client().clone();
-                async move { raw_client.$call_name(req).await }
-            };
-            rpc_resp(
-                $retry_client
-                    .call_with_retry(
-                        fact,
-                        temporal_client::CallType::Normal,
-                        stringify!($call_name),
-                    )
-                    .await,
-            )
+            rpc_resp($retry_client.$call_name(rpc_req($req)?).await)
         } else {
-            let mut raw_client = $retry_client.get_client().raw_client().clone();
-            rpc_resp(raw_client.$call_name(rpc_req($req)?).await)
+            rpc_resp($retry_client.into_inner().$call_name(rpc_req($req)?).await)
         }
     };
 }
@@ -149,8 +237,6 @@ impl TryFrom<ClientOptions> for temporal_client::ServerGatewayOptions {
                 url::Url::parse(&opts.target_url)
                     .map_err(|err| PyValueError::new_err(format!("invalid target URL: {}", err)))?,
             )
-            // TODO(cretz): Unneeded
-            .namespace("".to_string())
             .client_name(opts.client_name)
             .client_version(opts.client_version)
             .static_headers(opts.static_headers)

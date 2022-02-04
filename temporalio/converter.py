@@ -49,7 +49,7 @@ class DataConverter(ABC):
                 present, it must have the exact same length as payloads even if
                 the values are just "object".
 
-        Return:
+        Returns:
             Collection of Python values. Note, this does not have to be the same
             number as values given, but at least one must be present.
 
@@ -208,6 +208,7 @@ class BinaryNullPayloadConverter(PayloadConverter):
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
     ) -> Any:
+        """See base class."""
         if len(payload.data) > 0:
             raise RuntimeError("Expected empty data set for binary/null")
         return None
@@ -332,7 +333,7 @@ class JSONPlainPayloadConverter(PayloadConverter):
 
     This supports all values that :py:func:`json.dump` supports and also adds
     encoding support for :py:mod:`dataclasses` by converting them using
-    :py:func:`dataclasses.asdict`. Note that on decode, if there is a type hint,
+    :py:mod:`dataclasses.asdict`. Note that on decode, if there is a type hint,
     it will be used to construct the data class.
     """
 

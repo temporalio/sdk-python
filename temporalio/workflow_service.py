@@ -209,11 +209,6 @@ class WorkflowService(ABC):
             wsv1.TerminateWorkflowExecutionRequest,
             wsv1.TerminateWorkflowExecutionResponse,
         )
-        self.reset_workflow_execution = self._new_call(
-            "reset_workflow_execution",
-            wsv1.ResetWorkflowExecutionRequest,
-            wsv1.ResetWorkflowExecutionResponse,
-        )
         self.update_namespace = self._new_call(
             "update_namespace",
             wsv1.UpdateNamespaceRequest,

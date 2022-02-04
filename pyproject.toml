@@ -24,15 +24,21 @@ isort = "^5.10.1"
 maturin = "^0.12.6"
 mypy = "^0.931"
 mypy-protobuf = "^3.2.0"
+pydocstyle = "^6.1.1"
 pytest = "^6.2.5"
 pytest-asyncio = "^0.17.2"
+Sphinx = "^4.4.0"
+sphinx-rtd-theme = "^1.0.0"
+sphinxcontrib-napoleon = "^0.7"
 
 [tool.poe.tasks]
 build = ["gen-protos", "build-bridge"]
 build-bridge = "python scripts/build-bridge.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
+gen-docs = "sphinx-build docs docs/_build"
 gen-protos = "python scripts/gen-protos.py"
-lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types"]
+lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types"] # TODO(cretz): Add lint-docs
+lint-docs = "pydocstyle"
 lint-types = "mypy ."
 test = "pytest"
 
@@ -50,6 +56,11 @@ exclude = [
   'temporalio/api',
   'temporalio/bridge/proto',
 ]
+
+[tool.pydocstyle]
+convention = "google"
+# https://github.com/PyCQA/pydocstyle/issues/363#issuecomment-625563088
+match_dir = "^(?!(docs|scripts|tests|api|proto|\\.)).*"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
