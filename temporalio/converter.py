@@ -4,7 +4,7 @@ import dataclasses
 import inspect
 import json
 from abc import ABC, abstractmethod
-from typing import Any, List, Mapping, Optional, Type
+from typing import Any, Iterable, List, Mapping, Optional, Type
 
 import google.protobuf.json_format
 import google.protobuf.message
@@ -17,7 +17,9 @@ class DataConverter(ABC):
     """Base converter to/from multiple payloads/values."""
 
     @abstractmethod
-    async def encode(self, values: List[Any]) -> List[temporalio.api.common.v1.Payload]:
+    async def encode(
+        self, values: Iterable[Any]
+    ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
         Args:
@@ -35,8 +37,8 @@ class DataConverter(ABC):
     @abstractmethod
     async def decode(
         self,
-        payloads: List[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]],
+        payloads: Iterable[temporalio.api.common.v1.Payload],
+        type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode payloads into values.
 
@@ -47,7 +49,7 @@ class DataConverter(ABC):
                 present, it must have the exact same length as payloads even if
                 the values are just "object".
 
-        Return:
+        Returns:
             Collection of Python values. Note, this does not have to be the same
             number as values given, but at least one must be present.
 
@@ -128,7 +130,9 @@ class CompositeDataConverter(DataConverter):
         # Insertion order preserved here
         self.converters = {c.encoding.encode(): c for c in converters}
 
-    async def encode(self, values: List[Any]) -> List[temporalio.api.common.v1.Payload]:
+    async def encode(
+        self, values: Iterable[Any]
+    ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values trying each converter.
 
         See base class. Always returns the same number of payloads as values.
@@ -154,8 +158,8 @@ class CompositeDataConverter(DataConverter):
 
     async def decode(
         self,
-        payloads: List[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]],
+        payloads: Iterable[temporalio.api.common.v1.Payload],
+        type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode values trying each converter.
 
@@ -204,6 +208,7 @@ class BinaryNullPayloadConverter(PayloadConverter):
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
     ) -> Any:
+        """See base class."""
         if len(payload.data) > 0:
             raise RuntimeError("Expected empty data set for binary/null")
         return None
@@ -247,7 +252,10 @@ class JSONProtoPayloadConverter(PayloadConverter):
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        if isinstance(value, google.protobuf.message.Message):
+        if (
+            isinstance(value, google.protobuf.message.Message)
+            and value.DESCRIPTOR is not None
+        ):
             # We have to convert to dict then to JSON because MessageToJson does
             # not have a compact option removing spaces and newlines
             json_str = json.dumps(
@@ -290,7 +298,10 @@ class BinaryProtoPayloadConverter(PayloadConverter):
 
     async def encode(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        if isinstance(value, google.protobuf.message.Message):
+        if (
+            isinstance(value, google.protobuf.message.Message)
+            and value.DESCRIPTOR is not None
+        ):
             return temporalio.api.common.v1.Payload(
                 metadata={
                     "encoding": self.encoding.encode(),
@@ -322,7 +333,7 @@ class JSONPlainPayloadConverter(PayloadConverter):
 
     This supports all values that :py:func:`json.dump` supports and also adds
     encoding support for :py:mod:`dataclasses` by converting them using
-    :py:func:`dataclasses.asdict`. Note that on decode, if there is a type hint,
+    :py:mod:`dataclasses.asdict`. Note that on decode, if there is a type hint,
     it will be used to construct the data class.
     """
 
