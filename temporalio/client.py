@@ -19,6 +19,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.failure
 import temporalio.workflow_service
+from temporalio.workflow_service import RPCError, RPCStatusCode
 
 logger = logging.getLogger(__name__)
 
@@ -473,10 +474,6 @@ class WorkflowHandle(Generic[T]):
                     req.next_page_token = b""
                     continue
                 raise WorkflowContinuedAsNewError(cont_attr.new_execution_run_id)
-            else:
-                raise RuntimeError(
-                    f"Unexpected close event attribute of {event.WhichOneof('attributes')}"
-                )
 
     async def cancel(
         self,

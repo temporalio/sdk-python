@@ -5,6 +5,7 @@ import google.protobuf.message
 
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
+from temporalio.bridge.client import RPCError, RPCStatusCode
 
 WorkflowServiceRequest = TypeVar(
     "WorkflowServiceRequest", bound=google.protobuf.message.Message

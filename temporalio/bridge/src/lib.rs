@@ -6,11 +6,14 @@ use temporal_client::WorkflowService;
 use tonic;
 
 #[pymodule]
-fn temporal_sdk_bridge(_py: Python, m: &PyModule) -> PyResult<()> {
+fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
+    m.add("RPCError", py.get_type::<RPCError>())?;
     m.add_class::<ClientRef>()?;
     m.add_function(wrap_pyfunction!(new_client, m)?)?;
     Ok(())
 }
+
+pyo3::create_exception!(temporal_sdk_bridge, RPCError, pyo3::exceptions::PyException);
 
 type Client = temporal_client::RetryGateway<
     temporal_client::ConfiguredClient<temporal_client::WorkflowServiceClientWithMetrics>,
@@ -211,8 +214,15 @@ where
 {
     match res {
         Ok(resp) => Ok(resp.get_ref().encode_to_vec()),
-        // TODO(cretz): Better error struct here w/ all the details
-        Err(err) => Err(PyRuntimeError::new_err(format!("RPC failed: {}", err))),
+        Err(err) => {
+            Err(Python::with_gil(move |py| {
+                // Create tuple of "status", "message", and optional "details"
+                let code = err.code() as u32;
+                let message = err.message().to_owned();
+                let details = err.details().into_py(py);
+                RPCError::new_err((code, message, details))
+            }))
+        }
     }
 }
 

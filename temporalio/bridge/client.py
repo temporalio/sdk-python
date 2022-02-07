@@ -1,12 +1,12 @@
 import os
 import socket
 from dataclasses import dataclass, field
+from enum import IntEnum
 from typing import Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
+import grpc
 import temporal_sdk_bridge
-
-import temporalio.api.workflowservice.v1
 
 
 @dataclass
@@ -44,6 +44,42 @@ class ClientOptions:
 ProtoMessage = TypeVar("ProtoMessage", bound=google.protobuf.message.Message)
 
 
+class RPCStatusCode(IntEnum):
+    OK = grpc.StatusCode.OK.value[0]
+    CANCELLED = grpc.StatusCode.CANCELLED.value[0]
+    UNKNOWN = grpc.StatusCode.UNKNOWN.value[0]
+    INVALID_ARGUMENT = grpc.StatusCode.INVALID_ARGUMENT.value[0]
+    DEADLINE_EXCEEDED = grpc.StatusCode.DEADLINE_EXCEEDED.value[0]
+    NOT_FOUND = grpc.StatusCode.NOT_FOUND.value[0]
+    ALREADY_EXISTS = grpc.StatusCode.ALREADY_EXISTS.value[0]
+    PERMISSION_DENIED = grpc.StatusCode.PERMISSION_DENIED.value[0]
+    RESOURCE_EXHAUSTED = grpc.StatusCode.RESOURCE_EXHAUSTED.value[0]
+    FAILED_PRECONDITION = grpc.StatusCode.FAILED_PRECONDITION.value[0]
+    ABORTED = grpc.StatusCode.ABORTED.value[0]
+    OUT_OF_RANGE = grpc.StatusCode.OUT_OF_RANGE.value[0]
+    UNIMPLEMENTED = grpc.StatusCode.UNIMPLEMENTED.value[0]
+    INTERNAL = grpc.StatusCode.INTERNAL.value[0]
+    UNAVAILABLE = grpc.StatusCode.UNAVAILABLE.value[0]
+    DATA_LOSS = grpc.StatusCode.DATA_LOSS.value[0]
+    UNAUTHENTICATED = grpc.StatusCode.UNAUTHENTICATED.value[0]
+
+
+class RPCError(RuntimeError):
+    def __init__(self, raw: temporal_sdk_bridge.RPCError) -> None:
+        status, message, details = raw.args
+        super().__init__(message)
+        self._status = RPCStatusCode(status)
+        self._details = details
+
+    @property
+    def status(self) -> RPCStatusCode:
+        return self._status
+
+    @property
+    def details(self) -> bytes:
+        return self._details
+
+
 class Client:
     @staticmethod
     async def connect(opts: ClientOptions) -> "Client":
@@ -62,6 +98,12 @@ class Client:
         *,
         retry: bool = False,
     ) -> ProtoMessage:
-        resp = resp_type()
-        resp.ParseFromString(await self._ref.call(rpc, retry, req.SerializeToString()))
-        return resp
+        try:
+            resp = resp_type()
+            resp.ParseFromString(
+                await self._ref.call(rpc, retry, req.SerializeToString())
+            )
+            return resp
+        except temporal_sdk_bridge.RPCError as err:
+            # Intentionally swallow the bridge error after conversion
+            raise RPCError(err) from None
