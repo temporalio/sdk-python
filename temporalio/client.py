@@ -276,7 +276,7 @@ class Client:
         search_attributes: Optional[Mapping[str, Any]] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: list[Any] = [],
+        start_signal_args: Iterable[Any] = [],
     ) -> Any:
         """Start a workflow and wait for completion.
 
