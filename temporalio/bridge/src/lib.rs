@@ -9,7 +9,7 @@ use tonic;
 fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("RPCError", py.get_type::<RPCError>())?;
     m.add_class::<ClientRef>()?;
-    m.add_function(wrap_pyfunction!(new_client, m)?)?;
+    m.add_function(wrap_pyfunction!(connect_client, m)?)?;
     Ok(())
 }
 
@@ -55,7 +55,7 @@ pub struct ClientRetryConfig {
 }
 
 #[pyfunction]
-fn new_client(py: Python, opts: ClientOptions) -> PyResult<&PyAny> {
+fn connect_client(py: Python, opts: ClientOptions) -> PyResult<&PyAny> {
     // TODO(cretz): Add metrics_meter?
     let opts: temporal_client::ServerGatewayOptions = opts.try_into()?;
     pyo3_asyncio::tokio::future_into_py(py, async move {

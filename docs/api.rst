@@ -16,3 +16,9 @@ Converters
 
 .. automodule:: temporalio.converter
    :members:
+
+Exceptions
+----------
+
+.. automodule:: temporalio.exceptions
+   :members:

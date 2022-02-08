@@ -17,7 +17,7 @@ import temporalio.api.taskqueue.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
-import temporalio.failure
+import temporalio.exceptions
 import temporalio.workflow_service
 from temporalio.workflow_service import RPCError, RPCStatusCode
 
@@ -396,10 +396,8 @@ class WorkflowHandle(Generic[T]):
                     req.next_page_token = b""
                     continue
                 # Ignoring anything after the first response like TypeScript
-                if not complete_attr.result:
-                    return cast(T, None)
-                results = await self._client.data_converter.decode(
-                    complete_attr.result.payloads
+                results = await temporalio.converter.decode_payloads(
+                    complete_attr.result, self._client.data_converter
                 )
                 if not results:
                     return cast(T, None)
@@ -414,38 +412,35 @@ class WorkflowHandle(Generic[T]):
                     req.next_page_token = b""
                     continue
                 raise WorkflowFailureError(
-                    cause=await temporalio.failure.FailureError.from_proto(
+                    cause=await temporalio.exceptions.failure_to_error(
                         fail_attr.failure, self._client.data_converter
-                    )
+                    ),
                 )
             elif event.HasField("workflow_execution_canceled_event_attributes"):
                 cancel_attr = event.workflow_execution_canceled_event_attributes
-                details = []
-                if cancel_attr.details and cancel_attr.details.payloads:
-                    details = await self._client.data_converter.decode(
-                        cancel_attr.details.payloads
-                    )
                 raise WorkflowFailureError(
-                    cause=temporalio.failure.FailureError(
+                    cause=temporalio.exceptions.CancelledError(
                         "Workflow cancelled",
-                        temporalio.failure.CancelledFailure(*details),
+                        *(
+                            await temporalio.converter.decode_payloads(
+                                cancel_attr.details.payloads,
+                                self._client.data_converter,
+                            )
+                        ),
                     )
                 )
             elif event.HasField("workflow_execution_terminated_event_attributes"):
                 term_attr = event.workflow_execution_terminated_event_attributes
-                details = []
-                if term_attr.details and term_attr.details.payloads:
-                    details = await self._client.data_converter.decode(
-                        term_attr.details.payloads
-                    )
                 raise WorkflowFailureError(
-                    cause=temporalio.failure.FailureError(
+                    cause=temporalio.exceptions.TerminatedError(
                         term_attr.reason or "Workflow terminated",
-                        temporalio.failure.TerminatedFailure(
-                            *details,
-                            reason=term_attr.reason or None,
+                        *(
+                            await temporalio.converter.decode_payloads(
+                                term_attr.details.payloads,
+                                self._client.data_converter,
+                            )
                         ),
-                    )
+                    ),
                 )
             elif event.HasField("workflow_execution_timed_out_event_attributes"):
                 time_attr = event.workflow_execution_timed_out_event_attributes
@@ -455,12 +450,10 @@ class WorkflowHandle(Generic[T]):
                     req.next_page_token = b""
                     continue
                 raise WorkflowFailureError(
-                    cause=temporalio.failure.FailureError(
+                    cause=temporalio.exceptions.TimeoutError(
                         "Workflow timed out",
-                        temporalio.failure.TimeoutFailure(
-                            temporalio.failure.TimeoutType.START_TO_CLOSE
-                        ),
-                    )
+                        type=temporalio.exceptions.TimeoutType.START_TO_CLOSE,
+                    ),
                 )
             elif event.HasField("workflow_execution_continued_as_new_event_attributes"):
                 cont_attr = event.workflow_execution_continued_as_new_event_attributes
@@ -479,7 +472,7 @@ class WorkflowHandle(Generic[T]):
         self,
         *,
         run_id: Optional[str] = SELF_RUN_ID,
-        first_execution_run_id: Optional[None],
+        first_execution_run_id: Optional[str] = None,
     ) -> None:
         """Cancel the workflow.
 
@@ -902,7 +895,7 @@ class _ClientImpl(OutboundInterceptor):
 class WorkflowFailureError(Exception):
     """Error that occurs when a workflow is unsuccessful."""
 
-    def __init__(self, *, cause: temporalio.failure.FailureError) -> None:
+    def __init__(self, *, cause: temporalio.exceptions.FailureError) -> None:
         """Create workflow failure error."""
         super().__init__("Workflow execution failed")
         # TODO(cretz): Confirm setting this __cause__ is acceptable
@@ -916,6 +909,10 @@ class WorkflowContinuedAsNewError(Exception):
         """Create workflow continue as new error."""
         super().__init__("Workflow continued as new")
         self._new_execution_run_id = new_execution_run_id
+
+    @property
+    def new_execution_run_id(self) -> str:
+        return self._new_execution_run_id
 
 
 class WorkflowQueryRejectedError(Exception):

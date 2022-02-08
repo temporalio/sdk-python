@@ -419,3 +419,11 @@ def default() -> CompositeDataConverter:
         BinaryProtoPayloadConverter(),
         JSONPlainPayloadConverter(),
     )
+
+
+async def decode_payloads(
+    payloads: Optional[temporalio.api.common.v1.Payloads], converter: DataConverter
+) -> List[Any]:
+    if not payloads or not payloads.payloads:
+        return []
+    return await converter.decode(payloads.payloads)

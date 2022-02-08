@@ -83,7 +83,7 @@ class RPCError(RuntimeError):
 class Client:
     @staticmethod
     async def connect(opts: ClientOptions) -> "Client":
-        return Client(await temporal_sdk_bridge.new_client(opts))
+        return Client(await temporal_sdk_bridge.connect_client(opts))
 
     _ref: temporal_sdk_bridge.ClientRef
 
