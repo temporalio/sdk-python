@@ -1,13 +1,12 @@
 import asyncio
 import logging
 import os
-import signal
+import subprocess
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Optional
 
-import psutil
 import pytest_asyncio
 
 import temporalio.api.workflowservice.v1
@@ -60,15 +59,11 @@ class ExternalGolangServer(Server):
         namespace = f"test-namespace-{uuid.uuid4()}"
         # TODO(cretz): Make this configurable?
         port = "9233"
-        process = await asyncio.create_subprocess_exec(
-            "go",
-            "run",
-            ".",
+        process = await start_external_go_process(
+            os.path.join(os.path.dirname(__file__), "golangserver"),
+            "golangserver",
             port,
             namespace,
-            cwd=os.path.abspath(
-                os.path.join(os.path.dirname(__file__), "golangserver")
-            ),
         )
         server = ExternalGolangServer(f"localhost:{port}", namespace, process)
         # Try to get the client multiple times to check whether server is online
@@ -99,7 +94,7 @@ class ExternalGolangServer(Server):
         return self._namespace
 
     async def close(self):
-        kill_proc_tree(self._process.pid)
+        self._process.terminate()
         await self._process.wait()
 
 
@@ -143,19 +138,15 @@ class Worker(ABC):
 class ExternalGolangWorker(Worker):
     @staticmethod
     async def start(host_port: str, namespace: str) -> "ExternalGolangWorker":
-        task_queue = uuid.uuid4()
-        process = await asyncio.create_subprocess_exec(
-            "go",
-            "run",
-            ".",
+        task_queue = str(uuid.uuid4())
+        process = await start_external_go_process(
+            os.path.join(os.path.dirname(__file__), "golangworker"),
+            "golangworker",
             host_port,
             namespace,
-            str(task_queue),
-            cwd=os.path.abspath(
-                os.path.join(os.path.dirname(__file__), "golangworker")
-            ),
+            task_queue,
         )
-        return ExternalGolangWorker(str(task_queue), process)
+        return ExternalGolangWorker(task_queue, process)
 
     def __init__(self, task_queue: str, process: asyncio.subprocess.Process) -> None:
         super().__init__()
@@ -167,7 +158,7 @@ class ExternalGolangWorker(Worker):
         return self._task_queue
 
     async def close(self):
-        kill_proc_tree(self._process.pid)
+        self._process.terminate()
         await self._process.wait()
 
 
@@ -178,24 +169,14 @@ async def worker(server: Server) -> AsyncGenerator[Worker, None]:
     await worker.close()
 
 
-# See https://psutil.readthedocs.io/en/latest/#kill-process-tree
-def kill_proc_tree(
-    pid, sig=signal.SIGTERM, include_parent=True, timeout=None, on_terminate=None
-):
-    """Kill a process tree (including grandchildren) with signal
-    "sig" and return a (gone, still_alive) tuple.
-    "on_terminate", if specified, is a callback function which is
-    called as soon as a child terminates.
-    """
-    assert pid != os.getpid(), "won't kill myself"
-    parent = psutil.Process(pid)
-    children = parent.children(recursive=True)
-    if include_parent:
-        children.append(parent)
-    for p in children:
-        try:
-            p.send_signal(sig)
-        except psutil.NoSuchProcess:
-            pass
-    gone, alive = psutil.wait_procs(children, timeout=timeout, callback=on_terminate)
-    return (gone, alive)
+async def start_external_go_process(
+    source_dir: str, exe_name: str, *args: str
+) -> asyncio.subprocess.Process:
+    # First, build the executable. We accept the performance issues of building
+    # this each run.
+    logger.info("Building %s", exe_name)
+    subprocess.run(["go", "build", "-o", exe_name, "."], cwd=source_dir, check=True)
+    logger.info("Starting %s", exe_name)
+    return await asyncio.create_subprocess_exec(
+        os.path.join(source_dir, exe_name), *args
+    )

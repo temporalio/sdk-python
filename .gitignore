@@ -6,3 +6,5 @@ temporalio/api/*
 temporalio/bridge/proto/*
 !temporalio/bridge/proto/__init__.py
 temporalio/bridge/target/
+/tests/fixtures/golangserver/golangserver
+/tests/fixtures/golangworker/golangworker
