@@ -5,7 +5,7 @@ import subprocess
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Iterable, Optional
 
 import pytest_asyncio
 
@@ -120,6 +120,7 @@ class KitchenSinkWorkflowParams:
     result_as_string_signal_arg: Optional[str] = None
     result_as_run_id: Optional[bool] = None
     sleep_ms: Optional[int] = None
+    queries_with_string_arg: Iterable[str] = []
 
 
 class Worker(ABC):

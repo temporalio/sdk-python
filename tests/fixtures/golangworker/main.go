@@ -45,11 +45,16 @@ type KitchenSinkWorkflowParams struct {
 	ResultAsStringSignalArg string      `json:"result_as_string_signal_arg"`
 	ResultAsRunID           bool        `json:"result_as_run_id"`
 	SleepMS                 int64       `json:"sleep_ms"`
+	QueriesWithStringArg    []string    `json:"queries_with_string_arg"`
 }
 
 func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams) (interface{}, error) {
 	b, _ := json.Marshal(params)
 	workflow.GetLogger(ctx).Info("Started kitchen sink workflow", "params", string(b))
+
+	for _, name := range params.QueriesWithStringArg {
+		workflow.SetQueryHandler(ctx, name, func(arg string) (string, error) { return arg, nil })
+	}
 
 	if params.SleepMS > 0 {
 		if err := workflow.Sleep(ctx, time.Duration(params.SleepMS)*time.Millisecond); err != nil {

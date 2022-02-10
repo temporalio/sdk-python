@@ -1,8 +1,6 @@
 """Client for accessing Temporal."""
 
 import logging
-import os
-import socket
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -19,7 +17,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow_service
-from temporalio.workflow_service import RPCError, RPCStatusCode
+from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 logger = logging.getLogger(__name__)
 
@@ -122,10 +120,16 @@ class Client:
         target_url: str,
         *,
         namespace: str = "default",
-        identity: str = f"{os.getpid()}@{socket.gethostname()}",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
         interceptors: Iterable["Interceptor"] = [],
-        workflow_query_reject_condition: Optional[WorkflowQueryRejectCondition] = None,
+        default_workflow_query_reject_condition: Optional[
+            WorkflowQueryRejectCondition
+        ] = None,
+        tls_config: Optional[TLSConfig] = None,
+        retry_config: Optional[RetryConfig] = None,
+        static_headers: Mapping[str, str] = {},
+        identity: Optional[str] = None,
+        worker_binary_id: Optional[str] = None,
     ) -> "Client":
         """Connect to a Temporal server.
 
@@ -133,21 +137,44 @@ class Client:
             target_url: URL for the Temporal server. For local development, this
                 is often "http://localhost:7233".
             namespace: Namespace to use for client calls.
-            identity: Identity to use for client calls.
             data_converter: Data converter to use for all data conversions
                 to/from payloads.
             interceptors: Set of interceptors that are chained together to allow
                 intercepting of client calls. The earlier interceptors wrap the
                 later ones.
-            workflow_query_reject_condition: When to reject a query.
+            default_workflow_query_reject_condition: The default rejection
+                condition for workflow queries if not set during query. See
+                :py:meth:`WorkflowHandle.query` for details on the rejection
+                condition.
+            tls_config: TLS configuration for connecting to the server. If unset
+                no TLS connection will be used.
+            retry_config: Retry configuration for direct service calls (when
+                opted in) or all high-level calls made by this client (which all
+                opt-in to retries by default). If unset, a default retry
+                configuration is used.
+            static_headers: Static headers to use for all calls to the server.
+            identity: Identity for this client. If unset, a default is created
+                based on the version of the SDK.
+            worker_binary_id: Unique identifier for the current runtime. This is
+                best set as a hash of all code and should change only when code
+                does. If unset, a best-effort identifier is generated.
         """
+        connect_options = temporalio.workflow_service.ConnectOptions(
+            target_url=target_url,
+            tls_config=tls_config,
+            retry_config=retry_config,
+            static_headers=static_headers,
+        )
+        if identity:
+            connect_options.identity = identity
+        if worker_binary_id:
+            connect_options.worker_binary_id = worker_binary_id
         return Client(
-            await temporalio.workflow_service.WorkflowService.connect(target_url),
+            await temporalio.workflow_service.WorkflowService.connect(connect_options),
             namespace=namespace,
-            identity=identity,
             data_converter=data_converter,
             interceptors=interceptors,
-            workflow_query_reject_condition=workflow_query_reject_condition,
+            default_workflow_query_reject_condition=default_workflow_query_reject_condition,
         )
 
     def __init__(
@@ -155,10 +182,11 @@ class Client:
         service: temporalio.workflow_service.WorkflowService,
         *,
         namespace: str = "default",
-        identity: str = f"{os.getpid()}@{socket.gethostname()}",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
         interceptors: Iterable["Interceptor"] = [],
-        workflow_query_reject_condition: Optional[WorkflowQueryRejectCondition] = None,
+        default_workflow_query_reject_condition: Optional[
+            WorkflowQueryRejectCondition
+        ] = None,
     ):
         """Create a Temporal client from a workflow service.
 
@@ -166,10 +194,11 @@ class Client:
         """
         self._service = service
         self._namespace = namespace
-        self._identity = identity
         self._data_converter = data_converter
         self._interceptors = interceptors
-        self._workflow_query_reject_condition = workflow_query_reject_condition
+        self._default_workflow_query_reject_condition = (
+            default_workflow_query_reject_condition
+        )
 
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
@@ -189,7 +218,7 @@ class Client:
     @property
     def identity(self) -> str:
         """Identity used in calls by this client."""
-        return self._identity
+        return self.service.options.identity
 
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
@@ -378,7 +407,9 @@ class WorkflowHandle(Generic[T]):
             skip_archival=True,
         )
         while True:
-            resp = await self._client.service.get_workflow_execution_history(req)
+            resp = await self._client.service.get_workflow_execution_history(
+                req, retry=True
+            )
             # Continually ask for pages until we get close
             if len(resp.history.events) == 0:
                 req.next_page_token = resp.next_page_token
@@ -423,7 +454,7 @@ class WorkflowHandle(Generic[T]):
                         "Workflow cancelled",
                         *(
                             await temporalio.converter.decode_payloads(
-                                cancel_attr.details.payloads,
+                                cancel_attr.details,
                                 self._client.data_converter,
                             )
                         ),
@@ -436,7 +467,7 @@ class WorkflowHandle(Generic[T]):
                         term_attr.reason or "Workflow terminated",
                         *(
                             await temporalio.converter.decode_payloads(
-                                term_attr.details.payloads,
+                                term_attr.details,
                                 self._client.data_converter,
                             )
                         ),
@@ -501,7 +532,7 @@ class WorkflowHandle(Generic[T]):
         self,
         *,
         run_id: Optional[str] = SELF_RUN_ID,
-    ) -> temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse:
+    ) -> "WorkflowDescription":
         """Get workflow details.
 
         Args:
@@ -516,27 +547,36 @@ class WorkflowHandle(Generic[T]):
         """
         if run_id == WorkflowHandle.SELF_RUN_ID:
             run_id = self._run_id
-        return await self._client.service.describe_workflow_execution(
-            temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
-                namespace=self._client.namespace,
-                execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=self._id,
-                    run_id=run_id or "",
+        return WorkflowDescription(
+            await self._client.service.describe_workflow_execution(
+                temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
+                    namespace=self._client.namespace,
+                    execution=temporalio.api.common.v1.WorkflowExecution(
+                        workflow_id=self._id,
+                        run_id=run_id or "",
+                    ),
                 ),
+                retry=True,
             )
         )
 
     async def query(
-        self, name: str, *args: Any, run_id: Optional[str] = SELF_RUN_ID
+        self,
+        query: str,
+        *args: Any,
+        run_id: Optional[str] = SELF_RUN_ID,
+        reject_condition: Optional[WorkflowQueryRejectCondition] = None,
     ) -> Any:
         """Query the workflow.
 
         Args:
-            name: Query name on the workflow.
+            query: Query name on the workflow.
             args: Query arguments.
             run_id: Run ID to query. Defaults to using :py:meth:`run_id`. If set
                 to None or there is no :py:meth:`run_id`, this will query the
                 latest run for the workflow ID.
+            reject_condition: Condition for rejecting the query. If unset/None,
+                defaults to the client's default (which is defaulted to None).
 
         Returns:
             Result of the query.
@@ -549,9 +589,10 @@ class WorkflowHandle(Generic[T]):
             QueryWorkflowInput(
                 id=self._id,
                 run_id=run_id,
-                query=name,
+                query=query,
                 args=args,
-                reject_condition=self._client._workflow_query_reject_condition,
+                reject_condition=reject_condition
+                or self._client._default_workflow_query_reject_condition,
             )
         )
 
@@ -585,7 +626,7 @@ class WorkflowHandle(Generic[T]):
         *args: Any,
         reason: Optional[str] = None,
         run_id: Optional[str] = SELF_RUN_ID,
-        first_execution_run_id: Optional[None],
+        first_execution_run_id: Optional[None] = None,
     ) -> None:
         """Terminate the workflow.
 
@@ -612,6 +653,30 @@ class WorkflowHandle(Generic[T]):
                 first_execution_run_id=first_execution_run_id,
             )
         )
+
+
+class WorkflowDescription:
+    """Description for a workflow."""
+
+    def __init__(
+        self,
+        raw_message: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
+    ):
+        self._raw_message = raw_message
+        status = raw_message.workflow_execution_info.status
+        self._status = WorkflowExecutionStatus(status) if status else None
+
+    @property
+    def raw_message(
+        self,
+    ) -> temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse:
+        """Underlying workflow description response."""
+        return self._raw_message
+
+    @property
+    def status(self) -> Optional[WorkflowExecutionStatus]:
+        """Status of the workflow."""
+        return self._status
 
 
 @dataclass

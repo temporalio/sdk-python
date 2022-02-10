@@ -1,11 +1,15 @@
+import os
+import socket
 from abc import ABC, abstractmethod
-from typing import Generic, Type, TypeVar
+from dataclasses import dataclass, field
+from enum import IntEnum
+from typing import Generic, Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
+import grpc
 
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
-from temporalio.bridge.client import RPCError, RPCStatusCode
 
 WorkflowServiceRequest = TypeVar(
     "WorkflowServiceRequest", bound=google.protobuf.message.Message
@@ -15,13 +19,97 @@ WorkflowServiceResponse = TypeVar(
 )
 
 
-class WorkflowService(ABC):
-    @staticmethod
-    async def connect(target_url: str) -> "WorkflowService":
-        return await BridgeWorkflowService.connect(target_url=target_url)
+@dataclass
+class TLSConfig:
+    """TLS configuration for connecting to Temporal server."""
 
-    def __init__(self) -> None:
+    server_root_ca_cert: Optional[bytes]
+    """Root CA to validate the server certificate against."""
+
+    domain: Optional[str]
+    """TLS domain."""
+
+    client_cert: Optional[bytes]
+    """Client certificate for mTLS.
+    
+    This must be combined with :py:attr:`client_private_key`."""
+
+    client_private_key: Optional[bytes]
+    """Client private key for mTLS.
+    
+    This must be combined with :py:attr:`client_cert`."""
+
+    def _to_bridge_config(self) -> temporalio.bridge.client.ClientTlsConfig:
+        return temporalio.bridge.client.ClientTlsConfig(
+            server_root_ca_cert=self.server_root_ca_cert,
+            domain=self.domain,
+            client_cert=self.client_cert,
+            client_private_key=self.client_private_key,
+        )
+
+
+@dataclass
+class RetryConfig:
+    """Retry configuration for server calls."""
+
+    initial_interval_millis: int = 100
+    """Initial backoff interval."""
+    randomization_factor: float = 0.2
+    """Randomization jitter to add."""
+    multiplier: float = 1.5
+    """Backoff multiplier."""
+    max_interval_millis: int = 5000
+    """Maximum backoff interval."""
+    max_elapsed_time_millis: Optional[int] = 10000
+    """Maximum total time."""
+    max_retries: int = 10
+    """Maximum number of retries."""
+
+    def _to_bridge_config(self) -> temporalio.bridge.client.ClientRetryConfig:
+        return temporalio.bridge.client.ClientRetryConfig(
+            initial_interval_millis=self.initial_interval_millis,
+            randomization_factor=self.randomization_factor,
+            multiplier=self.multiplier,
+            max_interval_millis=self.max_interval_millis,
+            max_elapsed_time_millis=self.max_elapsed_time_millis,
+            max_retries=self.max_retries,
+        )
+
+
+@dataclass
+class ConnectOptions:
+    """Options for connecting to the server."""
+
+    target_url: str
+    tls_config: Optional[TLSConfig] = None
+    retry_config: Optional[RetryConfig] = None
+    static_headers: Mapping[str, str] = field(default_factory=dict)
+    identity: str = f"{os.getpid()}@{socket.gethostname()}"
+    worker_binary_id: str = temporalio.bridge.client.load_worker_binary_id()
+
+    def _to_bridge_options(self) -> temporalio.bridge.client.ClientOptions:
+        return temporalio.bridge.client.ClientOptions(
+            target_url=self.target_url,
+            tls_config=self.tls_config._to_bridge_config() if self.tls_config else None,
+            retry_config=self.retry_config._to_bridge_config()
+            if self.retry_config
+            else None,
+            static_headers=self.static_headers,
+            identity=self.identity,
+            worker_binary_id=self.worker_binary_id,
+        )
+
+
+class WorkflowService(ABC):
+    """Client to the Temporal server's workflow service."""
+
+    @staticmethod
+    async def connect(options: ConnectOptions) -> "WorkflowService":
+        return await BridgeWorkflowService.connect(options)
+
+    def __init__(self, options: ConnectOptions) -> None:
         super().__init__()
+        self._options = options
 
         wsv1 = temporalio.api.workflowservice.v1
 
@@ -216,6 +304,10 @@ class WorkflowService(ABC):
             wsv1.UpdateNamespaceResponse,
         )
 
+    @property
+    def options(self) -> ConnectOptions:
+        return self._options
+
     @abstractmethod
     async def _rpc_call(
         self,
@@ -256,17 +348,18 @@ class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceRespons
 
 class BridgeWorkflowService(WorkflowService):
     @staticmethod
-    async def connect(target_url: str) -> "BridgeWorkflowService":
+    async def connect(options: ConnectOptions) -> "BridgeWorkflowService":
         return BridgeWorkflowService(
-            await temporalio.bridge.client.Client.connect(
-                temporalio.bridge.client.ClientOptions(target_url=target_url)
-            )
+            options,
+            await temporalio.bridge.client.Client.connect(options._to_bridge_options()),
         )
 
     _bridge_client: temporalio.bridge.client.Client
 
-    def __init__(self, bridge_client: temporalio.bridge.client.Client) -> None:
-        super().__init__()
+    def __init__(
+        self, options: ConnectOptions, bridge_client: temporalio.bridge.client.Client
+    ) -> None:
+        super().__init__(options)
         self._bridge_client = bridge_client
 
     async def _rpc_call(
@@ -277,4 +370,44 @@ class BridgeWorkflowService(WorkflowService):
         *,
         retry: bool = False,
     ) -> WorkflowServiceResponse:
-        return await self._bridge_client.rpc_call(rpc, req, resp_type, retry=retry)
+        try:
+            return await self._bridge_client.rpc_call(rpc, req, resp_type, retry=retry)
+        except temporalio.bridge.client.RPCError as err:
+            # Intentionally swallowing the cause instead of using "from"
+            status, message, details = err.args
+            raise RPCError(message, RPCStatusCode(status), details)
+
+
+class RPCStatusCode(IntEnum):
+    OK = grpc.StatusCode.OK.value[0]
+    CANCELLED = grpc.StatusCode.CANCELLED.value[0]
+    UNKNOWN = grpc.StatusCode.UNKNOWN.value[0]
+    INVALID_ARGUMENT = grpc.StatusCode.INVALID_ARGUMENT.value[0]
+    DEADLINE_EXCEEDED = grpc.StatusCode.DEADLINE_EXCEEDED.value[0]
+    NOT_FOUND = grpc.StatusCode.NOT_FOUND.value[0]
+    ALREADY_EXISTS = grpc.StatusCode.ALREADY_EXISTS.value[0]
+    PERMISSION_DENIED = grpc.StatusCode.PERMISSION_DENIED.value[0]
+    RESOURCE_EXHAUSTED = grpc.StatusCode.RESOURCE_EXHAUSTED.value[0]
+    FAILED_PRECONDITION = grpc.StatusCode.FAILED_PRECONDITION.value[0]
+    ABORTED = grpc.StatusCode.ABORTED.value[0]
+    OUT_OF_RANGE = grpc.StatusCode.OUT_OF_RANGE.value[0]
+    UNIMPLEMENTED = grpc.StatusCode.UNIMPLEMENTED.value[0]
+    INTERNAL = grpc.StatusCode.INTERNAL.value[0]
+    UNAVAILABLE = grpc.StatusCode.UNAVAILABLE.value[0]
+    DATA_LOSS = grpc.StatusCode.DATA_LOSS.value[0]
+    UNAUTHENTICATED = grpc.StatusCode.UNAUTHENTICATED.value[0]
+
+
+class RPCError(RuntimeError):
+    def __init__(self, message: str, status: RPCStatusCode, details: bytes) -> None:
+        super().__init__(message)
+        self._status = status
+        self._details = details
+
+    @property
+    def status(self) -> RPCStatusCode:
+        return self._status
+
+    @property
+    def details(self) -> bytes:
+        return self._details
