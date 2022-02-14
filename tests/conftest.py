@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from .fixtures.utils import client, server, worker
+from .fixtures.utils import client, server, tls_client, worker
 
 
 @pytest.fixture(scope="session")

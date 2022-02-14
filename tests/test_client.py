@@ -1,9 +1,10 @@
 import uuid
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import pytest
 
 import temporalio.api.enums.v1
+import temporalio.api.workflowservice.v1
 import temporalio.client
 import temporalio.exceptions
 from tests.fixtures import utils
@@ -18,7 +19,6 @@ async def test_start_id_reuse(client: temporalio.client.Client, worker: utils.Wo
         id=id,
         task_queue=worker.task_queue,
     )
-    assert handle.run_id
     assert "some result" == await handle.result()
 
     # Run again with reject duplicate
@@ -285,6 +285,12 @@ async def test_interceptor(client: temporalio.client.Client, worker: utils.Worke
     assert interceptor.traces[4][1].id == id
 
 
-async def test_tls_config():
-    # TODO(cretz): This
-    pass
+async def test_tls_config(tls_client: Optional[temporalio.client.Client]):
+    if not tls_client:
+        pytest.skip("No TLS client")
+    resp = await tls_client.service.describe_namespace(
+        temporalio.api.workflowservice.v1.DescribeNamespaceRequest(
+            namespace=tls_client.namespace
+        )
+    )
+    assert resp.namespace_info.name == tls_client.namespace

@@ -4,7 +4,7 @@ import os
 import subprocess
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Iterable, Optional
 
 import pytest_asyncio
@@ -39,6 +39,9 @@ class Server(ABC):
             self.target_url, namespace=self.namespace
         )
 
+    async def new_tls_client(self) -> Optional[temporalio.client.Client]:
+        return None
+
 
 class LocalhostDefaultServer(Server):
     @property
@@ -65,7 +68,12 @@ class ExternalGolangServer(Server):
             port,
             namespace,
         )
-        server = ExternalGolangServer(f"localhost:{port}", namespace, process)
+        server = ExternalGolangServer(
+            host_port=f"localhost:{port}",
+            tls_host_port=f"localhost:{int(port)+1000}",
+            namespace=namespace,
+            process=process,
+        )
         # Try to get the client multiple times to check whether server is online
         last_err: RuntimeError
         for _ in range(10):
@@ -78,10 +86,16 @@ class ExternalGolangServer(Server):
         raise last_err
 
     def __init__(
-        self, host_port: str, namespace: str, process: asyncio.subprocess.Process
+        self,
+        *,
+        host_port: str,
+        tls_host_port: str,
+        namespace: str,
+        process: asyncio.subprocess.Process,
     ) -> None:
         super().__init__()
         self._host_port = host_port
+        self._tls_host_port = tls_host_port
         self._namespace = namespace
         self._process = process
 
@@ -97,6 +111,25 @@ class ExternalGolangServer(Server):
         self._process.terminate()
         await self._process.wait()
 
+    async def new_tls_client(self) -> Optional[temporalio.client.Client]:
+        # Read certs
+        certs_dir = os.path.join(os.path.dirname(__file__), "golangserver", "certs")
+        with open(os.path.join(certs_dir, "server-ca-cert.pem"), "rb") as f:
+            server_root_ca_cert = f.read()
+        with open(os.path.join(certs_dir, "client-cert.pem"), "rb") as f:
+            client_cert = f.read()
+        with open(os.path.join(certs_dir, "client-key.pem"), "rb") as f:
+            client_private_key = f.read()
+        return await temporalio.client.Client.connect(
+            target_url=f"https://{self._tls_host_port}",
+            namespace=self._namespace,
+            tls_config=temporalio.client.TLSConfig(
+                server_root_ca_cert=server_root_ca_cert,
+                client_cert=client_cert,
+                client_private_key=client_private_key,
+            ),
+        )
+
 
 @pytest_asyncio.fixture(scope="session")
 async def server() -> AsyncGenerator[Server, None]:
@@ -111,6 +144,11 @@ async def client(server: Server) -> temporalio.client.Client:
     return await server.new_client()
 
 
+@pytest_asyncio.fixture
+async def tls_client(server: Server) -> Optional[temporalio.client.Client]:
+    return await server.new_tls_client()
+
+
 @dataclass
 class KitchenSinkWorkflowParams:
     result: Optional[Any] = None
@@ -120,7 +158,7 @@ class KitchenSinkWorkflowParams:
     result_as_string_signal_arg: Optional[str] = None
     result_as_run_id: Optional[bool] = None
     sleep_ms: Optional[int] = None
-    queries_with_string_arg: Iterable[str] = []
+    queries_with_string_arg: Iterable[str] = field(default_factory=list)
 
 
 class Worker(ABC):

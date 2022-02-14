@@ -334,15 +334,27 @@ class Client:
         ).result()
 
     def get_workflow_handle(
-        self, workflow_id: str, *, run_id: Optional[str] = None
+        self,
+        workflow_id: str,
+        *,
+        run_id: Optional[str] = None,
+        first_execution_run_id: Optional[str] = None,
     ) -> "WorkflowHandle[Any]":
         """Get a workflow handle to an existing workflow by its ID.
 
         Args:
             workflow_id: Workflow ID to get a handle to.
             run_id: Run ID that will be used for all calls.
+            first_execution_run_id: First execution run ID used for cancellation
+                and termination.
         """
-        return WorkflowHandle(self, workflow_id, run_id=run_id)
+        return WorkflowHandle(
+            self,
+            workflow_id,
+            run_id=run_id,
+            result_run_id=run_id,
+            first_execution_run_id=first_execution_run_id,
+        )
 
 
 T = TypeVar("T")
@@ -352,18 +364,24 @@ class WorkflowHandle(Generic[T]):
     """Handle for interacting with a workflow.
 
     This is usually created via :py:meth:`Client.get_workflow_handle` or
-    returned from :py:meth:`Client.start_workflow`/:py:meth:`Client.execute_workflow`.
+    returned from :py:meth:`Client.start_workflow`.
     """
 
-    SELF_RUN_ID = "_<self_run_id>_"
-
     def __init__(
-        self, client: Client, id: str, *, run_id: Optional[str] = None
+        self,
+        client: Client,
+        id: str,
+        *,
+        run_id: Optional[str] = None,
+        result_run_id: Optional[str] = None,
+        first_execution_run_id: Optional[str] = None,
     ) -> None:
         """Create workflow handle."""
         self._client = client
         self._id = id
         self._run_id = run_id
+        self._result_run_id = result_run_id
+        self._first_execution_run_id = first_execution_run_id
 
     @property
     def id(self) -> str:
@@ -372,19 +390,55 @@ class WorkflowHandle(Generic[T]):
 
     @property
     def run_id(self) -> Optional[str]:
-        """Run ID used for calls on this handle if present."""
+        """Run ID used for :py:meth:`signal` and :py:meth:`query` calls if
+        present to ensure the query or signal happen on this exact run.
+
+        This is only created via :py:meth:`Client.get_workflow_handle`.
+        :py:meth:`Client.start_workflow` will not set this value.
+
+        This cannot be mutated. If a different run ID is needed,
+        :py:meth:`Client.get_workflow_handle` must be used instead.
+        """
         return self._run_id
 
-    async def result(
-        self, *, starting_run_id: Optional[str] = SELF_RUN_ID, follow_runs: bool = True
-    ) -> T:
+    @property
+    def result_run_id(self) -> Optional[str]:
+        """Run ID used for :py:meth:`result` calls if present to ensure result
+        is for a workflow starting from this run.
+
+        When this handle is created via :py:meth:`Client.get_workflow_handle`,
+        this is the same as run_id. When this handle is created via
+        :py:meth:`Client.start_workflow`, this value will be the resulting run
+        ID.
+
+        This cannot be mutated. If a different run ID is needed,
+        :py:meth:`Client.get_workflow_handle` must be used instead.
+        """
+        return self._run_id
+
+    @property
+    def first_execution_run_id(self) -> Optional[str]:
+        """Run ID used for :py:meth:`cancel` and :py:meth:`terminate` calls if
+        present to ensure the cancel and terminate happen for a workflow ID
+        started with this run ID.
+
+        This can be set when using :py:meth:`Client.get_workflow_handle`. When
+        :py:meth:`Client.start_workflow` is called without a start signal, this
+        is set to the resulting run.
+
+        This cannot be mutated. If a different first execution run ID is needed,
+        :py:meth:`Client.get_workflow_handle` must be used instead.
+        """
+        return self._run_id
+
+    async def result(self, *, follow_runs: bool = True) -> T:
         """Wait for result of the workflow.
 
+        This will use :py:attr:`result_run_id` if present to base the result on.
+        To use another run ID, a new handle must be created via
+        :py:meth:`Client.get_workflow_handle`.
+
         Args:
-            starting_run_id: Run ID to fetch result for. Defaults to using
-                :py:meth:`run_id`. If set to None or there is no
-                :py:meth:`run_id`, this will get the latest result for the
-                workflow ID.
             follow_runs: If true (default), workflow runs will be continually
                 fetched, until the most recent one is found. If false, the first
                 result is used.
@@ -395,12 +449,10 @@ class WorkflowHandle(Generic[T]):
         Raises:
             Exception: Any failure of the workflow.
         """
-        if starting_run_id == WorkflowHandle.SELF_RUN_ID:
-            starting_run_id = self._run_id
         req = temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest(
             namespace=self._client.namespace,
             execution=temporalio.api.common.v1.WorkflowExecution(
-                workflow_id=self._id, run_id=starting_run_id or ""
+                workflow_id=self._id, run_id=self._result_run_id or ""
             ),
             wait_new_event=True,
             history_event_filter_type=temporalio.api.enums.v1.HistoryEventFilterType.HISTORY_EVENT_FILTER_TYPE_CLOSE_EVENT,
@@ -499,61 +551,55 @@ class WorkflowHandle(Generic[T]):
                     continue
                 raise WorkflowContinuedAsNewError(cont_attr.new_execution_run_id)
 
-    async def cancel(
-        self,
-        *,
-        run_id: Optional[str] = SELF_RUN_ID,
-        first_execution_run_id: Optional[str] = None,
-    ) -> None:
+    async def cancel(self) -> None:
         """Cancel the workflow.
 
-        Args:
-            run_id: Run ID to cancel. Defaults to using :py:meth:`run_id`. If
-                set to None or there is no :py:meth:`run_id`, this will cancel
-                the latest run for the workflow ID.
-            first_execution_run_id: First run ID that started the workflow. If
-                set, the cancellation makes sure that the workflow was started
-                with the given run ID.
+        This will issue a cancellation for :py:attr:`run_id` if present. This
+        call will make sure to use the run chain starting from
+        :py:attr:`first_execution_run_id` if present. To create handles with
+        these values, use :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+            Handles created as a result of :py:meth:`Client.start_workflow` with
+            a start signal will cancel the latest workflow with the same
+            workflow ID even if it is unrelated to the started workflow.
 
         TODO(cretz): Raises
         """
-        if run_id == WorkflowHandle.SELF_RUN_ID:
-            run_id = self._run_id
         await self._client._impl.cancel_workflow(
             CancelWorkflowInput(
                 id=self._id,
-                run_id=run_id,
-                first_execution_run_id=first_execution_run_id,
+                run_id=self._run_id,
+                first_execution_run_id=self._first_execution_run_id,
             )
         )
 
-    # TODO(cretz): Wrap the result in Python-friendlier type?
     async def describe(
         self,
-        *,
-        run_id: Optional[str] = SELF_RUN_ID,
     ) -> "WorkflowDescription":
         """Get workflow details.
 
-        Args:
-            run_id: Run ID to describe. Defaults to using :py:meth:`run_id`. If
-                set to None or there is no :py:meth:`run_id`, this will describe
-                the latest run for the workflow ID.
+        This will get details for :py:attr:`run_id` if present. To use a
+        different run ID, create a new handle with via
+        :py:meth:`Client.get_workflow_handle`.
 
         Returns:
             Workflow details.
 
+        .. warning::
+            Handles created as a result of :py:meth:`Client.start_workflow` will
+            describe the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
+
         TODO(cretz): Raises
         """
-        if run_id == WorkflowHandle.SELF_RUN_ID:
-            run_id = self._run_id
         return WorkflowDescription(
             await self._client.service.describe_workflow_execution(
                 temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
                     namespace=self._client.namespace,
                     execution=temporalio.api.common.v1.WorkflowExecution(
                         workflow_id=self._id,
-                        run_id=run_id or "",
+                        run_id=self._run_id or "",
                     ),
                 ),
                 retry=True,
@@ -564,7 +610,6 @@ class WorkflowHandle(Generic[T]):
         self,
         query: str,
         *args: Any,
-        run_id: Optional[str] = SELF_RUN_ID,
         reject_condition: Optional[WorkflowQueryRejectCondition] = None,
     ) -> Any:
         """Query the workflow.
@@ -572,23 +617,27 @@ class WorkflowHandle(Generic[T]):
         Args:
             query: Query name on the workflow.
             args: Query arguments.
-            run_id: Run ID to query. Defaults to using :py:meth:`run_id`. If set
-                to None or there is no :py:meth:`run_id`, this will query the
-                latest run for the workflow ID.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
 
         Returns:
             Result of the query.
 
+        This will query for :py:attr:`run_id` if present. To use a different
+        run ID, create a new handle with via
+        :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+            Handles created as a result of :py:meth:`Client.start_workflow` will
+            query the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
+
         TODO(cretz): Raises
         """
-        if run_id == WorkflowHandle.SELF_RUN_ID:
-            run_id = self._run_id
         return await self._client._impl.query_workflow(
             QueryWorkflowInput(
                 id=self._id,
-                run_id=run_id,
+                run_id=self._run_id,
                 query=query,
                 args=args,
                 reject_condition=reject_condition
@@ -596,9 +645,7 @@ class WorkflowHandle(Generic[T]):
             )
         )
 
-    async def signal(
-        self, name: str, *args: Any, run_id: Optional[str] = SELF_RUN_ID
-    ) -> None:
+    async def signal(self, name: str, *args: Any) -> None:
         """Send a signal to the workflow.
 
         Args:
@@ -608,14 +655,21 @@ class WorkflowHandle(Generic[T]):
                 set to None or there is no :py:meth:`run_id`, this will query
                 the latest run for the workflow ID.
 
+        This will signal for :py:attr:`run_id` if present. To use a different
+        run ID, create a new handle with via
+        :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+            Handles created as a result of :py:meth:`Client.start_workflow` will
+            signal the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
+
         TODO(cretz): Raises
         """
-        if run_id == WorkflowHandle.SELF_RUN_ID:
-            run_id = self._run_id
         await self._client._impl.signal_workflow(
             SignalWorkflowInput(
                 id=self._id,
-                run_id=run_id,
+                run_id=self._run_id,
                 signal=name,
                 args=args,
             )
@@ -625,32 +679,32 @@ class WorkflowHandle(Generic[T]):
         self,
         *args: Any,
         reason: Optional[str] = None,
-        run_id: Optional[str] = SELF_RUN_ID,
-        first_execution_run_id: Optional[None] = None,
     ) -> None:
         """Terminate the workflow.
 
         Args:
             args: Details to store on the termination.
             reason: Reason for the termination.
-            run_id: Run ID to terminate. Defaults to using :py:meth:`run_id`. If
-                set to None or there is no :py:meth:`run_id`, this will
-                terminate the latest run for the workflow ID.
-            first_execution_run_id: First run ID that started the workflow. If
-                set, the termination makes sure that the workflow was started
-                with the given run ID.
+
+        This will issue a termination for :py:attr:`run_id` if present. This
+        call will make sure to use the run chain starting from
+        :py:attr:`first_execution_run_id` if present. To create handles with
+        these values, use :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+            Handles created as a result of :py:meth:`Client.start_workflow` with
+            a start signal will terminate the latest workflow with the same
+            workflow ID even if it is unrelated to the started workflow.
 
         TODO(cretz): Raises
         """
-        if run_id == WorkflowHandle.SELF_RUN_ID:
-            run_id = self._run_id
         await self._client._impl.terminate_workflow(
             TerminateWorkflowInput(
                 id=self._id,
-                run_id=run_id,
+                run_id=self._run_id,
                 args=args,
                 reason=reason,
-                first_execution_run_id=first_execution_run_id,
+                first_execution_run_id=self._first_execution_run_id,
             )
         )
 
@@ -859,6 +913,7 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
             temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
         ]
+        first_execution_run_id = None
         if isinstance(
             req,
             temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
@@ -868,7 +923,13 @@ class _ClientImpl(OutboundInterceptor):
             )
         else:
             resp = await self._client.service.start_workflow_execution(req, retry=True)
-        return WorkflowHandle(self._client, req.workflow_id, run_id=resp.run_id)
+            first_execution_run_id = resp.run_id
+        return WorkflowHandle(
+            self._client,
+            req.workflow_id,
+            result_run_id=resp.run_id,
+            first_execution_run_id=first_execution_run_id,
+        )
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         await self._client.service.request_cancel_workflow_execution(
@@ -904,7 +965,6 @@ class _ClientImpl(OutboundInterceptor):
             req.query.query_args.payloads.extend(
                 await self._client.data_converter.encode(input.args)
             )
-        # TODO(cretz): Wrap error
         resp = await self._client.service.query_workflow(req, retry=True)
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(

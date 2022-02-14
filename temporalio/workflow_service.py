@@ -23,18 +23,18 @@ WorkflowServiceResponse = TypeVar(
 class TLSConfig:
     """TLS configuration for connecting to Temporal server."""
 
-    server_root_ca_cert: Optional[bytes]
+    server_root_ca_cert: Optional[bytes] = None
     """Root CA to validate the server certificate against."""
 
-    domain: Optional[str]
+    domain: Optional[str] = None
     """TLS domain."""
 
-    client_cert: Optional[bytes]
+    client_cert: Optional[bytes] = None
     """Client certificate for mTLS.
     
     This must be combined with :py:attr:`client_private_key`."""
 
-    client_private_key: Optional[bytes]
+    client_private_key: Optional[bytes] = None
     """Client private key for mTLS.
     
     This must be combined with :py:attr:`client_cert`."""
