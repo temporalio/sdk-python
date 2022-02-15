@@ -401,9 +401,6 @@ class JSONPlainPayloadConverter(PayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
-# TODO(cretz): Should this be a var that can be changed instead? If so, can it
-# be replaced _after_ client creation? We'd just have to fallback to this
-# default at conversion time instead of instantiation time.
 def default() -> CompositeDataConverter:
     """Default converter compatible with other Temporal SDKs.
 

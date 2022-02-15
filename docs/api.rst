@@ -17,6 +17,12 @@ Converters
 .. automodule:: temporalio.converter
    :members:
 
+Common
+----------
+
+.. automodule:: temporalio.common
+   :members:
+
 Exceptions
 ----------
 

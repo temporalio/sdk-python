@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 from typing import Any, List, Optional, Tuple
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 import temporalio.api.enums.v1
 import temporalio.api.workflowservice.v1
 import temporalio.client
+import temporalio.common
 import temporalio.exceptions
 from tests.fixtures import utils
 
@@ -28,7 +30,7 @@ async def test_start_id_reuse(client: temporalio.client.Client, worker: utils.Wo
             utils.KitchenSinkWorkflowParams(result="some result 2"),
             id=id,
             task_queue=worker.task_queue,
-            id_reuse_policy=temporalio.client.WorkflowIDReusePolicy.REJECT_DUPLICATE,
+            id_reuse_policy=temporalio.common.WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
         await handle.result()
     assert err.value.status == temporalio.client.RPCStatusCode.ALREADY_EXISTS
@@ -87,10 +89,9 @@ async def test_workflow_failed(client: temporalio.client.Client, worker: utils.W
     )
     with pytest.raises(temporalio.client.WorkflowFailureError) as err:
         await handle.result()
-    assert isinstance(err.value.__cause__, temporalio.exceptions.ApplicationError)
-    app_err = err.value.__cause__
-    assert str(app_err) == "some error"
-    assert app_err.details[0] == {"foo": "bar", "baz": 123.45}
+    assert isinstance(err.value.cause, temporalio.exceptions.ApplicationError)
+    assert str(err.value.cause) == "some error"
+    assert err.value.cause.details[0] == {"foo": "bar", "baz": 123.45}
 
 
 async def test_cancel(client: temporalio.client.Client, worker: utils.Worker):
@@ -103,7 +104,7 @@ async def test_cancel(client: temporalio.client.Client, worker: utils.Worker):
     await handle.cancel()
     with pytest.raises(temporalio.client.WorkflowFailureError) as err:
         await handle.result()
-    assert isinstance(err.value.__cause__, temporalio.exceptions.CancelledError)
+    assert isinstance(err.value.cause, temporalio.exceptions.CancelledError)
 
 
 async def test_terminate(client: temporalio.client.Client, worker: utils.Worker):
@@ -116,9 +117,9 @@ async def test_terminate(client: temporalio.client.Client, worker: utils.Worker)
     await handle.terminate("arg1", "arg2", reason="some reason")
     with pytest.raises(temporalio.client.WorkflowFailureError) as err:
         await handle.result()
-    assert isinstance(err.value.__cause__, temporalio.exceptions.TerminatedError)
-    assert str(err.value.__cause__) == "some reason"
-    assert list(err.value.__cause__.details) == ["arg1", "arg2"]
+    assert isinstance(err.value.cause, temporalio.exceptions.TerminatedError)
+    assert str(err.value.cause) == "some reason"
+    assert list(err.value.cause.details) == ["arg1", "arg2"]
 
 
 async def test_cancel_not_found(client: temporalio.client.Client):
@@ -175,7 +176,7 @@ async def test_query_rejected(client: temporalio.client.Client, worker: utils.Wo
     assert "some query arg" == await handle.query(
         "some query",
         "some query arg",
-        reject_condition=temporalio.client.WorkflowQueryRejectCondition.NOT_OPEN,
+        reject_condition=temporalio.common.WorkflowQueryRejectCondition.NOT_OPEN,
     )
     # But if we signal then wait for result, that same query should fail
     await handle.signal("some signal", "some signal arg")
@@ -184,7 +185,7 @@ async def test_query_rejected(client: temporalio.client.Client, worker: utils.Wo
         assert "some query arg" == await handle.query(
             "some query",
             "some query arg",
-            reject_condition=temporalio.client.WorkflowQueryRejectCondition.NOT_OPEN,
+            reject_condition=temporalio.common.WorkflowQueryRejectCondition.NOT_OPEN,
         )
     assert err.value.status == temporalio.client.WorkflowExecutionStatus.COMPLETED
 
@@ -198,6 +199,48 @@ async def test_signal(client: temporalio.client.Client, worker: utils.Worker):
     )
     await handle.signal("some signal", "some signal arg")
     assert "some signal arg" == await handle.result()
+
+
+async def test_retry_policy(client: temporalio.client.Client, worker: utils.Worker):
+    # Make the workflow retry 3 times w/ no real backoff
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        utils.KitchenSinkWorkflowParams(error_with_attempt=True),
+        id=str(uuid.uuid4()),
+        task_queue=worker.task_queue,
+        retry_policy=temporalio.common.RetryPolicy(
+            initial_interval=timedelta(milliseconds=1),
+            maximum_attempts=3,
+        ),
+    )
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await handle.result()
+    assert isinstance(err.value.cause, temporalio.exceptions.ApplicationError)
+    assert str(err.value.cause) == "attempt 3"
+
+
+async def test_single_client_option_change(
+    client: temporalio.client.Client, worker: utils.Worker
+):
+    # Make sure normal query works on completed workflow
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        utils.KitchenSinkWorkflowParams(queries_with_string_arg=["some query"]),
+        id=str(uuid.uuid4()),
+        task_queue=worker.task_queue,
+    )
+    await handle.result()
+    assert "some query arg" == await handle.query("some query", "some query arg")
+    # Now create a client with the rejection condition changed to not open
+    options = client.options()
+    options[
+        "default_workflow_query_reject_condition"
+    ] = temporalio.common.WorkflowQueryRejectCondition.NOT_OPEN
+    reject_client = temporalio.client.Client(**options)
+    with pytest.raises(temporalio.client.WorkflowQueryRejectedError):
+        await reject_client.get_workflow_handle(handle.id).query(
+            "some query", "some query arg"
+        )
 
 
 class TracingClientInterceptor(temporalio.client.Interceptor):
@@ -249,18 +292,17 @@ class TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
 async def test_interceptor(client: temporalio.client.Client, worker: utils.Worker):
     # Create new client from existing client but with a tracing interceptor
     interceptor = TracingClientInterceptor()
-    client = temporalio.client.Client(
-        service=client.service, namespace=client.namespace, interceptors=[interceptor]
-    )
+    options = client.options()
+    options["interceptors"] = [interceptor]
+    client = temporalio.client.Client(**options)
     # Do things that would trigger the interceptors
-    id = str(uuid.uuid4())
     handle = await client.start_workflow(
         "kitchen_sink",
         utils.KitchenSinkWorkflowParams(
             queries_with_string_arg=["some query"],
             result_as_string_signal_arg="some signal",
         ),
-        id=id,
+        id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
     )
     await handle.query("some query", "some query arg")
@@ -280,9 +322,31 @@ async def test_interceptor(client: temporalio.client.Client, worker: utils.Worke
     assert interceptor.traces[2][0] == "signal_workflow"
     assert interceptor.traces[2][1].signal == "some signal"
     assert interceptor.traces[3][0] == "cancel_workflow"
-    assert interceptor.traces[3][1].id == id
+    assert interceptor.traces[3][1].id == handle.id
     assert interceptor.traces[4][0] == "terminate_workflow"
-    assert interceptor.traces[4][1].id == id
+    assert interceptor.traces[4][1].id == handle.id
+
+
+async def test_interceptor_callable(
+    client: temporalio.client.Client, worker: utils.Worker
+):
+    # Create new client from existing client but with a tracing interceptor
+    # callable and only check a simple call
+    interceptor = TracingClientInterceptor()
+    options = client.options()
+    options["interceptors"] = [interceptor.intercept_client]
+    client = temporalio.client.Client(**options)
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        utils.KitchenSinkWorkflowParams(),
+        id=str(uuid.uuid4()),
+        task_queue=worker.task_queue,
+    )
+    await handle.result()
+
+    # Check trace
+    assert interceptor.traces[0][0] == "start_workflow"
+    assert interceptor.traces[0][1].workflow == "kitchen_sink"
 
 
 async def test_tls_config(tls_client: Optional[temporalio.client.Client]):

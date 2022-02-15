@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -58,7 +60,7 @@ class LocalhostDefaultServer(Server):
 
 class ExternalGolangServer(Server):
     @staticmethod
-    async def start() -> "ExternalGolangServer":
+    async def start() -> ExternalGolangServer:
         namespace = f"test-namespace-{uuid.uuid4()}"
         # TODO(cretz): Make this configurable?
         port = "9233"
@@ -154,6 +156,7 @@ class KitchenSinkWorkflowParams:
     result: Optional[Any] = None
     error_with: Optional[str] = None
     error_details: Optional[Any] = None
+    error_with_attempt: Optional[bool] = None
     continue_as_new_count: Optional[int] = None
     result_as_string_signal_arg: Optional[str] = None
     result_as_run_id: Optional[bool] = None
@@ -176,7 +179,7 @@ class Worker(ABC):
 
 class ExternalGolangWorker(Worker):
     @staticmethod
-    async def start(host_port: str, namespace: str) -> "ExternalGolangWorker":
+    async def start(host_port: str, namespace: str) -> ExternalGolangWorker:
         task_queue = str(uuid.uuid4())
         process = await start_external_go_process(
             os.path.join(os.path.dirname(__file__), "golangworker"),

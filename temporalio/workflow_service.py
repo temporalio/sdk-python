@@ -1,15 +1,22 @@
+"""Underlying gRPC workflow service."""
+
+from __future__ import annotations
+
+import hashlib
 import os
 import socket
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Generic, Mapping, Optional, Type, TypeVar
+from typing import Any, Generic, Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
 import grpc
 
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
+import temporalio.exceptions
 
 WorkflowServiceRequest = TypeVar(
     "WorkflowServiceRequest", bound=google.protobuf.message.Message
@@ -84,8 +91,14 @@ class ConnectOptions:
     tls_config: Optional[TLSConfig] = None
     retry_config: Optional[RetryConfig] = None
     static_headers: Mapping[str, str] = field(default_factory=dict)
-    identity: str = f"{os.getpid()}@{socket.gethostname()}"
-    worker_binary_id: str = temporalio.bridge.client.load_worker_binary_id()
+    identity: str = ""
+    worker_binary_id: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.identity:
+            self.identity = f"{os.getpid()}@{socket.gethostname()}"
+        if not self.worker_binary_id:
+            self.worker_binary_id = load_default_worker_binary_id()
 
     def _to_bridge_options(self) -> temporalio.bridge.client.ClientOptions:
         return temporalio.bridge.client.ClientOptions(
@@ -96,7 +109,7 @@ class ConnectOptions:
             else None,
             static_headers=self.static_headers,
             identity=self.identity,
-            worker_binary_id=self.worker_binary_id,
+            worker_binary_id=self.worker_binary_id or "",
         )
 
 
@@ -104,7 +117,7 @@ class WorkflowService(ABC):
     """Client to the Temporal server's workflow service."""
 
     @staticmethod
-    async def connect(options: ConnectOptions) -> "WorkflowService":
+    async def connect(options: ConnectOptions) -> WorkflowService:
         return await BridgeWorkflowService.connect(options)
 
     def __init__(self, options: ConnectOptions) -> None:
@@ -338,6 +351,7 @@ class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceRespons
     ) -> None:
         self.service = service
         self.name = name
+        self.req_type = req_type
         self.resp_type = resp_type
 
     async def __call__(
@@ -348,7 +362,7 @@ class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceRespons
 
 class BridgeWorkflowService(WorkflowService):
     @staticmethod
-    async def connect(options: ConnectOptions) -> "BridgeWorkflowService":
+    async def connect(options: ConnectOptions) -> BridgeWorkflowService:
         return BridgeWorkflowService(
             options,
             await temporalio.bridge.client.Client.connect(options._to_bridge_options()),
@@ -398,7 +412,7 @@ class RPCStatusCode(IntEnum):
     UNAUTHENTICATED = grpc.StatusCode.UNAUTHENTICATED.value[0]
 
 
-class RPCError(RuntimeError):
+class RPCError(temporalio.exceptions.TemporalError):
     def __init__(self, message: str, status: RPCStatusCode, details: bytes) -> None:
         super().__init__(message)
         self._status = status
@@ -411,3 +425,68 @@ class RPCError(RuntimeError):
     @property
     def details(self) -> bytes:
         return self._details
+
+
+_default_worker_binary_id: Optional[str] = None
+
+
+def load_default_worker_binary_id(*, memoize: bool = True) -> str:
+    # Memoize
+    global _default_worker_binary_id
+    if memoize and _default_worker_binary_id:
+        return _default_worker_binary_id
+
+    # The goal is to get a hash representing the set of runtime code, both
+    # Temporal's and the user's. After all options were explored, we have
+    # decided to default to hashing all bytecode of imported modules. We accept
+    # that this has the following limitations:
+    #
+    # * Dynamic imports later on can affect this value
+    # * Dynamic imports based on env var, platform, etc can affect this value
+    # * Using the loader's get_code seems to use get_data which does a disk read
+    # * Using the loader's get_code in rare cases can cause a compile()
+
+    got_temporal_code = False
+    m = hashlib.md5()
+    for mod_name in sorted(sys.modules):
+        # Try to read code
+        code = _get_module_code(mod_name)
+        if not code:
+            continue
+        if mod_name == "temporalio":
+            got_temporal_code = True
+        # Add to MD5 digest
+        m.update(code)
+    # If we didn't even get the temporalio module from this approach, this
+    # approach is flawed and we prefer to return an error forcing user to
+    # explicitly set the worker binary ID instead of silently using a value that
+    # may never change
+    if not got_temporal_code:
+        raise RuntimeError(
+            "Cannot get default unique worker binary ID, the value should be explicitly set"
+        )
+    # Return the hex digest
+    digest = m.hexdigest()
+    if memoize:
+        _default_worker_binary_id = digest
+    return digest
+
+
+def _get_module_code(mod_name: str) -> Optional[bytes]:
+    # First try the module's loader and if that fails, try __cached__ file
+    try:
+        loader: Any = sys.modules[mod_name].__loader__
+        code = loader.get_code(mod_name).co_code
+        if code:
+            return code
+    except Exception:
+        pass
+    try:
+        # Technically we could read smaller chunks per file here and update the
+        # hash, but the benefit is negligible especially since many non-built-in
+        # modules will use get_code above
+        with open(sys.modules[mod_name].__cached__, "rb") as f:
+            return f.read()
+    except Exception:
+        pass
+    return None

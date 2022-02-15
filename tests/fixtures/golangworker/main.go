@@ -41,6 +41,7 @@ type KitchenSinkWorkflowParams struct {
 	Result                  interface{} `json:"result"`
 	ErrorWith               string      `json:"error_with"`
 	ErrorDetails            interface{} `json:"error_details"`
+	ErrorWithAttempt        bool        `json:"error_with_attempt"`
 	ContinueAsNewCount      int         `json:"continue_as_new_count"`
 	ResultAsStringSignalArg string      `json:"result_as_string_signal_arg"`
 	ResultAsRunID           bool        `json:"result_as_run_id"`
@@ -51,6 +52,7 @@ type KitchenSinkWorkflowParams struct {
 func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams) (interface{}, error) {
 	b, _ := json.Marshal(params)
 	workflow.GetLogger(ctx).Info("Started kitchen sink workflow", "params", string(b))
+	info := workflow.GetInfo(ctx)
 
 	for _, name := range params.QueriesWithStringArg {
 		workflow.SetQueryHandler(ctx, name, func(arg string) (string, error) { return arg, nil })
@@ -72,12 +74,14 @@ func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams
 			details = append(details, params.ErrorDetails)
 		}
 		return nil, temporal.NewApplicationError(params.ErrorWith, "", details...)
+	case params.ErrorWithAttempt:
+		return nil, fmt.Errorf("attempt %v", info.Attempt)
 	case params.ResultAsStringSignalArg != "":
 		var signalArg string
 		workflow.GetSignalChannel(ctx, params.ResultAsStringSignalArg).Receive(ctx, &signalArg)
 		return signalArg, nil
 	case params.ResultAsRunID:
-		return workflow.GetInfo(ctx).WorkflowExecution.RunID, nil
+		return info.WorkflowExecution.RunID, nil
 	}
 	return params.Result, nil
 }

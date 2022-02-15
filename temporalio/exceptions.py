@@ -1,3 +1,5 @@
+"""Common Temporal exceptions."""
+
 from enum import IntEnum
 from typing import Any, Iterable, Optional
 
@@ -8,10 +10,14 @@ import temporalio.converter
 
 
 class TemporalError(Exception):
+    """Base for all Temporal exceptions."""
+
     pass
 
 
 class FailureError(TemporalError):
+    """Base for runtime failures during workflow/activity execution."""
+
     def __init__(
         self,
         message: str,
@@ -32,6 +38,8 @@ class FailureError(TemporalError):
 
 
 class ApplicationError(FailureError):
+    """Error raised during workflow/activity execution."""
+
     def __init__(
         self,
         message: str,
@@ -53,16 +61,22 @@ class ApplicationError(FailureError):
 
 
 class CancelledError(FailureError):
+    """Error raised on workflow/activity cancellation."""
+
     def __init__(self, message: str, *details: Any) -> None:
         super().__init__(message, *details)
 
 
 class TerminatedError(FailureError):
+    """Error raised on workflow cancellation."""
+
     def __init__(self, message: str, *details: Any) -> None:
         super().__init__(message, *details)
 
 
 class TimeoutType(IntEnum):
+    """Type of timeout for :py:class:`TimeoutError`."""
+
     START_TO_CLOSE = int(
         temporalio.api.enums.v1.TimeoutType.TIMEOUT_TYPE_START_TO_CLOSE
     )
@@ -76,6 +90,8 @@ class TimeoutType(IntEnum):
 
 
 class TimeoutError(FailureError):
+    """Error raised on workflow/activity timeout."""
+
     def __init__(
         self,
         message: str,
@@ -97,6 +113,8 @@ class TimeoutError(FailureError):
 
 
 class ServerError(FailureError):
+    """Error originating in the Temporal server."""
+
     def __init__(self, message: str, *, non_retryable: bool = False) -> None:
         super().__init__(message)
         self._non_retryable = non_retryable
@@ -107,6 +125,8 @@ class ServerError(FailureError):
 
 
 class RetryState(IntEnum):
+    """Current retry state of the workflow/activity during error."""
+
     IN_PROGRESS = int(temporalio.api.enums.v1.RetryState.RETRY_STATE_IN_PROGRESS)
     NON_RETRYABLE_FAILURE = int(
         temporalio.api.enums.v1.RetryState.RETRY_STATE_NON_RETRYABLE_FAILURE
@@ -127,6 +147,8 @@ class RetryState(IntEnum):
 
 
 class ActivityError(FailureError):
+    """Error raised on activity failure."""
+
     def __init__(
         self,
         message: str,
@@ -172,6 +194,8 @@ class ActivityError(FailureError):
 
 
 class ChildWorkflowError(FailureError):
+    """Error raised on child workflow failure."""
+
     def __init__(
         self,
         message: str,

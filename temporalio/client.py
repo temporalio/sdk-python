@@ -1,11 +1,25 @@
 """Client for accessing Temporal."""
 
+from __future__ import annotations
+
 import logging
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
-from typing import Any, Generic, Iterable, Mapping, Optional, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    Mapping,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
+
+import typing_extensions
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -20,90 +34,6 @@ import temporalio.workflow_service
 from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 logger = logging.getLogger(__name__)
-
-
-class WorkflowIDReusePolicy(IntEnum):
-    """How already-in-use workflow IDs are handled on start.
-
-    See :py:class:`temporalio.api.enums.v1.WorkflowIdReusePolicy`.
-    """
-
-    ALLOW_DUPLICATE = int(
-        temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE`."""
-
-    ALLOW_DUPLICATE_FAILED_ONLY = int(
-        temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY`."""
-
-    REJECT_DUPLICATE = int(
-        temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE`."""
-
-
-class WorkflowQueryRejectCondition(IntEnum):
-    """Whether a query should be rejected in certain conditions.
-
-    See :py:class:`temporalio.api.enums.v1.QueryRejectCondition`.
-    """
-
-    NONE = int(temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NONE)
-    """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NONE`."""
-
-    NOT_OPEN = int(
-        temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_OPEN
-    )
-    """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_OPEN`."""
-
-    NOT_COMPLETED_CLEANLY = int(
-        temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY
-    )
-    """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY`."""
-
-
-class WorkflowExecutionStatus(IntEnum):
-    """Status of a workflow execution.
-
-    See :py:class:`temporalio.api.enums.v1.WorkflowExecutionStatus`.
-    """
-
-    RUNNING = int(
-        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING`."""
-
-    COMPLETED = int(
-        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED`."""
-
-    FAILED = int(
-        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_FAILED
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_FAILED`."""
-
-    CANCELED = int(
-        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CANCELED
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CANCELED`."""
-
-    TERMINATED = int(
-        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TERMINATED
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TERMINATED`."""
-
-    CONTINUED_AS_NEW = int(
-        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW`."""
-
-    TIMED_OUT = int(
-        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
-    )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT`."""
 
 
 class Client:
@@ -121,16 +51,18 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable["Interceptor"] = [],
+        interceptors: Iterable[
+            Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
+        ] = [],
         default_workflow_query_reject_condition: Optional[
-            WorkflowQueryRejectCondition
+            temporalio.common.WorkflowQueryRejectCondition
         ] = None,
         tls_config: Optional[TLSConfig] = None,
         retry_config: Optional[RetryConfig] = None,
         static_headers: Mapping[str, str] = {},
         identity: Optional[str] = None,
         worker_binary_id: Optional[str] = None,
-    ) -> "Client":
+    ) -> Client:
         """Connect to a Temporal server.
 
         Args:
@@ -164,17 +96,23 @@ class Client:
             tls_config=tls_config,
             retry_config=retry_config,
             static_headers=static_headers,
+            identity=identity or "",
+            worker_binary_id=worker_binary_id or "",
         )
-        if identity:
-            connect_options.identity = identity
-        if worker_binary_id:
-            connect_options.worker_binary_id = worker_binary_id
         return Client(
             await temporalio.workflow_service.WorkflowService.connect(connect_options),
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            connect_options=ConnectOptions(
+                target_url=connect_options.target_url,
+                tls_config=connect_options.tls_config,
+                retry_config=connect_options.retry_config,
+                static_headers=connect_options.static_headers,
+                identity=connect_options.identity,
+                worker_binary_id=connect_options.worker_binary_id,
+            ),
         )
 
     def __init__(
@@ -183,37 +121,60 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable["Interceptor"] = [],
+        interceptors: Iterable[
+            Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
+        ] = [],
         default_workflow_query_reject_condition: Optional[
-            WorkflowQueryRejectCondition
+            temporalio.common.WorkflowQueryRejectCondition
         ] = None,
+        connect_options: Optional[ConnectOptions] = None,
     ):
         """Create a Temporal client from a workflow service.
 
         See :py:meth:`connect` for details on the parameters.
-        """
-        self._service = service
-        self._namespace = namespace
-        self._data_converter = data_converter
-        self._interceptors = interceptors
-        self._default_workflow_query_reject_condition = (
-            default_workflow_query_reject_condition
-        )
 
+        Note, connect_options in this initializer are only for tracking and are
+        not used by this class in any way.
+        """
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
         for interceptor in reversed(list(interceptors)):
-            self._impl = interceptor.intercept_client(self._impl)
+            if isinstance(interceptor, Interceptor):
+                self._impl = interceptor.intercept_client(self._impl)
+            elif callable(interceptor):
+                self._impl = interceptor(self._impl)
+            else:
+                raise TypeError("interceptor neither OutboundInterceptor nor callable")
+
+        # Store the options for tracking
+        self._options = ClientOptions(
+            service=service,
+            namespace=namespace,
+            data_converter=data_converter,
+            interceptors=interceptors,
+            default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            connect_options=connect_options,
+        )
+
+    def options(self) -> ClientOptions:
+        """Options used to create this client as a dictionary.
+
+        This makes a shallow copy of the options each call.
+        """
+        options = self._options.copy()
+        if options["connect_options"]:
+            options["connect_options"] = options["connect_options"].copy()
+        return options
 
     @property
     def service(self) -> temporalio.workflow_service.WorkflowService:
         """Raw gRPC service for this client."""
-        return self._service
+        return self._options["service"]
 
     @property
     def namespace(self) -> str:
         """Namespace used in calls by this client."""
-        return self._namespace
+        return self._options["namespace"]
 
     @property
     def identity(self) -> str:
@@ -223,7 +184,7 @@ class Client:
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
         """Data converter used by this client."""
-        return self._data_converter
+        return self._options["data_converter"]
 
     async def start_workflow(
         self,
@@ -234,7 +195,7 @@ class Client:
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
-        id_reuse_policy: WorkflowIDReusePolicy = WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -242,7 +203,7 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> "WorkflowHandle[Any]":
+    ) -> WorkflowHandle[Any]:
         """Start a workflow and return its handle.
 
         Args:
@@ -269,6 +230,9 @@ class Client:
             A workflow handle to the started/existing workflow.
             :py:attr:`WorkflowHandle.run_id` will be populated with the current
             run ID.
+
+        Raises:
+            RPCError: Workflow could not be started.
         """
         return await self._impl.start_workflow(
             StartWorkflowInput(
@@ -299,7 +263,7 @@ class Client:
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
-        id_reuse_policy: WorkflowIDReusePolicy = WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -339,7 +303,7 @@ class Client:
         *,
         run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
-    ) -> "WorkflowHandle[Any]":
+    ) -> WorkflowHandle[Any]:
         """Get a workflow handle to an existing workflow by its ID.
 
         Args:
@@ -355,6 +319,32 @@ class Client:
             result_run_id=run_id,
             first_execution_run_id=first_execution_run_id,
         )
+
+
+class ConnectOptions(typing_extensions.TypedDict):
+    """TypedDict of options originally passed to :py:class:`Client`."""
+
+    target_url: str
+    tls_config: Optional[TLSConfig]
+    retry_config: Optional[RetryConfig]
+    static_headers: Mapping[str, str]
+    identity: str
+    worker_binary_id: str
+
+
+class ClientOptions(typing_extensions.TypedDict):
+    """TypedDict of options originally passed to :py:meth:`Client`."""
+
+    service: temporalio.workflow_service.WorkflowService
+    namespace: str
+    data_converter: temporalio.converter.DataConverter
+    interceptors: Iterable[
+        Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
+    ]
+    default_workflow_query_reject_condition: Optional[
+        temporalio.common.WorkflowQueryRejectCondition
+    ]
+    connect_options: Optional[ConnectOptions]
 
 
 T = TypeVar("T")
@@ -447,7 +437,11 @@ class WorkflowHandle(Generic[T]):
             Result of the workflow after being converted by the data converter.
 
         Raises:
-            Exception: Any failure of the workflow.
+            WorkflowFailureError: Workflow failed, was cancelled, was
+                terminated, or timed out. Use the
+                :py:attr:`WorkflowFailureError.__cause__` to see the underlying
+                reason.
+            Exception: Other possible failures during result fetching.
         """
         req = temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest(
             namespace=self._client.namespace,
@@ -564,7 +558,8 @@ class WorkflowHandle(Generic[T]):
             a start signal will cancel the latest workflow with the same
             workflow ID even if it is unrelated to the started workflow.
 
-        TODO(cretz): Raises
+        Raises:
+            RPCError: Workflow could not be cancelled.
         """
         await self._client._impl.cancel_workflow(
             CancelWorkflowInput(
@@ -591,7 +586,8 @@ class WorkflowHandle(Generic[T]):
             describe the latest workflow with the same workflow ID even if it is
             unrelated to the started workflow.
 
-        TODO(cretz): Raises
+        Raises:
+            RPCError: Workflow details could not be fetched.
         """
         return WorkflowDescription(
             await self._client.service.describe_workflow_execution(
@@ -610,7 +606,9 @@ class WorkflowHandle(Generic[T]):
         self,
         query: str,
         *args: Any,
-        reject_condition: Optional[WorkflowQueryRejectCondition] = None,
+        reject_condition: Optional[
+            temporalio.common.WorkflowQueryRejectCondition
+        ] = None,
     ) -> Any:
         """Query the workflow.
 
@@ -623,6 +621,10 @@ class WorkflowHandle(Generic[T]):
         Returns:
             Result of the query.
 
+        Raises:
+            WorkflowQueryRejectedError: A query reject condition was satisfied.
+            RPCError: Workflow details could not be fetched.
+
         This will query for :py:attr:`run_id` if present. To use a different
         run ID, create a new handle with via
         :py:meth:`Client.get_workflow_handle`.
@@ -631,8 +633,6 @@ class WorkflowHandle(Generic[T]):
             Handles created as a result of :py:meth:`Client.start_workflow` will
             query the latest workflow with the same workflow ID even if it is
             unrelated to the started workflow.
-
-        TODO(cretz): Raises
         """
         return await self._client._impl.query_workflow(
             QueryWorkflowInput(
@@ -641,7 +641,7 @@ class WorkflowHandle(Generic[T]):
                 query=query,
                 args=args,
                 reject_condition=reject_condition
-                or self._client._default_workflow_query_reject_condition,
+                or self._client._options["default_workflow_query_reject_condition"],
             )
         )
 
@@ -655,6 +655,9 @@ class WorkflowHandle(Generic[T]):
                 set to None or there is no :py:meth:`run_id`, this will query
                 the latest run for the workflow ID.
 
+        Raises:
+            RPCError: Workflow could not be signalled.
+
         This will signal for :py:attr:`run_id` if present. To use a different
         run ID, create a new handle with via
         :py:meth:`Client.get_workflow_handle`.
@@ -663,8 +666,6 @@ class WorkflowHandle(Generic[T]):
             Handles created as a result of :py:meth:`Client.start_workflow` will
             signal the latest workflow with the same workflow ID even if it is
             unrelated to the started workflow.
-
-        TODO(cretz): Raises
         """
         await self._client._impl.signal_workflow(
             SignalWorkflowInput(
@@ -686,6 +687,9 @@ class WorkflowHandle(Generic[T]):
             args: Details to store on the termination.
             reason: Reason for the termination.
 
+        Raises:
+            RPCError: Workflow could not be terminated.
+
         This will issue a termination for :py:attr:`run_id` if present. This
         call will make sure to use the run chain starting from
         :py:attr:`first_execution_run_id` if present. To create handles with
@@ -695,8 +699,6 @@ class WorkflowHandle(Generic[T]):
             Handles created as a result of :py:meth:`Client.start_workflow` with
             a start signal will terminate the latest workflow with the same
             workflow ID even if it is unrelated to the started workflow.
-
-        TODO(cretz): Raises
         """
         await self._client._impl.terminate_workflow(
             TerminateWorkflowInput(
@@ -733,6 +735,89 @@ class WorkflowDescription:
         return self._status
 
 
+class WorkflowExecutionStatus(IntEnum):
+    """Status of a workflow execution.
+
+    See :py:class:`temporalio.api.enums.v1.WorkflowExecutionStatus`.
+    """
+
+    RUNNING = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING
+    )
+    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING`."""
+
+    COMPLETED = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED
+    )
+    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED`."""
+
+    FAILED = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_FAILED
+    )
+    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_FAILED`."""
+
+    CANCELED = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CANCELED
+    )
+    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CANCELED`."""
+
+    TERMINATED = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TERMINATED
+    )
+    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TERMINATED`."""
+
+    CONTINUED_AS_NEW = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
+    )
+    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW`."""
+
+    TIMED_OUT = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+    )
+    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT`."""
+
+
+class WorkflowFailureError(Exception):
+    """Error that occurs when a workflow is unsuccessful."""
+
+    def __init__(self, *, cause: temporalio.exceptions.FailureError) -> None:
+        """Create workflow failure error."""
+        super().__init__("Workflow execution failed")
+        self.__cause__ = cause
+
+    @property
+    def cause(self) -> temporalio.exceptions.FailureError:
+        """Cause of the workflow failure."""
+        return self.__cause__
+
+
+class WorkflowContinuedAsNewError(temporalio.exceptions.TemporalError):
+    """Error that occurs when a workflow was continued as new."""
+
+    def __init__(self, new_execution_run_id: str) -> None:
+        """Create workflow continue as new error."""
+        super().__init__("Workflow continued as new")
+        self._new_execution_run_id = new_execution_run_id
+
+    @property
+    def new_execution_run_id(self) -> str:
+        return self._new_execution_run_id
+
+
+class WorkflowQueryRejectedError(temporalio.exceptions.TemporalError):
+    """Error that occurs when a query was rejected."""
+
+    def __init__(self, status: Optional[WorkflowExecutionStatus]) -> None:
+        """Create workflow query rejected error."""
+        super().__init__(f"Query rejected, status: {status}")
+        self._status = status
+
+    @property
+    def status(self) -> Optional[WorkflowExecutionStatus]:
+        """Get workflow execution status causing rejection."""
+        return self._status
+
+
 @dataclass
 class StartWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow`."""
@@ -744,7 +829,7 @@ class StartWorkflowInput:
     execution_timeout: Optional[timedelta]
     run_timeout: Optional[timedelta]
     task_timeout: Optional[timedelta]
-    id_reuse_policy: WorkflowIDReusePolicy
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
@@ -771,7 +856,7 @@ class QueryWorkflowInput:
     run_id: Optional[str]
     query: str
     args: Iterable[Any]
-    reject_condition: Optional[WorkflowQueryRejectCondition]
+    reject_condition: Optional[temporalio.common.WorkflowQueryRejectCondition]
 
 
 @dataclass
@@ -801,7 +886,7 @@ class Interceptor:
     This should be extended by any client interceptors.
     """
 
-    def intercept_client(self, next: "OutboundInterceptor") -> "OutboundInterceptor":
+    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
         """Method called for intercepting a client.
 
         Args:
@@ -820,7 +905,7 @@ class OutboundInterceptor:
     This should be extended by any client outbound interceptors.
     """
 
-    def __init__(self, next: "OutboundInterceptor") -> None:
+    def __init__(self, next: OutboundInterceptor) -> None:
         """Create the outbound interceptor.
 
         Args:
@@ -1015,40 +1100,3 @@ class _ClientImpl(OutboundInterceptor):
                 await self._client.data_converter.encode(input.args)
             )
         await self._client.service.terminate_workflow_execution(req, retry=True)
-
-
-class WorkflowFailureError(Exception):
-    """Error that occurs when a workflow is unsuccessful."""
-
-    def __init__(self, *, cause: temporalio.exceptions.FailureError) -> None:
-        """Create workflow failure error."""
-        super().__init__("Workflow execution failed")
-        # TODO(cretz): Confirm setting this __cause__ is acceptable
-        self.__cause__ = cause
-
-
-class WorkflowContinuedAsNewError(Exception):
-    """Error that occurs when a workflow was continued as new."""
-
-    def __init__(self, new_execution_run_id: str) -> None:
-        """Create workflow continue as new error."""
-        super().__init__("Workflow continued as new")
-        self._new_execution_run_id = new_execution_run_id
-
-    @property
-    def new_execution_run_id(self) -> str:
-        return self._new_execution_run_id
-
-
-class WorkflowQueryRejectedError(Exception):
-    """Error that occurs when a query was rejected."""
-
-    def __init__(self, status: Optional[WorkflowExecutionStatus]) -> None:
-        """Create workflow query rejected error."""
-        super().__init__(f"Query rejected, status: {status}")
-        self._status = status
-
-    @property
-    def status(self) -> Optional[WorkflowExecutionStatus]:
-        """Get workflow execution status causing rejection."""
-        return self._status

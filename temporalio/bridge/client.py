@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
-from enum import IntEnum
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
@@ -43,7 +44,7 @@ ProtoMessage = TypeVar("ProtoMessage", bound=google.protobuf.message.Message)
 
 class Client:
     @staticmethod
-    async def connect(opts: ClientOptions) -> "Client":
+    async def connect(opts: ClientOptions) -> Client:
         return Client(await temporal_sdk_bridge.connect_client(opts))
 
     _ref: temporal_sdk_bridge.ClientRef
@@ -62,11 +63,3 @@ class Client:
         resp = resp_type()
         resp.ParseFromString(await self._ref.call(rpc, retry, req.SerializeToString()))
         return resp
-
-
-def load_worker_binary_id() -> str:
-    # TODO(cretz): See if there's a reasonable way to build up a hash of the
-    # current runtime including user code here without walking disk too much.
-    # We can use importlib and module __cache__ pyc paths and such, but it's not
-    # yet clear what we can obtain from importlib without using disk.
-    return "python-sdk@0.1.0"
