@@ -421,6 +421,9 @@ def default() -> CompositeDataConverter:
 async def decode_payloads(
     payloads: Optional[temporalio.api.common.v1.Payloads], converter: DataConverter
 ) -> List[Any]:
+    """Decode :py:class:`temporalio.api.common.v1.Payloads` with the given
+    converter.
+    """
     if not payloads or not payloads.payloads:
         return []
     return await converter.decode(payloads.payloads)

@@ -176,7 +176,7 @@ async def test_query_rejected(client: temporalio.client.Client, worker: utils.Wo
     assert "some query arg" == await handle.query(
         "some query",
         "some query arg",
-        reject_condition=temporalio.common.WorkflowQueryRejectCondition.NOT_OPEN,
+        reject_condition=temporalio.common.QueryRejectCondition.NOT_OPEN,
     )
     # But if we signal then wait for result, that same query should fail
     await handle.signal("some signal", "some signal arg")
@@ -185,7 +185,7 @@ async def test_query_rejected(client: temporalio.client.Client, worker: utils.Wo
         assert "some query arg" == await handle.query(
             "some query",
             "some query arg",
-            reject_condition=temporalio.common.WorkflowQueryRejectCondition.NOT_OPEN,
+            reject_condition=temporalio.common.QueryRejectCondition.NOT_OPEN,
         )
     assert err.value.status == temporalio.client.WorkflowExecutionStatus.COMPLETED
 
@@ -235,7 +235,7 @@ async def test_single_client_option_change(
     options = client.options()
     options[
         "default_workflow_query_reject_condition"
-    ] = temporalio.common.WorkflowQueryRejectCondition.NOT_OPEN
+    ] = temporalio.common.QueryRejectCondition.NOT_OPEN
     reject_client = temporalio.client.Client(**options)
     with pytest.raises(temporalio.client.WorkflowQueryRejectedError):
         await reject_client.get_workflow_handle(handle.id).query(

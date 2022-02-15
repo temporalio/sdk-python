@@ -36,6 +36,7 @@ class RetryPolicy:
     """List of error types that are not retryable."""
 
     def apply_to_proto(self, proto: temporalio.api.common.v1.RetryPolicy) -> None:
+        """Apply the fields in this policy to the given proto object."""
         proto.initial_interval.FromTimedelta(self.initial_interval)
         proto.backoff_coefficient = self.backoff_coefficient
         proto.maximum_interval.FromTimedelta(
@@ -68,7 +69,7 @@ class WorkflowIDReusePolicy(IntEnum):
     """See :py:attr:`temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE`."""
 
 
-class WorkflowQueryRejectCondition(IntEnum):
+class QueryRejectCondition(IntEnum):
     """Whether a query should be rejected in certain conditions.
 
     See :py:class:`temporalio.api.enums.v1.QueryRejectCondition`.

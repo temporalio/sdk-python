@@ -95,6 +95,7 @@ class ConnectOptions:
     worker_binary_id: str = ""
 
     def __post_init__(self) -> None:
+        """Set extra defaults on unset properties."""
         if not self.identity:
             self.identity = f"{os.getpid()}@{socket.gethostname()}"
         if not self.worker_binary_id:
@@ -118,9 +119,11 @@ class WorkflowService(ABC):
 
     @staticmethod
     async def connect(options: ConnectOptions) -> WorkflowService:
-        return await BridgeWorkflowService.connect(options)
+        """Connect directly to the workflow service."""
+        return await _BridgeWorkflowService.connect(options)
 
     def __init__(self, options: ConnectOptions) -> None:
+        """Initialize the base workflow service."""
         super().__init__()
         self._options = options
 
@@ -319,6 +322,7 @@ class WorkflowService(ABC):
 
     @property
     def options(self) -> ConnectOptions:
+        """Options originally used to connect."""
         return self._options
 
     @abstractmethod
@@ -342,6 +346,8 @@ class WorkflowService(ABC):
 
 
 class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceResponse]):
+    """Callable RPC method for :py:class:`WorkflowService`."""
+
     def __init__(
         self,
         service: WorkflowService,
@@ -349,6 +355,7 @@ class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceRespons
         req_type: Type[WorkflowServiceRequest],
         resp_type: Type[WorkflowServiceResponse],
     ) -> None:
+        """Initialize the workflow service call."""
         self.service = service
         self.name = name
         self.req_type = req_type
@@ -357,13 +364,25 @@ class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceRespons
     async def __call__(
         self, req: WorkflowServiceRequest, *, retry: bool = False
     ) -> WorkflowServiceResponse:
+        """Invoke underlying client with the given request.
+
+        Args:
+            req: Request for the call.
+            retry: If true, will use retry config to retry failed calls.
+
+        Returns:
+            RPC response.
+
+        Raises:
+            RPCError: Any RPC error that occurs during the call.
+        """
         return await self.service._rpc_call(self.name, req, self.resp_type, retry=retry)
 
 
-class BridgeWorkflowService(WorkflowService):
+class _BridgeWorkflowService(WorkflowService):
     @staticmethod
-    async def connect(options: ConnectOptions) -> BridgeWorkflowService:
-        return BridgeWorkflowService(
+    async def connect(options: ConnectOptions) -> _BridgeWorkflowService:
+        return _BridgeWorkflowService(
             options,
             await temporalio.bridge.client.Client.connect(options._to_bridge_options()),
         )
@@ -393,6 +412,8 @@ class BridgeWorkflowService(WorkflowService):
 
 
 class RPCStatusCode(IntEnum):
+    """Status code for :py:class:`RPCError`."""
+
     OK = grpc.StatusCode.OK.value[0]
     CANCELLED = grpc.StatusCode.CANCELLED.value[0]
     UNKNOWN = grpc.StatusCode.UNKNOWN.value[0]
@@ -413,17 +434,22 @@ class RPCStatusCode(IntEnum):
 
 
 class RPCError(temporalio.exceptions.TemporalError):
+    """Error during RPC call."""
+
     def __init__(self, message: str, status: RPCStatusCode, details: bytes) -> None:
+        """Initialize RPC error."""
         super().__init__(message)
         self._status = status
         self._details = details
 
     @property
     def status(self) -> RPCStatusCode:
+        """Status code for the error."""
         return self._status
 
     @property
     def details(self) -> bytes:
+        """Any details on the error."""
         return self._details
 
 
@@ -431,6 +457,20 @@ _default_worker_binary_id: Optional[str] = None
 
 
 def load_default_worker_binary_id(*, memoize: bool = True) -> str:
+    """Load the default worker binary ID.
+
+    The worker binary ID is a unique hash representing the entire set of code
+    including Temporal code and external code. The default here is currently
+    implemented by walking loaded modules and hashing their bytecode into a
+    common hash.
+
+    Args:
+        memoize: If true, the default, this will cache to a global variable to
+            keep from having to run again on successive calls.
+
+    Returns:
+        Unique identifier representing the set of running code.
+    """
     # Memoize
     global _default_worker_binary_id
     if memoize and _default_worker_binary_id:

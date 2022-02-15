@@ -24,16 +24,19 @@ class FailureError(TemporalError):
         *details: Any,
         failure: Optional[temporalio.api.failure.v1.Failure] = None
     ) -> None:
+        """Initialize a failure error."""
         super().__init__(message)
         self._details = details
         self._failure = failure
 
     @property
     def details(self) -> Iterable[Any]:
+        """User-defined details on the failure."""
         return self._details
 
     @property
     def failure(self) -> Optional[temporalio.api.failure.v1.Failure]:
+        """Underlying protobuf failure object."""
         return self._failure
 
 
@@ -47,16 +50,19 @@ class ApplicationError(FailureError):
         type: Optional[str] = None,
         non_retryable: bool = False
     ) -> None:
+        """Initialize an application error."""
         super().__init__(message, *details)
         self._type = type
         self._non_retryable = non_retryable
 
     @property
     def type(self) -> Optional[str]:
+        """General error type."""
         return self._type
 
     @property
     def non_retryable(self) -> bool:
+        """Whether the error is non-retryable."""
         return self._non_retryable
 
 
@@ -64,6 +70,7 @@ class CancelledError(FailureError):
     """Error raised on workflow/activity cancellation."""
 
     def __init__(self, message: str, *details: Any) -> None:
+        """Initialize a cancelled error."""
         super().__init__(message, *details)
 
 
@@ -71,6 +78,7 @@ class TerminatedError(FailureError):
     """Error raised on workflow cancellation."""
 
     def __init__(self, message: str, *details: Any) -> None:
+        """Initialize a terminated error."""
         super().__init__(message, *details)
 
 
@@ -99,16 +107,19 @@ class TimeoutError(FailureError):
         type: Optional[TimeoutType],
         last_heartbeat_details: Iterable[Any]
     ) -> None:
+        """Initialize a timeout error."""
         super().__init__(message)
         self._type = type
         self._last_heartbeat_details = last_heartbeat_details
 
     @property
     def type(self) -> Optional[TimeoutType]:
+        """Type of timeout error."""
         return self._type
 
     @property
     def last_heartbeat_details(self) -> Iterable[Any]:
+        """Last heartbeat details if this is for an activity heartbeat."""
         return self._last_heartbeat_details
 
 
@@ -116,11 +127,13 @@ class ServerError(FailureError):
     """Error originating in the Temporal server."""
 
     def __init__(self, message: str, *, non_retryable: bool = False) -> None:
+        """Initialize a server error."""
         super().__init__(message)
         self._non_retryable = non_retryable
 
     @property
     def non_retryable(self) -> bool:
+        """Whether this error is non-retryable."""
         return self._non_retryable
 
 
@@ -160,6 +173,7 @@ class ActivityError(FailureError):
         activity_id: str,
         retry_state: Optional[RetryState]
     ) -> None:
+        """Initialize an activity error."""
         super().__init__(message)
         self._scheduled_event_id = scheduled_event_id
         self._started_event_id = started_event_id
@@ -170,26 +184,32 @@ class ActivityError(FailureError):
 
     @property
     def scheduled_event_id(self) -> int:
+        """Scheduled event ID for this error."""
         return self._scheduled_event_id
 
     @property
     def started_event_id(self) -> int:
+        """Started event ID for this error."""
         return self._started_event_id
 
     @property
     def identity(self) -> str:
+        """Identity for this error."""
         return self._identity
 
     @property
     def activity_type(self) -> str:
+        """Activity type for this error."""
         return self._activity_type
 
     @property
     def activity_id(self) -> str:
+        """Activity ID for this error."""
         return self._activity_id
 
     @property
     def retry_state(self) -> Optional[RetryState]:
+        """Retry state for this error."""
         return self._retry_state
 
 
@@ -208,6 +228,7 @@ class ChildWorkflowError(FailureError):
         started_event_id: int,
         retry_state: Optional[RetryState]
     ) -> None:
+        """Initialize a child workflow error."""
         super().__init__(message)
         self._namespace = namespace
         self._workflow_id = workflow_id
@@ -219,30 +240,37 @@ class ChildWorkflowError(FailureError):
 
     @property
     def namespace(self) -> str:
+        """Namespace for this error."""
         return self._namespace
 
     @property
     def workflow_id(self) -> str:
+        """Workflow ID for this error."""
         return self._workflow_id
 
     @property
     def run_id(self) -> str:
+        """Run ID for this error."""
         return self._run_id
 
     @property
     def workflow_type(self) -> str:
+        """Workflow type for this error."""
         return self._workflow_type
 
     @property
     def initiated_event_id(self) -> int:
+        """Initiated event ID for this error."""
         return self._initiated_event_id
 
     @property
     def started_event_id(self) -> int:
+        """Started event ID for this error."""
         return self._started_event_id
 
     @property
     def retry_state(self) -> Optional[RetryState]:
+        """Retry state for this error."""
         return self._retry_state
 
 
@@ -250,6 +278,9 @@ async def failure_to_error(
     failure: temporalio.api.failure.v1.Failure,
     converter: temporalio.converter.DataConverter,
 ) -> FailureError:
+    """Create a :py:class:`FailureError` from the given protobuf failure and
+    data converter.
+    """
     err: FailureError
     if failure.HasField("application_failure_info"):
         app_info = failure.application_failure_info

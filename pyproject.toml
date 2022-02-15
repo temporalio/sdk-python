@@ -37,7 +37,7 @@ build-bridge = "python scripts/build-bridge.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-docs = "sphinx-build docs docs/_build"
 gen-protos = "python scripts/gen-protos.py"
-lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types"] # TODO(cretz): Add lint-docs
+lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types", "lint-docs"]
 lint-docs = "pydocstyle"
 lint-types = "mypy ."
 test = "pytest"
@@ -61,6 +61,11 @@ exclude = [
 convention = "google"
 # https://github.com/PyCQA/pydocstyle/issues/363#issuecomment-625563088
 match_dir = "^(?!(docs|scripts|tests|api|proto|\\.)).*"
+add_ignore = [
+  # We like to wrap at a certain number of chars, even long summary sentences.
+  # https://github.com/PyCQA/pydocstyle/issues/184
+  "D205", "D415"
+]
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

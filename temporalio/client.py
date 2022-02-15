@@ -55,7 +55,7 @@ class Client:
             Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
         ] = [],
         default_workflow_query_reject_condition: Optional[
-            temporalio.common.WorkflowQueryRejectCondition
+            temporalio.common.QueryRejectCondition
         ] = None,
         tls_config: Optional[TLSConfig] = None,
         retry_config: Optional[RetryConfig] = None,
@@ -105,14 +105,6 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
-            connect_options=ConnectOptions(
-                target_url=connect_options.target_url,
-                tls_config=connect_options.tls_config,
-                retry_config=connect_options.retry_config,
-                static_headers=connect_options.static_headers,
-                identity=connect_options.identity,
-                worker_binary_id=connect_options.worker_binary_id,
-            ),
         )
 
     def __init__(
@@ -125,16 +117,12 @@ class Client:
             Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
         ] = [],
         default_workflow_query_reject_condition: Optional[
-            temporalio.common.WorkflowQueryRejectCondition
+            temporalio.common.QueryRejectCondition
         ] = None,
-        connect_options: Optional[ConnectOptions] = None,
     ):
         """Create a Temporal client from a workflow service.
 
         See :py:meth:`connect` for details on the parameters.
-
-        Note, connect_options in this initializer are only for tracking and are
-        not used by this class in any way.
         """
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
@@ -153,7 +141,6 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
-            connect_options=connect_options,
         )
 
     def options(self) -> ClientOptions:
@@ -161,10 +148,7 @@ class Client:
 
         This makes a shallow copy of the options each call.
         """
-        options = self._options.copy()
-        if options["connect_options"]:
-            options["connect_options"] = options["connect_options"].copy()
-        return options
+        return self._options.copy()
 
     @property
     def service(self) -> temporalio.workflow_service.WorkflowService:
@@ -311,6 +295,9 @@ class Client:
             run_id: Run ID that will be used for all calls.
             first_execution_run_id: First execution run ID used for cancellation
                 and termination.
+
+        Returns:
+            The workflow handle.
         """
         return WorkflowHandle(
             self,
@@ -319,17 +306,6 @@ class Client:
             result_run_id=run_id,
             first_execution_run_id=first_execution_run_id,
         )
-
-
-class ConnectOptions(typing_extensions.TypedDict):
-    """TypedDict of options originally passed to :py:class:`Client`."""
-
-    target_url: str
-    tls_config: Optional[TLSConfig]
-    retry_config: Optional[RetryConfig]
-    static_headers: Mapping[str, str]
-    identity: str
-    worker_binary_id: str
 
 
 class ClientOptions(typing_extensions.TypedDict):
@@ -342,9 +318,8 @@ class ClientOptions(typing_extensions.TypedDict):
         Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
     ]
     default_workflow_query_reject_condition: Optional[
-        temporalio.common.WorkflowQueryRejectCondition
+        temporalio.common.QueryRejectCondition
     ]
-    connect_options: Optional[ConnectOptions]
 
 
 T = TypeVar("T")
@@ -571,20 +546,20 @@ class WorkflowHandle(Generic[T]):
 
     async def describe(
         self,
-    ) -> "WorkflowDescription":
+    ) -> WorkflowDescription:
         """Get workflow details.
 
         This will get details for :py:attr:`run_id` if present. To use a
         different run ID, create a new handle with via
         :py:meth:`Client.get_workflow_handle`.
 
-        Returns:
-            Workflow details.
-
         .. warning::
             Handles created as a result of :py:meth:`Client.start_workflow` will
             describe the latest workflow with the same workflow ID even if it is
             unrelated to the started workflow.
+
+        Returns:
+            Workflow details.
 
         Raises:
             RPCError: Workflow details could not be fetched.
@@ -606,11 +581,18 @@ class WorkflowHandle(Generic[T]):
         self,
         query: str,
         *args: Any,
-        reject_condition: Optional[
-            temporalio.common.WorkflowQueryRejectCondition
-        ] = None,
+        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> Any:
         """Query the workflow.
+
+        This will query for :py:attr:`run_id` if present. To use a different
+        run ID, create a new handle with via
+        :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+            Handles created as a result of :py:meth:`Client.start_workflow` will
+            query the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
 
         Args:
             query: Query name on the workflow.
@@ -624,15 +606,6 @@ class WorkflowHandle(Generic[T]):
         Raises:
             WorkflowQueryRejectedError: A query reject condition was satisfied.
             RPCError: Workflow details could not be fetched.
-
-        This will query for :py:attr:`run_id` if present. To use a different
-        run ID, create a new handle with via
-        :py:meth:`Client.get_workflow_handle`.
-
-        .. warning::
-            Handles created as a result of :py:meth:`Client.start_workflow` will
-            query the latest workflow with the same workflow ID even if it is
-            unrelated to the started workflow.
         """
         return await self._client._impl.query_workflow(
             QueryWorkflowInput(
@@ -648,6 +621,15 @@ class WorkflowHandle(Generic[T]):
     async def signal(self, name: str, *args: Any) -> None:
         """Send a signal to the workflow.
 
+        This will signal for :py:attr:`run_id` if present. To use a different
+        run ID, create a new handle with via
+        :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+            Handles created as a result of :py:meth:`Client.start_workflow` will
+            signal the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
+
         Args:
             name: Signal name on the workflow.
             args: Signal arguments.
@@ -657,15 +639,6 @@ class WorkflowHandle(Generic[T]):
 
         Raises:
             RPCError: Workflow could not be signalled.
-
-        This will signal for :py:attr:`run_id` if present. To use a different
-        run ID, create a new handle with via
-        :py:meth:`Client.get_workflow_handle`.
-
-        .. warning::
-            Handles created as a result of :py:meth:`Client.start_workflow` will
-            signal the latest workflow with the same workflow ID even if it is
-            unrelated to the started workflow.
         """
         await self._client._impl.signal_workflow(
             SignalWorkflowInput(
@@ -683,13 +656,6 @@ class WorkflowHandle(Generic[T]):
     ) -> None:
         """Terminate the workflow.
 
-        Args:
-            args: Details to store on the termination.
-            reason: Reason for the termination.
-
-        Raises:
-            RPCError: Workflow could not be terminated.
-
         This will issue a termination for :py:attr:`run_id` if present. This
         call will make sure to use the run chain starting from
         :py:attr:`first_execution_run_id` if present. To create handles with
@@ -699,6 +665,13 @@ class WorkflowHandle(Generic[T]):
             Handles created as a result of :py:meth:`Client.start_workflow` with
             a start signal will terminate the latest workflow with the same
             workflow ID even if it is unrelated to the started workflow.
+
+        Args:
+            args: Details to store on the termination.
+            reason: Reason for the termination.
+
+        Raises:
+            RPCError: Workflow could not be terminated.
         """
         await self._client._impl.terminate_workflow(
             TerminateWorkflowInput(
@@ -718,6 +691,7 @@ class WorkflowDescription:
         self,
         raw_message: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
     ):
+        """Create a workflow description from a describe response."""
         self._raw_message = raw_message
         status = raw_message.workflow_execution_info.status
         self._status = WorkflowExecutionStatus(status) if status else None
@@ -801,6 +775,7 @@ class WorkflowContinuedAsNewError(temporalio.exceptions.TemporalError):
 
     @property
     def new_execution_run_id(self) -> str:
+        """New execution run ID the workflow continued to"""
         return self._new_execution_run_id
 
 
@@ -856,7 +831,7 @@ class QueryWorkflowInput:
     run_id: Optional[str]
     query: str
     args: Iterable[Any]
-    reject_condition: Optional[temporalio.common.WorkflowQueryRejectCondition]
+    reject_condition: Optional[temporalio.common.QueryRejectCondition]
 
 
 @dataclass
