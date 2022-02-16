@@ -1,1 +1,2 @@
-from .core_interface_pb2 import ActivityHeartbeat, ActivityTaskCompletion
+from .core_interface_pb2 import ActivityHeartbeat
+from .core_interface_pb2 import ActivityTaskCompletion
