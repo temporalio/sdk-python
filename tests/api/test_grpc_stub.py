@@ -7,7 +7,7 @@ import temporalio.api.workflowservice.v1
 
 
 class SimpleServer(temporalio.api.workflowservice.v1.WorkflowServiceServicer):
-    async def CountWorkflowExecutions(
+    async def CountWorkflowExecutions(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
         self,
         request: temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest,
         context: grpc.aio.ServicerContext,
