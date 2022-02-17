@@ -33,7 +33,7 @@ class ClientRetryConfig:
 
 
 @dataclass
-class ClientOptions:
+class ClientConfig:
     """Python representation of the Rust struct for configuring the client."""
 
     target_url: str
@@ -54,9 +54,9 @@ class Client:
     """RPC client using SDK Core."""
 
     @staticmethod
-    async def connect(opts: ClientOptions) -> Client:
+    async def connect(config: ClientConfig) -> Client:
         """Establish connection with server."""
-        return Client(await temporal_sdk_bridge.connect_client(opts))
+        return Client(await temporal_sdk_bridge.connect_client(config))
 
     _ref: temporal_sdk_bridge.ClientRef
 

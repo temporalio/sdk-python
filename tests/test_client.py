@@ -219,7 +219,7 @@ async def test_retry_policy(client: temporalio.client.Client, worker: utils.Work
     assert str(err.value.cause) == "attempt 3"
 
 
-async def test_single_client_option_change(
+async def test_single_client_config_change(
     client: temporalio.client.Client, worker: utils.Worker
 ):
     # Make sure normal query works on completed workflow
@@ -232,11 +232,11 @@ async def test_single_client_option_change(
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Now create a client with the rejection condition changed to not open
-    options = client.options()
-    options[
+    config = client.config()
+    config[
         "default_workflow_query_reject_condition"
     ] = temporalio.common.QueryRejectCondition.NOT_OPEN
-    reject_client = temporalio.client.Client(**options)
+    reject_client = temporalio.client.Client(**config)
     with pytest.raises(temporalio.client.WorkflowQueryRejectedError):
         await reject_client.get_workflow_handle(handle.id).query(
             "some query", "some query arg"
@@ -292,9 +292,9 @@ class TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
 async def test_interceptor(client: temporalio.client.Client, worker: utils.Worker):
     # Create new client from existing client but with a tracing interceptor
     interceptor = TracingClientInterceptor()
-    options = client.options()
-    options["interceptors"] = [interceptor]
-    client = temporalio.client.Client(**options)
+    config = client.config()
+    config["interceptors"] = [interceptor]
+    client = temporalio.client.Client(**config)
     # Do things that would trigger the interceptors
     handle = await client.start_workflow(
         "kitchen_sink",
@@ -333,9 +333,9 @@ async def test_interceptor_callable(
     # Create new client from existing client but with a tracing interceptor
     # callable and only check a simple call
     interceptor = TracingClientInterceptor()
-    options = client.options()
-    options["interceptors"] = [interceptor.intercept_client]
-    client = temporalio.client.Client(**options)
+    config = client.config()
+    config["interceptors"] = [interceptor.intercept_client]
+    client = temporalio.client.Client(**config)
     handle = await client.start_workflow(
         "kitchen_sink",
         utils.KitchenSinkWorkflowParams(),

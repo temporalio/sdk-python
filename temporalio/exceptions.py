@@ -345,3 +345,15 @@ async def failure_to_error(
     if failure.HasField("cause"):
         err.__cause__ = await failure_to_error(failure.cause, converter)
     return err
+
+
+async def error_to_failure(
+    error: FailureError, converter: temporalio.converter.DataConverter
+) -> temporalio.api.failure.v1.Failure:
+    raise NotImplementedError
+
+
+async def exception_to_failure(
+    exception: Exception, converter: temporalio.converter.DataConverter
+) -> temporalio.api.failure.v1.Failure:
+    raise NotImplementedError

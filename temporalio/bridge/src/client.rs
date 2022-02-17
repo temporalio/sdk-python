@@ -17,7 +17,7 @@ pub struct ClientRef {
 }
 
 #[derive(FromPyObject)]
-pub struct ClientOptions {
+pub struct ClientConfig {
     target_url: String,
     client_name: String,
     client_version: String,
@@ -46,9 +46,9 @@ struct ClientRetryConfig {
     pub max_retries: usize,
 }
 
-pub fn connect_client(py: Python, opts: ClientOptions) -> PyResult<&PyAny> {
+pub fn connect_client(py: Python, config: ClientConfig) -> PyResult<&PyAny> {
     // TODO(cretz): Add metrics_meter?
-    let opts: temporal_client::ServerGatewayOptions = opts.try_into()?;
+    let opts: temporal_client::ServerGatewayOptions = config.try_into()?;
     pyo3_asyncio::tokio::future_into_py(py, async move {
         Ok(ClientRef {
             retry_client: opts.connect_no_namespace(None).await.map_err(|err| {
@@ -227,10 +227,10 @@ where
     }
 }
 
-impl TryFrom<ClientOptions> for temporal_client::ServerGatewayOptions {
+impl TryFrom<ClientConfig> for temporal_client::ServerGatewayOptions {
     type Error = PyErr;
 
-    fn try_from(opts: ClientOptions) -> PyResult<Self> {
+    fn try_from(opts: ClientConfig) -> PyResult<Self> {
         let mut gateway_opts = temporal_client::ServerGatewayOptionsBuilder::default();
         gateway_opts
             .target_url(
@@ -253,7 +253,7 @@ impl TryFrom<ClientOptions> for temporal_client::ServerGatewayOptions {
         }
         return gateway_opts
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid client options: {}", err)));
+            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {}", err)));
     }
 }
 

@@ -4,7 +4,7 @@ import dataclasses
 import inspect
 import json
 from abc import ABC, abstractmethod
-from typing import Any, Iterable, List, Mapping, Optional, Type
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Type
 
 import google.protobuf.json_format
 import google.protobuf.message
@@ -427,3 +427,9 @@ async def decode_payloads(
     if not payloads or not payloads.payloads:
         return []
     return await converter.decode(payloads.payloads)
+
+
+async def type_hints_from_func(
+    func: Callable[..., Any], require_arg_count: int = -1
+) -> Tuple[Optional[List[Type]], Optional[Type]]:
+    raise NotImplementedError

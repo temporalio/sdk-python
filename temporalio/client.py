@@ -74,6 +74,11 @@ class Client:
             interceptors: Set of interceptors that are chained together to allow
                 intercepting of client calls. The earlier interceptors wrap the
                 later ones.
+
+                Also, any interceptors that also implement
+                :py:class:`temporalio.worker.Interceptor` will be used as worker
+                interceptors too so they should not be given when creating a
+                worker.
             default_workflow_query_reject_condition: The default rejection
                 condition for workflow queries if not set during query. See
                 :py:meth:`WorkflowHandle.query` for details on the rejection
@@ -91,7 +96,7 @@ class Client:
                 best set as a hash of all code and should change only when code
                 does. If unset, a best-effort identifier is generated.
         """
-        connect_options = temporalio.workflow_service.ConnectOptions(
+        connect_config = temporalio.workflow_service.ConnectConfig(
             target_url=target_url,
             tls_config=tls_config,
             retry_config=retry_config,
@@ -100,7 +105,7 @@ class Client:
             worker_binary_id=worker_binary_id or "",
         )
         return Client(
-            await temporalio.workflow_service.WorkflowService.connect(connect_options),
+            await temporalio.workflow_service.WorkflowService.connect(connect_config),
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
@@ -134,8 +139,8 @@ class Client:
             else:
                 raise TypeError("interceptor neither OutboundInterceptor nor callable")
 
-        # Store the options for tracking
-        self._options = ClientOptions(
+        # Store the config for tracking
+        self._config = ClientConfig(
             service=service,
             namespace=namespace,
             data_converter=data_converter,
@@ -143,32 +148,34 @@ class Client:
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
         )
 
-    def options(self) -> ClientOptions:
-        """Options used to create this client as a dictionary.
+    def config(self) -> ClientConfig:
+        """Config, as a dictionary, used to create this client.
 
-        This makes a shallow copy of the options each call.
+        This makes a shallow copy of the config each call.
         """
-        return self._options.copy()
+        config = self._config.copy()
+        config["interceptors"] = list(config["interceptors"])
+        return config
 
     @property
     def service(self) -> temporalio.workflow_service.WorkflowService:
         """Raw gRPC service for this client."""
-        return self._options["service"]
+        return self._config["service"]
 
     @property
     def namespace(self) -> str:
         """Namespace used in calls by this client."""
-        return self._options["namespace"]
+        return self._config["namespace"]
 
     @property
     def identity(self) -> str:
         """Identity used in calls by this client."""
-        return self.service.options.identity
+        return self.service.config.identity
 
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
         """Data converter used by this client."""
-        return self._options["data_converter"]
+        return self._config["data_converter"]
 
     async def start_workflow(
         self,
@@ -308,8 +315,8 @@ class Client:
         )
 
 
-class ClientOptions(typing_extensions.TypedDict):
-    """TypedDict of options originally passed to :py:meth:`Client`."""
+class ClientConfig(typing_extensions.TypedDict):
+    """TypedDict of config originally passed to :py:meth:`Client`."""
 
     service: temporalio.workflow_service.WorkflowService
     namespace: str
@@ -614,7 +621,7 @@ class WorkflowHandle(Generic[T]):
                 query=query,
                 args=args,
                 reject_condition=reject_condition
-                or self._client._options["default_workflow_query_reject_condition"],
+                or self._client._config["default_workflow_query_reject_condition"],
             )
         )
 
