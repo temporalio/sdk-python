@@ -219,8 +219,6 @@ class Client:
 
         Returns:
             A workflow handle to the started/existing workflow.
-            :py:attr:`WorkflowHandle.run_id` will be populated with the current
-            run ID.
 
         Raises:
             RPCError: Workflow could not be started.
@@ -386,7 +384,7 @@ class WorkflowHandle(Generic[T]):
         This cannot be mutated. If a different run ID is needed,
         :py:meth:`Client.get_workflow_handle` must be used instead.
         """
-        return self._run_id
+        return self._result_run_id
 
     @property
     def first_execution_run_id(self) -> Optional[str]:
@@ -401,7 +399,7 @@ class WorkflowHandle(Generic[T]):
         This cannot be mutated. If a different first execution run ID is needed,
         :py:meth:`Client.get_workflow_handle` must be used instead.
         """
-        return self._run_id
+        return self._first_execution_run_id
 
     async def result(self, *, follow_runs: bool = True) -> T:
         """Wait for result of the workflow.
@@ -421,7 +419,7 @@ class WorkflowHandle(Generic[T]):
         Raises:
             WorkflowFailureError: Workflow failed, was cancelled, was
                 terminated, or timed out. Use the
-                :py:attr:`WorkflowFailureError.__cause__` to see the underlying
+                :py:attr:`WorkflowFailureError.cause` to see the underlying
                 reason.
             Exception: Other possible failures during result fetching.
         """

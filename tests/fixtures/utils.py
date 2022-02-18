@@ -152,16 +152,61 @@ async def tls_client(server: Server) -> Optional[temporalio.client.Client]:
 
 
 @dataclass
-class KitchenSinkWorkflowParams:
-    result: Optional[Any] = None
-    error_with: Optional[str] = None
-    error_details: Optional[Any] = None
-    error_with_attempt: Optional[bool] = None
-    continue_as_new_count: Optional[int] = None
-    result_as_string_signal_arg: Optional[str] = None
-    result_as_run_id: Optional[bool] = None
-    sleep_ms: Optional[int] = None
-    queries_with_string_arg: Iterable[str] = field(default_factory=list)
+class KSWorkflowParams:
+    actions: Optional[Iterable[KSAction]] = None
+    action_signal: Optional[str] = None
+
+
+@dataclass
+class KSAction:
+    result: Optional[KSResultAction] = None
+    error: Optional[KSErrorAction] = None
+    continue_as_new: Optional[KSContinueAsNewAction] = None
+    sleep: Optional[KSSleepAction] = None
+    query_handler: Optional[KSQueryHandlerAction] = None
+    signal: Optional[KSSignalAction] = None
+    execute_activity: Optional[KSExecuteActivityAction] = None
+
+
+@dataclass
+class KSResultAction:
+    value: Optional[Any] = None
+    run_id: Optional[bool] = None
+
+
+@dataclass
+class KSErrorAction:
+    message: Optional[str] = None
+    details: Optional[Any] = None
+    attempt: Optional[bool] = None
+
+
+@dataclass
+class KSContinueAsNewAction:
+    while_above_zero: int
+
+
+@dataclass
+class KSSleepAction:
+    millis: int
+
+
+@dataclass
+class KSQueryHandlerAction:
+    name: str
+
+
+@dataclass
+class KSSignalAction:
+    name: str
+
+
+@dataclass
+class KSExecuteActivityAction:
+    name: str
+    task_queue: Optional[str] = None
+    args: Optional[Iterable[Any]] = None
+    start_to_close_timeout_ms: Optional[int] = None
 
 
 class Worker(ABC):

@@ -38,50 +38,140 @@ func run(endpoint, namespace, taskQueue string) error {
 }
 
 type KitchenSinkWorkflowParams struct {
-	Result                  interface{} `json:"result"`
-	ErrorWith               string      `json:"error_with"`
-	ErrorDetails            interface{} `json:"error_details"`
-	ErrorWithAttempt        bool        `json:"error_with_attempt"`
-	ContinueAsNewCount      int         `json:"continue_as_new_count"`
-	ResultAsStringSignalArg string      `json:"result_as_string_signal_arg"`
-	ResultAsRunID           bool        `json:"result_as_run_id"`
-	SleepMS                 int64       `json:"sleep_ms"`
-	QueriesWithStringArg    []string    `json:"queries_with_string_arg"`
+	Actions      []*KitchenSinkAction `json:"actions"`
+	ActionSignal string               `json:"action_signal"`
+}
+
+type KitchenSinkAction struct {
+	Result          *ResultAction          `json:"result"`
+	Error           *ErrorAction           `json:"error"`
+	ContinueAsNew   *ContinueAsNewAction   `json:"continue_as_new"`
+	Sleep           *SleepAction           `json:"sleep"`
+	QueryHandler    *QueryHandlerAction    `json:"query_handler"`
+	Signal          *SignalAction          `json:"signal"`
+	ExecuteActivity *ExecuteActivityAction `json:"execute_activity"`
+}
+
+type ResultAction struct {
+	Value interface{} `json:"value"`
+	RunID bool        `json:"run_id"`
+}
+
+type ErrorAction struct {
+	Message string      `json:"message"`
+	Details interface{} `json:"details"`
+	Attempt bool        `json:"attempt"`
+}
+
+type ContinueAsNewAction struct {
+	WhileAboveZero int `json:"while_above_zero"`
+}
+
+type SleepAction struct {
+	Millis int64 `json:"millis"`
+}
+
+type QueryHandlerAction struct {
+	Name string `json:"name"`
+}
+
+type SignalAction struct {
+	Name string `json:"name"`
+}
+
+type ExecuteActivityAction struct {
+	Name                  string        `json:"name"`
+	TaskQueue             string        `json:"task_queue"`
+	Args                  []interface{} `json:"args"`
+	StartToCloseTimeoutMS int64         `json:"start_to_close_timeout_ms"`
 }
 
 func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams) (interface{}, error) {
 	b, _ := json.Marshal(params)
 	workflow.GetLogger(ctx).Info("Started kitchen sink workflow", "params", string(b))
+
+	// Handle all initial actions
+	for _, action := range params.Actions {
+		if shouldReturn, ret, err := handleAction(ctx, params, action); shouldReturn {
+			return ret, err
+		}
+	}
+
+	// Handle signal actions
+	if params.ActionSignal != "" {
+		actionCh := workflow.GetSignalChannel(ctx, params.ActionSignal)
+		for {
+			var action KitchenSinkAction
+			actionCh.Receive(ctx, &action)
+			if shouldReturn, ret, err := handleAction(ctx, params, &action); shouldReturn {
+				return ret, err
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func handleAction(
+	ctx workflow.Context,
+	params *KitchenSinkWorkflowParams,
+	action *KitchenSinkAction,
+) (bool, interface{}, error) {
 	info := workflow.GetInfo(ctx)
-
-	for _, name := range params.QueriesWithStringArg {
-		workflow.SetQueryHandler(ctx, name, func(arg string) (string, error) { return arg, nil })
-	}
-
-	if params.SleepMS > 0 {
-		if err := workflow.Sleep(ctx, time.Duration(params.SleepMS)*time.Millisecond); err != nil {
-			return nil, err
-		}
-	}
-
 	switch {
-	case params.ContinueAsNewCount > 0:
-		params.ContinueAsNewCount--
-		return nil, workflow.NewContinueAsNewError(ctx, KitchenSinkWorkflow, params)
-	case params.ErrorWith != "":
-		var details []interface{}
-		if params.ErrorDetails != nil {
-			details = append(details, params.ErrorDetails)
+	case action.Result != nil:
+		if action.Result.RunID {
+			return true, info.WorkflowExecution.RunID, nil
 		}
-		return nil, temporal.NewApplicationError(params.ErrorWith, "", details...)
-	case params.ErrorWithAttempt:
-		return nil, fmt.Errorf("attempt %v", info.Attempt)
-	case params.ResultAsStringSignalArg != "":
-		var signalArg string
-		workflow.GetSignalChannel(ctx, params.ResultAsStringSignalArg).Receive(ctx, &signalArg)
-		return signalArg, nil
-	case params.ResultAsRunID:
-		return info.WorkflowExecution.RunID, nil
+		return true, action.Result.Value, nil
+
+	case action.Error != nil:
+		if action.Error.Attempt {
+			return true, nil, fmt.Errorf("attempt %v", info.Attempt)
+		}
+		var details []interface{}
+		if action.Error.Details != nil {
+			details = append(details, action.Error.Details)
+		}
+		return true, nil, temporal.NewApplicationError(action.Error.Message, "", details...)
+
+	case action.ContinueAsNew != nil:
+		if action.ContinueAsNew.WhileAboveZero > 0 {
+			action.ContinueAsNew.WhileAboveZero--
+			return true, nil, workflow.NewContinueAsNewError(ctx, KitchenSinkWorkflow, params)
+		}
+
+	case action.Sleep != nil:
+		if err := workflow.Sleep(ctx, time.Duration(action.Sleep.Millis)*time.Millisecond); err != nil {
+			return true, nil, err
+		}
+
+	case action.QueryHandler != nil:
+		err := workflow.SetQueryHandler(ctx, action.QueryHandler.Name, func(arg string) (string, error) { return arg, nil })
+		if err != nil {
+			return true, nil, err
+		}
+
+	case action.Signal != nil:
+		workflow.GetSignalChannel(ctx, action.Signal.Name).Receive(ctx, nil)
+
+	case action.ExecuteActivity != nil:
+		opts := workflow.ActivityOptions{
+			TaskQueue: action.ExecuteActivity.TaskQueue,
+		}
+		if action.ExecuteActivity.StartToCloseTimeoutMS > 0 {
+			opts.StartToCloseTimeout = time.Duration(action.ExecuteActivity.StartToCloseTimeoutMS) * time.Millisecond
+		} else {
+			opts.ScheduleToCloseTimeout = 5 * time.Second
+		}
+		actCtx := workflow.WithActivityOptions(ctx, opts)
+		var res string
+		err := workflow.ExecuteActivity(actCtx, action.ExecuteActivity.Name,
+			action.ExecuteActivity.Args...).Get(ctx, &res)
+		return true, res, err
+
+	default:
+		return true, nil, fmt.Errorf("unrecognized action")
 	}
-	return params.Result, nil
+	return false, nil, nil
 }

@@ -6,9 +6,11 @@ import inspect
 import itertools
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
-from typing import Any, Callable, Iterable, Mapping, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 
+import google.protobuf.duration_pb2
+import google.protobuf.timestamp_pb2
 import typing_extensions
 
 import temporalio.activity
@@ -18,6 +20,7 @@ import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.activity_task
 import temporalio.bridge.worker
 import temporalio.client
+import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow_service
 
@@ -53,7 +56,7 @@ class Worker:
         for name, activity in activities.items():
             if not callable(activity):
                 raise TypeError(f"Activity {name} is not callable")
-            if not inspect.isgeneratorfunction(activity) and not activity_executor:
+            if not inspect.iscoroutinefunction(activity) and not activity_executor:
                 raise ValueError(
                     f"Activity {name} is not async so an activity_executor must be present"
                 )
@@ -130,7 +133,8 @@ class Worker:
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
         )
-        self._started = False
+        self._running_activities: Dict[bytes, asyncio.Future] = {}
+        self._task: Optional[asyncio.Task] = None
 
     def config(self) -> WorkerConfig:
         """Config, as a dictionary, used to create this worker.
@@ -141,14 +145,33 @@ class Worker:
         config["activities"] = dict(config["activities"])
         return config
 
+    @property
+    def task_queue(self) -> str:
+        return self._config["task_queue"]
+
+    async def __aenter__(self) -> Worker:
+        self._start()
+        return self
+
+    async def __aexit__(self, *args) -> None:
+        await self.shutdown()
+
     async def run(self) -> None:
-        if self._started:
-            raise RuntimeError("Run already called")
-        self._started = True
-        await asyncio.wait([self._run_activities()])
+        await self._start()
+
+    def _start(self) -> asyncio.Task:
+        if self._task:
+            raise RuntimeError("Already started")
+        self._task = asyncio.create_task(
+            asyncio.wait([asyncio.create_task(self._run_activities())])
+        )
+        return self._task
 
     async def shutdown(self) -> None:
+        if not self._task:
+            raise RuntimeError("Never started")
         await self._bridge_worker.shutdown()
+        await self._task
 
     async def _run_activities(self) -> None:
         # Continually poll for activity work
@@ -159,12 +182,13 @@ class Worker:
 
                 if task.HasField("start"):
                     try:
-                        await self._start_activity(task.start)
+                        await self._start_activity(task.task_token, task.start)
                     except Exception as err:
                         logger.warning(
                             "Failed starting activity %s due to %s",
                             task.start.activity_type,
                             err,
+                            exc_info=True,
                         )
                         # If failed to start, report failure
                         await self._bridge_worker.complete_activity_task(
@@ -189,7 +213,7 @@ class Worker:
         raise NotImplementedError
 
     async def _start_activity(
-        self, start: temporalio.bridge.proto.activity_task.Start
+        self, task_token: bytes, start: temporalio.bridge.proto.activity_task.Start
     ) -> None:
         # Find activity or fail
         fn = self._config["activities"].get(start.activity_type)
@@ -202,15 +226,154 @@ class Worker:
             )
 
         # Convert arguments
-        # TODO(cretz): Support passing type-hints for help in converting
+        arg_types, ret_type = await temporalio.converter.type_hints_from_func(
+            fn, require_arg_count=len(start.input)
+        )
         converter = self._config["client"].data_converter
-        args = await converter.decode()
-        raise NotImplementedError
+        try:
+            args = (
+                []
+                if not start.input
+                else await converter.decode(start.input, type_hints=arg_types)
+            )
+        except Exception as err:
+            raise temporalio.exceptions.ApplicationError(
+                "Failed decoding arguments", non_retryable=True
+            ) from err
+
+        # Convert heartbeat details
+        # TODO(cretz): Allow some way to configure heartbeat type hinting?
+        try:
+            heartbeat_details = (
+                [] if not start.input else converter.decode(start.heartbeat_details)
+            )
+        except Exception as err:
+            raise temporalio.exceptions.ApplicationError(
+                "Failed decoding heartbeat details", non_retryable=True
+            ) from err
+
+        # Build info
+        info = temporalio.activity.Info(
+            activity_id=start.activity_id,
+            activity_type=start.activity_type,
+            attempt=start.attempt,
+            heartbeat_details=heartbeat_details,
+            heartbeat_timeout=_proto_maybe_timedelta(start.heartbeat_timeout)
+            if start.HasField("heartbeat_timeout")
+            else None,
+            schedule_to_close_timeout=_proto_maybe_timedelta(
+                start.schedule_to_close_timeout
+            )
+            if start.HasField("schedule_to_close_timeout")
+            else None,
+            scheduled_time=_proto_maybe_datetime(start.scheduled_time)
+            if start.HasField("scheduled_time")
+            else None,
+            start_to_close_timeout=_proto_maybe_timedelta(start.start_to_close_timeout)
+            if start.HasField("start_to_close_timeout")
+            else None,
+            started_time=_proto_maybe_datetime(start.started_time)
+            if start.HasField("started_time")
+            else None,
+            task_queue=self._config["task_queue"],
+            task_token=task_token,
+            workflow_id=start.workflow_execution.workflow_id,
+            workflow_namespace=start.workflow_namespace,
+            workflow_run_id=start.workflow_execution.run_id,
+            workflow_type=start.workflow_type,
+            _fn=fn,
+            _args=args,
+        )
+
+        # We run the activity inside the executor if given. There are
+        # three ways to run - non-async executor, async executor, and async
+        # non-executor.
+        executor = (
+            self._config["async_activity_executor"]
+            if inspect.iscoroutinefunction(fn)
+            else self._config["activity_executor"]
+        )
+        future: asyncio.Future[Any]
+        if executor:
+            future = asyncio.get_running_loop().run_in_executor(
+                executor, self._run_activity, info
+            )
+        else:
+            future = asyncio.ensure_future(self._run_activity(info))
+        self._running_activities[task_token] = future
 
     def _cancel_activity(
         self, cancel: temporalio.bridge.proto.activity_task.Start
     ) -> None:
         raise NotImplementedError
+
+    def _heartbeat_activity(self, task_token: bytes, *details: Any) -> None:
+        raise NotImplementedError
+
+    async def _run_activity(self, info: temporalio.activity.Info) -> None:
+        # We choose to surround interceptor creation and activity invocation in
+        # a try block so we can mark the workflow as failed on any error instead
+        # of having error handling in the interceptor
+        completion = temporalio.bridge.proto.ActivityTaskCompletion(
+            task_token=info.task_token
+        )
+        try:
+            # Set the context early so the logging adapter works
+            temporalio.activity._Context.set(
+                temporalio.activity._Context(info=lambda: info, heartbeat=None)
+            )
+            temporalio.activity.logger.debug("Starting activity")
+
+            # Build the interceptors chaining in reverse. We build a context right
+            # now even though the info() can't be intercepted and heartbeat() will
+            # fail. The interceptors may want to use the info() during init.
+            impl: ActivityInboundInterceptor = _ActivityInboundImpl()
+            for interceptor in reversed(list(self._config["interceptors"])):
+                impl = interceptor.intercept_activity(impl)
+            # Init
+            impl.init(_ActivityOutboundImpl(self, info))
+            # Exec
+            result = await impl.execute_activity(ExecuteActivityInput(args=info._args))
+            # Convert result if not none. Since Python essentially only supports
+            # single result types (even if they are tuples), we will do the
+            # same.
+            if result is None:
+                completion.result.completed.SetInParent()
+            else:
+                result_payloads = await self._config["client"].data_converter.encode(
+                    [result]
+                )
+                # We have to convert from Temporal API payload to Core payload
+                completion.result.completed.result.metadata.update(
+                    result_payloads[0].metadata
+                )
+                completion.result.completed.result.data = result_payloads[0].data
+        except temporalio.activity.CompleteAsyncError:
+            temporalio.activity.logger.debug("Completing asynchronously")
+            completion.result.will_complete_async.SetInParent()
+        except temporalio.activity.CancelledError:
+            temporalio.activity.logger.debug("Completing as cancelled")
+            # We intentionally have a separate activity CancelledError so we
+            # don't accidentally bubble a cancellation that happened for another
+            # reason
+            await temporalio.exceptions.apply_error_to_failure(
+                # TODO(cretz): Should use some other message?
+                temporalio.exceptions.CancelledError("Cancelled"),
+                self._config["client"].data_converter,
+                completion.result.cancelled.failure,
+            )
+        except Exception as err:
+            temporalio.activity.logger.debug(
+                "Completing as failed", extra={"error": err}
+            )
+            await temporalio.exceptions.apply_exception_to_failure(
+                err,
+                self._config["client"].data_converter,
+                completion.result.cancelled.failure,
+            )
+
+        # Send task completion to core
+        await self._bridge_worker.complete_activity_task(completion)
 
 
 class WorkerConfig(typing_extensions.TypedDict):
@@ -235,10 +398,6 @@ class WorkerConfig(typing_extensions.TypedDict):
     default_heartbeat_throttle_interval: timedelta
 
 
-class _Activity:
-    pass
-
-
 @dataclass
 class ExecuteActivityInput:
     args: Iterable[Any]
@@ -258,8 +417,8 @@ class ActivityInboundInterceptor:
     def init(self, outbound: ActivityOutboundInterceptor) -> None:
         self.next.init(outbound)
 
-    def execute_activity(self, input: ExecuteActivityInput) -> Any:
-        return self.next.execute_activity(input)
+    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
+        return await self.next.execute_activity(input)
 
 
 class ActivityOutboundInterceptor:
@@ -271,3 +430,54 @@ class ActivityOutboundInterceptor:
 
     def heartbeat(self, *details: Any) -> None:
         self.next.heartbeat(*details)
+
+
+class _ActivityInboundImpl(ActivityInboundInterceptor):
+    def __init__(self) -> None:
+        # We are intentionally not calling the base class's __init__ here
+        pass
+
+    def init(self, outbound: ActivityOutboundInterceptor) -> None:
+        # Set the context callables. We are setting values instead of replacing
+        # the context just in case other interceptors held a reference.
+        context = temporalio.activity._Context.current()
+        context.info = outbound.info
+        context.heartbeat = outbound.heartbeat
+
+    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
+        # Await asyncs, otherwise just run
+        info = temporalio.activity.info()
+        if inspect.iscoroutinefunction(info._fn):
+            return await info._fn(*input.args)
+        return info._fn(*input.args)
+
+
+class _ActivityOutboundImpl(ActivityOutboundInterceptor):
+    def __init__(self, worker: Worker, info: temporalio.activity.Info) -> None:
+        # We are intentionally not calling the base class's __init__ here
+        self._worker = worker
+        self._info = info
+
+    def info(self) -> temporalio.activity.Info:
+        return self._info
+
+    def heartbeat(self, *details: Any) -> None:
+        info = temporalio.activity.info()
+        self._worker._heartbeat_activity(info.task_token, *details)
+
+
+def _proto_maybe_timedelta(
+    dur: google.protobuf.duration_pb2.Duration,
+) -> Optional[timedelta]:
+    if dur.seconds == 0 and dur.nanos == 0:
+        return None
+    return dur.ToTimedelta()
+
+
+def _proto_maybe_datetime(
+    ts: google.protobuf.timestamp_pb2.Timestamp,
+) -> Optional[datetime]:
+    if ts.seconds == 0 and ts.nanos == 0:
+        return None
+    # Protobuf doesn't set the timezone but we want to
+    return ts.ToDatetime().replace(tzinfo=timezone.utc)

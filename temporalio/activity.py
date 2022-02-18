@@ -1,6 +1,15 @@
+from __future__ import annotations
+
+import contextvars
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, NoReturn, Optional
+
+import temporalio.exceptions
+
+# TODO(cretz): Use logging adapter
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -20,22 +29,53 @@ class Info:
     workflow_namespace: str
     workflow_run_id: str
     workflow_type: str
+    _fn: Callable[..., Any]
+    _args: Iterable[Any]
+
+
+_current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("activity")
 
 
 @dataclass
-class Context:
-    def __init__(
-        self, info: Callable[[], Info], heartbeat: Callable[..., None]
-    ) -> None:
-        self._info = info
-        self._heartbeat = heartbeat
+class _Context:
+    info: Callable[[], Info]
+    # This is optional because during interceptor init it is not present
+    heartbeat: Optional[Callable[..., None]]
 
-    def info(self) -> Info:
-        return self._info()
+    @staticmethod
+    def current() -> _Context:
+        context = _current_context.get(None)
+        if not context:
+            raise RuntimeError("Not in activity context")
+        return context
 
-    def heartbeat(self, *details: Any) -> None:
-        self._heartbeat(*details)
+    @staticmethod
+    def set(context: _Context) -> None:
+        _current_context.set(context)
 
 
-def current() -> Context:
+def in_activity() -> bool:
+    return not _current_context.get(None) is None
+
+
+def info() -> Info:
+    return _Context.current().info()
+
+
+def heartbeat(*details: Any):
+    heartbeat_fn = _Context.current().heartbeat
+    if not heartbeat_fn:
+        raise RuntimeError("Can only execute heartbeat after interceptor init")
+    heartbeat_fn(*details)
+
+
+def raise_complete_async() -> NoReturn:
+    raise CompleteAsyncError()
+
+
+class CompleteAsyncError(temporalio.exceptions.TemporalError):
+    pass
+
+
+class CancelledError(temporalio.exceptions.TemporalError):
     pass

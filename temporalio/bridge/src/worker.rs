@@ -35,6 +35,8 @@ pub struct WorkerConfig {
 }
 
 pub fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> PyResult<WorkerRef> {
+    // This must be run with the Tokio context available
+    let _guard = pyo3_asyncio::tokio::get_runtime().enter();
     let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
     Ok(WorkerRef {
         worker: std::sync::Arc::new(temporal_sdk_core::init_worker_from_upgradeable_client(

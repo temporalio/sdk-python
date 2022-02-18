@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 mod client;
+mod telemetry;
 mod worker;
 
 #[pymodule]
@@ -9,6 +10,10 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("RPCError", py.get_type::<client::RPCError>())?;
     m.add_class::<client::ClientRef>()?;
     m.add_function(wrap_pyfunction!(connect_client, m)?)?;
+
+    // Telemetry stuff
+    m.add_class::<telemetry::TelemetryRef>()?;
+    m.add_function(wrap_pyfunction!(init_telemetry, m)?)?;
 
     // Worker stuff
     m.add(
@@ -26,7 +31,12 @@ fn connect_client(py: Python, config: client::ClientConfig) -> PyResult<&PyAny> 
 }
 
 #[pyfunction]
-pub fn new_worker(
+fn init_telemetry(config: telemetry::TelemetryConfig) -> PyResult<telemetry::TelemetryRef> {
+    telemetry::init_telemetry(config)
+}
+
+#[pyfunction]
+fn new_worker(
     client: &client::ClientRef,
     config: worker::WorkerConfig,
 ) -> PyResult<worker::WorkerRef> {

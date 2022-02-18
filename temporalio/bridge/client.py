@@ -58,8 +58,6 @@ class Client:
         """Establish connection with server."""
         return Client(await temporal_sdk_bridge.connect_client(config))
 
-    _ref: temporal_sdk_bridge.ClientRef
-
     def __init__(self, ref: temporal_sdk_bridge.ClientRef):
         """Initialize client with underlying SDK Core reference."""
         self._ref = ref

@@ -35,7 +35,7 @@ class Worker:
     def __init__(
         self, client: temporalio.bridge.client.Client, config: WorkerConfig
     ) -> None:
-        self._ref = temporal_sdk_bridge.new_worker(client, config)
+        self._ref = temporal_sdk_bridge.new_worker(client._ref, config)
 
     async def poll_workflow_activation(
         self,

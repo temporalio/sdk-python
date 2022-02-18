@@ -30,6 +30,7 @@ py_fixes = [
 
 pyi_fixes = [
     partial(re.compile(r"temporal\.api\.").sub, r"temporalio.api."),
+    partial(re.compile(r"temporal\.sdk\.core\.").sub, r"temporalio.bridge.proto."),
 ]
 
 find_message_re = re.compile(r"_sym_db\.RegisterMessage\(([^\)\.]+)\)")

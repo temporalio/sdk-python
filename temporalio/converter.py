@@ -27,7 +27,8 @@ class DataConverter(ABC):
 
         Returns:
             Converted payloads. Note, this does not have to be the same number
-            as values given, but at least one must be present.
+            as values given, but must be at least one and cannot be more than
+            was given.
 
         Raises:
             Exception: Any issue during conversion.
@@ -418,6 +419,16 @@ def default() -> CompositeDataConverter:
     )
 
 
+async def encode_payloads(
+    values: Iterable[Any], converter: DataConverter
+) -> temporalio.api.common.v1.Payloads:
+    """Encode :py:class:`temporalio.api.common.v1.Payloads` with the given
+    converter.
+    """
+
+    return temporalio.api.common.v1.Payloads(payloads=await converter.encode(values))
+
+
 async def decode_payloads(
     payloads: Optional[temporalio.api.common.v1.Payloads], converter: DataConverter
 ) -> List[Any]:
@@ -430,6 +441,7 @@ async def decode_payloads(
 
 
 async def type_hints_from_func(
-    func: Callable[..., Any], require_arg_count: int = -1
+    func: Callable[..., Any], *, require_arg_count: int = -1
 ) -> Tuple[Optional[List[Type]], Optional[Type]]:
-    raise NotImplementedError
+    # TODO(cretz): This
+    return (None, None)

@@ -8,6 +8,7 @@ name = "temporal_sdk_bridge"
 crate-type = ["cdylib"]
 
 [dependencies]
+log = "0.4"
 prost = "0.9"
 prost-types = "0.9"
 pyo3 = { version = "0.15", features = ["extension-module"] }

@@ -16,6 +16,7 @@ import grpc
 
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
+import temporalio.bridge.telemetry
 import temporalio.exceptions
 
 WorkflowServiceRequest = TypeVar(
@@ -382,6 +383,11 @@ class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceRespons
 class _BridgeWorkflowService(WorkflowService):
     @staticmethod
     async def connect(config: ConnectConfig) -> _BridgeWorkflowService:
+        # TODO(cretz): Expose telemetry init config
+        temporalio.bridge.telemetry.init_telemetry(
+            temporalio.bridge.telemetry.TelemetryConfig()
+        )
+
         return _BridgeWorkflowService(
             config,
             await temporalio.bridge.client.Client.connect(config._to_bridge_config()),
