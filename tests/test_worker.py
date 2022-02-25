@@ -1,3 +1,4 @@
+import concurrent.futures
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -8,10 +9,15 @@ import pytest
 import temporalio.activity
 import temporalio.client
 import temporalio.worker
-from tests.fixtures import utils
+from tests.helpers.worker import (
+    KSAction,
+    KSExecuteActivityAction,
+    KSWorkflowParams,
+    Worker,
+)
 
 
-async def test_activity_hello(client: temporalio.client.Client, worker: utils.Worker):
+async def test_activity_hello(client: temporalio.client.Client, worker: Worker):
     async def say_hello(name: str) -> str:
         return f"Hello, {name}!"
 
@@ -21,7 +27,7 @@ async def test_activity_hello(client: temporalio.client.Client, worker: utils.Wo
     assert result.result == "Hello, Temporal!"
 
 
-async def test_activity_info(client: temporalio.client.Client, worker: utils.Worker):
+async def test_activity_info(client: temporalio.client.Client, worker: Worker):
     # Make sure info call outside of activity context fails
     assert not temporalio.activity.in_activity()
     with pytest.raises(RuntimeError) as err:
@@ -57,10 +63,69 @@ async def test_activity_info(client: temporalio.client.Client, worker: utils.Wor
     assert info.workflow_type == "kitchen_sink"
 
 
-# async def test_activity_failure():
+async def test_sync_activity_thread(client: temporalio.client.Client, worker: Worker):
+    def some_activity() -> str:
+        return f"activity name: {temporalio.activity.info().activity_type}"
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            some_activity,
+            worker_config={"activity_executor": executor},
+        )
+    assert result.result == "activity name: some_activity"
+
+
+def picklable_activity() -> str:
+    return f"activity name: {temporalio.activity.info().activity_type}"
+
+
+async def test_sync_activity_process(client: temporalio.client.Client, worker: Worker):
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            picklable_activity,
+            worker_config={"activity_executor": executor},
+        )
+    assert result.result == "activity name: picklable_activity"
+
+
+async def test_sync_activity_process_non_picklable(
+    client: temporalio.client.Client, worker: Worker
+):
+    def some_activity() -> str:
+        return f"activity name: {temporalio.activity.info().activity_type}"
+
+    with pytest.raises(TypeError) as err:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            result = await _execute_workflow_with_activity(
+                client,
+                worker,
+                some_activity,
+                worker_config={"activity_executor": executor},
+            )
+    assert "must be picklable when using a process executor" in str(err.value)
+
+
+# async def test_sync_activity_process_non_picklable(client: temporalio.client.Client, worker: utils.Worker):
+#     TODO(cretz): Make an eager error for process executors w/ non-picklable funcs
+#     raise NotImplementedError
+
+# async def test_activity_failure(client: temporalio.client.Client, worker: utils.Worker):
+#     raise NotImplementedError
+
+# async def test_activity_bad_params(client: temporalio.client.Client, worker: utils.Worker):
 #     raise NotImplementedError
 
 # async def test_activity_cancel():
+#     raise NotImplementedError
+
+# async def test_sync_activity_thread_cancel():
+#     raise NotImplementedError
+
+# async def test_sync_activity_process_cancel():
 #     raise NotImplementedError
 
 # async def test_activity_catch_cancel():
@@ -87,6 +152,12 @@ async def test_activity_info(client: temporalio.client.Client, worker: utils.Wor
 # async def test_activity_heartbeat():
 #     raise NotImplementedError
 
+# async def test_sync_activity_thread_heartbeat():
+#     raise NotImplementedError
+
+# async def test_sync_activity_process_heartbeat():
+#     raise NotImplementedError
+
 # async def test_activity_retry():
 #     raise NotImplementedError
 
@@ -106,21 +177,25 @@ class _ActivityResult:
 
 async def _execute_workflow_with_activity(
     client: temporalio.client.Client,
-    worker: utils.Worker,
+    worker: Worker,
     fn: Callable,
     *args: Any,
     start_to_close_timeout_ms: Optional[int] = None,
+    worker_config: temporalio.worker.WorkerConfig = {},
 ) -> _ActivityResult:
     act_task_queue = str(uuid.uuid4())
     async with temporalio.worker.Worker(
-        client, task_queue=act_task_queue, activities={fn.__name__: fn}
+        client,
+        task_queue=act_task_queue,
+        activities={fn.__name__: fn},
+        **worker_config,
     ):
         handle = await client.start_workflow(
             "kitchen_sink",
-            utils.KSWorkflowParams(
+            KSWorkflowParams(
                 actions=[
-                    utils.KSAction(
-                        execute_activity=utils.KSExecuteActivityAction(
+                    KSAction(
+                        execute_activity=KSExecuteActivityAction(
                             name=fn.__name__,
                             task_queue=act_task_queue,
                             args=args,

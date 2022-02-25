@@ -9,16 +9,26 @@ import temporalio.api.workflowservice.v1
 import temporalio.client
 import temporalio.common
 import temporalio.exceptions
-from tests.fixtures import utils
+from tests.helpers.worker import (
+    KSAction,
+    KSContinueAsNewAction,
+    KSErrorAction,
+    KSQueryHandlerAction,
+    KSResultAction,
+    KSSignalAction,
+    KSSleepAction,
+    KSWorkflowParams,
+    Worker,
+)
 
 
-async def test_start_id_reuse(client: temporalio.client.Client, worker: utils.Worker):
+async def test_start_id_reuse(client: temporalio.client.Client, worker: Worker):
     # Run to return "some result"
     id = str(uuid.uuid4())
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[utils.KSAction(result=utils.KSResultAction(value="some result"))]
+        KSWorkflowParams(
+            actions=[KSAction(result=KSResultAction(value="some result"))]
         ),
         id=id,
         task_queue=worker.task_queue,
@@ -29,10 +39,8 @@ async def test_start_id_reuse(client: temporalio.client.Client, worker: utils.Wo
     with pytest.raises(temporalio.client.RPCError) as err:
         handle = await client.start_workflow(
             "kitchen_sink",
-            utils.KSWorkflowParams(
-                actions=[
-                    utils.KSAction(result=utils.KSResultAction(value="some result 2"))
-                ]
+            KSWorkflowParams(
+                actions=[KSAction(result=KSResultAction(value="some result 2"))]
             ),
             id=id,
             task_queue=worker.task_queue,
@@ -44,8 +52,8 @@ async def test_start_id_reuse(client: temporalio.client.Client, worker: utils.Wo
     # Run again allowing duplicate (the default)
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[utils.KSAction(result=utils.KSResultAction(value="some result 3"))]
+        KSWorkflowParams(
+            actions=[KSAction(result=KSResultAction(value="some result 3"))]
         ),
         id=id,
         task_queue=worker.task_queue,
@@ -53,33 +61,27 @@ async def test_start_id_reuse(client: temporalio.client.Client, worker: utils.Wo
     assert "some result 3" == await handle.result()
 
 
-async def test_start_with_signal(
-    client: temporalio.client.Client, worker: utils.Worker
-):
+async def test_start_with_signal(client: temporalio.client.Client, worker: Worker):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(action_signal="my-signal"),
+        KSWorkflowParams(action_signal="my-signal"),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
         start_signal="my-signal",
-        start_signal_args=[
-            utils.KSAction(result=utils.KSResultAction(value="some signal arg"))
-        ],
+        start_signal_args=[KSAction(result=KSResultAction(value="some signal arg"))],
     )
     assert "some signal arg" == await handle.result()
 
 
 async def test_result_follow_continue_as_new(
-    client: temporalio.client.Client, worker: utils.Worker
+    client: temporalio.client.Client, worker: Worker
 ):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
+        KSWorkflowParams(
             actions=[
-                utils.KSAction(
-                    continue_as_new=utils.KSContinueAsNewAction(while_above_zero=1)
-                ),
-                utils.KSAction(result=utils.KSResultAction(run_id=True)),
+                KSAction(continue_as_new=KSContinueAsNewAction(while_above_zero=1)),
+                KSAction(result=KSResultAction(run_id=True)),
             ],
         ),
         id=str(uuid.uuid4()),
@@ -95,13 +97,13 @@ async def test_result_follow_continue_as_new(
     assert err.value.new_execution_run_id == final_run_id
 
 
-async def test_workflow_failed(client: temporalio.client.Client, worker: utils.Worker):
+async def test_workflow_failed(client: temporalio.client.Client, worker: Worker):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
+        KSWorkflowParams(
             actions=[
-                utils.KSAction(
-                    error=utils.KSErrorAction(
+                KSAction(
+                    error=KSErrorAction(
                         message="some error", details={"foo": "bar", "baz": 123.45}
                     )
                 )
@@ -117,12 +119,10 @@ async def test_workflow_failed(client: temporalio.client.Client, worker: utils.W
     assert err.value.cause.details[0] == {"foo": "bar", "baz": 123.45}
 
 
-async def test_cancel(client: temporalio.client.Client, worker: utils.Worker):
+async def test_cancel(client: temporalio.client.Client, worker: Worker):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[utils.KSAction(sleep=utils.KSSleepAction(millis=50000))]
-        ),
+        KSWorkflowParams(actions=[KSAction(sleep=KSSleepAction(millis=50000))]),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
     )
@@ -132,12 +132,10 @@ async def test_cancel(client: temporalio.client.Client, worker: utils.Worker):
     assert isinstance(err.value.cause, temporalio.exceptions.CancelledError)
 
 
-async def test_terminate(client: temporalio.client.Client, worker: utils.Worker):
+async def test_terminate(client: temporalio.client.Client, worker: Worker):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[utils.KSAction(sleep=utils.KSSleepAction(millis=50000))]
-        ),
+        KSWorkflowParams(actions=[KSAction(sleep=KSSleepAction(millis=50000))]),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
     )
@@ -155,12 +153,10 @@ async def test_cancel_not_found(client: temporalio.client.Client):
     assert err.value.status == temporalio.client.RPCStatusCode.NOT_FOUND
 
 
-async def test_describe(client: temporalio.client.Client, worker: utils.Worker):
+async def test_describe(client: temporalio.client.Client, worker: Worker):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[utils.KSAction(result=utils.KSResultAction(value="some value"))]
-        ),
+        KSWorkflowParams(actions=[KSAction(result=KSResultAction(value="some value"))]),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
     )
@@ -173,15 +169,11 @@ async def test_describe(client: temporalio.client.Client, worker: utils.Worker):
     )
 
 
-async def test_query(client: temporalio.client.Client, worker: utils.Worker):
+async def test_query(client: temporalio.client.Client, worker: Worker):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[
-                utils.KSAction(
-                    query_handler=utils.KSQueryHandlerAction(name="some query")
-                )
-            ]
+        KSWorkflowParams(
+            actions=[KSAction(query_handler=KSQueryHandlerAction(name="some query"))]
         ),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
@@ -195,16 +187,14 @@ async def test_query(client: temporalio.client.Client, worker: utils.Worker):
     assert err.value.status == temporalio.client.RPCStatusCode.INVALID_ARGUMENT
 
 
-async def test_query_rejected(client: temporalio.client.Client, worker: utils.Worker):
+async def test_query_rejected(client: temporalio.client.Client, worker: Worker):
     # Make a queryable workflow that waits on a signal
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
+        KSWorkflowParams(
             actions=[
-                utils.KSAction(
-                    query_handler=utils.KSQueryHandlerAction(name="some query")
-                ),
-                utils.KSAction(signal=utils.KSSignalAction(name="some signal")),
+                KSAction(query_handler=KSQueryHandlerAction(name="some query")),
+                KSAction(signal=KSSignalAction(name="some signal")),
             ],
         ),
         id=str(uuid.uuid4()),
@@ -229,27 +219,25 @@ async def test_query_rejected(client: temporalio.client.Client, worker: utils.Wo
     assert err.value.status == temporalio.client.WorkflowExecutionStatus.COMPLETED
 
 
-async def test_signal(client: temporalio.client.Client, worker: utils.Worker):
+async def test_signal(client: temporalio.client.Client, worker: Worker):
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(action_signal="some signal"),
+        KSWorkflowParams(action_signal="some signal"),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
     )
     await handle.signal(
         "some signal",
-        utils.KSAction(result=utils.KSResultAction(value="some signal arg")),
+        KSAction(result=KSResultAction(value="some signal arg")),
     )
     assert "some signal arg" == await handle.result()
 
 
-async def test_retry_policy(client: temporalio.client.Client, worker: utils.Worker):
+async def test_retry_policy(client: temporalio.client.Client, worker: Worker):
     # Make the workflow retry 3 times w/ no real backoff
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[utils.KSAction(error=utils.KSErrorAction(attempt=True))]
-        ),
+        KSWorkflowParams(actions=[KSAction(error=KSErrorAction(attempt=True))]),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
         retry_policy=temporalio.common.RetryPolicy(
@@ -264,17 +252,13 @@ async def test_retry_policy(client: temporalio.client.Client, worker: utils.Work
 
 
 async def test_single_client_config_change(
-    client: temporalio.client.Client, worker: utils.Worker
+    client: temporalio.client.Client, worker: Worker
 ):
     # Make sure normal query works on completed workflow
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
-            actions=[
-                utils.KSAction(
-                    query_handler=utils.KSQueryHandlerAction(name="some query")
-                )
-            ]
+        KSWorkflowParams(
+            actions=[KSAction(query_handler=KSQueryHandlerAction(name="some query"))]
         ),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
@@ -339,7 +323,7 @@ class TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         return await super().terminate_workflow(input)
 
 
-async def test_interceptor(client: temporalio.client.Client, worker: utils.Worker):
+async def test_interceptor(client: temporalio.client.Client, worker: Worker):
     # Create new client from existing client but with a tracing interceptor
     interceptor = TracingClientInterceptor()
     config = client.config()
@@ -348,12 +332,10 @@ async def test_interceptor(client: temporalio.client.Client, worker: utils.Worke
     # Do things that would trigger the interceptors
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(
+        KSWorkflowParams(
             actions=[
-                utils.KSAction(
-                    query_handler=utils.KSQueryHandlerAction(name="some query")
-                ),
-                utils.KSAction(signal=utils.KSSignalAction(name="some signal")),
+                KSAction(query_handler=KSQueryHandlerAction(name="some query")),
+                KSAction(signal=KSSignalAction(name="some signal")),
             ],
         ),
         id=str(uuid.uuid4()),
@@ -381,9 +363,7 @@ async def test_interceptor(client: temporalio.client.Client, worker: utils.Worke
     assert interceptor.traces[4][1].id == handle.id
 
 
-async def test_interceptor_callable(
-    client: temporalio.client.Client, worker: utils.Worker
-):
+async def test_interceptor_callable(client: temporalio.client.Client, worker: Worker):
     # Create new client from existing client but with a tracing interceptor
     # callable and only check a simple call
     interceptor = TracingClientInterceptor()
@@ -392,7 +372,7 @@ async def test_interceptor_callable(
     client = temporalio.client.Client(**config)
     handle = await client.start_workflow(
         "kitchen_sink",
-        utils.KSWorkflowParams(),
+        KSWorkflowParams(),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
     )

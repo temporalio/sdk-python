@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextvars
 import inspect
 import itertools
 import logging
+import pickle
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional
@@ -35,7 +37,6 @@ class Worker:
         task_queue: str,
         activities: Mapping[str, Callable] = {},
         activity_executor: Optional[concurrent.futures.Executor] = None,
-        async_activity_executor: Optional[concurrent.futures.Executor] = None,
         interceptors: Iterable[Interceptor] = [],
         max_cached_workflows: int = 0,
         max_outstanding_workflow_tasks: int = 100,
@@ -56,10 +57,24 @@ class Worker:
         for name, activity in activities.items():
             if not callable(activity):
                 raise TypeError(f"Activity {name} is not callable")
-            if not inspect.iscoroutinefunction(activity) and not activity_executor:
-                raise ValueError(
-                    f"Activity {name} is not async so an activity_executor must be present"
-                )
+            if not inspect.iscoroutinefunction(activity):
+                if not activity_executor:
+                    raise ValueError(
+                        f"Activity {name} is not async so an activity_executor must be present"
+                    )
+                elif isinstance(
+                    activity_executor, concurrent.futures.ProcessPoolExecutor
+                ):
+                    # The function must be picklable for use in process
+                    # executors, we we perform this eager check to fail at
+                    # registration time
+                    # TODO(cretz): Is this too expensive/unnecessary?
+                    try:
+                        pickle.dumps(activity)
+                    except Exception as err:
+                        raise TypeError(
+                            f"Activity {name} must be picklable when using a process executor"
+                        ) from err
 
         # Prepend applicable client interceptors to the given ones
         interceptors = itertools.chain(
@@ -119,7 +134,6 @@ class Worker:
             task_queue=task_queue,
             activities=activities,
             activity_executor=activity_executor,
-            async_activity_executor=async_activity_executor,
             interceptors=interceptors,
             max_cached_workflows=max_cached_workflows,
             max_outstanding_workflow_tasks=max_outstanding_workflow_tasks,
@@ -281,26 +295,18 @@ class Worker:
             workflow_namespace=start.workflow_namespace,
             workflow_run_id=start.workflow_execution.run_id,
             workflow_type=start.workflow_type,
-            _fn=fn,
-            _args=args,
+        )
+        input = ExecuteActivityInput(
+            fn=fn,
+            args=args,
+            executor=None
+            if inspect.iscoroutinefunction(fn)
+            else self._config["activity_executor"],
         )
 
-        # We run the activity inside the executor if given. There are
-        # three ways to run - non-async executor, async executor, and async
-        # non-executor.
-        executor = (
-            self._config["async_activity_executor"]
-            if inspect.iscoroutinefunction(fn)
-            else self._config["activity_executor"]
+        self._running_activities[task_token] = asyncio.ensure_future(
+            self._run_activity(info, input)
         )
-        future: asyncio.Future[Any]
-        if executor:
-            future = asyncio.get_running_loop().run_in_executor(
-                executor, self._run_activity, info
-            )
-        else:
-            future = asyncio.ensure_future(self._run_activity(info))
-        self._running_activities[task_token] = future
 
     def _cancel_activity(
         self, cancel: temporalio.bridge.proto.activity_task.Start
@@ -310,7 +316,9 @@ class Worker:
     def _heartbeat_activity(self, task_token: bytes, *details: Any) -> None:
         raise NotImplementedError
 
-    async def _run_activity(self, info: temporalio.activity.Info) -> None:
+    async def _run_activity(
+        self, info: temporalio.activity.Info, input: ExecuteActivityInput
+    ) -> None:
         # We choose to surround interceptor creation and activity invocation in
         # a try block so we can mark the workflow as failed on any error instead
         # of having error handling in the interceptor
@@ -318,7 +326,8 @@ class Worker:
             task_token=info.task_token
         )
         try:
-            # Set the context early so the logging adapter works
+            # Set the context early so the logging adapter works and
+            # interceptors have it
             temporalio.activity._Context.set(
                 temporalio.activity._Context(info=lambda: info, heartbeat=None)
             )
@@ -333,7 +342,7 @@ class Worker:
             # Init
             impl.init(_ActivityOutboundImpl(self, info))
             # Exec
-            result = await impl.execute_activity(ExecuteActivityInput(args=info._args))
+            result = await impl.execute_activity(input)
             # Convert result if not none. Since Python essentially only supports
             # single result types (even if they are tuples), we will do the
             # same.
@@ -364,7 +373,7 @@ class Worker:
             )
         except Exception as err:
             temporalio.activity.logger.debug(
-                "Completing as failed", extra={"error": err}
+                f"Completing as failed with error: {err}", extra={"error": err}
             )
             await temporalio.exceptions.apply_exception_to_failure(
                 err,
@@ -383,7 +392,6 @@ class WorkerConfig(typing_extensions.TypedDict):
     task_queue: str
     activities: Mapping[str, Callable]
     activity_executor: Optional[concurrent.futures.Executor]
-    async_activity_executor: Optional[concurrent.futures.Executor]
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int
     max_outstanding_workflow_tasks: int
@@ -400,7 +408,9 @@ class WorkerConfig(typing_extensions.TypedDict):
 
 @dataclass
 class ExecuteActivityInput:
+    fn: Callable[..., Any]
     args: Iterable[Any]
+    executor: Optional[concurrent.futures.Executor]
 
 
 class Interceptor:
@@ -446,10 +456,36 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         # Await asyncs, otherwise just run
-        info = temporalio.activity.info()
-        if inspect.iscoroutinefunction(info._fn):
-            return await info._fn(*input.args)
-        return info._fn(*input.args)
+        if not inspect.iscoroutinefunction(input.fn):
+            # We execute a top-level function via the executor. It is top-level
+            # because it needs to be picklable. Also, by default Python does not
+            # propagate contexts into executor futures so we don't either with
+            # the obvious exception of the info (if they want more, they can set
+            # the initializer on the executor).
+            # TODO(cretz): multiprocessing.Pipe-based heartbeat/cancel
+            # We always expect an executor
+            return await asyncio.get_running_loop().run_in_executor(
+                input.executor,
+                _execute_sync_activity,
+                temporalio.activity.info(),
+                input.fn,
+                *input.args,
+            )
+        return await input.fn(*input.args)
+
+
+# This has to be defined at the top-level to be picklable for process executors
+def _execute_sync_activity(
+    info: temporalio.activity.Info, fn: Callable[..., Any], *args: Any
+) -> Any:
+    temporalio.activity._Context.set(
+        temporalio.activity._Context(
+            info=lambda: info,
+            # TODO(cretz): Pipe-based heartbeater, canceller, etc
+            heartbeat=None,
+        )
+    )
+    return fn(*args)
 
 
 class _ActivityOutboundImpl(ActivityOutboundInterceptor):

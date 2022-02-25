@@ -1,0 +1,127 @@
+from __future__ import annotations
+
+import asyncio
+import os
+import uuid
+from abc import ABC, abstractmethod
+from typing import Optional
+
+import temporalio.api.workflowservice.v1
+import temporalio.client
+import tests.helpers.golang
+
+
+class Server(ABC):
+    @property
+    @abstractmethod
+    def host_port(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def target_url(self) -> str:
+        return f"http://{self.host_port}"
+
+    @property
+    @abstractmethod
+    def namespace(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def close(self):
+        raise NotImplementedError
+
+    async def new_client(self) -> temporalio.client.Client:
+        return await temporalio.client.Client.connect(
+            self.target_url, namespace=self.namespace
+        )
+
+    async def new_tls_client(self) -> Optional[temporalio.client.Client]:
+        return None
+
+
+class LocalhostDefaultServer(Server):
+    @property
+    def host_port(self):
+        return "localhost:7233"
+
+    @property
+    def namespace(self):
+        return "default"
+
+    async def close(self):
+        pass
+
+
+class ExternalGolangServer(Server):
+    @staticmethod
+    async def start() -> ExternalGolangServer:
+        namespace = f"test-namespace-{uuid.uuid4()}"
+        # TODO(cretz): Make this configurable?
+        port = "9233"
+        process = await tests.helpers.golang.start_external_go_process(
+            os.path.join(os.path.dirname(__file__), "golangserver"),
+            "golangserver",
+            port,
+            namespace,
+        )
+        server = ExternalGolangServer(
+            host_port=f"localhost:{port}",
+            tls_host_port=f"localhost:{int(port)+1000}",
+            namespace=namespace,
+            process=process,
+        )
+        # Try to get the client multiple times to check whether server is online
+        last_err: RuntimeError
+        for _ in range(10):
+            try:
+                await server.new_client()
+                return server
+            except RuntimeError as err:
+                last_err = err
+                await asyncio.sleep(0.1)
+        raise last_err
+
+    def __init__(
+        self,
+        *,
+        host_port: str,
+        tls_host_port: str,
+        namespace: str,
+        process: asyncio.subprocess.Process,
+    ) -> None:
+        super().__init__()
+        self._host_port = host_port
+        self._tls_host_port = tls_host_port
+        self._namespace = namespace
+        self._process = process
+
+    @property
+    def host_port(self) -> str:
+        return self._host_port
+
+    @property
+    def namespace(self) -> str:
+        return self._namespace
+
+    async def close(self):
+        self._process.terminate()
+        await self._process.wait()
+
+    async def new_tls_client(self) -> Optional[temporalio.client.Client]:
+        # Read certs
+        certs_dir = os.path.join(os.path.dirname(__file__), "golangserver", "certs")
+        with open(os.path.join(certs_dir, "server-ca-cert.pem"), "rb") as f:
+            server_root_ca_cert = f.read()
+        with open(os.path.join(certs_dir, "client-cert.pem"), "rb") as f:
+            client_cert = f.read()
+        with open(os.path.join(certs_dir, "client-key.pem"), "rb") as f:
+            client_private_key = f.read()
+        return await temporalio.client.Client.connect(
+            target_url=f"https://{self._tls_host_port}",
+            namespace=self._namespace,
+            tls_config=temporalio.client.TLSConfig(
+                server_root_ca_cert=server_root_ca_cert,
+                client_cert=client_cert,
+                client_private_key=client_private_key,
+            ),
+        )

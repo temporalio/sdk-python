@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import concurrent.futures
 import contextvars
 import logging
 from dataclasses import dataclass
@@ -29,8 +30,7 @@ class Info:
     workflow_namespace: str
     workflow_run_id: str
     workflow_type: str
-    _fn: Callable[..., Any]
-    _args: Iterable[Any]
+    # TODO(cretz): Add headers, current_attempt_scheduled_time, retry_policy, and is_local
 
 
 _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("activity")
