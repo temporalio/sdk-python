@@ -84,6 +84,7 @@ type ExecuteActivityAction struct {
 	TaskQueue             string        `json:"task_queue"`
 	Args                  []interface{} `json:"args"`
 	StartToCloseTimeoutMS int64         `json:"start_to_close_timeout_ms"`
+	CancelAfterMS         int64         `json:"cancel_after_ms"`
 }
 
 func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams) (interface{}, error) {
@@ -157,7 +158,8 @@ func handleAction(
 
 	case action.ExecuteActivity != nil:
 		opts := workflow.ActivityOptions{
-			TaskQueue: action.ExecuteActivity.TaskQueue,
+			TaskQueue:   action.ExecuteActivity.TaskQueue,
+			RetryPolicy: &temporal.RetryPolicy{MaximumAttempts: 1},
 		}
 		if action.ExecuteActivity.StartToCloseTimeoutMS > 0 {
 			opts.StartToCloseTimeout = time.Duration(action.ExecuteActivity.StartToCloseTimeoutMS) * time.Millisecond
@@ -165,6 +167,14 @@ func handleAction(
 			opts.ScheduleToCloseTimeout = 5 * time.Second
 		}
 		actCtx := workflow.WithActivityOptions(ctx, opts)
+		if action.ExecuteActivity.CancelAfterMS > 0 {
+			var cancel workflow.CancelFunc
+			actCtx, cancel = workflow.WithCancel(actCtx)
+			workflow.Go(actCtx, func(actCtx workflow.Context) {
+				workflow.Sleep(actCtx, time.Duration(action.ExecuteActivity.CancelAfterMS)*time.Millisecond)
+				cancel()
+			})
+		}
 		var res string
 		err := workflow.ExecuteActivity(actCtx, action.ExecuteActivity.Name,
 			action.ExecuteActivity.Args...).Get(ctx, &res)

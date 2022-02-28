@@ -1,3 +1,4 @@
+import asyncio
 import concurrent.futures
 import uuid
 from dataclasses import dataclass
@@ -8,6 +9,7 @@ import pytest
 
 import temporalio.activity
 import temporalio.client
+import temporalio.exceptions
 import temporalio.worker
 from tests.helpers.worker import (
     KSAction,
@@ -100,7 +102,7 @@ async def test_sync_activity_process_non_picklable(
 
     with pytest.raises(TypeError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            result = await _execute_workflow_with_activity(
+            await _execute_workflow_with_activity(
                 client,
                 worker,
                 some_activity,
@@ -109,18 +111,67 @@ async def test_sync_activity_process_non_picklable(
     assert "must be picklable when using a process executor" in str(err.value)
 
 
-# async def test_sync_activity_process_non_picklable(client: temporalio.client.Client, worker: utils.Worker):
-#     TODO(cretz): Make an eager error for process executors w/ non-picklable funcs
-#     raise NotImplementedError
+async def test_activity_failure(client: temporalio.client.Client, worker: Worker):
+    async def raise_error():
+        raise RuntimeError("oh no!")
 
-# async def test_activity_failure(client: temporalio.client.Client, worker: utils.Worker):
-#     raise NotImplementedError
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(client, worker, raise_error)
+    cause = err.value.cause
+    assert isinstance(cause, temporalio.exceptions.ActivityError)
+    cause = cause.__cause__
+    assert isinstance(cause, temporalio.exceptions.ApplicationError)
+    assert cause.message == "oh no!"
+    assert cause.__cause__ is None
 
-# async def test_activity_bad_params(client: temporalio.client.Client, worker: utils.Worker):
-#     raise NotImplementedError
 
-# async def test_activity_cancel():
-#     raise NotImplementedError
+def picklable_activity_failure():
+    raise RuntimeError("oh no!")
+
+
+async def test_sync_activity_process_failure(
+    client: temporalio.client.Client, worker: Worker
+):
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            await _execute_workflow_with_activity(
+                client,
+                worker,
+                picklable_activity_failure,
+                worker_config={"activity_executor": executor},
+            )
+    cause = err.value.cause
+    assert isinstance(cause, temporalio.exceptions.ActivityError)
+    cause = cause.__cause__
+    assert isinstance(cause, temporalio.exceptions.ApplicationError)
+    assert cause.message == "oh no!"
+    assert cause.__cause__ is None
+
+
+async def test_activity_bad_params(client: temporalio.client.Client, worker: Worker):
+    async def say_hello(name: str) -> str:
+        return f"Hello, {name}!"
+
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(client, worker, say_hello)
+    cause = err.value.cause
+    assert isinstance(cause, temporalio.exceptions.ActivityError)
+    cause = cause.__cause__
+    assert isinstance(cause, temporalio.exceptions.ApplicationError)
+    assert cause.message.endswith("missing 1 required positional argument: 'name'")
+    assert cause.__cause__ is None
+
+
+# async def test_activity_cancel(client: temporalio.client.Client, worker: Worker):
+#     async def wait_cancel() -> str:
+#         try:
+#             while True:
+#                 await asyncio.sleep(0.1)
+#                 temporalio.activity.heartbeat()
+#         except asyncio.CancelledError:
+#             return "Got cancelled error"
+
+#     result = await _execute_workflow_with_activity(client, worker, wait_cancel, cancel_after_ms=100)
 
 # async def test_sync_activity_thread_cancel():
 #     raise NotImplementedError
@@ -149,7 +200,10 @@ async def test_sync_activity_process_non_picklable(
 # async def test_activity_async_completion():
 #     raise NotImplementedError
 
-# async def test_activity_heartbeat():
+# async def test_activity_heartbeat_details():
+#     raise NotImplementedError
+
+# async def test_activity_heartbeat_details_converter_fail():
 #     raise NotImplementedError
 
 # async def test_sync_activity_thread_heartbeat():
@@ -167,6 +221,12 @@ async def test_sync_activity_process_non_picklable(
 # async def test_activity_logging():
 #     raise NotImplementedError
 
+# async def test_activity_failure_with_details():
+#     raise NotImplementedError
+
+# async def test_activity_worker_shutdown():
+#     raise NotImplementedError
+
 
 @dataclass
 class _ActivityResult:
@@ -181,6 +241,7 @@ async def _execute_workflow_with_activity(
     fn: Callable,
     *args: Any,
     start_to_close_timeout_ms: Optional[int] = None,
+    cancel_after_ms: Optional[int] = None,
     worker_config: temporalio.worker.WorkerConfig = {},
 ) -> _ActivityResult:
     act_task_queue = str(uuid.uuid4())
@@ -200,6 +261,7 @@ async def _execute_workflow_with_activity(
                             task_queue=act_task_queue,
                             args=args,
                             start_to_close_timeout_ms=start_to_close_timeout_ms,
+                            cancel_after_ms=cancel_after_ms,
                         )
                     )
                 ]

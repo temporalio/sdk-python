@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import contextvars
 import inspect
 import itertools
 import logging
@@ -147,7 +146,7 @@ class Worker:
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
         )
-        self._running_activities: Dict[bytes, asyncio.Future] = {}
+        self._running_activities: Dict[bytes, asyncio.Task] = {}
         self._task: Optional[asyncio.Task] = None
 
     def config(self) -> WorkerConfig:
@@ -195,29 +194,11 @@ class Worker:
                 task = await self._bridge_worker.poll_activity_task()
 
                 if task.HasField("start"):
-                    try:
-                        await self._start_activity(task.task_token, task.start)
-                    except Exception as err:
-                        logger.warning(
-                            "Failed starting activity %s due to %s",
-                            task.start.activity_type,
-                            err,
-                            exc_info=True,
-                        )
-                        # If failed to start, report failure
-                        await self._bridge_worker.complete_activity_task(
-                            temporalio.bridge.proto.ActivityTaskCompletion(
-                                task_token=task.task_token,
-                                result=temporalio.bridge.proto.activity_result.ActivityExecutionResult(
-                                    failed=temporalio.exceptions.exception_to_failure(
-                                        err,
-                                        self._config["client"].data_converter,
-                                    ),
-                                ),
-                            )
-                        )
+                    self._running_activities[task.task_token] = asyncio.create_task(
+                        self._run_activity(task.task_token, task.start)
+                    )
                 elif task.HasField("cancel"):
-                    self._cancel_activity(task.cancel)
+                    self._cancel_activity(task.task_token, task.cancel)
                 else:
                     logger.warning("unrecognized activity task: %s", task)
             except temporalio.bridge.worker.PollShutdownError:
@@ -226,106 +207,110 @@ class Worker:
     async def _run_workflows(self) -> None:
         raise NotImplementedError
 
-    async def _start_activity(
-        self, task_token: bytes, start: temporalio.bridge.proto.activity_task.Start
-    ) -> None:
-        # Find activity or fail
-        fn = self._config["activities"].get(start.activity_type)
-        if not fn:
-            activity_names = ", ".join(sorted(self._config["activities"].keys()))
-            raise temporalio.exceptions.ApplicationError(
-                f"Activity function {start.activity_type} is not registered on this worker, available activities: {activity_names}",
-                type="NotFoundError",
-                non_retryable=True,
-            )
-
-        # Convert arguments
-        arg_types, ret_type = await temporalio.converter.type_hints_from_func(
-            fn, require_arg_count=len(start.input)
-        )
-        converter = self._config["client"].data_converter
-        try:
-            args = (
-                []
-                if not start.input
-                else await converter.decode(start.input, type_hints=arg_types)
-            )
-        except Exception as err:
-            raise temporalio.exceptions.ApplicationError(
-                "Failed decoding arguments", non_retryable=True
-            ) from err
-
-        # Convert heartbeat details
-        # TODO(cretz): Allow some way to configure heartbeat type hinting?
-        try:
-            heartbeat_details = (
-                [] if not start.input else converter.decode(start.heartbeat_details)
-            )
-        except Exception as err:
-            raise temporalio.exceptions.ApplicationError(
-                "Failed decoding heartbeat details", non_retryable=True
-            ) from err
-
-        # Build info
-        info = temporalio.activity.Info(
-            activity_id=start.activity_id,
-            activity_type=start.activity_type,
-            attempt=start.attempt,
-            heartbeat_details=heartbeat_details,
-            heartbeat_timeout=_proto_maybe_timedelta(start.heartbeat_timeout)
-            if start.HasField("heartbeat_timeout")
-            else None,
-            schedule_to_close_timeout=_proto_maybe_timedelta(
-                start.schedule_to_close_timeout
-            )
-            if start.HasField("schedule_to_close_timeout")
-            else None,
-            scheduled_time=_proto_maybe_datetime(start.scheduled_time)
-            if start.HasField("scheduled_time")
-            else None,
-            start_to_close_timeout=_proto_maybe_timedelta(start.start_to_close_timeout)
-            if start.HasField("start_to_close_timeout")
-            else None,
-            started_time=_proto_maybe_datetime(start.started_time)
-            if start.HasField("started_time")
-            else None,
-            task_queue=self._config["task_queue"],
-            task_token=task_token,
-            workflow_id=start.workflow_execution.workflow_id,
-            workflow_namespace=start.workflow_namespace,
-            workflow_run_id=start.workflow_execution.run_id,
-            workflow_type=start.workflow_type,
-        )
-        input = ExecuteActivityInput(
-            fn=fn,
-            args=args,
-            executor=None
-            if inspect.iscoroutinefunction(fn)
-            else self._config["activity_executor"],
-        )
-
-        self._running_activities[task_token] = asyncio.ensure_future(
-            self._run_activity(info, input)
-        )
-
     def _cancel_activity(
-        self, cancel: temporalio.bridge.proto.activity_task.Start
+        self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
     ) -> None:
-        raise NotImplementedError
+        task = self._running_activities.get(task_token)
+        if not task:
+            logger.warning("Cannot find activity to cancel for token %s", task_token)
+            return
+        logger.debug("Cancelling activity %s", task_token)
+        # TODO(cretz): Check that Python >= 3.9 and set msg?
+        task.cancel()
 
     def _heartbeat_activity(self, task_token: bytes, *details: Any) -> None:
         raise NotImplementedError
 
     async def _run_activity(
-        self, info: temporalio.activity.Info, input: ExecuteActivityInput
+        self, task_token: bytes, start: temporalio.bridge.proto.activity_task.Start
     ) -> None:
+        logger.debug("Running activity %s (token %s)", start.activity_type, task_token)
         # We choose to surround interceptor creation and activity invocation in
         # a try block so we can mark the workflow as failed on any error instead
         # of having error handling in the interceptor
         completion = temporalio.bridge.proto.ActivityTaskCompletion(
-            task_token=info.task_token
+            task_token=task_token
         )
         try:
+            # Find activity or fail
+            fn = self._config["activities"].get(start.activity_type)
+            if not fn:
+                activity_names = ", ".join(sorted(self._config["activities"].keys()))
+                raise temporalio.exceptions.ApplicationError(
+                    f"Activity function {start.activity_type} is not registered on this worker, available activities: {activity_names}",
+                    type="NotFoundError",
+                    non_retryable=True,
+                )
+
+            # Convert arguments
+            arg_types, ret_type = await temporalio.converter.type_hints_from_func(
+                fn, require_arg_count=len(start.input)
+            )
+            converter = self._config["client"].data_converter
+            try:
+                args = (
+                    []
+                    if not start.input
+                    else await converter.decode(start.input, type_hints=arg_types)
+                )
+            except Exception as err:
+                raise temporalio.exceptions.ApplicationError(
+                    "Failed decoding arguments", non_retryable=True
+                ) from err
+
+            # Convert heartbeat details
+            # TODO(cretz): Allow some way to configure heartbeat type hinting?
+            try:
+                heartbeat_details = (
+                    []
+                    if not start.heartbeat_details
+                    else await converter.decode(start.heartbeat_details)
+                )
+            except Exception as err:
+                raise temporalio.exceptions.ApplicationError(
+                    "Failed decoding heartbeat details", non_retryable=True
+                ) from err
+
+            # Build info
+            info = temporalio.activity.Info(
+                activity_id=start.activity_id,
+                activity_type=start.activity_type,
+                attempt=start.attempt,
+                heartbeat_details=heartbeat_details,
+                heartbeat_timeout=_proto_maybe_timedelta(start.heartbeat_timeout)
+                if start.HasField("heartbeat_timeout")
+                else None,
+                schedule_to_close_timeout=_proto_maybe_timedelta(
+                    start.schedule_to_close_timeout
+                )
+                if start.HasField("schedule_to_close_timeout")
+                else None,
+                scheduled_time=_proto_maybe_datetime(start.scheduled_time)
+                if start.HasField("scheduled_time")
+                else None,
+                start_to_close_timeout=_proto_maybe_timedelta(
+                    start.start_to_close_timeout
+                )
+                if start.HasField("start_to_close_timeout")
+                else None,
+                started_time=_proto_maybe_datetime(start.started_time)
+                if start.HasField("started_time")
+                else None,
+                task_queue=self._config["task_queue"],
+                task_token=task_token,
+                workflow_id=start.workflow_execution.workflow_id,
+                workflow_namespace=start.workflow_namespace,
+                workflow_run_id=start.workflow_execution.run_id,
+                workflow_type=start.workflow_type,
+            )
+            input = ExecuteActivityInput(
+                fn=fn,
+                args=args,
+                executor=None
+                if inspect.iscoroutinefunction(fn)
+                else self._config["activity_executor"],
+            )
+
             # Set the context early so the logging adapter works and
             # interceptors have it
             temporalio.activity._Context.set(
@@ -357,32 +342,49 @@ class Worker:
                     result_payloads[0].metadata
                 )
                 completion.result.completed.result.data = result_payloads[0].data
-        except temporalio.activity.CompleteAsyncError:
-            temporalio.activity.logger.debug("Completing asynchronously")
-            completion.result.will_complete_async.SetInParent()
-        except temporalio.activity.CancelledError:
-            temporalio.activity.logger.debug("Completing as cancelled")
-            # We intentionally have a separate activity CancelledError so we
-            # don't accidentally bubble a cancellation that happened for another
-            # reason
-            await temporalio.exceptions.apply_error_to_failure(
-                # TODO(cretz): Should use some other message?
-                temporalio.exceptions.CancelledError("Cancelled"),
-                self._config["client"].data_converter,
-                completion.result.cancelled.failure,
-            )
         except Exception as err:
-            temporalio.activity.logger.debug(
-                f"Completing as failed with error: {err}", extra={"error": err}
-            )
-            await temporalio.exceptions.apply_exception_to_failure(
-                err,
-                self._config["client"].data_converter,
-                completion.result.cancelled.failure,
-            )
+            try:
+                if isinstance(err, temporalio.activity.CompleteAsyncError):
+                    temporalio.activity.logger.debug("Completing asynchronously")
+                    completion.result.will_complete_async.SetInParent()
+                elif isinstance(err, temporalio.activity.CancelledError):
+                    temporalio.activity.logger.debug("Completing as cancelled")
+                    # We intentionally have a separate activity CancelledError
+                    # so we don't accidentally bubble a cancellation that
+                    # happened for another reason
+                    await temporalio.exceptions.apply_error_to_failure(
+                        # TODO(cretz): Should use some other message?
+                        temporalio.exceptions.CancelledError("Cancelled"),
+                        self._config["client"].data_converter,
+                        completion.result.cancelled.failure,
+                    )
+                else:
+                    temporalio.activity.logger.debug(
+                        f"Completing as failed with error: {err}", extra={"error": err}
+                    )
+                    await temporalio.exceptions.apply_exception_to_failure(
+                        err,
+                        self._config["client"].data_converter,
+                        completion.result.failed.failure,
+                    )
+            except Exception as inner_err:
+                logger.error(
+                    f"Exception handling failed, original error: {err}, failure: {inner_err}",
+                    extra={"error": err},
+                )
+                completion.result.Clear()
+                completion.result.failed.failure.message = (
+                    f"Failed building exception result: {inner_err}"
+                )
 
         # Send task completion to core
-        await self._bridge_worker.complete_activity_task(completion)
+        try:
+            await self._bridge_worker.complete_activity_task(completion)
+        except Exception as err:
+            logger.error(
+                f"Failed completing activity task: {err}", extra={"error": err}
+            )
+        del self._running_activities[info.task_token]
 
 
 class WorkerConfig(typing_extensions.TypedDict):

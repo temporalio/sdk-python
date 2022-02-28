@@ -66,6 +66,7 @@ class KSExecuteActivityAction:
     task_queue: Optional[str] = None
     args: Optional[Iterable[Any]] = None
     start_to_close_timeout_ms: Optional[int] = None
+    cancel_after_ms: Optional[int] = None
 
 
 class Worker(ABC):

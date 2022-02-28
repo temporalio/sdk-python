@@ -27,7 +27,13 @@ class FailureError(TemporalError):
     ) -> None:
         """Initialize a failure error."""
         super().__init__(message)
+        self._message = message
         self._failure = failure
+
+    @property
+    def message(self) -> str:
+        """Message."""
+        return self._message
 
     @property
     def failure(self) -> Optional[temporalio.api.failure.v1.Failure]:
@@ -377,7 +383,7 @@ async def apply_error_to_failure(
     # Set message, stack, and cause
     failure.message = str(error)
     if error.__traceback__:
-        failure.stack_trace = traceback.format_tb(error.__traceback__)
+        failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
     if error.__cause__:
         await apply_exception_to_failure(error.__cause__, converter, failure.cause)
     elif not error.__suppress_context__ and error.__context__:
@@ -449,15 +455,13 @@ async def apply_exception_to_failure(
     converter: temporalio.converter.DataConverter,
     failure: temporalio.api.failure.v1.Failure,
 ) -> None:
-    exception.__traceback__
     # If already a failure error, use that
     if isinstance(exception, FailureError):
         await apply_error_to_failure(exception, converter, failure)
     else:
         # Convert to failure error
-        failure_error = FailureError(str(exception))
-        failure_error.__cause__ = exception.__cause__
-        failure_error.__context__ = exception.__context__
-        failure_error.__suppress_context__ = exception.__suppress_context__
+        failure_error = ApplicationError(
+            str(exception), type=exception.__class__.__name__
+        )
         failure_error.__traceback__ = exception.__traceback__
         await apply_error_to_failure(failure_error, converter, failure)
