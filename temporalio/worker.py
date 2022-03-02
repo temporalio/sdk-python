@@ -5,10 +5,15 @@ import concurrent.futures
 import inspect
 import itertools
 import logging
+import multiprocessing
+import multiprocessing.managers
 import pickle
+import queue
+import threading
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Iterable, Mapping, Optional
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
@@ -48,6 +53,9 @@ class Worker:
         sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
+        # Used and required for sync activities when the executor is not a
+        # thread pool executor.
+        shared_state_manager: Optional[SharedStateManager] = None,
     ) -> None:
         # TODO(cretz): Support workflows
         if not activities:
@@ -56,12 +64,26 @@ class Worker:
         for name, activity in activities.items():
             if not callable(activity):
                 raise TypeError(f"Activity {name} is not callable")
-            if not inspect.iscoroutinefunction(activity):
+            elif not activity.__code__:
+                raise TypeError(f"Activity {name} does not have __code__")
+            elif activity.__code__.co_kwonlyargcount:
+                raise TypeError(f"Activity {name} cannot have keyword-only arguments")
+            elif not inspect.iscoroutinefunction(activity):
                 if not activity_executor:
                     raise ValueError(
                         f"Activity {name} is not async so an activity_executor must be present"
                     )
-                elif isinstance(
+                if (
+                    not isinstance(
+                        activity_executor, concurrent.futures.ThreadPoolExecutor
+                    )
+                    and not shared_state_manager
+                ):
+                    raise ValueError(
+                        f"Activity {name} is not async and executor is not thread-pool executor, "
+                        "so a shared_state_manager must be present"
+                    )
+                if isinstance(
                     activity_executor, concurrent.futures.ProcessPoolExecutor
                 ):
                     # The function must be picklable for use in process
@@ -145,8 +167,9 @@ class Worker:
             sticky_queue_schedule_to_start_timeout=sticky_queue_schedule_to_start_timeout,
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
+            shared_state_manager=shared_state_manager,
         )
-        self._running_activities: Dict[bytes, asyncio.Task] = {}
+        self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._task: Optional[asyncio.Task] = None
 
     def config(self) -> WorkerConfig:
@@ -194,15 +217,24 @@ class Worker:
                 task = await self._bridge_worker.poll_activity_task()
 
                 if task.HasField("start"):
-                    self._running_activities[task.task_token] = asyncio.create_task(
-                        self._run_activity(task.task_token, task.start)
+                    # Cancelled event and sync field will be updated inside
+                    # _run_activity when the activity function is obtained
+                    activity = _RunningActivity(
+                        task=None, cancelled_event=threading.Event(), sync=False
                     )
+                    activity.task = asyncio.create_task(
+                        self._run_activity(task.task_token, task.start, activity)
+                    )
+                    self._running_activities[task.task_token] = activity
                 elif task.HasField("cancel"):
                     self._cancel_activity(task.task_token, task.cancel)
                 else:
                     logger.warning("unrecognized activity task: %s", task)
             except temporalio.bridge.worker.PollShutdownError:
                 return
+            except Exception as err:
+                # Should never happen
+                logger.exception(f"Activity runner failed: {err}", extra={"error": err})
 
     async def _run_workflows(self) -> None:
         raise NotImplementedError
@@ -210,19 +242,52 @@ class Worker:
     def _cancel_activity(
         self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
     ) -> None:
-        task = self._running_activities.get(task_token)
-        if not task:
+        activity = self._running_activities.get(task_token)
+        if not activity:
             logger.warning("Cannot find activity to cancel for token %s", task_token)
             return
-        logger.debug("Cancelling activity %s", task_token)
+        logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
         # TODO(cretz): Check that Python >= 3.9 and set msg?
-        task.cancel()
+        activity.cancel()
 
     def _heartbeat_activity(self, task_token: bytes, *details: Any) -> None:
-        raise NotImplementedError
+        # We intentionally make heartbeating non-async, but since the data
+        # converter is async, we have to schedule it
+        logger = temporalio.activity.logger
+        asyncio.create_task(
+            self._heartbeat_activity_async(logger, task_token, *details)
+        )
+
+    async def _heartbeat_activity_async(
+        self, logger: logging.Logger, task_token: bytes, *details: Any
+    ) -> None:
+        try:
+            heartbeat = temporalio.bridge.proto.ActivityHeartbeat(task_token=task_token)
+            if details:
+                heartbeat.details.extend(
+                    await self._config["client"].data_converter.encode(details)
+                )
+            # Since this is called async on the event loop, it is possible that
+            # this is reached _after_ a sync activity has completed and removed
+            # itself from the dict since, so we check it first
+            if task_token in self._running_activities:
+                self._bridge_worker.record_activity_heartbeat(heartbeat)
+        except Exception as err:
+            # Since this exception cannot be captured by the user, we will log
+            # and cancel the activity
+            logger.exception(
+                "Cancelling activity because failed recording heartbeat: {err}",
+                extra={"error": err},
+            )
+            activity = self._running_activities.get(task_token)
+            if activity:
+                activity.cancel()
 
     async def _run_activity(
-        self, task_token: bytes, start: temporalio.bridge.proto.activity_task.Start
+        self,
+        task_token: bytes,
+        start: temporalio.bridge.proto.activity_task.Start,
+        running_activity: _RunningActivity,
     ) -> None:
         logger.debug("Running activity %s (token %s)", start.activity_type, task_token)
         # We choose to surround interceptor creation and activity invocation in
@@ -241,6 +306,23 @@ class Worker:
                     type="NotFoundError",
                     non_retryable=True,
                 )
+
+            # We must mark the running activity as sync if it's not async so
+            # that cancellation doesn't attempt to cancel the task
+            if not inspect.iscoroutinefunction(fn):
+                running_activity.sync = True
+
+            # As a special case, if we're neither a coroutine or a thread pool
+            # executor, we use a shared state manager event so it can span
+            # processes just in case they are using some kind of multiprocess
+            # executor
+            if not inspect.iscoroutinefunction(fn) and not isinstance(
+                self._config["activity_executor"], concurrent.futures.ThreadPoolExecutor
+            ):
+                manager = self._config["shared_state_manager"]
+                # Pre-checked on worker init
+                assert manager
+                running_activity.cancelled_event = manager.new_cancellation_event()
 
             # Convert arguments
             arg_types, ret_type = await temporalio.converter.type_hints_from_func(
@@ -309,12 +391,18 @@ class Worker:
                 executor=None
                 if inspect.iscoroutinefunction(fn)
                 else self._config["activity_executor"],
+                _cancelled_event=running_activity.cancelled_event,
+                _worker=self,
             )
 
             # Set the context early so the logging adapter works and
             # interceptors have it
             temporalio.activity._Context.set(
-                temporalio.activity._Context(info=lambda: info, heartbeat=None)
+                temporalio.activity._Context(
+                    info=lambda: info,
+                    heartbeat=None,
+                    cancelled_event=running_activity.cancelled_event,
+                )
             )
             temporalio.activity.logger.debug("Starting activity")
 
@@ -342,12 +430,12 @@ class Worker:
                     result_payloads[0].metadata
                 )
                 completion.result.completed.result.data = result_payloads[0].data
-        except Exception as err:
+        except (BaseException, asyncio.CancelledError) as err:
             try:
                 if isinstance(err, temporalio.activity.CompleteAsyncError):
                     temporalio.activity.logger.debug("Completing asynchronously")
                     completion.result.will_complete_async.SetInParent()
-                elif isinstance(err, temporalio.activity.CancelledError):
+                elif isinstance(err, asyncio.CancelledError):
                     temporalio.activity.logger.debug("Completing as cancelled")
                     # We intentionally have a separate activity CancelledError
                     # so we don't accidentally bubble a cancellation that
@@ -360,7 +448,9 @@ class Worker:
                     )
                 else:
                     temporalio.activity.logger.debug(
-                        f"Completing as failed with error: {err}", extra={"error": err}
+                        f"Completing as failed with error of type {type(err)}: {err}",
+                        extra={"error": err},
+                        exc_info=True,
                     )
                     await temporalio.exceptions.apply_exception_to_failure(
                         err,
@@ -368,7 +458,7 @@ class Worker:
                         completion.result.failed.failure,
                     )
             except Exception as inner_err:
-                logger.error(
+                temporalio.activity.logger.exception(
                     f"Exception handling failed, original error: {err}, failure: {inner_err}",
                     extra={"error": err},
                 )
@@ -378,13 +468,13 @@ class Worker:
                 )
 
         # Send task completion to core
+        del self._running_activities[info.task_token]
         try:
             await self._bridge_worker.complete_activity_task(completion)
         except Exception as err:
-            logger.error(
+            temporalio.activity.logger.exception(
                 f"Failed completing activity task: {err}", extra={"error": err}
             )
-        del self._running_activities[info.task_token]
 
 
 class WorkerConfig(typing_extensions.TypedDict):
@@ -406,6 +496,20 @@ class WorkerConfig(typing_extensions.TypedDict):
     sticky_queue_schedule_to_start_timeout: timedelta
     max_heartbeat_throttle_interval: timedelta
     default_heartbeat_throttle_interval: timedelta
+    shared_state_manager: Optional[SharedStateManager]
+
+
+@dataclass
+class _RunningActivity:
+    task: Optional[asyncio.Task]
+    cancelled_event: threading.Event
+    sync: bool
+
+    def cancel(self) -> None:
+        self.cancelled_event.set()
+        # We do not cancel the task of sync activities
+        if not self.sync and self.task:
+            self.task.cancel()
 
 
 @dataclass
@@ -413,6 +517,8 @@ class ExecuteActivityInput:
     fn: Callable[..., Any]
     args: Iterable[Any]
     executor: Optional[concurrent.futures.Executor]
+    _cancelled_event: threading.Event
+    _worker: Worker
 
 
 class Interceptor:
@@ -457,34 +563,78 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
         context.heartbeat = outbound.heartbeat
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
-        # Await asyncs, otherwise just run
+        # Handle synchronous activity
         if not inspect.iscoroutinefunction(input.fn):
             # We execute a top-level function via the executor. It is top-level
             # because it needs to be picklable. Also, by default Python does not
             # propagate contexts into executor futures so we don't either with
             # the obvious exception of the info (if they want more, they can set
             # the initializer on the executor).
-            # TODO(cretz): multiprocessing.Pipe-based heartbeat/cancel
-            # We always expect an executor
-            return await asyncio.get_running_loop().run_in_executor(
-                input.executor,
-                _execute_sync_activity,
-                temporalio.activity.info(),
-                input.fn,
-                *input.args,
-            )
+            ctx = temporalio.activity._Context.current()
+            info = ctx.info()
+
+            # Heartbeat calls internally use a data converter which is async so
+            # they need to be called on the event loop
+            loop = asyncio.get_running_loop()
+
+            def thread_safe_heartbeat(*details: Any) -> None:
+                temporalio.activity._Context.set(ctx)
+                loop.call_soon_threadsafe(ctx.heartbeat, *details)
+
+            # For heartbeats, we use the existing heartbeat callable for thread
+            # pool executors or a multiprocessing queue for others
+            heartbeat: Union[
+                Callable[..., None], SharedHeartbeatSender
+            ] = thread_safe_heartbeat
+            shared_manager: Optional[SharedStateManager] = None
+            if not isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
+                # Should always be present in worker, pre-checked on init
+                shared_manager = input._worker._config["shared_state_manager"]
+                assert shared_manager
+                heartbeat = shared_manager.register_heartbeater(
+                    info.task_token, thread_safe_heartbeat
+                )
+
+            try:
+                return await asyncio.get_running_loop().run_in_executor(
+                    input.executor,
+                    _execute_sync_activity,
+                    info,
+                    heartbeat,
+                    input._cancelled_event,
+                    input.fn,
+                    *input.args,
+                )
+            finally:
+                if shared_manager:
+                    shared_manager.unregister_heartbeater(info.task_token)
+
+        # Otherwise for async activity, just run
         return await input.fn(*input.args)
 
 
 # This has to be defined at the top-level to be picklable for process executors
 def _execute_sync_activity(
-    info: temporalio.activity.Info, fn: Callable[..., Any], *args: Any
+    info: temporalio.activity.Info,
+    heartbeat: Union[Callable[..., None], SharedHeartbeatSender],
+    cancelled_event: threading.Event,
+    fn: Callable[..., Any],
+    *args: Any,
 ) -> Any:
+    heartbeat_fn: Callable[..., None]
+    if isinstance(heartbeat, SharedHeartbeatSender):
+        # To make mypy happy
+        heartbeat_sender = heartbeat
+        heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
+            info.task_token, *details
+        )
+    else:
+        heartbeat_fn = heartbeat
     temporalio.activity._Context.set(
         temporalio.activity._Context(
             info=lambda: info,
-            # TODO(cretz): Pipe-based heartbeater, canceller, etc
-            heartbeat=None,
+            heartbeat=heartbeat_fn,
+            cancelled_event=cancelled_event,
         )
     )
     return fn(*args)
@@ -519,3 +669,104 @@ def _proto_maybe_datetime(
         return None
     # Protobuf doesn't set the timezone but we want to
     return ts.ToDatetime().replace(tzinfo=timezone.utc)
+
+
+class SharedStateManager(ABC):
+    # TODO(cretz): Document that queue should be a multiprocessing.Manager().Queue()
+    # and that executor defaults as a single-worker thread pool executor
+    @staticmethod
+    def create_from_multiprocessing(
+        mgr: multiprocessing.managers.SyncManager,
+        queue_poller_executor: Optional[concurrent.futures.Executor] = None,
+    ) -> SharedStateManager:
+        return _MultiprocessingSharedStateManager(
+            mgr, queue_poller_executor or concurrent.futures.ThreadPoolExecutor(1)
+        )
+
+    @abstractmethod
+    def new_cancellation_event(self) -> threading.Event:
+        raise NotImplementedError
+
+    @abstractmethod
+    def register_heartbeater(
+        self, task_token: bytes, heartbeat: Callable[..., None]
+    ) -> SharedHeartbeatSender:
+        raise NotImplementedError
+
+    @abstractmethod
+    def unregister_heartbeater(self, task_token: bytes) -> None:
+        raise NotImplementedError
+
+
+class SharedHeartbeatSender(ABC):
+    @abstractmethod
+    def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
+        raise NotImplementedError
+
+
+class _MultiprocessingSharedStateManager(SharedStateManager):
+    def __init__(
+        self,
+        mgr: multiprocessing.managers.SyncManager,
+        queue_poller_executor: concurrent.futures.Executor,
+    ) -> None:
+        super().__init__()
+        self._mgr = mgr
+        self._queue_poller_executor = queue_poller_executor
+        # 1000 in-flight heartbeats should be plenty
+        self._heartbeat_queue: queue.Queue[Tuple[bytes, Iterable[Any]]] = mgr.Queue(
+            1000
+        )
+        self._heartbeats: Dict[bytes, Callable[..., None]] = {}
+
+    def new_cancellation_event(self) -> threading.Event:
+        return self._mgr.Event()
+
+    def register_heartbeater(
+        self, task_token: bytes, heartbeat: Callable[..., None]
+    ) -> SharedHeartbeatSender:
+        self._heartbeats[task_token] = heartbeat
+        # If just now non-empty, start processor
+        if len(self._heartbeats) == 1:
+            self._queue_poller_executor.submit(self._heartbeat_processor)
+        return _MultiprocessingSharedHeartbeatSender(self._heartbeat_queue)
+
+    def unregister_heartbeater(self, task_token: bytes) -> None:
+        del self._heartbeats[task_token]
+
+    def _heartbeat_processor(self) -> None:
+        while len(self._heartbeats) > 0:
+            try:
+                # The timeout here of 0.5 seconds is how long until we try
+                # again. This timeout then is the max amount of time before this
+                # processor can stop when there are no more activity heartbeats
+                # registered.
+                # TODO(cretz): Need to be configurable or derived from heartbeat
+                # timeouts on activities themselves? E.g. 0.8 of the current
+                # shortest registered timeout? It wouldn't really add much
+                # benefit except for stopping speed
+                item: Tuple[bytes, Iterable[Any]] = self._heartbeat_queue.get(True, 0.5)
+                # We count on this being a _very_ cheap function
+                fn = self._heartbeats.get(item[0])
+                if fn:
+                    fn(*item[1])
+            except queue.Empty:
+                pass
+            except Exception as err:
+                logger.exception(
+                    "Failed during multiprocess queue poll for heartbeat: {err}",
+                    extra={"error": err},
+                )
+                return
+
+
+class _MultiprocessingSharedHeartbeatSender(SharedHeartbeatSender):
+    def __init__(
+        self, heartbeat_queue: queue.Queue[Tuple[bytes, Iterable[Any]]]
+    ) -> None:
+        super().__init__()
+        self._heartbeat_queue = heartbeat_queue
+
+    def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
+        # No wait
+        self._heartbeat_queue.put((task_token, details), False)

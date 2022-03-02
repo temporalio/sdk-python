@@ -67,6 +67,8 @@ class KSExecuteActivityAction:
     args: Optional[Iterable[Any]] = None
     start_to_close_timeout_ms: Optional[int] = None
     cancel_after_ms: Optional[int] = None
+    wait_for_cancellation: Optional[bool] = None
+    heartbeat_timeout_ms: Optional[int] = None
 
 
 class Worker(ABC):

@@ -1,5 +1,7 @@
 import asyncio
 import concurrent.futures
+import multiprocessing
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -34,7 +36,7 @@ async def test_activity_info(client: temporalio.client.Client, worker: Worker):
     assert not temporalio.activity.in_activity()
     with pytest.raises(RuntimeError) as err:
         temporalio.activity.info()
-    assert err.value.args == ("Not in activity context",)
+    assert str(err.value) == "Not in activity context"
 
     # Capture the info from the activity
     info: Optional[temporalio.activity.Info] = None
@@ -162,22 +164,102 @@ async def test_activity_bad_params(client: temporalio.client.Client, worker: Wor
     assert cause.__cause__ is None
 
 
-# async def test_activity_cancel(client: temporalio.client.Client, worker: Worker):
-#     async def wait_cancel() -> str:
-#         try:
-#             while True:
-#                 await asyncio.sleep(0.1)
-#                 temporalio.activity.heartbeat()
-#         except asyncio.CancelledError:
-#             return "Got cancelled error"
+async def test_activity_kwonly_params(client: temporalio.client.Client, worker: Worker):
+    async def say_hello(*, name: str) -> str:
+        return f"Hello, {name}!"
 
-#     result = await _execute_workflow_with_activity(client, worker, wait_cancel, cancel_after_ms=100)
+    with pytest.raises(TypeError) as err:
+        await _execute_workflow_with_activity(client, worker, say_hello, "blah")
+    assert str(err.value).endswith("cannot have keyword-only arguments")
 
-# async def test_sync_activity_thread_cancel():
-#     raise NotImplementedError
 
-# async def test_sync_activity_process_cancel():
-#     raise NotImplementedError
+async def test_activity_cancel_catch(client: temporalio.client.Client, worker: Worker):
+    async def wait_cancel() -> str:
+        try:
+            while True:
+                await asyncio.sleep(0.1)
+                temporalio.activity.heartbeat()
+        except asyncio.CancelledError:
+            return "Got cancelled error, cancelled? " + str(
+                temporalio.activity.cancelled()
+            )
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        wait_cancel,
+        cancel_after_ms=100,
+        wait_for_cancellation=True,
+        heartbeat_timeout_ms=1000,
+    )
+    assert result.result == "Got cancelled error, cancelled? True"
+
+
+async def test_activity_cancel_throw(client: temporalio.client.Client, worker: Worker):
+    async def wait_cancel() -> str:
+        while True:
+            await asyncio.sleep(0.1)
+            temporalio.activity.heartbeat()
+
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            wait_cancel,
+            cancel_after_ms=100,
+            wait_for_cancellation=True,
+            heartbeat_timeout_ms=1000,
+        )
+    # TODO(cretz): This is a side effect of Go where returning the activity
+    # cancel looks like a workflow cancel. Change assertion if/when on another
+    # lang.
+    assert isinstance(err.value.cause, temporalio.exceptions.CancelledError)
+
+
+async def test_sync_activity_thread_cancel(
+    client: temporalio.client.Client, worker: Worker
+):
+    def wait_cancel() -> str:
+        while not temporalio.activity.cancelled():
+            time.sleep(0.1)
+            temporalio.activity.heartbeat()
+        return "Cancelled"
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            wait_cancel,
+            cancel_after_ms=100,
+            wait_for_cancellation=True,
+            heartbeat_timeout_ms=1000,
+            worker_config={"activity_executor": executor},
+        )
+    assert result.result == "Cancelled"
+
+
+def picklable_activity_wait_cancel() -> str:
+    while not temporalio.activity.cancelled():
+        time.sleep(0.1)
+        temporalio.activity.heartbeat()
+    return "Cancelled"
+
+
+async def test_sync_activity_process_cancel(
+    client: temporalio.client.Client, worker: Worker
+):
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            picklable_activity_wait_cancel,
+            cancel_after_ms=100,
+            wait_for_cancellation=True,
+            heartbeat_timeout_ms=1000,
+            worker_config={"activity_executor": executor},
+        )
+    assert result.result == "Cancelled"
+
 
 # async def test_activity_catch_cancel():
 #     raise NotImplementedError
@@ -212,6 +294,9 @@ async def test_activity_bad_params(client: temporalio.client.Client, worker: Wor
 # async def test_sync_activity_process_heartbeat():
 #     raise NotImplementedError
 
+# async def test_sync_activity_process_heartbeat_non_picklable_details():
+#     raise NotImplementedError
+
 # async def test_activity_retry():
 #     raise NotImplementedError
 
@@ -242,6 +327,8 @@ async def _execute_workflow_with_activity(
     *args: Any,
     start_to_close_timeout_ms: Optional[int] = None,
     cancel_after_ms: Optional[int] = None,
+    wait_for_cancellation: Optional[bool] = None,
+    heartbeat_timeout_ms: Optional[int] = None,
     worker_config: temporalio.worker.WorkerConfig = {},
 ) -> _ActivityResult:
     act_task_queue = str(uuid.uuid4())
@@ -249,6 +336,7 @@ async def _execute_workflow_with_activity(
         client,
         task_queue=act_task_queue,
         activities={fn.__name__: fn},
+        shared_state_manager=default_shared_state_manager(),
         **worker_config,
     ):
         handle = await client.start_workflow(
@@ -262,6 +350,8 @@ async def _execute_workflow_with_activity(
                             args=args,
                             start_to_close_timeout_ms=start_to_close_timeout_ms,
                             cancel_after_ms=cancel_after_ms,
+                            wait_for_cancellation=wait_for_cancellation,
+                            heartbeat_timeout_ms=heartbeat_timeout_ms,
                         )
                     )
                 ]
@@ -272,3 +362,17 @@ async def _execute_workflow_with_activity(
         return _ActivityResult(
             act_task_queue=act_task_queue, result=await handle.result(), handle=handle
         )
+
+
+_default_shared_state_manager: Optional[temporalio.worker.SharedStateManager] = None
+
+
+def default_shared_state_manager() -> temporalio.worker.SharedStateManager:
+    global _default_shared_state_manager
+    if not _default_shared_state_manager:
+        _default_shared_state_manager = (
+            temporalio.worker.SharedStateManager.create_from_multiprocessing(
+                multiprocessing.Manager()
+            )
+        )
+    return _default_shared_state_manager

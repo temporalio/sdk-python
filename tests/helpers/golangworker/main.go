@@ -85,6 +85,8 @@ type ExecuteActivityAction struct {
 	Args                  []interface{} `json:"args"`
 	StartToCloseTimeoutMS int64         `json:"start_to_close_timeout_ms"`
 	CancelAfterMS         int64         `json:"cancel_after_ms"`
+	WaitForCancellation   bool          `json:"wait_for_cancellation"`
+	HeartbeatTimeoutMS    int64         `json:"heartbeat_timeout_ms"`
 }
 
 func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams) (interface{}, error) {
@@ -158,8 +160,10 @@ func handleAction(
 
 	case action.ExecuteActivity != nil:
 		opts := workflow.ActivityOptions{
-			TaskQueue:   action.ExecuteActivity.TaskQueue,
-			RetryPolicy: &temporal.RetryPolicy{MaximumAttempts: 1},
+			TaskQueue:           action.ExecuteActivity.TaskQueue,
+			WaitForCancellation: action.ExecuteActivity.WaitForCancellation,
+			HeartbeatTimeout:    time.Duration(action.ExecuteActivity.HeartbeatTimeoutMS) * time.Millisecond,
+			RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
 		}
 		if action.ExecuteActivity.StartToCloseTimeoutMS > 0 {
 			opts.StartToCloseTimeout = time.Duration(action.ExecuteActivity.StartToCloseTimeoutMS) * time.Millisecond

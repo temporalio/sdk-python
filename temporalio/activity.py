@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import concurrent.futures
 import contextvars
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, NoReturn, Optional
@@ -41,6 +41,7 @@ class _Context:
     info: Callable[[], Info]
     # This is optional because during interceptor init it is not present
     heartbeat: Optional[Callable[..., None]]
+    cancelled_event: threading.Event
 
     @staticmethod
     def current() -> _Context:
@@ -69,13 +70,18 @@ def heartbeat(*details: Any):
     heartbeat_fn(*details)
 
 
+def cancelled() -> bool:
+    return _Context.current().cancelled_event.is_set()
+
+
+# TODO(cretz): Make it clear this is not async API
+def wait_for_cancelled(timeout: Optional[float] = None):
+    _Context.current().cancelled_event.wait(timeout)
+
+
 def raise_complete_async() -> NoReturn:
     raise CompleteAsyncError()
 
 
 class CompleteAsyncError(temporalio.exceptions.TemporalError):
-    pass
-
-
-class CancelledError(temporalio.exceptions.TemporalError):
     pass
