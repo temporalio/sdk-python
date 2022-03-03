@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import asyncio
 import concurrent.futures
+import inspect
 import multiprocessing
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional
 
 import pytest
 
@@ -261,23 +264,102 @@ async def test_sync_activity_process_cancel(
     assert result.result == "Cancelled"
 
 
-# async def test_activity_catch_cancel():
-#     raise NotImplementedError
+async def test_activity_does_not_exist(
+    client: temporalio.client.Client, worker: Worker
+):
+    async def say_hello(name: str) -> str:
+        return f"Hello, {name}!"
 
-# async def test_activity_not_exist():
-#     raise NotImplementedError
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        act_task_queue = str(uuid.uuid4())
+        async with temporalio.worker.Worker(
+            client, task_queue=act_task_queue, activities={"say_hello": say_hello}
+        ):
+            await client.execute_workflow(
+                "kitchen_sink",
+                KSWorkflowParams(
+                    actions=[
+                        KSAction(
+                            execute_activity=KSExecuteActivityAction(
+                                name="wrong_activity", task_queue=act_task_queue
+                            )
+                        )
+                    ]
+                ),
+                id=str(uuid.uuid4()),
+                task_queue=worker.task_queue,
+            )
+    assert isinstance(err.value.cause, temporalio.exceptions.ActivityError)
+    assert isinstance(err.value.cause.__cause__, temporalio.exceptions.ApplicationError)
+    assert str(err.value.cause.__cause__) == (
+        "Activity function wrong_activity is not registered on this worker, "
+        "available activities: say_hello"
+    )
 
-# async def test_max_concurrent_activities():
-#     raise NotImplementedError
 
-# async def test_activity_type_hints():
-#     raise NotImplementedError
+async def test_max_concurrent_activities(
+    client: temporalio.client.Client, worker: Worker
+):
+    seen_indexes: List[int] = []
+    complete_activities_event = asyncio.Event()
 
-# async def test_activity_async_with_executor():
-#     raise NotImplementedError
+    async def some_activity(index: int) -> str:
+        seen_indexes.append(index)
+        # Wait here to hold up the activity
+        await complete_activities_event.wait()
+        return ""
 
-# async def test_activity_interceptor():
-#     raise NotImplementedError
+    # Only allow 42 activities, but try to execute 43. Make a short schedule to
+    # start timeout but a long schedule to close timeout.
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            some_activity,
+            count=43,
+            index_as_arg=True,
+            schedule_to_close_timeout_ms=5000,
+            schedule_to_start_timeout_ms=1000,
+            worker_config={"max_outstanding_activities": 42},
+            on_complete=complete_activities_event.set,
+        )
+    assert isinstance(err.value.cause, temporalio.exceptions.ActivityError)
+    timeout = err.value.cause.__cause__
+    assert isinstance(timeout, temporalio.exceptions.TimeoutError)
+    assert str(timeout) == "activity timeout"
+    assert timeout.type == temporalio.exceptions.TimeoutType.SCHEDULE_TO_START
+
+
+@dataclass
+class SomeClass:
+    foo: str
+    bar: Optional[SomeClass] = None
+
+
+async def test_activity_type_hints(client: temporalio.client.Client, worker: Worker):
+    activity_param1: SomeClass
+
+    async def some_activity(param1: SomeClass, param2: str) -> str:
+        nonlocal activity_param1
+        activity_param1 = param1
+        return f"param1: {type(param1)}, param2: {type(param2)}"
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        some_activity,
+        SomeClass(foo="str1", bar=SomeClass(foo="str2")),
+        123,
+    )
+    # We called with the wrong non-dataclass type, but since we don't strictly
+    # check non-data-types, we don't perform any validation there
+    # TODO(cretz): Do we want a strict option for scalars?
+    assert (
+        result.result
+        == "param1: <class 'tests.test_worker.SomeClass'>, param2: <class 'int'>"
+    )
+    assert activity_param1 == SomeClass(foo="str1", bar=SomeClass(foo="str2"))
+
 
 # async def test_activity_async_completion():
 #     raise NotImplementedError
@@ -312,6 +394,9 @@ async def test_sync_activity_process_cancel(
 # async def test_activity_worker_shutdown():
 #     raise NotImplementedError
 
+# async def test_activity_interceptor():
+#     raise NotImplementedError
+
 
 @dataclass
 class _ActivityResult:
@@ -325,11 +410,16 @@ async def _execute_workflow_with_activity(
     worker: Worker,
     fn: Callable,
     *args: Any,
+    count: Optional[int] = None,
+    index_as_arg: Optional[bool] = None,
+    schedule_to_close_timeout_ms: Optional[int] = None,
     start_to_close_timeout_ms: Optional[int] = None,
+    schedule_to_start_timeout_ms: Optional[int] = None,
     cancel_after_ms: Optional[int] = None,
     wait_for_cancellation: Optional[bool] = None,
     heartbeat_timeout_ms: Optional[int] = None,
     worker_config: temporalio.worker.WorkerConfig = {},
+    on_complete: Optional[Callable[[], None]] = None,
 ) -> _ActivityResult:
     act_task_queue = str(uuid.uuid4())
     async with temporalio.worker.Worker(
@@ -339,29 +429,39 @@ async def _execute_workflow_with_activity(
         shared_state_manager=default_shared_state_manager(),
         **worker_config,
     ):
-        handle = await client.start_workflow(
-            "kitchen_sink",
-            KSWorkflowParams(
-                actions=[
-                    KSAction(
-                        execute_activity=KSExecuteActivityAction(
-                            name=fn.__name__,
-                            task_queue=act_task_queue,
-                            args=args,
-                            start_to_close_timeout_ms=start_to_close_timeout_ms,
-                            cancel_after_ms=cancel_after_ms,
-                            wait_for_cancellation=wait_for_cancellation,
-                            heartbeat_timeout_ms=heartbeat_timeout_ms,
+        try:
+            handle = await client.start_workflow(
+                "kitchen_sink",
+                KSWorkflowParams(
+                    actions=[
+                        KSAction(
+                            execute_activity=KSExecuteActivityAction(
+                                name=fn.__name__,
+                                task_queue=act_task_queue,
+                                args=args,
+                                count=count,
+                                index_as_arg=index_as_arg,
+                                schedule_to_close_timeout_ms=schedule_to_close_timeout_ms,
+                                start_to_close_timeout_ms=start_to_close_timeout_ms,
+                                schedule_to_start_timeout_ms=schedule_to_start_timeout_ms,
+                                cancel_after_ms=cancel_after_ms,
+                                wait_for_cancellation=wait_for_cancellation,
+                                heartbeat_timeout_ms=heartbeat_timeout_ms,
+                            )
                         )
-                    )
-                ]
-            ),
-            id=str(uuid.uuid4()),
-            task_queue=worker.task_queue,
-        )
-        return _ActivityResult(
-            act_task_queue=act_task_queue, result=await handle.result(), handle=handle
-        )
+                    ]
+                ),
+                id=str(uuid.uuid4()),
+                task_queue=worker.task_queue,
+            )
+            return _ActivityResult(
+                act_task_queue=act_task_queue,
+                result=await handle.result(),
+                handle=handle,
+            )
+        finally:
+            if on_complete:
+                on_complete()
 
 
 _default_shared_state_manager: Optional[temporalio.worker.SharedStateManager] = None

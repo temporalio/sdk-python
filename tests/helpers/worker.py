@@ -65,7 +65,11 @@ class KSExecuteActivityAction:
     name: str
     task_queue: Optional[str] = None
     args: Optional[Iterable[Any]] = None
+    count: Optional[int] = None
+    index_as_arg: Optional[bool] = None
+    schedule_to_close_timeout_ms: Optional[int] = None
     start_to_close_timeout_ms: Optional[int] = None
+    schedule_to_start_timeout_ms: Optional[int] = None
     cancel_after_ms: Optional[int] = None
     wait_for_cancellation: Optional[bool] = None
     heartbeat_timeout_ms: Optional[int] = None

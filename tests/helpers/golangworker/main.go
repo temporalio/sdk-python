@@ -80,13 +80,17 @@ type SignalAction struct {
 }
 
 type ExecuteActivityAction struct {
-	Name                  string        `json:"name"`
-	TaskQueue             string        `json:"task_queue"`
-	Args                  []interface{} `json:"args"`
-	StartToCloseTimeoutMS int64         `json:"start_to_close_timeout_ms"`
-	CancelAfterMS         int64         `json:"cancel_after_ms"`
-	WaitForCancellation   bool          `json:"wait_for_cancellation"`
-	HeartbeatTimeoutMS    int64         `json:"heartbeat_timeout_ms"`
+	Name                     string        `json:"name"`
+	TaskQueue                string        `json:"task_queue"`
+	Args                     []interface{} `json:"args"`
+	Count                    int           `json:"count"` // 0 same as 1
+	IndexAsArg               bool          `json:"index_as_arg"`
+	ScheduleToCloseTimeoutMS int64         `json:"schedule_to_close_timeout_ms"`
+	StartToCloseTimeoutMS    int64         `json:"start_to_close_timeout_ms"`
+	ScheduleToStartTimeoutMS int64         `json:"schedule_to_start_timeout_ms"`
+	CancelAfterMS            int64         `json:"cancel_after_ms"`
+	WaitForCancellation      bool          `json:"wait_for_cancellation"`
+	HeartbeatTimeoutMS       int64         `json:"heartbeat_timeout_ms"`
 }
 
 func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams) (interface{}, error) {
@@ -160,29 +164,46 @@ func handleAction(
 
 	case action.ExecuteActivity != nil:
 		opts := workflow.ActivityOptions{
-			TaskQueue:           action.ExecuteActivity.TaskQueue,
-			WaitForCancellation: action.ExecuteActivity.WaitForCancellation,
-			HeartbeatTimeout:    time.Duration(action.ExecuteActivity.HeartbeatTimeoutMS) * time.Millisecond,
-			RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
+			TaskQueue:              action.ExecuteActivity.TaskQueue,
+			ScheduleToCloseTimeout: time.Duration(action.ExecuteActivity.ScheduleToCloseTimeoutMS) * time.Millisecond,
+			StartToCloseTimeout:    time.Duration(action.ExecuteActivity.StartToCloseTimeoutMS) * time.Millisecond,
+			ScheduleToStartTimeout: time.Duration(action.ExecuteActivity.ScheduleToStartTimeoutMS) * time.Millisecond,
+			WaitForCancellation:    action.ExecuteActivity.WaitForCancellation,
+			HeartbeatTimeout:       time.Duration(action.ExecuteActivity.HeartbeatTimeoutMS) * time.Millisecond,
+			RetryPolicy:            &temporal.RetryPolicy{MaximumAttempts: 1},
 		}
-		if action.ExecuteActivity.StartToCloseTimeoutMS > 0 {
-			opts.StartToCloseTimeout = time.Duration(action.ExecuteActivity.StartToCloseTimeoutMS) * time.Millisecond
-		} else {
+		if opts.StartToCloseTimeout == 0 && opts.ScheduleToCloseTimeout == 0 {
 			opts.ScheduleToCloseTimeout = 5 * time.Second
 		}
-		actCtx := workflow.WithActivityOptions(ctx, opts)
-		if action.ExecuteActivity.CancelAfterMS > 0 {
-			var cancel workflow.CancelFunc
-			actCtx, cancel = workflow.WithCancel(actCtx)
-			workflow.Go(actCtx, func(actCtx workflow.Context) {
-				workflow.Sleep(actCtx, time.Duration(action.ExecuteActivity.CancelAfterMS)*time.Millisecond)
-				cancel()
-			})
+		var lastErr error
+		var lastResponse string
+		count := action.ExecuteActivity.Count
+		if count == 0 {
+			count = 1
 		}
-		var res string
-		err := workflow.ExecuteActivity(actCtx, action.ExecuteActivity.Name,
-			action.ExecuteActivity.Args...).Get(ctx, &res)
-		return true, res, err
+		sel := workflow.NewSelector(ctx)
+		sel.AddReceive(ctx.Done(), func(workflow.ReceiveChannel, bool) { lastErr = fmt.Errorf("context closed") })
+		for i := 0; i < count; i++ {
+			actCtx := workflow.WithActivityOptions(ctx, opts)
+			if action.ExecuteActivity.CancelAfterMS > 0 {
+				var cancel workflow.CancelFunc
+				actCtx, cancel = workflow.WithCancel(actCtx)
+				workflow.Go(actCtx, func(actCtx workflow.Context) {
+					workflow.Sleep(actCtx, time.Duration(action.ExecuteActivity.CancelAfterMS)*time.Millisecond)
+					cancel()
+				})
+			}
+			args := action.ExecuteActivity.Args
+			if action.ExecuteActivity.IndexAsArg {
+				args = []interface{}{i}
+			}
+			sel.AddFuture(workflow.ExecuteActivity(actCtx, action.ExecuteActivity.Name, args...),
+				func(fut workflow.Future) { lastErr = fut.Get(actCtx, &lastResponse) })
+		}
+		for i := 0; i < count && lastErr == nil; i++ {
+			sel.Select(ctx)
+		}
+		return true, lastResponse, lastErr
 
 	default:
 		return true, nil, fmt.Errorf("unrecognized action")

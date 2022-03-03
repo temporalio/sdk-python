@@ -6,6 +6,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Type
 
+import dacite
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
@@ -396,7 +397,8 @@ class JSONPlainPayloadConverter(PayloadConverter):
                 and inspect.isclass(type_hint)
                 and dataclasses.is_dataclass(type_hint)
             ):
-                obj = type_hint(**obj)
+                # We have to use dacite here to handle nested dataclasses
+                obj = dacite.from_dict(type_hint, obj)
             return obj
         except json.JSONDecodeError as err:
             raise RuntimeError("Failed parsing") from err
@@ -440,8 +442,24 @@ async def decode_payloads(
     return await converter.decode(payloads.payloads)
 
 
-async def type_hints_from_func(
-    func: Callable[..., Any], *, require_arg_count: int = -1
+# TODO(cretz): Document that this is basically inspect.signature, but anything
+# invalid means nothing returned. So if there are any kwargs or if any arg
+# annotations are not classes, the arg list is None.
+def _type_hints_from_func(
+    func: Callable[..., Any], eval_str: bool
 ) -> Tuple[Optional[List[Type]], Optional[Type]]:
-    # TODO(cretz): This
-    return (None, None)
+    sig = inspect.signature(func, eval_str=eval_str)
+    ret: Optional[Type] = None
+    if inspect.isclass(sig.return_annotation):
+        ret = sig.return_annotation
+    args: List[Type] = []
+    for value in sig.parameters.values():
+        if (
+            value.kind is not inspect.Parameter.POSITIONAL_ONLY
+            and value.kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD
+        ):
+            return (None, ret)
+        if not inspect.isclass(value.annotation):
+            return (None, ret)
+        args.append(value.annotation)
+    return args, ret

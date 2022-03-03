@@ -13,7 +13,18 @@ import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
@@ -56,11 +67,16 @@ class Worker:
         # Used and required for sync activities when the executor is not a
         # thread pool executor.
         shared_state_manager: Optional[SharedStateManager] = None,
+        # Unless this is false, eval_str will be used when evaluating type-hints
+        # which is needed on files doing "from __future__ import annotations".
+        # One may want to disable this if it's causing errors.
+        type_hint_eval_str: bool = True,
     ) -> None:
         # TODO(cretz): Support workflows
         if not activities:
             raise ValueError("At least one activity must be specified")
         # If there are any non-async activities, an executor is required
+        self._activities: Dict[str, _ActivityDefinition] = {}
         for name, activity in activities.items():
             if not callable(activity):
                 raise TypeError(f"Activity {name} is not callable")
@@ -96,6 +112,12 @@ class Worker:
                         raise TypeError(
                             f"Activity {name} must be picklable when using a process executor"
                         ) from err
+            arg_types, ret_type = temporalio.converter._type_hints_from_func(
+                activity, type_hint_eval_str
+            )
+            self._activities[name] = _ActivityDefinition(
+                name=name, fn=activity, arg_types=arg_types, ret_type=ret_type
+            )
 
         # Prepend applicable client interceptors to the given ones
         interceptors = itertools.chain(
@@ -168,6 +190,7 @@ class Worker:
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
             shared_state_manager=shared_state_manager,
+            type_hint_eval_str=type_hint_eval_str,
         )
         self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._task: Optional[asyncio.Task] = None
@@ -298,8 +321,8 @@ class Worker:
         )
         try:
             # Find activity or fail
-            fn = self._config["activities"].get(start.activity_type)
-            if not fn:
+            activity_def = self._activities.get(start.activity_type)
+            if not activity_def:
                 activity_names = ", ".join(sorted(self._config["activities"].keys()))
                 raise temporalio.exceptions.ApplicationError(
                     f"Activity function {start.activity_type} is not registered on this worker, available activities: {activity_names}",
@@ -309,14 +332,14 @@ class Worker:
 
             # We must mark the running activity as sync if it's not async so
             # that cancellation doesn't attempt to cancel the task
-            if not inspect.iscoroutinefunction(fn):
+            if not inspect.iscoroutinefunction(activity_def.fn):
                 running_activity.sync = True
 
             # As a special case, if we're neither a coroutine or a thread pool
             # executor, we use a shared state manager event so it can span
             # processes just in case they are using some kind of multiprocess
             # executor
-            if not inspect.iscoroutinefunction(fn) and not isinstance(
+            if not inspect.iscoroutinefunction(activity_def.fn) and not isinstance(
                 self._config["activity_executor"], concurrent.futures.ThreadPoolExecutor
             ):
                 manager = self._config["shared_state_manager"]
@@ -324,10 +347,13 @@ class Worker:
                 assert manager
                 running_activity.cancelled_event = manager.new_cancellation_event()
 
-            # Convert arguments
-            arg_types, ret_type = await temporalio.converter.type_hints_from_func(
-                fn, require_arg_count=len(start.input)
-            )
+            # Convert arguments. We only use arg type hints if they match the
+            # input count.
+            arg_types = activity_def.arg_types
+            if activity_def.arg_types is not None and len(
+                activity_def.arg_types
+            ) != len(start.input):
+                arg_types = None
             converter = self._config["client"].data_converter
             try:
                 args = (
@@ -386,10 +412,10 @@ class Worker:
                 workflow_type=start.workflow_type,
             )
             input = ExecuteActivityInput(
-                fn=fn,
+                fn=activity_def.fn,
                 args=args,
                 executor=None
-                if inspect.iscoroutinefunction(fn)
+                if inspect.iscoroutinefunction(activity_def.fn)
                 else self._config["activity_executor"],
                 _cancelled_event=running_activity.cancelled_event,
                 _worker=self,
@@ -468,7 +494,7 @@ class Worker:
                 )
 
         # Send task completion to core
-        del self._running_activities[info.task_token]
+        del self._running_activities[task_token]
         try:
             await self._bridge_worker.complete_activity_task(completion)
         except Exception as err:
@@ -497,6 +523,15 @@ class WorkerConfig(typing_extensions.TypedDict):
     max_heartbeat_throttle_interval: timedelta
     default_heartbeat_throttle_interval: timedelta
     shared_state_manager: Optional[SharedStateManager]
+    type_hint_eval_str: bool
+
+
+@dataclass
+class _ActivityDefinition:
+    name: str
+    fn: Callable[..., Any]
+    arg_types: Optional[List[Type]]
+    ret_type: Optional[Type]
 
 
 @dataclass
@@ -576,23 +611,24 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             # Heartbeat calls internally use a data converter which is async so
             # they need to be called on the event loop
             loop = asyncio.get_running_loop()
+            orig_heartbeat = ctx.heartbeat
 
             def thread_safe_heartbeat(*details: Any) -> None:
                 temporalio.activity._Context.set(ctx)
-                loop.call_soon_threadsafe(ctx.heartbeat, *details)
+                loop.call_soon_threadsafe(orig_heartbeat, *details)
+
+            ctx.heartbeat = thread_safe_heartbeat
 
             # For heartbeats, we use the existing heartbeat callable for thread
             # pool executors or a multiprocessing queue for others
-            heartbeat: Union[
-                Callable[..., None], SharedHeartbeatSender
-            ] = thread_safe_heartbeat
+            heartbeat: Union[Callable[..., None], SharedHeartbeatSender] = ctx.heartbeat
             shared_manager: Optional[SharedStateManager] = None
             if not isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
                 # Should always be present in worker, pre-checked on init
                 shared_manager = input._worker._config["shared_state_manager"]
                 assert shared_manager
                 heartbeat = shared_manager.register_heartbeater(
-                    info.task_token, thread_safe_heartbeat
+                    info.task_token, ctx.heartbeat
                 )
 
             try:
