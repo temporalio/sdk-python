@@ -243,7 +243,10 @@ class Worker:
                     # Cancelled event and sync field will be updated inside
                     # _run_activity when the activity function is obtained
                     activity = _RunningActivity(
-                        task=None, cancelled_event=threading.Event(), sync=False
+                        task=None,
+                        cancelled_event=threading.Event(),
+                        sync=False,
+                        last_heartbeat_task=None,
                     )
                     activity.task = asyncio.create_task(
                         self._run_activity(task.task_token, task.start, activity)
@@ -270,41 +273,62 @@ class Worker:
             logger.warning("Cannot find activity to cancel for token %s", task_token)
             return
         logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
-        # TODO(cretz): Check that Python >= 3.9 and set msg?
-        activity.cancel()
+        activity.cancel(cancelled_by_request=True)
 
     def _heartbeat_activity(self, task_token: bytes, *details: Any) -> None:
         # We intentionally make heartbeating non-async, but since the data
         # converter is async, we have to schedule it
         logger = temporalio.activity.logger
-        asyncio.create_task(
-            self._heartbeat_activity_async(logger, task_token, *details)
-        )
+        activity = self._running_activities.get(task_token)
+        if activity:
+            activity.current_heartbeat_seq += 1
+            heartbeat_seq = activity.current_heartbeat_seq
+            activity.last_heartbeat_task = asyncio.create_task(
+                self._heartbeat_activity_async(
+                    logger, task_token, heartbeat_seq, *details
+                )
+            )
 
     async def _heartbeat_activity_async(
-        self, logger: logging.Logger, task_token: bytes, *details: Any
+        self,
+        logger: logging.Logger,
+        task_token: bytes,
+        heartbeat_seq: int,
+        *details: Any,
     ) -> None:
+        activity = self._running_activities.get(task_token)
+        # Bail if not the latest
+        if not activity or activity.current_heartbeat_seq != heartbeat_seq:
+            return
         try:
             heartbeat = temporalio.bridge.proto.ActivityHeartbeat(task_token=task_token)
             if details:
                 heartbeat.details.extend(
-                    await self._config["client"].data_converter.encode(details)
+                    temporalio.bridge.worker.payloads_to_core(
+                        await self._config["client"].data_converter.encode(details)
+                    )
                 )
-            # Since this is called async on the event loop, it is possible that
-            # this is reached _after_ a sync activity has completed and removed
-            # itself from the dict since, so we check it first
-            if task_token in self._running_activities:
-                self._bridge_worker.record_activity_heartbeat(heartbeat)
+            # Bail if not the latest
+            if activity.current_heartbeat_seq != heartbeat_seq:
+                return
+            self._bridge_worker.record_activity_heartbeat(heartbeat)
         except Exception as err:
-            # Since this exception cannot be captured by the user, we will log
-            # and cancel the activity
-            logger.exception(
-                "Cancelling activity because failed recording heartbeat: {err}",
-                extra={"error": err},
-            )
-            activity = self._running_activities.get(task_token)
-            if activity:
-                activity.cancel()
+            # Bail if not the latest
+            if activity.current_heartbeat_seq != heartbeat_seq:
+                return
+            # If the activity is done, nothing we can do but log
+            if activity.done:
+                logger.exception(
+                    f"Failed recording heartbeat (activity already done, cannot error): {err}",
+                    extra={"error": err},
+                )
+            else:
+                logger.warning(
+                    f"Cancelling activity because failed recording heartbeat: {err}",
+                    extra={"error": err},
+                    exc_info=True,
+                )
+                activity.cancel(cancelled_due_to_heartbeat_error=err)
 
     async def _run_activity(
         self,
@@ -461,7 +485,25 @@ class Worker:
                 if isinstance(err, temporalio.activity.CompleteAsyncError):
                     temporalio.activity.logger.debug("Completing asynchronously")
                     completion.result.will_complete_async.SetInParent()
-                elif isinstance(err, asyncio.CancelledError):
+                elif (
+                    isinstance(err, asyncio.CancelledError)
+                    and running_activity.cancelled_due_to_heartbeat_error
+                ):
+                    err = running_activity.cancelled_due_to_heartbeat_error
+                    temporalio.activity.logger.debug(
+                        f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
+                        extra={"error": err},
+                        exc_info=True,
+                    )
+                    await temporalio.exceptions.apply_exception_to_failure(
+                        err,
+                        self._config["client"].data_converter,
+                        completion.result.failed.failure,
+                    )
+                elif (
+                    isinstance(err, asyncio.CancelledError)
+                    and running_activity.cancelled_by_request
+                ):
                     temporalio.activity.logger.debug("Completing as cancelled")
                     # We intentionally have a separate activity CancelledError
                     # so we don't accidentally bubble a cancellation that
@@ -493,6 +535,20 @@ class Worker:
                     f"Failed building exception result: {inner_err}"
                 )
 
+        # If there was a last heartbeat task, we have to wait on it. We mark the
+        # activity as already done to make sure that the heartbeater doesn't try
+        # to cancel it if it fails.
+        running_activity.done = True
+        if running_activity.last_heartbeat_task:
+            task = running_activity.last_heartbeat_task
+            running_activity.last_heartbeat_task = None
+            try:
+                await task
+            except:
+                # Should never happen because it's trapped in-task
+                temporalio.activity.logger.exception(
+                    "Final heartbeat task didn't trap error"
+                )
         # Send task completion to core
         del self._running_activities[task_token]
         try:
@@ -538,12 +594,26 @@ class _ActivityDefinition:
 class _RunningActivity:
     task: Optional[asyncio.Task]
     cancelled_event: threading.Event
+    last_heartbeat_task: Optional[asyncio.Task]
     sync: bool
+    done: bool = False
+    # Increased each heartbeat, heartbeats not at this seq are ignored
+    current_heartbeat_seq: int = 10
+    cancelled_by_request: bool = False
+    cancelled_due_to_heartbeat_error: Optional[Exception] = None
 
-    def cancel(self) -> None:
+    def cancel(
+        self,
+        *,
+        cancelled_by_request: bool = False,
+        cancelled_due_to_heartbeat_error: Optional[Exception] = None,
+    ) -> None:
+        self.cancelled_by_request = cancelled_by_request
+        self.cancelled_due_to_heartbeat_error = cancelled_due_to_heartbeat_error
         self.cancelled_event.set()
         # We do not cancel the task of sync activities
         if not self.sync and self.task:
+            # TODO(cretz): Check that Python >= 3.9 and set msg?
             self.task.cancel()
 
 

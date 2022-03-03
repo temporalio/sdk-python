@@ -14,9 +14,11 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
+    Tuple,
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import typing_extensions
@@ -311,6 +313,40 @@ class Client:
             result_run_id=run_id,
             first_execution_run_id=first_execution_run_id,
         )
+
+    @overload
+    def get_activity_completion_handle(
+        self, *, workflow_id: str, run_id: str, activity_id: str
+    ) -> ActivityCompletionHandle:
+        pass
+
+    @overload
+    def get_activity_completion_handle(
+        self, *, task_token: bytes
+    ) -> ActivityCompletionHandle:
+        pass
+
+    def get_activity_completion_handle(
+        self,
+        *,
+        workflow_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        activity_id: Optional[str] = None,
+        task_token: Optional[bytes] = None,
+    ) -> ActivityCompletionHandle:
+        if task_token is not None:
+            if workflow_id is not None or run_id is not None or activity_id is not None:
+                raise ValueError("Task token cannot be present with other IDs")
+            return ActivityCompletionHandle(id_or_token=task_token)
+        elif workflow_id is not None:
+            if run_id is None or activity_id is None:
+                raise ValueError(
+                    "Workflow ID, run ID, and activity ID must all be given together"
+                )
+            return ActivityCompletionHandle(
+                id_or_token=(workflow_id, run_id, activity_id)
+            )
+        raise ValueError("Task token or workflow/run/activity ID must be present")
 
 
 class ClientConfig(typing_extensions.TypedDict):
@@ -687,6 +723,13 @@ class WorkflowHandle(Generic[T]):
                 first_execution_run_id=self._first_execution_run_id,
             )
         )
+
+
+class ActivityCompletionHandle:
+    def __init__(self, id_or_token: Union[Tuple[str, str, str], bytes]) -> None:
+        self._id_or_token = id_or_token
+
+    # TODO(cretz): The async methods here
 
 
 class WorkflowDescription:

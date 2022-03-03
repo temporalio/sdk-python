@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Iterable, List, Optional
 
 import pytest
 
@@ -122,12 +122,7 @@ async def test_activity_failure(client: temporalio.client.Client, worker: Worker
 
     with pytest.raises(temporalio.client.WorkflowFailureError) as err:
         await _execute_workflow_with_activity(client, worker, raise_error)
-    cause = err.value.cause
-    assert isinstance(cause, temporalio.exceptions.ActivityError)
-    cause = cause.__cause__
-    assert isinstance(cause, temporalio.exceptions.ApplicationError)
-    assert cause.message == "oh no!"
-    assert cause.__cause__ is None
+    assert str(assert_activity_application_error(err.value)) == "oh no!"
 
 
 def picklable_activity_failure():
@@ -145,12 +140,7 @@ async def test_sync_activity_process_failure(
                 picklable_activity_failure,
                 worker_config={"activity_executor": executor},
             )
-    cause = err.value.cause
-    assert isinstance(cause, temporalio.exceptions.ActivityError)
-    cause = cause.__cause__
-    assert isinstance(cause, temporalio.exceptions.ApplicationError)
-    assert cause.message == "oh no!"
-    assert cause.__cause__ is None
+    assert str(assert_activity_application_error(err.value)) == "oh no!"
 
 
 async def test_activity_bad_params(client: temporalio.client.Client, worker: Worker):
@@ -159,12 +149,9 @@ async def test_activity_bad_params(client: temporalio.client.Client, worker: Wor
 
     with pytest.raises(temporalio.client.WorkflowFailureError) as err:
         await _execute_workflow_with_activity(client, worker, say_hello)
-    cause = err.value.cause
-    assert isinstance(cause, temporalio.exceptions.ActivityError)
-    cause = cause.__cause__
-    assert isinstance(cause, temporalio.exceptions.ApplicationError)
-    assert cause.message.endswith("missing 1 required positional argument: 'name'")
-    assert cause.__cause__ is None
+    assert str(assert_activity_application_error(err.value)).endswith(
+        "missing 1 required positional argument: 'name'"
+    )
 
 
 async def test_activity_kwonly_params(client: temporalio.client.Client, worker: Worker):
@@ -289,9 +276,7 @@ async def test_activity_does_not_exist(
                 id=str(uuid.uuid4()),
                 task_queue=worker.task_queue,
             )
-    assert isinstance(err.value.cause, temporalio.exceptions.ActivityError)
-    assert isinstance(err.value.cause.__cause__, temporalio.exceptions.ApplicationError)
-    assert str(err.value.cause.__cause__) == (
+    assert str(assert_activity_application_error(err.value)) == (
         "Activity function wrong_activity is not registered on this worker, "
         "available activities: say_hello"
     )
@@ -323,8 +308,7 @@ async def test_max_concurrent_activities(
             worker_config={"max_outstanding_activities": 42},
             on_complete=complete_activities_event.set,
         )
-    assert isinstance(err.value.cause, temporalio.exceptions.ActivityError)
-    timeout = err.value.cause.__cause__
+    timeout = assert_activity_error(err.value)
     assert isinstance(timeout, temporalio.exceptions.TimeoutError)
     assert str(timeout) == "activity timeout"
     assert timeout.type == temporalio.exceptions.TimeoutType.SCHEDULE_TO_START
@@ -361,28 +345,178 @@ async def test_activity_type_hints(client: temporalio.client.Client, worker: Wor
     assert activity_param1 == SomeClass(foo="str1", bar=SomeClass(foo="str2"))
 
 
+async def test_activity_heartbeat_details(
+    client: temporalio.client.Client, worker: Worker
+):
+    async def some_activity() -> str:
+        info = temporalio.activity.info()
+        count = int(info.heartbeat_details[0]) if info.heartbeat_details else 0
+        count += 9
+        temporalio.activity.heartbeat(count)
+        if count < 30:
+            raise RuntimeError("Try again!")
+        return f"final count: {count}"
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        some_activity,
+        retry_max_attempts=5,
+    )
+    assert result.result == "final count: 36"
+
+
+class NotSerializableValue:
+    pass
+
+
+async def test_activity_heartbeat_details_converter_fail(
+    client: temporalio.client.Client, worker: Worker
+):
+    async def some_activity() -> str:
+        temporalio.activity.heartbeat(NotSerializableValue())
+        # Since the above fails, it will cause this task to be cancelled on the
+        # next event loop iteration, so we sleep for a short time to allow that
+        # iteration to occur
+        await asyncio.sleep(0.05)
+        return "Should not get here"
+
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(client, worker, some_activity)
+    assert str(assert_activity_application_error(err.value)).endswith(
+        "has no known converter"
+    )
+
+
+async def test_activity_heartbeat_details_timeout(
+    client: temporalio.client.Client, worker: Worker
+):
+    async def some_activity() -> str:
+        temporalio.activity.heartbeat("some details!")
+        await asyncio.sleep(3)
+        return "Should not get here"
+
+    # Have a 1s heartbeat timeout that we won't meet with a second heartbeat
+    # then check the timeout's details
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(
+            client, worker, some_activity, heartbeat_timeout_ms=1000
+        )
+    timeout = assert_activity_error(err.value)
+    assert isinstance(timeout, temporalio.exceptions.TimeoutError)
+    assert str(timeout) == "activity timeout"
+    assert timeout.type == temporalio.exceptions.TimeoutType.HEARTBEAT
+    assert list(timeout.last_heartbeat_details) == ["some details!"]
+
+
+def picklable_heartbeat_details_activity() -> str:
+    info = temporalio.activity.info()
+    some_list: List[str] = (
+        list(info.heartbeat_details[0]) if info.heartbeat_details else []
+    )
+    some_list.append(f"attempt: {info.attempt}")
+    temporalio.activity.heartbeat(some_list)
+    if len(some_list) < 2:
+        raise RuntimeError("Try again!")
+    return ", ".join(some_list)
+
+
+async def test_sync_activity_thread_heartbeat_details(
+    client: temporalio.client.Client, worker: Worker
+):
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            picklable_heartbeat_details_activity,
+            retry_max_attempts=3,
+            worker_config={"activity_executor": executor},
+        )
+    assert result.result == "attempt: 1, attempt: 2"
+
+
+async def test_sync_activity_process_heartbeat_details(
+    client: temporalio.client.Client, worker: Worker
+):
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            picklable_heartbeat_details_activity,
+            retry_max_attempts=3,
+            worker_config={"activity_executor": executor},
+        )
+    assert result.result == "attempt: 1, attempt: 2"
+
+
+def picklable_activity_non_pickable_heartbeat_details() -> str:
+    temporalio.activity.heartbeat(lambda: "cannot pickle lambda by default")
+    return "Should not get here"
+
+
+async def test_sync_activity_process_non_picklable_heartbeat_details(
+    client: temporalio.client.Client, worker: Worker
+):
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            await _execute_workflow_with_activity(
+                client,
+                worker,
+                picklable_activity_non_pickable_heartbeat_details,
+                worker_config={"activity_executor": executor},
+            )
+    assert "Can't pickle" in str(assert_activity_application_error(err.value))
+
+
+async def test_activity_error_non_retryable(
+    client: temporalio.client.Client, worker: Worker
+):
+    async def some_activity():
+        if temporalio.activity.info().attempt < 2:
+            raise temporalio.exceptions.ApplicationError(
+                "Retry me", non_retryable=False
+            )
+        # We'll test error details while we're here
+        raise temporalio.exceptions.ApplicationError(
+            "Do not retry me", "detail1", 123, non_retryable=True
+        )
+
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            some_activity,
+            retry_max_attempts=100,
+        )
+    app_err = assert_activity_application_error(err.value)
+    assert str(app_err) == "Do not retry me"
+    assert list(app_err.details) == ["detail1", 123]
+
+
+async def test_activity_error_non_retryable_type(
+    client: temporalio.client.Client, worker: Worker
+):
+    async def some_activity():
+        if temporalio.activity.info().attempt < 2:
+            raise temporalio.exceptions.ApplicationError(
+                "Retry me", type="Can retry me"
+            )
+        raise temporalio.exceptions.ApplicationError(
+            "Do not retry me", type="Cannot retry me"
+        )
+
+    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            some_activity,
+            retry_max_attempts=100,
+            non_retryable_error_types=["Cannot retry me"],
+        )
+    assert str(assert_activity_application_error(err.value)) == "Do not retry me"
+
+
 # async def test_activity_async_completion():
-#     raise NotImplementedError
-
-# async def test_activity_heartbeat_details():
-#     raise NotImplementedError
-
-# async def test_activity_heartbeat_details_converter_fail():
-#     raise NotImplementedError
-
-# async def test_sync_activity_thread_heartbeat():
-#     raise NotImplementedError
-
-# async def test_sync_activity_process_heartbeat():
-#     raise NotImplementedError
-
-# async def test_sync_activity_process_heartbeat_non_picklable_details():
-#     raise NotImplementedError
-
-# async def test_activity_retry():
-#     raise NotImplementedError
-
-# async def test_activity_non_retry_error():
 #     raise NotImplementedError
 
 # async def test_activity_logging():
@@ -418,6 +552,8 @@ async def _execute_workflow_with_activity(
     cancel_after_ms: Optional[int] = None,
     wait_for_cancellation: Optional[bool] = None,
     heartbeat_timeout_ms: Optional[int] = None,
+    retry_max_attempts: Optional[int] = None,
+    non_retryable_error_types: Optional[Iterable[str]] = None,
     worker_config: temporalio.worker.WorkerConfig = {},
     on_complete: Optional[Callable[[], None]] = None,
 ) -> _ActivityResult:
@@ -447,6 +583,8 @@ async def _execute_workflow_with_activity(
                                 cancel_after_ms=cancel_after_ms,
                                 wait_for_cancellation=wait_for_cancellation,
                                 heartbeat_timeout_ms=heartbeat_timeout_ms,
+                                retry_max_attempts=retry_max_attempts,
+                                non_retryable_error_types=non_retryable_error_types,
                             )
                         )
                     ]
@@ -476,3 +614,17 @@ def default_shared_state_manager() -> temporalio.worker.SharedStateManager:
             )
         )
     return _default_shared_state_manager
+
+
+def assert_activity_error(err: temporalio.client.WorkflowFailureError) -> BaseException:
+    assert isinstance(err.cause, temporalio.exceptions.ActivityError)
+    assert err.cause.__cause__
+    return err.cause.__cause__
+
+
+def assert_activity_application_error(
+    err: temporalio.client.WorkflowFailureError,
+) -> temporalio.exceptions.ApplicationError:
+    ret = assert_activity_error(err)
+    assert isinstance(ret, temporalio.exceptions.ApplicationError)
+    return ret

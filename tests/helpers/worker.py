@@ -73,6 +73,8 @@ class KSExecuteActivityAction:
     cancel_after_ms: Optional[int] = None
     wait_for_cancellation: Optional[bool] = None
     heartbeat_timeout_ms: Optional[int] = None
+    retry_max_attempts: Optional[int] = None
+    non_retryable_error_types: Optional[Iterable[str]] = None
 
 
 class Worker(ABC):

@@ -1,13 +1,16 @@
 """Worker using SDK Core."""
 
 from dataclasses import dataclass
+from typing import Iterable
 
 import temporal_sdk_bridge
 from temporal_sdk_bridge import PollShutdownError
 
+import temporalio.api.common.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
+import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 
@@ -74,3 +77,14 @@ class Worker:
 
     async def shutdown(self) -> None:
         await self._ref.shutdown()
+
+
+def payloads_to_core(
+    payloads: Iterable[temporalio.api.common.v1.Payload],
+) -> Iterable[temporalio.bridge.proto.common.Payload]:
+    return map(
+        lambda p: temporalio.bridge.proto.common.Payload(
+            metadata=p.metadata, data=p.data
+        ),
+        payloads,
+    )

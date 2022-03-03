@@ -91,6 +91,8 @@ type ExecuteActivityAction struct {
 	CancelAfterMS            int64         `json:"cancel_after_ms"`
 	WaitForCancellation      bool          `json:"wait_for_cancellation"`
 	HeartbeatTimeoutMS       int64         `json:"heartbeat_timeout_ms"`
+	RetryMaxAttempts         int           `json:"retry_max_attempts"` // 0 same as 1
+	NonRetryableErrorTypes   []string      `json:"non_retryable_error_types"`
 }
 
 func KitchenSinkWorkflow(ctx workflow.Context, params *KitchenSinkWorkflowParams) (interface{}, error) {
@@ -170,10 +172,19 @@ func handleAction(
 			ScheduleToStartTimeout: time.Duration(action.ExecuteActivity.ScheduleToStartTimeoutMS) * time.Millisecond,
 			WaitForCancellation:    action.ExecuteActivity.WaitForCancellation,
 			HeartbeatTimeout:       time.Duration(action.ExecuteActivity.HeartbeatTimeoutMS) * time.Millisecond,
-			RetryPolicy:            &temporal.RetryPolicy{MaximumAttempts: 1},
+			RetryPolicy: &temporal.RetryPolicy{
+				InitialInterval:        1 * time.Millisecond,
+				BackoffCoefficient:     1.01,
+				MaximumInterval:        2 * time.Millisecond,
+				MaximumAttempts:        1,
+				NonRetryableErrorTypes: action.ExecuteActivity.NonRetryableErrorTypes,
+			},
 		}
 		if opts.StartToCloseTimeout == 0 && opts.ScheduleToCloseTimeout == 0 {
 			opts.ScheduleToCloseTimeout = 5 * time.Second
+		}
+		if action.ExecuteActivity.RetryMaxAttempts > 1 {
+			opts.RetryPolicy.MaximumAttempts = int32(action.ExecuteActivity.RetryMaxAttempts)
 		}
 		var lastErr error
 		var lastResponse string

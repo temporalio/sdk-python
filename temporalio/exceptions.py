@@ -396,14 +396,14 @@ async def apply_error_to_failure(
             failure.application_failure_info.type = error.type
         failure.application_failure_info.non_retryable = error.non_retryable
         if error.details:
-            failure.application_failure_info.details = (
+            failure.application_failure_info.details.CopyFrom(
                 await temporalio.converter.encode_payloads(error.details, converter)
             )
     elif isinstance(error, TimeoutError):
         failure.timeout_failure_info.SetInParent()
         failure.timeout_failure_info.timeout_type = error.type or 0
         if error.last_heartbeat_details:
-            failure.timeout_failure_info.last_heartbeat_details = (
+            failure.timeout_failure_info.last_heartbeat_details.CopyFrom(
                 await temporalio.converter.encode_payloads(
                     error.last_heartbeat_details, converter
                 )
