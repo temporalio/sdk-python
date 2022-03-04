@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Callable, Iterable, NoReturn, Optional
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    NoReturn,
+    Optional,
+    Tuple,
+)
 
 import temporalio.exceptions
-
-# TODO(cretz): Use logging adapter
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -31,6 +38,7 @@ class Info:
     workflow_run_id: str
     workflow_type: str
     # TODO(cretz): Add headers, current_attempt_scheduled_time, retry_policy, and is_local
+    # TODO(cretz): Consider putting identity on here for "worker_id" for logger
 
 
 _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("activity")
@@ -41,7 +49,9 @@ class _Context:
     info: Callable[[], Info]
     # This is optional because during interceptor init it is not present
     heartbeat: Optional[Callable[..., None]]
-    cancelled_event: threading.Event
+    cancelled_event: _CompositeEvent
+    worker_shutdown_event: _CompositeEvent
+    _logger_details: Optional[Mapping[str, Any]] = None
 
     @staticmethod
     def current() -> _Context:
@@ -54,6 +64,33 @@ class _Context:
     def set(context: _Context) -> None:
         _current_context.set(context)
 
+    @property
+    def logger_details(self) -> Mapping[str, Any]:
+        if self._logger_details is None:
+            info = self.info()
+            self._logger_details = {
+                "activity_id": info.activity_id,
+                "activity_type": info.activity_type,
+                "attempt": info.attempt,
+                "namespace": info.workflow_namespace,
+                "task_queue": info.task_queue,
+                "workflow_id": info.workflow_id,
+                "workflow_run_id": info.workflow_run_id,
+                "workflow_type": info.workflow_type,
+            }
+        return self._logger_details
+
+
+@dataclass
+class _CompositeEvent:
+    thread_event: threading.Event
+    async_event: Optional[asyncio.Event]
+
+    def set(self) -> None:
+        self.thread_event.set()
+        if self.async_event:
+            self.async_event.set()
+
 
 def in_activity() -> bool:
     return not _current_context.get(None) is None
@@ -63,7 +100,7 @@ def info() -> Info:
     return _Context.current().info()
 
 
-def heartbeat(*details: Any):
+def heartbeat(*details: Any) -> None:
     heartbeat_fn = _Context.current().heartbeat
     if not heartbeat_fn:
         raise RuntimeError("Can only execute heartbeat after interceptor init")
@@ -71,12 +108,35 @@ def heartbeat(*details: Any):
 
 
 def cancelled() -> bool:
-    return _Context.current().cancelled_event.is_set()
+    return _Context.current().cancelled_event.thread_event.is_set()
 
 
-# TODO(cretz): Make it clear this is not async API
-def wait_for_cancelled(timeout: Optional[float] = None):
-    _Context.current().cancelled_event.wait(timeout)
+def wait_for_cancelled_sync(timeout: Optional[float] = None) -> None:
+    _Context.current().cancelled_event.thread_event.wait(timeout)
+
+
+# TODO(cretz): Document that this throws when not async activity
+async def wait_for_cancelled() -> None:
+    async_event = _Context.current().cancelled_event.async_event
+    if not async_event:
+        raise RuntimeError("not in async activity")
+    await async_event.wait()
+
+
+def worker_shutdown() -> bool:
+    return _Context.current().worker_shutdown_event.thread_event.is_set()
+
+
+def wait_for_worker_shutdown_sync(timeout: Optional[float] = None) -> None:
+    _Context.current().worker_shutdown_event.thread_event.wait(timeout)
+
+
+# TODO(cretz): Document that this throws when not async activity
+async def wait_for_worker_shutdown() -> None:
+    async_event = _Context.current().worker_shutdown_event.async_event
+    if not async_event:
+        raise RuntimeError("not in async activity")
+    await async_event.wait()
 
 
 def raise_complete_async() -> NoReturn:
@@ -85,3 +145,42 @@ def raise_complete_async() -> NoReturn:
 
 class CompleteAsyncError(temporalio.exceptions.TemporalError):
     pass
+
+
+class LoggerAdapter(logging.LoggerAdapter):
+    def __init__(
+        self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]
+    ) -> None:
+        super().__init__(logger, extra)
+        self.activity_info_on_message = True
+        self.activity_info_on_extra = True
+
+    def process(
+        self, msg: Any, kwargs: MutableMapping[str, Any]
+    ) -> Tuple[Any, MutableMapping[str, Any]]:
+        msg, kwargs = super().process(msg, kwargs)
+        if self.activity_info_on_extra or self.activity_info_on_extra:
+            context = _current_context.get(None)
+            if context:
+                if self.activity_info_on_message:
+                    msg = f"{msg} ({context.logger_details})"
+                if self.activity_info_on_extra:
+                    # Extra can be absent or None, this handles both
+                    extra = kwargs.get("extra", None) or {}
+                    extra["activity_info"] = context.info()
+                    kwargs["extra"] = extra
+        return (msg, kwargs)
+
+    @property
+    def base_logger(self) -> logging.Logger:
+        return self.logger
+
+
+# TODO(cretz): Do we want to give this another name? In Python, often people
+# call this an "adapter" because it doesn't have every method that a logger does
+# (e.g. you can't set handlers or formatters on it). But from inside an
+# activity, temporalio.activity.logger.debug("whatever") is clearer. I have
+# exposed the "base_logger" property to provide the underlying logger as needed
+# (which is already on the "logger" property, but not typed). There are some
+# more advanced overrides we _could_ do but they are more brittle.
+logger = LoggerAdapter(logging.getLogger(__name__), None)

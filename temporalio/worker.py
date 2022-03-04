@@ -64,6 +64,7 @@ class Worker:
         sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
+        graceful_shutdown_timeout: timedelta = timedelta(),
         # Used and required for sync activities when the executor is not a
         # thread pool executor.
         shared_state_manager: Optional[SharedStateManager] = None,
@@ -189,6 +190,7 @@ class Worker:
             sticky_queue_schedule_to_start_timeout=sticky_queue_schedule_to_start_timeout,
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
+            graceful_shutdown_timeout=graceful_shutdown_timeout,
             shared_state_manager=shared_state_manager,
             type_hint_eval_str=type_hint_eval_str,
         )
@@ -229,8 +231,45 @@ class Worker:
     async def shutdown(self) -> None:
         if not self._task:
             raise RuntimeError("Never started")
-        await self._bridge_worker.shutdown()
+        graceful_timeout = self._config["graceful_shutdown_timeout"]
+        logger.info(
+            f"Beginning worker shutdown, will wait {graceful_timeout} before cancelling workflows/activities"
+        )
+        # Start shutdown of the bridge
+        bridge_shutdown_task = asyncio.create_task(self._bridge_worker.shutdown())
+        # Wait for the poller loop to stop
         await self._task
+
+        # Collect all activity tasks while telling them we're shutting down
+        activity_tasks: List[asyncio.Task] = []
+        for activity in self._running_activities.values():
+            if activity.task:
+                activity_tasks.append(activity.task)
+                activity.worker_shutdown_event.set()
+        if activity_tasks:
+            # Wait for any still running after graceful timeout
+            _, still_running = await asyncio.wait(
+                activity_tasks, timeout=graceful_timeout.total_seconds()
+            )
+            if still_running:
+                # Cancel all still running
+                suffix = (
+                    "activities that are"
+                    if len(still_running) > 1
+                    else "activity that is"
+                )
+                logger.info(f"Cancelling {len(still_running)} {suffix} still running")
+                for task in still_running:
+                    # We have to find the running activity that's associated with
+                    # the task so that we can cancel through that. It's ok if the
+                    # activity is already gone.
+                    for activity in self._running_activities.values():
+                        if activity.task is task:
+                            activity.cancel()
+                            break
+
+        # Wait for the bridge to report all activities are completed
+        await bridge_shutdown_task
 
     async def _run_activities(self) -> None:
         # Continually poll for activity work
@@ -244,7 +283,12 @@ class Worker:
                     # _run_activity when the activity function is obtained
                     activity = _RunningActivity(
                         task=None,
-                        cancelled_event=threading.Event(),
+                        cancelled_event=temporalio.activity._CompositeEvent(
+                            thread_event=threading.Event(), async_event=None
+                        ),
+                        worker_shutdown_event=temporalio.activity._CompositeEvent(
+                            thread_event=threading.Event(), async_event=None
+                        ),
                         sync=False,
                         last_heartbeat_task=None,
                     )
@@ -358,6 +402,10 @@ class Worker:
             # that cancellation doesn't attempt to cancel the task
             if not inspect.iscoroutinefunction(activity_def.fn):
                 running_activity.sync = True
+            else:
+                # We have to set the async form of events
+                running_activity.cancelled_event.async_event = asyncio.Event()
+                running_activity.worker_shutdown_event.async_event = asyncio.Event()
 
             # As a special case, if we're neither a coroutine or a thread pool
             # executor, we use a shared state manager event so it can span
@@ -369,7 +417,11 @@ class Worker:
                 manager = self._config["shared_state_manager"]
                 # Pre-checked on worker init
                 assert manager
-                running_activity.cancelled_event = manager.new_cancellation_event()
+                # Use cross-process events
+                running_activity.cancelled_event.thread_event = manager.new_event()
+                running_activity.worker_shutdown_event.thread_event = (
+                    manager.new_event()
+                )
 
             # Convert arguments. We only use arg type hints if they match the
             # input count.
@@ -442,6 +494,7 @@ class Worker:
                 if inspect.iscoroutinefunction(activity_def.fn)
                 else self._config["activity_executor"],
                 _cancelled_event=running_activity.cancelled_event,
+                _worker_shutdown_event=running_activity.worker_shutdown_event,
                 _worker=self,
             )
 
@@ -452,6 +505,7 @@ class Worker:
                     info=lambda: info,
                     heartbeat=None,
                     cancelled_event=running_activity.cancelled_event,
+                    worker_shutdown_event=running_activity.worker_shutdown_event,
                 )
             )
             temporalio.activity.logger.debug("Starting activity")
@@ -578,6 +632,7 @@ class WorkerConfig(typing_extensions.TypedDict):
     sticky_queue_schedule_to_start_timeout: timedelta
     max_heartbeat_throttle_interval: timedelta
     default_heartbeat_throttle_interval: timedelta
+    graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
     type_hint_eval_str: bool
 
@@ -593,7 +648,8 @@ class _ActivityDefinition:
 @dataclass
 class _RunningActivity:
     task: Optional[asyncio.Task]
-    cancelled_event: threading.Event
+    cancelled_event: temporalio.activity._CompositeEvent
+    worker_shutdown_event: temporalio.activity._CompositeEvent
     last_heartbeat_task: Optional[asyncio.Task]
     sync: bool
     done: bool = False
@@ -622,7 +678,8 @@ class ExecuteActivityInput:
     fn: Callable[..., Any]
     args: Iterable[Any]
     executor: Optional[concurrent.futures.Executor]
-    _cancelled_event: threading.Event
+    _cancelled_event: temporalio.activity._CompositeEvent
+    _worker_shutdown_event: temporalio.activity._CompositeEvent
     _worker: Worker
 
 
@@ -707,7 +764,9 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     _execute_sync_activity,
                     info,
                     heartbeat,
-                    input._cancelled_event,
+                    # Only thread event, this may cross a process boundary
+                    input._cancelled_event.thread_event,
+                    input._worker_shutdown_event.thread_event,
                     input.fn,
                     *input.args,
                 )
@@ -724,6 +783,7 @@ def _execute_sync_activity(
     info: temporalio.activity.Info,
     heartbeat: Union[Callable[..., None], SharedHeartbeatSender],
     cancelled_event: threading.Event,
+    worker_shutdown_event: threading.Event,
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -740,7 +800,12 @@ def _execute_sync_activity(
         temporalio.activity._Context(
             info=lambda: info,
             heartbeat=heartbeat_fn,
-            cancelled_event=cancelled_event,
+            cancelled_event=temporalio.activity._CompositeEvent(
+                thread_event=cancelled_event, async_event=None
+            ),
+            worker_shutdown_event=temporalio.activity._CompositeEvent(
+                thread_event=worker_shutdown_event, async_event=None
+            ),
         )
     )
     return fn(*args)
@@ -790,7 +855,7 @@ class SharedStateManager(ABC):
         )
 
     @abstractmethod
-    def new_cancellation_event(self) -> threading.Event:
+    def new_event(self) -> threading.Event:
         raise NotImplementedError
 
     @abstractmethod
@@ -825,7 +890,7 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
         )
         self._heartbeats: Dict[bytes, Callable[..., None]] = {}
 
-    def new_cancellation_event(self) -> threading.Event:
+    def new_event(self) -> threading.Event:
         return self._mgr.Event()
 
     def register_heartbeater(

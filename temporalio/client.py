@@ -727,7 +727,7 @@ class WorkflowHandle(Generic[T]):
 
 class ActivityCompletionHandle:
     def __init__(self, id_or_token: Union[Tuple[str, str, str], bytes]) -> None:
-        self._id_or_token = id_or_token
+        raise NotImplementedError
 
     # TODO(cretz): The async methods here
 

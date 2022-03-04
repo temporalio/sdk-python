@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import inspect
+import logging
+import logging.handlers
 import multiprocessing
+import queue
 import time
 import uuid
 from dataclasses import dataclass
@@ -516,17 +518,167 @@ async def test_activity_error_non_retryable_type(
     assert str(assert_activity_application_error(err.value)) == "Do not retry me"
 
 
-# async def test_activity_async_completion():
-#     raise NotImplementedError
+async def test_activity_logging(client: temporalio.client.Client, worker: Worker):
+    async def say_hello(name: str) -> str:
+        temporalio.activity.logger.info(f"Called with arg: {name}")
+        return f"Hello, {name}!"
 
-# async def test_activity_logging():
-#     raise NotImplementedError
+    # Create a queue, add handler to logger, call normal activity, then check
+    handler = logging.handlers.QueueHandler(queue.Queue())
+    temporalio.activity.logger.base_logger.addHandler(handler)
+    prev_level = temporalio.activity.logger.base_logger.level
+    temporalio.activity.logger.base_logger.setLevel(logging.INFO)
+    try:
+        result = await _execute_workflow_with_activity(
+            client, worker, say_hello, "Temporal"
+        )
+    finally:
+        temporalio.activity.logger.base_logger.removeHandler(handler)
+        temporalio.activity.logger.base_logger.setLevel(prev_level)
+    assert result.result == "Hello, Temporal!"
+    records: List[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
+    assert len(records) > 0
+    assert records[-1].message.startswith(
+        "Called with arg: Temporal ({'activity_id': '"
+    )
+    assert records[-1].__dict__["activity_info"].activity_type == "say_hello"
 
-# async def test_activity_failure_with_details():
-#     raise NotImplementedError
 
-# async def test_activity_worker_shutdown():
-#     raise NotImplementedError
+async def test_activity_worker_shutdown(
+    client: temporalio.client.Client, worker: Worker
+):
+    activity_started = asyncio.Event()
+
+    async def wait_on_event() -> str:
+        nonlocal activity_started
+        activity_started.set()
+        try:
+            while True:
+                await asyncio.sleep(0.1)
+                temporalio.activity.heartbeat()
+        except asyncio.CancelledError:
+            return "Properly cancelled"
+
+    act_task_queue = str(uuid.uuid4())
+    act_worker = temporalio.worker.Worker(
+        client, task_queue=act_task_queue, activities={"wait_on_event": wait_on_event}
+    )
+    asyncio.create_task(act_worker.run())
+    # Start workflow
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        KSWorkflowParams(
+            actions=[
+                KSAction(
+                    execute_activity=KSExecuteActivityAction(
+                        name="wait_on_event",
+                        task_queue=act_task_queue,
+                        heartbeat_timeout_ms=1000,
+                    )
+                )
+            ]
+        ),
+        id=str(uuid.uuid4()),
+        task_queue=worker.task_queue,
+    )
+    # Wait until activity started before shutting down the worker
+    await activity_started.wait()
+    await act_worker.shutdown()
+    assert "Properly cancelled" == await handle.result()
+
+
+async def test_activity_worker_shutdown_graceful(
+    client: temporalio.client.Client, worker: Worker
+):
+    activity_started = asyncio.Event()
+
+    async def wait_on_event() -> str:
+        nonlocal activity_started
+        activity_started.set()
+        await temporalio.activity.wait_for_worker_shutdown()
+        return "Worker graceful shutdown"
+
+    act_task_queue = str(uuid.uuid4())
+    act_worker = temporalio.worker.Worker(
+        client,
+        task_queue=act_task_queue,
+        activities={"wait_on_event": wait_on_event},
+        graceful_shutdown_timeout=timedelta(seconds=2),
+    )
+    asyncio.create_task(act_worker.run())
+    # Start workflow
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        KSWorkflowParams(
+            actions=[
+                KSAction(
+                    execute_activity=KSExecuteActivityAction(
+                        name="wait_on_event", task_queue=act_task_queue
+                    )
+                )
+            ]
+        ),
+        id=str(uuid.uuid4()),
+        task_queue=worker.task_queue,
+    )
+    # Wait until activity started before shutting down the worker
+    await activity_started.wait()
+    await act_worker.shutdown()
+    assert "Worker graceful shutdown" == await handle.result()
+
+
+def picklable_wait_on_event() -> str:
+    temporalio.activity.wait_for_worker_shutdown_sync(5)
+    return "Worker graceful shutdown"
+
+
+async def test_sync_activity_process_worker_shutdown_graceful(
+    client: temporalio.client.Client, worker: Worker
+):
+    act_task_queue = str(uuid.uuid4())
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        act_worker = temporalio.worker.Worker(
+            client,
+            task_queue=act_task_queue,
+            activities={"picklable_wait_on_event": picklable_wait_on_event},
+            activity_executor=executor,
+            graceful_shutdown_timeout=timedelta(seconds=2),
+            shared_state_manager=default_shared_state_manager(),
+        )
+        asyncio.create_task(act_worker.run())
+
+        # Start workflow
+        handle = await client.start_workflow(
+            "kitchen_sink",
+            KSWorkflowParams(
+                actions=[
+                    KSAction(
+                        execute_activity=KSExecuteActivityAction(
+                            name="picklable_wait_on_event",
+                            task_queue=act_task_queue,
+                            heartbeat_timeout_ms=1000,
+                        )
+                    )
+                ]
+            ),
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
+
+        # Wait until activity started before shutting down the worker. Since it's
+        # cross process, we'll just cheat a bit using a private var to check.
+        found = False
+        for _ in range(10):
+            await asyncio.sleep(0.2)
+            found = len(act_worker._running_activities) > 0
+            if found:
+                break
+        assert found
+
+        # Do shutdown
+        await act_worker.shutdown()
+    assert "Worker graceful shutdown" == await handle.result()
+
 
 # async def test_activity_interceptor():
 #     raise NotImplementedError
