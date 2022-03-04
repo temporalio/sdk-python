@@ -427,7 +427,6 @@ async def encode_payloads(
     """Encode :py:class:`temporalio.api.common.v1.Payloads` with the given
     converter.
     """
-
     return temporalio.api.common.v1.Payloads(payloads=await converter.encode(values))
 
 

@@ -1,3 +1,5 @@
+"""Worker for processing Temporal workflows and/or activities."""
+
 from __future__ import annotations
 
 import asyncio
@@ -45,6 +47,12 @@ logger = logging.getLogger(__name__)
 
 
 class Worker:
+    """Worker to process workflows and/or activities.
+
+    Once created, workers can be run and shutdown explicitly via :py:meth:`run`
+    and :py:meth:`shutdown`, or they can be used in an ``async with`` clause.
+    """
+
     def __init__(
         self,
         client: temporalio.client.Client,
@@ -73,6 +81,65 @@ class Worker:
         # One may want to disable this if it's causing errors.
         type_hint_eval_str: bool = True,
     ) -> None:
+        """Create a worker to process workflows and/or activities.
+
+        Args:
+            client: Client to use for this worker. This is required and must be
+                the :py:class:`temporalio.client.Client` instance or have a
+                worker_workflow_service attribute with reference to the original
+                client's underlying service.
+            task_queue: Required task queue for this worker.
+            activities: Mapping of activity type names to activity callables.
+                Activities may be async functions or non-async functions.
+            activity_executor: Concurrent executor to use for non-async
+                activities. This is required if any activities are non-async. If
+                this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
+                all non-async activities must be picklable.
+            interceptors: Collection of interceptors for this worker. Any
+                interceptors already on the client that also implement
+                :py:class:`Interceptor` are prepended to this list and should
+                not be explicitly given here.
+            max_cached_workflows: If nonzero, workflows will be cached and
+                sticky task queues will be used.
+            max_outstanding_workflow_tasks: Maximum allowed number of workflow
+                tasks that will ever be given to this worker at one time.
+            max_outstanding_activities: Maximum number of activity tasks that
+                will ever be given to this worker concurrently.
+            max_outstanding_local_activities: Maximum number of local activity
+                tasks that will ever be given to this worker concurrently.
+            max_concurrent_wft_polls: Maximum number of concurrent poll workflow
+                task requests we will perform at a time on this worker's task
+                queue.
+            nonsticky_to_sticky_poll_ratio: max_concurrent_wft_polls * this
+                number = the number of max pollers that will be allowed for the
+                nonsticky queue when sticky tasks are enabled.
+            max_concurrent_at_polls: Maximum number of concurrent poll activity
+                task requests we will perform at a time on this worker's task
+                queue.
+            no_remote_activities: If true, this worker will only handle workflow
+                tasks and local activities, it will not poll for activity tasks.
+            sticky_queue_schedule_to_start_timeout: How long a workflow task is
+                allowed to sit on the sticky queue before it is timed out and
+                moved to the non-sticky queue where it may be picked up by any
+                worker.
+            max_heartbeat_throttle_interval: Longest interval for throttling
+                activity heartbeats.
+            default_heartbeat_throttle_interval: Default interval for throttling
+                activity heartbeats in case per-activity heartbeat timeout is
+                unset. Otherwise, it's the per-activity heartbeat timeout * 0.8.
+            graceful_shutdown_timeout: Amount of time after shutdown is called
+                that activities are given to complete before their tasks are
+                cancelled.
+            shared_state_manager: Used for obtaining cross-process friendly
+                synchronization primitives. This is required for non-async
+                activities where the activity_executor is not a
+                :py:class:`concurrent.futures.ThreadPoolExecutor`. Reuse of
+                these across workers is encouraged.
+            type_hint_eval_str: Whether the type hinting that is used to
+                determine dataclass parameters for decoding uses evaluation on
+                stringified annotations. This corresponds to the eval_str
+                parameter on :py:meth:`inspect.get_annotations`.
+        """
         # TODO(cretz): Support workflows
         if not activities:
             raise ValueError("At least one activity must be specified")
@@ -200,7 +267,8 @@ class Worker:
     def config(self) -> WorkerConfig:
         """Config, as a dictionary, used to create this worker.
 
-        This makes a shallow copy of the config each call.
+        Returns:
+            Configuration, shallow-copied.
         """
         config = self._config.copy()
         config["activities"] = dict(config["activities"])
@@ -208,16 +276,24 @@ class Worker:
 
     @property
     def task_queue(self) -> str:
+        """Task queue this worker is on."""
         return self._config["task_queue"]
 
     async def __aenter__(self) -> Worker:
+        """Start the worker and return self for use by ``async with``.
+
+        Returns:
+            Self.
+        """
         self._start()
         return self
 
     async def __aexit__(self, *args) -> None:
+        """Same as :py:meth:`shutdown` for use by ``async with``."""
         await self.shutdown()
 
     async def run(self) -> None:
+        """Run the worker and wait on it to be shutdown."""
         await self._start()
 
     def _start(self) -> asyncio.Task:
@@ -229,6 +305,11 @@ class Worker:
         return self._task
 
     async def shutdown(self) -> None:
+        """Shutdown the worker and wait until all activities have completed.
+
+        This will initiate a shutdown and optionally wait for a grace period
+        before sending cancels to all activities.
+        """
         if not self._task:
             raise RuntimeError("Never started")
         graceful_timeout = self._config["graceful_shutdown_timeout"]
@@ -675,6 +756,8 @@ class _RunningActivity:
 
 @dataclass
 class ExecuteActivityInput:
+    """Input for :py:meth:`ActivityInboundInterceptor.execute_activity`."""
+
     fn: Callable[..., Any]
     args: Iterable[Any]
     executor: Optional[concurrent.futures.Executor]
@@ -684,32 +767,78 @@ class ExecuteActivityInput:
 
 
 class Interceptor:
+    """Interceptor for workers.
+
+    This should be extended by any worker interceptors.
+    """
+
     def intercept_activity(
         self, next: ActivityInboundInterceptor
     ) -> ActivityInboundInterceptor:
+        """Method called for intercepting an activity.
+
+        Args:
+            next: The underlying inbound interceptor this interceptor should
+                delegate to.
+
+        Returns:
+            The new interceptor that will be used to for the activity.
+        """
         return next
 
 
 class ActivityInboundInterceptor:
+    """Inbound interceptor to wrap outbound creation and activity execution.
+
+    This should be extended by any activity inbound interceptors.
+    """
+
     def __init__(self, next: ActivityInboundInterceptor) -> None:
+        """Create the inbound interceptor.
+
+        Args:
+            next: The next interceptor in the chain. The default implementation
+                of all calls is to delegate to the next interceptor.
+        """
         self.next = next
 
     def init(self, outbound: ActivityOutboundInterceptor) -> None:
+        """Initialize with an outbound interceptor.
+
+        To add a custom outbound interceptor, wrap the given interceptor before
+        sending to the next ``init`` call.
+        """
         self.next.init(outbound)
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
+        """Called to invoke the activity."""
         return await self.next.execute_activity(input)
 
 
 class ActivityOutboundInterceptor:
+    """Outbound interceptor to wrap calls made from within activities.
+
+    This should be extended by any activity outbound interceptors.
+    """
+
     def __init__(self, next: ActivityOutboundInterceptor) -> None:
+        """Create the outbound interceptor.
+
+        Args:
+            next: The next interceptor in the chain. The default implementation
+                of all calls is to delegate to the next interceptor.
+        """
         self.next = next
 
     def info(self) -> temporalio.activity.Info:
+        """Called for every :py:func:`temporalio.activity.info` call."""
         return self.next.info()
 
     def heartbeat(self, *details: Any) -> None:
+        """Called for every :py:func:`temporalio.activity.heartbeat` call."""
         self.next.heartbeat(*details)
+
+    # TODO(cretz): Do we want outbound interceptors for other items?
 
 
 class _ActivityInboundImpl(ActivityInboundInterceptor):
@@ -729,9 +858,9 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
         if not inspect.iscoroutinefunction(input.fn):
             # We execute a top-level function via the executor. It is top-level
             # because it needs to be picklable. Also, by default Python does not
-            # propagate contexts into executor futures so we don't either with
-            # the obvious exception of the info (if they want more, they can set
-            # the initializer on the executor).
+            # propagate contextvars into executor futures so we don't either
+            # with the obvious exception of our context (if they want more, they
+            # can set the initializer on the executor).
             ctx = temporalio.activity._Context.current()
             info = ctx.info()
 
@@ -843,6 +972,14 @@ def _proto_maybe_datetime(
 
 
 class SharedStateManager(ABC):
+    """Base class for a shared state manager providing cross-process-safe
+    primitives for use by activity executors.
+
+    Cross-worker use of the shared state manager is encouraged.
+    :py:meth:`create_from_multiprocessing` provides the commonly used
+    implementation.
+    """
+
     # TODO(cretz): Document that queue should be a multiprocessing.Manager().Queue()
     # and that executor defaults as a single-worker thread pool executor
     @staticmethod
@@ -850,28 +987,60 @@ class SharedStateManager(ABC):
         mgr: multiprocessing.managers.SyncManager,
         queue_poller_executor: Optional[concurrent.futures.Executor] = None,
     ) -> SharedStateManager:
+        """Create a shared state manager from a multiprocessing manager.
+
+        Args:
+            mgr: Sync manager to create primitives from. This is usually
+                :py:func:`multiprocessing.Manager`.
+            queue_poller_executor: The executor used when running the
+                synchronous heartbeat queue poller. This should be a
+                :py:class:`concurrent.futures.ThreadPoolExecutor`. If unset, a
+                thread pool executor is created with max-workers of 1.
+
+        Returns:
+            The shared state manager.
+        """
         return _MultiprocessingSharedStateManager(
             mgr, queue_poller_executor or concurrent.futures.ThreadPoolExecutor(1)
         )
 
     @abstractmethod
     def new_event(self) -> threading.Event:
+        """Create a threading.Event that can be used across processes."""
         raise NotImplementedError
 
     @abstractmethod
     def register_heartbeater(
         self, task_token: bytes, heartbeat: Callable[..., None]
     ) -> SharedHeartbeatSender:
+        """Register a heartbeat function.
+
+        Args:
+            task_token: Unique task token for the heartbeater.
+            heartbeat: Function that should be called when the resulting sender
+                is sent a heartbeat.
+
+        Returns:
+            A sender that can be pickled for use in another process.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def unregister_heartbeater(self, task_token: bytes) -> None:
+        """Unregisters a previously registered heartbeater for the task
+        token.
+        """
         raise NotImplementedError
 
 
 class SharedHeartbeatSender(ABC):
+    """Base class for a heartbeat sender that is picklable for use in another
+    process.
+    """
+
     @abstractmethod
     def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
+        """Send a heartbeat for the given task token and details."""
         raise NotImplementedError
 
 

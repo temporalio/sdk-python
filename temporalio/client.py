@@ -334,6 +334,7 @@ class Client:
         activity_id: Optional[str] = None,
         task_token: Optional[bytes] = None,
     ) -> ActivityCompletionHandle:
+        """Get an activity completion handle."""
         if task_token is not None:
             if workflow_id is not None or run_id is not None or activity_id is not None:
                 raise ValueError("Task token cannot be present with other IDs")
@@ -726,10 +727,14 @@ class WorkflowHandle(Generic[T]):
 
 
 class ActivityCompletionHandle:
+    """Handle representing an external activity for completion and heartbeat."""
+
     def __init__(self, id_or_token: Union[Tuple[str, str, str], bytes]) -> None:
+        """Create an activity completion handle."""
         raise NotImplementedError
 
-    # TODO(cretz): The async methods here
+    # TODO(cretz): The async methods here and the interceptor methods to support
+    # them
 
 
 class WorkflowDescription:

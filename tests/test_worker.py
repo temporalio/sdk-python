@@ -10,7 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Iterable, List, Optional
+from typing import Any, Callable, Iterable, List, Optional, Tuple
 
 import pytest
 
@@ -680,8 +680,29 @@ async def test_sync_activity_process_worker_shutdown_graceful(
     assert "Worker graceful shutdown" == await handle.result()
 
 
-# async def test_activity_interceptor():
-#     raise NotImplementedError
+async def test_activity_interceptor(client: temporalio.client.Client, worker: Worker):
+    async def say_hello(name: str) -> str:
+        # Get info and record a heartbeat
+        temporalio.activity.info()
+        temporalio.activity.heartbeat("some details!")
+        return f"Hello, {name}!"
+
+    interceptor = TracingWorkerInterceptor()
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        say_hello,
+        "Temporal",
+        worker_config={"interceptors": [interceptor]},
+    )
+    assert result.result == "Hello, Temporal!"
+    # Info is called inside heartbeat causing a 4th event
+    assert len(interceptor.traces) == 4
+    assert interceptor.traces[0][0] == "activity.inbound.execute_activity"
+    assert interceptor.traces[0][1].args[0] == "Temporal"
+    assert interceptor.traces[1][0] == "activity.outbound.info"
+    assert interceptor.traces[2][0] == "activity.outbound.heartbeat"
+    assert interceptor.traces[2][1][0] == "some details!"
 
 
 @dataclass
@@ -780,3 +801,54 @@ def assert_activity_application_error(
     ret = assert_activity_error(err)
     assert isinstance(ret, temporalio.exceptions.ApplicationError)
     return ret
+
+
+class TracingWorkerInterceptor(temporalio.worker.Interceptor):
+    def intercept_activity(
+        self, next: temporalio.worker.ActivityInboundInterceptor
+    ) -> temporalio.worker.ActivityInboundInterceptor:
+        self.traces: List[Tuple[str, Any]] = []
+        return TracingWorkerActivityInboundInterceptor(self, next)
+
+
+class TracingWorkerActivityInboundInterceptor(
+    temporalio.worker.ActivityInboundInterceptor
+):
+    def __init__(
+        self,
+        parent: TracingWorkerInterceptor,
+        next: temporalio.worker.ActivityInboundInterceptor,
+    ) -> None:
+        super().__init__(next)
+        self._parent = parent
+
+    def init(self, outbound: temporalio.worker.ActivityOutboundInterceptor) -> None:
+        return super().init(
+            TracingWorkerActivityOutboundInterceptor(self._parent, outbound)
+        )
+
+    async def execute_activity(
+        self, input: temporalio.worker.ExecuteActivityInput
+    ) -> Any:
+        self._parent.traces.append(("activity.inbound.execute_activity", input))
+        return await super().execute_activity(input)
+
+
+class TracingWorkerActivityOutboundInterceptor(
+    temporalio.worker.ActivityOutboundInterceptor
+):
+    def __init__(
+        self,
+        parent: TracingWorkerInterceptor,
+        next: temporalio.worker.ActivityOutboundInterceptor,
+    ) -> None:
+        super().__init__(next)
+        self._parent = parent
+
+    def info(self) -> temporalio.activity.Info:
+        self._parent.traces.append(("activity.outbound.info", None))
+        return super().info()
+
+    def heartbeat(self, *details: Any) -> None:
+        self._parent.traces.append(("activity.outbound.heartbeat", details))
+        return super().heartbeat(*details)

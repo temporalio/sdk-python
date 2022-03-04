@@ -375,6 +375,13 @@ async def apply_error_to_failure(
     converter: temporalio.converter.DataConverter,
     failure: temporalio.api.failure.v1.Failure,
 ) -> None:
+    """Convert the given failure error to a Temporal failure.
+
+    Args:
+        error: Python failure error.
+        converter: Converter used for translating error details.
+        failure: Internal Temporal failure to populate.
+    """
     # If there is an underlying proto already, just use that
     if error.failure:
         failure.CopyFrom(error.failure)
@@ -455,6 +462,7 @@ async def apply_exception_to_failure(
     converter: temporalio.converter.DataConverter,
     failure: temporalio.api.failure.v1.Failure,
 ) -> None:
+    """Small wrapper around :py:func:`apply_error_to_failure` for exceptions."""
     # If already a failure error, use that
     if isinstance(exception, FailureError):
         await apply_error_to_failure(exception, converter, failure)

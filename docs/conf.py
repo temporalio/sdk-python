@@ -69,3 +69,7 @@ autodoc_typehints_description_target = "documented"
 autodoc_preserve_defaults = True
 
 autodoc_member_order = "bysource"
+
+autodoc_default_options = {
+    "special-members": "__aenter__,__aexit__,__init__",
+}

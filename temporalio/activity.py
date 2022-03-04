@@ -1,3 +1,5 @@
+"""Functions that can be called inside of activities."""
+
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +24,11 @@ import temporalio.exceptions
 
 @dataclass(frozen=True)
 class Info:
+    """Information about the running activity.
+
+    Retrieved inside an activity via :py:func:`info`.
+    """
+
     activity_id: str
     activity_type: str
     attempt: int
@@ -93,14 +100,32 @@ class _CompositeEvent:
 
 
 def in_activity() -> bool:
+    """Whether the current code is inside an activity.
+
+    Returns:
+        True if in an activity, False otherwise.
+    """
     return not _current_context.get(None) is None
 
 
 def info() -> Info:
+    """Current activity's info.
+
+    Returns:
+        Info for the currently running activity.
+
+    Raises:
+        RuntimeError: When not in an activity.
+    """
     return _Context.current().info()
 
 
 def heartbeat(*details: Any) -> None:
+    """Send a heartbeat for the current activity.
+
+    Raises:
+        RuntimeError: When not in an activity.
+    """
     heartbeat_fn = _Context.current().heartbeat
     if not heartbeat_fn:
         raise RuntimeError("Can only execute heartbeat after interceptor init")
@@ -108,49 +133,112 @@ def heartbeat(*details: Any) -> None:
 
 
 def cancelled() -> bool:
+    """Whether this activity is cancelled.
+
+    Returns:
+        True if the activity has been cancelled, False otherwise.
+
+    Raises:
+        RuntimeError: When not in an activity.
+    """
     return _Context.current().cancelled_event.thread_event.is_set()
 
 
-def wait_for_cancelled_sync(timeout: Optional[float] = None) -> None:
-    _Context.current().cancelled_event.thread_event.wait(timeout)
-
-
-# TODO(cretz): Document that this throws when not async activity
 async def wait_for_cancelled() -> None:
+    """Asynchronously wait for this activity to be cancelled.
+
+    Raises:
+        RuntimeError: When not in an async activity.
+    """
     async_event = _Context.current().cancelled_event.async_event
     if not async_event:
         raise RuntimeError("not in async activity")
     await async_event.wait()
 
 
+def wait_for_cancelled_sync(timeout: Optional[float] = None) -> None:
+    """Synchronously block while waiting for cancellation on this activity.
+
+    This is essentially a wrapper around :py:meth:`threading.Event.wait`.
+
+    Args:
+        timeout: Max amount of time to wait for cancellation.
+
+    Raises:
+        RuntimeError: When not in an activity.
+    """
+    _Context.current().cancelled_event.thread_event.wait(timeout)
+
+
 def worker_shutdown() -> bool:
+    """Whether shutdown has been invoked on the worker.
+
+    Returns:
+        True if shutdown has been called on the worker, False otherwise.
+
+    Raises:
+        RuntimeError: When not in an activity.
+    """
     return _Context.current().worker_shutdown_event.thread_event.is_set()
 
 
-def wait_for_worker_shutdown_sync(timeout: Optional[float] = None) -> None:
-    _Context.current().worker_shutdown_event.thread_event.wait(timeout)
-
-
-# TODO(cretz): Document that this throws when not async activity
 async def wait_for_worker_shutdown() -> None:
+    """Asynchronously wait for shutdown to be called on the worker.
+
+    Raises:
+        RuntimeError: When not in an async activity.
+    """
     async_event = _Context.current().worker_shutdown_event.async_event
     if not async_event:
         raise RuntimeError("not in async activity")
     await async_event.wait()
 
 
+def wait_for_worker_shutdown_sync(timeout: Optional[float] = None) -> None:
+    """Synchronously block while waiting for shutdown to be called on the
+    worker.
+
+    This is essentially a wrapper around :py:meth:`threading.Event.wait`.
+
+    Args:
+        timeout: Max amount of time to wait for shutdown to be called on the
+            worker.
+
+    Raises:
+        RuntimeError: When not in an activity.
+    """
+    _Context.current().worker_shutdown_event.thread_event.wait(timeout)
+
+
 def raise_complete_async() -> NoReturn:
+    """Raise an error that says the activity will be completed
+    asynchronously.
+    """
     raise CompleteAsyncError()
 
 
 class CompleteAsyncError(temporalio.exceptions.TemporalError):
+    """Raised by an activity to signal it will be completed asynchronously."""
+
     pass
 
 
 class LoggerAdapter(logging.LoggerAdapter):
+    """Adapter that adds details to the log about the running activity.
+
+    Attributes:
+        activity_info_on_message: Boolean for whether a string representation of
+            a dict of some activity info will be appended to each message.
+            Default is True.
+        activity_info_on_extra: Boolean for whether an ``activity_info`` value
+            will be added to the ``extra`` dictionary, making it present on the
+            ``LogRecord.__dict__`` for use by others.
+    """
+
     def __init__(
         self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]
     ) -> None:
+        """Create the logger adapter."""
         super().__init__(logger, extra)
         self.activity_info_on_message = True
         self.activity_info_on_extra = True
@@ -158,6 +246,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> Tuple[Any, MutableMapping[str, Any]]:
+        """Override to add activity details."""
         msg, kwargs = super().process(msg, kwargs)
         if self.activity_info_on_extra or self.activity_info_on_extra:
             context = _current_context.get(None)
@@ -173,9 +262,14 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     @property
     def base_logger(self) -> logging.Logger:
+        """Underlying logger usable for actions such as adding
+        handlers/formatters.
+        """
         return self.logger
 
 
+#: Logger that will have contextual activity details embedded.
+logger = LoggerAdapter(logging.getLogger(__name__), None)
 # TODO(cretz): Do we want to give this another name? In Python, often people
 # call this an "adapter" because it doesn't have every method that a logger does
 # (e.g. you can't set handlers or formatters on it). But from inside an
@@ -183,4 +277,3 @@ class LoggerAdapter(logging.LoggerAdapter):
 # exposed the "base_logger" property to provide the underlying logger as needed
 # (which is already on the "logger" property, but not typed). There are some
 # more advanced overrides we _could_ do but they are more brittle.
-logger = LoggerAdapter(logging.getLogger(__name__), None)

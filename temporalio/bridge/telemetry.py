@@ -1,3 +1,5 @@
+"""Telemetry for SDK Core."""
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -18,6 +20,10 @@ _inited = False
 
 
 def init_telemetry(config: TelemetryConfig) -> bool:
+    """Initialize telemetry with the given configuration.
+
+    Does nothing if already called.
+    """
     global _inited
     if _inited:
         return False

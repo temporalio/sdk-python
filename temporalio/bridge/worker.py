@@ -35,14 +35,18 @@ class WorkerConfig:
 
 
 class Worker:
+    """SDK Core worker."""
+
     def __init__(
         self, client: temporalio.bridge.client.Client, config: WorkerConfig
     ) -> None:
+        """Create SDK core worker with a client and config."""
         self._ref = temporal_sdk_bridge.new_worker(client._ref, config)
 
     async def poll_workflow_activation(
         self,
     ) -> temporalio.bridge.proto.workflow_activation.WorkflowActivation:
+        """Poll for a workflow activation."""
         return (
             temporalio.bridge.proto.workflow_activation.WorkflowActivation.FromString(
                 await self._ref.poll_workflow_activation()
@@ -52,6 +56,7 @@ class Worker:
     async def poll_activity_task(
         self,
     ) -> temporalio.bridge.proto.activity_task.ActivityTask:
+        """Poll for an activity task."""
         return temporalio.bridge.proto.activity_task.ActivityTask.FromString(
             await self._ref.poll_activity_task()
         )
@@ -60,28 +65,34 @@ class Worker:
         self,
         comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     ) -> None:
+        """Complete a workflow activation."""
         await self._ref.complete_workflow_activation(comp.SerializeToString())
 
     async def complete_activity_task(
         self, comp: temporalio.bridge.proto.ActivityTaskCompletion
     ) -> None:
+        """Complete an activity task."""
         await self._ref.complete_activity_task(comp.SerializeToString())
 
     def record_activity_heartbeat(
         self, comp: temporalio.bridge.proto.ActivityHeartbeat
     ) -> None:
+        """Record an activity heartbeat."""
         self._ref.record_activity_heartbeat(comp.SerializeToString())
 
     def request_workflow_eviction(self, run_id: str) -> None:
+        """Request a workflow be evicted."""
         self._ref.request_workflow_eviction(run_id)
 
     async def shutdown(self) -> None:
+        """Shutdown the worker, waiting for completion."""
         await self._ref.shutdown()
 
 
 def payloads_to_core(
     payloads: Iterable[temporalio.api.common.v1.Payload],
 ) -> Iterable[temporalio.bridge.proto.common.Payload]:
+    """Convert Temporal API payloads to SDK Core payloads."""
     return map(
         lambda p: temporalio.bridge.proto.common.Payload(
             metadata=p.metadata, data=p.data
