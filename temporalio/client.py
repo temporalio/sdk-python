@@ -77,7 +77,7 @@ class Client:
                 intercepting of client calls. The earlier interceptors wrap the
                 later ones.
 
-                Also, any interceptors that also implement
+                Any interceptors that also implement
                 :py:class:`temporalio.worker.Interceptor` will be used as worker
                 interceptors too so they should not be given when creating a
                 worker.

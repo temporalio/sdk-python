@@ -73,12 +73,7 @@ class Worker:
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
         graceful_shutdown_timeout: timedelta = timedelta(),
-        # Used and required for sync activities when the executor is not a
-        # thread pool executor.
         shared_state_manager: Optional[SharedStateManager] = None,
-        # Unless this is false, eval_str will be used when evaluating type-hints
-        # which is needed on files doing "from __future__ import annotations".
-        # One may want to disable this if it's causing errors.
         type_hint_eval_str: bool = True,
     ) -> None:
         """Create a worker to process workflows and/or activities.
@@ -334,12 +329,12 @@ class Worker:
             )
             if still_running:
                 # Cancel all still running
-                suffix = (
-                    "activities that are"
-                    if len(still_running) > 1
-                    else "activity that is"
-                )
-                logger.info(f"Cancelling {len(still_running)} {suffix} still running")
+                if len(still_running) == 1:
+                    logger.info(f"Cancelling 1 activity that is still running")
+                else:
+                    logger.info(
+                        f"Cancelling {len(still_running)} activities that are still running"
+                    )
                 for task in still_running:
                     # We have to find the running activity that's associated with
                     # the task so that we can cancel through that. It's ok if the

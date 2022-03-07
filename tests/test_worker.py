@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import concurrent.futures
 import logging
@@ -317,15 +315,20 @@ async def test_max_concurrent_activities(
 
 
 @dataclass
-class SomeClass:
+class SomeClass1:
+    foo: int
+
+
+@dataclass
+class SomeClass2:
     foo: str
-    bar: Optional[SomeClass] = None
+    bar: Optional[SomeClass1] = None
 
 
 async def test_activity_type_hints(client: temporalio.client.Client, worker: Worker):
-    activity_param1: SomeClass
+    activity_param1: SomeClass2
 
-    async def some_activity(param1: SomeClass, param2: str) -> str:
+    async def some_activity(param1: SomeClass2, param2: str) -> str:
         nonlocal activity_param1
         activity_param1 = param1
         return f"param1: {type(param1)}, param2: {type(param2)}"
@@ -334,7 +337,7 @@ async def test_activity_type_hints(client: temporalio.client.Client, worker: Wor
         client,
         worker,
         some_activity,
-        SomeClass(foo="str1", bar=SomeClass(foo="str2")),
+        SomeClass2(foo="str1", bar=SomeClass1(foo=123)),
         123,
     )
     # We called with the wrong non-dataclass type, but since we don't strictly
@@ -342,9 +345,9 @@ async def test_activity_type_hints(client: temporalio.client.Client, worker: Wor
     # TODO(cretz): Do we want a strict option for scalars?
     assert (
         result.result
-        == "param1: <class 'tests.test_worker.SomeClass'>, param2: <class 'int'>"
+        == "param1: <class 'tests.test_worker.SomeClass2'>, param2: <class 'int'>"
     )
-    assert activity_param1 == SomeClass(foo="str1", bar=SomeClass(foo="str2"))
+    assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
 
 
 async def test_activity_heartbeat_details(
@@ -445,7 +448,7 @@ async def test_sync_activity_process_heartbeat_details(
             client,
             worker,
             picklable_heartbeat_details_activity,
-            retry_max_attempts=3,
+            retry_max_attempts=2,
             worker_config={"activity_executor": executor},
         )
     assert result.result == "attempt: 1, attempt: 2"

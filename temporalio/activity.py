@@ -1,4 +1,11 @@
-"""Functions that can be called inside of activities."""
+"""Functions that can be called inside of activities.
+
+Most of these functions use :py:mod:`contextvars` to obtain the current activity
+in context. This is already set before the start of the activity. Activities
+that make calls that do not automatically propagate the context, such as calls
+in another thread, should not use the calls herein unless the context is
+explicitly propagated.
+"""
 
 from __future__ import annotations
 
@@ -91,6 +98,7 @@ class _Context:
 @dataclass
 class _CompositeEvent:
     thread_event: threading.Event
+    # Async event only for async activities
     async_event: Optional[asyncio.Event]
 
     def set(self) -> None:
@@ -239,7 +247,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]
     ) -> None:
         """Create the logger adapter."""
-        super().__init__(logger, extra)
+        super().__init__(logger, extra or {})
         self.activity_info_on_message = True
         self.activity_info_on_extra = True
 

@@ -3,6 +3,7 @@
 import dataclasses
 import inspect
 import json
+import sys
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Type
 
@@ -441,13 +442,25 @@ async def decode_payloads(
     return await converter.decode(payloads.payloads)
 
 
-# TODO(cretz): Document that this is basically inspect.signature, but anything
-# invalid means nothing returned. So if there are any kwargs or if any arg
-# annotations are not classes, the arg list is None.
 def _type_hints_from_func(
     func: Callable[..., Any], eval_str: bool
 ) -> Tuple[Optional[List[Type]], Optional[Type]]:
-    sig = inspect.signature(func, eval_str=eval_str)
+    """Extracts the type hints from the function.
+
+    Args:
+        func: Function to extract hints from.
+        eval_str: Whether to use ``eval_str`` (only supported on Python >= 3.10)
+
+    Returns:
+        Tuple containing parameter types and return type. The parameter types
+        will be None if there are any non-positional parameters or if any of the
+        parameters to not have an annotation that represents a class.
+    """
+    sig_kwargs: Mapping[str, Any] = {}
+    # Only supported on >= 3.10
+    if sys.version_info >= (3, 10):
+        sig_kwargs = {"eval_str": eval_str}
+    sig = inspect.signature(func, **sig_kwargs)
     ret: Optional[Type] = None
     if inspect.isclass(sig.return_annotation):
         ret = sig.return_annotation

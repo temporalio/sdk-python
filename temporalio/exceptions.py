@@ -387,7 +387,8 @@ async def apply_error_to_failure(
         failure.CopyFrom(error.failure)
         return
 
-    # Set message, stack, and cause
+    # Set message, stack, and cause. Obtaining cause follows rules from
+    # https://docs.python.org/3/library/exceptions.html#exception-context
     failure.message = str(error)
     if error.__traceback__:
         failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
