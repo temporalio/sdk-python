@@ -443,7 +443,7 @@ async def decode_payloads(
 
 
 def _type_hints_from_func(
-    func: Callable[..., Any], eval_str: bool
+    func: Callable[..., Any], *, eval_str: bool
 ) -> Tuple[Optional[List[Type]], Optional[Type]]:
     """Extracts the type hints from the function.
 
@@ -456,11 +456,11 @@ def _type_hints_from_func(
         will be None if there are any non-positional parameters or if any of the
         parameters to not have an annotation that represents a class.
     """
-    sig_kwargs: Mapping[str, Any] = {}
-    # Only supported on >= 3.10
+    # eval_str only supported on >= 3.10
     if sys.version_info >= (3, 10):
-        sig_kwargs = {"eval_str": eval_str}
-    sig = inspect.signature(func, **sig_kwargs)
+        sig = inspect.signature(func, eval_str=eval_str)
+    else:
+        sig = inspect.signature(func)
     ret: Optional[Type] = None
     if inspect.isclass(sig.return_annotation):
         ret = sig.return_annotation

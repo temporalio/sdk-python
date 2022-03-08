@@ -59,6 +59,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
+        type_hint_eval_str: bool = True,
         tls_config: Optional[TLSConfig] = None,
         retry_config: Optional[RetryConfig] = None,
         static_headers: Mapping[str, str] = {},
@@ -85,6 +86,10 @@ class Client:
                 condition for workflow queries if not set during query. See
                 :py:meth:`WorkflowHandle.query` for details on the rejection
                 condition.
+            type_hint_eval_str: Whether the type hinting that is used to
+                determine dataclass parameters for decoding uses evaluation on
+                stringified annotations. This corresponds to the eval_str
+                parameter on :py:meth:`inspect.get_annotations`.
             tls_config: TLS configuration for connecting to the server. If unset
                 no TLS connection will be used.
             retry_config: Retry configuration for direct service calls (when
@@ -112,6 +117,7 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            type_hint_eval_str=type_hint_eval_str,
         )
 
     def __init__(
@@ -126,6 +132,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
+        type_hint_eval_str: bool = True,
     ):
         """Create a Temporal client from a workflow service.
 
@@ -148,6 +155,7 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            type_hint_eval_str=type_hint_eval_str,
         )
 
     def config(self) -> ClientConfig:
@@ -362,6 +370,7 @@ class ClientConfig(typing_extensions.TypedDict):
     default_workflow_query_reject_condition: Optional[
         temporalio.common.QueryRejectCondition
     ]
+    type_hint_eval_str: bool
 
 
 T = TypeVar("T")

@@ -33,6 +33,7 @@ import google.protobuf.timestamp_pb2
 import typing_extensions
 
 import temporalio.activity
+import temporalio.api.common.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_result
@@ -62,9 +63,9 @@ class Worker:
         activity_executor: Optional[concurrent.futures.Executor] = None,
         interceptors: Iterable[Interceptor] = [],
         max_cached_workflows: int = 0,
-        max_outstanding_workflow_tasks: int = 100,
-        max_outstanding_activities: int = 100,
-        max_outstanding_local_activities: int = 100,
+        max_concurrent_workflow_tasks: int = 100,
+        max_concurrent_activities: int = 100,
+        max_concurrent_local_activities: int = 100,
         max_concurrent_wft_polls: int = 5,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
         max_concurrent_at_polls: int = 5,
@@ -74,7 +75,6 @@ class Worker:
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
         graceful_shutdown_timeout: timedelta = timedelta(),
         shared_state_manager: Optional[SharedStateManager] = None,
-        type_hint_eval_str: bool = True,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -96,18 +96,22 @@ class Worker:
                 not be explicitly given here.
             max_cached_workflows: If nonzero, workflows will be cached and
                 sticky task queues will be used.
-            max_outstanding_workflow_tasks: Maximum allowed number of workflow
+            max_concurrent_workflow_tasks: Maximum allowed number of workflow
                 tasks that will ever be given to this worker at one time.
-            max_outstanding_activities: Maximum number of activity tasks that
+            max_concurrent_activities: Maximum number of activity tasks that
                 will ever be given to this worker concurrently.
-            max_outstanding_local_activities: Maximum number of local activity
+            max_concurrent_local_activities: Maximum number of local activity
                 tasks that will ever be given to this worker concurrently.
             max_concurrent_wft_polls: Maximum number of concurrent poll workflow
                 task requests we will perform at a time on this worker's task
                 queue.
             nonsticky_to_sticky_poll_ratio: max_concurrent_wft_polls * this
                 number = the number of max pollers that will be allowed for the
-                nonsticky queue when sticky tasks are enabled.
+                nonsticky queue when sticky tasks are enabled. If both defaults
+                are used, the sticky queue will allow 4 max pollers while the
+                nonsticky queue will allow one. The minimum for either poller is
+                1, so if ``max_concurrent_wft_polls`` is 1 and sticky queues are
+                enabled, there will be 2 concurrent polls.
             max_concurrent_at_polls: Maximum number of concurrent poll activity
                 task requests we will perform at a time on this worker's task
                 queue.
@@ -130,10 +134,6 @@ class Worker:
                 activities where the activity_executor is not a
                 :py:class:`concurrent.futures.ThreadPoolExecutor`. Reuse of
                 these across workers is encouraged.
-            type_hint_eval_str: Whether the type hinting that is used to
-                determine dataclass parameters for decoding uses evaluation on
-                stringified annotations. This corresponds to the eval_str
-                parameter on :py:meth:`inspect.get_annotations`.
         """
         # TODO(cretz): Support workflows
         if not activities:
@@ -176,7 +176,7 @@ class Worker:
                             f"Activity {name} must be picklable when using a process executor"
                         ) from err
             arg_types, ret_type = temporalio.converter._type_hints_from_func(
-                activity, type_hint_eval_str
+                activity, eval_str=client._config["type_hint_eval_str"]
             )
             self._activities[name] = _ActivityDefinition(
                 name=name, fn=activity, arg_types=arg_types, ret_type=ret_type
@@ -216,9 +216,9 @@ class Worker:
                 namespace=client.namespace,
                 task_queue=task_queue,
                 max_cached_workflows=max_cached_workflows,
-                max_outstanding_workflow_tasks=max_outstanding_workflow_tasks,
-                max_outstanding_activities=max_outstanding_activities,
-                max_outstanding_local_activities=max_outstanding_local_activities,
+                max_outstanding_workflow_tasks=max_concurrent_workflow_tasks,
+                max_outstanding_activities=max_concurrent_activities,
+                max_outstanding_local_activities=max_concurrent_local_activities,
                 max_concurrent_wft_polls=max_concurrent_wft_polls,
                 nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
                 max_concurrent_at_polls=max_concurrent_at_polls,
@@ -242,9 +242,9 @@ class Worker:
             activity_executor=activity_executor,
             interceptors=interceptors,
             max_cached_workflows=max_cached_workflows,
-            max_outstanding_workflow_tasks=max_outstanding_workflow_tasks,
-            max_outstanding_activities=max_outstanding_activities,
-            max_outstanding_local_activities=max_outstanding_local_activities,
+            max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
+            max_concurrent_activities=max_concurrent_activities,
+            max_concurrent_local_activities=max_concurrent_local_activities,
             max_concurrent_wft_polls=max_concurrent_wft_polls,
             nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
             max_concurrent_at_polls=max_concurrent_at_polls,
@@ -254,7 +254,6 @@ class Worker:
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             shared_state_manager=shared_state_manager,
-            type_hint_eval_str=type_hint_eval_str,
         )
         self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._task: Optional[asyncio.Task] = None
@@ -375,7 +374,7 @@ class Worker:
                 elif task.HasField("cancel"):
                     self._cancel_activity(task.task_token, task.cancel)
                 else:
-                    logger.warning("unrecognized activity task: %s", task)
+                    raise RuntimeError(f"Unrecognized activity task: {task}")
             except temporalio.bridge.worker.PollShutdownError:
                 return
             except Exception as err:
@@ -423,10 +422,17 @@ class Worker:
         try:
             heartbeat = temporalio.bridge.proto.ActivityHeartbeat(task_token=task_token)
             if details:
+                converted_details = await self._config["client"].data_converter.encode(
+                    details
+                )
+                # Convert to core payloads
                 heartbeat.details.extend(
-                    temporalio.bridge.worker.payloads_to_core(
-                        await self._config["client"].data_converter.encode(details)
-                    )
+                    [
+                        temporalio.bridge.proto.common.Payload(
+                            metadata=p.metadata, data=p.data
+                        )
+                        for p in converted_details
+                    ]
                 )
             # Bail if not the latest
             if activity.current_heartbeat_seq != heartbeat_seq:
@@ -536,24 +542,37 @@ class Worker:
                 activity_id=start.activity_id,
                 activity_type=start.activity_type,
                 attempt=start.attempt,
+                current_attempt_scheduled_time=_proto_to_datetime(
+                    start.current_attempt_scheduled_time
+                )
+                if start.HasField("current_attempt_scheduled_time")
+                else None,
+                header={
+                    k: temporalio.api.common.v1.Payload(
+                        metadata=v.metadata, data=v.data
+                    )
+                    for k, v in start.header_fields.items()
+                },
                 heartbeat_details=heartbeat_details,
-                heartbeat_timeout=_proto_maybe_timedelta(start.heartbeat_timeout)
+                heartbeat_timeout=start.heartbeat_timeout.ToTimedelta()
                 if start.HasField("heartbeat_timeout")
                 else None,
-                schedule_to_close_timeout=_proto_maybe_timedelta(
-                    start.schedule_to_close_timeout
+                is_local=False,
+                retry_policy=temporalio.bridge.worker.retry_policy_from_proto(
+                    start.retry_policy
                 )
+                if start.HasField("retry_policy")
+                else None,
+                schedule_to_close_timeout=start.schedule_to_close_timeout.ToTimedelta()
                 if start.HasField("schedule_to_close_timeout")
                 else None,
-                scheduled_time=_proto_maybe_datetime(start.scheduled_time)
+                scheduled_time=_proto_to_datetime(start.scheduled_time)
                 if start.HasField("scheduled_time")
                 else None,
-                start_to_close_timeout=_proto_maybe_timedelta(
-                    start.start_to_close_timeout
-                )
+                start_to_close_timeout=start.start_to_close_timeout.ToTimedelta()
                 if start.HasField("start_to_close_timeout")
                 else None,
-                started_time=_proto_maybe_datetime(start.started_time)
+                started_time=_proto_to_datetime(start.started_time)
                 if start.HasField("started_time")
                 else None,
                 task_queue=self._config["task_queue"],
@@ -610,7 +629,7 @@ class Worker:
                     result_payloads[0].metadata
                 )
                 completion.result.completed.result.data = result_payloads[0].data
-        except (BaseException, asyncio.CancelledError) as err:
+        except (Exception, asyncio.CancelledError) as err:
             try:
                 if isinstance(err, temporalio.activity.CompleteAsyncError):
                     temporalio.activity.logger.debug("Completing asynchronously")
@@ -635,9 +654,6 @@ class Worker:
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
-                    # We intentionally have a separate activity CancelledError
-                    # so we don't accidentally bubble a cancellation that
-                    # happened for another reason
                     await temporalio.exceptions.apply_error_to_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
@@ -690,7 +706,7 @@ class Worker:
 
 
 class WorkerConfig(typing_extensions.TypedDict):
-    """TypedDict of config originally passed to :py:meth:`Worker`."""
+    """TypedDict of config originally passed to :py:class:`Worker`."""
 
     client: temporalio.client.Client
     task_queue: str
@@ -698,9 +714,9 @@ class WorkerConfig(typing_extensions.TypedDict):
     activity_executor: Optional[concurrent.futures.Executor]
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int
-    max_outstanding_workflow_tasks: int
-    max_outstanding_activities: int
-    max_outstanding_local_activities: int
+    max_concurrent_workflow_tasks: int
+    max_concurrent_activities: int
+    max_concurrent_local_activities: int
     max_concurrent_wft_polls: int
     nonsticky_to_sticky_poll_ratio: float
     max_concurrent_at_polls: int
@@ -710,7 +726,6 @@ class WorkerConfig(typing_extensions.TypedDict):
     default_heartbeat_throttle_interval: timedelta
     graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
-    type_hint_eval_str: bool
 
 
 @dataclass
@@ -729,8 +744,11 @@ class _RunningActivity:
     last_heartbeat_task: Optional[asyncio.Task]
     sync: bool
     done: bool = False
-    # Increased each heartbeat, heartbeats not at this seq are ignored
-    current_heartbeat_seq: int = 10
+    # Increased each heartbeat, heartbeats not at this seq are ignored. The
+    # reason for this is to ensure that if async heartbeats appear out of order
+    # (which they can due to variable data converter speeds), only the latest
+    # one is applied.
+    current_heartbeat_seq: int = 1
     cancelled_by_request: bool = False
     cancelled_due_to_heartbeat_error: Optional[Exception] = None
 
@@ -949,19 +967,9 @@ class _ActivityOutboundImpl(ActivityOutboundInterceptor):
         self._worker._heartbeat_activity(info.task_token, *details)
 
 
-def _proto_maybe_timedelta(
-    dur: google.protobuf.duration_pb2.Duration,
-) -> Optional[timedelta]:
-    if dur.seconds == 0 and dur.nanos == 0:
-        return None
-    return dur.ToTimedelta()
-
-
-def _proto_maybe_datetime(
+def _proto_to_datetime(
     ts: google.protobuf.timestamp_pb2.Timestamp,
 ) -> Optional[datetime]:
-    if ts.seconds == 0 and ts.nanos == 0:
-        return None
     # Protobuf doesn't set the timezone but we want to
     return ts.ToDatetime().replace(tzinfo=timezone.utc)
 
@@ -975,8 +983,6 @@ class SharedStateManager(ABC):
     implementation.
     """
 
-    # TODO(cretz): Document that queue should be a multiprocessing.Manager().Queue()
-    # and that executor defaults as a single-worker thread pool executor
     @staticmethod
     def create_from_multiprocessing(
         mgr: multiprocessing.managers.SyncManager,

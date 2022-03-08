@@ -1,7 +1,6 @@
 """Worker using SDK Core."""
 
 from dataclasses import dataclass
-from typing import Iterable
 
 import temporal_sdk_bridge
 from temporal_sdk_bridge import PollShutdownError
@@ -13,6 +12,7 @@ import temporalio.bridge.proto.activity_task
 import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.common
 
 
 @dataclass
@@ -89,13 +89,16 @@ class Worker:
         await self._ref.shutdown()
 
 
-def payloads_to_core(
-    payloads: Iterable[temporalio.api.common.v1.Payload],
-) -> Iterable[temporalio.bridge.proto.common.Payload]:
-    """Convert Temporal API payloads to SDK Core payloads."""
-    return map(
-        lambda p: temporalio.bridge.proto.common.Payload(
-            metadata=p.metadata, data=p.data
-        ),
-        payloads,
+def retry_policy_from_proto(
+    p: temporalio.bridge.proto.common.RetryPolicy,
+) -> temporalio.common.RetryPolicy:
+    """Convert Core retry policy to Temporal retry policy."""
+    return temporalio.common.RetryPolicy(
+        initial_interval=p.initial_interval.ToTimedelta(),
+        backoff_coefficient=p.backoff_coefficient,
+        maximum_interval=p.maximum_interval.ToTimedelta()
+        if p.HasField("maximum_interval")
+        else None,
+        maximum_attempts=p.maximum_attempts,
+        non_retryable_error_types=p.non_retryable_error_types,
     )

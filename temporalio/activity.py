@@ -26,6 +26,8 @@ from typing import (
     Tuple,
 )
 
+import temporalio.api.common.v1
+import temporalio.common
 import temporalio.exceptions
 
 
@@ -39,8 +41,12 @@ class Info:
     activity_id: str
     activity_type: str
     attempt: int
+    current_attempt_scheduled_time: datetime
+    header: Mapping[str, temporalio.api.common.v1.Payload]
     heartbeat_details: Iterable[Any]
     heartbeat_timeout: Optional[timedelta]
+    is_local: bool
+    retry_policy: Optional[temporalio.common.RetryPolicy]
     schedule_to_close_timeout: Optional[timedelta]
     scheduled_time: datetime
     start_to_close_timeout: Optional[timedelta]
@@ -51,8 +57,7 @@ class Info:
     workflow_namespace: str
     workflow_run_id: str
     workflow_type: str
-    # TODO(cretz): Add headers, current_attempt_scheduled_time, retry_policy, and is_local
-    # TODO(cretz): Consider putting identity on here for "worker_id" for logger
+    # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
 
 _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("activity")

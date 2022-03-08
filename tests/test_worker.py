@@ -57,7 +57,7 @@ async def test_activity_info(client: temporalio.client.Client, worker: Worker):
     assert info.activity_type == "capture_info"
     assert info.attempt == 1
     assert info.heartbeat_details == []
-    assert info.heartbeat_timeout is None
+    assert info.heartbeat_timeout == timedelta()
     # TODO(cretz): Broken?
     # assert info.schedule_to_close_timeout is None
     assert abs(info.scheduled_time - datetime.now(timezone.utc)) < timedelta(seconds=5)
@@ -305,7 +305,7 @@ async def test_max_concurrent_activities(
             index_as_arg=True,
             schedule_to_close_timeout_ms=5000,
             schedule_to_start_timeout_ms=1000,
-            worker_config={"max_outstanding_activities": 42},
+            worker_config={"max_concurrent_activities": 42},
             on_complete=complete_activities_event.set,
         )
     timeout = assert_activity_error(err.value)

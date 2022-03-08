@@ -198,11 +198,7 @@ impl ClientRef {
     }
 }
 
-fn rpc_req<P>(bytes: Vec<u8>) -> PyResult<tonic::Request<P>>
-where
-    P: prost::Message,
-    P: Default,
-{
+fn rpc_req<P: prost::Message + Default>(bytes: Vec<u8>) -> PyResult<tonic::Request<P>> {
     let proto = P::decode(&*bytes)
         .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
     Ok(tonic::Request::new(proto))
