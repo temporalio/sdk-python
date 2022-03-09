@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import warnings
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
@@ -505,7 +506,7 @@ class WorkflowHandle(Generic[T]):
                 if not results:
                     return cast(T, None)
                 elif len(results) > 1:
-                    logger.warning("Expected single result, got %s", len(results))
+                    warnings.warn(f"Expected single result, got {len(results)}")
                 return cast(T, results[0])
             elif event.HasField("workflow_execution_failed_event_attributes"):
                 fail_attr = event.workflow_execution_failed_event_attributes
@@ -1100,7 +1101,7 @@ class _ClientImpl(OutboundInterceptor):
         if not results:
             return None
         elif len(results) > 1:
-            logger.warning("Expected single query result, got %s", len(results))
+            warnings.warn(f"Expected single query result, got {len(results)}")
         return results[0]
 
     async def signal_workflow(self, input: SignalWorkflowInput) -> None:

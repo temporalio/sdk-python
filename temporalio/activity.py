@@ -59,6 +59,18 @@ class Info:
     workflow_type: str
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
+    def _logger_details(self) -> Mapping[str, Any]:
+        return {
+            "activity_id": self.activity_id,
+            "activity_type": self.activity_type,
+            "attempt": self.attempt,
+            "namespace": self.workflow_namespace,
+            "task_queue": self.task_queue,
+            "workflow_id": self.workflow_id,
+            "workflow_run_id": self.workflow_run_id,
+            "workflow_type": self.workflow_type,
+        }
+
 
 _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("activity")
 
@@ -86,30 +98,38 @@ class _Context:
     @property
     def logger_details(self) -> Mapping[str, Any]:
         if self._logger_details is None:
-            info = self.info()
-            self._logger_details = {
-                "activity_id": info.activity_id,
-                "activity_type": info.activity_type,
-                "attempt": info.attempt,
-                "namespace": info.workflow_namespace,
-                "task_queue": info.task_queue,
-                "workflow_id": info.workflow_id,
-                "workflow_run_id": info.workflow_run_id,
-                "workflow_type": info.workflow_type,
-            }
+            self._logger_details = self.info()._logger_details()
         return self._logger_details
 
 
 @dataclass
 class _CompositeEvent:
-    thread_event: threading.Event
+    # This should always be present, but is sometimes lazily set internally
+    thread_event: Optional[threading.Event]
     # Async event only for async activities
     async_event: Optional[asyncio.Event]
 
     def set(self) -> None:
+        if not self.thread_event:
+            raise RuntimeError("Missing event")
         self.thread_event.set()
         if self.async_event:
             self.async_event.set()
+
+    def is_set(self) -> bool:
+        if not self.thread_event:
+            raise RuntimeError("Missing event")
+        return self.thread_event.is_set()
+
+    async def wait(self) -> None:
+        if not self.async_event:
+            raise RuntimeError("not in async activity")
+        await self.async_event.wait()
+
+    def wait_sync(self, timeout: Optional[float] = None) -> None:
+        if not self.thread_event:
+            raise RuntimeError("Missing event")
+        self.thread_event.wait(timeout)
 
 
 def in_activity() -> bool:
@@ -145,32 +165,30 @@ def heartbeat(*details: Any) -> None:
     heartbeat_fn(*details)
 
 
-def cancelled() -> bool:
-    """Whether this activity is cancelled.
+def is_cancelled() -> bool:
+    """Whether a cancellation was ever requested on this activity.
 
     Returns:
-        True if the activity has been cancelled, False otherwise.
+        True if the activity has had a cancellation request, False otherwise.
 
     Raises:
         RuntimeError: When not in an activity.
     """
-    return _Context.current().cancelled_event.thread_event.is_set()
+    return _Context.current().cancelled_event.is_set()
 
 
 async def wait_for_cancelled() -> None:
-    """Asynchronously wait for this activity to be cancelled.
+    """Asynchronously wait for this activity to get a cancellation request.
 
     Raises:
         RuntimeError: When not in an async activity.
     """
-    async_event = _Context.current().cancelled_event.async_event
-    if not async_event:
-        raise RuntimeError("not in async activity")
-    await async_event.wait()
+    await _Context.current().cancelled_event.wait()
 
 
 def wait_for_cancelled_sync(timeout: Optional[float] = None) -> None:
-    """Synchronously block while waiting for cancellation on this activity.
+    """Synchronously block while waiting for a cancellation request on this
+    activity.
 
     This is essentially a wrapper around :py:meth:`threading.Event.wait`.
 
@@ -180,10 +198,10 @@ def wait_for_cancelled_sync(timeout: Optional[float] = None) -> None:
     Raises:
         RuntimeError: When not in an activity.
     """
-    _Context.current().cancelled_event.thread_event.wait(timeout)
+    _Context.current().cancelled_event.wait_sync(timeout)
 
 
-def worker_shutdown() -> bool:
+def is_worker_shutdown() -> bool:
     """Whether shutdown has been invoked on the worker.
 
     Returns:
@@ -192,7 +210,7 @@ def worker_shutdown() -> bool:
     Raises:
         RuntimeError: When not in an activity.
     """
-    return _Context.current().worker_shutdown_event.thread_event.is_set()
+    return _Context.current().worker_shutdown_event.is_set()
 
 
 async def wait_for_worker_shutdown() -> None:
@@ -201,10 +219,7 @@ async def wait_for_worker_shutdown() -> None:
     Raises:
         RuntimeError: When not in an async activity.
     """
-    async_event = _Context.current().worker_shutdown_event.async_event
-    if not async_event:
-        raise RuntimeError("not in async activity")
-    await async_event.wait()
+    await _Context.current().worker_shutdown_event.wait()
 
 
 def wait_for_worker_shutdown_sync(timeout: Optional[float] = None) -> None:
@@ -220,19 +235,17 @@ def wait_for_worker_shutdown_sync(timeout: Optional[float] = None) -> None:
     Raises:
         RuntimeError: When not in an activity.
     """
-    _Context.current().worker_shutdown_event.thread_event.wait(timeout)
+    _Context.current().worker_shutdown_event.wait_sync(timeout)
 
 
 def raise_complete_async() -> NoReturn:
     """Raise an error that says the activity will be completed
     asynchronously.
     """
-    raise CompleteAsyncError()
+    raise _CompleteAsyncError()
 
 
-class CompleteAsyncError(temporalio.exceptions.TemporalError):
-    """Raised by an activity to signal it will be completed asynchronously."""
-
+class _CompleteAsyncError(temporalio.exceptions.TemporalError):
     pass
 
 
@@ -283,10 +296,3 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 #: Logger that will have contextual activity details embedded.
 logger = LoggerAdapter(logging.getLogger(__name__), None)
-# TODO(cretz): Do we want to give this another name? In Python, often people
-# call this an "adapter" because it doesn't have every method that a logger does
-# (e.g. you can't set handlers or formatters on it). But from inside an
-# activity, temporalio.activity.logger.debug("whatever") is clearer. I have
-# exposed the "base_logger" property to provide the underlying logger as needed
-# (which is already on the "logger" property, but not typed). There are some
-# more advanced overrides we _could_ do but they are more brittle.

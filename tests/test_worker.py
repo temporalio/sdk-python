@@ -171,7 +171,7 @@ async def test_activity_cancel_catch(client: temporalio.client.Client, worker: W
                 temporalio.activity.heartbeat()
         except asyncio.CancelledError:
             return "Got cancelled error, cancelled? " + str(
-                temporalio.activity.cancelled()
+                temporalio.activity.is_cancelled()
             )
 
     result = await _execute_workflow_with_activity(
@@ -210,7 +210,7 @@ async def test_sync_activity_thread_cancel(
     client: temporalio.client.Client, worker: Worker
 ):
     def wait_cancel() -> str:
-        while not temporalio.activity.cancelled():
+        while not temporalio.activity.is_cancelled():
             time.sleep(0.1)
             temporalio.activity.heartbeat()
         return "Cancelled"
@@ -229,7 +229,7 @@ async def test_sync_activity_thread_cancel(
 
 
 def picklable_activity_wait_cancel() -> str:
-    while not temporalio.activity.cancelled():
+    while not temporalio.activity.is_cancelled():
         time.sleep(0.1)
         temporalio.activity.heartbeat()
     return "Cancelled"
@@ -342,7 +342,6 @@ async def test_activity_type_hints(client: temporalio.client.Client, worker: Wor
     )
     # We called with the wrong non-dataclass type, but since we don't strictly
     # check non-data-types, we don't perform any validation there
-    # TODO(cretz): Do we want a strict option for scalars?
     assert (
         result.result
         == "param1: <class 'tests.test_worker.SomeClass2'>, param2: <class 'int'>"

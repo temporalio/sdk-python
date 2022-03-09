@@ -1,12 +1,10 @@
 """Telemetry for SDK Core."""
 
-import logging
+import warnings
 from dataclasses import dataclass
 from typing import Optional
 
 import temporal_sdk_bridge
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -22,16 +20,19 @@ class TelemetryConfig:
 _inited = False
 
 
-def init_telemetry(config: TelemetryConfig) -> bool:
+def init_telemetry(
+    config: TelemetryConfig, *, warn_if_already_inited: bool = True
+) -> bool:
     """Initialize telemetry with the given configuration.
 
     Does nothing if already called.
     """
     global _inited
     if _inited:
-        logger.warning(
-            "Telemetry initialization already called, ignoring successive calls"
-        )
+        if warn_if_already_inited:
+            warnings.warn(
+                "Telemetry initialization already called, ignoring successive calls"
+            )
         return False
     temporal_sdk_bridge.init_telemetry(config)
     _inited = True
