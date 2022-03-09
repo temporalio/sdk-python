@@ -1,15 +1,18 @@
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3_asyncio::tokio::future_into_py;
 use std::collections::HashMap;
 use std::time::Duration;
-use temporal_client::WorkflowService;
+use temporal_client::{
+    ConfiguredClient, RetryConfig, RetryGateway, ServerGatewayOptions, ServerGatewayOptionsBuilder,
+    TlsConfig, WorkflowService, WorkflowServiceClientWithMetrics,
+};
 use tonic;
+use url::Url;
 
-pyo3::create_exception!(temporal_sdk_bridge, RPCError, pyo3::exceptions::PyException);
+pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = temporal_client::RetryGateway<
-    temporal_client::ConfiguredClient<temporal_client::WorkflowServiceClientWithMetrics>,
->;
+type Client = RetryGateway<ConfiguredClient<WorkflowServiceClientWithMetrics>>;
 
 #[pyclass]
 pub struct ClientRef {
@@ -48,8 +51,8 @@ struct ClientRetryConfig {
 
 pub fn connect_client(py: Python, config: ClientConfig) -> PyResult<&PyAny> {
     // TODO(cretz): Add metrics_meter?
-    let opts: temporal_client::ServerGatewayOptions = config.try_into()?;
-    pyo3_asyncio::tokio::future_into_py(py, async move {
+    let opts: ServerGatewayOptions = config.try_into()?;
+    future_into_py(py, async move {
         Ok(ClientRef {
             retry_client: opts.connect_no_namespace(None).await.map_err(|err| {
                 PyRuntimeError::new_err(format!("Failed client connect: {}", err))
@@ -78,7 +81,7 @@ impl ClientRef {
         req: Vec<u8>,
     ) -> PyResult<&'p PyAny> {
         let mut retry_client = self.retry_client.clone();
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        future_into_py(py, async move {
             let bytes = match rpc.as_str() {
                 "count_workflow_executions" => {
                     rpc_call!(retry_client, retry, count_workflow_executions, req)
@@ -227,10 +230,10 @@ impl TryFrom<ClientConfig> for temporal_client::ServerGatewayOptions {
     type Error = PyErr;
 
     fn try_from(opts: ClientConfig) -> PyResult<Self> {
-        let mut gateway_opts = temporal_client::ServerGatewayOptionsBuilder::default();
+        let mut gateway_opts = ServerGatewayOptionsBuilder::default();
         gateway_opts
             .target_url(
-                url::Url::parse(&opts.target_url)
+                Url::parse(&opts.target_url)
                     .map_err(|err| PyValueError::new_err(format!("invalid target URL: {}", err)))?,
             )
             .client_name(opts.client_name)
@@ -240,7 +243,7 @@ impl TryFrom<ClientConfig> for temporal_client::ServerGatewayOptions {
             .worker_binary_id(opts.worker_binary_id)
             .retry_config(
                 opts.retry_config
-                    .map_or(temporal_client::RetryConfig::default(), |c| c.into()),
+                    .map_or(RetryConfig::default(), |c| c.into()),
             );
         // Builder does not allow us to set option here, so we have to make
         // a conditional to even call it
@@ -257,7 +260,7 @@ impl TryFrom<ClientTlsConfig> for temporal_client::TlsConfig {
     type Error = PyErr;
 
     fn try_from(conf: ClientTlsConfig) -> PyResult<Self> {
-        Ok(temporal_client::TlsConfig {
+        Ok(TlsConfig {
             server_root_ca_cert: conf.server_root_ca_cert,
             domain: conf.domain,
             client_tls_config: match (conf.client_cert, conf.client_private_key) {
@@ -278,9 +281,9 @@ impl TryFrom<ClientTlsConfig> for temporal_client::TlsConfig {
     }
 }
 
-impl From<ClientRetryConfig> for temporal_client::RetryConfig {
+impl From<ClientRetryConfig> for RetryConfig {
     fn from(conf: ClientRetryConfig) -> Self {
-        temporal_client::RetryConfig {
+        RetryConfig {
             initial_interval: Duration::from_millis(conf.initial_interval_millis),
             randomization_factor: conf.randomization_factor,
             multiplier: conf.multiplier,

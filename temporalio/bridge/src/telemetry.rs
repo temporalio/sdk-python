@@ -1,6 +1,9 @@
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use std::net::SocketAddr;
 use std::str::FromStr;
+use temporal_sdk_core::{telemetry_init, TelemetryOptions, TelemetryOptionsBuilder};
+use url::Url;
 
 #[pyclass]
 pub struct TelemetryRef {
@@ -17,8 +20,8 @@ pub struct TelemetryConfig {
 }
 
 pub fn init_telemetry(config: TelemetryConfig) -> PyResult<TelemetryRef> {
-    let opts: temporal_sdk_core::TelemetryOptions = config.try_into()?;
-    temporal_sdk_core::telemetry_init(&opts).map_err(|err| {
+    let opts: TelemetryOptions = config.try_into()?;
+    telemetry_init(&opts).map_err(|err| {
         PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err))
     })?;
     Ok(TelemetryRef {
@@ -26,14 +29,14 @@ pub fn init_telemetry(config: TelemetryConfig) -> PyResult<TelemetryRef> {
     })
 }
 
-impl TryFrom<TelemetryConfig> for temporal_sdk_core::TelemetryOptions {
+impl TryFrom<TelemetryConfig> for TelemetryOptions {
     type Error = PyErr;
 
     fn try_from(conf: TelemetryConfig) -> PyResult<Self> {
-        let mut build = temporal_sdk_core::TelemetryOptionsBuilder::default();
+        let mut build = TelemetryOptionsBuilder::default();
         if let Some(ref v) = conf.otel_collector_url {
             build.otel_collector_url(
-                url::Url::parse(v)
+                Url::parse(v)
                     .map_err(|err| PyValueError::new_err(format!("Invalid OTel URL: {}", err)))?,
             );
         }
@@ -47,9 +50,9 @@ impl TryFrom<TelemetryConfig> for temporal_sdk_core::TelemetryOptions {
             );
         }
         if let Some(ref v) = conf.prometheus_export_bind_address {
-            build.prometheus_export_bind_address(std::net::SocketAddr::from_str(v).map_err(
-                |err| PyValueError::new_err(format!("Invalid Prometheus address: {}", err)),
-            )?);
+            build.prometheus_export_bind_address(SocketAddr::from_str(v).map_err(|err| {
+                PyValueError::new_err(format!("Invalid Prometheus address: {}", err))
+            })?);
         }
         build
             .build()
