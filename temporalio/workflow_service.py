@@ -326,6 +326,12 @@ class WorkflowService(ABC):
         """Config originally used to connect."""
         return self._config
 
+    @property
+    @abstractmethod
+    def worker_workflow_service(self) -> _BridgeWorkflowService:
+        """Underlying workflow service."""
+        raise NotImplementedError
+
     @abstractmethod
     async def _rpc_call(
         self,
@@ -401,6 +407,11 @@ class _BridgeWorkflowService(WorkflowService):
     ) -> None:
         super().__init__(config)
         self._bridge_client = bridge_client
+
+    @property
+    def worker_workflow_service(self) -> _BridgeWorkflowService:
+        """Underlying workflow service."""
+        return self
 
     async def _rpc_call(
         self,

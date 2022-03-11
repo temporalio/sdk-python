@@ -1,9 +1,7 @@
 """Worker using SDK Core."""
 
 from dataclasses import dataclass
-
-import temporal_sdk_bridge
-from temporal_sdk_bridge import PollShutdownError
+from typing import Iterable, List
 
 import temporalio.api.common.v1
 import temporalio.bridge.client
@@ -12,7 +10,9 @@ import temporalio.bridge.proto.activity_task
 import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.bridge.temporal_sdk_bridge
 import temporalio.common
+from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
 @dataclass
@@ -41,7 +41,9 @@ class Worker:
         self, client: temporalio.bridge.client.Client, config: WorkerConfig
     ) -> None:
         """Create SDK core worker with a client and config."""
-        self._ref = temporal_sdk_bridge.new_worker(client._ref, config)
+        self._ref = temporalio.bridge.temporal_sdk_bridge.new_worker(
+            client._ref, config
+        )
 
     async def poll_workflow_activation(
         self,
@@ -101,4 +103,36 @@ def retry_policy_from_proto(
         else None,
         maximum_attempts=p.maximum_attempts,
         non_retryable_error_types=p.non_retryable_error_types,
+    )
+
+
+def from_bridge_payloads(
+    payloads: Iterable[temporalio.bridge.proto.common.Payload],
+) -> List[temporalio.api.common.v1.Payload]:
+    """Convert from bridge payloads to API payloads."""
+    return [from_bridge_payload(p) for p in payloads]
+
+
+def from_bridge_payload(
+    payload: temporalio.bridge.proto.common.Payload,
+) -> temporalio.api.common.v1.Payload:
+    """Convert from a bridge payload to an API payload."""
+    return temporalio.api.common.v1.Payload(
+        metadata=payload.metadata, data=payload.data
+    )
+
+
+def to_bridge_payloads(
+    payloads: Iterable[temporalio.api.common.v1.Payload],
+) -> List[temporalio.bridge.proto.common.Payload]:
+    """Convert from API payloads to bridge payloads."""
+    return [to_bridge_payload(p) for p in payloads]
+
+
+def to_bridge_payload(
+    payload: temporalio.api.common.v1.Payload,
+) -> temporalio.bridge.proto.common.Payload:
+    """Convert from an API payload to a bridge payload."""
+    return temporalio.bridge.proto.common.Payload(
+        metadata=payload.metadata, data=payload.data
     )

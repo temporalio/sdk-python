@@ -359,7 +359,7 @@ class Client:
         raise ValueError("Task token or workflow/run/activity ID must be present")
 
 
-class ClientConfig(typing_extensions.TypedDict):
+class ClientConfig(typing_extensions.TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
     service: temporalio.workflow_service.WorkflowService
@@ -557,6 +557,7 @@ class WorkflowHandle(Generic[T]):
                     cause=temporalio.exceptions.TimeoutError(
                         "Workflow timed out",
                         type=temporalio.exceptions.TimeoutType.START_TO_CLOSE,
+                        last_heartbeat_details=[],
                     ),
                 )
             elif event.HasField("workflow_execution_continued_as_new_event_attributes"):
@@ -825,7 +826,7 @@ class WorkflowFailureError(Exception):
     @property
     def cause(self) -> temporalio.exceptions.FailureError:
         """Cause of the workflow failure."""
-        return self.__cause__
+        return cast(temporalio.exceptions.FailureError, self.__cause__)
 
 
 class WorkflowContinuedAsNewError(temporalio.exceptions.TemporalError):

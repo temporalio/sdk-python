@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
-import temporal_sdk_bridge
-from temporal_sdk_bridge import RPCError
+
+import temporalio.bridge.temporal_sdk_bridge
+from temporalio.bridge.temporal_sdk_bridge import RPCError
 
 
 @dataclass
@@ -56,9 +57,11 @@ class Client:
     @staticmethod
     async def connect(config: ClientConfig) -> Client:
         """Establish connection with server."""
-        return Client(await temporal_sdk_bridge.connect_client(config))
+        return Client(
+            await temporalio.bridge.temporal_sdk_bridge.connect_client(config)
+        )
 
-    def __init__(self, ref: temporal_sdk_bridge.ClientRef):
+    def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.ClientRef):
         """Initialize client with underlying SDK Core reference."""
         self._ref = ref
 

@@ -245,7 +245,7 @@ def raise_complete_async() -> NoReturn:
     raise _CompleteAsyncError()
 
 
-class _CompleteAsyncError(temporalio.exceptions.TemporalError):
+class _CompleteAsyncError(BaseException):
     pass
 
 
