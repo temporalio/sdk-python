@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import warnings
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
@@ -14,9 +15,11 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
+    Tuple,
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import typing_extensions
@@ -57,6 +60,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
+        type_hint_eval_str: bool = True,
         tls_config: Optional[TLSConfig] = None,
         retry_config: Optional[RetryConfig] = None,
         static_headers: Mapping[str, str] = {},
@@ -74,10 +78,19 @@ class Client:
             interceptors: Set of interceptors that are chained together to allow
                 intercepting of client calls. The earlier interceptors wrap the
                 later ones.
+
+                Any interceptors that also implement
+                :py:class:`temporalio.worker.Interceptor` will be used as worker
+                interceptors too so they should not be given when creating a
+                worker.
             default_workflow_query_reject_condition: The default rejection
                 condition for workflow queries if not set during query. See
                 :py:meth:`WorkflowHandle.query` for details on the rejection
                 condition.
+            type_hint_eval_str: Whether the type hinting that is used to
+                determine dataclass parameters for decoding uses evaluation on
+                stringified annotations. This corresponds to the eval_str
+                parameter on :py:meth:`inspect.get_annotations`.
             tls_config: TLS configuration for connecting to the server. If unset
                 no TLS connection will be used.
             retry_config: Retry configuration for direct service calls (when
@@ -91,7 +104,7 @@ class Client:
                 best set as a hash of all code and should change only when code
                 does. If unset, a best-effort identifier is generated.
         """
-        connect_options = temporalio.workflow_service.ConnectOptions(
+        connect_config = temporalio.workflow_service.ConnectConfig(
             target_url=target_url,
             tls_config=tls_config,
             retry_config=retry_config,
@@ -100,11 +113,12 @@ class Client:
             worker_binary_id=worker_binary_id or "",
         )
         return Client(
-            await temporalio.workflow_service.WorkflowService.connect(connect_options),
+            await temporalio.workflow_service.WorkflowService.connect(connect_config),
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            type_hint_eval_str=type_hint_eval_str,
         )
 
     def __init__(
@@ -119,6 +133,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
+        type_hint_eval_str: bool = True,
     ):
         """Create a Temporal client from a workflow service.
 
@@ -134,41 +149,44 @@ class Client:
             else:
                 raise TypeError("interceptor neither OutboundInterceptor nor callable")
 
-        # Store the options for tracking
-        self._options = ClientOptions(
+        # Store the config for tracking
+        self._config = ClientConfig(
             service=service,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            type_hint_eval_str=type_hint_eval_str,
         )
 
-    def options(self) -> ClientOptions:
-        """Options used to create this client as a dictionary.
+    def config(self) -> ClientConfig:
+        """Config, as a dictionary, used to create this client.
 
-        This makes a shallow copy of the options each call.
+        This makes a shallow copy of the config each call.
         """
-        return self._options.copy()
+        config = self._config.copy()
+        config["interceptors"] = list(config["interceptors"])
+        return config
 
     @property
     def service(self) -> temporalio.workflow_service.WorkflowService:
         """Raw gRPC service for this client."""
-        return self._options["service"]
+        return self._config["service"]
 
     @property
     def namespace(self) -> str:
         """Namespace used in calls by this client."""
-        return self._options["namespace"]
+        return self._config["namespace"]
 
     @property
     def identity(self) -> str:
         """Identity used in calls by this client."""
-        return self.service.options.identity
+        return self.service.config.identity
 
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
         """Data converter used by this client."""
-        return self._options["data_converter"]
+        return self._config["data_converter"]
 
     async def start_workflow(
         self,
@@ -212,8 +230,6 @@ class Client:
 
         Returns:
             A workflow handle to the started/existing workflow.
-            :py:attr:`WorkflowHandle.run_id` will be populated with the current
-            run ID.
 
         Raises:
             RPCError: Workflow could not be started.
@@ -307,9 +323,44 @@ class Client:
             first_execution_run_id=first_execution_run_id,
         )
 
+    @overload
+    def get_activity_completion_handle(
+        self, *, workflow_id: str, run_id: str, activity_id: str
+    ) -> ActivityCompletionHandle:
+        pass
 
-class ClientOptions(typing_extensions.TypedDict):
-    """TypedDict of options originally passed to :py:meth:`Client`."""
+    @overload
+    def get_activity_completion_handle(
+        self, *, task_token: bytes
+    ) -> ActivityCompletionHandle:
+        pass
+
+    def get_activity_completion_handle(
+        self,
+        *,
+        workflow_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        activity_id: Optional[str] = None,
+        task_token: Optional[bytes] = None,
+    ) -> ActivityCompletionHandle:
+        """Get an activity completion handle."""
+        if task_token is not None:
+            if workflow_id is not None or run_id is not None or activity_id is not None:
+                raise ValueError("Task token cannot be present with other IDs")
+            return ActivityCompletionHandle(id_or_token=task_token)
+        elif workflow_id is not None:
+            if run_id is None or activity_id is None:
+                raise ValueError(
+                    "Workflow ID, run ID, and activity ID must all be given together"
+                )
+            return ActivityCompletionHandle(
+                id_or_token=(workflow_id, run_id, activity_id)
+            )
+        raise ValueError("Task token or workflow/run/activity ID must be present")
+
+
+class ClientConfig(typing_extensions.TypedDict):
+    """TypedDict of config originally passed to :py:meth:`Client`."""
 
     service: temporalio.workflow_service.WorkflowService
     namespace: str
@@ -320,6 +371,7 @@ class ClientOptions(typing_extensions.TypedDict):
     default_workflow_query_reject_condition: Optional[
         temporalio.common.QueryRejectCondition
     ]
+    type_hint_eval_str: bool
 
 
 T = TypeVar("T")
@@ -379,7 +431,7 @@ class WorkflowHandle(Generic[T]):
         This cannot be mutated. If a different run ID is needed,
         :py:meth:`Client.get_workflow_handle` must be used instead.
         """
-        return self._run_id
+        return self._result_run_id
 
     @property
     def first_execution_run_id(self) -> Optional[str]:
@@ -394,7 +446,7 @@ class WorkflowHandle(Generic[T]):
         This cannot be mutated. If a different first execution run ID is needed,
         :py:meth:`Client.get_workflow_handle` must be used instead.
         """
-        return self._run_id
+        return self._first_execution_run_id
 
     async def result(self, *, follow_runs: bool = True) -> T:
         """Wait for result of the workflow.
@@ -414,7 +466,7 @@ class WorkflowHandle(Generic[T]):
         Raises:
             WorkflowFailureError: Workflow failed, was cancelled, was
                 terminated, or timed out. Use the
-                :py:attr:`WorkflowFailureError.__cause__` to see the underlying
+                :py:attr:`WorkflowFailureError.cause` to see the underlying
                 reason.
             Exception: Other possible failures during result fetching.
         """
@@ -454,7 +506,7 @@ class WorkflowHandle(Generic[T]):
                 if not results:
                     return cast(T, None)
                 elif len(results) > 1:
-                    logger.warning("Expected single result, got %s", len(results))
+                    warnings.warn(f"Expected single result, got {len(results)}")
                 return cast(T, results[0])
             elif event.HasField("workflow_execution_failed_event_attributes"):
                 fail_attr = event.workflow_execution_failed_event_attributes
@@ -614,7 +666,7 @@ class WorkflowHandle(Generic[T]):
                 query=query,
                 args=args,
                 reject_condition=reject_condition
-                or self._client._options["default_workflow_query_reject_condition"],
+                or self._client._config["default_workflow_query_reject_condition"],
             )
         )
 
@@ -682,6 +734,17 @@ class WorkflowHandle(Generic[T]):
                 first_execution_run_id=self._first_execution_run_id,
             )
         )
+
+
+class ActivityCompletionHandle:
+    """Handle representing an external activity for completion and heartbeat."""
+
+    def __init__(self, id_or_token: Union[Tuple[str, str, str], bytes]) -> None:
+        """Create an activity completion handle."""
+        raise NotImplementedError
+
+    # TODO(cretz): The async methods here and the interceptor methods to support
+    # them
 
 
 class WorkflowDescription:
@@ -1038,7 +1101,7 @@ class _ClientImpl(OutboundInterceptor):
         if not results:
             return None
         elif len(results) > 1:
-            logger.warning("Expected single query result, got %s", len(results))
+            warnings.warn(f"Expected single query result, got {len(results)}")
         return results[0]
 
     async def signal_workflow(self, input: SignalWorkflowInput) -> None:

@@ -79,7 +79,7 @@ func run(portStr, namespace string) error {
 
 	defer log.Printf("Stopping servers")
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM, os.Interrupt)
 	<-sigCh
 	return nil
 }

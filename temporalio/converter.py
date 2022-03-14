@@ -3,9 +3,11 @@
 import dataclasses
 import inspect
 import json
+import sys
 from abc import ABC, abstractmethod
-from typing import Any, Iterable, List, Mapping, Optional, Type
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Type
 
+import dacite
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
@@ -27,7 +29,8 @@ class DataConverter(ABC):
 
         Returns:
             Converted payloads. Note, this does not have to be the same number
-            as values given, but at least one must be present.
+            as values given, but must be at least one and cannot be more than
+            was given.
 
         Raises:
             Exception: Any issue during conversion.
@@ -395,7 +398,8 @@ class JSONPlainPayloadConverter(PayloadConverter):
                 and inspect.isclass(type_hint)
                 and dataclasses.is_dataclass(type_hint)
             ):
-                obj = type_hint(**obj)
+                # We have to use dacite here to handle nested dataclasses
+                obj = dacite.from_dict(type_hint, obj)
             return obj
         except json.JSONDecodeError as err:
             raise RuntimeError("Failed parsing") from err
@@ -418,6 +422,15 @@ def default() -> CompositeDataConverter:
     )
 
 
+async def encode_payloads(
+    values: Iterable[Any], converter: DataConverter
+) -> temporalio.api.common.v1.Payloads:
+    """Encode :py:class:`temporalio.api.common.v1.Payloads` with the given
+    converter.
+    """
+    return temporalio.api.common.v1.Payloads(payloads=await converter.encode(values))
+
+
 async def decode_payloads(
     payloads: Optional[temporalio.api.common.v1.Payloads], converter: DataConverter
 ) -> List[Any]:
@@ -427,3 +440,38 @@ async def decode_payloads(
     if not payloads or not payloads.payloads:
         return []
     return await converter.decode(payloads.payloads)
+
+
+def _type_hints_from_func(
+    func: Callable[..., Any], *, eval_str: bool
+) -> Tuple[Optional[List[Type]], Optional[Type]]:
+    """Extracts the type hints from the function.
+
+    Args:
+        func: Function to extract hints from.
+        eval_str: Whether to use ``eval_str`` (only supported on Python >= 3.10)
+
+    Returns:
+        Tuple containing parameter types and return type. The parameter types
+        will be None if there are any non-positional parameters or if any of the
+        parameters to not have an annotation that represents a class.
+    """
+    # eval_str only supported on >= 3.10
+    if sys.version_info >= (3, 10):
+        sig = inspect.signature(func, eval_str=eval_str)
+    else:
+        sig = inspect.signature(func)
+    ret: Optional[Type] = None
+    if inspect.isclass(sig.return_annotation):
+        ret = sig.return_annotation
+    args: List[Type] = []
+    for value in sig.parameters.values():
+        if (
+            value.kind is not inspect.Parameter.POSITIONAL_ONLY
+            and value.kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD
+        ):
+            return (None, ret)
+        if not inspect.isclass(value.annotation):
+            return (None, ret)
+        args.append(value.annotation)
+    return args, ret

@@ -4,6 +4,7 @@ import pytest
 
 import temporalio.api.common.v1
 import temporalio.converter
+from temporalio.api.common.v1 import Payload as AnotherNameForPayload
 
 
 async def test_default():

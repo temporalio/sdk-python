@@ -16,6 +16,7 @@ import grpc
 
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
+import temporalio.bridge.telemetry
 import temporalio.exceptions
 
 WorkflowServiceRequest = TypeVar(
@@ -84,8 +85,8 @@ class RetryConfig:
 
 
 @dataclass
-class ConnectOptions:
-    """Options for connecting to the server."""
+class ConnectConfig:
+    """Config for connecting to the server."""
 
     target_url: str
     tls_config: Optional[TLSConfig] = None
@@ -101,8 +102,8 @@ class ConnectOptions:
         if not self.worker_binary_id:
             self.worker_binary_id = load_default_worker_binary_id()
 
-    def _to_bridge_options(self) -> temporalio.bridge.client.ClientOptions:
-        return temporalio.bridge.client.ClientOptions(
+    def _to_bridge_config(self) -> temporalio.bridge.client.ClientConfig:
+        return temporalio.bridge.client.ClientConfig(
             target_url=self.target_url,
             tls_config=self.tls_config._to_bridge_config() if self.tls_config else None,
             retry_config=self.retry_config._to_bridge_config()
@@ -118,14 +119,14 @@ class WorkflowService(ABC):
     """Client to the Temporal server's workflow service."""
 
     @staticmethod
-    async def connect(options: ConnectOptions) -> WorkflowService:
+    async def connect(config: ConnectConfig) -> WorkflowService:
         """Connect directly to the workflow service."""
-        return await _BridgeWorkflowService.connect(options)
+        return await _BridgeWorkflowService.connect(config)
 
-    def __init__(self, options: ConnectOptions) -> None:
+    def __init__(self, config: ConnectConfig) -> None:
         """Initialize the base workflow service."""
         super().__init__()
-        self._options = options
+        self._config = config
 
         wsv1 = temporalio.api.workflowservice.v1
 
@@ -321,9 +322,9 @@ class WorkflowService(ABC):
         )
 
     @property
-    def options(self) -> ConnectOptions:
-        """Options originally used to connect."""
-        return self._options
+    def config(self) -> ConnectConfig:
+        """Config originally used to connect."""
+        return self._config
 
     @abstractmethod
     async def _rpc_call(
@@ -381,18 +382,24 @@ class WorkflowServiceCall(Generic[WorkflowServiceRequest, WorkflowServiceRespons
 
 class _BridgeWorkflowService(WorkflowService):
     @staticmethod
-    async def connect(options: ConnectOptions) -> _BridgeWorkflowService:
+    async def connect(config: ConnectConfig) -> _BridgeWorkflowService:
+        # TODO(cretz): Expose telemetry init config
+        temporalio.bridge.telemetry.init_telemetry(
+            temporalio.bridge.telemetry.TelemetryConfig(),
+            warn_if_already_inited=False,
+        )
+
         return _BridgeWorkflowService(
-            options,
-            await temporalio.bridge.client.Client.connect(options._to_bridge_options()),
+            config,
+            await temporalio.bridge.client.Client.connect(config._to_bridge_config()),
         )
 
     _bridge_client: temporalio.bridge.client.Client
 
     def __init__(
-        self, options: ConnectOptions, bridge_client: temporalio.bridge.client.Client
+        self, config: ConnectConfig, bridge_client: temporalio.bridge.client.Client
     ) -> None:
-        super().__init__(options)
+        super().__init__(config)
         self._bridge_client = bridge_client
 
     async def _rpc_call(

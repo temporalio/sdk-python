@@ -1,5 +1,6 @@
 """Common Temporal exceptions."""
 
+import traceback
 from enum import IntEnum
 from typing import Any, Iterable, Optional
 
@@ -21,18 +22,18 @@ class FailureError(TemporalError):
     def __init__(
         self,
         message: str,
-        *details: Any,
+        *,
         failure: Optional[temporalio.api.failure.v1.Failure] = None
     ) -> None:
         """Initialize a failure error."""
         super().__init__(message)
-        self._details = details
+        self._message = message
         self._failure = failure
 
     @property
-    def details(self) -> Iterable[Any]:
-        """User-defined details on the failure."""
-        return self._details
+    def message(self) -> str:
+        """Message."""
+        return self._message
 
     @property
     def failure(self) -> Optional[temporalio.api.failure.v1.Failure]:
@@ -51,9 +52,15 @@ class ApplicationError(FailureError):
         non_retryable: bool = False
     ) -> None:
         """Initialize an application error."""
-        super().__init__(message, *details)
+        super().__init__(message)
+        self._details = details
         self._type = type
         self._non_retryable = non_retryable
+
+    @property
+    def details(self) -> Iterable[Any]:
+        """User-defined details on the error."""
+        return self._details
 
     @property
     def type(self) -> Optional[str]:
@@ -71,7 +78,13 @@ class CancelledError(FailureError):
 
     def __init__(self, message: str, *details: Any) -> None:
         """Initialize a cancelled error."""
-        super().__init__(message, *details)
+        super().__init__(message)
+        self._details = details
+
+    @property
+    def details(self) -> Iterable[Any]:
+        """User-defined details on the error."""
+        return self._details
 
 
 class TerminatedError(FailureError):
@@ -79,7 +92,13 @@ class TerminatedError(FailureError):
 
     def __init__(self, message: str, *details: Any) -> None:
         """Initialize a terminated error."""
-        super().__init__(message, *details)
+        super().__init__(message)
+        self._details = details
+
+    @property
+    def details(self) -> Iterable[Any]:
+        """User-defined details on the error."""
+        return self._details
 
 
 class TimeoutType(IntEnum):
@@ -288,7 +307,7 @@ async def failure_to_error(
             failure.message,
             *(await temporalio.converter.decode_payloads(app_info.details, converter)),
             type=app_info.type or None,
-            non_retryable=app_info.non_retryable
+            non_retryable=app_info.non_retryable,
         )
     elif failure.HasField("timeout_failure_info"):
         timeout_info = failure.timeout_failure_info
@@ -305,7 +324,11 @@ async def failure_to_error(
         cancel_info = failure.canceled_failure_info
         err = CancelledError(
             failure.message,
-            await temporalio.converter.decode_payloads(cancel_info.details, converter),
+            *(
+                await temporalio.converter.decode_payloads(
+                    cancel_info.details, converter
+                )
+            ),
         )
     elif failure.HasField("terminated_failure_info"):
         err = TerminatedError(failure.message)
@@ -345,3 +368,109 @@ async def failure_to_error(
     if failure.HasField("cause"):
         err.__cause__ = await failure_to_error(failure.cause, converter)
     return err
+
+
+async def apply_error_to_failure(
+    error: FailureError,
+    converter: temporalio.converter.DataConverter,
+    failure: temporalio.api.failure.v1.Failure,
+) -> None:
+    """Convert the given failure error to a Temporal failure.
+
+    Args:
+        error: Python failure error.
+        converter: Converter used for translating error details.
+        failure: Internal Temporal failure to populate.
+    """
+    # If there is an underlying proto already, just use that
+    if error.failure:
+        failure.CopyFrom(error.failure)
+        return
+
+    # Set message, stack, and cause. Obtaining cause follows rules from
+    # https://docs.python.org/3/library/exceptions.html#exception-context
+    failure.message = str(error)
+    if error.__traceback__:
+        failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
+    if error.__cause__:
+        await apply_exception_to_failure(error.__cause__, converter, failure.cause)
+    elif not error.__suppress_context__ and error.__context__:
+        await apply_exception_to_failure(error.__context__, converter, failure.cause)
+
+    # Set specific subclass values
+    if isinstance(error, ApplicationError):
+        failure.application_failure_info.SetInParent()
+        if error.type:
+            failure.application_failure_info.type = error.type
+        failure.application_failure_info.non_retryable = error.non_retryable
+        if error.details:
+            failure.application_failure_info.details.CopyFrom(
+                await temporalio.converter.encode_payloads(error.details, converter)
+            )
+    elif isinstance(error, TimeoutError):
+        failure.timeout_failure_info.SetInParent()
+        failure.timeout_failure_info.timeout_type = error.type or 0
+        if error.last_heartbeat_details:
+            failure.timeout_failure_info.last_heartbeat_details.CopyFrom(
+                await temporalio.converter.encode_payloads(
+                    error.last_heartbeat_details, converter
+                )
+            )
+    elif isinstance(error, CancelledError):
+        failure.canceled_failure_info.SetInParent()
+        if error.details:
+            failure.canceled_failure_info.details = (
+                await temporalio.converter.encode_payloads(error.details, converter)
+            )
+    elif isinstance(error, TerminatedError):
+        failure.terminated_failure_info.SetInParent()
+    elif isinstance(error, ServerError):
+        failure.server_failure_info.SetInParent()
+        failure.server_failure_info.non_retryable = error.non_retryable
+    elif isinstance(error, ActivityError):
+        failure.activity_failure_info.SetInParent()
+        failure.activity_failure_info.scheduled_event_id = error.scheduled_event_id
+        failure.activity_failure_info.started_event_id = error.started_event_id
+        failure.activity_failure_info.identity = error.identity
+        failure.activity_failure_info.activity_type.name = error.activity_type
+        failure.activity_failure_info.activity_id = error.activity_id
+        failure.activity_failure_info.retry_state = error.retry_state or 0
+    elif isinstance(error, ChildWorkflowError):
+        failure.child_workflow_execution_failure_info.SetInParent()
+        failure.child_workflow_execution_failure_info.namespace = error.namespace
+        failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = (
+            error.workflow_id
+        )
+        failure.child_workflow_execution_failure_info.workflow_execution.run_id = (
+            error.run_id
+        )
+        failure.child_workflow_execution_failure_info.workflow_type.name = (
+            error.workflow_type
+        )
+        failure.child_workflow_execution_failure_info.initiated_event_id = (
+            error.initiated_event_id
+        )
+        failure.child_workflow_execution_failure_info.started_event_id = (
+            error.started_event_id
+        )
+        failure.child_workflow_execution_failure_info.retry_state = (
+            error.retry_state or 0
+        )
+
+
+async def apply_exception_to_failure(
+    exception: BaseException,
+    converter: temporalio.converter.DataConverter,
+    failure: temporalio.api.failure.v1.Failure,
+) -> None:
+    """Small wrapper around :py:func:`apply_error_to_failure` for exceptions."""
+    # If already a failure error, use that
+    if isinstance(exception, FailureError):
+        await apply_error_to_failure(exception, converter, failure)
+    else:
+        # Convert to failure error
+        failure_error = ApplicationError(
+            str(exception), type=exception.__class__.__name__
+        )
+        failure_error.__traceback__ = exception.__traceback__
+        await apply_error_to_failure(failure_error, converter, failure)

@@ -11,6 +11,18 @@ Client
 .. automodule:: temporalio.client
    :members:
 
+Worker
+------
+
+.. automodule:: temporalio.worker
+   :members:
+
+Activity
+--------
+
+.. automodule:: temporalio.activity
+   :members:
+
 Converters
 ----------
 
