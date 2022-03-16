@@ -472,7 +472,6 @@ class Worker:
         completion = temporalio.bridge.proto.ActivityTaskCompletion(
             task_token=task_token
         )
-        manager: Optional[SharedStateManager] = None
         try:
             # Find activity or fail
             activity_def = self._activities.get(start.activity_type)
@@ -695,25 +694,22 @@ class Worker:
                     f"Failed building exception result: {inner_err}"
                 )
 
-        # If there is a manager here, we make it flush all pending heartbeats in
-        # the queue
-        if manager:
-            manager.flush_pending_heartbeats(task_token)
-        # We mark the activity as done and let the currently running (and next
-        # pending) heartbeat task finish
-        running_activity.done = True
-        while running_activity.current_heartbeat_task:
-            try:
-                await running_activity.current_heartbeat_task
-            except:
-                # Should never happen because it's trapped in-task
-                temporalio.activity.logger.exception(
-                    "Final heartbeat task didn't trap error"
-                )
-
-        # Send task completion to core
-        del self._running_activities[task_token]
+        # Do final completion
         try:
+            # We mark the activity as done and let the currently running (and next
+            # pending) heartbeat task finish
+            running_activity.done = True
+            while running_activity.current_heartbeat_task:
+                try:
+                    await running_activity.current_heartbeat_task
+                except:
+                    # Should never happen because it's trapped in-task
+                    temporalio.activity.logger.exception(
+                        "Final heartbeat task didn't trap error"
+                    )
+
+            # Send task completion to core
+            del self._running_activities[task_token]
             logger.debug("Completing activity with completion: %s", completion)
             await self._bridge_worker.complete_activity_task(completion)
         except Exception:
@@ -895,24 +891,21 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             loop = asyncio.get_running_loop()
             orig_heartbeat = ctx.heartbeat
 
-            # We have to create an async call for use by
-            # run_coroutine_threadsafe, then thread-safe heartbeat call that
-            # calls that. The first async one is needed because we have to be on
-            # the event loop even though the heartbeat call is non-async. The
-            # second is needed because we want to block and wait on the first
-            # one to complete.
-            async def async_heartbeat(*details: Any) -> None:
+            # We have to call the heartbeat function inside the asyncio event
+            # loop (even though it's sync). So we need a call that puts the
+            # context back on the activity and calls heartbeat, then another
+            # call schedules it.
+            def heartbeat_with_context(*details: Any) -> None:
                 temporalio.activity._Context.set(ctx)
                 assert orig_heartbeat
                 orig_heartbeat(*details)
 
             def thread_safe_heartbeat(*details: Any) -> None:
-                # We want to wait until the event loop has processed the
-                # heartbeat. We wait 5 seconds which should be plenty if the
-                # queue is being processed.
-                asyncio.run_coroutine_threadsafe(
-                    async_heartbeat(*details), loop
-                ).result(5)
+                # TODO(cretz): Final heartbeat can be flaky if we don't wait on
+                # result here, but waiting on result of
+                # asyncio.run_coroutine_threadsafe times out in rare cases.
+                # Need more investigation: https://github.com/temporalio/sdk-python/issues/12
+                loop.call_soon_threadsafe(heartbeat_with_context, *details)
 
             ctx.heartbeat = thread_safe_heartbeat
 
@@ -929,7 +922,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                 )
 
             try:
-                return await asyncio.get_running_loop().run_in_executor(
+                return await loop.run_in_executor(
                     input.executor,
                     _execute_sync_activity,
                     info,
@@ -1057,13 +1050,8 @@ class SharedStateManager(ABC):
     @abstractmethod
     def unregister_heartbeater(self, task_token: bytes) -> None:
         """Unregisters a previously registered heartbeater for the task
-        token.
+        token. This should also flush any pending heartbeats.
         """
-        raise NotImplementedError
-
-    @abstractmethod
-    def flush_pending_heartbeats(self, task_token: bytes) -> None:
-        """Flushes outstanding heartbeats from the queue"""
         raise NotImplementedError
 
 
@@ -1076,6 +1064,10 @@ class SharedHeartbeatSender(ABC):
     def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
         """Send a heartbeat for the given task token and details."""
         raise NotImplementedError
+
+
+# List used for details to say a heartbeat is complete
+_multiprocess_heartbeat_complete = ["__temporal_heartbeat_complete__"]
 
 
 class _MultiprocessingSharedStateManager(SharedStateManager):
@@ -1092,6 +1084,7 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
             1000
         )
         self._heartbeats: Dict[bytes, Callable[..., None]] = {}
+        self._heartbeat_completions: Dict[bytes, Callable[[], None]] = {}
 
     def new_event(self) -> threading.Event:
         return self._mgr.Event()
@@ -1106,7 +1099,18 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
         return _MultiprocessingSharedHeartbeatSender(self._heartbeat_queue)
 
     def unregister_heartbeater(self, task_token: bytes) -> None:
-        del self._heartbeats[task_token]
+        # Put a completion on the queue and wait for it to happen
+        flush_complete = threading.Event()
+        self._heartbeat_completions[task_token] = flush_complete.set
+        try:
+            # 30 seconds to put complete, 30 to get notified should be plenty
+            self._heartbeat_queue.put(
+                (task_token, _multiprocess_heartbeat_complete), True, 30
+            )
+            if not flush_complete.wait(30):
+                raise RuntimeError("Timeout waiting for heartbeat flush")
+        finally:
+            del self._heartbeat_completions[task_token]
 
     def _heartbeat_processor(self) -> None:
         while len(self._heartbeats) > 0:
@@ -1115,11 +1119,14 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
                 # again. This timeout then is the max amount of time before this
                 # processor can stop when there are no more activity heartbeats
                 # registered.
-                # TODO(cretz): Need to be configurable or derived from heartbeat
-                # timeouts on activities themselves? E.g. 0.8 of the current
-                # shortest registered timeout? It wouldn't really add much
-                # benefit except for stopping speed
-                item: Tuple[bytes, Iterable[Any]] = self._heartbeat_queue.get(True, 0.5)
+                item = self._heartbeat_queue.get(True, 0.5)
+                # If it's a completion, perform that and continue
+                if item[1] == _multiprocess_heartbeat_complete:
+                    del self._heartbeats[item[0]]
+                    completion = self._heartbeat_completions.get(item[0])
+                    if completion:
+                        completion()
+                    continue
                 # We count on this being a _very_ cheap function
                 fn = self._heartbeats.get(item[0])
                 if fn:
@@ -1128,17 +1135,6 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
                 pass
             except Exception:
                 logger.exception("Failed during multiprocess queue poll for heartbeat")
-                return
-
-    def flush_pending_heartbeats(self, task_token: bytes) -> None:
-        # We're gonna go ahead and just flush them all
-        while True:
-            try:
-                item: Tuple[bytes, Iterable[Any]] = self._heartbeat_queue.get_nowait()
-                fn = self._heartbeats.get(item[0])
-                if fn:
-                    fn(*item[1])
-            except queue.Empty:
                 return
 
 
@@ -1151,6 +1147,6 @@ class _MultiprocessingSharedHeartbeatSender(SharedHeartbeatSender):
 
     def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
         # We do want to wait here to ensure it was put on the queue, and we'll
-        # timeout after 5 seconds (should be plenty if the queue is being
+        # timeout after 30 seconds (should be plenty if the queue is being
         # properly processed)
-        self._heartbeat_queue.put((task_token, details), True, 5)
+        self._heartbeat_queue.put((task_token, details), True, 30)

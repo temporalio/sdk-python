@@ -217,8 +217,8 @@ async def test_sync_activity_thread_cancel(
 ):
     def wait_cancel() -> str:
         while not temporalio.activity.is_cancelled():
-            time.sleep(0.1)
             temporalio.activity.heartbeat()
+            time.sleep(1)
         return "Cancelled"
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -228,7 +228,7 @@ async def test_sync_activity_thread_cancel(
             wait_cancel,
             cancel_after_ms=100,
             wait_for_cancellation=True,
-            heartbeat_timeout_ms=1000,
+            heartbeat_timeout_ms=30000,
             worker_config={"activity_executor": executor},
         )
     assert result.result == "Cancelled"
@@ -236,8 +236,8 @@ async def test_sync_activity_thread_cancel(
 
 def picklable_activity_wait_cancel() -> str:
     while not temporalio.activity.is_cancelled():
-        time.sleep(0.3)
         temporalio.activity.heartbeat()
+        time.sleep(1)
     return "Cancelled"
 
 
@@ -430,6 +430,8 @@ def picklable_heartbeat_details_activity() -> str:
     some_list.append(f"attempt: {info.attempt}")
     temporalio.activity.logger.debug("Heartbeating with value: %s", some_list)
     temporalio.activity.heartbeat(some_list)
+    # TODO(cretz): Remove when we fix multiprocess heartbeats
+    time.sleep(1)
     if len(some_list) < 2:
         raise RuntimeError(f"Try again, list contains: {some_list}")
     return ", ".join(some_list)
@@ -640,7 +642,7 @@ async def test_activity_worker_shutdown_graceful(
 
 
 def picklable_wait_on_event() -> str:
-    temporalio.activity.wait_for_worker_shutdown_sync(5)
+    temporalio.activity.wait_for_worker_shutdown_sync(20)
     return "Worker graceful shutdown"
 
 
@@ -668,7 +670,7 @@ async def test_sync_activity_process_worker_shutdown_graceful(
                         execute_activity=KSExecuteActivityAction(
                             name="picklable_wait_on_event",
                             task_queue=act_task_queue,
-                            heartbeat_timeout_ms=1000,
+                            heartbeat_timeout_ms=30000,
                         )
                     )
                 ]
