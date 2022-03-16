@@ -908,11 +908,11 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
             def thread_safe_heartbeat(*details: Any) -> None:
                 # We want to wait until the event loop has processed the
-                # heartbeat
-                # TODO(cretz): Should we put a timeout on the result here?
+                # heartbeat. We wait 5 seconds which should be plenty if the
+                # queue is being processed.
                 asyncio.run_coroutine_threadsafe(
                     async_heartbeat(*details), loop
-                ).result()
+                ).result(5)
 
             ctx.heartbeat = thread_safe_heartbeat
 
@@ -1150,5 +1150,7 @@ class _MultiprocessingSharedHeartbeatSender(SharedHeartbeatSender):
         self._heartbeat_queue = heartbeat_queue
 
     def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
-        # No wait
-        self._heartbeat_queue.put((task_token, details), False)
+        # We do want to wait here to ensure it was put on the queue, and we'll
+        # timeout after 5 seconds (should be plenty if the queue is being
+        # properly processed)
+        self._heartbeat_queue.put((task_token, details), True, 5)

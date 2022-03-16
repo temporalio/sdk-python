@@ -25,7 +25,7 @@ async def main():
   client = await Client.connect("http://localhost:7233", namespace="my-namespace")
 
   # Start a workflow
-  handle = await client.start_workflow("my workflow name", id="my-workflow-id", task_queue="my-task-queue")
+  handle = await client.start_workflow("my workflow name", "some arg", id="my-workflow-id", task_queue="my-task-queue")
 
   # Wait for result
   result = await handle.result()
@@ -34,7 +34,7 @@ async def main():
 
 Some things to note about the above code:
 
-* A `Client` is not closed explicitly
+* A `Client` does not have an explicit "close"
 * Positional arguments can be passed to `start_workflow`
 * The `handle` represents the workflow that was started and can be used for more than just getting the result
 * Since we are just getting the handle and waiting on the result, we could have called `client.execute_workflow` which
@@ -58,7 +58,7 @@ automatically [converted to dictionaries](https://docs.python.org/3/library/data
 encoding as JSON. Since Python is a dynamic language, when decoding via
 [`json.load`](https://docs.python.org/3/library/json.html#json.load), the type is not known at runtime so, for example,
 a JSON object will be a `dict`. As a special case, if the parameter type hint is a data class for a JSON payload, it is
-decoded into an instance of that data class.
+decoded into an instance of that data class (properly recursing into child data classes).
 
 ### Activities
 

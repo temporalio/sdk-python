@@ -44,11 +44,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            package-suffix: linux-x86_64
+            package-suffix: linux-amd64
           - os: macos-latest
-            package-suffix: macos-x86_64
+            package-suffix: macos-amd64
           - os: windows-latest
-            package-suffix: windows-x86_64
+            package-suffix: windows-amd64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2

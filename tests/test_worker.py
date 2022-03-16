@@ -236,7 +236,7 @@ async def test_sync_activity_thread_cancel(
 
 def picklable_activity_wait_cancel() -> str:
     while not temporalio.activity.is_cancelled():
-        time.sleep(0.1)
+        time.sleep(0.3)
         temporalio.activity.heartbeat()
     return "Cancelled"
 

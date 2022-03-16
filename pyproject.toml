@@ -1,9 +1,14 @@
 [tool.poetry]
 name = "temporalio"
-version = "0.1a1.dev1"
+version = "0.1a1.dev3"
 description = "Temporal.io Python SDK"
-authors = ["Temporal Technologies Inc <sdk@temporal.io>"]
 license = "MIT"
+authors = ["Temporal Technologies Inc <sdk@temporal.io>"]
+readme = "README.md"
+homepage = "https://github.com/temporalio/sdk-python"
+repository = "https://github.com/temporalio/sdk-python"
+documentation = "https://docs.temporal.io/docs/python"
+keywords = ["temporal", "workflow"]
 # We need to include proto source that is otherwise excluded via .gitignore.
 # We have chosen to keep all source including Rust source in precompiled wheels
 # for easy viewing. It is also complicated to exclude certain pieces for wheels
@@ -18,9 +23,6 @@ script = "build.py"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/temporalio/sdk-python/issues"
-homepage = "https://github.com/temporalio/sdk-python#readme"
-repository = "https://github.com/temporalio/sdk-python"
-documentation = "https://docs.temporal.io/docs/python"
 
 [tool.poetry.dependencies]
 dacite = "^1.6.0"
@@ -44,6 +46,7 @@ setuptools = "^60.9.3"
 setuptools-rust = "^1.1.2"
 Sphinx = "^4.4.0"
 sphinxcontrib-napoleon = "^0.7"
+twine = "^3.8.0"
 
 [tool.poe.tasks]
 build-develop = ["gen-protos", "build-bridge-develop"]
@@ -52,7 +55,12 @@ fix-wheel = "python scripts/fix_wheel.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-docs = "sphinx-build docs docs/_build"
 gen-protos = "python scripts/gen_protos.py"
-lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types", "lint-docs"]
+lint = [
+  {cmd = "black --check ."},
+  {cmd = "isort --check-only ."},
+  {ref = "lint-types"},
+  {ref = "lint-docs"},
+]
 lint-docs = "pydocstyle"
 lint-types = "mypy ."
 test = "pytest"
