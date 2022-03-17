@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import collections
 import re
 import shutil
@@ -34,7 +33,7 @@ pyi_fixes = [
 ]
 
 find_message_re = re.compile(r"_sym_db\.RegisterMessage\(([^\)\.]+)\)")
-find_enum_re = re.compile(r"DESCRIPTOR\.enum_types_by_name\['([^']+)'\] =")
+find_enum_re = re.compile(r"DESCRIPTOR\.enum_types_by_name\['([^']+)'\]")
 find_class_re = re.compile(r"\nclass ([^\(\:]+)")
 find_def_re = re.compile(r"\ndef ([^\(\:]+)")
 

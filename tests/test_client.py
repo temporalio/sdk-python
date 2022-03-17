@@ -116,7 +116,7 @@ async def test_workflow_failed(client: temporalio.client.Client, worker: Worker)
         await handle.result()
     assert isinstance(err.value.cause, temporalio.exceptions.ApplicationError)
     assert str(err.value.cause) == "some error"
-    assert err.value.cause.details[0] == {"foo": "bar", "baz": 123.45}
+    assert list(err.value.cause.details)[0] == {"foo": "bar", "baz": 123.45}
 
 
 async def test_cancel(client: temporalio.client.Client, worker: Worker):

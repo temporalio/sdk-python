@@ -181,7 +181,7 @@ func handleAction(
 			},
 		}
 		if opts.StartToCloseTimeout == 0 && opts.ScheduleToCloseTimeout == 0 {
-			opts.ScheduleToCloseTimeout = 10 * time.Second
+			opts.ScheduleToCloseTimeout = 3 * time.Minute
 		}
 		if action.ExecuteActivity.RetryMaxAttempts > 1 {
 			opts.RetryPolicy.MaximumAttempts = int32(action.ExecuteActivity.RetryMaxAttempts)

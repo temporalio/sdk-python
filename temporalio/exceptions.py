@@ -409,7 +409,9 @@ async def apply_error_to_failure(
             )
     elif isinstance(error, TimeoutError):
         failure.timeout_failure_info.SetInParent()
-        failure.timeout_failure_info.timeout_type = error.type or 0
+        failure.timeout_failure_info.timeout_type = (
+            temporalio.api.enums.v1.TimeoutType.ValueType(error.type or 0)
+        )
         if error.last_heartbeat_details:
             failure.timeout_failure_info.last_heartbeat_details.CopyFrom(
                 await temporalio.converter.encode_payloads(
@@ -419,7 +421,7 @@ async def apply_error_to_failure(
     elif isinstance(error, CancelledError):
         failure.canceled_failure_info.SetInParent()
         if error.details:
-            failure.canceled_failure_info.details = (
+            failure.canceled_failure_info.details.CopyFrom(
                 await temporalio.converter.encode_payloads(error.details, converter)
             )
     elif isinstance(error, TerminatedError):
@@ -434,7 +436,9 @@ async def apply_error_to_failure(
         failure.activity_failure_info.identity = error.identity
         failure.activity_failure_info.activity_type.name = error.activity_type
         failure.activity_failure_info.activity_id = error.activity_id
-        failure.activity_failure_info.retry_state = error.retry_state or 0
+        failure.activity_failure_info.retry_state = (
+            temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
+        )
     elif isinstance(error, ChildWorkflowError):
         failure.child_workflow_execution_failure_info.SetInParent()
         failure.child_workflow_execution_failure_info.namespace = error.namespace
@@ -454,7 +458,7 @@ async def apply_error_to_failure(
             error.started_event_id
         )
         failure.child_workflow_execution_failure_info.retry_state = (
-            error.retry_state or 0
+            temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
         )
 
 

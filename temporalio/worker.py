@@ -28,6 +28,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
 )
 
 import google.protobuf.duration_pb2
@@ -186,10 +187,11 @@ class Worker:
             )
 
         # Prepend applicable client interceptors to the given ones
-        interceptors = itertools.chain(
-            (i for i in client.config()["interceptors"] if isinstance(i, Interceptor)),
-            interceptors,
+        interceptors_from_client = cast(
+            List[Interceptor],
+            [i for i in client.config()["interceptors"] if isinstance(i, Interceptor)],
         )
+        interceptors = itertools.chain(interceptors_from_client, interceptors)
 
         # Extract the bridge workflow service. We try the service on the client
         # first, then we support a worker_workflow_service on the client's
@@ -418,7 +420,7 @@ class Worker:
 
     async def _heartbeat_activity_async(
         self,
-        logger: logging.Logger,
+        logger: logging.LoggerAdapter,
         activity: _RunningActivity,
         task_token: bytes,
         *details: Any,
@@ -431,13 +433,9 @@ class Worker:
                 )
                 # Convert to core payloads
                 heartbeat.details.extend(
-                    [
-                        temporalio.bridge.proto.common.Payload(
-                            metadata=p.metadata, data=p.data
-                        )
-                        for p in converted_details
-                    ]
+                    temporalio.bridge.worker.to_bridge_payloads(converted_details)
                 )
+            logger.debug("Recording heartbeat with details %s", details)
             self._bridge_worker.record_activity_heartbeat(heartbeat)
             # If there is one pending, schedule it
             if activity.pending_heartbeat:
@@ -539,7 +537,10 @@ class Worker:
                 args = (
                     []
                     if not start.input
-                    else await converter.decode(start.input, type_hints=arg_types)
+                    else await converter.decode(
+                        temporalio.bridge.worker.from_bridge_payloads(start.input),
+                        type_hints=arg_types,
+                    )
                 )
             except Exception as err:
                 raise temporalio.exceptions.ApplicationError(
@@ -552,7 +553,11 @@ class Worker:
                 heartbeat_details = (
                     []
                     if not start.heartbeat_details
-                    else await converter.decode(start.heartbeat_details)
+                    else await converter.decode(
+                        temporalio.bridge.worker.from_bridge_payloads(
+                            start.heartbeat_details
+                        )
+                    )
                 )
             except Exception as err:
                 raise temporalio.exceptions.ApplicationError(
@@ -560,19 +565,15 @@ class Worker:
                 ) from err
 
             # Build info
-            running_activity.info = temporalio.activity.Info(
+            info = temporalio.activity.Info(
                 activity_id=start.activity_id,
                 activity_type=start.activity_type,
                 attempt=start.attempt,
                 current_attempt_scheduled_time=_proto_to_datetime(
                     start.current_attempt_scheduled_time
-                )
-                if start.HasField("current_attempt_scheduled_time")
-                else None,
+                ),
                 header={
-                    k: temporalio.api.common.v1.Payload(
-                        metadata=v.metadata, data=v.data
-                    )
+                    k: temporalio.bridge.worker.from_bridge_payload(v)
                     for k, v in start.header_fields.items()
                 },
                 heartbeat_details=heartbeat_details,
@@ -588,15 +589,11 @@ class Worker:
                 schedule_to_close_timeout=start.schedule_to_close_timeout.ToTimedelta()
                 if start.HasField("schedule_to_close_timeout")
                 else None,
-                scheduled_time=_proto_to_datetime(start.scheduled_time)
-                if start.HasField("scheduled_time")
-                else None,
+                scheduled_time=_proto_to_datetime(start.scheduled_time),
                 start_to_close_timeout=start.start_to_close_timeout.ToTimedelta()
                 if start.HasField("start_to_close_timeout")
                 else None,
-                started_time=_proto_to_datetime(start.started_time)
-                if start.HasField("started_time")
-                else None,
+                started_time=_proto_to_datetime(start.started_time),
                 task_queue=self._config["task_queue"],
                 task_token=task_token,
                 workflow_id=start.workflow_execution.workflow_id,
@@ -604,6 +601,7 @@ class Worker:
                 workflow_run_id=start.workflow_execution.run_id,
                 workflow_type=start.workflow_type,
             )
+            running_activity.info = info
             input = ExecuteActivityInput(
                 fn=activity_def.fn,
                 args=args,
@@ -619,7 +617,7 @@ class Worker:
             # interceptors have it
             temporalio.activity._Context.set(
                 temporalio.activity._Context(
-                    info=lambda: running_activity.info,
+                    info=lambda: info,
                     heartbeat=None,
                     cancelled_event=running_activity.cancelled_event,
                     worker_shutdown_event=self._worker_shutdown_event,
@@ -646,11 +644,9 @@ class Worker:
                 result_payloads = await self._config["client"].data_converter.encode(
                     [result]
                 )
-                # We have to convert from Temporal API payload to Core payload
-                completion.result.completed.result.metadata.update(
-                    result_payloads[0].metadata
+                completion.result.completed.result.CopyFrom(
+                    temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
                 )
-                completion.result.completed.result.data = result_payloads[0].data
         except (Exception, asyncio.CancelledError) as err:
             try:
                 if isinstance(err, temporalio.activity._CompleteAsyncError):
@@ -698,27 +694,29 @@ class Worker:
                     f"Failed building exception result: {inner_err}"
                 )
 
-        # We mark the activity as done and let the currently running (and next
-        # pending) heartbeat task finish
-        running_activity.done = True
-        while running_activity.current_heartbeat_task:
-            try:
-                await running_activity.current_heartbeat_task
-            except:
-                # Should never happen because it's trapped in-task
-                temporalio.activity.logger.exception(
-                    "Final heartbeat task didn't trap error"
-                )
-
-        # Send task completion to core
-        del self._running_activities[task_token]
+        # Do final completion
         try:
+            # We mark the activity as done and let the currently running (and next
+            # pending) heartbeat task finish
+            running_activity.done = True
+            while running_activity.current_heartbeat_task:
+                try:
+                    await running_activity.current_heartbeat_task
+                except:
+                    # Should never happen because it's trapped in-task
+                    temporalio.activity.logger.exception(
+                        "Final heartbeat task didn't trap error"
+                    )
+
+            # Send task completion to core
+            del self._running_activities[task_token]
+            logger.debug("Completing activity with completion: %s", completion)
             await self._bridge_worker.complete_activity_task(completion)
         except Exception:
             temporalio.activity.logger.exception("Failed completing activity task")
 
 
-class WorkerConfig(typing_extensions.TypedDict):
+class WorkerConfig(typing_extensions.TypedDict, total=False):
     """TypedDict of config originally passed to :py:class:`Worker`."""
 
     client: temporalio.client.Client
@@ -893,9 +891,21 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             loop = asyncio.get_running_loop()
             orig_heartbeat = ctx.heartbeat
 
-            def thread_safe_heartbeat(*details: Any) -> None:
+            # We have to call the heartbeat function inside the asyncio event
+            # loop (even though it's sync). So we need a call that puts the
+            # context back on the activity and calls heartbeat, then another
+            # call schedules it.
+            def heartbeat_with_context(*details: Any) -> None:
                 temporalio.activity._Context.set(ctx)
-                loop.call_soon_threadsafe(orig_heartbeat, *details)
+                assert orig_heartbeat
+                orig_heartbeat(*details)
+
+            def thread_safe_heartbeat(*details: Any) -> None:
+                # TODO(cretz): Final heartbeat can be flaky if we don't wait on
+                # result here, but waiting on result of
+                # asyncio.run_coroutine_threadsafe times out in rare cases.
+                # Need more investigation: https://github.com/temporalio/sdk-python/issues/12
+                loop.call_soon_threadsafe(heartbeat_with_context, *details)
 
             ctx.heartbeat = thread_safe_heartbeat
 
@@ -912,7 +922,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                 )
 
             try:
-                return await asyncio.get_running_loop().run_in_executor(
+                return await loop.run_in_executor(
                     input.executor,
                     _execute_sync_activity,
                     info,
@@ -980,7 +990,7 @@ class _ActivityOutboundImpl(ActivityOutboundInterceptor):
 
 def _proto_to_datetime(
     ts: google.protobuf.timestamp_pb2.Timestamp,
-) -> Optional[datetime]:
+) -> datetime:
     # Protobuf doesn't set the timezone but we want to
     return ts.ToDatetime().replace(tzinfo=timezone.utc)
 
@@ -1040,7 +1050,7 @@ class SharedStateManager(ABC):
     @abstractmethod
     def unregister_heartbeater(self, task_token: bytes) -> None:
         """Unregisters a previously registered heartbeater for the task
-        token.
+        token. This should also flush any pending heartbeats.
         """
         raise NotImplementedError
 
@@ -1054,6 +1064,10 @@ class SharedHeartbeatSender(ABC):
     def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
         """Send a heartbeat for the given task token and details."""
         raise NotImplementedError
+
+
+# List used for details to say a heartbeat is complete
+_multiprocess_heartbeat_complete = ["__temporal_heartbeat_complete__"]
 
 
 class _MultiprocessingSharedStateManager(SharedStateManager):
@@ -1070,6 +1084,7 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
             1000
         )
         self._heartbeats: Dict[bytes, Callable[..., None]] = {}
+        self._heartbeat_completions: Dict[bytes, Callable[[], None]] = {}
 
     def new_event(self) -> threading.Event:
         return self._mgr.Event()
@@ -1084,7 +1099,18 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
         return _MultiprocessingSharedHeartbeatSender(self._heartbeat_queue)
 
     def unregister_heartbeater(self, task_token: bytes) -> None:
-        del self._heartbeats[task_token]
+        # Put a completion on the queue and wait for it to happen
+        flush_complete = threading.Event()
+        self._heartbeat_completions[task_token] = flush_complete.set
+        try:
+            # 30 seconds to put complete, 30 to get notified should be plenty
+            self._heartbeat_queue.put(
+                (task_token, _multiprocess_heartbeat_complete), True, 30
+            )
+            if not flush_complete.wait(30):
+                raise RuntimeError("Timeout waiting for heartbeat flush")
+        finally:
+            del self._heartbeat_completions[task_token]
 
     def _heartbeat_processor(self) -> None:
         while len(self._heartbeats) > 0:
@@ -1093,18 +1119,21 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
                 # again. This timeout then is the max amount of time before this
                 # processor can stop when there are no more activity heartbeats
                 # registered.
-                # TODO(cretz): Need to be configurable or derived from heartbeat
-                # timeouts on activities themselves? E.g. 0.8 of the current
-                # shortest registered timeout? It wouldn't really add much
-                # benefit except for stopping speed
-                item: Tuple[bytes, Iterable[Any]] = self._heartbeat_queue.get(True, 0.5)
+                item = self._heartbeat_queue.get(True, 0.5)
+                # If it's a completion, perform that and continue
+                if item[1] == _multiprocess_heartbeat_complete:
+                    del self._heartbeats[item[0]]
+                    completion = self._heartbeat_completions.get(item[0])
+                    if completion:
+                        completion()
+                    continue
                 # We count on this being a _very_ cheap function
                 fn = self._heartbeats.get(item[0])
                 if fn:
                     fn(*item[1])
             except queue.Empty:
                 pass
-            except Exception as err:
+            except Exception:
                 logger.exception("Failed during multiprocess queue poll for heartbeat")
                 return
 
@@ -1117,5 +1146,7 @@ class _MultiprocessingSharedHeartbeatSender(SharedHeartbeatSender):
         self._heartbeat_queue = heartbeat_queue
 
     def send_heartbeat(self, task_token: bytes, *details: Any) -> None:
-        # No wait
-        self._heartbeat_queue.put((task_token, details), False)
+        # We do want to wait here to ensure it was put on the queue, and we'll
+        # timeout after 30 seconds (should be plenty if the queue is being
+        # properly processed)
+        self._heartbeat_queue.put((task_token, details), True, 30)

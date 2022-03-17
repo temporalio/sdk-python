@@ -1,50 +1,89 @@
 [tool.poetry]
 name = "temporalio"
-version = "0.1.0"
+version = "0.1a1"
 description = "Temporal.io Python SDK"
-authors = ["Temporal Technologies Inc <sdk@temporal.io>"]
 license = "MIT"
+authors = ["Temporal Technologies Inc <sdk@temporal.io>"]
+readme = "README.md"
+homepage = "https://github.com/temporalio/sdk-python"
+repository = "https://github.com/temporalio/sdk-python"
+documentation = "https://docs.temporal.io/docs/python"
+keywords = ["temporal", "workflow"]
+# We need to include proto source that is otherwise excluded via .gitignore.
+# We have chosen to keep all source including Rust source in precompiled wheels
+# for easy viewing. It is also complicated to exclude certain pieces for wheels
+# with Poetry (see https://github.com/python-poetry/poetry/issues/3380).
+include = ["temporalio/api/**/*", "temporalio/bridge/proto/**/*"]
+exclude = ["temporalio/bridge/**/target"]
+
+# Known undocumented API for hooking into setup. Unfortunately Poetry does not
+# support this script in a subdirectory like scripts/.
+[tool.poetry.build]
+script = "build.py"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/temporalio/sdk-python/issues"
-homepage = "https://github.com/temporalio/sdk-python#readme"
-repository = "https://github.com/temporalio/sdk-python"
-documentation = "https://docs.temporal.io/docs/python"
 
 [tool.poetry.dependencies]
 dacite = "^1.6.0"
 grpcio = "^1.43.0"
+protobuf = "^3.19.4"
 python = "^3.7"
 types-protobuf = "^3.19.6"
 typing-extensions = "^4.0.1"
 
 [tool.poetry.dev-dependencies]
 black = "^21.12b0"
+furo = "^2022.3.4"
 grpcio-tools = "^1.43.0"
 isort = "^5.10.1"
-maturin = "^0.12.6"
 mypy = "^0.931"
 mypy-protobuf = "^3.2.0"
 pydocstyle = "^6.1.1"
 pytest = "^6.2.5"
 pytest-asyncio = "^0.18.0"
+setuptools = "^60.9.3"
+setuptools-rust = "^1.1.2"
 Sphinx = "^4.4.0"
-sphinx-rtd-theme = "^1.0.0"
 sphinxcontrib-napoleon = "^0.7"
+twine = "^3.8.0"
 
 [tool.poe.tasks]
-build = ["gen-protos", "build-bridge"]
-build-bridge = "python scripts/build-bridge.py"
+build-develop = ["gen-protos", "build-bridge-develop"]
+build-bridge-develop = "python scripts/setup_bridge.py develop"
+fix-wheel = "python scripts/fix_wheel.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-docs = "sphinx-build docs docs/_build"
-gen-protos = "python scripts/gen-protos.py"
-lint = [{cmd = "black --check ."}, {cmd = "isort --check-only ."}, "lint-types", "lint-docs"]
+gen-protos = "python scripts/gen_protos.py"
+lint = [
+  {cmd = "black --check ."},
+  {cmd = "isort --check-only ."},
+  {ref = "lint-types"},
+  {ref = "lint-docs"},
+]
 lint-docs = "pydocstyle"
 lint-types = "mypy ."
 test = "pytest"
 
+# Install local, run single pytest with env var, uninstall local
+[tool.poe.tasks.test-dist-single]
+ignore_fail = "return_non_zero"
+# Has to be a child table due to the Python TOML decoder in many default pips
+# failing on inline table with "Invalid inline table value encountered" because
+# there's a comma (see https://github.com/uiri/toml/issues/348).
+[[tool.poe.tasks.test-dist-single.sequence]]
+cmd = "pip install --no-index --find-links=./dist temporalio"
+[[tool.poe.tasks.test-dist-single.sequence]]
+cmd = "pytest -k test_activity_hello"
+env = { TEMPORAL_INTEGRATION_TEST = "1" }
+[[tool.poe.tasks.test-dist-single.sequence]]
+cmd = "pip uninstall temporalio -y"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 
 [tool.isort]
 profile = "black"
@@ -70,4 +109,4 @@ add_ignore = [
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.0.0", "setuptools", "wheel", "setuptools-rust"]

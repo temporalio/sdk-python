@@ -4,7 +4,7 @@ import warnings
 from dataclasses import dataclass
 from typing import Optional
 
-import temporal_sdk_bridge
+import temporalio.bridge.temporal_sdk_bridge
 
 
 @dataclass
@@ -34,6 +34,6 @@ def init_telemetry(
                 "Telemetry initialization already called, ignoring successive calls"
             )
         return False
-    temporal_sdk_bridge.init_telemetry(config)
+    temporalio.bridge.temporal_sdk_bridge.init_telemetry(config)
     _inited = True
     return True

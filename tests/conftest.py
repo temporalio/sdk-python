@@ -1,8 +1,24 @@
 import asyncio
+import os
+import sys
 from typing import AsyncGenerator, Optional
 
 import pytest
 import pytest_asyncio
+
+# If there is an integration test environment variable set, we must remove the
+# first path from the sys.path so we can import the wheel instead
+if os.getenv("TEMPORAL_INTEGRATION_TEST"):
+    assert (
+        sys.path[0] == os.getcwd()
+    ), "Expected first sys.path to be the current working dir"
+    sys.path.pop(0)
+    # Import temporalio and confirm it is prefixed with virtual env
+    import temporalio
+
+    assert temporalio.__file__.startswith(
+        sys.prefix
+    ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
 
 import temporalio.client
 import tests.helpers.server
@@ -13,7 +29,12 @@ import tests.helpers.worker
 def event_loop():
     # See https://github.com/pytest-dev/pytest-asyncio/issues/68
     # See https://github.com/pytest-dev/pytest-asyncio/issues/257
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    # Also need ProactorEventLoop on older versions of Python with Windows so
+    # that asyncio subprocess works properly
+    if sys.version_info < (3, 8) and sys.platform == "win32":
+        loop = asyncio.ProactorEventLoop()
+    else:
+        loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
 

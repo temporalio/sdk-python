@@ -23,6 +23,12 @@ from tests.helpers.worker import (
     Worker,
 )
 
+_default_shared_state_manager = (
+    temporalio.worker.SharedStateManager.create_from_multiprocessing(
+        multiprocessing.Manager()
+    )
+)
+
 
 async def test_activity_hello(client: temporalio.client.Client, worker: Worker):
     async def say_hello(name: str) -> str:
@@ -211,8 +217,8 @@ async def test_sync_activity_thread_cancel(
 ):
     def wait_cancel() -> str:
         while not temporalio.activity.is_cancelled():
-            time.sleep(0.1)
             temporalio.activity.heartbeat()
+            time.sleep(1)
         return "Cancelled"
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -222,7 +228,7 @@ async def test_sync_activity_thread_cancel(
             wait_cancel,
             cancel_after_ms=100,
             wait_for_cancellation=True,
-            heartbeat_timeout_ms=1000,
+            heartbeat_timeout_ms=30000,
             worker_config={"activity_executor": executor},
         )
     assert result.result == "Cancelled"
@@ -230,8 +236,8 @@ async def test_sync_activity_thread_cancel(
 
 def picklable_activity_wait_cancel() -> str:
     while not temporalio.activity.is_cancelled():
-        time.sleep(0.1)
         temporalio.activity.heartbeat()
+        time.sleep(1)
     return "Cancelled"
 
 
@@ -245,7 +251,7 @@ async def test_sync_activity_process_cancel(
             picklable_activity_wait_cancel,
             cancel_after_ms=100,
             wait_for_cancellation=True,
-            heartbeat_timeout_ms=1000,
+            heartbeat_timeout_ms=30000,
             worker_config={"activity_executor": executor},
         )
     assert result.result == "Cancelled"
@@ -354,7 +360,10 @@ async def test_activity_heartbeat_details(
 ):
     async def some_activity() -> str:
         info = temporalio.activity.info()
-        count = int(info.heartbeat_details[0]) if info.heartbeat_details else 0
+        count = int(next(iter(info.heartbeat_details))) if info.heartbeat_details else 0
+        temporalio.activity.logger.debug(
+            "Changing count from %s to %s", count, count + 9
+        )
         count += 9
         temporalio.activity.heartbeat(count)
         if count < 30:
@@ -365,7 +374,7 @@ async def test_activity_heartbeat_details(
         client,
         worker,
         some_activity,
-        retry_max_attempts=5,
+        retry_max_attempts=4,
     )
     assert result.result == "final count: 36"
 
@@ -416,12 +425,15 @@ async def test_activity_heartbeat_details_timeout(
 def picklable_heartbeat_details_activity() -> str:
     info = temporalio.activity.info()
     some_list: List[str] = (
-        list(info.heartbeat_details[0]) if info.heartbeat_details else []
+        next(iter(info.heartbeat_details)) if info.heartbeat_details else []
     )
     some_list.append(f"attempt: {info.attempt}")
+    temporalio.activity.logger.debug("Heartbeating with value: %s", some_list)
     temporalio.activity.heartbeat(some_list)
+    # TODO(cretz): Remove when we fix multiprocess heartbeats
+    time.sleep(1)
     if len(some_list) < 2:
-        raise RuntimeError("Try again!")
+        raise RuntimeError(f"Try again, list contains: {some_list}")
     return ", ".join(some_list)
 
 
@@ -433,7 +445,7 @@ async def test_sync_activity_thread_heartbeat_details(
             client,
             worker,
             picklable_heartbeat_details_activity,
-            retry_max_attempts=3,
+            retry_max_attempts=2,
             worker_config={"activity_executor": executor},
         )
     assert result.result == "attempt: 1, attempt: 2"
@@ -630,7 +642,7 @@ async def test_activity_worker_shutdown_graceful(
 
 
 def picklable_wait_on_event() -> str:
-    temporalio.activity.wait_for_worker_shutdown_sync(5)
+    temporalio.activity.wait_for_worker_shutdown_sync(20)
     return "Worker graceful shutdown"
 
 
@@ -645,7 +657,7 @@ async def test_sync_activity_process_worker_shutdown_graceful(
             activities={"picklable_wait_on_event": picklable_wait_on_event},
             activity_executor=executor,
             graceful_shutdown_timeout=timedelta(seconds=2),
-            shared_state_manager=default_shared_state_manager(),
+            shared_state_manager=_default_shared_state_manager,
         )
         asyncio.create_task(act_worker.run())
 
@@ -658,7 +670,7 @@ async def test_sync_activity_process_worker_shutdown_graceful(
                         execute_activity=KSExecuteActivityAction(
                             name="picklable_wait_on_event",
                             task_queue=act_task_queue,
-                            heartbeat_timeout_ms=1000,
+                            heartbeat_timeout_ms=30000,
                         )
                     )
                 ]
@@ -698,13 +710,12 @@ async def test_activity_interceptor(client: temporalio.client.Client, worker: Wo
         worker_config={"interceptors": [interceptor]},
     )
     assert result.result == "Hello, Temporal!"
-    # Info is called inside heartbeat causing a 4th event
-    assert len(interceptor.traces) == 4
-    assert interceptor.traces[0][0] == "activity.inbound.execute_activity"
-    assert interceptor.traces[0][1].args[0] == "Temporal"
-    assert interceptor.traces[1][0] == "activity.outbound.info"
-    assert interceptor.traces[2][0] == "activity.outbound.heartbeat"
-    assert interceptor.traces[2][1][0] == "some details!"
+    # Since "info" is called multiple times (called in logger to provide
+    # context), we just get traces by key
+    traces = {trace[0]: trace[1] for trace in interceptor.traces}
+    assert traces["activity.inbound.execute_activity"].args[0] == "Temporal"
+    assert "activity.outbound.info" in traces
+    assert traces["activity.outbound.heartbeat"][0] == "some details!"
 
 
 @dataclass
@@ -732,14 +743,11 @@ async def _execute_workflow_with_activity(
     worker_config: temporalio.worker.WorkerConfig = {},
     on_complete: Optional[Callable[[], None]] = None,
 ) -> _ActivityResult:
-    act_task_queue = str(uuid.uuid4())
-    async with temporalio.worker.Worker(
-        client,
-        task_queue=act_task_queue,
-        activities={fn.__name__: fn},
-        shared_state_manager=default_shared_state_manager(),
-        **worker_config,
-    ):
+    worker_config["client"] = client
+    worker_config["task_queue"] = str(uuid.uuid4())
+    worker_config["activities"] = {fn.__name__: fn}
+    worker_config["shared_state_manager"] = _default_shared_state_manager
+    async with temporalio.worker.Worker(**worker_config):
         try:
             handle = await client.start_workflow(
                 "kitchen_sink",
@@ -748,7 +756,7 @@ async def _execute_workflow_with_activity(
                         KSAction(
                             execute_activity=KSExecuteActivityAction(
                                 name=fn.__name__,
-                                task_queue=act_task_queue,
+                                task_queue=worker_config["task_queue"],
                                 args=args,
                                 count=count,
                                 index_as_arg=index_as_arg,
@@ -768,27 +776,13 @@ async def _execute_workflow_with_activity(
                 task_queue=worker.task_queue,
             )
             return _ActivityResult(
-                act_task_queue=act_task_queue,
+                act_task_queue=worker_config["task_queue"],
                 result=await handle.result(),
                 handle=handle,
             )
         finally:
             if on_complete:
                 on_complete()
-
-
-_default_shared_state_manager: Optional[temporalio.worker.SharedStateManager] = None
-
-
-def default_shared_state_manager() -> temporalio.worker.SharedStateManager:
-    global _default_shared_state_manager
-    if not _default_shared_state_manager:
-        _default_shared_state_manager = (
-            temporalio.worker.SharedStateManager.create_from_multiprocessing(
-                multiprocessing.Manager()
-            )
-        )
-    return _default_shared_state_manager
 
 
 def assert_activity_error(err: temporalio.client.WorkflowFailureError) -> BaseException:
