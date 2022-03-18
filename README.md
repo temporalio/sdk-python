@@ -1,17 +1,71 @@
 # Temporal Python SDK
 
-**UNDER DEVELOPMENT**
+[![Python 3.7+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
+
+[Temporal](https://temporal.io/) is a distributed, scalable, durable, and highly available orchestration engine used to
+execute asynchronous long-running business logic in a scalable and resilient way.
+
+"Temporal Python SDK" is the framework for authoring workflows and activities using the Python programming language.
+
+In addition to this documentation, see the [samples](https://github.com/temporalio/samples-python) repository for code
+examples.
+
+**⚠️ UNDER DEVELOPMENT**
 
 The Python SDK is under development. There are no compatibility guarantees nor proper documentation pages at this time.
 
-## Usage
+Currently missing features:
+
+* Workflow worker support
+* Async activity support (in client or worker)
+* Support for Windows arm, macOS arm (i.e. M1), Linux arm, and Linux x64 glibc < 2.31.
+
+## Quick Start
 
 ### Installation
 
-Install the `temporalio` package from [PyPI](https://pypi.org/project/temporalio). If using `pip` directly, this might
-look like:
+Install the `temporalio` package from [PyPI](https://pypi.org/project/temporalio).
 
-    python -m pip install temporalio
+These steps can be followed to use with a virtual environment and `pip`:
+
+* [Create a virtual environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)
+* Update `pip` - `python -m pip install -U pip`
+  * Needed because older versions of `pip` may not pick the right wheel
+* Install Temporal SDK - `python -m pip install temporalio`
+
+The SDK is now ready for use.
+
+### Starting a Workflow
+
+Create the following script at `start_workflow.py`:
+
+```python
+import asyncio
+from temporalio.client import Client
+
+async def main():
+  # Create client connected to server at the given address
+  client = await Client.connect("http://localhost:7233")
+
+  # Start a workflow
+  handle = await client.start_workflow("my workflow name", "some arg", id="my-workflow-id", task_queue="my-task-queue")
+
+  print(f"Workflow started with ID {handle.id}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Assuming you have a [Temporal server running on localhost](https://docs.temporal.io/docs/server/quick-install/), this
+will start a workflow:
+
+    python start_workflow.py
+
+Note that an external worker has to be started with this workflow registered to actually run the workflow.
+
+## Usage
 
 ### Client
 
@@ -21,7 +75,7 @@ A client can be created and used to start a workflow like so:
 from temporalio.client import Client
 
 async def main():
-  # Create client connected to server at the given address
+  # Create client connected to server at the given address and namespace
   client = await Client.connect("http://localhost:7233", namespace="my-namespace")
 
   # Start a workflow
