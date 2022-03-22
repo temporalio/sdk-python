@@ -22,7 +22,7 @@ from typing import (
     overload,
 )
 
-import typing_extensions
+from typing_extensions import TypedDict
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -359,7 +359,7 @@ class Client:
         raise ValueError("Task token or workflow/run/activity ID must be present")
 
 
-class ClientConfig(typing_extensions.TypedDict, total=False):
+class ClientConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
     service: temporalio.workflow_service.WorkflowService

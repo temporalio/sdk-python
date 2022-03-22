@@ -680,9 +680,11 @@ async def test_sync_activity_process_worker_shutdown_graceful(
         # Wait until activity started before shutting down the worker. Since it's
         # cross process, we'll just cheat a bit using a private var to check.
         found = False
+        activity_worker = act_worker._activity_worker
+        assert activity_worker
         for _ in range(10):
             await asyncio.sleep(0.2)
-            found = len(act_worker._running_activities) > 0
+            found = len(activity_worker._running_activities) > 0
             if found:
                 break
         assert found
