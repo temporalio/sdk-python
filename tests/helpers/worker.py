@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
-import tests.helpers.golang
+from tests.helpers.golang import start_external_go_process
 
 
 @dataclass
@@ -83,7 +83,7 @@ class KSExecuteActivityAction:
     non_retryable_error_types: Optional[Iterable[str]] = None
 
 
-class Worker(ABC):
+class ExternalWorker(ABC):
     """Worker guaranteed to have a "kitchen_sink" workflow."""
 
     @property
@@ -96,11 +96,11 @@ class Worker(ABC):
         raise NotImplementedError
 
 
-class ExternalGolangWorker(Worker):
+class ExternalGolangWorker(ExternalWorker):
     @staticmethod
     async def start(host_port: str, namespace: str) -> ExternalGolangWorker:
         task_queue = str(uuid.uuid4())
-        process = await tests.helpers.golang.start_external_go_process(
+        process = await start_external_go_process(
             os.path.join(os.path.dirname(__file__), "golangworker"),
             "golangworker",
             host_port,

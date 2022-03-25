@@ -24,7 +24,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow_service
 
-from .activity import SharedStateManager, _Worker
+from .activity import SharedStateManager, _ActivityWorker
 from .interceptor import Interceptor
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class Worker:
         client: temporalio.client.Client,
         *,
         task_queue: str,
-        activities: Mapping[str, Callable] = {},
+        activities: Iterable[Callable] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         interceptors: Iterable[Interceptor] = [],
         max_cached_workflows: int = 0,
@@ -67,8 +67,9 @@ class Worker:
                 worker_workflow_service attribute with reference to the original
                 client's underlying service.
             task_queue: Required task queue for this worker.
-            activities: Mapping of activity type names to activity callables.
-                Activities may be async functions or non-async functions.
+            activities: Set of activity callables decorated with
+                :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
+                may be async functions or non-async functions.
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async. If
                 this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
@@ -176,9 +177,9 @@ class Worker:
         self._task: Optional[asyncio.Task] = None
 
         # Create activity worker
-        self._activity_worker: Optional[_Worker] = None
+        self._activity_worker: Optional[_ActivityWorker] = None
         if activities:
-            self._activity_worker = _Worker(
+            self._activity_worker = _ActivityWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 task_queue=task_queue,
                 activities=activities,
@@ -227,7 +228,7 @@ class Worker:
             Configuration, shallow-copied.
         """
         config = self._config.copy()
-        config["activities"] = dict(config["activities"])
+        config["activities"] = list(config["activities"])
         return config
 
     @property
@@ -295,7 +296,7 @@ class WorkerConfig(TypedDict, total=False):
 
     client: temporalio.client.Client
     task_queue: str
-    activities: Mapping[str, Callable]
+    activities: Iterable[Callable]
     activity_executor: Optional[concurrent.futures.Executor]
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int

@@ -1,4 +1,4 @@
-"""Base converter and default implementations for conversion to/from values/payloads."""
+"""Base converter and implementations for data conversion."""
 
 import dataclasses
 import inspect

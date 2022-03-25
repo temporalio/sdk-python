@@ -6,12 +6,11 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 
-import temporalio.api.workflowservice.v1
-import temporalio.client
-import tests.helpers.golang
+from temporalio.client import Client, TLSConfig
+from tests.helpers.golang import start_external_go_process
 
 
-class Server(ABC):
+class ExternalServer(ABC):
     @property
     @abstractmethod
     def host_port(self) -> str:
@@ -30,16 +29,14 @@ class Server(ABC):
     async def close(self):
         raise NotImplementedError
 
-    async def new_client(self) -> temporalio.client.Client:
-        return await temporalio.client.Client.connect(
-            self.target_url, namespace=self.namespace
-        )
+    async def new_client(self) -> Client:
+        return await Client.connect(self.target_url, namespace=self.namespace)
 
-    async def new_tls_client(self) -> Optional[temporalio.client.Client]:
+    async def new_tls_client(self) -> Optional[Client]:
         return None
 
 
-class LocalhostDefaultServer(Server):
+class LocalhostDefaultServer(ExternalServer):
     @property
     def host_port(self):
         return "localhost:7233"
@@ -52,13 +49,13 @@ class LocalhostDefaultServer(Server):
         pass
 
 
-class ExternalGolangServer(Server):
+class ExternalGolangServer(ExternalServer):
     @staticmethod
     async def start() -> ExternalGolangServer:
         namespace = f"test-namespace-{uuid.uuid4()}"
         # TODO(cretz): Make this configurable?
         port = "9233"
-        process = await tests.helpers.golang.start_external_go_process(
+        process = await start_external_go_process(
             os.path.join(os.path.dirname(__file__), "golangserver"),
             "golangserver",
             port,
@@ -107,7 +104,7 @@ class ExternalGolangServer(Server):
         self._process.terminate()
         await self._process.wait()
 
-    async def new_tls_client(self) -> Optional[temporalio.client.Client]:
+    async def new_tls_client(self) -> Optional[Client]:
         # Read certs
         certs_dir = os.path.join(os.path.dirname(__file__), "golangserver", "certs")
         with open(os.path.join(certs_dir, "server-ca-cert.pem"), "rb") as f:
@@ -116,10 +113,10 @@ class ExternalGolangServer(Server):
             client_cert = f.read()
         with open(os.path.join(certs_dir, "client-key.pem"), "rb") as f:
             client_private_key = f.read()
-        return await temporalio.client.Client.connect(
+        return await Client.connect(
             target_url=f"https://{self._tls_host_port}",
             namespace=self._namespace,
-            tls_config=temporalio.client.TLSConfig(
+            tls_config=TLSConfig(
                 server_root_ca_cert=server_root_ca_cert,
                 client_cert=client_cert,
                 client_private_key=client_private_key,

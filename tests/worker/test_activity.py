@@ -12,25 +12,38 @@ from typing import Any, Callable, Iterable, List, Optional, Tuple
 
 import pytest
 
-import temporalio.activity
-import temporalio.client
-import temporalio.exceptions
-import temporalio.worker
+from temporalio import activity
+from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.exceptions import (
+    ActivityError,
+    ApplicationError,
+    CancelledError,
+    TimeoutError,
+    TimeoutType,
+)
+from temporalio.worker import (
+    ActivityInboundInterceptor,
+    ActivityOutboundInterceptor,
+    ExecuteActivityInput,
+    Interceptor,
+    SharedStateManager,
+    Worker,
+    WorkerConfig,
+)
 from tests.helpers.worker import (
+    ExternalWorker,
     KSAction,
     KSExecuteActivityAction,
     KSWorkflowParams,
-    Worker,
 )
 
-_default_shared_state_manager = (
-    temporalio.worker.SharedStateManager.create_from_multiprocessing(
-        multiprocessing.Manager()
-    )
+_default_shared_state_manager = SharedStateManager.create_from_multiprocessing(
+    multiprocessing.Manager()
 )
 
 
-async def test_activity_hello(client: temporalio.client.Client, worker: Worker):
+async def test_activity_hello(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def say_hello(name: str) -> str:
         return f"Hello, {name}!"
 
@@ -40,19 +53,44 @@ async def test_activity_hello(client: temporalio.client.Client, worker: Worker):
     assert result.result == "Hello, Temporal!"
 
 
-async def test_activity_info(client: temporalio.client.Client, worker: Worker):
+async def test_activity_without_decorator(client: Client, worker: ExternalWorker):
+    async def say_hello(name: str) -> str:
+        return f"Hello, {name}!"
+
+    with pytest.raises(TypeError) as err:
+        await _execute_workflow_with_activity(client, worker, say_hello, "Temporal")
+    assert "Activity missing attributes" in str(err.value)
+
+
+async def test_activity_custom_name(client: Client, worker: ExternalWorker):
+    @activity.defn(name="my custom activity name!")
+    async def get_name(name: str) -> str:
+        return f"Name: {activity.info().activity_type}"
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        get_name,
+        "Temporal",
+        activity_name_override="my custom activity name!",
+    )
+    assert result.result == "Name: my custom activity name!"
+
+
+async def test_activity_info(client: Client, worker: ExternalWorker):
     # Make sure info call outside of activity context fails
-    assert not temporalio.activity.in_activity()
+    assert not activity.in_activity()
     with pytest.raises(RuntimeError) as err:
-        temporalio.activity.info()
+        activity.info()
     assert str(err.value) == "Not in activity context"
 
     # Capture the info from the activity
-    info: Optional[temporalio.activity.Info] = None
+    info: Optional[activity.Info] = None
 
+    @activity.defn
     async def capture_info() -> None:
         nonlocal info
-        info = temporalio.activity.info()
+        info = activity.info()
 
     result = await _execute_workflow_with_activity(
         client, worker, capture_info, start_to_close_timeout_ms=4000
@@ -76,9 +114,10 @@ async def test_activity_info(client: temporalio.client.Client, worker: Worker):
     assert info.workflow_type == "kitchen_sink"
 
 
-async def test_sync_activity_thread(client: temporalio.client.Client, worker: Worker):
+async def test_sync_activity_thread(client: Client, worker: ExternalWorker):
+    @activity.defn
     def some_activity() -> str:
-        return f"activity name: {temporalio.activity.info().activity_type}"
+        return f"activity name: {activity.info().activity_type}"
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
@@ -90,11 +129,12 @@ async def test_sync_activity_thread(client: temporalio.client.Client, worker: Wo
     assert result.result == "activity name: some_activity"
 
 
+@activity.defn
 def picklable_activity() -> str:
-    return f"activity name: {temporalio.activity.info().activity_type}"
+    return f"activity name: {activity.info().activity_type}"
 
 
-async def test_sync_activity_process(client: temporalio.client.Client, worker: Worker):
+async def test_sync_activity_process(client: Client, worker: ExternalWorker):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
@@ -106,10 +146,11 @@ async def test_sync_activity_process(client: temporalio.client.Client, worker: W
 
 
 async def test_sync_activity_process_non_picklable(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
+    @activity.defn
     def some_activity() -> str:
-        return f"activity name: {temporalio.activity.info().activity_type}"
+        return f"activity name: {activity.info().activity_type}"
 
     with pytest.raises(TypeError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -122,23 +163,23 @@ async def test_sync_activity_process_non_picklable(
     assert "must be picklable when using a process executor" in str(err.value)
 
 
-async def test_activity_failure(client: temporalio.client.Client, worker: Worker):
+async def test_activity_failure(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def raise_error():
         raise RuntimeError("oh no!")
 
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(client, worker, raise_error)
     assert str(assert_activity_application_error(err.value)) == "oh no!"
 
 
+@activity.defn
 def picklable_activity_failure():
     raise RuntimeError("oh no!")
 
 
-async def test_sync_activity_process_failure(
-    client: temporalio.client.Client, worker: Worker
-):
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+async def test_sync_activity_process_failure(client: Client, worker: ExternalWorker):
+    with pytest.raises(WorkflowFailureError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
             await _execute_workflow_with_activity(
                 client,
@@ -149,36 +190,37 @@ async def test_sync_activity_process_failure(
     assert str(assert_activity_application_error(err.value)) == "oh no!"
 
 
-async def test_activity_bad_params(client: temporalio.client.Client, worker: Worker):
+async def test_activity_bad_params(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def say_hello(name: str) -> str:
         return f"Hello, {name}!"
 
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(client, worker, say_hello)
     assert str(assert_activity_application_error(err.value)).endswith(
         "missing 1 required positional argument: 'name'"
     )
 
 
-async def test_activity_kwonly_params(client: temporalio.client.Client, worker: Worker):
-    async def say_hello(*, name: str) -> str:
-        return f"Hello, {name}!"
-
+async def test_activity_kwonly_params():
     with pytest.raises(TypeError) as err:
-        await _execute_workflow_with_activity(client, worker, say_hello, "blah")
+
+        @activity.defn
+        async def say_hello(*, name: str) -> str:
+            return f"Hello, {name}!"
+
     assert str(err.value).endswith("cannot have keyword-only arguments")
 
 
-async def test_activity_cancel_catch(client: temporalio.client.Client, worker: Worker):
+async def test_activity_cancel_catch(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def wait_cancel() -> str:
         try:
             while True:
                 await asyncio.sleep(0.1)
-                temporalio.activity.heartbeat()
+                activity.heartbeat()
         except asyncio.CancelledError:
-            return "Got cancelled error, cancelled? " + str(
-                temporalio.activity.is_cancelled()
-            )
+            return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
 
     result = await _execute_workflow_with_activity(
         client,
@@ -191,13 +233,14 @@ async def test_activity_cancel_catch(client: temporalio.client.Client, worker: W
     assert result.result == "Got cancelled error, cancelled? True"
 
 
-async def test_activity_cancel_throw(client: temporalio.client.Client, worker: Worker):
+async def test_activity_cancel_throw(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def wait_cancel() -> str:
         while True:
             await asyncio.sleep(0.1)
-            temporalio.activity.heartbeat()
+            activity.heartbeat()
 
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(
             client,
             worker,
@@ -209,16 +252,15 @@ async def test_activity_cancel_throw(client: temporalio.client.Client, worker: W
     # TODO(cretz): This is a side effect of Go where returning the activity
     # cancel looks like a workflow cancel. Change assertion if/when on another
     # lang.
-    assert isinstance(err.value.cause, temporalio.exceptions.CancelledError)
+    assert isinstance(err.value.cause, CancelledError)
 
 
-async def test_sync_activity_thread_cancel(
-    client: temporalio.client.Client, worker: Worker
-):
+async def test_sync_activity_thread_cancel(client: Client, worker: ExternalWorker):
+    @activity.defn
     def wait_cancel() -> str:
-        while not temporalio.activity.is_cancelled():
+        while not activity.is_cancelled():
             time.sleep(1)
-            temporalio.activity.heartbeat()
+            activity.heartbeat()
         return "Cancelled"
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -234,16 +276,15 @@ async def test_sync_activity_thread_cancel(
     assert result.result == "Cancelled"
 
 
+@activity.defn
 def picklable_activity_wait_cancel() -> str:
-    while not temporalio.activity.is_cancelled():
+    while not activity.is_cancelled():
         time.sleep(1)
-        temporalio.activity.heartbeat()
+        activity.heartbeat()
     return "Cancelled"
 
 
-async def test_sync_activity_process_cancel(
-    client: temporalio.client.Client, worker: Worker
-):
+async def test_sync_activity_process_cancel(client: Client, worker: ExternalWorker):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
@@ -257,17 +298,14 @@ async def test_sync_activity_process_cancel(
     assert result.result == "Cancelled"
 
 
-async def test_activity_does_not_exist(
-    client: temporalio.client.Client, worker: Worker
-):
+async def test_activity_does_not_exist(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def say_hello(name: str) -> str:
         return f"Hello, {name}!"
 
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         act_task_queue = str(uuid.uuid4())
-        async with temporalio.worker.Worker(
-            client, task_queue=act_task_queue, activities={"say_hello": say_hello}
-        ):
+        async with Worker(client, task_queue=act_task_queue, activities=[say_hello]):
             await client.execute_workflow(
                 "kitchen_sink",
                 KSWorkflowParams(
@@ -288,12 +326,11 @@ async def test_activity_does_not_exist(
     )
 
 
-async def test_max_concurrent_activities(
-    client: temporalio.client.Client, worker: Worker
-):
+async def test_max_concurrent_activities(client: Client, worker: ExternalWorker):
     seen_indexes: List[int] = []
     complete_activities_event = asyncio.Event()
 
+    @activity.defn
     async def some_activity(index: int) -> str:
         seen_indexes.append(index)
         # Wait here to hold up the activity
@@ -302,7 +339,7 @@ async def test_max_concurrent_activities(
 
     # Only allow 42 activities, but try to execute 43. Make a short schedule to
     # start timeout but a long schedule to close timeout.
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(
             client,
             worker,
@@ -315,9 +352,9 @@ async def test_max_concurrent_activities(
             on_complete=complete_activities_event.set,
         )
     timeout = assert_activity_error(err.value)
-    assert isinstance(timeout, temporalio.exceptions.TimeoutError)
+    assert isinstance(timeout, TimeoutError)
     assert str(timeout) == "activity timeout"
-    assert timeout.type == temporalio.exceptions.TimeoutType.SCHEDULE_TO_START
+    assert timeout.type == TimeoutType.SCHEDULE_TO_START
 
 
 @dataclass
@@ -331,9 +368,10 @@ class SomeClass2:
     bar: Optional[SomeClass1] = None
 
 
-async def test_activity_type_hints(client: temporalio.client.Client, worker: Worker):
+async def test_activity_type_hints(client: Client, worker: ExternalWorker):
     activity_param1: SomeClass2
 
+    @activity.defn
     async def some_activity(param1: SomeClass2, param2: str) -> str:
         nonlocal activity_param1
         activity_param1 = param1
@@ -355,17 +393,14 @@ async def test_activity_type_hints(client: temporalio.client.Client, worker: Wor
     assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
 
 
-async def test_activity_heartbeat_details(
-    client: temporalio.client.Client, worker: Worker
-):
+async def test_activity_heartbeat_details(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def some_activity() -> str:
-        info = temporalio.activity.info()
+        info = activity.info()
         count = int(next(iter(info.heartbeat_details))) if info.heartbeat_details else 0
-        temporalio.activity.logger.debug(
-            "Changing count from %s to %s", count, count + 9
-        )
+        activity.logger.debug("Changing count from %s to %s", count, count + 9)
         count += 9
-        temporalio.activity.heartbeat(count)
+        activity.heartbeat(count)
         if count < 30:
             raise RuntimeError("Try again!")
         return f"final count: {count}"
@@ -384,17 +419,18 @@ class NotSerializableValue:
 
 
 async def test_activity_heartbeat_details_converter_fail(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
+    @activity.defn
     async def some_activity() -> str:
-        temporalio.activity.heartbeat(NotSerializableValue())
+        activity.heartbeat(NotSerializableValue())
         # Since the above fails, it will cause this task to be cancelled on the
         # next event loop iteration, so we sleep for a short time to allow that
         # iteration to occur
         await asyncio.sleep(0.05)
         return "Should not get here"
 
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(client, worker, some_activity)
     assert str(assert_activity_application_error(err.value)).endswith(
         "has no known converter"
@@ -402,41 +438,43 @@ async def test_activity_heartbeat_details_converter_fail(
 
 
 async def test_activity_heartbeat_details_timeout(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
+    @activity.defn
     async def some_activity() -> str:
-        temporalio.activity.heartbeat("some details!")
+        activity.heartbeat("some details!")
         await asyncio.sleep(3)
         return "Should not get here"
 
     # Have a 1s heartbeat timeout that we won't meet with a second heartbeat
     # then check the timeout's details
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(
             client, worker, some_activity, heartbeat_timeout_ms=1000
         )
     timeout = assert_activity_error(err.value)
-    assert isinstance(timeout, temporalio.exceptions.TimeoutError)
+    assert isinstance(timeout, TimeoutError)
     assert str(timeout) == "activity timeout"
-    assert timeout.type == temporalio.exceptions.TimeoutType.HEARTBEAT
+    assert timeout.type == TimeoutType.HEARTBEAT
     assert list(timeout.last_heartbeat_details) == ["some details!"]
 
 
+@activity.defn
 def picklable_heartbeat_details_activity() -> str:
-    info = temporalio.activity.info()
+    info = activity.info()
     some_list: List[str] = (
         next(iter(info.heartbeat_details)) if info.heartbeat_details else []
     )
     some_list.append(f"attempt: {info.attempt}")
-    temporalio.activity.logger.debug("Heartbeating with value: %s", some_list)
-    temporalio.activity.heartbeat(some_list)
+    activity.logger.debug("Heartbeating with value: %s", some_list)
+    activity.heartbeat(some_list)
     if len(some_list) < 2:
         raise RuntimeError(f"Try again, list contains: {some_list}")
     return ", ".join(some_list)
 
 
 async def test_sync_activity_thread_heartbeat_details(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
@@ -450,7 +488,7 @@ async def test_sync_activity_thread_heartbeat_details(
 
 
 async def test_sync_activity_process_heartbeat_details(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
@@ -463,15 +501,16 @@ async def test_sync_activity_process_heartbeat_details(
     assert result.result == "attempt: 1, attempt: 2"
 
 
+@activity.defn
 def picklable_activity_non_pickable_heartbeat_details() -> str:
-    temporalio.activity.heartbeat(lambda: "cannot pickle lambda by default")
+    activity.heartbeat(lambda: "cannot pickle lambda by default")
     return "Should not get here"
 
 
 async def test_sync_activity_process_non_picklable_heartbeat_details(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
             await _execute_workflow_with_activity(
                 client,
@@ -482,20 +521,15 @@ async def test_sync_activity_process_non_picklable_heartbeat_details(
     assert "Can't pickle" in str(assert_activity_application_error(err.value))
 
 
-async def test_activity_error_non_retryable(
-    client: temporalio.client.Client, worker: Worker
-):
+async def test_activity_error_non_retryable(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def some_activity():
-        if temporalio.activity.info().attempt < 2:
-            raise temporalio.exceptions.ApplicationError(
-                "Retry me", non_retryable=False
-            )
+        if activity.info().attempt < 2:
+            raise ApplicationError("Retry me", non_retryable=False)
         # We'll test error details while we're here
-        raise temporalio.exceptions.ApplicationError(
-            "Do not retry me", "detail1", 123, non_retryable=True
-        )
+        raise ApplicationError("Do not retry me", "detail1", 123, non_retryable=True)
 
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(
             client,
             worker,
@@ -508,18 +542,15 @@ async def test_activity_error_non_retryable(
 
 
 async def test_activity_error_non_retryable_type(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
+    @activity.defn
     async def some_activity():
-        if temporalio.activity.info().attempt < 2:
-            raise temporalio.exceptions.ApplicationError(
-                "Retry me", type="Can retry me"
-            )
-        raise temporalio.exceptions.ApplicationError(
-            "Do not retry me", type="Cannot retry me"
-        )
+        if activity.info().attempt < 2:
+            raise ApplicationError("Retry me", type="Can retry me")
+        raise ApplicationError("Do not retry me", type="Cannot retry me")
 
-    with pytest.raises(temporalio.client.WorkflowFailureError) as err:
+    with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(
             client,
             worker,
@@ -530,23 +561,24 @@ async def test_activity_error_non_retryable_type(
     assert str(assert_activity_application_error(err.value)) == "Do not retry me"
 
 
-async def test_activity_logging(client: temporalio.client.Client, worker: Worker):
+async def test_activity_logging(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def say_hello(name: str) -> str:
-        temporalio.activity.logger.info(f"Called with arg: {name}")
+        activity.logger.info(f"Called with arg: {name}")
         return f"Hello, {name}!"
 
     # Create a queue, add handler to logger, call normal activity, then check
     handler = logging.handlers.QueueHandler(queue.Queue())
-    temporalio.activity.logger.base_logger.addHandler(handler)
-    prev_level = temporalio.activity.logger.base_logger.level
-    temporalio.activity.logger.base_logger.setLevel(logging.INFO)
+    activity.logger.base_logger.addHandler(handler)
+    prev_level = activity.logger.base_logger.level
+    activity.logger.base_logger.setLevel(logging.INFO)
     try:
         result = await _execute_workflow_with_activity(
             client, worker, say_hello, "Temporal"
         )
     finally:
-        temporalio.activity.logger.base_logger.removeHandler(handler)
-        temporalio.activity.logger.base_logger.setLevel(prev_level)
+        activity.logger.base_logger.removeHandler(handler)
+        activity.logger.base_logger.setLevel(prev_level)
     assert result.result == "Hello, Temporal!"
     records: List[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
     assert len(records) > 0
@@ -556,25 +588,22 @@ async def test_activity_logging(client: temporalio.client.Client, worker: Worker
     assert records[-1].__dict__["activity_info"].activity_type == "say_hello"
 
 
-async def test_activity_worker_shutdown(
-    client: temporalio.client.Client, worker: Worker
-):
+async def test_activity_worker_shutdown(client: Client, worker: ExternalWorker):
     activity_started = asyncio.Event()
 
+    @activity.defn
     async def wait_on_event() -> str:
         nonlocal activity_started
         activity_started.set()
         try:
             while True:
                 await asyncio.sleep(0.1)
-                temporalio.activity.heartbeat()
+                activity.heartbeat()
         except asyncio.CancelledError:
             return "Properly cancelled"
 
     act_task_queue = str(uuid.uuid4())
-    act_worker = temporalio.worker.Worker(
-        client, task_queue=act_task_queue, activities={"wait_on_event": wait_on_event}
-    )
+    act_worker = Worker(client, task_queue=act_task_queue, activities=[wait_on_event])
     asyncio.create_task(act_worker.run())
     # Start workflow
     handle = await client.start_workflow(
@@ -600,21 +629,22 @@ async def test_activity_worker_shutdown(
 
 
 async def test_activity_worker_shutdown_graceful(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
     activity_started = asyncio.Event()
 
+    @activity.defn
     async def wait_on_event() -> str:
         nonlocal activity_started
         activity_started.set()
-        await temporalio.activity.wait_for_worker_shutdown()
+        await activity.wait_for_worker_shutdown()
         return "Worker graceful shutdown"
 
     act_task_queue = str(uuid.uuid4())
-    act_worker = temporalio.worker.Worker(
+    act_worker = Worker(
         client,
         task_queue=act_task_queue,
-        activities={"wait_on_event": wait_on_event},
+        activities=[wait_on_event],
         graceful_shutdown_timeout=timedelta(seconds=2),
     )
     asyncio.create_task(act_worker.run())
@@ -639,20 +669,21 @@ async def test_activity_worker_shutdown_graceful(
     assert "Worker graceful shutdown" == await handle.result()
 
 
+@activity.defn
 def picklable_wait_on_event() -> str:
-    temporalio.activity.wait_for_worker_shutdown_sync(20)
+    activity.wait_for_worker_shutdown_sync(20)
     return "Worker graceful shutdown"
 
 
 async def test_sync_activity_process_worker_shutdown_graceful(
-    client: temporalio.client.Client, worker: Worker
+    client: Client, worker: ExternalWorker
 ):
     act_task_queue = str(uuid.uuid4())
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        act_worker = temporalio.worker.Worker(
+        act_worker = Worker(
             client,
             task_queue=act_task_queue,
-            activities={"picklable_wait_on_event": picklable_wait_on_event},
+            activities=[picklable_wait_on_event],
             activity_executor=executor,
             graceful_shutdown_timeout=timedelta(seconds=2),
             shared_state_manager=_default_shared_state_manager,
@@ -694,11 +725,12 @@ async def test_sync_activity_process_worker_shutdown_graceful(
     assert "Worker graceful shutdown" == await handle.result()
 
 
-async def test_activity_interceptor(client: temporalio.client.Client, worker: Worker):
+async def test_activity_interceptor(client: Client, worker: ExternalWorker):
+    @activity.defn
     async def say_hello(name: str) -> str:
         # Get info and record a heartbeat
-        temporalio.activity.info()
-        temporalio.activity.heartbeat("some details!")
+        activity.info()
+        activity.heartbeat("some details!")
         return f"Hello, {name}!"
 
     interceptor = TracingWorkerInterceptor()
@@ -722,12 +754,12 @@ async def test_activity_interceptor(client: temporalio.client.Client, worker: Wo
 class _ActivityResult:
     act_task_queue: str
     result: Any
-    handle: temporalio.client.WorkflowHandle
+    handle: WorkflowHandle
 
 
 async def _execute_workflow_with_activity(
-    client: temporalio.client.Client,
-    worker: Worker,
+    client: Client,
+    worker: ExternalWorker,
     fn: Callable,
     *args: Any,
     count: Optional[int] = None,
@@ -740,14 +772,15 @@ async def _execute_workflow_with_activity(
     heartbeat_timeout_ms: Optional[int] = None,
     retry_max_attempts: Optional[int] = None,
     non_retryable_error_types: Optional[Iterable[str]] = None,
-    worker_config: temporalio.worker.WorkerConfig = {},
+    worker_config: WorkerConfig = {},
     on_complete: Optional[Callable[[], None]] = None,
+    activity_name_override: Optional[str] = None,
 ) -> _ActivityResult:
     worker_config["client"] = client
     worker_config["task_queue"] = str(uuid.uuid4())
-    worker_config["activities"] = {fn.__name__: fn}
+    worker_config["activities"] = [fn]
     worker_config["shared_state_manager"] = _default_shared_state_manager
-    async with temporalio.worker.Worker(**worker_config):
+    async with Worker(**worker_config):
         try:
             handle = await client.start_workflow(
                 "kitchen_sink",
@@ -755,7 +788,7 @@ async def _execute_workflow_with_activity(
                     actions=[
                         KSAction(
                             execute_activity=KSExecuteActivityAction(
-                                name=fn.__name__,
+                                name=activity_name_override or fn.__name__,
                                 task_queue=worker_config["task_queue"],
                                 args=args,
                                 count=count,
@@ -785,63 +818,57 @@ async def _execute_workflow_with_activity(
                 on_complete()
 
 
-def assert_activity_error(err: temporalio.client.WorkflowFailureError) -> BaseException:
-    assert isinstance(err.cause, temporalio.exceptions.ActivityError)
+def assert_activity_error(err: WorkflowFailureError) -> BaseException:
+    assert isinstance(err.cause, ActivityError)
     assert err.cause.__cause__
     return err.cause.__cause__
 
 
 def assert_activity_application_error(
-    err: temporalio.client.WorkflowFailureError,
-) -> temporalio.exceptions.ApplicationError:
+    err: WorkflowFailureError,
+) -> ApplicationError:
     ret = assert_activity_error(err)
-    assert isinstance(ret, temporalio.exceptions.ApplicationError)
+    assert isinstance(ret, ApplicationError)
     return ret
 
 
-class TracingWorkerInterceptor(temporalio.worker.Interceptor):
+class TracingWorkerInterceptor(Interceptor):
     def intercept_activity(
-        self, next: temporalio.worker.ActivityInboundInterceptor
-    ) -> temporalio.worker.ActivityInboundInterceptor:
+        self, next: ActivityInboundInterceptor
+    ) -> ActivityInboundInterceptor:
         self.traces: List[Tuple[str, Any]] = []
         return TracingWorkerActivityInboundInterceptor(self, next)
 
 
-class TracingWorkerActivityInboundInterceptor(
-    temporalio.worker.ActivityInboundInterceptor
-):
+class TracingWorkerActivityInboundInterceptor(ActivityInboundInterceptor):
     def __init__(
         self,
         parent: TracingWorkerInterceptor,
-        next: temporalio.worker.ActivityInboundInterceptor,
+        next: ActivityInboundInterceptor,
     ) -> None:
         super().__init__(next)
         self._parent = parent
 
-    def init(self, outbound: temporalio.worker.ActivityOutboundInterceptor) -> None:
+    def init(self, outbound: ActivityOutboundInterceptor) -> None:
         return super().init(
             TracingWorkerActivityOutboundInterceptor(self._parent, outbound)
         )
 
-    async def execute_activity(
-        self, input: temporalio.worker.ExecuteActivityInput
-    ) -> Any:
+    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         self._parent.traces.append(("activity.inbound.execute_activity", input))
         return await super().execute_activity(input)
 
 
-class TracingWorkerActivityOutboundInterceptor(
-    temporalio.worker.ActivityOutboundInterceptor
-):
+class TracingWorkerActivityOutboundInterceptor(ActivityOutboundInterceptor):
     def __init__(
         self,
         parent: TracingWorkerInterceptor,
-        next: temporalio.worker.ActivityOutboundInterceptor,
+        next: ActivityOutboundInterceptor,
     ) -> None:
         super().__init__(next)
         self._parent = parent
 
-    def info(self) -> temporalio.activity.Info:
+    def info(self) -> activity.Info:
         self._parent.traces.append(("activity.outbound.info", None))
         return super().info()
 

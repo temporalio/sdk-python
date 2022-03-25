@@ -15,6 +15,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from typing import (
     Any,
     Callable,
@@ -24,11 +25,54 @@ from typing import (
     NoReturn,
     Optional,
     Tuple,
+    TypeVar,
+    overload,
 )
 
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.exceptions
+
+ActivityFunc = TypeVar("ActivityFunc", bound=Callable[..., Any])
+
+
+@overload
+def defn(fn: ActivityFunc) -> ActivityFunc:
+    ...
+
+
+@overload
+def defn(*, name: str) -> Callable[[ActivityFunc], ActivityFunc]:
+    ...
+
+
+def defn(fn: Optional[ActivityFunc] = None, *, name: Optional[str] = None):
+    """Decorator for activity functions.
+
+    Activities can be async or non-async.
+
+    Args:
+        fn: The function to decorate.
+        name: Name to use for the activity. Defaults to function ``__name__``.
+    """
+
+    def with_name(name: str, fn: ActivityFunc) -> ActivityFunc:
+        # Validate the activity
+        if not callable(fn):
+            raise TypeError("Activity is not callable")
+        elif not fn.__code__:
+            raise TypeError("Activity callable missing __code__")
+        elif fn.__code__.co_kwonlyargcount:
+            raise TypeError("Activity cannot have keyword-only arguments")
+        # Set the name
+        setattr(fn, "__temporal_activity_name", name)
+        return fn
+
+    # If name option is available, return decorator function
+    if name is not None:
+        return partial(with_name, name)
+    # Otherwise just run decorator function
+    return with_name(fn.__name__, fn)
 
 
 @dataclass(frozen=True)
