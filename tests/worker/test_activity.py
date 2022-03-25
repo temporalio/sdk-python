@@ -350,7 +350,7 @@ async def test_activity_type_hints(client: temporalio.client.Client, worker: Wor
     # check non-data-types, we don't perform any validation there
     assert (
         result.result
-        == "param1: <class 'tests.test_worker.SomeClass2'>, param2: <class 'int'>"
+        == "param1: <class 'tests.worker.test_activity.SomeClass2'>, param2: <class 'int'>"
     )
     assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
 
