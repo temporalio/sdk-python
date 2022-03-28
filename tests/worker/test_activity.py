@@ -59,7 +59,7 @@ async def test_activity_without_decorator(client: Client, worker: ExternalWorker
 
     with pytest.raises(TypeError) as err:
         await _execute_workflow_with_activity(client, worker, say_hello, "Temporal")
-    assert "Activity missing attributes" in str(err.value)
+    assert "Activity say_hello missing attributes" in str(err.value)
 
 
 async def test_activity_custom_name(client: Client, worker: ExternalWorker):

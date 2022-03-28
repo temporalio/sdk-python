@@ -86,8 +86,9 @@ class _ActivityWorker:
             # Confirm name is present
             name: Optional[str] = getattr(activity, "__temporal_activity_name", None)
             if not name:
+                fn_name = getattr(activity, "__name__", "<unknown>")
                 raise TypeError(
-                    "Activity missing attributes, was it decorated with @activity.defn?"
+                    f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
                 )
 
             # Some extra requirements for sync functions

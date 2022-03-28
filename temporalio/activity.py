@@ -71,6 +71,8 @@ def defn(fn: Optional[ActivityFunc] = None, *, name: Optional[str] = None):
     # If name option is available, return decorator function
     if name is not None:
         return partial(with_name, name)
+    if fn is None:
+        raise RuntimeError("Cannot invoke defn without function or name")
     # Otherwise just run decorator function
     return with_name(fn.__name__, fn)
 
