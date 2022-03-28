@@ -54,13 +54,13 @@ from .interceptor import (
 logger = logging.getLogger(__name__)
 
 
-class _Worker:
+class _ActivityWorker:
     def __init__(
         self,
         *,
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         task_queue: str,
-        activities: Mapping[str, Callable],
+        activities: Iterable[Callable],
         activity_executor: Optional[concurrent.futures.Executor],
         shared_state_manager: Optional[SharedStateManager],
         type_hint_eval_str: bool,
@@ -82,14 +82,17 @@ class _Worker:
 
         # Validate and build activity dict
         self._activities: Dict[str, _ActivityDefinition] = {}
-        for name, activity in activities.items():
-            if not callable(activity):
-                raise TypeError(f"Activity {name} is not callable")
-            elif not activity.__code__:
-                raise TypeError(f"Activity {name} does not have __code__")
-            elif activity.__code__.co_kwonlyargcount:
-                raise TypeError(f"Activity {name} cannot have keyword-only arguments")
-            elif not inspect.iscoroutinefunction(activity):
+        for activity in activities:
+            # Confirm name is present
+            name: Optional[str] = getattr(activity, "__temporal_activity_name", None)
+            if not name:
+                fn_name = getattr(activity, "__name__", "<unknown>")
+                raise TypeError(
+                    f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
+                )
+
+            # Some extra requirements for sync functions
+            if not inspect.iscoroutinefunction(activity):
                 if not activity_executor:
                     raise ValueError(
                         f"Activity {name} is not async so an activity_executor must be present"
@@ -538,7 +541,7 @@ class _RunningActivity:
 
 
 class _ActivityInboundImpl(ActivityInboundInterceptor):
-    def __init__(self, worker: _Worker) -> None:
+    def __init__(self, worker: _ActivityWorker) -> None:
         # We are intentionally not calling the base class's __init__ here
         self._worker = worker
 
@@ -616,7 +619,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
 
 class _ActivityOutboundImpl(ActivityOutboundInterceptor):
-    def __init__(self, worker: _Worker, info: temporalio.activity.Info) -> None:
+    def __init__(self, worker: _ActivityWorker, info: temporalio.activity.Info) -> None:
         # We are intentionally not calling the base class's __init__ here
         self._worker = worker
         self._info = info

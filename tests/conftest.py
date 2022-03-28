@@ -20,9 +20,9 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
         sys.prefix
     ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
 
-import temporalio.client
-import tests.helpers.server
-import tests.helpers.worker
+from temporalio.client import Client
+from tests.helpers.server import ExternalGolangServer, ExternalServer
+from tests.helpers.worker import ExternalGolangWorker, ExternalWorker
 
 
 @pytest.fixture(scope="session")
@@ -40,31 +40,29 @@ def event_loop():
 
 
 @pytest_asyncio.fixture(scope="session")
-async def server() -> AsyncGenerator[tests.helpers.server.Server, None]:
+async def server() -> AsyncGenerator[ExternalServer, None]:
     # TODO(cretz): More options such as our test server
-    server = await tests.helpers.server.ExternalGolangServer.start()
+    server = await ExternalGolangServer.start()
     yield server
     await server.close()
 
 
 @pytest_asyncio.fixture
-async def client(server: tests.helpers.server.Server) -> temporalio.client.Client:
+async def client(server: ExternalServer) -> Client:
     return await server.new_client()
 
 
 @pytest_asyncio.fixture
 async def tls_client(
-    server: tests.helpers.server.Server,
-) -> Optional[temporalio.client.Client]:
+    server: ExternalServer,
+) -> Optional[Client]:
     return await server.new_tls_client()
 
 
 @pytest_asyncio.fixture(scope="session")
 async def worker(
-    server: tests.helpers.server.Server,
-) -> AsyncGenerator[tests.helpers.worker.Worker, None]:
-    worker = await tests.helpers.worker.ExternalGolangWorker.start(
-        server.host_port, server.namespace
-    )
+    server: ExternalServer,
+) -> AsyncGenerator[ExternalWorker, None]:
+    worker = await ExternalGolangWorker.start(server.host_port, server.namespace)
     yield worker
     await worker.close()

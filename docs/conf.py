@@ -30,6 +30,7 @@ author = "Temporal Technologies Inc"
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
 ]
@@ -54,11 +55,17 @@ html_theme = "furo"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_theme_options = {
+    "light_logo": "temporal-logo-light-mode.svg",
+    "dark_logo": "temporal-logo-dark-mode.svg",
+}
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "protobuf": ("https://googleapis.dev/python/protobuf/latest/", None),
 }
+
+html_title = "API Documentation"
 
 autodoc_docstring_signature = True
 
@@ -75,3 +82,5 @@ autodoc_member_order = "bysource"
 autodoc_default_options = {
     "special-members": "__aenter__,__aexit__,__init__",
 }
+
+autosummary_generate = True

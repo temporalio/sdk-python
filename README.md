@@ -125,7 +125,9 @@ import asyncio
 import logging
 from temporalio.client import Client
 from temporalio.worker import Worker
+from temporalio import activity
 
+@activity.defn
 async def say_hello_activity(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -135,7 +137,7 @@ async def main(stop_event: asyncio.Event):
   client = await Client.connect("http://localhost:7233", namespace="my-namespace")
 
   # Run the worker until the event is set
-  worker = Worker(client, task_queue="my-task-queue", activities={"say-hello-activity": say_hello_activity})
+  worker = Worker(client, task_queue="my-task-queue", activities=[say_hello_activity])
   async with worker:
     await stop_event.wait()
 ```
@@ -148,6 +150,7 @@ Some things to note about the above code:
 * Activities are passed as a mapping with the key as a string activity name and the value as a callable
 * While this example accepts a stop event and uses `async with`, `run()` and `shutdown()` may be used instead
 * Workers can have many more options not shown here (e.g. data converters and interceptors)
+* A custom name for the activity can be set with a decorator argument, e.g. `@activity.defn(name="my activity")`
 
 #### Types of Activities
 
@@ -277,3 +280,13 @@ The Python SDK is built to work with Python 3.7 and newer. It is built using
   ```bash
   poe test
   ```
+
+### Style
+
+* Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
+  * We use [Black](https://github.com/psf/black) for formatting, so that takes precedence
+  * In tests and example code, can import individual classes/functions to make it more readable. Can also do this for
+    rarely in library code for some Python common items (e.g. `dataclass` or `partial`), but not allowed to do this for
+    any `temporalio` packages or any classes/functions that aren't clear when unqualified.
+  * We allow relative imports for private packages
+  * We allow `@staticmethod`

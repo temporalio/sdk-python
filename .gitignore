@@ -2,6 +2,7 @@
 __pycache__
 /build
 /dist
+/docs/_autosummary
 /docs/_build
 temporalio/api/*
 !temporalio/api/__init__.py

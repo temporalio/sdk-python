@@ -1,22 +1,26 @@
-.. Temporal Python SDK documentation master file, created by
-   sphinx-quickstart on Fri Feb  4 11:52:42 2022.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
-Temporal Python SDK
-===================
+Temporal Python SDK API Documentation
+=====================================
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+Modules
+-------
 
-   api
-   direct_api
+.. autosummary::
+   :toctree: _autosummary
+   :template: custom_module_template.rst
+   :recursive:
 
+   temporalio.client
+   temporalio.worker
+   temporalio.activity
+   temporalio.converter
+   temporalio.exceptions
+   temporalio.api
+   temporalio.workflow_service
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

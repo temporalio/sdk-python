@@ -5,8 +5,8 @@ from typing import Dict, Tuple, Type
 import grpc
 
 import temporalio.api.workflowservice.v1
-import temporalio.client
 import temporalio.workflow_service
+from temporalio.client import Client
 
 
 def test_load_default_worker_binary_id():
@@ -16,7 +16,7 @@ def test_load_default_worker_binary_id():
     assert val1 == val2
 
 
-def test_all_grpc_calls_present(client: temporalio.client.Client):
+def test_all_grpc_calls_present(client: Client):
     # Collect workflow service calls
     workflow_service_calls: Dict[str, Tuple[Type, Type]] = {}
     for member in inspect.getmembers(client.service):
