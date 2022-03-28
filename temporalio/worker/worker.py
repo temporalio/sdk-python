@@ -7,7 +7,7 @@ import concurrent.futures
 import itertools
 import logging
 from datetime import timedelta
-from typing import Callable, Iterable, List, Mapping, Optional, cast
+from typing import Callable, Iterable, List, Mapping, Optional, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -26,6 +26,7 @@ import temporalio.workflow_service
 
 from .activity import SharedStateManager, _ActivityWorker
 from .interceptor import Interceptor
+from .workflow import _WorkflowWorker
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class Worker:
         *,
         task_queue: str,
         activities: Iterable[Callable] = [],
+        workflows: Iterable[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         interceptors: Iterable[Interceptor] = [],
         max_cached_workflows: int = 0,
@@ -70,6 +72,8 @@ class Worker:
             activities: Set of activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
+            workflows: Set of workflow classes decorated with
+                :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async. If
                 this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
@@ -119,9 +123,8 @@ class Worker:
                 :py:class:`concurrent.futures.ThreadPoolExecutor`. Reuse of
                 these across workers is encouraged.
         """
-        # TODO(cretz): Support workflows
-        if not activities:
-            raise ValueError("At least one activity must be specified")
+        if not activities and not workflows:
+            raise ValueError("At least one activity or workflow must be specified")
 
         # Prepend applicable client interceptors to the given ones
         client_config = client.config()
@@ -158,6 +161,7 @@ class Worker:
             client=client,
             task_queue=task_queue,
             activities=activities,
+            workflows=workflows,
             activity_executor=activity_executor,
             interceptors=interceptors,
             max_cached_workflows=max_cached_workflows,
@@ -176,7 +180,7 @@ class Worker:
         )
         self._task: Optional[asyncio.Task] = None
 
-        # Create activity worker
+        # Create activity and workflow worker
         self._activity_worker: Optional[_ActivityWorker] = None
         if activities:
             self._activity_worker = _ActivityWorker(
@@ -185,6 +189,16 @@ class Worker:
                 activities=activities,
                 activity_executor=activity_executor,
                 shared_state_manager=shared_state_manager,
+                type_hint_eval_str=client_config["type_hint_eval_str"],
+                data_converter=client_config["data_converter"],
+                interceptors=interceptors,
+            )
+        self._workflow_worker: Optional[_WorkflowWorker] = None
+        if workflows:
+            self._workflow_worker = _ActivityWorker(
+                bridge_worker=lambda: self._bridge_worker,
+                task_queue=task_queue,
+                workflows=workflows,
                 type_hint_eval_str=client_config["type_hint_eval_str"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
@@ -259,7 +273,8 @@ class Worker:
         worker_tasks: List[asyncio.Task] = []
         if self._activity_worker:
             worker_tasks.append(asyncio.create_task(self._activity_worker.run()))
-        # TODO(cretz): Support workflow worker
+        if self._workflow_worker:
+            worker_tasks.append(asyncio.create_task(self._workflow_worker.run()))
         self._task = asyncio.create_task(asyncio.wait(worker_tasks))
         return self._task
 
@@ -285,7 +300,10 @@ class Worker:
             worker_tasks.append(
                 asyncio.create_task(self._activity_worker.shutdown(graceful_timeout))
             )
-        # TODO(cretz): Support workflow worker
+        if self._workflow_worker:
+            worker_tasks.append(
+                asyncio.create_task(self._workflow_worker.shutdown())
+            )
         await asyncio.wait(worker_tasks)
         # Wait for the bridge to report everything is completed
         await bridge_shutdown_task
@@ -297,6 +315,7 @@ class WorkerConfig(TypedDict, total=False):
     client: temporalio.client.Client
     task_queue: str
     activities: Iterable[Callable]
+    workflows: Iterable[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int

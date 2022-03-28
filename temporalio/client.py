@@ -10,12 +10,15 @@ from datetime import timedelta
 from enum import IntEnum
 from typing import (
     Any,
+    Awaitable,
     Callable,
     Generic,
     Iterable,
     Mapping,
+    NoReturn,
     Optional,
     Tuple,
+    Type,
     TypeVar,
     Union,
     cast,
@@ -37,6 +40,10 @@ import temporalio.workflow_service
 from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 logger = logging.getLogger(__name__)
+
+LocalParamType = TypeVar("LocalParamType")
+WorkflowClass = TypeVar("WorkflowClass", bound=Type)
+WorkflowReturnType = TypeVar("WorkflowReturnType")
 
 
 class Client:
@@ -188,6 +195,52 @@ class Client:
         """Data converter used by this client."""
         return self._config["data_converter"]
 
+    @overload
+    async def start_workflow(
+        self,
+        workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+        /,
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+        ...
+
+    @overload
+    async def start_workflow(
+        self,
+        workflow: Callable[[WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]],
+        arg: LocalParamType,
+        /,
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+        ...
+
+    @overload
     async def start_workflow(
         self,
         workflow: str,
@@ -205,11 +258,31 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowHandle[Any]:
+    ) -> WorkflowHandle[None, Any]:
+        ...
+
+    async def start_workflow(
+        self,
+        workflow: Union[str, Callable],
+        *args: Any,
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
         Args:
-            workflow: Name of the workflow to start.
+            workflow: String name or class method decorated with ``@workflow.run`` for the workflow to start.
             args: Arguments for the workflow if any.
             id: Unique identifier for the workflow execution.
             task_queue: Task queue to run the workflow on.
@@ -254,9 +327,75 @@ class Client:
             )
         )
 
+    @overload
+    async def execute_workflow(
+        self,
+        workflow: Callable[[WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]],
+        arg: LocalParamType,
+        /,
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> WorkflowReturnType:
+        ...
+
+    @overload
+    async def execute_workflow(
+        self,
+        workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+        /,
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> WorkflowReturnType:
+        ...
+
+    @overload
     async def execute_workflow(
         self,
         workflow: str,
+        *args: Any,
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> Any:
+        ...
+
+    async def execute_workflow(
+        self,
+        workflow: Union[str, Callable],
         *args: Any,
         id: str,
         task_queue: str,
@@ -374,10 +513,7 @@ class ClientConfig(TypedDict, total=False):
     type_hint_eval_str: bool
 
 
-T = TypeVar("T")
-
-
-class WorkflowHandle(Generic[T]):
+class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     """Handle for interacting with a workflow.
 
     This is usually created via :py:meth:`Client.get_workflow_handle` or
@@ -448,7 +584,7 @@ class WorkflowHandle(Generic[T]):
         """
         return self._first_execution_run_id
 
-    async def result(self, *, follow_runs: bool = True) -> T:
+    async def result(self, *, follow_runs: bool = True) -> WorkflowReturnType:
         """Wait for result of the workflow.
 
         This will use :py:attr:`result_run_id` if present to base the result on.

@@ -90,6 +90,8 @@ class _ActivityWorker:
                 raise TypeError(
                     f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
                 )
+            elif name in self._activities:
+                raise ValueError(f"More than one activity named {name}")
 
             # Some extra requirements for sync functions
             if not inspect.iscoroutinefunction(activity):
