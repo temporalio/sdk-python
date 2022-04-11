@@ -36,13 +36,14 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.workflow
 import temporalio.workflow_service
 from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 logger = logging.getLogger(__name__)
 
 LocalParamType = TypeVar("LocalParamType")
-WorkflowClass = TypeVar("WorkflowClass", bound=Type)
+WorkflowClass = TypeVar("WorkflowClass")
 WorkflowReturnType = TypeVar("WorkflowReturnType")
 
 
@@ -220,7 +221,9 @@ class Client:
     @overload
     async def start_workflow(
         self,
-        workflow: Callable[[WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]],
+        workflow: Callable[
+            [WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
+        ],
         arg: LocalParamType,
         /,
         *,
@@ -258,12 +261,12 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowHandle[None, Any]:
+    ) -> WorkflowHandle[Any, Any]:
         ...
 
     async def start_workflow(
         self,
-        workflow: Union[str, Callable],
+        workflow: Union[str, Callable[..., Awaitable[Any]]],
         *args: Any,
         id: str,
         task_queue: str,
@@ -307,9 +310,24 @@ class Client:
         Raises:
             RPCError: Workflow could not be started.
         """
+
+        # If the workflow is a callable, we get the name from the definition
+        workflow_name: str
+        if callable(workflow):
+            defn = temporalio.workflow._Definition.from_run_fn(workflow)
+            if not defn:
+                raise RuntimeError(
+                    f"Workflow definition not found on {workflow.__qualname__}, "
+                    "is it on a class with @workflow.defn?"
+                )
+            # TODO(cretz): Check count/type of args?
+            workflow_name = defn.name
+        else:
+            workflow_name = str(workflow)
+
         return await self._impl.start_workflow(
             StartWorkflowInput(
-                workflow=workflow,
+                workflow=workflow_name,
                 args=args,
                 id=id,
                 task_queue=task_queue,
@@ -330,7 +348,9 @@ class Client:
     @overload
     async def execute_workflow(
         self,
-        workflow: Callable[[WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]],
+        workflow: Callable[
+            [WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
+        ],
         arg: LocalParamType,
         /,
         *,
@@ -442,7 +462,7 @@ class Client:
         *,
         run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
-    ) -> WorkflowHandle[Any]:
+    ) -> WorkflowHandle[Any, Any]:
         """Get a workflow handle to an existing workflow by its ID.
 
         Args:
@@ -460,6 +480,21 @@ class Client:
             run_id=run_id,
             result_run_id=run_id,
             first_execution_run_id=first_execution_run_id,
+        )
+
+    def get_workflow_handle_for(
+        self,
+        workflow: Union[
+            Callable[[WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]],
+            Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+        ],
+        workflow_id: str,
+        *,
+        run_id: Optional[str] = None,
+        first_execution_run_id: Optional[str] = None,
+    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+        return self.get_workflow_handle(
+            workflow_id, run_id=run_id, first_execution_run_id=first_execution_run_id
         )
 
     @overload
@@ -640,10 +675,10 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     complete_attr.result, self._client.data_converter
                 )
                 if not results:
-                    return cast(T, None)
+                    return cast(WorkflowReturnType, None)
                 elif len(results) > 1:
                     warnings.warn(f"Expected single result, got {len(results)}")
-                return cast(T, results[0])
+                return cast(WorkflowReturnType, results[0])
             elif event.HasField("workflow_execution_failed_event_attributes"):
                 fail_attr = event.workflow_execution_failed_event_attributes
                 # Follow execution
@@ -1089,7 +1124,9 @@ class OutboundInterceptor:
         """
         self.next = next
 
-    async def start_workflow(self, input: StartWorkflowInput) -> WorkflowHandle[Any]:
+    async def start_workflow(
+        self, input: StartWorkflowInput
+    ) -> WorkflowHandle[Any, Any]:
         """Called for every :py:meth:`Client.start_workflow` call."""
         return await self.next.start_workflow(input)
 
@@ -1115,7 +1152,9 @@ class _ClientImpl(OutboundInterceptor):
         # We are intentionally not calling the base class's __init__ here
         self._client = client
 
-    async def start_workflow(self, input: StartWorkflowInput) -> WorkflowHandle[Any]:
+    async def start_workflow(
+        self, input: StartWorkflowInput
+    ) -> WorkflowHandle[Any, Any]:
         # Build request
         req: Union[
             temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,

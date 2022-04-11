@@ -304,7 +304,9 @@ class TracingClientOutboundInterceptor(OutboundInterceptor):
         super().__init__(next)
         self._parent = parent
 
-    async def start_workflow(self, input: StartWorkflowInput) -> WorkflowHandle[Any]:
+    async def start_workflow(
+        self, input: StartWorkflowInput
+    ) -> WorkflowHandle[Any, Any]:
         self._parent.traces.append(("start_workflow", input))
         return await super().start_workflow(input)
 

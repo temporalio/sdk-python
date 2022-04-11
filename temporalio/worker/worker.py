@@ -195,8 +195,9 @@ class Worker:
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
-            self._workflow_worker = _ActivityWorker(
+            self._workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: self._bridge_worker,
+                namespace=client.namespace,
                 task_queue=task_queue,
                 workflows=workflows,
                 type_hint_eval_str=client_config["type_hint_eval_str"],
@@ -294,17 +295,9 @@ class Worker:
         bridge_shutdown_task = asyncio.create_task(self._bridge_worker.shutdown())
         # Wait for the poller loops to stop
         await self._task
-        # Shutdown the workers
-        worker_tasks: List[asyncio.Task] = []
+        # Shutdown the activity worker (there is no workflow worker shutdown)
         if self._activity_worker:
-            worker_tasks.append(
-                asyncio.create_task(self._activity_worker.shutdown(graceful_timeout))
-            )
-        if self._workflow_worker:
-            worker_tasks.append(
-                asyncio.create_task(self._workflow_worker.shutdown())
-            )
-        await asyncio.wait(worker_tasks)
+            await self._activity_worker.shutdown(graceful_timeout)
         # Wait for the bridge to report everything is completed
         await bridge_shutdown_task
 

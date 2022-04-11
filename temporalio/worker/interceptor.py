@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import concurrent.futures
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Awaitable, Callable, Iterable, Optional, Type
 
 import temporalio.activity
+import temporalio.workflow
 
 
 @dataclass
@@ -37,6 +38,11 @@ class Interceptor:
         Returns:
             The new interceptor that will be used to for the activity.
         """
+        return next
+
+    def intercept_workflow(
+        self, next: WorkflowInboundInterceptor
+    ) -> WorkflowInboundInterceptor:
         return next
 
 
@@ -90,3 +96,29 @@ class ActivityOutboundInterceptor:
     def heartbeat(self, *details: Any) -> None:
         """Called for every :py:func:`temporalio.activity.heartbeat` call."""
         self.next.heartbeat(*details)
+
+
+@dataclass
+class ExecuteWorkflowInput:
+    type: Type
+    run_fn: Callable[..., Awaitable[Any]]
+    args: Iterable[Any]
+
+
+class WorkflowInboundInterceptor:
+    def __init__(self, next: WorkflowInboundInterceptor) -> None:
+        self.next = next
+
+    def init(self, outbound: WorkflowOutboundInterceptor) -> None:
+        self.next.init(outbound)
+
+    async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+        return await self.next.execute_workflow(input)
+
+
+class WorkflowOutboundInterceptor:
+    def __init__(self, next: WorkflowOutboundInterceptor) -> None:
+        self.next = next
+
+    def info(self) -> temporalio.workflow.Info:
+        return self.next.info()
