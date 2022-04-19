@@ -101,6 +101,7 @@ class ActivityOutboundInterceptor:
 @dataclass
 class ExecuteWorkflowInput:
     type: Type
+    # Note, this is an unbound method
     run_fn: Callable[..., Awaitable[Any]]
     args: Iterable[Any]
 

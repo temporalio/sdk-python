@@ -7,7 +7,7 @@ import concurrent.futures
 import itertools
 import logging
 from datetime import timedelta
-from typing import Callable, Iterable, List, Mapping, Optional, Type, cast
+from typing import Callable, Iterable, List, Optional, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -46,6 +46,7 @@ class Worker:
         activities: Iterable[Callable] = [],
         workflows: Iterable[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
+        workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         interceptors: Iterable[Interceptor] = [],
         max_cached_workflows: int = 0,
         max_concurrent_workflow_tasks: int = 100,
@@ -78,6 +79,13 @@ class Worker:
                 activities. This is required if any activities are non-async. If
                 this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
                 all non-async activities must be picklable.
+            workflow_task_executor: Thread pool executor for workflow tasks. If this
+                is not present, a new
+                :py:class:`concurrent.futures.ThreadPoolExecutor` will be
+                created with ``max_workers`` set to
+                ``max_concurrent_workflow_tasks``. The default one will be
+                properly shutdown, but if one is provided, the caller is
+                responsible for shutting down after the worker is shut down.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
@@ -163,6 +171,7 @@ class Worker:
             activities=activities,
             workflows=workflows,
             activity_executor=activity_executor,
+            workflow_task_executor=workflow_task_executor,
             interceptors=interceptors,
             max_cached_workflows=max_cached_workflows,
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
@@ -200,9 +209,11 @@ class Worker:
                 namespace=client.namespace,
                 task_queue=task_queue,
                 workflows=workflows,
+                workflow_task_executor=workflow_task_executor,
                 type_hint_eval_str=client_config["type_hint_eval_str"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
+                max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             )
 
         # Create bridge worker last. We have empirically observed that if it is
@@ -310,6 +321,7 @@ class WorkerConfig(TypedDict, total=False):
     activities: Iterable[Callable]
     workflows: Iterable[Type]
     activity_executor: Optional[concurrent.futures.Executor]
+    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int
     max_concurrent_workflow_tasks: int

@@ -1,11 +1,82 @@
-import uuid
-from typing import Awaitable, Callable, Type, TypeVar
-
 import pytest
 
 from temporalio import workflow
-from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
-from temporalio.worker import Worker
+
+
+class GoodDefnBase:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        raise NotImplementedError
+
+    @workflow.signal
+    def base_signal(self):
+        pass
+
+    @workflow.query
+    def base_query(self):
+        pass
+
+
+@workflow.defn(name="workflow-custom")
+class GoodDefn(GoodDefnBase):
+    @workflow.run
+    async def run(self, name: str) -> str:
+        raise NotImplementedError
+
+    @workflow.signal
+    def signal1(self):
+        pass
+
+    @workflow.signal(name="signal-custom")
+    def signal2(self):
+        pass
+
+    @workflow.signal(dynamic=True)
+    def signal3(self):
+        pass
+
+    @workflow.query
+    def query1(self):
+        pass
+
+    @workflow.query(name="query-custom")
+    def query2(self):
+        pass
+
+    @workflow.query(dynamic=True)
+    def query3(self):
+        pass
+
+
+def test_workflow_defn_good():
+    # Although the API is internal, we want to check the literal definition just
+    # in case
+    defn = workflow._Definition.from_class(GoodDefn)
+    assert defn == workflow._Definition(
+        name="workflow-custom",
+        cls=GoodDefn,
+        run_fn=GoodDefn.run,
+        signals={
+            "signal1": workflow._SignalDefinition(name="signal1", fn=GoodDefn.signal1),
+            "signal-custom": workflow._SignalDefinition(
+                name="signal-custom", fn=GoodDefn.signal2
+            ),
+            None: workflow._SignalDefinition(name=None, fn=GoodDefn.signal3),
+            "base_signal": workflow._SignalDefinition(
+                name="base_signal", fn=GoodDefnBase.base_signal
+            ),
+        },
+        queries={
+            "query1": workflow._QueryDefinition(name="query1", fn=GoodDefn.query1),
+            "query-custom": workflow._QueryDefinition(
+                name="query-custom", fn=GoodDefn.query2
+            ),
+            None: workflow._QueryDefinition(name=None, fn=GoodDefn.query3),
+            "base_query": workflow._QueryDefinition(
+                name="base_query", fn=GoodDefnBase.base_query
+            ),
+        },
+    )
 
 
 class BadDefnBase:
@@ -130,7 +201,7 @@ class RunOnlyOnBase(BaseWithRun):
 def test_workflow_defn_run_only_on_base():
     with pytest.raises(ValueError) as err:
         workflow.defn(RunOnlyOnBase)
-    assert "@workflow.run method run must be defined on this class" in str(err.value)
+    assert "@workflow.run method run must be defined on RunOnlyOnBase" in str(err.value)
 
 
 class RunWithoutDecoratorOnOverride(BaseWithRun):

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextvars
-import functools
 import inspect
 import logging
 from dataclasses import dataclass
@@ -282,7 +281,7 @@ class _Definition:
         return getattr(fn, "__temporal_workflow_definition", None)
 
     @staticmethod
-    def _apply_to_class(cls: Type, name: str) -> None:
+    def _apply_to_class(cls: Type, workflow_name: str) -> None:
         if hasattr(cls, "__temporal_workflow_definition"):
             raise ValueError("Class already contains workflow definition")
         issues: List[str] = []
@@ -296,9 +295,9 @@ class _Definition:
         for name, member in members:
             if hasattr(member, "__temporal_workflow_run"):
                 seen_run_attr = True
-                if _defined_class_of_unbound_method(member) is not cls:
+                if not _is_unbound_method_on_cls(member, cls):
                     issues.append(
-                        f"@workflow.run method {name} must be defined on this class"
+                        f"@workflow.run method {name} must be defined on {cls.__qualname__}"
                     )
                 elif run_fn is not None:
                     issues.append(
@@ -339,9 +338,8 @@ class _Definition:
         for base_cls in inspect.getmro(cls)[1:]:
             for _, base_member in inspect.getmembers(base_cls):
                 # We only care about methods defined on this class
-                if (
-                    not inspect.isfunction(base_member)
-                    or _defined_class_of_unbound_method(base_member) is not base_cls
+                if not inspect.isfunction(base_member) or not _is_unbound_method_on_cls(
+                    base_member, base_cls
                 ):
                     continue
                 if hasattr(base_member, "__temporal_workflow_run"):
@@ -380,7 +378,7 @@ class _Definition:
 
         assert run_fn
         defn = _Definition(
-            name=name, cls=cls, run_fn=run_fn, signals=signals, queries=queries
+            name=workflow_name, cls=cls, run_fn=run_fn, signals=signals, queries=queries
         )
         setattr(cls, "__temporal_workflow_definition", defn)
         setattr(run_fn, "__temporal_workflow_definition", defn)
@@ -400,14 +398,10 @@ class _QueryDefinition:
     fn: Callable[..., Any]
 
 
-def _defined_class_of_unbound_method(fn: Callable[..., Any]) -> Optional[Type]:
+def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:
     # Python 3 does not make this easy, ref https://stackoverflow.com/questions/3589311
-    if inspect.isfunction(fn):
-        cls = getattr(
-            inspect.getmodule(fn),
-            fn.__qualname__.split(".<locals>", 1)[0].rsplit(".", 1)[0],
-            None,
-        )
-        if isinstance(cls, type):
-            return cls
-    return None
+    return (
+        inspect.isfunction(fn)
+        and inspect.getmodule(fn) is inspect.getmodule(cls)
+        and fn.__qualname__.rsplit(".", 1)[0] == cls.__name__
+    )
