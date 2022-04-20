@@ -2,10 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import inspect
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Type, cast
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    cast,
+)
 
 import google.protobuf.timestamp_pb2
 
@@ -25,12 +39,17 @@ import temporalio.workflow_service
 
 from .interceptor import (
     ExecuteWorkflowInput,
+    HandleQueryInput,
+    HandleSignalInput,
     Interceptor,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
 
 logger = logging.getLogger(__name__)
+
+LOG_PROTOS = False
+DEADLOCK_TIMEOUT_SECONDS = 2
 
 
 @dataclass
@@ -66,20 +85,10 @@ class _WorkflowWorker:
         # Validate and build workflow dict
         self._workflows: Dict[str, _TypedDefinition] = {}
         for workflow in workflows:
-            defn = temporalio.workflow._Definition.from_class(workflow)
-            if not defn:
-                cls_name = getattr(workflow, "__name__", "<unknown>")
-                raise ValueError(
-                    f"Workflow {cls_name} missing attributes, was it decorated with @workflow.defn?"
-                )
-            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
-            run_fn = cast(Callable[..., Any], defn.run_fn)
-            arg_types, ret_type = temporalio.converter._type_hints_from_func(
-                run_fn, eval_str=type_hint_eval_str
+            defn = _TypedDefinition.from_workflow_class(
+                workflow, type_hint_eval_str=type_hint_eval_str
             )
-            self._workflows[defn.name] = _TypedDefinition(
-                defn=defn, arg_types=arg_types, ret_type=ret_type
-            )
+            self._workflows[defn.defn.name] = defn
 
     async def run(self) -> None:
         # Continually poll for workflow work
@@ -112,6 +121,9 @@ class _WorkflowWorker:
     async def _handle_activation(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> None:
+        global LOG_PROTOS
+        if LOG_PROTOS:
+            logger.debug("Received activation: %s", act)
         completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
                 run_id=act.run_id
@@ -143,13 +155,8 @@ class _WorkflowWorker:
                 )
                 self._running_workflows[act.run_id] = workflow
 
-            # Perform activation in a separate thread and await it
-            # TODO(cretz): Deadlock detection at the thread level
-            commands = await asyncio.get_running_loop().run_in_executor(
-                self._workflow_task_executor, workflow.activate, act
-            )
-
-            # Set successful command
+            # Run activation and set successful commands
+            commands = await workflow.activate(act)
             # TODO(cretz): Is this copy too expensive?
             completion.successful.commands.extend(commands)
         except Exception as err:
@@ -169,6 +176,8 @@ class _WorkflowWorker:
                 )
 
         # Send off completion (intentionally let any exception bubble out)
+        if LOG_PROTOS:
+            logger.debug("Sending completion: %s", completion)
         await self._bridge_worker().complete_workflow_activation(completion)
 
         # If there is a remove-from-cache job, do so
@@ -181,12 +190,70 @@ class _WorkflowWorker:
             )
             del self._running_workflows[act.run_id]
 
+    async def _convert_args(
+        self,
+        payloads: Sequence[temporalio.bridge.proto.common.Payload],
+        arg_types: Optional[List[Type]],
+    ) -> List[Any]:
+        if not payloads:
+            return []
+        # Only use type hints if they match count
+        if arg_types and len(arg_types) != len(payloads):
+            arg_types = None
+        try:
+            return await self._data_converter.decode(
+                temporalio.bridge.worker.from_bridge_payloads(payloads),
+                type_hints=arg_types,
+            )
+        except Exception as err:
+            raise RuntimeError("Failed decoding arguments") from err
+
 
 @dataclass(frozen=True)
 class _TypedDefinition:
     defn: temporalio.workflow._Definition
     arg_types: Optional[List[Type]]
-    ret_type: Optional[Type]
+    # Only present for non-dynamic signals/queries with type args
+    signal_arg_types: Mapping[str, List[Type]]
+    query_arg_types: Mapping[str, List[Type]]
+
+    @staticmethod
+    def from_workflow_class(cls: Type, *, type_hint_eval_str: bool) -> _TypedDefinition:
+        defn = temporalio.workflow._Definition.from_class(cls)
+        if not defn:
+            cls_name = getattr(cls, "__name__", "<unknown>")
+            raise ValueError(
+                f"Workflow {cls_name} missing attributes, was it decorated with @workflow.defn?"
+            )
+        # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
+        run_fn = cast(Callable[..., Any], defn.run_fn)
+        arg_types, _ = temporalio.converter._type_hints_from_func(
+            run_fn, eval_str=type_hint_eval_str
+        )
+        signal_arg_types = {}
+        for name, signal_defn in defn.signals.items():
+            if name:
+                # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
+                signal_fn = cast(Callable[..., Any], signal_defn.fn)
+                arg_types, _ = temporalio.converter._type_hints_from_func(
+                    signal_fn, eval_str=type_hint_eval_str
+                )
+                if arg_types:
+                    signal_arg_types[name] = arg_types
+        query_arg_types = {}
+        for name, query_defn in defn.queries.items():
+            if name:
+                arg_types, _ = temporalio.converter._type_hints_from_func(
+                    query_defn.fn, eval_str=type_hint_eval_str
+                )
+                if arg_types:
+                    query_arg_types[name] = arg_types
+        return _TypedDefinition(
+            defn=defn,
+            arg_types=arg_types,
+            signal_arg_types=signal_arg_types,
+            query_arg_types=query_arg_types,
+        )
 
 
 class _RunningWorkflow:
@@ -240,9 +307,23 @@ class _RunningWorkflow:
         self._instance = instance
         self._scheduler = _Scheduler()
         self._pending_commands: List[
-            temporalio.bridge.proto.workflow_commands.WorkflowCommand
+            Callable[
+                [], Awaitable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]
+            ]
         ] = []
         self._pending_activation_failure: Optional[Exception] = None
+
+        # We maintain signals and queries on this class since handlers can be
+        # added during workflow execution
+        self._signals = dict(defn.defn.signals)
+        self._signal_arg_types = dict(defn.signal_arg_types)
+        self._queries = dict(defn.defn.queries)
+        self._query_arg_types = dict(defn.query_arg_types)
+
+        # Maintain buffered signals for later-added dynamic handlers
+        self._buffered_signals: Dict[
+            str, List[temporalio.bridge.proto.workflow_activation.SignalWorkflow]
+        ] = {}
 
         # Init the interceptor
         self._inbound: WorkflowInboundInterceptor = _WorkflowInboundImpl(self)
@@ -250,89 +331,89 @@ class _RunningWorkflow:
             self._inbound = interceptor.intercept_workflow(self._inbound)
         self._inbound.init(_WorkflowOutboundImpl(worker, info))
 
-    def activate(
+    async def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> Iterable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]:
+        global DEADLOCK_TIMEOUT_SECONDS
+
         self._pending_commands = []
         self._pending_activation_failure = None
 
-        # Apply jobs
+        # Split into job sets with patches, then signals, then non-queries, then
+        # queries
+        job_sets: List[
+            List[temporalio.bridge.proto.workflow_activation.WorkflowActivationJob]
+        ] = [[], [], [], []]
         for job in act.jobs:
-            if job.HasField("remove_from_cache"):
-                # Ignore, handled by _handle_activation
-                pass
-            elif job.HasField("start_workflow"):
-                self._scheduler.add_task(self._start_workflow(job.start_workflow))
+            if job.HasField("notify_has_patch"):
+                job_sets[0].append(job)
+            elif job.HasField("signal_workflow"):
+                job_sets[1].append(job)
+            elif not job.HasField("query_workflow"):
+                job_sets[2].append(job)
             else:
-                print(f"TODO(cretz) JOB: {job.WhichOneof('variant')}")
-                # raise RuntimeError(f"unrecognized job: {job.WhichOneof('variant')}")
+                job_sets[3].append(job)
 
-        # Run the scheduler until blocked
-        self._scheduler.run_until_all_blocked()
+        # Apply jobs
+        for job_set in job_sets:
+            if not job_set:
+                continue
+            for job in job_set:
+                # Let errors bubble out of these to the caller to fail the task
+                if job.HasField("query_workflow"):
+                    await self._query_workflow(job.query_workflow)
+                elif job.HasField("remove_from_cache"):
+                    # Ignore, handled by _handle_activation
+                    pass
+                elif job.HasField("signal_workflow"):
+                    await self._signal_workflow(job.signal_workflow)
+                elif job.HasField("start_workflow"):
+                    await self._start_workflow(job.start_workflow)
+                else:
+                    print(f"TODO(cretz) JOB: {job.WhichOneof('variant')}")
+                    # raise RuntimeError(f"unrecognized job: {job.WhichOneof('variant')}")
 
-        # If there's a pending failure, we have to raise it so it can fail the
-        # activation
-        if self._pending_activation_failure:
-            raise self._pending_activation_failure
-        return self._pending_commands
+            # Run the scheduler on a thread until blocked. We will throw a
+            # deadlock detected error if it exceeds the timeout
+            exec_task = asyncio.get_running_loop().run_in_executor(
+                self._worker._workflow_task_executor,
+                self._scheduler.run_until_all_blocked,
+            )
+            try:
+                await asyncio.wait_for(exec_task, DEADLOCK_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                raise RuntimeError(
+                    f"Potential deadlock detected, workflow didn't yield within {DEADLOCK_TIMEOUT_SECONDS} second(s)"
+                )
 
-    async def _start_workflow(
-        self, job: temporalio.bridge.proto.workflow_activation.StartWorkflow
+            # If there's a pending failure, we have to raise it so it can fail the
+            # activation
+            if self._pending_activation_failure:
+                raise self._pending_activation_failure
+
+        # Apply all collected commands
+        commands: List[temporalio.bridge.proto.workflow_commands.WorkflowCommand] = []
+        for pending_command in self._pending_commands:
+            commands.append(await pending_command())
+        return commands
+
+    async def _query_workflow(
+        self, job: temporalio.bridge.proto.workflow_activation.QueryWorkflow
     ) -> None:
-        try:
-            # Convert arguments (only use type hints if they match count)
-            arg_types = self._defn.arg_types
-            if arg_types and len(arg_types) != len(job.arguments):
-                arg_types = None
-            try:
-                args = (
-                    []
-                    if not job.arguments
-                    else await self._worker._data_converter.decode(
-                        temporalio.bridge.worker.from_bridge_payloads(job.arguments),
-                        type_hints=arg_types,
-                    )
-                )
-            except Exception as err:
-                raise RuntimeError("Failed decoding arguments") from err
+        # Command builder call after query completes to run in this event
+        # loop
+        success: Optional[Any] = None
+        failure: Optional[Exception] = None
 
-            # Execute and capture ApplicationError as failed workflow
-            try:
-                result = await self._inbound.execute_workflow(
-                    ExecuteWorkflowInput(
-                        type=self._defn.defn.cls,
-                        # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
-                        run_fn=cast(
-                            Callable[..., Awaitable[Any]], self._defn.defn.run_fn
-                        ),
-                        args=args,
-                    )
-                )
-                result_payloads = await self._worker._data_converter.encode([result])
-                if len(result_payloads) != 1:
-                    raise ValueError(
-                        f"Expected 1 result payload, got {len(result_payloads)}"
-                    )
-                self._pending_commands.append(
-                    temporalio.bridge.proto.workflow_commands.WorkflowCommand(
-                        complete_workflow_execution=temporalio.bridge.proto.workflow_commands.CompleteWorkflowExecution(
-                            result=temporalio.bridge.worker.to_bridge_payload(
-                                result_payloads[0]
-                            ),
-                        ),
-                    )
-                )
-            except temporalio.exceptions.FailureError as err:
-                # TODO(cretz): Confirm which exceptions are what kind of failures
-                logger.debug(
-                    f"Workflow raised failure with run ID {self._info.run_id}",
-                    exc_info=True,
-                )
-                command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
-                command.fail_workflow_execution.failure.SetInParent()
+        async def handle_complete() -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+            nonlocal success, failure
+            command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+            command.respond_to_query.query_id = job.query_id
+            if failure:
+                command.respond_to_query.failed.SetInParent()
                 try:
                     await temporalio.exceptions.apply_exception_to_failure(
-                        err,
+                        failure,
                         self._worker._data_converter,
                         command.fail_workflow_execution.failure,
                     )
@@ -340,12 +421,123 @@ class _RunningWorkflow:
                     raise ValueError(
                         "Failed converting application error"
                     ) from inner_err
-                self._pending_commands.append(command)
-        except Exception as fail_err:
-            logger.warning(
-                f"Workflow failed with run ID {self._info.run_id}", exc_info=True
+            else:
+                result_payloads = await self._worker._data_converter.encode([success])
+                if len(result_payloads) != 1:
+                    raise ValueError(
+                        f"Expected 1 result payload, got {len(result_payloads)}"
+                    )
+                command.respond_to_query.succeeded.response.CopyFrom(
+                    temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
+                )
+            return command
+
+        # Async call to run on the scheduler thread
+        async def run_query(input: HandleQueryInput) -> None:
+            nonlocal success, failure
+            try:
+                success = await self._inbound.handle_query(input)
+            except Exception as err:
+                failure = err
+            self._pending_commands.append(handle_complete)
+
+        # Just find the arg types for now. The interceptor will be responsible
+        # for checking whether the query definition actually exists.
+        arg_types = self._query_arg_types.get(job.query_type)
+        args = await self._worker._convert_args(job.arguments, arg_types)
+
+        # Schedule it
+        input = HandleQueryInput(
+            id=job.query_id,
+            name=job.query_type,
+            args=args,
+        )
+        self._scheduler.add_task(run_query(input))
+
+    async def _signal_workflow(
+        self, job: temporalio.bridge.proto.workflow_activation.SignalWorkflow
+    ) -> None:
+        # Find the handler or fall through to the dynamic signal handler if
+        # available. We only do this lookup to know the arg types and to buffer
+        # if necessary. The interceptor will end up performing this lookup
+        # again.
+        signal_def = self._signals.get(job.signal_name) or self._signals.get(None)
+        # If there is no definition, we buffer and ignore
+        if not signal_def:
+            self._buffered_signals.setdefault(job.signal_name, []).append(job)
+            return
+
+        # Add the interceptor invocation to the scheduler
+        arg_types = (
+            self._signal_arg_types.get(signal_def.name) if signal_def.name else None
+        )
+        args = await self._worker._convert_args(job.input, arg_types)
+        self._scheduler.add_task(
+            self._inbound.handle_signal(
+                HandleSignalInput(name=job.signal_name, args=args)
             )
-            self._pending_activation_failure = fail_err
+        )
+
+    async def _start_workflow(
+        self, job: temporalio.bridge.proto.workflow_activation.StartWorkflow
+    ) -> None:
+        # Command builder call after workflow completes to run in this event
+        # loop
+        success: Optional[Any] = None
+        workflow_failure: Optional[temporalio.exceptions.FailureError] = None
+        task_failure: Optional[Exception] = None
+
+        async def handle_complete() -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+            nonlocal success, workflow_failure, task_failure
+            command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+            if task_failure:
+                raise task_failure
+            elif workflow_failure:
+                command.fail_workflow_execution.failure.SetInParent()
+                try:
+                    await temporalio.exceptions.apply_exception_to_failure(
+                        workflow_failure,
+                        self._worker._data_converter,
+                        command.fail_workflow_execution.failure,
+                    )
+                except Exception as inner_err:
+                    raise ValueError(
+                        "Failed converting workflow exception"
+                    ) from inner_err
+            else:
+                result_payloads = await self._worker._data_converter.encode([success])
+                if len(result_payloads) != 1:
+                    raise ValueError(
+                        f"Expected 1 result payload, got {len(result_payloads)}"
+                    )
+                command.complete_workflow_execution.result.CopyFrom(
+                    temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
+                )
+            return command
+
+        # Async call to run on the scheduler thread
+        async def run_workflow(input: ExecuteWorkflowInput) -> None:
+            nonlocal success, workflow_failure, task_failure
+            try:
+                success = await self._inbound.execute_workflow(input)
+            except temporalio.exceptions.FailureError as err:
+                logger.debug(
+                    f"Workflow raised failure with run ID {self._info.run_id}",
+                    exc_info=True,
+                )
+                workflow_failure = err
+            except Exception as err:
+                task_failure = err
+            self._pending_commands.append(handle_complete)
+
+        # Schedule it
+        input = ExecuteWorkflowInput(
+            type=self._defn.defn.cls,
+            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
+            run_fn=cast(Callable[..., Awaitable[Any]], self._defn.defn.run_fn),
+            args=await self._worker._convert_args(job.arguments, self._defn.arg_types),
+        )
+        self._scheduler.add_task(run_workflow(input))
 
 
 class _WorkflowInboundImpl(WorkflowInboundInterceptor):
@@ -366,6 +558,44 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         args = [self._running._instance] + list(input.args)
         return await input.run_fn(*args)
 
+    async def handle_signal(self, input: HandleSignalInput) -> None:
+        # Get the definition or fall through to dynamic
+        signal_defn = self._running._signals.get(
+            input.name
+        ) or self._running._signals.get(None)
+        # Presence of the signal handler was already checked, but they could
+        # change the name so we re-check
+        if not signal_defn:
+            raise RuntimeError(
+                f"signal handler for {input.name} expected but not found"
+            )
+        # Put self as arg first
+        args = [self._running._instance] + list(input.args)
+        if inspect.iscoroutinefunction(signal_defn.fn):
+            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
+            signal_fn = cast(Callable[..., Awaitable[None]], signal_defn.fn)
+            await signal_fn(*args)
+        else:
+            signal_fn = cast(Callable, signal_defn.fn)
+            signal_fn(*args)
+
+    async def handle_query(self, input: HandleQueryInput) -> Any:
+        # Get the definition or fall through to dynamic
+        query_defn = self._running._queries.get(
+            input.name
+        ) or self._running._queries.get(None)
+        if not query_defn:
+            raise RuntimeError(f"Workflow did not register a handler for {input.name}")
+        # Put self as arg first
+        args = [self._running._instance] + list(input.args)
+        if inspect.iscoroutinefunction(query_defn.fn):
+            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
+            query_fn = cast(Callable[..., Awaitable[None]], query_defn.fn)
+            return await query_fn(*args)
+        else:
+            query_fn = cast(Callable, query_defn.fn)
+            return query_fn(*args)
+
 
 class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     def __init__(self, worker: _WorkflowWorker, info: temporalio.workflow.Info) -> None:
@@ -375,6 +605,9 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
 
     def info(self) -> temporalio.workflow.Info:
         return self._info
+
+
+_TaskReturn = TypeVar("_TaskReturn")
 
 
 class _Scheduler:
@@ -397,7 +630,7 @@ class _Scheduler:
     #         raise RuntimeError("no scheduler in this event loop")
     #     return scheduler
 
-    def add_task(self, task: Awaitable) -> asyncio.Task:
+    def add_task(self, task: Awaitable[_TaskReturn]) -> asyncio.Task[_TaskReturn]:
         return asyncio.ensure_future(task, loop=self._loop)
 
     # async def wait(self) -> None:
@@ -443,6 +676,10 @@ class _Scheduler:
         self._loop.run_forever()
 
         # TODO(cretz): Repeatedly run until all tasks are waiting on us properly
+        # tasks = asyncio.all_tasks(self._loop)
+        # print("TASK COUNT", len(tasks))
+        # for task in tasks:
+        #     print("  TASK DONE: ", task.done())
 
 
 def _proto_to_datetime(

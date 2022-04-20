@@ -43,6 +43,7 @@ from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TL
 logger = logging.getLogger(__name__)
 
 LocalParamType = TypeVar("LocalParamType")
+LocalReturnType = TypeVar("LocalReturnType")
 WorkflowClass = TypeVar("WorkflowClass")
 WorkflowReturnType = TypeVar("WorkflowReturnType")
 
@@ -320,7 +321,7 @@ class Client:
                     f"Workflow definition not found on {workflow.__qualname__}, "
                     "is it on a class with @workflow.defn?"
                 )
-            # TODO(cretz): Check count/type of args?
+            # TODO(cretz): Check count/type of args at runtime?
             workflow_name = defn.name
         else:
             workflow_name = str(workflow)
@@ -801,9 +802,44 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             )
         )
 
+    @overload
+    async def query(
+        self,
+        query: Callable[
+            [WorkflowClass], Union[Awaitable[LocalReturnType], LocalReturnType]
+        ],
+        /,
+        *,
+        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+    ) -> LocalReturnType:
+        ...
+
+    @overload
+    async def query(
+        self,
+        query: Callable[
+            [WorkflowClass, LocalParamType],
+            Union[Awaitable[LocalReturnType], LocalReturnType],
+        ],
+        arg: LocalParamType,
+        /,
+        *,
+        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+    ) -> LocalReturnType:
+        ...
+
+    @overload
     async def query(
         self,
         query: str,
+        *args: Any,
+        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+    ) -> Any:
+        ...
+
+    async def query(
+        self,
+        query: Union[str, Callable],
         *args: Any,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> Any:
@@ -819,7 +855,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             unrelated to the started workflow.
 
         Args:
-            query: Query name on the workflow.
+            query: Query function or name on the workflow.
             args: Query arguments.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
@@ -831,18 +867,54 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             WorkflowQueryRejectedError: A query reject condition was satisfied.
             RPCError: Workflow details could not be fetched.
         """
+        query_name: str
+        if callable(query):
+            defn = temporalio.workflow._QueryDefinition.from_fn(query)
+            if not defn:
+                raise RuntimeError(
+                    f"Query definition not found on {query.__qualname__}, "
+                    "is it decorated with @workflow.query?"
+                )
+            elif not defn.name:
+                raise RuntimeError("Cannot invoke dynamic query definition")
+            # TODO(cretz): Check count/type of args at runtime?
+            query_name = defn.name
+        else:
+            query_name = str(query)
+
         return await self._client._impl.query_workflow(
             QueryWorkflowInput(
                 id=self._id,
                 run_id=self._run_id,
-                query=query,
+                query=query_name,
                 args=args,
                 reject_condition=reject_condition
                 or self._client._config["default_workflow_query_reject_condition"],
             )
         )
 
-    async def signal(self, name: str, *args: Any) -> None:
+    @overload
+    async def signal(
+        self,
+        signal: Callable[[WorkflowClass], Union[Awaitable[None], None]],
+        /,
+    ) -> None:
+        ...
+
+    @overload
+    async def signal(
+        self,
+        signal: Callable[[WorkflowClass, LocalParamType], Union[Awaitable[None], None]],
+        arg: LocalParamType,
+        /,
+    ) -> None:
+        ...
+
+    @overload
+    async def signal(self, signal: str, *args: Any) -> None:
+        ...
+
+    async def signal(self, signal: Union[str, Callable], *args: Any) -> None:
         """Send a signal to the workflow.
 
         This will signal for :py:attr:`run_id` if present. To use a different
@@ -855,20 +927,32 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             unrelated to the started workflow.
 
         Args:
-            name: Signal name on the workflow.
+            signal: Signal function or name on the workflow.
             args: Signal arguments.
-            run_id: Run ID to signal. Defaults to using :py:meth:`run_id`. If
-                set to None or there is no :py:meth:`run_id`, this will query
-                the latest run for the workflow ID.
 
         Raises:
             RPCError: Workflow could not be signalled.
         """
+        signal_name: str
+        if callable(signal):
+            defn = temporalio.workflow._SignalDefinition.from_fn(signal)
+            if not defn:
+                raise RuntimeError(
+                    f"Signal definition not found on {signal.__qualname__}, "
+                    "is it decorated with @workflow.signal?"
+                )
+            elif not defn.name:
+                raise RuntimeError("Cannot invoke dynamic signal definition")
+            # TODO(cretz): Check count/type of args at runtime?
+            signal_name = defn.name
+        else:
+            signal_name = str(signal)
+
         await self._client._impl.signal_workflow(
             SignalWorkflowInput(
                 id=self._id,
                 run_id=self._run_id,
-                signal=name,
+                signal=signal_name,
                 args=args,
             )
         )

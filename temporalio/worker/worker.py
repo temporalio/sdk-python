@@ -48,7 +48,7 @@ class Worker:
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         interceptors: Iterable[Interceptor] = [],
-        max_cached_workflows: int = 0,
+        max_cached_workflows: int = 1000,
         max_concurrent_workflow_tasks: int = 100,
         max_concurrent_activities: int = 100,
         max_concurrent_local_activities: int = 100,

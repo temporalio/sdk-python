@@ -390,12 +390,20 @@ class _SignalDefinition:
     name: Optional[str]
     fn: Callable[..., Union[None, Awaitable[None]]]
 
+    @staticmethod
+    def from_fn(fn: Callable) -> Optional[_SignalDefinition]:
+        return getattr(fn, "__temporal_signal_definition", None)
+
 
 @dataclass(frozen=True)
 class _QueryDefinition:
     # None if dynamic
     name: Optional[str]
     fn: Callable[..., Any]
+
+    @staticmethod
+    def from_fn(fn: Callable) -> Optional[_QueryDefinition]:
+        return getattr(fn, "__temporal_query_definition", None)
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:

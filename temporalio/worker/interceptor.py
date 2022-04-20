@@ -106,6 +106,19 @@ class ExecuteWorkflowInput:
     args: Iterable[Any]
 
 
+@dataclass
+class HandleSignalInput:
+    name: str
+    args: Iterable[Any]
+
+
+@dataclass
+class HandleQueryInput:
+    id: str
+    name: str
+    args: Iterable[Any]
+
+
 class WorkflowInboundInterceptor:
     def __init__(self, next: WorkflowInboundInterceptor) -> None:
         self.next = next
@@ -115,6 +128,12 @@ class WorkflowInboundInterceptor:
 
     async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
         return await self.next.execute_workflow(input)
+
+    async def handle_signal(self, input: HandleSignalInput) -> None:
+        return await self.next.handle_signal(input)
+
+    async def handle_query(self, input: HandleQueryInput) -> Any:
+        return await self.next.handle_query(input)
 
 
 class WorkflowOutboundInterceptor:
