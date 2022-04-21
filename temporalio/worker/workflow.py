@@ -1,23 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+import collections
 import concurrent.futures
+import contextvars
 import inspect
 import logging
+import traceback
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import (
     Any,
     Awaitable,
     Callable,
+    Deque,
     Dict,
+    Generator,
     Iterable,
     List,
     Mapping,
     Optional,
     Sequence,
     Type,
+    TypeAlias,
     TypeVar,
+    Union,
     cast,
 )
 
@@ -256,6 +263,13 @@ class _TypedDefinition:
         )
 
 
+# Command can either be a fixed command or a callback
+_PendingCommand: TypeAlias = Union[
+    temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    Callable[[], Awaitable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]],
+]
+
+
 class _RunningWorkflow:
     @staticmethod
     def create(
@@ -305,13 +319,10 @@ class _RunningWorkflow:
         self._defn = defn
         self._info = info
         self._instance = instance
-        self._scheduler = _Scheduler()
-        self._pending_commands: List[
-            Callable[
-                [], Awaitable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]
-            ]
-        ] = []
-        self._pending_activation_failure: Optional[Exception] = None
+        # We ignore MyPy failing to instantiate this because it's not _really_
+        # abstract at runtime
+        self._loop = _EventLoop(self)  # type: ignore[abstract]
+        self._pending_commands: List[_PendingCommand] = []
 
         # We maintain signals and queries on this class since handlers can be
         # added during workflow execution
@@ -337,7 +348,10 @@ class _RunningWorkflow:
         global DEADLOCK_TIMEOUT_SECONDS
 
         self._pending_commands = []
-        self._pending_activation_failure = None
+
+        # TODO(cretz): Apparently this can go backwards, but Python expects it
+        # to be monotonic
+        self._loop.set_time(act.timestamp.ToMicroseconds() / 1e6)
 
         # Split into job sets with patches, then signals, then non-queries, then
         # queries
@@ -360,7 +374,9 @@ class _RunningWorkflow:
                 continue
             for job in job_set:
                 # Let errors bubble out of these to the caller to fail the task
-                if job.HasField("query_workflow"):
+                if job.HasField("fire_timer"):
+                    await self._fire_timer(job.fire_timer)
+                elif job.HasField("query_workflow"):
                     await self._query_workflow(job.query_workflow)
                 elif job.HasField("remove_from_cache"):
                     # Ignore, handled by _handle_activation
@@ -373,11 +389,11 @@ class _RunningWorkflow:
                     print(f"TODO(cretz) JOB: {job.WhichOneof('variant')}")
                     # raise RuntimeError(f"unrecognized job: {job.WhichOneof('variant')}")
 
-            # Run the scheduler on a thread until blocked. We will throw a
-            # deadlock detected error if it exceeds the timeout
+            # Run a loop iteration on a thread. We will throw a deadlock
+            # detected error if it exceeds the timeout
             exec_task = asyncio.get_running_loop().run_in_executor(
                 self._worker._workflow_task_executor,
-                self._scheduler.run_until_all_blocked,
+                self._loop.run_once,
             )
             try:
                 await asyncio.wait_for(exec_task, DEADLOCK_TIMEOUT_SECONDS)
@@ -386,16 +402,19 @@ class _RunningWorkflow:
                     f"Potential deadlock detected, workflow didn't yield within {DEADLOCK_TIMEOUT_SECONDS} second(s)"
                 )
 
-            # If there's a pending failure, we have to raise it so it can fail the
-            # activation
-            if self._pending_activation_failure:
-                raise self._pending_activation_failure
-
         # Apply all collected commands
         commands: List[temporalio.bridge.proto.workflow_commands.WorkflowCommand] = []
         for pending_command in self._pending_commands:
-            commands.append(await pending_command())
+            if callable(pending_command):
+                commands.append(await pending_command())
+            else:
+                commands.append(pending_command)
         return commands
+
+    async def _fire_timer(
+        self, job: temporalio.bridge.proto.workflow_activation.FireTimer
+    ) -> None:
+        self._loop.resolve_timer(job.seq)
 
     async def _query_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.QueryWorkflow
@@ -452,27 +471,21 @@ class _RunningWorkflow:
             name=job.query_type,
             args=args,
         )
-        self._scheduler.add_task(run_query(input))
+        self._loop.create_task(run_query(input))
 
     async def _signal_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.SignalWorkflow
     ) -> None:
-        # Find the handler or fall through to the dynamic signal handler if
-        # available. We only do this lookup to know the arg types and to buffer
-        # if necessary. The interceptor will end up performing this lookup
-        # again.
-        signal_def = self._signals.get(job.signal_name) or self._signals.get(None)
-        # If there is no definition, we buffer and ignore
-        if not signal_def:
+        # If there is no definition or dynamic, we buffer and ignore
+        if job.signal_name not in self._signals and None not in self._signals:
             self._buffered_signals.setdefault(job.signal_name, []).append(job)
             return
 
-        # Add the interceptor invocation to the scheduler
-        arg_types = (
-            self._signal_arg_types.get(signal_def.name) if signal_def.name else None
-        )
+        # Just find the arg types for now. The interceptor will look up the
+        # defn.
+        arg_types = self._signal_arg_types.get(job.signal_name)
         args = await self._worker._convert_args(job.input, arg_types)
-        self._scheduler.add_task(
+        self._loop.create_task(
             self._inbound.handle_signal(
                 HandleSignalInput(name=job.signal_name, args=args)
             )
@@ -537,7 +550,7 @@ class _RunningWorkflow:
             run_fn=cast(Callable[..., Awaitable[Any]], self._defn.defn.run_fn),
             args=await self._worker._convert_args(job.arguments, self._defn.arg_types),
         )
-        self._scheduler.add_task(run_workflow(input))
+        self._loop.create_task(run_workflow(input))
 
 
 class _WorkflowInboundImpl(WorkflowInboundInterceptor):
@@ -569,8 +582,12 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             raise RuntimeError(
                 f"signal handler for {input.name} expected but not found"
             )
-        # Put self as arg first
-        args = [self._running._instance] + list(input.args)
+        # Put self as arg first, then name only if dynamic
+        args: Iterable[Any]
+        if signal_defn.name:
+            args = [self._running._instance] + list(input.args)
+        else:
+            args = [self._running._instance, input.name] + list(input.args)
         if inspect.iscoroutinefunction(signal_defn.fn):
             # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
             signal_fn = cast(Callable[..., Awaitable[None]], signal_defn.fn)
@@ -586,8 +603,12 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         ) or self._running._queries.get(None)
         if not query_defn:
             raise RuntimeError(f"Workflow did not register a handler for {input.name}")
-        # Put self as arg first
-        args = [self._running._instance] + list(input.args)
+        # Put self as arg first, then name only if dynamic
+        args: Iterable[Any]
+        if query_defn.name:
+            args = [self._running._instance] + list(input.args)
+        else:
+            args = [self._running._instance, input.name] + list(input.args)
         if inspect.iscoroutinefunction(query_defn.fn):
             # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
             query_fn = cast(Callable[..., Awaitable[None]], query_defn.fn)
@@ -607,79 +628,211 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
         return self._info
 
 
-_TaskReturn = TypeVar("_TaskReturn")
+_T = TypeVar("_T")
+_Context: TypeAlias = Dict[str, Any]
+_ExceptionHandler: TypeAlias = Callable[[asyncio.AbstractEventLoop, _Context], Any]
 
 
-class _Scheduler:
-    _loop: asyncio.AbstractEventLoop
-    # _waiters: Deque[asyncio.Future]
+class _PendingHandle(asyncio.TimerHandle):
+    def __init__(
+        self,
+        type: str,
+        when: float,
+        callback: Callable[..., Any],
+        args: Sequence[Any],
+        loop: asyncio.AbstractEventLoop,
+        context: Optional[contextvars.Context] = None,
+    ) -> None:
+        super().__init__(when, callback, args, loop, context)
+        self.type = type
 
-    def __init__(self) -> None:
-        self._loop = asyncio.new_event_loop()
-        # Set of tasks waiting on a single wakeup (modeled off asyncio.Event)
-        # self._waiters = collections.deque()
-        # Put ourself on the loop
-        setattr(self._loop, "__temporal_scheduler", self)
 
-    # @staticmethod
-    # def get_running_scheduler() -> _Scheduler:
-    #     scheduler: Optional[_Scheduler] = getattr(
-    #         asyncio.get_running_loop(), "__temporal_scheduler", None
-    #     )
-    #     if scheduler is None:
-    #         raise RuntimeError("no scheduler in this event loop")
-    #     return scheduler
+class _EventLoop(asyncio.AbstractEventLoop):
+    def __init__(self, workflow: _RunningWorkflow) -> None:
+        super().__init__()
+        self._workflow = workflow
+        self._time = 0.0
+        self._ready: Deque[asyncio.Handle] = collections.deque()
+        # Keyed by seq
+        self._pending: Dict[int, _PendingHandle] = {}
+        self._curr_seq = 0
+        self._exception_handler: Optional[_ExceptionHandler] = None
 
-    def add_task(self, task: Awaitable[_TaskReturn]) -> asyncio.Task[_TaskReturn]:
-        return asyncio.ensure_future(task, loop=self._loop)
+        # Mark this as a workflow loop
+        temporalio.workflow._mark_as_workflow_loop(self)
 
-    # async def wait(self) -> None:
-    #     # Mark current task as having reached our wait
-    #     curr_task = asyncio.current_task(self._loop)
-    #     if curr_task is None:
-    #         raise RuntimeError("no current task or not in current event loop")
-    #     setattr(curr_task, "__temporal_waiting", True)
+    def _next_seq(self) -> int:
+        self._curr_seq += 1
+        return self._curr_seq
 
-    #     # Create future and wait on it
-    #     fut = self._loop.create_future()
-    #     self._waiters.append(fut)
-    #     try:
-    #         await fut
-    #         return
-    #     finally:
-    #         # Unset that the task is waiting and remove from waiters
-    #         setattr(curr_task, "__temporal_waiting", False)
-    #         self._waiters.remove(fut)
+    def resolve_timer(self, seq: int) -> None:
+        handle = self._pending.pop(seq, None)
+        if not handle:
+            raise RuntimeError(f"Failed finding timer handle for sequence {seq}")
+        elif handle.type != "timer":
+            raise RuntimeError(
+                f"Expected 'timer' for sequence {seq}, found '{handle.type}'"
+            )
+        # Mark cancelled so the cancel() from things like asyncio.sleep() don't
+        # invoke _timer_handle_cancelled
+        handle._cancelled = True
+        self._ready.append(handle)
 
-    # def tick(self) -> None:
-    #     # Go over every waiter and set it as done
-    #     for fut in self._waiters:
-    #         if not fut.done():
-    #             fut.set_result(True)
+    def run_once(self) -> None:
+        try:
+            asyncio._set_running_loop(self)
 
-    #     # Run one iteration
-    #     # Ref https://stackoverflow.com/questions/29782377/is-it-possible-to-run-only-a-single-step-of-the-asyncio-event-loop
-    #     self._loop.call_soon(self._loop.stop)
-    #     self._loop.run_forever()
+            # Run all the ready ones
+            while self._ready:
+                handle = self._ready.popleft()
+                handle._run()
+        finally:
+            asyncio._set_running_loop(None)
 
-    #     # Make sure every task is done or waiting on our future
-    #     for task in asyncio.all_tasks(self._loop):
-    #         if not getattr(task, "__temporal_waiting", False):
-    #             raise RuntimeError(
-    #                 "Task did not complete and is not waiting on the Temporal scheduler"
-    #             )
+    def set_time(self, time: float) -> None:
+        self._time = time
 
-    def run_until_all_blocked(self) -> None:
-        # Run one iteration
-        # Ref https://stackoverflow.com/questions/29782377/is-it-possible-to-run-only-a-single-step-of-the-asyncio-event-loop
-        self._loop.call_soon(self._loop.stop)
-        self._loop.run_forever()
+    async def wait_condition(
+        self, fn: Callable[[], Awaitable[bool]], *, timeout: Optional[float] = None
+    ) -> None:
+        raise NotImplementedError
 
-        # TODO(cretz): Repeatedly run until all tasks are waiting on us properly
-        # tasks = asyncio.all_tasks(self._loop)
-        # print("TASK COUNT", len(tasks))
-        # for task in tasks:
-        #     print("  TASK DONE: ", task.done())
+    ### Call overrides
+
+    def _timer_handle_cancelled(self, handle: asyncio.TimerHandle) -> None:
+        raise NotImplementedError
+
+    def call_soon(
+        self,
+        callback: Callable[..., Any],
+        *args: Any,
+        context: Optional[contextvars.Context] = None,
+    ) -> asyncio.Handle:
+        handle = asyncio.Handle(callback, args, self, context)
+        self._ready.append(handle)
+        return handle
+
+    def call_later(
+        self,
+        delay: float,
+        callback: Callable[..., Any],
+        *args: Any,
+        context: Optional[contextvars.Context] = None,
+    ) -> asyncio.TimerHandle:
+        # Delay must be positive
+        if delay < 0:
+            raise RuntimeError("Attempting to schedule timer with negative delay")
+
+        # Schedule a timer
+        seq = self._next_seq()
+        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        command.start_timer.seq = seq
+        command.start_timer.start_to_fire_timeout.FromNanoseconds(int(delay * 1e9))
+        self._workflow._pending_commands.append(command)
+
+        # Create and return the handle
+        handle = _PendingHandle(
+            "timer", self._time + delay, callback, args, self, context
+        )
+        self._pending[seq] = handle
+        return handle
+
+    def time(self) -> float:
+        return self._time
+
+    def create_future(self) -> asyncio.Future[Any]:
+        return asyncio.Future(loop=self)
+
+    def create_task(
+        self,
+        coro: Union[Awaitable[_T], Generator[Any, None, _T]],
+        *,
+        name: Optional[str] = None,
+    ) -> asyncio.Task[_T]:
+        return asyncio.Task(coro, loop=self, name=name)
+
+    def get_exception_handler(self) -> Optional[_ExceptionHandler]:
+        return self._exception_handler
+
+    def set_exception_handler(self, handler: Optional[_ExceptionHandler]) -> None:
+        self._exception_handler = handler
+
+    def default_exception_handler(self, context: _Context) -> None:
+        # Copied and slightly modified from
+        # asyncio.BaseEventLoop.default_exception_handler
+        message = context.get("message")
+        if not message:
+            message = "Unhandled exception in event loop"
+
+        exception = context.get("exception")
+        exc_info: Any
+        if exception is not None:
+            exc_info = (type(exception), exception, exception.__traceback__)
+        else:
+            exc_info = False
+
+        log_lines = [message]
+        for key in sorted(context):
+            if key in {"message", "exception"}:
+                continue
+            value = context[key]
+            if key == "source_traceback":
+                tb = "".join(traceback.format_list(value))
+                value = "Object created at (most recent call last):\n"
+                value += tb.rstrip()
+            elif key == "handle_traceback":
+                tb = "".join(traceback.format_list(value))
+                value = "Handle created at (most recent call last):\n"
+                value += tb.rstrip()
+            else:
+                value = repr(value)
+            log_lines.append(f"{key}: {value}")
+
+        logger.error("\n".join(log_lines), exc_info=exc_info)
+
+    def call_exception_handler(self, context: _Context) -> None:
+        # Copied and slightly modified from
+        # asyncio.BaseEventLoop.call_exception_handler
+        if self._exception_handler is None:
+            try:
+                self.default_exception_handler(context)
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except BaseException:
+                # Second protection layer for unexpected errors
+                # in the default implementation, as well as for subclassed
+                # event loops with overloaded "default_exception_handler".
+                logger.error("Exception in default exception handler", exc_info=True)
+        else:
+            try:
+                self._exception_handler(self, context)
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except BaseException as exc:
+                # Exception in the user set custom exception handler.
+                try:
+                    # Let's try default handler.
+                    self.default_exception_handler(
+                        {
+                            "message": "Unhandled error in exception handler",
+                            "exception": exc,
+                            "context": context,
+                        }
+                    )
+                except (SystemExit, KeyboardInterrupt):
+                    raise
+                except BaseException:
+                    # Guard 'default_exception_handler' in case it is
+                    # overloaded.
+                    logger.error(
+                        "Exception in default exception handler "
+                        "while handling an unexpected error "
+                        "in custom exception handler",
+                        exc_info=True,
+                    )
+
+    def get_debug(self) -> bool:
+        return False
 
 
 def _proto_to_datetime(

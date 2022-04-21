@@ -56,13 +56,13 @@ async def test_default():
     await assert_payload(False, "json/plain", "false")
 
     # Unknown type
-    with pytest.raises(RuntimeError) as excinfo:
+    with pytest.raises(TypeError) as excinfo:
 
         class NonSerializableClass:
             pass
 
         await assert_payload(NonSerializableClass(), None, None)
-    assert "has no known converter" in str(excinfo.value)
+    assert "not JSON serializable" in str(excinfo.value)
 
     @dataclass
     class MyDataClass:

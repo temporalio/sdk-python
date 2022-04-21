@@ -372,16 +372,13 @@ class JSONPlainPayloadConverter(PayloadConverter):
         """See base class."""
         if dataclasses.is_dataclass(value):
             value = dataclasses.asdict(value)
-        # We swallow JSON encode error and just return None
-        try:
-            return temporalio.api.common.v1.Payload(
-                metadata={"encoding": self._encoding.encode()},
-                data=json.dumps(
-                    value, cls=self._encoder, separators=(",", ":"), sort_keys=True
-                ).encode(),
-            )
-        except (RuntimeError, TypeError, ValueError):
-            return None
+        # We let JSON conversion errors be thrown to caller
+        return temporalio.api.common.v1.Payload(
+            metadata={"encoding": self._encoding.encode()},
+            data=json.dumps(
+                value, cls=self._encoder, separators=(",", ":"), sort_keys=True
+            ).encode(),
+        )
 
     async def decode(
         self,

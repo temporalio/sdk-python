@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import inspect
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import partial
@@ -11,6 +13,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    Generic,
     List,
     Mapping,
     MutableMapping,
@@ -23,9 +26,11 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Literal
+from typing_extensions import Literal, Protocol
 
 WorkflowClass = TypeVar("WorkflowClass", bound=Type)
+ActivityReturnType = TypeVar("ActivityReturnType")
+T = TypeVar("T")
 
 
 @overload
@@ -106,6 +111,8 @@ def signal(
     dynamic: Optional[bool] = False,
 ):
     def with_name(name: Optional[str], fn: WorkflowSignalFunc) -> WorkflowSignalFunc:
+        if not name:
+            _assert_dynamic_signature(fn)
         # TODO(cretz): Validate type attributes?
         setattr(fn, "__temporal_signal_definition", _SignalDefinition(name=name, fn=fn))
         return fn
@@ -146,6 +153,8 @@ def query(
     dynamic: Optional[bool] = False,
 ):
     def with_name(name: Optional[str], fn: WorkflowQueryFunc) -> WorkflowQueryFunc:
+        if not name:
+            _assert_dynamic_signature(fn)
         # TODO(cretz): Validate type attributes?
         setattr(fn, "__temporal_query_definition", _QueryDefinition(name=name, fn=fn))
         return fn
@@ -157,6 +166,20 @@ def query(
     if fn is None:
         raise RuntimeError("Cannot create query without function or name or dynamic")
     return with_name(fn.__name__, fn)
+
+
+def _assert_dynamic_signature(fn: Callable) -> None:
+    # If dynamic, must have three args: self, name, and varargs
+    sig = inspect.signature(fn)
+    params = list(sig.parameters.values())
+    if (
+        len(params) != 3
+        or params[1].kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD
+        or params[2].kind is not inspect.Parameter.VAR_POSITIONAL
+    ):
+        raise RuntimeError(
+            "Dynamic handler must have 3 arguments: self, name, and var args"
+        )
 
 
 @dataclass(frozen=True)
@@ -189,7 +212,29 @@ class Info:
         }
 
 
+# TODO(cretz): Move this to a variable on the event loop?
 _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("workflow")
+
+
+class _EventLoopProto(Protocol):
+    async def wait_condition(
+        self, fn: Callable[[], Awaitable[bool]], *, timeout: Optional[float] = None
+    ) -> None:
+        ...
+
+    def time(self) -> float:
+        ...
+
+
+def _get_running_loop() -> _EventLoopProto:
+    loop = asyncio.get_running_loop()
+    if not getattr(loop, "__temporal_workflow_loop", False):
+        raise RuntimeError("Not in workflow event loop")
+    return cast(_EventLoopProto, loop)
+
+
+def _mark_as_workflow_loop(loop: _EventLoopProto) -> None:
+    setattr(loop, "__temporal_workflow_loop", True)
 
 
 @dataclass
@@ -213,6 +258,20 @@ class _Context:
         if self._logger_details is None:
             self._logger_details = self.info()._logger_details()
         return self._logger_details
+
+
+def info() -> Info:
+    return _Context.current().info()
+
+
+def now() -> datetime:
+    return datetime.utcfromtimestamp(_get_running_loop().time())
+
+
+async def wait_condition(
+    fn: Callable[[], Awaitable[bool]], *, timeout: Optional[float] = None
+) -> None:
+    await _get_running_loop().wait_condition(fn, timeout=timeout)
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -404,6 +463,49 @@ class _QueryDefinition:
     @staticmethod
     def from_fn(fn: Callable) -> Optional[_QueryDefinition]:
         return getattr(fn, "__temporal_query_definition", None)
+
+
+class CancellationScope:
+    @property
+    @staticmethod
+    def current() -> CancellationScope:
+        raise NotImplementedError()
+
+    def __init__(
+        self,
+        *,
+        # Default is current
+        parent: Optional[CancellationScope] = None,
+        detached: bool = False,
+        timeout: Optional[timedelta] = None,
+    ) -> None:
+        raise NotImplementedError()
+
+    async def run(self, fn: Callable[..., Union[Awaitable[T], T]]) -> T:
+        raise NotImplementedError()
+
+    def __enter__(self) -> CancellationScope:
+        pass
+
+    def __exit__(self) -> None:
+        raise NotImplementedError()
+
+    def cancel(self) -> None:
+        raise NotImplementedError()
+
+    @property
+    def cancelled(self) -> bool:
+        raise NotImplementedError()
+
+
+class ActivityHandle(ABC, Generic[ActivityReturnType]):
+    @abstractmethod
+    async def result(self) -> ActivityReturnType:
+        ...
+
+    @abstractmethod
+    async def cancel(self) -> None:
+        ...
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:

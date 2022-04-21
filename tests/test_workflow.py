@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from temporalio import workflow
@@ -32,7 +34,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal3(self):
+    def signal3(self, name: str, *args: Any):
         pass
 
     @workflow.query
@@ -44,7 +46,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.query(dynamic=True)
-    def query3(self):
+    def query3(self, name: str, *args: Any):
         pass
 
 
@@ -101,11 +103,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal3(self):
+    def signal3(self, name: str, *args: Any):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal4(self):
+    def signal4(self, name: str, *args: Any):
         pass
 
     # Intentionally missing decorator
@@ -121,11 +123,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.query(dynamic=True)
-    def query3(self):
+    def query3(self, name: str, *args: Any):
         pass
 
     @workflow.query(dynamic=True)
-    def query4(self):
+    def query4(self, name: str, *args: Any):
         pass
 
     # Intentionally missing decorator
@@ -233,3 +235,32 @@ def test_workflow_defn_multiple_run():
     assert "Multiple @workflow.run methods found (at least on run2 and run1" in str(
         err.value
     )
+
+
+@workflow.defn
+class BadDynamic:
+    @workflow.run
+    async def run(self):
+        pass
+
+    # We intentionally don't decorate these here since they throw
+    def some_dynamic1(self):
+        pass
+
+    def some_dynamic2(self, no_vararg):
+        pass
+
+
+def test_workflow_defn_bad_dynamic():
+    with pytest.raises(RuntimeError) as err:
+        workflow.signal(dynamic=True)(BadDynamic.some_dynamic1)
+    assert "must have 3 arguments" in str(err.value)
+    with pytest.raises(RuntimeError) as err:
+        workflow.signal(dynamic=True)(BadDynamic.some_dynamic2)
+    assert "must have 3 arguments" in str(err.value)
+    with pytest.raises(RuntimeError) as err:
+        workflow.query(dynamic=True)(BadDynamic.some_dynamic1)
+    assert "must have 3 arguments" in str(err.value)
+    with pytest.raises(RuntimeError) as err:
+        workflow.query(dynamic=True)(BadDynamic.some_dynamic2)
+    assert "must have 3 arguments" in str(err.value)
