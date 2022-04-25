@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import concurrent.futures
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Iterable, Optional, Type
+from datetime import timedelta
+from typing import Any, Awaitable, Callable, Iterable, List, Optional, Type
 
 import temporalio.activity
+import temporalio.common
 import temporalio.workflow
 
 
@@ -119,6 +121,23 @@ class HandleQueryInput:
     args: Iterable[Any]
 
 
+@dataclass
+class StartActivityInput:
+    activity: str
+    args: Iterable[Any]
+    activity_id: Optional[str]
+    task_queue: Optional[str]
+    schedule_to_close_timeout: Optional[timedelta]
+    schedule_to_start_timeout: Optional[timedelta]
+    start_to_close_timeout: Optional[timedelta]
+    heartbeat_timeout: Optional[timedelta]
+    retry_policy: Optional[temporalio.common.RetryPolicy]
+    cancellation_type: temporalio.workflow.ActivityCancellationType
+    # The types may be absent
+    arg_types: Optional[List[Type]]
+    ret_type: Optional[Type]
+
+
 class WorkflowInboundInterceptor:
     def __init__(self, next: WorkflowInboundInterceptor) -> None:
         self.next = next
@@ -142,3 +161,8 @@ class WorkflowOutboundInterceptor:
 
     def info(self) -> temporalio.workflow.Info:
         return self.next.info()
+
+    def start_activity(
+        self, input: StartActivityInput
+    ) -> temporalio.workflow.ActivityHandle:
+        return self.next.start_activity(input)

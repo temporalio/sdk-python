@@ -7,6 +7,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import IntEnum
 from functools import partial
 from typing import (
     Any,
@@ -26,9 +27,13 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Literal, Protocol
+from typing_extensions import Literal, Protocol, TypedDict
+
+import temporalio.bridge.proto.workflow_commands
+import temporalio.common
 
 WorkflowClass = TypeVar("WorkflowClass", bound=Type)
+LocalParamType = TypeVar("LocalParamType")
 ActivityReturnType = TypeVar("ActivityReturnType")
 T = TypeVar("T")
 
@@ -212,46 +217,34 @@ class Info:
         }
 
 
-# TODO(cretz): Move this to a variable on the event loop?
-_current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("workflow")
+class _Runtime(ABC):
+    @staticmethod
+    def current() -> _Runtime:
+        runtime = _Runtime.maybe_current()
+        if not runtime:
+            raise RuntimeError("Not in workflow event loop")
+        return runtime
 
+    @staticmethod
+    def maybe_current() -> Optional[_Runtime]:
+        return getattr(asyncio.get_running_loop(), "__temporal_workflow_runtime", None)
 
-class _EventLoopProto(Protocol):
-    async def wait_condition(
-        self, fn: Callable[[], Awaitable[bool]], *, timeout: Optional[float] = None
+    @staticmethod
+    def set_on_loop(
+        loop: asyncio.AbstractEventLoop, runtime: Optional[_Runtime]
     ) -> None:
+        if runtime:
+            setattr(loop, "__temporal_workflow_runtime", runtime)
+        elif hasattr(loop, "__temporal_workflow_runtime"):
+            delattr(loop, "__temporal_workflow_runtime")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._logger_details: Optional[Mapping[str, Any]] = None
+
+    @abstractmethod
+    def info(self) -> Info:
         ...
-
-    def time(self) -> float:
-        ...
-
-
-def _get_running_loop() -> _EventLoopProto:
-    loop = asyncio.get_running_loop()
-    if not getattr(loop, "__temporal_workflow_loop", False):
-        raise RuntimeError("Not in workflow event loop")
-    return cast(_EventLoopProto, loop)
-
-
-def _mark_as_workflow_loop(loop: _EventLoopProto) -> None:
-    setattr(loop, "__temporal_workflow_loop", True)
-
-
-@dataclass
-class _Context:
-    info: Callable[[], Info]
-    _logger_details: Optional[Mapping[str, Any]] = None
-
-    @staticmethod
-    def current() -> _Context:
-        context = _current_context.get(None)
-        if not context:
-            raise RuntimeError("Not in workflow context")
-        return context
-
-    @staticmethod
-    def set(context: _Context) -> None:
-        _current_context.set(context)
 
     @property
     def logger_details(self) -> Mapping[str, Any]:
@@ -259,19 +252,45 @@ class _Context:
             self._logger_details = self.info()._logger_details()
         return self._logger_details
 
+    @abstractmethod
+    def now(self) -> datetime:
+        ...
+
+    @abstractmethod
+    def start_activity(
+        self,
+        activity: Any,
+        *args: Any,
+        activity_id: Optional[str],
+        task_queue: Optional[str],
+        schedule_to_close_timeout: Optional[timedelta],
+        schedule_to_start_timeout: Optional[timedelta],
+        start_to_close_timeout: Optional[timedelta],
+        heartbeat_timeout: Optional[timedelta],
+        retry_policy: Optional[temporalio.common.RetryPolicy],
+        cancellation_type: ActivityCancellationType,
+    ) -> ActivityHandle[Any]:
+        ...
+
+    @abstractmethod
+    async def wait_condition(
+        self, fn: Callable[[], bool], *, timeout: Optional[float] = None
+    ) -> None:
+        ...
+
 
 def info() -> Info:
-    return _Context.current().info()
+    return _Runtime.current().info()
 
 
 def now() -> datetime:
-    return datetime.utcfromtimestamp(_get_running_loop().time())
+    return _Runtime.current().now()
 
 
 async def wait_condition(
-    fn: Callable[[], Awaitable[bool]], *, timeout: Optional[float] = None
+    fn: Callable[[], bool], *, timeout: Optional[float] = None
 ) -> None:
-    await _get_running_loop().wait_condition(fn, timeout=timeout)
+    await _Runtime.current().wait_condition(fn, timeout=timeout)
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -300,14 +319,14 @@ class LoggerAdapter(logging.LoggerAdapter):
         """Override to add workflow details."""
         msg, kwargs = super().process(msg, kwargs)
         if self.workflow_info_on_message or self.workflow_info_on_extra:
-            context = _current_context.get(None)
-            if context:
+            runtime = _Runtime.maybe_current()
+            if runtime:
                 if self.workflow_info_on_message:
-                    msg = f"{msg} ({context.logger_details})"
+                    msg = f"{msg} ({runtime.logger_details})"
                 if self.workflow_info_on_extra:
                     # Extra can be absent or None, this handles both
                     extra = kwargs.get("extra", None) or {}
-                    extra["workflow_info"] = context.info()
+                    extra["workflow_info"] = runtime.info()
                     kwargs["extra"] = extra
         return (msg, kwargs)
 
@@ -504,8 +523,137 @@ class ActivityHandle(ABC, Generic[ActivityReturnType]):
         ...
 
     @abstractmethod
-    async def cancel(self) -> None:
+    def cancel(self) -> None:
         ...
+
+
+class ActivityCancellationType(IntEnum):
+    TRY_CANCEL = int(
+        temporalio.bridge.proto.workflow_commands.ActivityCancellationType.TRY_CANCEL
+    )
+    WAIT_CANCELLATION_COMPLETED = int(
+        temporalio.bridge.proto.workflow_commands.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+    )
+    ABANDON = int(
+        temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ABANDON
+    )
+
+
+# Overload for async no-param activity
+@overload
+def start_activity(
+    activity: Callable[[], Awaitable[ActivityReturnType]],
+    /,
+    *,
+    activity_id: Optional[str] = None,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+) -> ActivityHandle[ActivityReturnType]:
+    ...
+
+
+# Overload for sync no-param activity
+@overload
+def start_activity(
+    activity: Callable[[], ActivityReturnType],
+    /,
+    *,
+    activity_id: Optional[str] = None,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+) -> ActivityHandle[ActivityReturnType]:
+    ...
+
+
+# Overload for async single-param activity
+@overload
+def start_activity(
+    activity: Callable[[LocalParamType], Awaitable[ActivityReturnType]],
+    arg: LocalParamType,
+    /,
+    *,
+    activity_id: Optional[str] = None,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+) -> ActivityHandle[ActivityReturnType]:
+    ...
+
+
+# Overload for sync single-param activity
+@overload
+def start_activity(
+    activity: Callable[[LocalParamType], ActivityReturnType],
+    arg: LocalParamType,
+    /,
+    *,
+    activity_id: Optional[str] = None,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+) -> ActivityHandle[ActivityReturnType]:
+    ...
+
+
+# Overload for string activity
+@overload
+def start_activity(
+    activity: str,
+    *args: Any,
+    activity_id: Optional[str] = None,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+) -> ActivityHandle[Any]:
+    ...
+
+
+def start_activity(
+    activity: Any,
+    *args: Any,
+    activity_id: Optional[str] = None,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+) -> ActivityHandle[Any]:
+    return _Runtime.current().start_activity(
+        activity,
+        *args,
+        activity_id=activity_id,
+        task_queue=task_queue,
+        schedule_to_close_timeout=schedule_to_close_timeout,
+        schedule_to_start_timeout=schedule_to_start_timeout,
+        start_to_close_timeout=start_to_close_timeout,
+        heartbeat_timeout=heartbeat_timeout,
+        retry_policy=retry_policy,
+        cancellation_type=cancellation_type,
+    )
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:

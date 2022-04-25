@@ -72,21 +72,19 @@ class _ActivityWorker:
         # Validate and build activity dict
         self._activities: Dict[str, _ActivityDefinition] = {}
         for activity in activities:
-            # Confirm name is present
-            name: Optional[str] = getattr(activity, "__temporal_activity_name", None)
-            if not name:
-                fn_name = getattr(activity, "__name__", "<unknown>")
-                raise TypeError(
-                    f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
-                )
-            elif name in self._activities:
-                raise ValueError(f"More than one activity named {name}")
+            # Get definition
+            defn = _ActivityDefinition.from_callable(
+                activity, type_hint_eval_str=type_hint_eval_str
+            )
+            # Confirm name unique
+            if defn.name in self._activities:
+                raise ValueError(f"More than one activity named {defn.name}")
 
             # Some extra requirements for sync functions
-            if not inspect.iscoroutinefunction(activity):
+            if not defn.is_async:
                 if not activity_executor:
                     raise ValueError(
-                        f"Activity {name} is not async so an activity_executor must be present"
+                        f"Activity {defn.name} is not async so an activity_executor must be present"
                     )
                 if (
                     not isinstance(
@@ -95,7 +93,7 @@ class _ActivityWorker:
                     and not shared_state_manager
                 ):
                     raise ValueError(
-                        f"Activity {name} is not async and executor is not thread-pool executor, "
+                        f"Activity {defn.name} is not async and executor is not thread-pool executor, "
                         "so a shared_state_manager must be present"
                     )
                 if isinstance(
@@ -109,14 +107,9 @@ class _ActivityWorker:
                         pickle.dumps(activity)
                     except Exception as err:
                         raise TypeError(
-                            f"Activity {name} must be picklable when using a process executor"
+                            f"Activity {defn.name} must be picklable when using a process executor"
                         ) from err
-            arg_types, ret_type = temporalio.converter._type_hints_from_func(
-                activity, eval_str=type_hint_eval_str
-            )
-            self._activities[name] = _ActivityDefinition(
-                name=name, fn=activity, arg_types=arg_types, ret_type=ret_type
-            )
+            self._activities[defn.name] = defn
 
     async def run(self) -> None:
         # Continually poll for activity work
@@ -498,8 +491,28 @@ class _ActivityWorker:
 class _ActivityDefinition:
     name: str
     fn: Callable[..., Any]
+    is_async: bool
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
+
+    @staticmethod
+    def from_callable(fn: Callable, *, type_hint_eval_str: bool) -> _ActivityDefinition:
+        name: Optional[str] = getattr(fn, "__temporal_activity_name", None)
+        if not name:
+            fn_name = getattr(fn, "__name__", "<unknown>")
+            raise TypeError(
+                f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
+            )
+        arg_types, ret_type = temporalio.converter._type_hints_from_func(
+            fn, eval_str=type_hint_eval_str
+        )
+        return _ActivityDefinition(
+            name=name,
+            fn=fn,
+            is_async=inspect.iscoroutinefunction(fn),
+            arg_types=arg_types,
+            ret_type=ret_type,
+        )
 
 
 @dataclass

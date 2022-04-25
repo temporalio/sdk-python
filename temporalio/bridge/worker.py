@@ -106,6 +106,19 @@ def retry_policy_from_proto(
     )
 
 
+def retry_policy_to_proto(
+    p: temporalio.common.RetryPolicy,
+    v: temporalio.bridge.proto.common.RetryPolicy,
+) -> None:
+    v.initial_interval.FromTimedelta(p.initial_interval)
+    v.backoff_coefficient = p.backoff_coefficient
+    if p.maximum_interval:
+        v.maximum_interval.FromTimedelta(p.maximum_interval)
+    v.maximum_attempts = p.maximum_attempts
+    if p.non_retryable_error_types:
+        v.non_retryable_error_types.extend(p.non_retryable_error_types)
+
+
 def from_bridge_payloads(
     payloads: Iterable[temporalio.bridge.proto.common.Payload],
 ) -> List[temporalio.api.common.v1.Payload]:

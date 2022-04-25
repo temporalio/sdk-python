@@ -127,6 +127,8 @@ async def test_workflow_signal_and_query(client: Client):
 class AsyncUtilWorkflow:
     def __init__(self) -> None:
         self._status = "starting"
+        self._wait_event1 = asyncio.Event()
+        self._received_event2 = False
 
     @workflow.run
     async def run(self) -> Dict:
@@ -141,21 +143,57 @@ class AsyncUtilWorkflow:
         # the server)
         await asyncio.sleep(0.1)
 
-        # TODO(cretz): Test workflow,.wait_condition
+        # Wait for event 1
+        self._status = "waiting for event1"
+        await self._wait_event1.wait()
+
+        # Wait for event 2
+        self._status = "waiting for event2"
+        await workflow.wait_condition(lambda: self._received_event2)
 
         # Record completion times
+        self._status = "done"
         ret["end"] = str(workflow.now())
         ret["event_loop_end"] = asyncio.get_running_loop().time()
         return ret
 
+    @workflow.signal
+    def event1(self) -> None:
+        self._wait_event1.set()
+
+    @workflow.signal
+    def event2(self) -> None:
+        self._received_event2 = True
+
+    @workflow.query
+    def status(self) -> str:
+        return self._status
+
 
 async def test_workflow_async_utils(client: Client):
     async with new_worker(client, AsyncUtilWorkflow) as worker:
-        result = await client.execute_workflow(
+        # Start workflow and wait until status is waiting for event 1
+        handle = await client.start_workflow(
             AsyncUtilWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
+        async def status() -> str:
+            return await handle.query(AsyncUtilWorkflow.status)
+
+        await assert_eq_eventually("waiting for event1", status)
+
+        # Set event 1 and confirm waiting on event 2
+        await handle.signal(AsyncUtilWorkflow.event1)
+        await assert_eq_eventually("waiting for event2", status)
+
+        # Set event 2 and get the result and confirm query still works
+        await handle.signal(AsyncUtilWorkflow.event2)
+        result = await handle.result()
+        assert "done" == await status()
+
+        # Check the result
         assert datetime.fromisoformat(result["start"]) <= datetime.fromisoformat(
             result["end"]
         )
