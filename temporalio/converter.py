@@ -5,7 +5,7 @@ import inspect
 import json
 import sys
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Type
 
 import dacite
 import google.protobuf.json_format
@@ -402,6 +402,9 @@ class JSONPlainPayloadConverter(PayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
+_default: Optional[CompositeDataConverter] = None
+
+
 def default() -> CompositeDataConverter:
     """Default converter compatible with other Temporal SDKs.
 
@@ -410,13 +413,16 @@ def default() -> CompositeDataConverter:
     :py:mod:`dataclasses` and also decoding them provided the data class is in
     the type hint.
     """
-    return CompositeDataConverter(
-        BinaryNullPayloadConverter(),
-        BinaryPlainPayloadConverter(),
-        JSONProtoPayloadConverter(),
-        BinaryProtoPayloadConverter(),
-        JSONPlainPayloadConverter(),
-    )
+    global _default
+    if not _default:
+        _default = CompositeDataConverter(
+            BinaryNullPayloadConverter(),
+            BinaryPlainPayloadConverter(),
+            JSONProtoPayloadConverter(),
+            BinaryProtoPayloadConverter(),
+            JSONPlainPayloadConverter(),
+        )
+    return _default
 
 
 async def encode_payloads(
@@ -439,8 +445,27 @@ async def decode_payloads(
     return await converter.decode(payloads.payloads)
 
 
+class _FunctionTypeLookup:
+    def __init__(self, type_hint_eval_str: bool) -> None:
+        # Keyed by callable __qualname__, value is optional arg types and
+        # optional ret type
+        self._type_hint_eval_str = type_hint_eval_str
+        self._cache: Dict[str, Tuple[Optional[List[Type]], Optional[Type]]] = {}
+
+    def get_type_hints(self, fn: Any) -> Tuple[Optional[List[Type]], Optional[Type]]:
+        # Due to MyPy issues, we cannot type "fn" as callable
+        if not callable(fn):
+            return (None, None)
+        ret = self._cache.get(fn.__qualname__)
+        if not ret:
+            # TODO(cretz): Do we even need to cache?
+            ret = _type_hints_from_func(fn, eval_str=self._type_hint_eval_str)
+            self._cache[fn.__qualname__] = ret
+        return ret
+
+
 def _type_hints_from_func(
-    func: Callable[..., Any], *, eval_str: bool
+    func: Callable, *, eval_str: bool
 ) -> Tuple[Optional[List[Type]], Optional[Type]]:
     """Extracts the type hints from the function.
 
@@ -451,7 +476,8 @@ def _type_hints_from_func(
     Returns:
         Tuple containing parameter types and return type. The parameter types
         will be None if there are any non-positional parameters or if any of the
-        parameters to not have an annotation that represents a class.
+        parameters to not have an annotation that represents a class. If the
+        first parameter is "self" with no attribute, it is not included.
     """
     # eval_str only supported on >= 3.10
     if sys.version_info >= (3, 10):
@@ -462,7 +488,15 @@ def _type_hints_from_func(
     if inspect.isclass(sig.return_annotation):
         ret = sig.return_annotation
     args: List[Type] = []
-    for value in sig.parameters.values():
+    for index, value in enumerate(sig.parameters.values()):
+        # Ignore self
+        if (
+            index == 0
+            and value.name == "self"
+            and value.annotation is inspect.Parameter.empty
+        ):
+            continue
+        # Stop if non-positional or not a class
         if (
             value.kind is not inspect.Parameter.POSITIONAL_ONLY
             and value.kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD

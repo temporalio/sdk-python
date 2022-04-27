@@ -14,8 +14,8 @@ from typing import (
     Callable,
     Generic,
     Iterable,
+    List,
     Mapping,
-    NoReturn,
     Optional,
     Tuple,
     Type,
@@ -148,6 +148,7 @@ class Client:
 
         See :py:meth:`connect` for details on the parameters.
         """
+        self._type_lookup = temporalio.converter._FunctionTypeLookup(type_hint_eval_str)
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
         for interceptor in reversed(list(interceptors)):
@@ -312,23 +313,22 @@ class Client:
             RPCError: Workflow could not be started.
         """
 
-        # If the workflow is a callable, we get the name from the definition
-        workflow_name: str
-        if callable(workflow):
-            defn = temporalio.workflow._Definition.from_run_fn(workflow)
-            if not defn:
-                raise RuntimeError(
-                    f"Workflow definition not found on {workflow.__qualname__}, "
-                    "is it on a class with @workflow.defn?"
-                )
-            # TODO(cretz): Check count/type of args at runtime?
-            workflow_name = defn.name
+        # Use definition if callable
+        name: str
+        arg_types: Optional[List[Type]] = None
+        ret_type: Optional[Type] = None
+        if isinstance(workflow, str):
+            name = workflow
+        elif callable(workflow):
+            defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
+            name = defn.name
+            arg_types, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
         else:
-            workflow_name = str(workflow)
+            raise TypeError("Workflow must be a string or callable")
 
         return await self._impl.start_workflow(
             StartWorkflowInput(
-                workflow=workflow_name,
+                workflow=name,
                 args=args,
                 id=id,
                 task_queue=task_queue,
@@ -343,6 +343,8 @@ class Client:
                 header=header,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
+                arg_types=arg_types,
+                ret_type=ret_type,
             )
         )
 
@@ -672,6 +674,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     req.next_page_token = b""
                     continue
                 # Ignoring anything after the first response like TypeScript
+                # TODO(cretz): Support type hints
                 results = await temporalio.converter.decode_payloads(
                     complete_attr.result, self._client.data_converter
                 )
@@ -1131,6 +1134,9 @@ class StartWorkflowInput:
     header: Optional[Mapping[str, Any]]
     start_signal: Optional[str]
     start_signal_args: Iterable[Any]
+    # The types may be absent
+    arg_types: Optional[List[Type]]
+    ret_type: Optional[Type]
 
 
 @dataclass

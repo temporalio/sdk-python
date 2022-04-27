@@ -16,6 +16,15 @@ class TemporalError(Exception):
     pass
 
 
+class WorkflowAlreadyStartedError(TemporalError):
+    """Thrown by a client or workflow when a workflow execution has already started."""
+
+    def __init__(self, workflow_id: str, workflow_type: str) -> None:
+        super().__init__("Workflow execution already started")
+        self.workflow_id = workflow_id
+        self.workflow_type = workflow_type
+
+
 class FailureError(TemporalError):
     """Base for runtime failures during workflow/activity execution."""
 

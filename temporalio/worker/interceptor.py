@@ -5,7 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Iterable, List, Optional, Type
+from typing import Any, Awaitable, Callable, Iterable, List, Mapping, Optional, Type
 
 import temporalio.activity
 import temporalio.common
@@ -138,6 +138,28 @@ class StartActivityInput:
     ret_type: Optional[Type]
 
 
+@dataclass
+class StartChildWorkflowInput:
+    workflow: str
+    args: Iterable[Any]
+    id: str
+    task_queue: Optional[str]
+    namespace: Optional[str]
+    cancellation_type: temporalio.workflow.ChildWorkflowCancellationType
+    parent_close_policy: temporalio.workflow.ParentClosePolicy
+    execution_timeout: Optional[timedelta]
+    run_timeout: Optional[timedelta]
+    task_timeout: Optional[timedelta]
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
+    retry_policy: Optional[temporalio.common.RetryPolicy]
+    cron_schedule: str
+    memo: Optional[Mapping[str, Any]]
+    search_attributes: Optional[Mapping[str, Any]]
+    # The types may be absent
+    arg_types: Optional[List[Type]]
+    ret_type: Optional[Type]
+
+
 class WorkflowInboundInterceptor:
     def __init__(self, next: WorkflowInboundInterceptor) -> None:
         self.next = next
@@ -166,3 +188,8 @@ class WorkflowOutboundInterceptor:
         self, input: StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
         return self.next.start_activity(input)
+
+    async def start_child_workflow(
+        self, input: StartChildWorkflowInput
+    ) -> temporalio.workflow.ChildWorkflowHandle:
+        return await self.next.start_child_workflow(input)

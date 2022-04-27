@@ -7,7 +7,7 @@ import concurrent.futures
 import itertools
 import logging
 from datetime import timedelta
-from typing import Callable, Iterable, List, Optional, Type, cast
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -142,6 +142,12 @@ class Worker:
         )
         interceptors = itertools.chain(interceptors_from_client, interceptors)
 
+        # Instead of using the _type_lookup on the client, we create a separate
+        # one here so we can continue to only use the public API of the client
+        type_lookup = temporalio.converter._FunctionTypeLookup(
+            client_config["type_hint_eval_str"]
+        )
+
         # Extract the bridge workflow service. We try the service on the client
         # first, then we support a worker_workflow_service on the client's
         # service to return underlying service we can use.
@@ -198,9 +204,9 @@ class Worker:
                 activities=activities,
                 activity_executor=activity_executor,
                 shared_state_manager=shared_state_manager,
-                type_hint_eval_str=client_config["type_hint_eval_str"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
+                type_lookup=type_lookup,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
@@ -210,9 +216,9 @@ class Worker:
                 task_queue=task_queue,
                 workflows=workflows,
                 workflow_task_executor=workflow_task_executor,
-                type_hint_eval_str=client_config["type_hint_eval_str"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
+                type_lookup=type_lookup,
                 max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             )
 

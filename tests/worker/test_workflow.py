@@ -3,6 +3,7 @@ import dataclasses
 import json
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Awaitable, Callable, Dict, Iterable, Type
 
@@ -200,6 +201,74 @@ async def test_workflow_async_utils(client: Client):
         assert isinstance(result["event_loop_start"], float)
         assert isinstance(result["event_loop_end"], float)
         assert result["event_loop_start"] <= result["event_loop_end"]
+
+
+@activity.defn
+async def say_hello(name: str) -> str:
+    return f"Hello, {name}!"
+
+
+@workflow.defn
+class SimpleActivityWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return await workflow.execute_activity(
+            say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
+        )
+
+
+async def test_workflow_simple_activity(client: Client):
+    async with new_worker(
+        client, SimpleActivityWorkflow, activities=[say_hello]
+    ) as worker:
+        result = await client.execute_workflow(
+            SimpleActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "Hello, Temporal!"
+
+
+@dataclass
+class SimpleChildWorkflowParams:
+    name: str
+    child_id: str
+
+
+@workflow.defn
+class SimpleChildWorkflow:
+    @workflow.run
+    async def run(self, params: SimpleChildWorkflowParams) -> str:
+        return await workflow.execute_child_workflow(
+            HelloWorkflow.run, params.name, id=params.child_id
+        )
+
+
+async def test_workflow_simple_child(client: Client):
+    async with new_worker(client, SimpleChildWorkflow, HelloWorkflow) as worker:
+        result = await client.execute_workflow(
+            SimpleChildWorkflow.run,
+            SimpleChildWorkflowParams(
+                name="Temporal", child_id=f"workflow-{uuid.uuid4()}"
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "Hello, Temporal!"
+
+
+# TODO:
+# * Explicit activity cancellation
+# * Cancellation scopes
+# * Activity cancellation types
+# * Activity timeout behavior
+# * Workflow logger
+# * Local activities
+# * Data class params and return types
+# * Separate protocol and impl
+# * Separate ABC and impl
+# * Workflow execution already started error (from client _and_ child workflow)
 
 
 def new_worker(

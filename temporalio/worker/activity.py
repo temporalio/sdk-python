@@ -15,7 +15,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
@@ -52,9 +52,9 @@ class _ActivityWorker:
         activities: Iterable[Callable],
         activity_executor: Optional[concurrent.futures.Executor],
         shared_state_manager: Optional[SharedStateManager],
-        type_hint_eval_str: bool,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
+        type_lookup: temporalio.converter._FunctionTypeLookup,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
@@ -63,6 +63,7 @@ class _ActivityWorker:
         self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._data_converter = data_converter
         self._interceptors = interceptors
+        self._type_lookup = type_lookup
         # Lazily created on first activity
         self._worker_shutdown_event: Optional[
             temporalio.activity._CompositeEvent
@@ -70,12 +71,10 @@ class _ActivityWorker:
         self._seen_sync_activity = False
 
         # Validate and build activity dict
-        self._activities: Dict[str, _ActivityDefinition] = {}
+        self._activities: Dict[str, temporalio.activity._Definition] = {}
         for activity in activities:
             # Get definition
-            defn = _ActivityDefinition.from_callable(
-                activity, type_hint_eval_str=type_hint_eval_str
-            )
+            defn = temporalio.activity._Definition.must_from_callable(activity)
             # Confirm name unique
             if defn.name in self._activities:
                 raise ValueError(f"More than one activity named {defn.name}")
@@ -305,10 +304,8 @@ class _ActivityWorker:
 
             # Convert arguments. We only use arg type hints if they match the
             # input count.
-            arg_types = activity_def.arg_types
-            if activity_def.arg_types is not None and len(
-                activity_def.arg_types
-            ) != len(start.input):
+            arg_types, _ = self._type_lookup.get_type_hints(activity_def.fn)
+            if arg_types is not None and len(arg_types) != len(start.input):
                 arg_types = None
             try:
                 args = (
@@ -485,34 +482,6 @@ class _ActivityWorker:
             await self._bridge_worker().complete_activity_task(completion)
         except Exception:
             temporalio.activity.logger.exception("Failed completing activity task")
-
-
-@dataclass
-class _ActivityDefinition:
-    name: str
-    fn: Callable[..., Any]
-    is_async: bool
-    arg_types: Optional[List[Type]]
-    ret_type: Optional[Type]
-
-    @staticmethod
-    def from_callable(fn: Callable, *, type_hint_eval_str: bool) -> _ActivityDefinition:
-        name: Optional[str] = getattr(fn, "__temporal_activity_name", None)
-        if not name:
-            fn_name = getattr(fn, "__name__", "<unknown>")
-            raise TypeError(
-                f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
-            )
-        arg_types, ret_type = temporalio.converter._type_hints_from_func(
-            fn, eval_str=type_hint_eval_str
-        )
-        return _ActivityDefinition(
-            name=name,
-            fn=fn,
-            is_async=inspect.iscoroutinefunction(fn),
-            arg_types=arg_types,
-            ret_type=ret_type,
-        )
 
 
 @dataclass
