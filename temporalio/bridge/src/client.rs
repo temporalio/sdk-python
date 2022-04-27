@@ -4,7 +4,7 @@ use pyo3_asyncio::tokio::future_into_py;
 use std::collections::HashMap;
 use std::time::Duration;
 use temporal_client::{
-    ConfiguredClient, RetryConfig, RetryGateway, ServerGatewayOptions, ServerGatewayOptionsBuilder,
+    ConfiguredClient, RetryConfig, RetryClient, ClientOptions, ClientOptionsBuilder,
     TlsConfig, WorkflowService, WorkflowServiceClientWithMetrics,
 };
 use tonic;
@@ -12,7 +12,7 @@ use url::Url;
 
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = RetryGateway<ConfiguredClient<WorkflowServiceClientWithMetrics>>;
+type Client = RetryClient<ConfiguredClient<WorkflowServiceClientWithMetrics>>;
 
 #[pyclass]
 pub struct ClientRef {
@@ -51,7 +51,7 @@ struct ClientRetryConfig {
 
 pub fn connect_client(py: Python, config: ClientConfig) -> PyResult<&PyAny> {
     // TODO(cretz): Add metrics_meter?
-    let opts: ServerGatewayOptions = config.try_into()?;
+    let opts: ClientOptions = config.try_into()?;
     future_into_py(py, async move {
         Ok(ClientRef {
             retry_client: opts.connect_no_namespace(None).await.map_err(|err| {
@@ -226,11 +226,11 @@ where
     }
 }
 
-impl TryFrom<ClientConfig> for temporal_client::ServerGatewayOptions {
+impl TryFrom<ClientConfig> for ClientOptions {
     type Error = PyErr;
 
     fn try_from(opts: ClientConfig) -> PyResult<Self> {
-        let mut gateway_opts = ServerGatewayOptionsBuilder::default();
+        let mut gateway_opts = ClientOptionsBuilder::default();
         gateway_opts
             .target_url(
                 Url::parse(&opts.target_url)
