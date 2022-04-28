@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Awaitable, Callable, Dict, Iterable, Type
 
+import pytest
+
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -230,6 +232,29 @@ async def test_workflow_simple_activity(client: Client):
         assert result == "Hello, Temporal!"
 
 
+@workflow.defn
+class SimpleLocalActivityWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return await workflow.execute_local_activity(
+            say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
+        )
+
+
+@pytest.mark.skip(reason="failing due to lack of retry policy currently")
+async def test_workflow_simple_local_activity(client: Client):
+    async with new_worker(
+        client, SimpleLocalActivityWorkflow, activities=[say_hello]
+    ) as worker:
+        result = await client.execute_workflow(
+            SimpleLocalActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "Hello, Temporal!"
+
+
 @dataclass
 class SimpleChildWorkflowParams:
     name: str
@@ -259,16 +284,17 @@ async def test_workflow_simple_child(client: Client):
 
 
 # TODO:
+# * Local activities
 # * Explicit activity cancellation
 # * Cancellation scopes
 # * Activity cancellation types
 # * Activity timeout behavior
 # * Workflow logger
-# * Local activities
 # * Data class params and return types
 # * Separate protocol and impl
 # * Separate ABC and impl
 # * Workflow execution already started error (from client _and_ child workflow)
+# * Use typed dicts for activity, local activity, and child workflow configs
 
 
 def new_worker(

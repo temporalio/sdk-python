@@ -160,6 +160,22 @@ class StartChildWorkflowInput:
     ret_type: Optional[Type]
 
 
+@dataclass
+class StartLocalActivityInput:
+    activity: str
+    args: Iterable[Any]
+    activity_id: Optional[str]
+    schedule_to_close_timeout: Optional[timedelta]
+    schedule_to_start_timeout: Optional[timedelta]
+    start_to_close_timeout: Optional[timedelta]
+    retry_policy: Optional[temporalio.common.RetryPolicy]
+    local_retry_threshold: Optional[timedelta]
+    cancellation_type: temporalio.workflow.ActivityCancellationType
+    # The types may be absent
+    arg_types: Optional[List[Type]]
+    ret_type: Optional[Type]
+
+
 class WorkflowInboundInterceptor:
     def __init__(self, next: WorkflowInboundInterceptor) -> None:
         self.next = next
@@ -193,3 +209,8 @@ class WorkflowOutboundInterceptor:
         self, input: StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
         return await self.next.start_child_workflow(input)
+
+    def start_local_activity(
+        self, input: StartLocalActivityInput
+    ) -> temporalio.workflow.ActivityHandle:
+        return self.next.start_local_activity(input)

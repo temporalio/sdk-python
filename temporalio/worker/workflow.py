@@ -36,6 +36,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
+import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
@@ -56,6 +57,7 @@ from .interceptor import (
     Interceptor,
     StartActivityInput,
     StartChildWorkflowInput,
+    StartLocalActivityInput,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
@@ -498,6 +500,8 @@ class _RunningWorkflow:
                 job.result.cancelled.failure, self._worker._data_converter
             )
             self._loop.resolve_activity_failure(job.seq, exc)
+        elif job.result.HasField("backoff"):
+            self._loop.resolve_activity_local_backoff(job.seq, job.result.backoff)
         else:
             raise RuntimeError("Activity did not have result")
 
@@ -736,6 +740,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     ) -> temporalio.workflow.ChildWorkflowHandle:
         return await self._workflow._loop.start_child_workflow(input)
 
+    def start_local_activity(
+        self, input: StartLocalActivityInput
+    ) -> temporalio.workflow.ActivityHandle:
+        return self._workflow._loop.schedule_activity(input)
+
 
 class _WorkflowRuntimeImpl(temporalio.workflow._Runtime):
     def __init__(
@@ -851,6 +860,49 @@ class _WorkflowRuntimeImpl(temporalio.workflow._Runtime):
             )
         )
 
+    def start_local_activity(
+        self,
+        activity: Any,
+        *args: Any,
+        activity_id: Optional[str],
+        schedule_to_close_timeout: Optional[timedelta],
+        schedule_to_start_timeout: Optional[timedelta],
+        start_to_close_timeout: Optional[timedelta],
+        retry_policy: Optional[temporalio.common.RetryPolicy],
+        local_retry_threshold: Optional[timedelta],
+        cancellation_type: temporalio.workflow.ActivityCancellationType,
+    ) -> temporalio.workflow.ActivityHandle[Any]:
+        # Get activity definition if it's callable
+        name: str
+        arg_types: Optional[List[Type]] = None
+        ret_type: Optional[Type] = None
+        if isinstance(activity, str):
+            name = activity
+        elif callable(activity):
+            defn = temporalio.activity._Definition.must_from_callable(activity)
+            name = defn.name
+            arg_types, ret_type = self._workflow._worker._type_lookup.get_type_hints(
+                activity
+            )
+        else:
+            raise TypeError("Activity must be a string or callable")
+
+        return self._outbound.start_local_activity(
+            StartLocalActivityInput(
+                activity=name,
+                args=args,
+                activity_id=activity_id,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
+                retry_policy=retry_policy,
+                local_retry_threshold=local_retry_threshold,
+                cancellation_type=cancellation_type,
+                arg_types=arg_types,
+                ret_type=ret_type,
+            )
+        )
+
     async def wait_condition(
         self, fn: Callable[[], bool], *, timeout: Optional[float] = None
     ) -> None:
@@ -896,6 +948,33 @@ class _EventLoop(asyncio.AbstractEventLoop):
         if not handle:
             raise RuntimeError(f"Failed finding activity handle for sequence {seq}")
         handle.result_fut.set_exception(exc)
+
+    def resolve_activity_local_backoff(
+        self, seq: int, backoff: temporalio.bridge.proto.activity_result.DoBackoff
+    ) -> None:
+        # Async call to wait for the timer then execute the activity again
+        # TODO(cretz): Make sure this is in the same cancellation scope as the
+        # local activity itself
+        async def backoff_then_reschedule() -> None:
+            # Don't pop, we want this to remain as pending
+            handle = self._pending_activities[seq]
+            try:
+                await asyncio.sleep(
+                    backoff.backoff_duration.ToTimedelta().total_seconds()
+                )
+            except Exception as err:
+                self._pending_activities.pop(seq)
+                handle.result_fut.set_exception(err)
+                return
+
+            async def build_command() -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+                return await self.build_schedule_activity_command(
+                    seq, handle.input, backoff
+                )
+
+            self._workflow._pending_commands.append(build_command)
+
+        self.create_task(backoff_then_reschedule())
 
     def resolve_activity_success(self, seq: int, result: Any) -> None:
         handle = self._pending_activities.pop(seq, None)
@@ -971,7 +1050,13 @@ class _EventLoop(asyncio.AbstractEventLoop):
     def set_time(self, time: float) -> None:
         self._time = time
 
-    def schedule_activity(self, input: StartActivityInput) -> _ActivityHandle:
+    def schedule_activity(
+        self,
+        input: Union[StartActivityInput, StartLocalActivityInput],
+        local_backoff: Optional[
+            temporalio.bridge.proto.activity_result.DoBackoff
+        ] = None,
+    ) -> _ActivityHandle:
         # Validate
         if not input.start_to_close_timeout and not input.schedule_to_close_timeout:
             raise ValueError(
@@ -981,48 +1066,81 @@ class _EventLoop(asyncio.AbstractEventLoop):
         seq = self._next_seq("activity")
         # We build the command in a callback to run on the other event loop
         async def build_command() -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
-            command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
-            v = command.schedule_activity
-            v.seq = seq
-            v.activity_id = input.activity_id or str(seq)
-            v.activity_type = input.activity
-            v.namespace = self._workflow._worker._namespace
-            v.task_queue = input.task_queue or self._workflow._info.task_queue
-            # TODO(cretz): Headers
-            # v.headers = input.he
-            if input.args:
-                v.arguments.extend(
-                    temporalio.bridge.worker.to_bridge_payloads(
-                        await self._workflow._worker._data_converter.encode(input.args)
-                    )
-                )
-            if input.schedule_to_close_timeout:
-                v.schedule_to_close_timeout.FromTimedelta(
-                    input.schedule_to_close_timeout
-                )
-            if input.schedule_to_start_timeout:
-                v.schedule_to_start_timeout.FromTimedelta(
-                    input.schedule_to_start_timeout
-                )
-            if input.start_to_close_timeout:
-                v.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
-            if input.heartbeat_timeout:
-                v.heartbeat_timeout.FromTimedelta(input.heartbeat_timeout)
-            if input.retry_policy:
-                temporalio.bridge.worker.retry_policy_to_proto(
-                    input.retry_policy, v.retry_policy
-                )
-            v.cancellation_type = cast(
-                "temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType",
-                int(input.cancellation_type),
-            )
-            return command
+            return await self.build_schedule_activity_command(seq, input, local_backoff)
 
         # Create the handle and set as pending
-        handle = _ActivityHandle(self.create_future(), input.arg_types, input.ret_type)
+        handle = _ActivityHandle(
+            input, self.create_future(), input.arg_types, input.ret_type
+        )
         self._pending_activities[seq] = handle
         self._workflow._pending_commands.append(build_command)
         return handle
+
+    # Note, this should not be called on _this_ event loop, only on the main one
+    async def build_schedule_activity_command(
+        self,
+        seq: int,
+        input: Union[StartActivityInput, StartLocalActivityInput],
+        local_backoff: Optional[
+            temporalio.bridge.proto.activity_result.DoBackoff
+        ] = None,
+    ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        # TODO(cretz): Why can't MyPy infer this?
+        v: Union[
+            temporalio.bridge.proto.workflow_commands.ScheduleActivity,
+            temporalio.bridge.proto.workflow_commands.ScheduleLocalActivity,
+        ] = (
+            command.schedule_local_activity
+            if isinstance(input, StartLocalActivityInput)
+            else command.schedule_activity
+        )
+        v.seq = seq
+        v.activity_id = input.activity_id or str(seq)
+        v.activity_type = input.activity
+        # TODO(cretz): Headers
+        # v.headers = input.he
+        if input.args:
+            v.arguments.extend(
+                temporalio.bridge.worker.to_bridge_payloads(
+                    await self._workflow._worker._data_converter.encode(input.args)
+                )
+            )
+        if input.schedule_to_close_timeout:
+            v.schedule_to_close_timeout.FromTimedelta(input.schedule_to_close_timeout)
+        if input.schedule_to_start_timeout:
+            v.schedule_to_start_timeout.FromTimedelta(input.schedule_to_start_timeout)
+        if input.start_to_close_timeout:
+            v.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
+        if input.retry_policy:
+            temporalio.bridge.worker.retry_policy_to_proto(
+                input.retry_policy, v.retry_policy
+            )
+        v.cancellation_type = cast(
+            "temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType",
+            int(input.cancellation_type),
+        )
+
+        # Things specific to local or remote
+        if isinstance(input, StartActivityInput):
+            command.schedule_activity.task_queue = (
+                input.task_queue or self._workflow._info.task_queue
+            )
+            if input.heartbeat_timeout:
+                command.schedule_activity.heartbeat_timeout.FromTimedelta(
+                    input.heartbeat_timeout
+                )
+        if isinstance(input, StartLocalActivityInput):
+            if input.local_retry_threshold:
+                command.schedule_local_activity.local_retry_threshold.FromTimedelta(
+                    input.local_retry_threshold
+                )
+            if local_backoff:
+                command.schedule_local_activity.attempt = local_backoff.attempt
+                command.schedule_local_activity.original_schedule_time.CopyFrom(
+                    local_backoff.original_schedule_time
+                )
+        return command
 
     async def start_child_workflow(
         self, input: StartChildWorkflowInput
@@ -1243,11 +1361,13 @@ class _EventLoop(asyncio.AbstractEventLoop):
 class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     def __init__(
         self,
+        input: Union[StartActivityInput, StartLocalActivityInput],
         result_fut: asyncio.Future[Any],
         arg_types: Optional[List[Type]],
         ret_type: Optional[Type],
     ) -> None:
         super().__init__()
+        self.input = input
         self.result_fut = result_fut
         self.arg_types = arg_types
         self.ret_type = ret_type
