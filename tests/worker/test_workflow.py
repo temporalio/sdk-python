@@ -5,12 +5,13 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Awaitable, Callable, Dict, Iterable, Type
+from typing import Any, Awaitable, Callable, Dict, Iterable, Type, TypeVar
 
 import pytest
 
 from temporalio import activity, workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowFailureError
+from temporalio.exceptions import ActivityError, CancelledError, ChildWorkflowError
 from temporalio.worker import Worker
 
 
@@ -241,7 +242,6 @@ class SimpleLocalActivityWorkflow:
         )
 
 
-@pytest.mark.skip(reason="failing due to lack of retry policy currently")
 async def test_workflow_simple_local_activity(client: Client):
     async with new_worker(
         client, SimpleLocalActivityWorkflow, activities=[say_hello]
@@ -253,6 +253,115 @@ async def test_workflow_simple_local_activity(client: Client):
             task_queue=worker.task_queue,
         )
         assert result == "Hello, Temporal!"
+
+
+@activity.defn
+async def wait_cancel() -> str:
+    try:
+        while True:
+            await asyncio.sleep(0.1)
+            activity.heartbeat()
+    except asyncio.CancelledError:
+        return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
+
+
+@workflow.defn
+class CancelActivityWorkflow:
+    @workflow.run
+    async def run(self, wait_for_cancel: bool) -> str:
+        cancellation_type = workflow.ActivityCancellationType.TRY_CANCEL
+        if wait_for_cancel:
+            cancellation_type = (
+                workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+            )
+        handle = workflow.start_activity(
+            wait_cancel,
+            schedule_to_close_timeout=timedelta(seconds=5),
+            heartbeat_timeout=timedelta(seconds=1),
+            cancellation_type=cancellation_type,
+        )
+        await asyncio.sleep(0.01)
+        handle.cancel()
+        return await handle.result()
+
+
+async def test_workflow_cancel_activity(client: Client):
+    async with new_worker(
+        client, CancelActivityWorkflow, activities=[wait_cancel]
+    ) as worker:
+        # Do not wait for cancel
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                CancelActivityWorkflow.run,
+                False,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, CancelledError)
+
+        # Wait for cancel
+        result = await client.execute_workflow(
+            CancelActivityWorkflow.run,
+            True,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert "Got cancelled error, cancelled? True" == result
+
+
+@activity.defn
+async def wait_local_cancel() -> str:
+    try:
+        await asyncio.sleep(1000)
+        raise RuntimeError("Should not get here")
+    except asyncio.CancelledError:
+        return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
+
+
+@workflow.defn
+class CancelLocalActivityWorkflow:
+    @workflow.run
+    async def run(self, wait_for_cancel: bool) -> str:
+        cancellation_type = workflow.ActivityCancellationType.TRY_CANCEL
+        if wait_for_cancel:
+            cancellation_type = (
+                workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+            )
+        handle = workflow.start_local_activity(
+            wait_local_cancel,
+            schedule_to_close_timeout=timedelta(seconds=5),
+            cancellation_type=cancellation_type,
+        )
+        await asyncio.sleep(0.01)
+        handle.cancel()
+        return await handle.result()
+
+
+@pytest.mark.skip(reason="Make test to timeout WFT better")
+async def test_workflow_cancel_local_activity(client: Client):
+    async with new_worker(
+        client, CancelLocalActivityWorkflow, activities=[wait_local_cancel]
+    ) as worker:
+        # Do not wait for cancel
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                CancelLocalActivityWorkflow.run,
+                False,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, CancelledError)
+
+        # Wait for cancel
+        result = await client.execute_workflow(
+            CancelLocalActivityWorkflow.run,
+            True,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert "Got cancelled error, cancelled? True" == result
 
 
 @dataclass
@@ -283,11 +392,65 @@ async def test_workflow_simple_child(client: Client):
         assert result == "Hello, Temporal!"
 
 
+@workflow.defn
+class LongSleepWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        self._started = True
+        await asyncio.sleep(1000)
+
+    @workflow.query
+    def started(self) -> bool:
+        return self._started
+
+
+async def test_workflow_simple_cancel(client: Client):
+    async with new_worker(client, LongSleepWorkflow) as worker:
+        handle = await client.start_workflow(
+            LongSleepWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def started() -> bool:
+            return await handle.query(LongSleepWorkflow.started)
+
+        await assert_eq_eventually(True, started)
+        await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+        assert "Workflow cancelled" == err.value.cause.message
+
+
+@workflow.defn
+class CancelChildWorkflow:
+    @workflow.run
+    async def run(self, child_id: str) -> None:
+        handle = await workflow.start_child_workflow(LongSleepWorkflow.run, id=child_id)
+        await asyncio.sleep(0.1)
+        handle.cancel()
+        await handle.result()
+
+
+async def test_workflow_cancel_child(client: Client):
+    async with new_worker(client, CancelChildWorkflow, LongSleepWorkflow) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                CancelChildWorkflow.run,
+                f"child-workflow-{uuid.uuid4()}",
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ChildWorkflowError)
+        assert isinstance(err.value.cause.cause, CancelledError)
+        assert "Workflow cancelled" == err.value.cause.cause.message
+
+
 # TODO:
-# * Local activities
-# * Explicit activity cancellation
 # * Cancellation scopes
 # * Activity cancellation types
+# * Cancel workflow
 # * Activity timeout behavior
 # * Workflow logger
 # * Data class params and return types
@@ -295,6 +458,14 @@ async def test_workflow_simple_child(client: Client):
 # * Separate ABC and impl
 # * Workflow execution already started error (from client _and_ child workflow)
 # * Use typed dicts for activity, local activity, and child workflow configs
+# * Local activity invalid options
+# * Cancelling things not started
+# * Cancel without waiting for cancel (i.e. cancel unstarted)
+# * Starting something on an already-cancelled cancelled scope
+# * Cancel timers
+# * Cancel unstarted child
+# * Cancel unstarted child from a signal in the same WFT that "child started" may be in later
+# * create_task and create_future cancelling (with and without scopes)
 
 
 def new_worker(
@@ -305,15 +476,18 @@ def new_worker(
     )
 
 
+T = TypeVar("T")
+
+
 async def assert_eq_eventually(
-    expected: str,
-    fn: Callable[[], Awaitable[str]],
+    expected: T,
+    fn: Callable[[], Awaitable[T]],
     *,
     timeout: timedelta = timedelta(seconds=3),
     interval: timedelta = timedelta(milliseconds=200),
 ) -> None:
     start_sec = time.monotonic()
-    last_value = "<no value>"
+    last_value = None
     while timedelta(seconds=time.monotonic() - start_sec) < timeout:
         last_value = await fn()
         if expected == last_value:

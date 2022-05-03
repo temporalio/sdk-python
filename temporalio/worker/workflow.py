@@ -7,9 +7,7 @@ import contextvars
 import inspect
 import logging
 import traceback
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from tkinter import E
 from typing import (
     Any,
     Awaitable,
@@ -68,7 +66,6 @@ LOG_PROTOS = False
 DEADLOCK_TIMEOUT_SECONDS = 2
 
 
-@dataclass
 class _WorkflowWorker:
     def __init__(
         self,
@@ -282,6 +279,9 @@ class _RunningWorkflow:
         self._defn = defn
         self._info = info
         self._instance = instance
+        self._root_cancellation_scope = temporalio.workflow.CancellationScope(
+            detached=True
+        )
         # We ignore MyPy failing to instantiate this because it's not _really_
         # abstract at runtime
         self._loop = _EventLoop(self)  # type: ignore[abstract]
@@ -327,8 +327,7 @@ class _RunningWorkflow:
 
         self._pending_commands = []
 
-        # TODO(cretz): Apparently this can go backwards, but Python expects it
-        # to be monotonic
+        # Core ensures this is monotonic
         self._loop.set_time(act.timestamp.ToMicroseconds() / 1e6)
 
         # Split into job sets with patches, then signals, then non-queries, then
@@ -352,7 +351,9 @@ class _RunningWorkflow:
                 continue
             for job in job_set:
                 # Let errors bubble out of these to the caller to fail the task
-                if job.HasField("fire_timer"):
+                if job.HasField("cancel_workflow"):
+                    await self._cancel_workflow(job.cancel_workflow)
+                elif job.HasField("fire_timer"):
                     await self._fire_timer(job.fire_timer)
                 elif job.HasField("query_workflow"):
                     await self._query_workflow(job.query_workflow)
@@ -369,6 +370,9 @@ class _RunningWorkflow:
                     await self._resolve_child_workflow_execution_start(
                         job.resolve_child_workflow_execution_start
                     )
+                elif job.HasField("resolve_request_cancel_external_workflow"):
+                    # TODO(cretz): Resolve external cancel
+                    pass
                 elif job.HasField("signal_workflow"):
                     await self._signal_workflow(job.signal_workflow)
                 elif job.HasField("start_workflow"):
@@ -398,6 +402,18 @@ class _RunningWorkflow:
             else:
                 commands.append(pending_command)
         return commands
+
+    async def _cancel_workflow(
+        self, job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
+    ) -> None:
+        details: List[Any] = []
+        if job.details:
+            details = await self._worker._data_converter.decode(
+                temporalio.bridge.worker.from_bridge_payloads(job.details)
+            )
+        self._root_cancellation_scope._cancel(
+            temporalio.exceptions.CancelledError("Workflow cancelled", *details)
+        )
 
     async def _fire_timer(
         self, job: temporalio.bridge.proto.workflow_activation.FireTimer
@@ -559,17 +575,17 @@ class _RunningWorkflow:
                 raise ValueError(
                     f"Unexpected child start fail cause: {job.failed.cause}"
                 )
-            self._loop.resolve_child_workflow_start_failure(
+            self._loop.resolve_child_workflow_failure(
                 job.seq,
                 temporalio.exceptions.WorkflowAlreadyStartedError(
                     job.failed.workflow_id, job.failed.workflow_type
                 ),
             )
         elif job.HasField("cancelled"):
-            exc = await temporalio.exceptions.failure_to_error(
+            err = await temporalio.exceptions.failure_to_error(
                 job.cancelled.failure, self._worker._data_converter
             )
-            self._loop.resolve_child_workflow_start_failure(job.seq, exc)
+            self._loop.resolve_child_workflow_failure(job.seq, err)
         else:
             raise RuntimeError("Child workflow start did not have status")
 
@@ -638,7 +654,8 @@ class _RunningWorkflow:
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
             nonlocal success, workflow_failure, task_failure
             try:
-                success = await self._inbound.execute_workflow(input)
+                with self._root_cancellation_scope:
+                    success = await self._inbound.execute_workflow(input)
             except temporalio.exceptions.FailureError as err:
                 logger.debug(
                     f"Workflow raised failure with run ID {self._info.run_id}",
@@ -922,7 +939,7 @@ class _EventLoop(asyncio.AbstractEventLoop):
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
         # Keyed by seq
-        self._pending_timers: Dict[int, asyncio.Handle] = {}
+        self._pending_timers: Dict[int, _TimerHandle] = {}
         self._pending_activities: Dict[int, _ActivityHandle] = {}
         self._pending_child_workflows: Dict[int, _ChildWorkflowHandle] = {}
         # Keyed by type
@@ -941,13 +958,71 @@ class _EventLoop(asyncio.AbstractEventLoop):
             return True
         return False
 
+    def cancel_activity(self, seq: int) -> None:
+        # Do nothing if the activity isn't known (may have completed already) or
+        # has already attempted cancel or is already done
+        handle = self._pending_activities.get(seq)
+        if not handle or handle.cancel_requested or handle.done:
+            return
+        # TODO(cretz): What if the schedule command hasn't been sent yet
+        handle._cancel_requested = True
+        self._workflow._pending_commands.append(
+            temporalio.bridge.proto.workflow_commands.WorkflowCommand(
+                request_cancel_activity=temporalio.bridge.proto.workflow_commands.RequestCancelActivity(
+                    seq=seq
+                ),
+            )
+        )
+
+    def cancel_child_workflow(self, seq: int) -> None:
+        # Do nothing if the child workflow isn't known (may have completed
+        # already) or has already attempted cancel or is already done
+        handle = self._pending_child_workflows.get(seq)
+        if not handle or handle.cancel_requested or handle.done:
+            return
+        # TODO(cretz): What if the schedule command hasn't been sent yet
+        handle._cancel_requested = True
+        if handle.start_fut.done():
+            self._workflow._pending_commands.append(
+                temporalio.bridge.proto.workflow_commands.WorkflowCommand(
+                    request_cancel_external_workflow_execution=temporalio.bridge.proto.workflow_commands.RequestCancelExternalWorkflowExecution(
+                        seq=seq,
+                        child_workflow_id=handle.id,
+                    ),
+                )
+            )
+        else:
+            self._workflow._pending_commands.append(
+                temporalio.bridge.proto.workflow_commands.WorkflowCommand(
+                    cancel_unstarted_child_workflow_execution=temporalio.bridge.proto.workflow_commands.CancelUnstartedChildWorkflowExecution(
+                        child_workflow_seq=seq,
+                    ),
+                )
+            )
+
+    def cancel_local_activity(self, seq: int) -> None:
+        # Do nothing if the activity isn't known (may have completed already) or
+        # has already attempted cancel or is already done
+        handle = self._pending_activities.get(seq)
+        if not handle or handle.cancel_requested or handle.done:
+            return
+        # TODO(cretz): What if the schedule command hasn't been sent yet
+        handle._cancel_requested = True
+        self._workflow._pending_commands.append(
+            temporalio.bridge.proto.workflow_commands.WorkflowCommand(
+                request_cancel_local_activity=temporalio.bridge.proto.workflow_commands.RequestCancelLocalActivity(
+                    seq=seq
+                ),
+            )
+        )
+
     def resolve_activity_failure(
-        self, seq: int, exc: temporalio.exceptions.FailureError
+        self, seq: int, err: temporalio.exceptions.FailureError
     ) -> None:
         handle = self._pending_activities.pop(seq, None)
         if not handle:
             raise RuntimeError(f"Failed finding activity handle for sequence {seq}")
-        handle.result_fut.set_exception(exc)
+        handle.resolve_failure(err)
 
     def resolve_activity_local_backoff(
         self, seq: int, backoff: temporalio.bridge.proto.activity_result.DoBackoff
@@ -964,7 +1039,7 @@ class _EventLoop(asyncio.AbstractEventLoop):
                 )
             except Exception as err:
                 self._pending_activities.pop(seq)
-                handle.result_fut.set_exception(err)
+                handle.resolve_failure(err)
                 return
 
             async def build_command() -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
@@ -980,27 +1055,17 @@ class _EventLoop(asyncio.AbstractEventLoop):
         handle = self._pending_activities.pop(seq, None)
         if not handle:
             raise RuntimeError(f"Failed finding activity handle for sequence {seq}")
-        handle.result_fut.set_result(result)
+        handle.resolve_success(result)
 
     def resolve_child_workflow_failure(
-        self, seq: int, exc: temporalio.exceptions.FailureError
+        self, seq: int, err: temporalio.exceptions.TemporalError
     ) -> None:
         handle = self._pending_child_workflows.pop(seq, None)
         if not handle:
             raise RuntimeError(
                 f"Failed finding child workflow handle for sequence {seq}"
             )
-        handle.result_fut.set_exception(exc)
-
-    def resolve_child_workflow_start_failure(
-        self, seq: int, exc: temporalio.exceptions.TemporalError
-    ) -> None:
-        handle = self._pending_child_workflows.pop(seq, None)
-        if not handle:
-            raise RuntimeError(
-                f"Failed finding child workflow handle for sequence {seq}"
-            )
-        handle.start_fut.set_exception(exc)
+        handle.resolve_failure(err)
 
     def resolve_child_workflow_start_success(self, seq: int, run_id: str) -> None:
         handle = self._pending_child_workflows.get(seq)
@@ -1008,8 +1073,8 @@ class _EventLoop(asyncio.AbstractEventLoop):
             raise RuntimeError(
                 f"Failed finding child workflow handle for sequence {seq}"
             )
-        handle.original_run_id = run_id
-        handle.start_fut.set_result(None)
+        handle._original_run_id = run_id
+        handle.resolve_start_success()
 
     def resolve_child_workflow_success(self, seq: int, result: Any) -> None:
         handle = self._pending_child_workflows.pop(seq, None)
@@ -1017,7 +1082,7 @@ class _EventLoop(asyncio.AbstractEventLoop):
             raise RuntimeError(
                 f"Failed finding child workflow handle for sequence {seq}"
             )
-        handle.result_fut.set_result(result)
+        handle.resolve_success(result)
 
     def resolve_timer(self, seq: int) -> None:
         handle = self._pending_timers.pop(seq, None)
@@ -1057,6 +1122,10 @@ class _EventLoop(asyncio.AbstractEventLoop):
             temporalio.bridge.proto.activity_result.DoBackoff
         ] = None,
     ) -> _ActivityHandle:
+        # If the cancellation scope is already cancelled, throw
+        if temporalio.workflow.CancellationScope.current().cancelled:
+            raise temporalio.exceptions.CancelledError("Cancellation scope cancelled")
+
         # Validate
         if not input.start_to_close_timeout and not input.schedule_to_close_timeout:
             raise ValueError(
@@ -1070,10 +1139,13 @@ class _EventLoop(asyncio.AbstractEventLoop):
 
         # Create the handle and set as pending
         handle = _ActivityHandle(
-            input, self.create_future(), input.arg_types, input.ret_type
+            seq, self, input, asyncio.Future(loop=self), input.arg_types, input.ret_type
         )
         self._pending_activities[seq] = handle
         self._workflow._pending_commands.append(build_command)
+        temporalio.workflow.CancellationScope.current()._add_cancel_callback(
+            handle.cancel
+        )
         return handle
 
     # Note, this should not be called on _this_ event loop, only on the main one
@@ -1140,11 +1212,17 @@ class _EventLoop(asyncio.AbstractEventLoop):
                 command.schedule_local_activity.original_schedule_time.CopyFrom(
                     local_backoff.original_schedule_time
                 )
+            # TODO(cretz): Remove when https://github.com/temporalio/sdk-core/issues/316 fixed
+            command.schedule_local_activity.retry_policy.SetInParent()
         return command
 
     async def start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> _ChildWorkflowHandle:
+        # If the cancellation scope is already cancelled, throw
+        if temporalio.workflow.CancellationScope.current().cancelled:
+            raise temporalio.exceptions.CancelledError("Cancellation scope cancelled")
+
         seq = self._next_seq("child_workflow")
         # We build the command in a callback to run on the other event loop
         async def build_command() -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
@@ -1201,14 +1279,19 @@ class _EventLoop(asyncio.AbstractEventLoop):
 
         # Create the handle and set as pending
         handle = _ChildWorkflowHandle(
+            seq,
+            self,
             input.id,
-            self.create_future(),
-            self.create_future(),
+            asyncio.Future(loop=self),
+            asyncio.Future(loop=self),
             input.arg_types,
             input.ret_type,
         )
         self._pending_child_workflows[seq] = handle
         self._workflow._pending_commands.append(build_command)
+        temporalio.workflow.CancellationScope.current()._add_cancel_callback(
+            handle.cancel
+        )
 
         # Wait on start
         await handle.start_fut
@@ -1225,7 +1308,18 @@ class _EventLoop(asyncio.AbstractEventLoop):
     ### Call overrides
 
     def _timer_handle_cancelled(self, handle: asyncio.TimerHandle) -> None:
-        raise NotImplementedError
+        if not isinstance(handle, _TimerHandle):
+            raise TypeError("Expected Temporal timer handle")
+        if not self._pending_timers.pop(handle.seq, None):
+            return
+        # TODO(cretz): How do we make this throw when cancelled?
+        self._workflow._pending_commands.append(
+            temporalio.bridge.proto.workflow_commands.WorkflowCommand(
+                cancel_timer=temporalio.bridge.proto.workflow_commands.CancelTimer(
+                    seq=handle.seq
+                ),
+            )
+        )
 
     def call_soon(
         self,
@@ -1244,6 +1338,10 @@ class _EventLoop(asyncio.AbstractEventLoop):
         *args: Any,
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.TimerHandle:
+        # If the cancellation scope is already cancelled, throw
+        if temporalio.workflow.CancellationScope.current().cancelled:
+            raise temporalio.exceptions.CancelledError("Cancellation scope cancelled")
+
         # Delay must be positive
         if delay < 0:
             raise RuntimeError("Attempting to schedule timer with negative delay")
@@ -1256,15 +1354,23 @@ class _EventLoop(asyncio.AbstractEventLoop):
         self._workflow._pending_commands.append(command)
 
         # Create and return the handle
-        handle = asyncio.TimerHandle(self._time + delay, callback, args, self, context)
+        handle = _TimerHandle(seq, self._time + delay, callback, args, self, context)
         self._pending_timers[seq] = handle
+        temporalio.workflow.CancellationScope.current()._add_cancel_callback(
+            handle.cancel
+        )
         return handle
 
     def time(self) -> float:
         return self._time
 
     def create_future(self) -> asyncio.Future[Any]:
-        return asyncio.Future(loop=self)
+        fut = _CancelSafeFuture(loop=self)
+        # We need to propagate cancellation
+        temporalio.workflow.CancellationScope.current()._add_cancel_callback_with_error(
+            fut.cancel_with_error
+        )
+        return fut
 
     def create_task(
         self,
@@ -1358,30 +1464,70 @@ class _EventLoop(asyncio.AbstractEventLoop):
         return False
 
 
+class _TimerHandle(asyncio.TimerHandle):
+    def __init__(
+        self,
+        seq: int,
+        when: float,
+        callback: Callable[..., Any],
+        args: Sequence[Any],
+        loop: asyncio.AbstractEventLoop,
+        context: Optional[contextvars.Context],
+    ) -> None:
+        super().__init__(when, callback, args, loop, context)
+        self.seq = seq
+
+
 class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     def __init__(
         self,
+        seq: int,
+        loop: _EventLoop,
         input: Union[StartActivityInput, StartLocalActivityInput],
         result_fut: asyncio.Future[Any],
         arg_types: Optional[List[Type]],
         ret_type: Optional[Type],
     ) -> None:
         super().__init__()
+        self.seq = seq
+        self.loop = loop
         self.input = input
         self.result_fut = result_fut
         self.arg_types = arg_types
         self.ret_type = ret_type
+        self._cancel_requested = False
 
     async def result(self) -> Any:
         return await self.result_fut
 
     def cancel(self) -> None:
-        raise NotImplementedError
+        if isinstance(self.input, StartActivityInput):
+            self.loop.cancel_activity(self.seq)
+        else:
+            self.loop.cancel_local_activity(self.seq)
+
+    @property
+    def cancel_requested(self) -> bool:
+        return self._cancel_requested
+
+    @property
+    def done(self) -> bool:
+        return self.result_fut.done()
+
+    def resolve_success(self, value: Any) -> None:
+        if not self.result_fut.done():
+            self.result_fut.set_result(value)
+
+    def resolve_failure(self, err: Exception) -> None:
+        if not self.result_fut.done():
+            self.result_fut.set_exception(err)
 
 
 class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def __init__(
         self,
+        seq: int,
+        loop: _EventLoop,
         id: str,
         start_fut: asyncio.Future[None],
         result_fut: asyncio.Future[Any],
@@ -1389,12 +1535,15 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         ret_type: Optional[Type],
     ) -> None:
         super().__init__()
+        self.seq = seq
+        self.loop = loop
         self._id = id
         self._original_run_id = "<unknown>"
         self.start_fut = start_fut
         self.result_fut = result_fut
         self.arg_types = arg_types
         self.ret_type = ret_type
+        self._cancel_requested = False
 
     @property
     def id(self) -> str:
@@ -1404,10 +1553,6 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def original_run_id(self) -> Optional[str]:
         return self._original_run_id
 
-    @original_run_id.setter
-    def original_run_id(self, value: str) -> None:
-        self._original_run_id = value
-
     async def signal(self, signal: Union[str, Callable], *args: Any) -> None:
         raise NotImplementedError
 
@@ -1415,7 +1560,44 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         return await self.result_fut
 
     def cancel(self) -> None:
-        raise NotImplementedError
+        self.loop.cancel_child_workflow(self.seq)
+
+    @property
+    def cancel_requested(self) -> bool:
+        return self._cancel_requested
+
+    @property
+    def done(self) -> bool:
+        return self.result_fut.done()
+
+    def resolve_start_success(self) -> None:
+        if not self.start_fut.done():
+            self.start_fut.set_result(None)
+
+    def resolve_success(self, value: Any) -> None:
+        if not self.result_fut.done():
+            self.result_fut.set_result(value)
+
+    def resolve_failure(self, err: Exception) -> None:
+        if not self.start_fut.done():
+            self.start_fut.set_exception(err)
+        if not self.result_fut.done():
+            self.result_fut.set_exception(err)
+
+
+# This is needed because sleep and other futures we want to use our exception
+# instead of their own, so we have to consider our exception as cancelled too
+class _CancelSafeFuture(asyncio.Future):
+    def cancelled(self) -> bool:
+        if self.done() and isinstance(
+            self.exception(), temporalio.exceptions.CancelledError
+        ):
+            return True
+        return super().cancelled()
+
+    def cancel_with_error(self, err: temporalio.exceptions.CancelledError) -> None:
+        if not self.done():
+            self.set_exception(err)
 
 
 def _proto_to_datetime(

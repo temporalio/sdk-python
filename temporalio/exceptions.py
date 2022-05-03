@@ -13,7 +13,9 @@ import temporalio.converter
 class TemporalError(Exception):
     """Base for all Temporal exceptions."""
 
-    pass
+    @property
+    def cause(self) -> Optional[BaseException]:
+        return self.__cause__
 
 
 class WorkflowAlreadyStartedError(TemporalError):
@@ -313,7 +315,7 @@ async def failure_to_error(
     if failure.HasField("application_failure_info"):
         app_info = failure.application_failure_info
         err = ApplicationError(
-            failure.message,
+            failure.message or "Application error",
             *(await temporalio.converter.decode_payloads(app_info.details, converter)),
             type=app_info.type or None,
             non_retryable=app_info.non_retryable,
@@ -321,7 +323,7 @@ async def failure_to_error(
     elif failure.HasField("timeout_failure_info"):
         timeout_info = failure.timeout_failure_info
         err = TimeoutError(
-            failure.message,
+            failure.message or "Timeout",
             type=TimeoutType(int(timeout_info.timeout_type))
             if timeout_info.timeout_type
             else None,
@@ -332,7 +334,7 @@ async def failure_to_error(
     elif failure.HasField("canceled_failure_info"):
         cancel_info = failure.canceled_failure_info
         err = CancelledError(
-            failure.message,
+            failure.message or "Cancelled",
             *(
                 await temporalio.converter.decode_payloads(
                     cancel_info.details, converter
@@ -340,14 +342,16 @@ async def failure_to_error(
             ),
         )
     elif failure.HasField("terminated_failure_info"):
-        err = TerminatedError(failure.message)
+        err = TerminatedError(failure.message or "Terminated")
     elif failure.HasField("server_failure_info"):
         server_info = failure.server_failure_info
-        err = ServerError(failure.message, non_retryable=server_info.non_retryable)
+        err = ServerError(
+            failure.message or "Server error", non_retryable=server_info.non_retryable
+        )
     elif failure.HasField("activity_failure_info"):
         act_info = failure.activity_failure_info
         err = ActivityError(
-            failure.message,
+            failure.message or "Activity error",
             scheduled_event_id=act_info.scheduled_event_id,
             started_event_id=act_info.started_event_id,
             identity=act_info.identity,
@@ -360,7 +364,7 @@ async def failure_to_error(
     elif failure.HasField("child_workflow_execution_failure_info"):
         child_info = failure.child_workflow_execution_failure_info
         err = ChildWorkflowError(
-            failure.message,
+            failure.message or "Child workflow error",
             namespace=child_info.namespace,
             workflow_id=child_info.workflow_execution.workflow_id,
             run_id=child_info.workflow_execution.run_id,
@@ -372,10 +376,11 @@ async def failure_to_error(
             else None,
         )
     else:
-        err = FailureError(failure.message)
+        err = FailureError(failure.message or "Failure error")
     err._failure = failure
     if failure.HasField("cause"):
-        err.__cause__ = await failure_to_error(failure.cause, converter)
+        temp = await failure_to_error(failure.cause, converter)
+        err.__cause__ = temp
     return err
 
 

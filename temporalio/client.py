@@ -1073,7 +1073,7 @@ class WorkflowExecutionStatus(IntEnum):
     """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT`."""
 
 
-class WorkflowFailureError(Exception):
+class WorkflowFailureError(temporalio.exceptions.TemporalError):
     """Error that occurs when a workflow is unsuccessful."""
 
     def __init__(self, *, cause: temporalio.exceptions.FailureError) -> None:
