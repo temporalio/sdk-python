@@ -1,9 +1,40 @@
+# Environments
+.env
 .venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+.DS_Store
+docs/.DS_Store
 __pycache__
+# Sphinx documentation
 /build
 /dist
 /docs/_autosummary
 /docs/_build
+
 temporalio/api/*
 !temporalio/api/__init__.py
 temporalio/bridge/proto/*

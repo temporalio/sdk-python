@@ -31,9 +31,10 @@ protobuf = "^3.19.4"
 python = "^3.7"
 types-protobuf = "^3.19.6"
 typing-extensions = "^4.0.1"
+black = "^22.3.0"
 
 [tool.poetry.dev-dependencies]
-black = "^21.12b0"
+black = "^22.3.0"
 furo = "^2022.3.4"
 grpcio-tools = "^1.43.0"
 isort = "^5.10.1"

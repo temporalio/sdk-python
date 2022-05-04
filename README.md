@@ -7,7 +7,7 @@
 [Temporal](https://temporal.io/) is a distributed, scalable, durable, and highly available orchestration engine used to
 execute asynchronous long-running business logic in a scalable and resilient way.
 
-"Temporal Python SDK" is the framework for authoring workflows and activities using the Python programming language.
+_Temporal Python SDK_ is the framework for authoring workflows and activities using the Python programming language.
 
 In addition to this documentation, see the [samples](https://github.com/temporalio/samples-python) repository for code
 examples.
@@ -16,11 +16,11 @@ examples.
 
 The Python SDK is under development. There are no compatibility guarantees nor proper documentation pages at this time.
 
-Currently missing features:
+Currently, missing features:
 
-* Workflow worker support
-* Async activity support (in client or worker)
-* Support for Windows arm, macOS arm (i.e. M1), Linux arm, and Linux x64 glibc < 2.31.
+- Workflow worker support
+- Async activity support (in client or worker)
+- Support for Windows arm, macOS arm (that is M1), Linux arm, and Linux x64 glibc < 2.31.
 
 ## Quick Start
 
@@ -30,10 +30,10 @@ Install the `temporalio` package from [PyPI](https://pypi.org/project/temporalio
 
 These steps can be followed to use with a virtual environment and `pip`:
 
-* [Create a virtual environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)
-* Update `pip` - `python -m pip install -U pip`
-  * Needed because older versions of `pip` may not pick the right wheel
-* Install Temporal SDK - `python -m pip install temporalio`
+- [Create a virtual environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)
+- Update `pip` – `python -m pip install -U pip`
+- Needed because older versions of `pip` may not pick the right wheel
+- Install Temporal SDK – `python -m pip install temporalio`
 
 The SDK is now ready for use.
 
@@ -45,14 +45,18 @@ Create the following script at `start_workflow.py`:
 import asyncio
 from temporalio.client import Client
 
+
 async def main():
-  # Create client connected to server at the given address
-  client = await Client.connect("http://localhost:7233")
+    # Create client connected to server at the given address
+    client = await Client.connect("http://localhost:7233")
 
-  # Start a workflow
-  handle = await client.start_workflow("my workflow name", "some arg", id="my-workflow-id", task_queue="my-task-queue")
+    # Start a workflow
+    handle = await client.start_workflow(
+        "my workflow name", "some arg", id="my-workflow-id", task_queue="my-task-queue"
+    )
 
-  print(f"Workflow started with ID {handle.id}")
+    print(f"Workflow started with ID {handle.id}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -61,7 +65,7 @@ if __name__ == "__main__":
 Assuming you have a [Temporal server running on localhost](https://docs.temporal.io/docs/server/quick-install/), this
 will start a workflow:
 
-    python start_workflow.py
+python start_workflow.py
 
 Note that an external worker has to be started with this workflow registered to actually run the workflow.
 
@@ -74,38 +78,41 @@ A client can be created and used to start a workflow like so:
 ```python
 from temporalio.client import Client
 
+
 async def main():
-  # Create client connected to server at the given address and namespace
-  client = await Client.connect("http://localhost:7233", namespace="my-namespace")
+    # Create client connected to server at the given address and namespace
+    client = await Client.connect("http://localhost:7233", namespace="my-namespace")
 
-  # Start a workflow
-  handle = await client.start_workflow("my workflow name", "some arg", id="my-workflow-id", task_queue="my-task-queue")
+    # Start a workflow
+    handle = await client.start_workflow(
+        "my workflow name", "some arg", id="my-workflow-id", task_queue="my-task-queue"
+    )
 
-  # Wait for result
-  result = await handle.result()
-  print(f"Result: {result}")
+    # Wait for result
+    result = await handle.result()
+    print(f"Result: {result}")
 ```
 
 Some things to note about the above code:
 
-* A `Client` does not have an explicit "close"
-* Positional arguments can be passed to `start_workflow`
-* The `handle` represents the workflow that was started and can be used for more than just getting the result
-* Since we are just getting the handle and waiting on the result, we could have called `client.execute_workflow` which
+- A `Client` doesn't have an explicit “close”
+- Positional arguments can be passed to `start_workflow`
+- The `handle` represents the workflow that was started and can be used for more than just getting the result
+- Since we are just getting the handle and waiting on the result, we could have called `client.execute_workflow` which
   does the same thing
-* Clients can have many more options not shown here (e.g. data converters and interceptors)
+- Clients can have many more options not shown here (for example, data converters and interceptors)
 
 #### Data Conversion
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
 `temporalio.converter.DataConverter` can be set via the `data_converter` client parameter.
 
-The default data converter supports converting multiple types including:
+The default data converter supports converting multiple types, including:
 
-* `None`
-* `bytes`
-* `google.protobuf.message.Message` - As JSON when encoding, but has ability to decode binary proto from other languages
-* Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports
+- `None`
+- `bytes`
+- `google.protobuf.message.Message` - As JSON when encoding, but has ability to decode binary proto from other languages
+- Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports
 
 As a special case in the default converter, [data classes](https://docs.python.org/3/library/dataclasses.html) are
 automatically [converted to dictionaries](https://docs.python.org/3/library/dataclasses.html#dataclasses.asdict) before
@@ -127,30 +134,31 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 from temporalio import activity
 
+
 @activity.defn
 async def say_hello_activity(name: str) -> str:
     return f"Hello, {name}!"
 
 
 async def main(stop_event: asyncio.Event):
-  # Create client connected to server at the given address
-  client = await Client.connect("http://localhost:7233", namespace="my-namespace")
+    # Create client connected to server at the given address
+    client = await Client.connect("http://localhost:7233", namespace="my-namespace")
 
-  # Run the worker until the event is set
-  worker = Worker(client, task_queue="my-task-queue", activities=[say_hello_activity])
-  async with worker:
-    await stop_event.wait()
+    # Run the worker until the event is set
+    worker = Worker(client, task_queue="my-task-queue", activities=[say_hello_activity])
+    async with worker:
+        await stop_event.wait()
 ```
 
 Some things to note about the above code:
 
-* This creates/uses the same client that is used for starting workflows
-* The `say_hello_activity` is `async` which is the recommended activity type (see "Types of Activities" below)
-* The created worker only runs activities, not workflows
-* Activities are passed as a mapping with the key as a string activity name and the value as a callable
-* While this example accepts a stop event and uses `async with`, `run()` and `shutdown()` may be used instead
-* Workers can have many more options not shown here (e.g. data converters and interceptors)
-* A custom name for the activity can be set with a decorator argument, e.g. `@activity.defn(name="my activity")`
+- This creates/uses the same client that is used for starting workflows
+- The `say_hello_activity` is `async` which is the recommended activity type (see "Types of Activities" below)
+- The created worker only runs activities, not workflows
+- Activities are passed as a mapping with the key as a string activity name and the value as a callable
+- While this example accepts a stop event and uses `async with`, `run()` and `shutdown()` may be used instead
+- Workers can have many more options not shown here (for example, data converters and interceptors)
+- A custom name for the activity can be set with a decorator argument, for example, `@activity.defn(name="my activity")`
 
 #### Types of Activities
 
@@ -159,7 +167,7 @@ synchronous multiprocess/other. Only positional parameters are allowed in activi
 
 ##### Asynchronous Activities
 
-Asynchronous activities, i.e. functions using `async def`, are the recommended activity type. When using asynchronous
+Asynchronous activities, that is, functions using `async def`, are the recommended activity type. When using asynchronous
 activities no special worker parameters are needed.
 
 Cancellation for asynchronous activities is done via
@@ -170,11 +178,11 @@ receive cancellation and there are other ways to be notified about cancellation 
 
 ##### Synchronous Activities
 
-Synchronous activities, i.e. functions that do not have `async def`, can be used with workers, but the
+Synchronous activities, that is, functions that do not have `async def`, can be used with workers, but the
 `activity_executor` worker parameter must be set with a `concurrent.futures.Executor` instance to use for executing the
 activities.
 
-Cancellation for synchronous activities is done in the background and the activity must choose to listen for it and
+Cancellation for synchronous activities is done in the background, and the activity must choose to listen for it and
 react appropriately. An activity must heartbeat to receive cancellation and there are other ways to be notified about
 cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
 
@@ -184,20 +192,19 @@ If `activity_executor` is set to an instance of `concurrent.futures.ThreadPoolEx
 are considered multithreaded activities. Besides `activity_executor`, no other worker parameters are required for
 synchronous multithreaded activities.
 
-###### Synchronous Multiprocess/Other Activities
+###### Synchronous Multi Process/Other Activities
 
-Synchronous activities, i.e. functions that do not have `async def`, can be used with workers, but the
+Synchronous activities, that is, functions that don't have `async def`, can be used with workers, but the
 `activity_executor` worker parameter must be set with a `concurrent.futures.Executor` instance to use for executing the
 activities. If this is _not_ set to an instance of `concurrent.futures.ThreadPoolExecutor` then the synchronous
 activities are considered multiprocess/other activities.
 
-These require special primitives for heartbeating and cancellation. The `shared_state_manager` worker parameter must be
+These require special primitives for heart beating and cancellation. The `shared_state_manager` worker parameter must be
 set to an instance of `temporalio.worker.SharedStateManager`. The most common implementation can be created by passing a
-`multiprocessing.managers.SyncManager` (i.e. result of `multiprocessing.managers.Manager()`) to
+`multiprocessing.managers.SyncManager` (that is, result of `multiprocessing.managers.Manager()`) to
 `temporalio.worker.SharedStateManager.create_from_multiprocessing()`.
 
-Also, all of these activity functions must be
-["picklable"](https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
+Activity Functions must be ["picklable"](https://docs.python.org/3/library/pickle.html#what-can-be-pickled-and-unpickled).
 
 #### Activity Context
 
@@ -205,16 +212,16 @@ During activity execution, an implicit activity context is set as a
 [context variable](https://docs.python.org/3/library/contextvars.html). The context variable itself is not visible, but
 calls in the `temporalio.activity` package make use of it. Specifically:
 
-* `in_activity()` - Whether an activity context is present
-* `info()` - Returns the immutable info of the currently running activity
-* `heartbeat(*details)` - Record a heartbeat
-* `is_cancelled()` - Whether a cancellation has been requested on this activity
-* `wait_for_cancelled()` - `async` call to wait for cancellation request
-* `wait_for_cancelled_sync(timeout)` - Synchronous blocking call to wait for cancellation request
-* `is_worker_shutdown()` - Whether the worker has started graceful shutdown
-* `wait_for_worker_shutdown()` - `async` call to wait for start of graceful worker shutdown
-* `wait_for_worker_shutdown_sync(timeout)` - Synchronous blocking call to wait for start of graceful worker shutdown
-* `raise_complete_async()` - Raise an error that this activity will be completed asynchronously (i.e. after return of
+- `in_activity()` – Whether an activity context is present
+- `info()` – Returns the immutable info of the currently running activity
+- `heartbeat(*details)` – Record a heartbeat
+- `is_cancelled()` – Whether a cancellation has been requested on this activity
+- `wait_for_cancelled()` - `async` call to wait for cancellation request
+- `wait_for_cancelled_sync(timeout)` – Synchronous blocking call to wait for cancellation request
+- `is_worker_shutdown()` – Whether the worker has started graceful shutdown
+- `wait_for_worker_shutdown()` - `async` call to wait for start of graceful worker shutdown
+- `wait_for_worker_shutdown_sync(timeout)` - Synchronous blocking call to wait for start of graceful worker shutdown
+- `raise_complete_async()` – Raise an error that this activity will be completed asynchronously (that is, after return of
   the activity function in a separate client call)
 
 With the exception of `in_activity()`, if any of the functions are called outside of an activity context, an error
@@ -240,53 +247,53 @@ When the `graceful_shutdown_timeout` worker parameter is given a `datetime.timed
 notify activities of the graceful shutdown. Once that timeout has passed (or if wasn't set), the worker will perform
 cancellation of all outstanding activities.
 
-The `shutdown()` invocation will wait on all activities to complete, so if a long-running activity does not at least
+The `shutdown()` invocation waits for all activities to complete, so if a long-running activity doesn't, at least
 respect cancellation, the shutdown may never complete.
 
 ## Development
 
 The Python SDK is built to work with Python 3.7 and newer. It is built using
-[SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
+[SDK Core](https://github.com/temporalio/sdk-core/), which is written in Rust.
 
 ### Local development environment
 
 - Install the system dependencies:
 
-  - Python >=3.7
-  - [pipx](https://github.com/pypa/pipx#install-pipx) (only needed for installing the two dependencies below)
-  - [poetry](https://github.com/python-poetry/poetry) `pipx install poetry`
-  - [poe](https://github.com/nat-n/poethepoet) `pipx install poethepoet`
+- Python >=3.7
+- [pipx](https://github.com/pypa/pipx#install-pipx) (only needed for installing the two dependencies below)
+- [poetry](https://github.com/python-poetry/poetry) `pipx install poetry`
+- [poe](https://github.com/nat-n/poethepoet) `pipx install poethepoet`
 
 - Use a local virtual env environment (helps IDEs and Windows):
 
-  ```bash
-  poetry config virtualenvs.in-project true
-  ```
+```bash
+poetry config virtualenvs.in-project true
+```
 
 - Install the package dependencies (requires Rust):
 
-  ```bash
-  poetry install
-  ```
+```bash
+poetry install
+```
 
 - Build the project (requires Rust):
 
-  ```bash
-  poe build-develop
-  ```
+```bash
+poe build-develop
+```
 
 - Run the tests (requires Go):
 
-  ```bash
-  poe test
-  ```
+```bash
+poe test
+```
 
 ### Style
 
-* Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
-  * We use [Black](https://github.com/psf/black) for formatting, so that takes precedence
-  * In tests and example code, can import individual classes/functions to make it more readable. Can also do this for
-    rarely in library code for some Python common items (e.g. `dataclass` or `partial`), but not allowed to do this for
-    any `temporalio` packages or any classes/functions that aren't clear when unqualified.
-  * We allow relative imports for private packages
-  * We allow `@staticmethod`
+- Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
+- We use [Black](https://github.com/psf/black) for formatting, so that takes precedence
+- In tests and example code, can import individual classes/functions to make it more readable. Can also do this for
+  rarely in library code for some Python common items (for example, `dataclass` or `partial`), but not allowed to do this for
+  any `temporalio` packages or any classes/functions that aren't clear when unqualified.
+- We allow relative imports for private packages
+- We allow `@staticmethod`

@@ -12,6 +12,7 @@
 #
 import os
 import sys
+from datetime import date
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -19,8 +20,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # -- Project information -----------------------------------------------------
 
 project = "Temporal Python SDK"
-copyright = "2022, Temporal Technologies Inc"
 author = "Temporal Technologies Inc"
+copyright = f"{date.today().year} {author}"
 
 
 # -- General configuration ---------------------------------------------------
