@@ -5,7 +5,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Awaitable, Callable, Dict, Iterable, Type, TypeVar
+from typing import Any, Awaitable, Callable, Dict, Iterable, List, Type, TypeVar
 
 import pytest
 
@@ -282,7 +282,7 @@ class CancelActivityWorkflow:
         )
         await asyncio.sleep(0.01)
         handle.cancel()
-        return await handle.result()
+        return await handle
 
 
 async def test_workflow_cancel_activity(client: Client):
@@ -335,10 +335,10 @@ class CancelLocalActivityWorkflow:
         )
         await asyncio.sleep(0.01)
         handle.cancel()
-        return await handle.result()
+        return await handle
 
 
-@pytest.mark.skip(reason="Make test to timeout WFT better")
+# # @pytest.mark.skip(reason="Make test to timeout WFT better")
 async def test_workflow_cancel_local_activity(client: Client):
     async with new_worker(
         client, CancelLocalActivityWorkflow, activities=[wait_local_cancel]
@@ -350,9 +350,12 @@ async def test_workflow_cancel_local_activity(client: Client):
                 False,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
+                # This has to be low to timeout the LA task
+                task_timeout=timedelta(seconds=1),
             )
-        assert isinstance(err.value.cause, ActivityError)
-        assert isinstance(err.value.cause.cause, CancelledError)
+        # TODO(cretz): Fix when https://github.com/temporalio/sdk-core/issues/323 is fixed
+        # assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause, CancelledError)
 
         # Wait for cancel
         result = await client.execute_workflow(
@@ -360,6 +363,8 @@ async def test_workflow_cancel_local_activity(client: Client):
             True,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            # This has to be low to timeout the LA task
+            task_timeout=timedelta(seconds=1),
         )
         assert "Got cancelled error, cancelled? True" == result
 
@@ -420,7 +425,6 @@ async def test_workflow_simple_cancel(client: Client):
         with pytest.raises(WorkflowFailureError) as err:
             await handle.result()
         assert isinstance(err.value.cause, CancelledError)
-        assert "Workflow cancelled" == err.value.cause.message
 
 
 @workflow.defn
@@ -430,7 +434,7 @@ class CancelChildWorkflow:
         handle = await workflow.start_child_workflow(LongSleepWorkflow.run, id=child_id)
         await asyncio.sleep(0.1)
         handle.cancel()
-        await handle.result()
+        await handle
 
 
 async def test_workflow_cancel_child(client: Client):
@@ -444,13 +448,74 @@ async def test_workflow_cancel_child(client: Client):
             )
         assert isinstance(err.value.cause, ChildWorkflowError)
         assert isinstance(err.value.cause.cause, CancelledError)
-        assert "Workflow cancelled" == err.value.cause.cause.message
+
+
+@workflow.defn
+class MultiCancelWorkflow:
+    @workflow.run
+    async def run(self) -> List[str]:
+        events: List[str] = []
+
+        async def timer():
+            nonlocal events
+            try:
+                await asyncio.sleep(1)
+                events.append("timer success")
+            except asyncio.CancelledError:
+                events.append("timer cancelled")
+
+        async def activity():
+            nonlocal events
+            try:
+                await workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(5)
+                )
+                events.append("activity success")
+            except ActivityError as err:
+                if isinstance(err.cause, CancelledError):
+                    events.append("activity cancelled")
+
+        async def child(id: str):
+            nonlocal events
+            try:
+                await workflow.execute_child_workflow(LongSleepWorkflow.run, id=id)
+                events.append("child success")
+            except ChildWorkflowError as err:
+                if isinstance(err.cause, CancelledError):
+                    events.append("child cancelled")
+
+        # Start all tasks, send a cancel to all, and wait until done
+        fut = asyncio.gather(
+            timer(),
+            asyncio.shield(timer()),
+            activity(),
+            child(f"child-{workflow.info().workflow_id}"),
+            return_exceptions=True,
+        )
+        await asyncio.sleep(0.1)
+        fut.cancel()
+        await workflow.wait_condition(lambda: len(events) == 4, timeout=4)
+        return events
+
+
+async def test_workflow_cancel_multi(client: Client):
+    async with new_worker(
+        client, MultiCancelWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+    ) as worker:
+        results = await client.execute_workflow(
+            MultiCancelWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert sorted(results) == [
+            "activity cancelled",
+            "child cancelled",
+            "timer cancelled",
+            "timer success",
+        ]
 
 
 # TODO:
-# * Cancellation scopes
-# * Activity cancellation types
-# * Cancel workflow
 # * Activity timeout behavior
 # * Workflow logger
 # * Data class params and return types
@@ -459,13 +524,13 @@ async def test_workflow_cancel_child(client: Client):
 # * Workflow execution already started error (from client _and_ child workflow)
 # * Use typed dicts for activity, local activity, and child workflow configs
 # * Local activity invalid options
-# * Cancelling things not started
-# * Cancel without waiting for cancel (i.e. cancel unstarted)
-# * Starting something on an already-cancelled cancelled scope
+# * Cancelling things whose commands haven't been sent
+# * Starting something on an already-cancelled cancelled task
 # * Cancel timers
 # * Cancel unstarted child
 # * Cancel unstarted child from a signal in the same WFT that "child started" may be in later
-# * create_task and create_future cancelling (with and without scopes)
+# * Explicit create_task and create_future cancelling
+# * Cancel only after N attempts (i.e. showing cancel is an event not a state)
 
 
 def new_worker(

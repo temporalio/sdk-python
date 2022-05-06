@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import collections
 import inspect
 import logging
 from abc import ABC, abstractmethod
@@ -13,7 +12,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Deque,
     Dict,
     Generic,
     List,
@@ -246,7 +244,6 @@ class _Runtime(ABC):
     def __init__(self) -> None:
         super().__init__()
         self._logger_details: Optional[Mapping[str, Any]] = None
-        self._cancellation_scopes: Deque[CancellationScope] = collections.deque()
 
     @abstractmethod
     def info(self) -> Info:
@@ -546,136 +543,8 @@ class _QueryDefinition:
         return getattr(fn, "__temporal_query_definition", None)
 
 
-class CancellationScope:
-    @staticmethod
-    def current() -> CancellationScope:
-        return _Runtime.current()._cancellation_scopes[-1]
-
-    @overload
-    def __init__(
-        self,
-        *,
-        # Default is current
-        parent: Optional[CancellationScope] = None,
-        timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
-
-    @overload
-    def __init__(
-        self,
-        *,
-        detached: Literal[True],
-        timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
-
-    def __init__(
-        self,
-        *,
-        parent: Optional[CancellationScope] = None,
-        detached: bool = False,
-        timeout: Optional[timedelta] = None,
-    ) -> None:
-        self._cancel_fut = asyncio.get_running_loop().create_future()
-        if parent and detached:
-            raise ValueError("Cannot have a parent with detached cancellation scope")
-        elif not detached:
-            actual_parent = parent or CancellationScope.current()
-            actual_parent._add_cancel_callback_with_error(self._cancel)
-        self._timeout = timeout
-
-    async def run(self, fn: Callable[..., Union[Awaitable[T], T]]) -> T:
-        try:
-            self.__enter__()
-            if inspect.iscoroutinefunction(fn):
-                return await cast(Awaitable[T], fn())
-            else:
-                return cast(T, fn())
-        finally:
-            self.__exit__()
-
-    def __enter__(self) -> CancellationScope:
-        # TODO(cretz): Should I check the entire hierarchy to confirm not already set?
-        scopes = _Runtime.current()._cancellation_scopes
-        if scopes and scopes[-1] is self:
-            raise RuntimeError("Scope already set as current")
-
-        # Set as current before timeout so the cancel can cancel the timeout too
-        scopes.append(self)
-
-        # Set timeout if present
-        if self._timeout:
-
-            def timed_out() -> None:
-                if not self.cancelled:
-                    self.cancel("Cancellation scope timed out")
-
-            asyncio.get_running_loop().call_later(
-                self._timeout.total_seconds(), timed_out
-            )
-        return self
-
-    def __exit__(self, *args) -> None:
-        # Make sure the current is us, then pop
-        if CancellationScope.current() is not self:
-            raise RuntimeError("Unexpected cancellation scope")
-        _Runtime.current()._cancellation_scopes.pop()
-
-    async def wait_cancelled(self) -> temporalio.exceptions.CancelledError:
-        try:
-            await self._cancel_fut
-            raise RuntimeError(
-                "Unexpected completion of cancel future without cancel error"
-            )
-        except temporalio.exceptions.CancelledError as err:
-            return err
-
-    @property
-    def cancelled(self) -> bool:
-        return self._cancel_fut.done()
-
-    def cancel(self, message: str = "Cancellation scope cancelled") -> None:
-        # Only apply if not already cancelled
-        if not self.cancelled:
-            self._cancel(temporalio.exceptions.CancelledError(message))
-
-    def _cancel(self, err: temporalio.exceptions.CancelledError) -> None:
-        if not self.cancelled:
-            self._cancel_fut.set_exception(err)
-
-    def _add_cancel_callback(self, fn: Callable[[], None]) -> None:
-        self._cancel_fut.add_done_callback(lambda fut: fn())
-
-    def _add_cancel_callback_with_error(
-        self, fn: Callable[[temporalio.exceptions.CancelledError], None]
-    ) -> None:
-        def callback(fut: asyncio.Future) -> None:
-            err = fut.exception()
-            assert isinstance(err, temporalio.exceptions.CancelledError)
-            fn(err)
-
-        self._cancel_fut.add_done_callback(callback)
-
-
-class ActivityHandle(ABC, Generic[ActivityReturnType]):
-    @abstractmethod
-    async def result(self) -> ActivityReturnType:
-        ...
-
-    @abstractmethod
-    def cancel(self) -> None:
-        ...
-
-    @property
-    @abstractmethod
-    def cancel_requested(self) -> bool:
-        ...
-
-    @property
-    @abstractmethod
-    def done(self) -> bool:
-        ...
+class ActivityHandle(asyncio.Task[ActivityReturnType]):
+    pass
 
 
 class ActivityCancellationType(IntEnum):
@@ -923,21 +792,17 @@ async def execute_activity(
 ) -> Any:
     # We call the runtime directly instead of top-level start_activity to ensure
     # we don't miss new parameters
-    return (
-        await _Runtime.current()
-        .start_activity(
-            activity,
-            *args,
-            activity_id=activity_id,
-            task_queue=task_queue,
-            schedule_to_close_timeout=schedule_to_close_timeout,
-            schedule_to_start_timeout=schedule_to_start_timeout,
-            start_to_close_timeout=start_to_close_timeout,
-            heartbeat_timeout=heartbeat_timeout,
-            retry_policy=retry_policy,
-            cancellation_type=cancellation_type,
-        )
-        .result()
+    return await _Runtime.current().start_activity(
+        activity,
+        *args,
+        activity_id=activity_id,
+        task_queue=task_queue,
+        schedule_to_close_timeout=schedule_to_close_timeout,
+        schedule_to_start_timeout=schedule_to_start_timeout,
+        start_to_close_timeout=start_to_close_timeout,
+        heartbeat_timeout=heartbeat_timeout,
+        retry_policy=retry_policy,
+        cancellation_type=cancellation_type,
     )
 
 
@@ -1160,33 +1025,29 @@ async def execute_local_activity(
 ) -> Any:
     # We call the runtime directly instead of top-level start_local_activity to
     # ensure we don't miss new parameters
-    return (
-        await _Runtime.current()
-        .start_local_activity(
-            activity,
-            *args,
-            activity_id=activity_id,
-            schedule_to_close_timeout=schedule_to_close_timeout,
-            schedule_to_start_timeout=schedule_to_start_timeout,
-            start_to_close_timeout=start_to_close_timeout,
-            retry_policy=retry_policy,
-            local_retry_threshold=local_retry_threshold,
-            cancellation_type=cancellation_type,
-        )
-        .result()
+    return await _Runtime.current().start_local_activity(
+        activity,
+        *args,
+        activity_id=activity_id,
+        schedule_to_close_timeout=schedule_to_close_timeout,
+        schedule_to_start_timeout=schedule_to_start_timeout,
+        start_to_close_timeout=start_to_close_timeout,
+        retry_policy=retry_policy,
+        local_retry_threshold=local_retry_threshold,
+        cancellation_type=cancellation_type,
     )
 
 
-class ChildWorkflowHandle(ABC, Generic[ChildWorkflowClass, WorkflowReturnType]):
+class ChildWorkflowHandle(
+    asyncio.Task[WorkflowReturnType], Generic[ChildWorkflowClass, WorkflowReturnType]
+):
     @property
-    @abstractmethod
     def id(self) -> str:
-        ...
+        raise NotImplementedError
 
     @property
-    @abstractmethod
     def original_run_id(self) -> Optional[str]:
-        ...
+        raise NotImplementedError
 
     @overload
     async def signal(
@@ -1211,27 +1072,8 @@ class ChildWorkflowHandle(ABC, Generic[ChildWorkflowClass, WorkflowReturnType]):
     async def signal(self, signal: str, *args: Any) -> None:
         ...
 
-    @abstractmethod
     async def signal(self, signal: Union[str, Callable], *args: Any) -> None:
-        ...
-
-    @abstractmethod
-    async def result(self) -> WorkflowReturnType:
-        ...
-
-    @abstractmethod
-    def cancel(self) -> None:
-        ...
-
-    @property
-    @abstractmethod
-    def cancel_requested(self) -> bool:
-        ...
-
-    @property
-    @abstractmethod
-    def done(self) -> bool:
-        ...
+        raise NotImplementedError
 
 
 class ChildWorkflowCancellationType(IntEnum):
@@ -1494,7 +1336,7 @@ async def execute_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
     )
-    return await handle.result()
+    return await handle
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:
