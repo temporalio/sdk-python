@@ -396,3 +396,7 @@ async def test_tls_config(tls_client: Optional[Client]):
         )
     )
     assert resp.namespace_info.name == tls_client.namespace
+
+
+# TODO:
+# * Payload codec applying to results and errors

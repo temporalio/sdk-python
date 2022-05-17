@@ -526,11 +526,17 @@ async def test_workflow_cancel_multi(client: Client):
 # * Local activity invalid options
 # * Cancelling things whose commands haven't been sent
 # * Starting something on an already-cancelled cancelled task
-# * Cancel timers
 # * Cancel unstarted child
 # * Cancel unstarted child from a signal in the same WFT that "child started" may be in later
 # * Explicit create_task and create_future cancelling
 # * Cancel only after N attempts (i.e. showing cancel is an event not a state)
+# * In-workflow signal/query handler registration
+# * Exception details with codec
+# * Custom workflow runner that also confirms WorkflowInstanceDetails can be pickled
+# * Continue as new
+# * "is replaying" check
+# * External workflow handle for cancel and signal
+# * Deadlock detection
 
 
 def new_worker(

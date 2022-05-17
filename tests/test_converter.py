@@ -16,7 +16,7 @@ async def test_default():
         expected_decoded_input=None,
         type_hint=None
     ):
-        payloads = await temporalio.converter.default().encode([input])
+        payloads = await temporalio.converter.DataConverter().encode([input])
         # Check encoding and data
         assert len(payloads) == 1
         if isinstance(expected_encoding, str):
@@ -26,7 +26,7 @@ async def test_default():
             expected_data = expected_data.encode()
         assert payloads[0].data == expected_data
         # Decode and check
-        actual_inputs = await temporalio.converter.default().decode(
+        actual_inputs = await temporalio.converter.DataConverter().decode(
             payloads, [type_hint]
         )
         assert len(actual_inputs) == 1
@@ -86,16 +86,20 @@ async def test_default():
     )
 
 
-async def test_binary_proto():
+def test_binary_proto():
     # We have to test this separately because by default it never encodes
     # anything since JSON proto takes precedence
     conv = temporalio.converter.BinaryProtoPayloadConverter()
     proto = temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
-    payload = await conv.encode(proto)
+    payload = conv.to_payload(proto)
     assert payload.metadata["encoding"] == b"binary/protobuf"
     assert (
         payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
     )
     assert payload.data == proto.SerializeToString()
-    decoded = await conv.decode(payload)
+    decoded = conv.from_payload(payload)
     assert decoded == proto
+
+
+# TODO:
+# * Payload codec

@@ -223,10 +223,10 @@ class Info:
 class _Runtime(ABC):
     @staticmethod
     def current() -> _Runtime:
-        runtime = _Runtime.maybe_current()
-        if not runtime:
+        loop = _Runtime.maybe_current()
+        if not loop:
             raise RuntimeError("Not in workflow event loop")
-        return runtime
+        return loop
 
     @staticmethod
     def maybe_current() -> Optional[_Runtime]:
@@ -245,22 +245,22 @@ class _Runtime(ABC):
         super().__init__()
         self._logger_details: Optional[Mapping[str, Any]] = None
 
-    @abstractmethod
-    def info(self) -> Info:
-        ...
-
     @property
     def logger_details(self) -> Mapping[str, Any]:
         if self._logger_details is None:
-            self._logger_details = self.info()._logger_details()
+            self._logger_details = self.workflow_info()._logger_details()
         return self._logger_details
 
     @abstractmethod
-    def now(self) -> datetime:
+    def workflow_info(self) -> Info:
         ...
 
     @abstractmethod
-    def start_activity(
+    def workflow_now(self) -> datetime:
+        ...
+
+    @abstractmethod
+    def workflow_start_activity(
         self,
         activity: Any,
         *args: Any,
@@ -276,7 +276,7 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
-    async def start_child_workflow(
+    async def workflow_start_child_workflow(
         self,
         workflow: Any,
         *args: Any,
@@ -297,7 +297,7 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
-    def start_local_activity(
+    def workflow_start_local_activity(
         self,
         activity: Any,
         *args: Any,
@@ -312,24 +312,24 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
-    async def wait_condition(
+    async def workflow_wait_condition(
         self, fn: Callable[[], bool], *, timeout: Optional[float] = None
     ) -> None:
         ...
 
 
 def info() -> Info:
-    return _Runtime.current().info()
+    return _Runtime.current().workflow_info()
 
 
 def now() -> datetime:
-    return _Runtime.current().now()
+    return _Runtime.current().workflow_now()
 
 
 async def wait_condition(
     fn: Callable[[], bool], *, timeout: Optional[float] = None
 ) -> None:
-    await _Runtime.current().wait_condition(fn, timeout=timeout)
+    await _Runtime.current().workflow_wait_condition(fn, timeout=timeout)
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -673,7 +673,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
 ) -> ActivityHandle[Any]:
-    return _Runtime.current().start_activity(
+    return _Runtime.current().workflow_start_activity(
         activity,
         *args,
         activity_id=activity_id,
@@ -792,7 +792,7 @@ async def execute_activity(
 ) -> Any:
     # We call the runtime directly instead of top-level start_activity to ensure
     # we don't miss new parameters
-    return await _Runtime.current().start_activity(
+    return await _Runtime.current().workflow_start_activity(
         activity,
         *args,
         activity_id=activity_id,
@@ -913,7 +913,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
 ) -> ActivityHandle[Any]:
-    return _Runtime.current().start_local_activity(
+    return _Runtime.current().workflow_start_local_activity(
         activity,
         *args,
         activity_id=activity_id,
@@ -1025,7 +1025,7 @@ async def execute_local_activity(
 ) -> Any:
     # We call the runtime directly instead of top-level start_local_activity to
     # ensure we don't miss new parameters
-    return await _Runtime.current().start_local_activity(
+    return await _Runtime.current().workflow_start_local_activity(
         activity,
         *args,
         activity_id=activity_id,
@@ -1210,7 +1210,7 @@ async def start_child_workflow(
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[Mapping[str, Any]] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
-    return await _Runtime.current().start_child_workflow(
+    return await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *args,
         id=id,
@@ -1319,7 +1319,7 @@ async def execute_child_workflow(
 ) -> Any:
     # We call the runtime directly instead of top-level start_child_workflow to
     # ensure we don't miss new parameters
-    handle = await _Runtime.current().start_child_workflow(
+    handle = await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *args,
         id=id,

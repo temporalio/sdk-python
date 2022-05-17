@@ -691,7 +691,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     req.next_page_token = b""
                     continue
                 raise WorkflowFailureError(
-                    cause=await temporalio.exceptions.failure_to_error(
+                    cause=await temporalio.exceptions.decode_failure_to_error(
                         fail_attr.failure, self._client.data_converter
                     ),
                 )

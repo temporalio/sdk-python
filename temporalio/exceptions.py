@@ -304,9 +304,9 @@ class ChildWorkflowError(FailureError):
         return self._retry_state
 
 
-async def failure_to_error(
+def failure_to_error(
     failure: temporalio.api.failure.v1.Failure,
-    converter: temporalio.converter.DataConverter,
+    converter: temporalio.converter.PayloadConverter,
 ) -> FailureError:
     """Create a :py:class:`FailureError` from the given protobuf failure and
     data converter.
@@ -316,7 +316,7 @@ async def failure_to_error(
         app_info = failure.application_failure_info
         err = ApplicationError(
             failure.message or "Application error",
-            *(await temporalio.converter.decode_payloads(app_info.details, converter)),
+            *temporalio.converter.convert_from_payloads(app_info.details, converter),
             type=app_info.type or None,
             non_retryable=app_info.non_retryable,
         )
@@ -327,7 +327,7 @@ async def failure_to_error(
             type=TimeoutType(int(timeout_info.timeout_type))
             if timeout_info.timeout_type
             else None,
-            last_heartbeat_details=await temporalio.converter.decode_payloads(
+            last_heartbeat_details=temporalio.converter.convert_from_payloads(
                 timeout_info.last_heartbeat_details, converter
             ),
         )
@@ -335,11 +335,7 @@ async def failure_to_error(
         cancel_info = failure.canceled_failure_info
         err = CancelledError(
             failure.message or "Cancelled",
-            *(
-                await temporalio.converter.decode_payloads(
-                    cancel_info.details, converter
-                )
-            ),
+            *temporalio.converter.convert_from_payloads(cancel_info.details, converter),
         )
     elif failure.HasField("terminated_failure_info"):
         err = TerminatedError(failure.message or "Terminated")
@@ -379,14 +375,14 @@ async def failure_to_error(
         err = FailureError(failure.message or "Failure error")
     err._failure = failure
     if failure.HasField("cause"):
-        temp = await failure_to_error(failure.cause, converter)
+        temp = failure_to_error(failure.cause, converter)
         err.__cause__ = temp
     return err
 
 
-async def apply_error_to_failure(
+def apply_error_to_failure(
     error: FailureError,
-    converter: temporalio.converter.DataConverter,
+    converter: temporalio.converter.PayloadConverter,
     failure: temporalio.api.failure.v1.Failure,
 ) -> None:
     """Convert the given failure error to a Temporal failure.
@@ -407,9 +403,9 @@ async def apply_error_to_failure(
     if error.__traceback__:
         failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
     if error.__cause__:
-        await apply_exception_to_failure(error.__cause__, converter, failure.cause)
+        apply_exception_to_failure(error.__cause__, converter, failure.cause)
     elif not error.__suppress_context__ and error.__context__:
-        await apply_exception_to_failure(error.__context__, converter, failure.cause)
+        apply_exception_to_failure(error.__context__, converter, failure.cause)
 
     # Set specific subclass values
     if isinstance(error, ApplicationError):
@@ -419,7 +415,7 @@ async def apply_error_to_failure(
         failure.application_failure_info.non_retryable = error.non_retryable
         if error.details:
             failure.application_failure_info.details.CopyFrom(
-                await temporalio.converter.encode_payloads(error.details, converter)
+                temporalio.converter.convert_to_payloads(error.details, converter)
             )
     elif isinstance(error, TimeoutError):
         failure.timeout_failure_info.SetInParent()
@@ -428,7 +424,7 @@ async def apply_error_to_failure(
         )
         if error.last_heartbeat_details:
             failure.timeout_failure_info.last_heartbeat_details.CopyFrom(
-                await temporalio.converter.encode_payloads(
+                temporalio.converter.convert_to_payloads(
                     error.last_heartbeat_details, converter
                 )
             )
@@ -436,7 +432,7 @@ async def apply_error_to_failure(
         failure.canceled_failure_info.SetInParent()
         if error.details:
             failure.canceled_failure_info.details.CopyFrom(
-                await temporalio.converter.encode_payloads(error.details, converter)
+                temporalio.converter.convert_to_payloads(error.details, converter)
             )
     elif isinstance(error, TerminatedError):
         failure.terminated_failure_info.SetInParent()
@@ -476,19 +472,63 @@ async def apply_error_to_failure(
         )
 
 
-async def apply_exception_to_failure(
+def apply_exception_to_failure(
     exception: BaseException,
-    converter: temporalio.converter.DataConverter,
+    converter: temporalio.converter.PayloadConverter,
     failure: temporalio.api.failure.v1.Failure,
 ) -> None:
     """Small wrapper around :py:func:`apply_error_to_failure` for exceptions."""
     # If already a failure error, use that
     if isinstance(exception, FailureError):
-        await apply_error_to_failure(exception, converter, failure)
+        apply_error_to_failure(exception, converter, failure)
     else:
         # Convert to failure error
         failure_error = ApplicationError(
             str(exception), type=exception.__class__.__name__
         )
         failure_error.__traceback__ = exception.__traceback__
-        await apply_error_to_failure(failure_error, converter, failure)
+        apply_error_to_failure(failure_error, converter, failure)
+
+
+async def decode_failure(
+    failure: temporalio.api.failure.v1.Failure, codec: temporalio.converter.PayloadCodec
+) -> None:
+    # TODO(cretz): This
+    raise NotImplementedError
+
+
+# TODO(cretz): Document that this mutates failure
+async def decode_failure_to_error(
+    failure: temporalio.api.failure.v1.Failure,
+    converter: temporalio.converter.DataConverter,
+) -> FailureError:
+    if converter.payload_codec:
+        await decode_failure(failure, converter.payload_codec)
+    return failure_to_error(failure, converter.payload_converter)
+
+
+async def encode_failure(
+    failure: temporalio.api.failure.v1.Failure, codec: temporalio.converter.PayloadCodec
+) -> None:
+    # TODO(cretz): This
+    raise NotImplementedError
+
+
+async def encode_error_to_failure(
+    error: FailureError,
+    converter: temporalio.converter.DataConverter,
+    failure: temporalio.api.failure.v1.Failure,
+) -> None:
+    apply_error_to_failure(error, converter.payload_converter, failure)
+    if converter.payload_codec:
+        await encode_failure(failure, converter.payload_codec)
+
+
+async def encode_exception_to_failure(
+    exception: BaseException,
+    converter: temporalio.converter.DataConverter,
+    failure: temporalio.api.failure.v1.Failure,
+) -> None:
+    apply_exception_to_failure(exception, converter.payload_converter, failure)
+    if converter.payload_codec:
+        await encode_failure(failure, converter.payload_codec)

@@ -12,16 +12,6 @@ import temporalio.common
 import temporalio.workflow
 
 
-@dataclass
-class ExecuteActivityInput:
-    """Input for :py:meth:`ActivityInboundInterceptor.execute_activity`."""
-
-    fn: Callable[..., Any]
-    args: Iterable[Any]
-    executor: Optional[concurrent.futures.Executor]
-    _cancelled_event: temporalio.activity._CompositeEvent
-
-
 class Interceptor:
     """Interceptor for workers.
 
@@ -42,10 +32,18 @@ class Interceptor:
         """
         return next
 
-    def intercept_workflow(
-        self, next: WorkflowInboundInterceptor
-    ) -> WorkflowInboundInterceptor:
-        return next
+    def workflow_interceptor_class(self) -> Optional[Type[WorkflowInboundInterceptor]]:
+        return None
+
+
+@dataclass
+class ExecuteActivityInput:
+    """Input for :py:meth:`ActivityInboundInterceptor.execute_activity`."""
+
+    fn: Callable[..., Any]
+    args: Iterable[Any]
+    executor: Optional[concurrent.futures.Executor]
+    _cancelled_event: temporalio.activity._CompositeEvent
 
 
 class ActivityInboundInterceptor:

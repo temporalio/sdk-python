@@ -428,7 +428,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.debug(
                         f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
                     )
-                    await temporalio.exceptions.apply_exception_to_failure(
+                    await temporalio.exceptions.encode_exception_to_failure(
                         err,
                         self._data_converter,
                         completion.result.failed.failure,
@@ -438,7 +438,7 @@ class _ActivityWorker:
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
-                    await temporalio.exceptions.apply_error_to_failure(
+                    await temporalio.exceptions.encode_error_to_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
                         self._data_converter,
@@ -448,7 +448,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.debug(
                         "Completing as failed", exc_info=True
                     )
-                    await temporalio.exceptions.apply_exception_to_failure(
+                    await temporalio.exceptions.encode_exception_to_failure(
                         err,
                         self._data_converter,
                         completion.result.failed.failure,

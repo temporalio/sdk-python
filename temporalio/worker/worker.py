@@ -7,7 +7,7 @@ import concurrent.futures
 import itertools
 import logging
 from datetime import timedelta
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, Type, cast
+from typing import Callable, Iterable, List, Optional, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -27,6 +27,7 @@ import temporalio.workflow_service
 from .activity import SharedStateManager, _ActivityWorker
 from .interceptor import Interceptor
 from .workflow import _WorkflowWorker
+from .workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ class Worker:
         workflows: Iterable[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         interceptors: Iterable[Interceptor] = [],
         max_cached_workflows: int = 1000,
         max_concurrent_workflow_tasks: int = 100,
@@ -79,13 +81,14 @@ class Worker:
                 activities. This is required if any activities are non-async. If
                 this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
                 all non-async activities must be picklable.
-            workflow_task_executor: Thread pool executor for workflow tasks. If this
-                is not present, a new
+            workflow_task_executor: Thread pool executor for workflow tasks. If
+                this is not present, a new
                 :py:class:`concurrent.futures.ThreadPoolExecutor` will be
                 created with ``max_workers`` set to
                 ``max_concurrent_workflow_tasks``. The default one will be
                 properly shutdown, but if one is provided, the caller is
                 responsible for shutting down after the worker is shut down.
+            workflow_runner: Runner for the workflow.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
@@ -178,6 +181,7 @@ class Worker:
             workflows=workflows,
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
+            workflow_runner=workflow_runner,
             interceptors=interceptors,
             max_cached_workflows=max_cached_workflows,
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
@@ -216,9 +220,10 @@ class Worker:
                 task_queue=task_queue,
                 workflows=workflows,
                 workflow_task_executor=workflow_task_executor,
+                workflow_runner=workflow_runner,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
-                type_lookup=type_lookup,
+                type_hint_eval_str=client_config["type_hint_eval_str"],
                 max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             )
 
@@ -328,6 +333,7 @@ class WorkerConfig(TypedDict, total=False):
     workflows: Iterable[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    workflow_runner: WorkflowRunner
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int
     max_concurrent_workflow_tasks: int

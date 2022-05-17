@@ -12,6 +12,7 @@ import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.common
+import temporalio.converter
 from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
@@ -149,3 +150,19 @@ def to_bridge_payload(
     return temporalio.bridge.proto.common.Payload(
         metadata=payload.metadata, data=payload.data
     )
+
+
+async def decode_activation(
+    act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+    codec: temporalio.converter.PayloadCodec,
+) -> None:
+    # TODO(cretz): This
+    raise NotImplementedError
+
+
+async def encode_completion(
+    comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
+    codec: temporalio.converter.PayloadCodec,
+) -> None:
+    # TODO(cretz): This
+    raise NotImplementedError
