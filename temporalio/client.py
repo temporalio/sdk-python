@@ -287,7 +287,8 @@ class Client:
         """Start a workflow and return its handle.
 
         Args:
-            workflow: String name or class method decorated with ``@workflow.run`` for the workflow to start.
+            workflow: String name or class method decorated with
+                ``@workflow.run`` for the workflow to start.
             args: Arguments for the workflow if any.
             id: Unique identifier for the workflow execution.
             task_queue: Task queue to run the workflow on.
@@ -312,7 +313,6 @@ class Client:
         Raises:
             RPCError: Workflow could not be started.
         """
-
         # Use definition if callable
         name: str
         arg_types: Optional[List[Type]] = None
@@ -496,6 +496,21 @@ class Client:
         run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
     ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+        """Get a typed workflow handle to an existing workflow by its ID.
+
+        This is the same as :py:meth:`get_workflow_handle` but typed. Note, the
+        workflow type given is not validated, it is only for typing.
+
+        Args:
+            workflow: The workflow run method to use for typing the handle.
+            workflow_id: Workflow ID to get a handle to.
+            run_id: Run ID that will be used for all calls.
+            first_execution_run_id: First execution run ID used for cancellation
+                and termination.
+
+        Returns:
+            The workflow handle.
+        """
         return self.get_workflow_handle(
             workflow_id, run_id=run_id, first_execution_run_id=first_execution_run_id
         )

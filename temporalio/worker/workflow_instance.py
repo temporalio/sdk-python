@@ -1,3 +1,5 @@
+"""Workflow worker runner and instance."""
+
 from __future__ import annotations
 
 import asyncio
@@ -56,13 +58,29 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowRunner(ABC):
+    """Abstract runner for workflows that creates workflow instances to run.
+
+    :py:class:`UnsandboxedWorkflowRunner` is an implementation that locally runs
+    the workflow.
+    """
+
     @abstractmethod
     async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+        """Create a workflow instance that can handle activations.
+
+        Args:
+            det: Serializable details that can be used to create the instance.
+
+        Returns:
+            Workflow instance that can handle activations.
+        """
         raise NotImplementedError
 
 
 @dataclass(frozen=True)
 class WorkflowInstanceDetails:
+    """Immutable, serializable details for creating a workflow instance."""
+
     payload_converter_class: Type[temporalio.converter.PayloadConverter]
     interceptor_classes: Iterable[Type[WorkflowInboundInterceptor]]
     defn: temporalio.workflow._Definition
@@ -71,18 +89,28 @@ class WorkflowInstanceDetails:
 
 
 class WorkflowInstance(ABC):
-    def __init__(self) -> None:
-        pass
+    """Instance of a workflow that can handle activations."""
 
     @abstractmethod
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> Iterable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]:
+        """Handle an activation and return a list of resulting commands.
+
+        Args:
+            act: Protobuf activation.
+
+        Returns:
+            Set of protobuf commands.
+        """
         raise NotImplementedError
 
 
 class UnsandboxedWorkflowRunner(WorkflowRunner):
+    """Workflow runner that does not do any sandboxing."""
+
     async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+        """Create an unsandboxed workflow instance."""
         # We ignore MyPy failing to instantiate this because it's not _really_
         # abstract at runtime. All of the asyncio.AbstractEventLoop calls that
         # we are not implementing are not abstract, they just throw not-impl'd
@@ -205,6 +233,9 @@ class _WorkflowInstanceImpl(
             self._apply_fire_timer(job.fire_timer)
         elif job.HasField("query_workflow"):
             self._apply_query_workflow(job.query_workflow)
+        elif job.HasField("notify_has_patch"):
+            # TODO(cretz): This
+            pass
         elif job.HasField("remove_from_cache"):
             # Ignore, handled externally
             pass
@@ -219,14 +250,20 @@ class _WorkflowInstanceImpl(
                 job.resolve_child_workflow_execution_start
             )
         elif job.HasField("resolve_request_cancel_external_workflow"):
-            # TODO(cretz): Resolve external cancel
+            # TODO(cretz): This
+            pass
+        elif job.HasField("resolve_signal_external_workflow"):
+            # TODO(cretz): This
             pass
         elif job.HasField("signal_workflow"):
             self._apply_signal_workflow(job.signal_workflow)
         elif job.HasField("start_workflow"):
             self._apply_start_workflow(job.start_workflow)
+        elif job.HasField("update_random_seed"):
+            # TODO(cretz): This
+            pass
         else:
-            print(f"TODO(cretz) JOB: {job.WhichOneof('variant')}")
+            raise RuntimeError(f"Unrecognized job: {job.WhichOneof('variant')}")
 
     def _apply_cancel_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.CancelWorkflow

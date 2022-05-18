@@ -1,3 +1,5 @@
+"""Utilities that can decorate or be called inside workflows."""
+
 from __future__ import annotations
 
 import asyncio
@@ -54,7 +56,8 @@ def defn(*, name: str) -> Callable[[WorkflowClass], WorkflowClass]:
 def defn(cls: Optional[WorkflowClass] = None, *, name: Optional[str] = None):
     """Decorator for workflow classes.
 
-    Activities can be async or non-async.
+    This must be set on any registered workflow class (it is ignored if on a
+    base class).
 
     Args:
         cls: The class to decorate.
@@ -79,6 +82,19 @@ WorkflowRunFunc = TypeVar("WorkflowRunFunc", bound=Callable[..., Awaitable[Any]]
 
 
 def run(fn: WorkflowRunFunc) -> WorkflowRunFunc:
+    """Decorator for the workflow run method.
+
+    This must be set on one and only one async method defined on the same class
+    as ``@workflow.defn``. This can be defined on a base class method but must
+    then be explicitly overridden and defined on the workflow class.
+
+    Run methods can only have positional parameters. Best practice is to only
+    take a single object/dataclass argument that can accept more fields later if
+    needed.
+
+    Args:
+        fn: The function to decorate.
+    """
     if not inspect.iscoroutinefunction(fn):
         raise ValueError("Workflow run method must be an async function")
     # Disallow local classes
@@ -118,6 +134,27 @@ def signal(
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
 ):
+    """Decorator for a workflow signal method.
+
+    This is set on any async or non-async method that expects to receive a
+    signal. If a function overrides one with this decorator, it too must be
+    decorated.
+
+    Signal methods can only have positional parameters. Best practice for
+    non-dynamic signal methods is to only take a single object/dataclass
+    argument that can accept more fields later if needed. Return values from
+    signal methods are ignored.
+
+    Args:
+        fn: The function to decorate.
+        name: Signal name. Defaults to method ``__name__``. Cannot be present
+            when ``dynamic`` is present.
+        dynamic: If true, this handles all signals not otherwise handled. The
+            parameters of the method must be self, a string name, and a
+            ``*args`` positional varargs. Cannot be present when ``name`` is
+            present.
+    """
+
     def with_name(name: Optional[str], fn: WorkflowSignalFunc) -> WorkflowSignalFunc:
         if not name:
             _assert_dynamic_signature(fn)
@@ -160,6 +197,27 @@ def query(
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
 ):
+    """Decorator for a workflow query method.
+
+    This is set on any async or non-async method that expects to handle a
+    query. If a function overrides one with this decorator, it too must be
+    decorated.
+
+    Query methods can only have positional parameters. Best practice for
+    non-dynamic query methods is to only take a single object/dataclass
+    argument that can accept more fields later if needed. The return value is
+    the resulting query value. Query methods must not mutate any workflow state.
+
+    Args:
+        fn: The function to decorate.
+        name: Query name. Defaults to method ``__name__``. Cannot be present
+            when ``dynamic`` is present.
+        dynamic: If true, this handles all queries not otherwise handled. The
+            parameters of the method must be self, a string name, and a
+            ``*args`` positional varargs. Cannot be present when ``name`` is
+            present.
+    """
+
     def with_name(name: Optional[str], fn: WorkflowQueryFunc) -> WorkflowQueryFunc:
         if not name:
             _assert_dynamic_signature(fn)
@@ -192,6 +250,11 @@ def _assert_dynamic_signature(fn: Callable) -> None:
 
 @dataclass(frozen=True)
 class Info:
+    """Information about the running workflow.
+
+    Retrieved inside a workflow via :py:func:`info`.
+    """
+
     attempt: int
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
@@ -319,16 +382,36 @@ class _Runtime(ABC):
 
 
 def info() -> Info:
+    """Current workflow's info.
+
+    Returns:
+        Info for the currently running workflow.
+    """
     return _Runtime.current().workflow_info()
 
 
 def now() -> datetime:
+    """Current time from the workflow perspective.
+
+    Returns:
+        UTC datetime for the current workflow time
+    """
     return _Runtime.current().workflow_now()
 
 
 async def wait_condition(
     fn: Callable[[], bool], *, timeout: Optional[float] = None
 ) -> None:
+    """Wait on a callback to become true.
+
+    This function returns when the callback returns true (invoked each loop
+    iteration) or the timeout has been reached.
+
+    Args:
+        fn: Non-async callback that accepts no parameters and returns a boolean.
+        timeout: Optional number of seconds to wait until throwing
+            :py:class:`asyncio.TimeoutError`.
+    """
     await _Runtime.current().workflow_wait_condition(fn, timeout=timeout)
 
 
@@ -365,7 +448,7 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.workflow_info_on_extra:
                     # Extra can be absent or None, this handles both
                     extra = kwargs.get("extra", None) or {}
-                    extra["workflow_info"] = runtime.info()
+                    extra["workflow_info"] = runtime.workflow_info()
                     kwargs["extra"] = extra
         return (msg, kwargs)
 
@@ -544,10 +627,18 @@ class _QueryDefinition:
 
 
 class ActivityHandle(asyncio.Task[ActivityReturnType]):
+    """Handle returned from :py:func:`start_activity` and
+    :py:func:`start_local_activity`.
+
+    This extends :py:class:`asyncio.Task` and supports all task features.
+    """
+
     pass
 
 
 class ActivityCancellationType(IntEnum):
+    """How an activity cancellation should be handled."""
+
     TRY_CANCEL = int(
         temporalio.bridge.proto.workflow_commands.ActivityCancellationType.TRY_CANCEL
     )
@@ -560,6 +651,10 @@ class ActivityCancellationType(IntEnum):
 
 
 class ActivityConfig(TypedDict, total=False):
+    """TypedDict of config that can be used for :py:func:`start_activity` and
+    :py:func:`execute_activity`.
+    """
+
     activity_id: Optional[str]
     task_queue: Optional[str]
     schedule_to_close_timeout: Optional[timedelta]
@@ -673,6 +768,35 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
 ) -> ActivityHandle[Any]:
+    """Start an activity and return its handle.
+
+    At least one of ``schedule_to_close_timeout`` or ``start_to_close_timeout``
+    must be present.
+
+    Args:
+        activity: Activity name or function reference.
+        args: Arguments for the activity if any.
+        activity_id: Optional unique identifier for the activity.
+        task_queue: Task queue to run the activity on. Defaults to the current
+            workflow's task queue.
+        schedule_to_close_timeout: Max amount of time the activity can take from
+            first being scheduled to being completed before it times out. This
+            is inclusive of all retries.
+        schedule_to_start_timeout: Max amount of time the activity can take to
+            be started from first being scheduled.
+        start_to_close_timeout: Max amount of time a single activity run can
+            take from when it starts to when it completes. This is per retry.
+        heartbeat_timeout: How frequently an activity must invoke heartbeat
+            while running before it is considered timed out.
+        retry_policy: How an activity is retried on failure. If unset, a
+            server-defined default is used. Set maximum attempts to 1 to disable
+            retries.
+        cancellation_type: How the activity is treated when it is cancelled from
+            the workflow.
+
+    Returns:
+        An activity handle to the activity which is an async task.
+    """
     return _Runtime.current().workflow_start_activity(
         activity,
         *args,
@@ -790,6 +914,10 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
 ) -> Any:
+    """Start a local workflow and wait for completion.
+
+    This is a shortcut for ``await`` :py:meth:`start_activity`.
+    """
     # We call the runtime directly instead of top-level start_activity to ensure
     # we don't miss new parameters
     return await _Runtime.current().workflow_start_activity(
@@ -807,6 +935,10 @@ async def execute_activity(
 
 
 class LocalActivityConfig(TypedDict, total=False):
+    """TypedDict of config that can be used for :py:func:`start_local_activity`
+    and :py:func:`execute_local_activity`.
+    """
+
     activity_id: Optional[str]
     schedule_to_close_timeout: Optional[timedelta]
     schedule_to_start_timeout: Optional[timedelta]
@@ -913,6 +1045,31 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
 ) -> ActivityHandle[Any]:
+    """Start a local activity and return its handle.
+
+    At least one of ``schedule_to_close_timeout`` or ``start_to_close_timeout``
+    must be present.
+
+    Args:
+        activity: Activity name or function reference.
+        args: Arguments for the activity if any.
+        activity_id: Optional unique identifier for the activity.
+        schedule_to_close_timeout: Max amount of time the activity can take from
+            first being scheduled to being completed before it times out. This
+            is inclusive of all retries.
+        schedule_to_start_timeout: Max amount of time the activity can take to
+            be started from first being scheduled.
+        start_to_close_timeout: Max amount of time a single activity run can
+            take from when it starts to when it completes. This is per retry.
+        retry_policy: How an activity is retried on failure. If unset, an
+            SDK-defined default is used. Set maximum attempts to 1 to disable
+            retries.
+        cancellation_type: How the activity is treated when it is cancelled from
+            the workflow.
+
+    Returns:
+        An activity handle to the activity which is an async task.
+    """
     return _Runtime.current().workflow_start_local_activity(
         activity,
         *args,
@@ -1023,6 +1180,10 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
 ) -> Any:
+    """Start a local workflow and wait for completion.
+
+    This is a shortcut for ``await`` :py:meth:`start_local_activity`.
+    """
     # We call the runtime directly instead of top-level start_local_activity to
     # ensure we don't miss new parameters
     return await _Runtime.current().workflow_start_local_activity(
@@ -1041,12 +1202,22 @@ async def execute_local_activity(
 class ChildWorkflowHandle(
     asyncio.Task[WorkflowReturnType], Generic[ChildWorkflowClass, WorkflowReturnType]
 ):
+    """Handle for interacting with a child workflow.
+
+    This is usually created via :py:meth:`Client.get_workflow_handle` or
+    returned from :py:meth:`Client.start_workflow`.
+
+    This extends :py:class:`asyncio.Task` and supports all task features.
+    """
+
     @property
     def id(self) -> str:
+        """ID for the workflow."""
         raise NotImplementedError
 
     @property
     def original_run_id(self) -> Optional[str]:
+        """Run ID for the workflow."""
         raise NotImplementedError
 
     @overload
@@ -1073,10 +1244,19 @@ class ChildWorkflowHandle(
         ...
 
     async def signal(self, signal: Union[str, Callable], *args: Any) -> None:
+        """Signal this child workflow.
+
+        Args:
+            signal: Name or method reference for the signal.
+            args: Arguments for the signal if any.
+
+        """
         raise NotImplementedError
 
 
 class ChildWorkflowCancellationType(IntEnum):
+    """How a child workflow cancellation should be handled."""
+
     ABANDON = int(
         temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ABANDON
     )
@@ -1092,6 +1272,8 @@ class ChildWorkflowCancellationType(IntEnum):
 
 
 class ParentClosePolicy(IntEnum):
+    """How a child workflow should be handled when the parent closes."""
+
     UNSPECIFIED = int(
         temporalio.bridge.proto.child_workflow.ParentClosePolicy.PARENT_CLOSE_POLICY_UNSPECIFIED
     )
@@ -1107,6 +1289,10 @@ class ParentClosePolicy(IntEnum):
 
 
 class ChildWorkflowConfig(TypedDict, total=False):
+    """TypedDict of config that can be used for :py:func:`start_child_workflow`
+    and :py:func:`execute_child_workflow`.
+    """
+
     id: str
     task_queue: Optional[str]
     namespace: Optional[str]
@@ -1210,6 +1396,33 @@ async def start_child_workflow(
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[Mapping[str, Any]] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
+    """Start a child workflow and return its handle.
+
+    Args:
+        workflow: String name or class method decorated with ``@workflow.run``
+            for the workflow to start.
+        args: Arguments for the workflow if any.
+        id: Unique identifier for the workflow execution.
+        task_queue: Task queue to run the workflow on. Defaults to the current
+            workflow's task queue.
+        namespace: Namespace to run the child workflow on. Defaults to the
+            current workflow's namespace.
+        cancellation_type: How the child workflow will react to cancellation.
+        parent_close_policy: How to handle the child workflow when the parent
+            workflow closes.
+        execution_timeout: Total workflow execution timeout including
+            retries and continue as new.
+        run_timeout: Timeout of a single workflow run.
+        task_timeout: Timeout of a single workflow task.
+        id_reuse_policy: How already-existing IDs are treated.
+        retry_policy: Retry policy for the workflow.
+        cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
+        memo: Memo for the workflow.
+        search_attributes: Search attributes for the workflow.
+
+    Returns:
+        A workflow handle to the started/existing workflow.
+    """
     return await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *args,
@@ -1317,6 +1530,10 @@ async def execute_child_workflow(
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[Mapping[str, Any]] = None,
 ) -> Any:
+    """Start a child workflow and wait for completion.
+
+    This is a shortcut for ``await`` :py:meth:`start_child_workflow`.
+    """
     # We call the runtime directly instead of top-level start_child_workflow to
     # ensure we don't miss new parameters
     handle = await _Runtime.current().workflow_start_child_workflow(

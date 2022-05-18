@@ -15,6 +15,10 @@ class TemporalError(Exception):
 
     @property
     def cause(self) -> Optional[BaseException]:
+        """Cause of the exception.
+
+        This is the same as :py:attr:`__cause__`.
+        """
         return self.__cause__
 
 
@@ -22,6 +26,7 @@ class WorkflowAlreadyStartedError(TemporalError):
     """Thrown by a client or workflow when a workflow execution has already started."""
 
     def __init__(self, workflow_id: str, workflow_type: str) -> None:
+        """Initialize a workflow already started error."""
         super().__init__("Workflow execution already started")
         self.workflow_id = workflow_id
         self.workflow_type = workflow_type
@@ -493,6 +498,7 @@ def apply_exception_to_failure(
 async def decode_failure(
     failure: temporalio.api.failure.v1.Failure, codec: temporalio.converter.PayloadCodec
 ) -> None:
+    """Decode payloads within the failure using the given codec."""
     # TODO(cretz): This
     raise NotImplementedError
 
@@ -502,6 +508,7 @@ async def decode_failure_to_error(
     failure: temporalio.api.failure.v1.Failure,
     converter: temporalio.converter.DataConverter,
 ) -> FailureError:
+    """Shortcut for :py:func:`decode_failure` + :py:func:`failure_to_error`."""
     if converter.payload_codec:
         await decode_failure(failure, converter.payload_codec)
     return failure_to_error(failure, converter.payload_converter)
@@ -510,6 +517,7 @@ async def decode_failure_to_error(
 async def encode_failure(
     failure: temporalio.api.failure.v1.Failure, codec: temporalio.converter.PayloadCodec
 ) -> None:
+    """Encode payloads within the failure using the given codec."""
     # TODO(cretz): This
     raise NotImplementedError
 
@@ -519,6 +527,7 @@ async def encode_error_to_failure(
     converter: temporalio.converter.DataConverter,
     failure: temporalio.api.failure.v1.Failure,
 ) -> None:
+    """Shortcut for :py:func:`apply_error_to_failure` + :py:func:`encode_failure`."""
     apply_error_to_failure(error, converter.payload_converter, failure)
     if converter.payload_codec:
         await encode_failure(failure, converter.payload_codec)
@@ -529,6 +538,7 @@ async def encode_exception_to_failure(
     converter: temporalio.converter.DataConverter,
     failure: temporalio.api.failure.v1.Failure,
 ) -> None:
+    """Shortcut for :py:func:`apply_exception_to_failure` + :py:func:`encode_failure`."""
     apply_exception_to_failure(exception, converter.payload_converter, failure)
     if converter.payload_codec:
         await encode_failure(failure, converter.payload_codec)

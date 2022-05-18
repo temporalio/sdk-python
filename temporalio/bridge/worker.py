@@ -111,6 +111,7 @@ def retry_policy_to_proto(
     p: temporalio.common.RetryPolicy,
     v: temporalio.bridge.proto.common.RetryPolicy,
 ) -> None:
+    """Convert Temporal retry policy to Core retry policy."""
     v.initial_interval.FromTimedelta(p.initial_interval)
     v.backoff_coefficient = p.backoff_coefficient
     if p.maximum_interval:
@@ -156,6 +157,7 @@ async def decode_activation(
     act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
+    """Recursively decode the given activation with the codec."""
     # TODO(cretz): This
     raise NotImplementedError
 
@@ -164,5 +166,6 @@ async def encode_completion(
     comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
+    """Recursively encode the given completion with the codec."""
     # TODO(cretz): This
     raise NotImplementedError

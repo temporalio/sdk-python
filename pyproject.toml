@@ -63,7 +63,9 @@ lint = [
   {ref = "lint-types"},
   {ref = "lint-docs"},
 ]
-lint-docs = "pydocstyle"
+# TODO(cretz): Why does pydocstyle complain about @overload missing docs after
+# https://github.com/PyCQA/pydocstyle/pull/511?
+lint-docs = "pydocstyle --ignore-decorators=overload"
 lint-types = "mypy ."
 test = "pytest"
 

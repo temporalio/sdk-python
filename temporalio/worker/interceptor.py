@@ -33,6 +33,14 @@ class Interceptor:
         return next
 
     def workflow_interceptor_class(self) -> Optional[Type[WorkflowInboundInterceptor]]:
+        """Class that will be instantiated and used to intercept workflows.
+
+        The class must have the same init as
+        :py:meth:`WorkflowInboundInterceptor.__init__`.
+
+        Returns:
+            The class to construct to intercept each workflow.
+        """
         return None
 
 
@@ -100,6 +108,8 @@ class ActivityOutboundInterceptor:
 
 @dataclass
 class ExecuteWorkflowInput:
+    """Input for :py:meth:`WorkflowInboundInterceptor.execute_workflow`."""
+
     type: Type
     # Note, this is an unbound method
     run_fn: Callable[..., Awaitable[Any]]
@@ -108,12 +118,16 @@ class ExecuteWorkflowInput:
 
 @dataclass
 class HandleSignalInput:
+    """Input for :py:meth:`WorkflowInboundInterceptor.handle_signal`."""
+
     name: str
     args: Iterable[Any]
 
 
 @dataclass
 class HandleQueryInput:
+    """Input for :py:meth:`WorkflowInboundInterceptor.handle_query`."""
+
     id: str
     name: str
     args: Iterable[Any]
@@ -121,6 +135,8 @@ class HandleQueryInput:
 
 @dataclass
 class StartActivityInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.start_activity`."""
+
     activity: str
     args: Iterable[Any]
     activity_id: Optional[str]
@@ -138,6 +154,8 @@ class StartActivityInput:
 
 @dataclass
 class StartChildWorkflowInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.start_child_workflow`."""
+
     workflow: str
     args: Iterable[Any]
     id: str
@@ -160,6 +178,8 @@ class StartChildWorkflowInput:
 
 @dataclass
 class StartLocalActivityInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.start_local_activity`."""
+
     activity: str
     args: Iterable[Any]
     activity_id: Optional[str]
@@ -175,40 +195,81 @@ class StartLocalActivityInput:
 
 
 class WorkflowInboundInterceptor:
+    """Inbound interceptor to wrap outbound creation, workflow execution, and
+    signal/query handling.
+
+    This should be extended by any workflow inbound interceptors.
+    """
+
     def __init__(self, next: WorkflowInboundInterceptor) -> None:
+        """Create the inbound interceptor.
+
+        Args:
+            next: The next interceptor in the chain. The default implementation
+                of all calls is to delegate to the next interceptor.
+        """
         self.next = next
 
     def init(self, outbound: WorkflowOutboundInterceptor) -> None:
+        """Initialize with an outbound interceptor.
+
+        To add a custom outbound interceptor, wrap the given interceptor before
+        sending to the next ``init`` call.
+        """
         self.next.init(outbound)
 
     async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+        """Called to run the workflow."""
         return await self.next.execute_workflow(input)
 
     async def handle_signal(self, input: HandleSignalInput) -> None:
+        """Called to handle a signal."""
         return await self.next.handle_signal(input)
 
     async def handle_query(self, input: HandleQueryInput) -> Any:
+        """Called to handle a query."""
         return await self.next.handle_query(input)
 
 
 class WorkflowOutboundInterceptor:
+    """Outbound interceptor to wrap calls made from within workflows.
+
+    This should be extended by any workflow outbound interceptors.
+    """
+
     def __init__(self, next: WorkflowOutboundInterceptor) -> None:
+        """Create the outbound interceptor.
+
+        Args:
+            next: The next interceptor in the chain. The default implementation
+                of all calls is to delegate to the next interceptor.
+        """
         self.next = next
 
     def info(self) -> temporalio.workflow.Info:
+        """Called for every :py:func:`temporalio.workflow.info` call."""
         return self.next.info()
 
     def start_activity(
         self, input: StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
+        """Called for every :py:func:`temporalio.workflow.start_activity` and
+        :py:func:`temporalio.workflow.execute_activity`call.
+        """
         return self.next.start_activity(input)
 
     async def start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
+        """Called for every :py:func:`temporalio.workflow.start_child_workflow`
+        and :py:func:`temporalio.workflow.execute_child_workflow`call.
+        """
         return await self.next.start_child_workflow(input)
 
     def start_local_activity(
         self, input: StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
+        """Called for every :py:func:`temporalio.workflow.start_local_activity`
+        and :py:func:`temporalio.workflow.execute_local_activity`call.
+        """
         return self.next.start_local_activity(input)

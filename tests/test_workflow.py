@@ -264,3 +264,7 @@ def test_workflow_defn_bad_dynamic():
     with pytest.raises(RuntimeError) as err:
         workflow.query(dynamic=True)(BadDynamic.some_dynamic2)
     assert "must have 3 arguments" in str(err.value)
+
+
+# TODO:
+# * Only positional params on run, signal, and query

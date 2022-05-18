@@ -203,6 +203,7 @@ class DefaultPayloadConverter(CompositePayloadConverter):
     """
 
     def __init__(self) -> None:
+        """Create a default payload converter."""
         super().__init__(
             BinaryNullPayloadConverter(),
             BinaryPlainPayloadConverter(),
@@ -425,32 +426,78 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
 
 class PayloadCodec(ABC):
+    """Codec for encoding/decoding to/from bytes.
+
+    Commonly used for compression or encryption.
+    """
+
     @abstractmethod
     async def encode(
-        self, values: Iterable[temporalio.api.common.v1.Payload]
+        self, payloads: Iterable[temporalio.api.common.v1.Payload]
     ) -> List[temporalio.api.common.v1.Payload]:
+        """Encode the given payloads.
+
+        Args:
+            payloads: Payloads to encode. This value should not be mutated.
+
+        Returns:
+            Encoded payloads. Note, this does not have to be the same number as
+            payloads given, but must be at least one and cannot be more than was
+            given.
+        """
         raise NotImplementedError
 
     @abstractmethod
     async def decode(
-        self, values: Iterable[temporalio.api.common.v1.Payload]
+        self, payloads: Iterable[temporalio.api.common.v1.Payload]
     ) -> List[temporalio.api.common.v1.Payload]:
+        """Decode the given payloads.
+
+        Args:
+            payloads: Payloads to decode. This value should not be mutated.
+
+        Returns:
+            Decoded payloads. Note, this does not have to be the same number as
+            payloads given, but must be at least one and cannot be more than was
+            given.
+        """
         raise NotImplementedError
 
 
 @dataclass(frozen=True)
 class DataConverter:
+    """Data converter for converting and encoding payloads to/from Python values.
+
+    This combines :py:class:`PayloadConverter` which converts values with
+    :py:class:`PayloadCodec` which encodes bytes.
+    """
+
     payload_converter_class: Type[PayloadConverter] = DefaultPayloadConverter
+    """Class to instantiate for payload conversion."""
+
     payload_codec: Optional[PayloadCodec] = None
+    """Optional codec for encoding payload bytes."""
+
     payload_converter: PayloadConverter = dataclasses.field(init=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
 
     async def encode(
         self, values: Iterable[Any]
     ) -> List[temporalio.api.common.v1.Payload]:
-        # Apply payload converter then codec
+        """Encode values into payloads.
+
+        First converts values to payloads then encodes payloads using codec.
+
+        Args:
+            values: Values to be converted and encoded.
+
+        Returns:
+            Converted and encoded payloads. Note, this does not have to be the
+            same number as values given, but must be at least one and cannot be
+            more than was given.
+        """
         payloads = self.payload_converter.to_payloads(values)
         if self.payload_codec:
             payloads = await self.payload_codec.encode(payloads)
@@ -461,7 +508,16 @@ class DataConverter:
         payloads: Iterable[temporalio.api.common.v1.Payload],
         type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
-        # Apply payload codec then converter
+        """Decode payloads into values.
+
+        First decodes payloads using codec then converts payloads to values.
+
+        Args:
+            payloads: Payloads to be decoded and converted.
+
+        Returns:
+            Decoded and converted values.
+        """
         if self.payload_codec:
             payloads = await self.payload_codec.decode(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)
@@ -471,6 +527,7 @@ _default: Optional[DataConverter] = None
 
 
 def default() -> DataConverter:
+    """Default data converter."""
     global _default
     if not _default:
         _default = DataConverter()
