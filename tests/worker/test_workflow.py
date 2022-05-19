@@ -524,6 +524,7 @@ async def test_workflow_cancel_multi(client: Client):
 # * Workflow execution already started error (from client _and_ child workflow)
 # * Use typed dicts for activity, local activity, and child workflow configs
 # * Local activity invalid options
+# * Local activity backoff
 # * Cancelling things whose commands haven't been sent
 # * Starting something on an already-cancelled cancelled task
 # * Cancel unstarted child

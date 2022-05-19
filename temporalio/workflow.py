@@ -11,11 +11,13 @@ from datetime import datetime, timedelta
 from enum import IntEnum
 from functools import partial
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
     Dict,
     Generic,
+    Iterable,
     List,
     Mapping,
     MutableMapping,
@@ -136,9 +138,9 @@ def signal(
 ):
     """Decorator for a workflow signal method.
 
-    This is set on any async or non-async method that expects to receive a
-    signal. If a function overrides one with this decorator, it too must be
-    decorated.
+    This is set on any async or non-async method that you wish to be called upon
+    receiving a signal. If a function overrides one with this decorator, it too
+    must be decorated.
 
     Signal methods can only have positional parameters. Best practice for
     non-dynamic signal methods is to only take a single object/dataclass
@@ -626,7 +628,19 @@ class _QueryDefinition:
         return getattr(fn, "__temporal_query_definition", None)
 
 
-class ActivityHandle(asyncio.Task[ActivityReturnType]):
+# See https://mypy.readthedocs.io/en/latest/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
+if TYPE_CHECKING:
+
+    class _AsyncioTask(asyncio.Task[T]):
+        pass
+
+else:
+
+    class _AsyncioTask(Generic[T], asyncio.Task):
+        pass
+
+
+class ActivityHandle(_AsyncioTask[ActivityReturnType]):
     """Handle returned from :py:func:`start_activity` and
     :py:func:`start_local_activity`.
 
@@ -669,7 +683,6 @@ class ActivityConfig(TypedDict, total=False):
 @overload
 def start_activity(
     activity: Callable[[], Awaitable[ActivityReturnType]],
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -687,7 +700,6 @@ def start_activity(
 @overload
 def start_activity(
     activity: Callable[[], ActivityReturnType],
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -706,7 +718,6 @@ def start_activity(
 def start_activity(
     activity: Callable[[LocalParamType], Awaitable[ActivityReturnType]],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -725,7 +736,6 @@ def start_activity(
 def start_activity(
     activity: Callable[[LocalParamType], ActivityReturnType],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -743,7 +753,9 @@ def start_activity(
 @overload
 def start_activity(
     activity: str,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -758,7 +770,9 @@ def start_activity(
 
 def start_activity(
     activity: Any,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -775,7 +789,8 @@ def start_activity(
 
     Args:
         activity: Activity name or function reference.
-        args: Arguments for the activity if any.
+        arg: Single argument to the activity.
+        args: Multiple arguments to the activity.
         activity_id: Optional unique identifier for the activity.
         task_queue: Task queue to run the activity on. Defaults to the current
             workflow's task queue.
@@ -799,7 +814,7 @@ def start_activity(
     """
     return _Runtime.current().workflow_start_activity(
         activity,
-        *args,
+        *temporalio.common._arg_or_args(arg, args),
         activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
@@ -815,7 +830,6 @@ def start_activity(
 @overload
 async def execute_activity(
     activity: Callable[[], Awaitable[ActivityReturnType]],
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -833,7 +847,6 @@ async def execute_activity(
 @overload
 async def execute_activity(
     activity: Callable[[], ActivityReturnType],
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -852,7 +865,6 @@ async def execute_activity(
 async def execute_activity(
     activity: Callable[[LocalParamType], Awaitable[ActivityReturnType]],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -871,7 +883,6 @@ async def execute_activity(
 async def execute_activity(
     activity: Callable[[LocalParamType], ActivityReturnType],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
@@ -889,7 +900,9 @@ async def execute_activity(
 @overload
 async def execute_activity(
     activity: str,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -904,7 +917,9 @@ async def execute_activity(
 
 async def execute_activity(
     activity: Any,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -922,7 +937,7 @@ async def execute_activity(
     # we don't miss new parameters
     return await _Runtime.current().workflow_start_activity(
         activity,
-        *args,
+        *temporalio.common._arg_or_args(arg, args),
         activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
@@ -952,7 +967,6 @@ class LocalActivityConfig(TypedDict, total=False):
 @overload
 def start_local_activity(
     activity: Callable[[], Awaitable[ActivityReturnType]],
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -969,7 +983,6 @@ def start_local_activity(
 @overload
 def start_local_activity(
     activity: Callable[[], ActivityReturnType],
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -987,7 +1000,6 @@ def start_local_activity(
 def start_local_activity(
     activity: Callable[[LocalParamType], Awaitable[ActivityReturnType]],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1005,7 +1017,6 @@ def start_local_activity(
 def start_local_activity(
     activity: Callable[[LocalParamType], ActivityReturnType],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1022,7 +1033,9 @@ def start_local_activity(
 @overload
 def start_local_activity(
     activity: str,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1036,7 +1049,9 @@ def start_local_activity(
 
 def start_local_activity(
     activity: Any,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1052,7 +1067,8 @@ def start_local_activity(
 
     Args:
         activity: Activity name or function reference.
-        args: Arguments for the activity if any.
+        arg: Single argument to the activity.
+        args: Multiple arguments to the activity.
         activity_id: Optional unique identifier for the activity.
         schedule_to_close_timeout: Max amount of time the activity can take from
             first being scheduled to being completed before it times out. This
@@ -1072,7 +1088,7 @@ def start_local_activity(
     """
     return _Runtime.current().workflow_start_local_activity(
         activity,
-        *args,
+        *temporalio.common._arg_or_args(arg, args),
         activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1087,7 +1103,6 @@ def start_local_activity(
 @overload
 async def execute_local_activity(
     activity: Callable[[], Awaitable[ActivityReturnType]],
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1104,7 +1119,6 @@ async def execute_local_activity(
 @overload
 async def execute_local_activity(
     activity: Callable[[], ActivityReturnType],
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1122,7 +1136,6 @@ async def execute_local_activity(
 async def execute_local_activity(
     activity: Callable[[LocalParamType], Awaitable[ActivityReturnType]],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1140,7 +1153,6 @@ async def execute_local_activity(
 async def execute_local_activity(
     activity: Callable[[LocalParamType], ActivityReturnType],
     arg: LocalParamType,
-    /,
     *,
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1157,7 +1169,9 @@ async def execute_local_activity(
 @overload
 async def execute_local_activity(
     activity: str,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1171,7 +1185,9 @@ async def execute_local_activity(
 
 async def execute_local_activity(
     activity: Any,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1188,7 +1204,7 @@ async def execute_local_activity(
     # ensure we don't miss new parameters
     return await _Runtime.current().workflow_start_local_activity(
         activity,
-        *args,
+        *temporalio.common._arg_or_args(arg, args),
         activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1200,7 +1216,7 @@ async def execute_local_activity(
 
 
 class ChildWorkflowHandle(
-    asyncio.Task[WorkflowReturnType], Generic[ChildWorkflowClass, WorkflowReturnType]
+    _AsyncioTask[WorkflowReturnType], Generic[ChildWorkflowClass, WorkflowReturnType]
 ):
     """Handle for interacting with a child workflow.
 
@@ -1224,7 +1240,6 @@ class ChildWorkflowHandle(
     async def signal(
         self,
         signal: Callable[[ChildWorkflowClass], Union[Awaitable[None], None]],
-        /,
     ) -> None:
         ...
 
@@ -1235,20 +1250,32 @@ class ChildWorkflowHandle(
             [ChildWorkflowClass, LocalParamType], Union[Awaitable[None], None]
         ],
         arg: LocalParamType,
-        /,
     ) -> None:
         ...
 
     @overload
-    async def signal(self, signal: str, *args: Any) -> None:
+    async def signal(
+        self,
+        signal: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
         ...
 
-    async def signal(self, signal: Union[str, Callable], *args: Any) -> None:
+    async def signal(
+        self,
+        signal: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
         """Signal this child workflow.
 
         Args:
             signal: Name or method reference for the signal.
-            args: Arguments for the signal if any.
+            arg: Single argument to the signal.
+            args: Multiple arguments to the signal.
 
         """
         raise NotImplementedError
@@ -1312,7 +1339,6 @@ class ChildWorkflowConfig(TypedDict, total=False):
 @overload
 async def start_child_workflow(
     workflow: Callable[[ChildWorkflowClass], Awaitable[WorkflowReturnType]],
-    /,
     *,
     id: str,
     task_queue: Optional[str] = None,
@@ -1338,7 +1364,6 @@ async def start_child_workflow(
         [ChildWorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
     ],
     arg: LocalParamType,
-    /,
     *,
     id: str,
     task_queue: Optional[str] = None,
@@ -1361,7 +1386,9 @@ async def start_child_workflow(
 @overload
 async def start_child_workflow(
     workflow: str,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     id: str,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
@@ -1381,7 +1408,9 @@ async def start_child_workflow(
 
 async def start_child_workflow(
     workflow: Any,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     id: str,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
@@ -1401,7 +1430,8 @@ async def start_child_workflow(
     Args:
         workflow: String name or class method decorated with ``@workflow.run``
             for the workflow to start.
-        args: Arguments for the workflow if any.
+        arg: Single argument to the child workflow.
+        args: Multiple arguments to the child workflow.
         id: Unique identifier for the workflow execution.
         task_queue: Task queue to run the workflow on. Defaults to the current
             workflow's task queue.
@@ -1425,7 +1455,7 @@ async def start_child_workflow(
     """
     return await _Runtime.current().workflow_start_child_workflow(
         workflow,
-        *args,
+        *temporalio.common._arg_or_args(arg, args),
         id=id,
         task_queue=task_queue,
         namespace=namespace,
@@ -1446,7 +1476,6 @@ async def start_child_workflow(
 @overload
 async def execute_child_workflow(
     workflow: Callable[[ChildWorkflowClass], Awaitable[WorkflowReturnType]],
-    /,
     *,
     id: str,
     task_queue: Optional[str] = None,
@@ -1472,7 +1501,6 @@ async def execute_child_workflow(
         [ChildWorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
     ],
     arg: LocalParamType,
-    /,
     *,
     id: str,
     task_queue: Optional[str] = None,
@@ -1495,7 +1523,9 @@ async def execute_child_workflow(
 @overload
 async def execute_child_workflow(
     workflow: str,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     id: str,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
@@ -1515,7 +1545,9 @@ async def execute_child_workflow(
 
 async def execute_child_workflow(
     workflow: Any,
-    *args: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
     id: str,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
@@ -1538,7 +1570,7 @@ async def execute_child_workflow(
     # ensure we don't miss new parameters
     handle = await _Runtime.current().workflow_start_child_workflow(
         workflow,
-        *args,
+        *temporalio.common._arg_or_args(arg, args),
         id=id,
         task_queue=task_queue,
         namespace=namespace,

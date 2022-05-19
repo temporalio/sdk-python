@@ -135,25 +135,30 @@ class _WorkflowWorker:
                 workflow = await self._create_workflow_instance(act)
                 self._running_workflows[act.run_id] = workflow
 
-            # Run activation in separate thread so we can check if it's
-            # deadlocked
-            activate_task = asyncio.get_running_loop().run_in_executor(
-                self._workflow_task_executor,
-                workflow.activate,
-                act,
+            # We only have to run if there are any non-remove-from-cache jobs
+            remove_job = next(
+                (j for j in act.jobs if j.HasField("remove_from_cache")), None
             )
+            if len(act.jobs) > 1 or not remove_job:
+                # Run activation in separate thread so we can check if it's
+                # deadlocked
+                activate_task = asyncio.get_running_loop().run_in_executor(
+                    self._workflow_task_executor,
+                    workflow.activate,
+                    act,
+                )
 
-            # Wait for deadlock timeout and set commands if successful
-            try:
-                commands = await asyncio.wait_for(
-                    activate_task, DEADLOCK_TIMEOUT_SECONDS
-                )
-                # TODO(cretz): Is this copy too expensive?
-                completion.successful.commands.extend(commands)
-            except asyncio.TimeoutError:
-                raise RuntimeError(
-                    f"Potential deadlock detected, workflow didn't yield within {DEADLOCK_TIMEOUT_SECONDS} second(s)"
-                )
+                # Wait for deadlock timeout and set commands if successful
+                try:
+                    commands = await asyncio.wait_for(
+                        activate_task, DEADLOCK_TIMEOUT_SECONDS
+                    )
+                    # TODO(cretz): Is this copy too expensive?
+                    completion.successful.commands.extend(commands)
+                except asyncio.TimeoutError:
+                    raise RuntimeError(
+                        f"Potential deadlock detected, workflow didn't yield within {DEADLOCK_TIMEOUT_SECONDS} second(s)"
+                    )
         except Exception as err:
             logger.exception(f"Failed activation on workflow with run ID {act.run_id}")
             # Set completion failure
@@ -190,9 +195,6 @@ class _WorkflowWorker:
             )
 
         # If there is a remove-from-cache job, do so
-        remove_job = next(
-            (j for j in act.jobs if j.HasField("remove_from_cache")), None
-        )
         if remove_job:
             logger.debug(
                 f"Evicting workflow with run ID {act.run_id}, message: {remove_job.remove_from_cache.message}"
@@ -205,7 +207,9 @@ class _WorkflowWorker:
         # First find the start workflow job
         start_job = next((j for j in act.jobs if j.HasField("start_workflow")), None)
         if not start_job:
-            raise RuntimeError("Missing start workflow")
+            raise RuntimeError(
+                "Missing start workflow, workflow could have unexpectedly been removed from cache"
+            )
 
         # Get the definition
         defn = self._workflows.get(start_job.start_workflow.workflow_type)

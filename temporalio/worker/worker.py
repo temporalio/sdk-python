@@ -88,7 +88,7 @@ class Worker:
                 ``max_concurrent_workflow_tasks``. The default one will be
                 properly shutdown, but if one is provided, the caller is
                 responsible for shutting down after the worker is shut down.
-            workflow_runner: Runner for the workflow.
+            workflow_runner: Runner for workflows.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should

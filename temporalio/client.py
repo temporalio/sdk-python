@@ -202,7 +202,6 @@ class Client:
     async def start_workflow(
         self,
         workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
-        /,
         *,
         id: str,
         task_queue: str,
@@ -227,7 +226,6 @@ class Client:
             [WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
         ],
         arg: LocalParamType,
-        /,
         *,
         id: str,
         task_queue: str,
@@ -249,7 +247,9 @@ class Client:
     async def start_workflow(
         self,
         workflow: str,
-        *args: Any,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -269,7 +269,9 @@ class Client:
     async def start_workflow(
         self,
         workflow: Union[str, Callable[..., Awaitable[Any]]],
-        *args: Any,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -289,7 +291,8 @@ class Client:
         Args:
             workflow: String name or class method decorated with
                 ``@workflow.run`` for the workflow to start.
-            args: Arguments for the workflow if any.
+            arg: Single argument to the workflow.
+            args: Multiple arguments to the workflow.
             id: Unique identifier for the workflow execution.
             task_queue: Task queue to run the workflow on.
             execution_timeout: Total workflow execution timeout including
@@ -329,7 +332,7 @@ class Client:
         return await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,
-                args=args,
+                args=temporalio.common._arg_or_args(arg, args),
                 id=id,
                 task_queue=task_queue,
                 execution_timeout=execution_timeout,
@@ -355,7 +358,6 @@ class Client:
             [WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
         ],
         arg: LocalParamType,
-        /,
         *,
         id: str,
         task_queue: str,
@@ -377,7 +379,6 @@ class Client:
     async def execute_workflow(
         self,
         workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
-        /,
         *,
         id: str,
         task_queue: str,
@@ -399,7 +400,9 @@ class Client:
     async def execute_workflow(
         self,
         workflow: str,
-        *args: Any,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -418,8 +421,10 @@ class Client:
 
     async def execute_workflow(
         self,
-        workflow: Union[str, Callable],
-        *args: Any,
+        workflow: Union[str, Callable[..., Awaitable[Any]]],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -440,9 +445,12 @@ class Client:
         :py:meth:`WorkflowHandle.result`.
         """
         return await (
-            await self.start_workflow(
-                workflow,
-                *args,
+            # We have to tell MyPy to ignore errors here because we want to call
+            # the non-@overload form of this and MyPy does not support that
+            await self.start_workflow(  # type: ignore
+                workflow,  # type: ignore[arg-type]
+                arg,
+                args=args,
                 task_queue=task_queue,
                 id=id,
                 execution_timeout=execution_timeout,
@@ -826,7 +834,6 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         query: Callable[
             [WorkflowClass], Union[Awaitable[LocalReturnType], LocalReturnType]
         ],
-        /,
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> LocalReturnType:
@@ -840,7 +847,6 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             Union[Awaitable[LocalReturnType], LocalReturnType],
         ],
         arg: LocalParamType,
-        /,
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> LocalReturnType:
@@ -850,7 +856,9 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     async def query(
         self,
         query: str,
-        *args: Any,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> Any:
         ...
@@ -858,7 +866,9 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     async def query(
         self,
         query: Union[str, Callable],
-        *args: Any,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> Any:
         """Query the workflow.
@@ -874,7 +884,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
 
         Args:
             query: Query function or name on the workflow.
-            args: Query arguments.
+            arg: Single argument to the query.
+            args: Multiple arguments to the query.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
 
@@ -905,7 +916,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                 id=self._id,
                 run_id=self._run_id,
                 query=query_name,
-                args=args,
+                args=temporalio.common._arg_or_args(arg, args),
                 reject_condition=reject_condition
                 or self._client._config["default_workflow_query_reject_condition"],
             )
@@ -915,7 +926,6 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     async def signal(
         self,
         signal: Callable[[WorkflowClass], Union[Awaitable[None], None]],
-        /,
     ) -> None:
         ...
 
@@ -924,15 +934,26 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         self,
         signal: Callable[[WorkflowClass, LocalParamType], Union[Awaitable[None], None]],
         arg: LocalParamType,
-        /,
     ) -> None:
         ...
 
     @overload
-    async def signal(self, signal: str, *args: Any) -> None:
+    async def signal(
+        self,
+        signal: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
         ...
 
-    async def signal(self, signal: Union[str, Callable], *args: Any) -> None:
+    async def signal(
+        self,
+        signal: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
         """Send a signal to the workflow.
 
         This will signal for :py:attr:`run_id` if present. To use a different
@@ -946,7 +967,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
 
         Args:
             signal: Signal function or name on the workflow.
-            args: Signal arguments.
+            arg: Single argument to the signal.
+            args: Multiple arguments to the signal.
 
         Raises:
             RPCError: Workflow could not be signalled.
@@ -971,7 +993,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                 id=self._id,
                 run_id=self._run_id,
                 signal=signal_name,
-                args=args,
+                args=temporalio.common._arg_or_args(arg, args),
             )
         )
 

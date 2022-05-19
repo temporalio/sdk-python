@@ -7,6 +7,7 @@ import collections
 import contextvars
 import inspect
 import logging
+import sys
 import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -25,11 +26,12 @@ from typing import (
     Sequence,
     Tuple,
     Type,
-    TypeAlias,
     TypeVar,
     Union,
     cast,
 )
+
+from typing_extensions import TypeAlias
 
 import temporalio.activity
 import temporalio.bridge.proto.activity_result
@@ -138,6 +140,7 @@ class _WorkflowInstanceImpl(
         ] = []
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time = 0.0
+        # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
         # Keyed by seq
@@ -152,9 +155,8 @@ class _WorkflowInstanceImpl(
             det.type_hint_eval_str
         )
         self._exception_handler: Optional[_ExceptionHandler] = None
-
-        # Instantiate the actual instance
-        self._instance = self._defn.cls()
+        # The actual instance, instantiated on first _run_once
+        self._object: Any = None
 
         # We maintain signals and queries on this class since handlers can be
         # added during workflow execution
@@ -300,6 +302,7 @@ class _WorkflowInstanceImpl(
                 command.respond_to_query.succeeded.response.CopyFrom(
                     temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
                 )
+                self._pending_commands.append(command)
             except Exception as err:
                 try:
                     temporalio.exceptions.apply_exception_to_failure(
@@ -307,12 +310,11 @@ class _WorkflowInstanceImpl(
                         self._payload_converter,
                         command.respond_to_query.failed,
                     )
+                    self._pending_commands.append(command)
                 except Exception as inner_err:
                     raise ValueError(
                         "Failed converting application error"
                     ) from inner_err
-            finally:
-                self._pending_commands.append(command)
 
         # Just find the arg types for now. The interceptor will be responsible
         # for checking whether the query definition actually exists.
@@ -438,19 +440,19 @@ class _WorkflowInstanceImpl(
             handle._resolve_start_success(job.succeeded.run_id)
         elif job.HasField("failed"):
             self._pending_child_workflows.pop(job.seq)
-            # TODO(cretz): This is not future proof
             if (
                 job.failed.cause
-                != temporalio.bridge.proto.child_workflow.StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+                == temporalio.bridge.proto.child_workflow.StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
             ):
-                raise ValueError(
-                    f"Unexpected child start fail cause: {job.failed.cause}"
+                handle._resolve_failure(
+                    temporalio.exceptions.WorkflowAlreadyStartedError(
+                        job.failed.workflow_id, job.failed.workflow_type
+                    )
                 )
-            handle._resolve_failure(
-                temporalio.exceptions.WorkflowAlreadyStartedError(
-                    job.failed.workflow_id, job.failed.workflow_type
+            else:
+                handle._resolve_failure(
+                    RuntimeError("Unknown child start fail cause: {job.failed.cause}")
                 )
-            )
         elif job.HasField("cancelled"):
             self._pending_child_workflows.pop(job.seq)
             handle._resolve_failure(
@@ -502,6 +504,7 @@ class _WorkflowInstanceImpl(
                 command.complete_workflow_execution.result.CopyFrom(
                     temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
                 )
+                self._pending_commands.append(command)
             except temporalio.exceptions.FailureError as err:
                 logger.debug(
                     f"Workflow raised failure with run ID {self._info.run_id}",
@@ -514,6 +517,7 @@ class _WorkflowInstanceImpl(
                         self._payload_converter,
                         command.fail_workflow_execution.failure,
                     )
+                    self._pending_commands.append(command)
                 except Exception as inner_err:
                     raise ValueError(
                         "Failed converting workflow exception"
@@ -525,7 +529,6 @@ class _WorkflowInstanceImpl(
                     self._payload_converter,
                     command.fail_workflow_execution.failure,
                 )
-            finally:
                 self._pending_commands.append(command)
 
         # Schedule it
@@ -799,6 +802,11 @@ class _WorkflowInstanceImpl(
         try:
             asyncio._set_running_loop(self)
 
+            # We instantiate the workflow class _inside_ here because __init__
+            # needs to run with this event loop set
+            if not self._object:
+                self._object = self._defn.cls()
+
             # Run while there is anything ready
             while self._ready:
 
@@ -865,8 +873,9 @@ class _WorkflowInstanceImpl(
         *,
         name: Optional[str] = None,
     ) -> asyncio.Task[_T]:
-        # We need to propagate cancellation
-        # TODO(cretz): Name not supported in older Python versions
+        # Name not supported in older Python versions
+        if sys.version_info < (3, 8):
+            return asyncio.Task(coro, loop=self)
         return asyncio.Task(coro, loop=self, name=name)
 
     def get_exception_handler(self) -> Optional[_ExceptionHandler]:
@@ -965,7 +974,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         self._outbound = outbound
 
     async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
-        args = [self._instance._instance] + list(input.args)
+        args = [self._instance._object] + list(input.args)
         return await input.run_fn(*args)
 
     async def handle_signal(self, input: HandleSignalInput) -> None:
@@ -982,9 +991,9 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         # Put self as arg first, then name only if dynamic
         args: Iterable[Any]
         if signal_defn.name:
-            args = [self._instance._instance] + list(input.args)
+            args = [self._instance._object] + list(input.args)
         else:
-            args = [self._instance._instance, input.name] + list(input.args)
+            args = [self._instance._object, input.name] + list(input.args)
         if inspect.iscoroutinefunction(signal_defn.fn):
             # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
             signal_fn = cast(Callable[..., Awaitable[None]], signal_defn.fn)
@@ -1003,9 +1012,9 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         # Put self as arg first, then name only if dynamic
         args: Iterable[Any]
         if query_defn.name:
-            args = [self._instance._instance] + list(input.args)
+            args = [self._instance._object] + list(input.args)
         else:
-            args = [self._instance._instance, input.name] + list(input.args)
+            args = [self._instance._object, input.name] + list(input.args)
         if inspect.iscoroutinefunction(query_defn.fn):
             # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
             query_fn = cast(Callable[..., Awaitable[None]], query_defn.fn)
@@ -1206,7 +1215,13 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def original_run_id(self) -> Optional[str]:
         return self._original_run_id
 
-    async def signal(self, signal: Union[str, Callable], *args: Any) -> None:
+    async def signal(
+        self,
+        signal: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
         raise NotImplementedError
 
     def _resolve_start_success(self, run_id: str) -> None:
