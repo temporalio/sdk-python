@@ -113,22 +113,20 @@ class _WorkflowWorker:
     ) -> None:
         global LOG_PROTOS, DEADLOCK_TIMEOUT_SECONDS
 
-        # Decode the activation if there's a codec
-        if self._data_converter.payload_codec:
-            await temporalio.bridge.worker.decode_activation(
-                act, self._data_converter.payload_codec
-            )
-
-        if LOG_PROTOS:
-            logger.debug("Received workflow activation: %s", act)
-        completion = (
-            temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
-                run_id=act.run_id
-            )
-        )
-
         # Build completion
         try:
+            # Decode the activation if there's a codec
+            if self._data_converter.payload_codec:
+                await temporalio.bridge.worker.decode_activation(
+                    act, self._data_converter.payload_codec
+                )
+
+            if LOG_PROTOS:
+                logger.debug("Received workflow activation: %s", act)
+            completion = temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
+                run_id=act.run_id
+            )
+
             # If the workflow is not running yet, create it
             workflow = self._running_workflows.get(act.run_id)
             if not workflow:

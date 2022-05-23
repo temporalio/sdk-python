@@ -698,8 +698,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     continue
                 # Ignoring anything after the first response like TypeScript
                 # TODO(cretz): Support type hints
-                results = await temporalio.converter.decode_payloads(
-                    complete_attr.result, self._client.data_converter
+                results = await self._client.data_converter.decode_wrapper(
+                    complete_attr.result
                 )
                 if not results:
                     return cast(WorkflowReturnType, None)
@@ -724,9 +724,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     cause=temporalio.exceptions.CancelledError(
                         "Workflow cancelled",
                         *(
-                            await temporalio.converter.decode_payloads(
-                                cancel_attr.details,
-                                self._client.data_converter,
+                            await self._client.data_converter.decode_wrapper(
+                                cancel_attr.details
                             )
                         ),
                     )
@@ -737,9 +736,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     cause=temporalio.exceptions.TerminatedError(
                         term_attr.reason or "Workflow terminated",
                         *(
-                            await temporalio.converter.decode_payloads(
-                                term_attr.details,
-                                self._client.data_converter,
+                            await self._client.data_converter.decode_wrapper(
+                                term_attr.details
                             )
                         ),
                     ),

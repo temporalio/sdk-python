@@ -64,6 +64,24 @@ class PayloadConverter(ABC):
         """
         raise NotImplementedError
 
+    def to_payloads_wrapper(
+        self, values: Iterable[Any]
+    ) -> temporalio.api.common.v1.Payloads:
+        """:py:meth:`to_payloads` for the
+        :py:class:`temporalio.api.common.v1.Payloads` wrapper.
+        """
+        return temporalio.api.common.v1.Payloads(payloads=self.to_payloads(values))
+
+    def from_payloads_wrapper(
+        self, payloads: Optional[temporalio.api.common.v1.Payloads]
+    ) -> List[Any]:
+        """:py:meth:`from_payloads` for the
+        :py:class:`temporalio.api.common.v1.Payloads` wrapper.
+        """
+        if not payloads or not payloads.payloads:
+            return []
+        return self.from_payloads(payloads.payloads)
+
 
 class EncodingPayloadConverter(ABC):
     """Base converter to/from single payload/value with a known encoding for use in CompositePayloadConverter."""
@@ -463,6 +481,28 @@ class PayloadCodec(ABC):
         """
         raise NotImplementedError
 
+    async def encode_wrapper(self, payloads: temporalio.api.common.v1.Payloads) -> None:
+        """:py:meth:`encode` for the
+        :py:class:`temporalio.api.common.v1.Payloads` wrapper.
+
+        This replaces the payloads within the wrapper.
+        """
+        new_payloads = await self.encode(payloads.payloads)
+        del payloads.payloads[:]
+        # TODO(cretz): Copy too expensive?
+        payloads.payloads.extend(new_payloads)
+
+    async def decode_wrapper(self, payloads: temporalio.api.common.v1.Payloads) -> None:
+        """:py:meth:`decode` for the
+        :py:class:`temporalio.api.common.v1.Payloads` wrapper.
+
+        This replaces the payloads within.
+        """
+        new_payloads = await self.decode(payloads.payloads)
+        del payloads.payloads[:]
+        # TODO(cretz): Copy too expensive?
+        payloads.payloads.extend(new_payloads)
+
 
 @dataclass(frozen=True)
 class DataConverter:
@@ -522,6 +562,24 @@ class DataConverter:
             payloads = await self.payload_codec.decode(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)
 
+    async def encode_wrapper(
+        self, values: Iterable[Any]
+    ) -> temporalio.api.common.v1.Payloads:
+        """:py:meth:`encode` for the
+        :py:class:`temporalio.api.common.v1.Payloads` wrapper.
+        """
+        return temporalio.api.common.v1.Payloads(payloads=(await self.encode(values)))
+
+    async def decode_wrapper(
+        self, payloads: Optional[temporalio.api.common.v1.Payloads]
+    ) -> List[Any]:
+        """:py:meth:`decode` for the
+        :py:class:`temporalio.api.common.v1.Payloads` wrapper.
+        """
+        if not payloads or not payloads.payloads:
+            return []
+        return await self.decode(payloads.payloads)
+
 
 _default: Optional[DataConverter] = None
 
@@ -532,46 +590,6 @@ def default() -> DataConverter:
     if not _default:
         _default = DataConverter()
     return _default
-
-
-async def encode_payloads(
-    values: Iterable[Any], converter: DataConverter
-) -> temporalio.api.common.v1.Payloads:
-    """Encode :py:class:`temporalio.api.common.v1.Payloads` with the given
-    data converter.
-    """
-    return temporalio.api.common.v1.Payloads(payloads=(await converter.encode(values)))
-
-
-async def decode_payloads(
-    payloads: Optional[temporalio.api.common.v1.Payloads], converter: DataConverter
-) -> List[Any]:
-    """Decode :py:class:`temporalio.api.common.v1.Payloads` with the given
-    converter.
-    """
-    if not payloads or not payloads.payloads:
-        return []
-    return await converter.decode(payloads.payloads)
-
-
-def convert_to_payloads(
-    values: Iterable[Any], converter: PayloadConverter
-) -> temporalio.api.common.v1.Payloads:
-    """Encode :py:class:`temporalio.api.common.v1.Payloads` with the given
-    payload converter.
-    """
-    return temporalio.api.common.v1.Payloads(payloads=converter.to_payloads(values))
-
-
-def convert_from_payloads(
-    payloads: Optional[temporalio.api.common.v1.Payloads], converter: PayloadConverter
-) -> List[Any]:
-    """Decode :py:class:`temporalio.api.common.v1.Payloads` with the given
-    payload converter.
-    """
-    if not payloads or not payloads.payloads:
-        return []
-    return converter.from_payloads(payloads.payloads)
 
 
 class _FunctionTypeLookup:

@@ -99,7 +99,3 @@ def test_binary_proto():
     assert payload.data == proto.SerializeToString()
     decoded = conv.from_payload(payload)
     assert decoded == proto
-
-
-# TODO:
-# * Payload codec

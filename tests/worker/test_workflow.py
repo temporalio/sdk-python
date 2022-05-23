@@ -9,8 +9,10 @@ from typing import Any, Awaitable, Callable, Dict, Iterable, List, Type, TypeVar
 
 import pytest
 
+import temporalio.api.common.v1
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
+from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import ActivityError, CancelledError, ChildWorkflowError
 from temporalio.worker import Worker
 
@@ -513,6 +515,40 @@ async def test_workflow_cancel_multi(client: Client):
             "timer cancelled",
             "timer success",
         ]
+
+
+# Just serializes in a "payloads" wrapper
+class SimpleCodec(PayloadCodec):
+    async def encode(
+        self, payloads: Iterable[temporalio.api.common.v1.Payload]
+    ) -> List[temporalio.api.common.v1.Payload]:
+        wrapper = temporalio.api.common.v1.Payloads(payloads=payloads)
+        return [
+            temporalio.api.common.v1.Payload(
+                metadata={"simple-codec": b"true"}, data=wrapper.SerializeToString()
+            )
+        ]
+
+    async def decode(
+        self, payloads: Iterable[temporalio.api.common.v1.Payload]
+    ) -> List[temporalio.api.common.v1.Payload]:
+        payloads = list(payloads)
+        if len(payloads) != 1:
+            raise RuntimeError("Expected only a single payload")
+        elif payloads[0].metadata.get("simple-codec") != b"true":
+            raise RuntimeError("Not encoded with this codec")
+        wrapper = temporalio.api.common.v1.Payloads()
+        wrapper.ParseFromString(payloads[0].data)
+        return list(wrapper.payloads)
+
+
+async def test_workflow_with_codec(client: Client):
+    # Make client with this codec and run a couple of existing tests
+    config = client.config()
+    config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
+    client = Client(**config)
+    await test_workflow_signal_and_query(client)
+    await test_workflow_simple_activity(client)
 
 
 # TODO:
