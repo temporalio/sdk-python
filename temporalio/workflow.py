@@ -21,6 +21,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    NoReturn,
     Optional,
     Tuple,
     Type,
@@ -258,6 +259,7 @@ class Info:
     """
 
     attempt: int
+    continued_run_id: Optional[str]
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
     namespace: str
@@ -269,7 +271,6 @@ class Info:
     workflow_id: str
     workflow_type: str
 
-    # TODO(cretz): continued_run_id
     # TODO(cretz): memo
     # TODO(cretz): parent_namespace
     # TODO(cretz): parent_run_id
@@ -315,6 +316,19 @@ class _Runtime(ABC):
         if self._logger_details is None:
             self._logger_details = self.workflow_info()._logger_details()
         return self._logger_details
+
+    @abstractmethod
+    async def workflow_continue_as_new(
+        self,
+        *args: Any,
+        workflow: Union[None, Callable, str],
+        task_queue: Optional[str],
+        run_timeout: Optional[timedelta],
+        task_timeout: Optional[timedelta],
+        memo: Optional[Mapping[str, Any]],
+        search_attributes: Optional[Mapping[str, Any]],
+    ) -> NoReturn:
+        ...
 
     @abstractmethod
     def workflow_info(self) -> Info:
@@ -1586,6 +1600,104 @@ async def execute_child_workflow(
         search_attributes=search_attributes,
     )
     return await handle
+
+
+# Overload for self (unfortunately, cannot type args)
+@overload
+async def continue_as_new(
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
+    task_queue: Optional[str] = None,
+    run_timeout: Optional[timedelta] = None,
+    task_timeout: Optional[timedelta] = None,
+    memo: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[Mapping[str, Any]] = None,
+) -> NoReturn:
+    ...
+
+
+# Overload for no-param workflow
+@overload
+async def continue_as_new(
+    *,
+    workflow: Callable[[WorkflowClass], Any],
+    task_queue: Optional[str] = None,
+    run_timeout: Optional[timedelta] = None,
+    task_timeout: Optional[timedelta] = None,
+    memo: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[Mapping[str, Any]] = None,
+) -> NoReturn:
+    ...
+
+
+# Overload for single-param workflow
+@overload
+async def continue_as_new(
+    arg: LocalParamType,
+    *,
+    workflow: Callable[[WorkflowClass, LocalParamType], Any],
+    task_queue: Optional[str] = None,
+    run_timeout: Optional[timedelta] = None,
+    task_timeout: Optional[timedelta] = None,
+    memo: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[Mapping[str, Any]] = None,
+) -> NoReturn:
+    ...
+
+
+# Overload for string-name workflow
+@overload
+async def continue_as_new(
+    *,
+    workflow: str,
+    args: Iterable[Any] = [],
+    task_queue: Optional[str] = None,
+    run_timeout: Optional[timedelta] = None,
+    task_timeout: Optional[timedelta] = None,
+    memo: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[Mapping[str, Any]] = None,
+) -> NoReturn:
+    ...
+
+
+async def continue_as_new(
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Iterable[Any] = [],
+    workflow: Union[None, Callable, str] = None,
+    task_queue: Optional[str] = None,
+    run_timeout: Optional[timedelta] = None,
+    task_timeout: Optional[timedelta] = None,
+    memo: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[Mapping[str, Any]] = None,
+) -> NoReturn:
+    """Stop the workflow immediately and continue as new.
+
+    Args:
+        arg: Single argument to the continued workflow.
+        args: Multiple arguments to the continued workflow.
+        workflow: Specific workflow to continue to. Defaults to the current
+            workflow.
+        task_queue: Task queue to run the workflow on. Defaults to the current
+            workflow's task queue.
+        run_timeout: Timeout of a single workflow run. Defaults to the current
+            workflow's run timeout.
+        task_timeout: Timeout of a single workflow task. Defaults to the current
+            workflow's task timeout.
+        memo: Memo for the workflow. Defaults to the current workflow's memo.
+        search_attributes: Search attributes for the workflow. Defaults to the
+            current workflow's search attributes.
+    """
+    await _Runtime.current().workflow_continue_as_new(
+        *temporalio.common._arg_or_args(arg, args),
+        workflow=workflow,
+        task_queue=task_queue,
+        run_timeout=run_timeout,
+        task_timeout=task_timeout,
+        memo=memo,
+        search_attributes=search_attributes,
+    )
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:

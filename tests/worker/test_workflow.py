@@ -5,7 +5,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Awaitable, Callable, Dict, Iterable, List, Type, TypeVar
+from typing import Any, Awaitable, Callable, Dict, Iterable, List, Type, TypeVar, cast
 
 import pytest
 
@@ -551,6 +551,32 @@ async def test_workflow_with_codec(client: Client):
     await test_workflow_simple_activity(client)
 
 
+@workflow.defn
+class ContinueAsNewWorkflow:
+    @workflow.run
+    async def run(self, past_run_ids: List[str]) -> List[str]:
+        if len(past_run_ids) == 5:
+            return past_run_ids
+        info = workflow.info()
+        if info.continued_run_id:
+            past_run_ids.append(info.continued_run_id)
+        await workflow.continue_as_new(past_run_ids)
+        raise RuntimeError("Unreachable")
+
+
+async def test_workflow_continue_as_new(client: Client):
+    async with new_worker(client, ContinueAsNewWorkflow) as worker:
+        handle = await client.start_workflow(
+            ContinueAsNewWorkflow.run,
+            cast(List[str], []),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert len(result) == 5
+        assert result[0] == handle.first_execution_run_id
+
+
 # TODO:
 # * Activity timeout behavior
 # * Workflow logger
@@ -570,7 +596,6 @@ async def test_workflow_with_codec(client: Client):
 # * In-workflow signal/query handler registration
 # * Exception details with codec
 # * Custom workflow runner that also confirms WorkflowInstanceDetails can be pickled
-# * Continue as new
 # * "is replaying" check
 # * External workflow handle for cancel and signal
 # * Deadlock detection

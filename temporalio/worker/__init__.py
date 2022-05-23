@@ -4,6 +4,7 @@ from .activity import SharedHeartbeatSender, SharedStateManager
 from .interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
+    ContinueAsNewInput,
     ExecuteActivityInput,
     ExecuteWorkflowInput,
     HandleQueryInput,
@@ -33,6 +34,7 @@ __all__ = [
     "WorkflowInboundInterceptor",
     "WorkflowOutboundInterceptor",
     # Interceptor input
+    "ContinueAsNewInput",
     "ExecuteActivityInput",
     "ExecuteWorkflowInput",
     "HandleSignalInput",

@@ -222,6 +222,7 @@ class _WorkflowWorker:
         start = start_job.start_workflow
         info = temporalio.workflow.Info(
             attempt=start.attempt,
+            continued_run_id=start.continued_from_execution_run_id or None,
             cron_schedule=start.cron_schedule or None,
             execution_timeout=start.workflow_execution_timeout.ToTimedelta()
             if start.HasField("workflow_execution_timeout")

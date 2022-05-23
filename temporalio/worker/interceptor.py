@@ -5,7 +5,17 @@ from __future__ import annotations
 import concurrent.futures
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Iterable, List, Mapping, Optional, Type
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    List,
+    Mapping,
+    NoReturn,
+    Optional,
+    Type,
+)
 
 import temporalio.activity
 import temporalio.common
@@ -104,6 +114,21 @@ class ActivityOutboundInterceptor:
     def heartbeat(self, *details: Any) -> None:
         """Called for every :py:func:`temporalio.activity.heartbeat` call."""
         self.next.heartbeat(*details)
+
+
+@dataclass
+class ContinueAsNewInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.continue_as_new`."""
+
+    workflow: Optional[str]
+    args: Iterable[Any]
+    task_queue: Optional[str]
+    run_timeout: Optional[timedelta]
+    task_timeout: Optional[timedelta]
+    memo: Optional[Mapping[str, Any]]
+    search_attributes: Optional[Mapping[str, Any]]
+    # The types may be absent
+    arg_types: Optional[List[Type]]
 
 
 @dataclass
@@ -246,6 +271,10 @@ class WorkflowOutboundInterceptor:
         """
         self.next = next
 
+    async def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
+        """Called for every :py:func:`temporalio.workflow.continue_as_new` call."""
+        await self.next.continue_as_new(input)
+
     def info(self) -> temporalio.workflow.Info:
         """Called for every :py:func:`temporalio.workflow.info` call."""
         return self.next.info()
@@ -254,7 +283,7 @@ class WorkflowOutboundInterceptor:
         self, input: StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
         """Called for every :py:func:`temporalio.workflow.start_activity` and
-        :py:func:`temporalio.workflow.execute_activity`call.
+        :py:func:`temporalio.workflow.execute_activity` call.
         """
         return self.next.start_activity(input)
 
@@ -262,7 +291,7 @@ class WorkflowOutboundInterceptor:
         self, input: StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
         """Called for every :py:func:`temporalio.workflow.start_child_workflow`
-        and :py:func:`temporalio.workflow.execute_child_workflow`call.
+        and :py:func:`temporalio.workflow.execute_child_workflow` call.
         """
         return await self.next.start_child_workflow(input)
 
@@ -270,6 +299,6 @@ class WorkflowOutboundInterceptor:
         self, input: StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
         """Called for every :py:func:`temporalio.workflow.start_local_activity`
-        and :py:func:`temporalio.workflow.execute_local_activity`call.
+        and :py:func:`temporalio.workflow.execute_local_activity` call.
         """
         return self.next.start_local_activity(input)

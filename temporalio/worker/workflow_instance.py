@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    NoReturn,
     Optional,
     Sequence,
     Tuple,
@@ -46,6 +47,7 @@ import temporalio.exceptions
 import temporalio.workflow
 
 from .interceptor import (
+    ContinueAsNewInput,
     ExecuteWorkflowInput,
     HandleQueryInput,
     HandleSignalInput,
@@ -143,6 +145,8 @@ class _WorkflowInstanceImpl(
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
+        # Only set for continue-as-new
+        self._force_stop_loop: bool = False
         # Keyed by seq
         self._pending_timers: Dict[int, _TimerHandle] = {}
         self._pending_activities: Dict[int, _ActivityHandle] = {}
@@ -544,6 +548,42 @@ class _WorkflowInstanceImpl(
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
 
+    async def workflow_continue_as_new(
+        self,
+        *args: Any,
+        workflow: Union[None, Callable, str],
+        task_queue: Optional[str],
+        run_timeout: Optional[timedelta],
+        task_timeout: Optional[timedelta],
+        memo: Optional[Mapping[str, Any]],
+        search_attributes: Optional[Mapping[str, Any]],
+    ) -> NoReturn:
+        # Use definition if callable
+        name: Optional[str] = None
+        arg_types: Optional[List[Type]] = None
+        if isinstance(workflow, str):
+            name = workflow
+        elif callable(workflow):
+            defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
+            name = defn.name
+            arg_types, _ = self._type_lookup.get_type_hints(defn.run_fn)
+        elif workflow is not None:
+            raise TypeError("Workflow must be None, a string, or callable")
+
+        await self._outbound.continue_as_new(
+            ContinueAsNewInput(
+                workflow=name,
+                args=args,
+                task_queue=task_queue,
+                run_timeout=run_timeout,
+                task_timeout=task_timeout,
+                memo=memo,
+                search_attributes=search_attributes,
+                arg_types=arg_types,
+            )
+        )
+        raise RuntimeError("Unreachable")
+
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
 
@@ -697,6 +737,45 @@ class _WorkflowInstanceImpl(
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
 
+    async def _outbound_continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
+        # Just add the command, force stop the loop, and wait on a
+        # never-resolved future
+        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        v = command.continue_as_new_workflow_execution
+        if input.workflow:
+            v.workflow_type = input.workflow
+        if input.task_queue:
+            v.task_queue = input.task_queue
+        if input.args:
+            v.arguments.extend(
+                temporalio.bridge.worker.to_bridge_payloads(
+                    self._payload_converter.to_payloads(input.args)
+                )
+            )
+        if input.run_timeout:
+            v.workflow_run_timeout.FromTimedelta(input.run_timeout)
+        if input.task_timeout:
+            v.workflow_task_timeout.FromTimedelta(input.task_timeout)
+        # TODO(cretz): Headers
+        # v.headers = input.he
+        if input.memo:
+            for k, val in input.memo.items():
+                v.memo[k] = temporalio.bridge.worker.to_bridge_payload(
+                    self._payload_converter.to_payloads([val])[0]
+                )
+        if input.search_attributes:
+            for k, val in input.search_attributes.items():
+                v.search_attributes[k] = temporalio.bridge.worker.to_bridge_payload(
+                    # We have to use the default data converter for this
+                    temporalio.converter.default().payload_converter.to_payloads([val])[
+                        0
+                    ]
+                )
+        self._pending_commands.append(command)
+        self._force_stop_loop = True
+        await self.create_future()
+        raise RuntimeError("Unreachable")
+
     def _outbound_schedule_activity(
         self,
         input: Union[StartActivityInput, StartLocalActivityInput],
@@ -808,10 +887,10 @@ class _WorkflowInstanceImpl(
                 self._object = self._defn.cls()
 
             # Run while there is anything ready
-            while self._ready:
+            while self._ready and not self._force_stop_loop:
 
                 # Run and remove all ready ones
-                while self._ready:
+                while self._ready and not self._force_stop_loop:
                     handle = self._ready.popleft()
                     handle._run()
 
@@ -1028,6 +1107,9 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     def __init__(self, instance: _WorkflowInstanceImpl) -> None:
         # We are intentionally not calling the base class's __init__ here
         self._instance = instance
+
+    async def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
+        await self._instance._outbound_continue_as_new(input)
 
     def info(self) -> temporalio.workflow.Info:
         return self._instance._info
@@ -1279,7 +1361,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         if self._input.memo:
             for k, val in self._input.memo.items():
                 v.memo[k] = temporalio.bridge.worker.to_bridge_payload(
-                    (self._instance._payload_converter.to_payloads([val]))[0]
+                    self._instance._payload_converter.to_payloads([val])[0]
                 )
         if self._input.search_attributes:
             for k, val in self._input.search_attributes.items():

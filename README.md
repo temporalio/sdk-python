@@ -393,9 +393,10 @@ When the workflow itself is requested to cancel, `Task.cancel` is called on the 
 While running in a workflow, in addition to features documented elsewhere, the following items are available from the
 `temporalio.workflow` package:
 
+* `continue_as_new()` - Async function to stop the workflow immediately and continue as new
 * `info()` - Returns information about the current workflow
-* `now()` - Returns the "current time" from the workflow's perspective
 * `logger` - A logger for use in a workflow (properly skips logging on replay)
+* `now()` - Returns the "current time" from the workflow's perspective
 
 #### Exceptions
 
