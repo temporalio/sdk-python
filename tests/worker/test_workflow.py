@@ -5,7 +5,18 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Awaitable, Callable, Dict, Iterable, List, Type, TypeVar, cast
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    cast,
+)
 
 import pytest
 
@@ -450,6 +461,107 @@ async def test_workflow_cancel_child(client: Client):
             )
         assert isinstance(err.value.cause, ChildWorkflowError)
         assert isinstance(err.value.cause.cause, CancelledError)
+
+
+@workflow.defn
+class ReturnSignalWorkflow:
+    def __init__(self) -> None:
+        self._signal: Optional[str] = None
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self._signal is not None)
+        assert self._signal
+        return self._signal
+
+    @workflow.signal
+    def my_signal(self, value: str) -> None:
+        self._signal = value
+
+
+@workflow.defn
+class SignalChildWorkflow:
+    @workflow.run
+    async def run(self, signal_value: str) -> str:
+        handle = await workflow.start_child_workflow(
+            ReturnSignalWorkflow.run, id=workflow.info().workflow_id + "_child"
+        )
+        await handle.signal(ReturnSignalWorkflow.my_signal, signal_value)
+        return await handle
+
+
+async def test_workflow_signal_child(client: Client):
+    async with new_worker(client, SignalChildWorkflow, ReturnSignalWorkflow) as worker:
+        result = await client.execute_workflow(
+            SignalChildWorkflow.run,
+            "some value",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "some value"
+
+
+@workflow.defn
+class CancelExternalWorkflow:
+    @workflow.run
+    async def run(self, external_workflow_id: str) -> None:
+        await workflow.get_external_workflow_handle(external_workflow_id).cancel()
+
+
+async def test_workflow_cancel_external(client: Client):
+    async with new_worker(client, CancelExternalWorkflow, LongSleepWorkflow) as worker:
+        # Start long sleep, then cancel and check that it got cancelled
+        long_sleep_handle = await client.start_workflow(
+            LongSleepWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await client.execute_workflow(
+            CancelExternalWorkflow.run,
+            long_sleep_handle.id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        with pytest.raises(WorkflowFailureError) as err:
+            await long_sleep_handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+
+@dataclass
+class SignalExternalWorkflowArgs:
+    external_workflow_id: str
+    signal_value: str
+
+
+@workflow.defn
+class SignalExternalWorkflow:
+    @workflow.run
+    async def run(self, args: SignalExternalWorkflowArgs) -> None:
+        handle = workflow.get_external_workflow_handle_for(
+            ReturnSignalWorkflow.run, args.external_workflow_id
+        )
+        await handle.signal(ReturnSignalWorkflow.my_signal, args.signal_value)
+
+
+async def test_workflow_signal_external(client: Client):
+    async with new_worker(
+        client, SignalExternalWorkflow, ReturnSignalWorkflow
+    ) as worker:
+        # Start return signal, then signal and check that it got signalled
+        return_signal_handle = await client.start_workflow(
+            ReturnSignalWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await client.execute_workflow(
+            SignalExternalWorkflow.run,
+            SignalExternalWorkflowArgs(
+                external_workflow_id=return_signal_handle.id, signal_value="some value"
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert "some value" == await return_signal_handle.result()
 
 
 @workflow.defn

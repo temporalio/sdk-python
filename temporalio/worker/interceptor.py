@@ -142,6 +142,14 @@ class ExecuteWorkflowInput:
 
 
 @dataclass
+class GetExternalWorkflowHandleInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.get_external_workflow_handle`."""
+
+    id: str
+    run_id: Optional[str]
+
+
+@dataclass
 class HandleSignalInput:
     """Input for :py:meth:`WorkflowInboundInterceptor.handle_signal`."""
 
@@ -274,6 +282,15 @@ class WorkflowOutboundInterceptor:
     async def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         """Called for every :py:func:`temporalio.workflow.continue_as_new` call."""
         await self.next.continue_as_new(input)
+
+    def get_external_workflow_handle(
+        self, input: GetExternalWorkflowHandleInput
+    ) -> temporalio.workflow.ExternalWorkflowHandle:
+        """Called for every
+        :py:func:`temporalio.workflow.get_external_workflow_handle` and
+        :py:func:`temporalio.workflow.get_external_workflow_handle_for` call.
+        """
+        return self.next.get_external_workflow_handle(input)
 
     def info(self) -> temporalio.workflow.Info:
         """Called for every :py:func:`temporalio.workflow.info` call."""

@@ -88,7 +88,7 @@ asyncio_mode = "auto"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-timeout = 60
+timeout = 120
 timeout_func_only = true
 
 [tool.isort]

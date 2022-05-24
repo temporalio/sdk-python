@@ -151,6 +151,8 @@ class _WorkflowInstanceImpl(
         self._pending_timers: Dict[int, _TimerHandle] = {}
         self._pending_activities: Dict[int, _ActivityHandle] = {}
         self._pending_child_workflows: Dict[int, _ChildWorkflowHandle] = {}
+        self._pending_external_signals: Dict[int, asyncio.Future] = {}
+        self._pending_external_cancels: Dict[int, asyncio.Future] = {}
         # Keyed by type
         self._curr_seqs: Dict[str, int] = {}
         # TODO(cretz): Any concerns about not sharing this? Maybe the types I
@@ -256,11 +258,13 @@ class _WorkflowInstanceImpl(
                 job.resolve_child_workflow_execution_start
             )
         elif job.HasField("resolve_request_cancel_external_workflow"):
-            # TODO(cretz): This
-            pass
+            self._apply_resolve_request_cancel_external_workflow(
+                job.resolve_request_cancel_external_workflow
+            )
         elif job.HasField("resolve_signal_external_workflow"):
-            # TODO(cretz): This
-            pass
+            self._apply_resolve_signal_external_workflow(
+                job.resolve_signal_external_workflow
+            )
         elif job.HasField("signal_workflow"):
             self._apply_signal_workflow(job.signal_workflow)
         elif job.HasField("start_workflow"):
@@ -455,7 +459,7 @@ class _WorkflowInstanceImpl(
                 )
             else:
                 handle._resolve_failure(
-                    RuntimeError("Unknown child start fail cause: {job.failed.cause}")
+                    RuntimeError(f"Unknown child start fail cause: {job.failed.cause}")
                 )
         elif job.HasField("cancelled"):
             self._pending_child_workflows.pop(job.seq)
@@ -466,6 +470,46 @@ class _WorkflowInstanceImpl(
             )
         else:
             raise RuntimeError("Child workflow start did not have status")
+
+    def _apply_resolve_request_cancel_external_workflow(
+        self,
+        job: temporalio.bridge.proto.workflow_activation.ResolveRequestCancelExternalWorkflow,
+    ) -> None:
+        fut = self._pending_external_cancels.pop(job.seq, None)
+        if not fut:
+            raise RuntimeError(
+                f"Failed finding pending external cancel for sequence {job.seq}"
+            )
+        elif fut.done():
+            return
+        if job.HasField("failure"):
+            fut.set_exception(
+                temporalio.exceptions.failure_to_error(
+                    job.failure, self._payload_converter
+                )
+            )
+        else:
+            fut.set_result(None)
+
+    def _apply_resolve_signal_external_workflow(
+        self,
+        job: temporalio.bridge.proto.workflow_activation.ResolveSignalExternalWorkflow,
+    ) -> None:
+        fut = self._pending_external_signals.pop(job.seq, None)
+        if not fut:
+            raise RuntimeError(
+                f"Failed finding pending external signal for sequence {job.seq}"
+            )
+        elif fut.done():
+            return
+        if job.HasField("failure"):
+            fut.set_exception(
+                temporalio.exceptions.failure_to_error(
+                    job.failure, self._payload_converter
+                )
+            )
+        else:
+            fut.set_result(None)
 
     def _apply_signal_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.SignalWorkflow
@@ -583,6 +627,11 @@ class _WorkflowInstanceImpl(
             )
         )
         raise RuntimeError("Unreachable")
+
+    def workflow_get_external_workflow_handle(
+        self, id: str, *, run_id: Optional[str]
+    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
+        return _ExternalWorkflowHandle(self, id, run_id)
 
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
@@ -832,7 +881,23 @@ class _WorkflowInstanceImpl(
                     # already) or is already done
                     # TODO(cretz): What if the schedule command hasn't been sent yet?
                     if handle and not handle.done():
-                        self._pending_commands.append(handle.build_cancel_command())
+                        cancel_command = handle._build_cancel_command()
+                        # If the cancel command is for external workflow, we
+                        # have to add a seq and mark it pending
+                        if cancel_command.HasField(
+                            "request_cancel_external_workflow_execution"
+                        ):
+                            cancel_seq = self._next_seq("external_cancel")
+                            cancel_command.request_cancel_external_workflow_execution.seq = (
+                                cancel_seq
+                            )
+                            # TODO(cretz): Nothing waits on this future, so how
+                            # if at all should we report child-workflow cancel
+                            # request failure?
+                            self._pending_external_cancels[
+                                cancel_seq
+                            ] = self.create_future()
+                        self._pending_commands.append(cancel_command)
 
         # Create the handle and set as pending
         handle = _ChildWorkflowHandle(
@@ -847,6 +912,22 @@ class _WorkflowInstanceImpl(
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
+
+    async def _cancel_external_workflow(
+        self,
+        # Should not have seq set
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
+        seq = self._next_seq("external_cancel")
+        done_fut = self.create_future()
+        command.request_cancel_external_workflow_execution.seq = seq
+        self._pending_commands.append(command)
+
+        # Set as pending
+        self._pending_external_cancels[seq] = done_fut
+
+        # Wait until done (there is no cancelling a cancel request)
+        await done_fut
 
     def _check_condition(self, fn: Callable[[], bool], fut: asyncio.Future) -> bool:
         if fn():
@@ -900,6 +981,32 @@ class _WorkflowInstanceImpl(
                 ]
         finally:
             asyncio._set_running_loop(None)
+
+    async def _signal_external_workflow(
+        self,
+        # Should not have seq set
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
+        seq = self._next_seq("external_signal")
+        done_fut = self.create_future()
+        command.signal_external_workflow_execution.seq = seq
+        self._pending_commands.append(command)
+
+        # Set as pending
+        self._pending_external_signals[seq] = done_fut
+
+        # Wait until completed or cancelled
+        while True:
+            try:
+                # We have to shield because we don't want the future itself
+                # to be cancelled
+                return await asyncio.shield(done_fut)
+            except asyncio.CancelledError:
+                cancel_command = (
+                    temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+                )
+                cancel_command.cancel_signal_workflow.seq = seq
+                self._pending_commands.append(command)
 
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many
@@ -1287,15 +1394,15 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._input = input
         self._start_fut = start_fut
         self._result_fut = result_fut
-        self._original_run_id = "<unknown>"
+        self._first_execution_run_id = "<unknown>"
 
     @property
     def id(self) -> str:
         return self._input.id
 
     @property
-    def original_run_id(self) -> Optional[str]:
-        return self._original_run_id
+    def first_execution_run_id(self) -> Optional[str]:
+        return self._first_execution_run_id
 
     async def signal(
         self,
@@ -1304,10 +1411,24 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         *,
         args: Iterable[Any] = [],
     ) -> None:
-        raise NotImplementedError
+        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        v = command.signal_external_workflow_execution
+        v.child_workflow_id = self._input.id
+        v.signal_name = temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
+            signal
+        )
+        args = temporalio.common._arg_or_args(arg, args)
+        if args:
+            v.args.extend(
+                temporalio.bridge.worker.to_bridge_payloads(
+                    self._instance._payload_converter.to_payloads(args)
+                )
+            )
+        # TODO(cretz): Headers
+        await self._instance._signal_external_workflow(command)
 
     def _resolve_start_success(self, run_id: str) -> None:
-        self._original_run_id = run_id
+        self._first_execution_run_id = run_id
         if not self._start_fut.done():
             self._start_fut.set_result(None)
 
@@ -1379,7 +1500,8 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         )
         return command
 
-    def build_cancel_command(
+    # If request cancel external, result does _not_ have seq
+    def _build_cancel_command(
         self,
     ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
         if self._start_fut.done():
@@ -1394,3 +1516,59 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 child_workflow_seq=self._seq,
             ),
         )
+
+
+class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
+    def __init__(
+        self,
+        instance: _WorkflowInstanceImpl,
+        id: str,
+        run_id: Optional[str],
+    ) -> None:
+        super().__init__()
+        self._instance = instance
+        self._id = id
+        self._run_id = run_id
+
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @property
+    def run_id(self) -> Optional[str]:
+        return self._run_id
+
+    async def signal(
+        self,
+        signal: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
+        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        v = command.signal_external_workflow_execution
+        v.workflow_execution.namespace = self._instance._info.namespace
+        v.workflow_execution.workflow_id = self._id
+        if self._run_id:
+            v.workflow_execution.run_id = self._run_id
+        v.signal_name = temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
+            signal
+        )
+        args = temporalio.common._arg_or_args(arg, args)
+        if args:
+            v.args.extend(
+                temporalio.bridge.worker.to_bridge_payloads(
+                    self._instance._payload_converter.to_payloads(args)
+                )
+            )
+        # TODO(cretz): Headers
+        await self._instance._signal_external_workflow(command)
+
+    async def cancel(self) -> None:
+        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        v = command.request_cancel_external_workflow_execution
+        v.workflow_execution.namespace = self._instance._info.namespace
+        v.workflow_execution.workflow_id = self._id
+        if self._run_id:
+            v.workflow_execution.run_id = self._run_id
+        await self._instance._cancel_external_workflow(command)

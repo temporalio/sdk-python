@@ -292,7 +292,7 @@ class Client:
             workflow: String name or class method decorated with
                 ``@workflow.run`` for the workflow to start.
             arg: Single argument to the workflow.
-            args: Multiple arguments to the workflow.
+            args: Multiple arguments to the workflow. Cannot be set if arg is.
             id: Unique identifier for the workflow execution.
             task_queue: Task queue to run the workflow on.
             execution_timeout: Total workflow execution timeout including
@@ -883,7 +883,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         Args:
             query: Query function or name on the workflow.
             arg: Single argument to the query.
-            args: Multiple arguments to the query.
+            args: Multiple arguments to the query. Cannot be set if arg is.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
 
@@ -966,31 +966,18 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         Args:
             signal: Signal function or name on the workflow.
             arg: Single argument to the signal.
-            args: Multiple arguments to the signal.
+            args: Multiple arguments to the signal. Cannot be set if arg is.
 
         Raises:
             RPCError: Workflow could not be signalled.
         """
-        signal_name: str
-        if callable(signal):
-            defn = temporalio.workflow._SignalDefinition.from_fn(signal)
-            if not defn:
-                raise RuntimeError(
-                    f"Signal definition not found on {signal.__qualname__}, "
-                    "is it decorated with @workflow.signal?"
-                )
-            elif not defn.name:
-                raise RuntimeError("Cannot invoke dynamic signal definition")
-            # TODO(cretz): Check count/type of args at runtime?
-            signal_name = defn.name
-        else:
-            signal_name = str(signal)
-
         await self._client._impl.signal_workflow(
             SignalWorkflowInput(
                 id=self._id,
                 run_id=self._run_id,
-                signal=signal_name,
+                signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
+                    signal
+                ),
                 args=temporalio.common._arg_or_args(arg, args),
             )
         )

@@ -39,7 +39,7 @@ import temporalio.common
 import temporalio.exceptions
 
 WorkflowClass = TypeVar("WorkflowClass", bound=Type)
-ChildWorkflowClass = TypeVar("ChildWorkflowClass")
+ExternalWorkflowClass = TypeVar("ExternalWorkflowClass")
 LocalParamType = TypeVar("LocalParamType")
 ActivityReturnType = TypeVar("ActivityReturnType")
 WorkflowReturnType = TypeVar("WorkflowReturnType")
@@ -328,6 +328,12 @@ class _Runtime(ABC):
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[Mapping[str, Any]],
     ) -> NoReturn:
+        ...
+
+    @abstractmethod
+    def workflow_get_external_workflow_handle(
+        self, id: str, *, run_id: Optional[str]
+    ) -> ExternalWorkflowHandle[Any]:
         ...
 
     @abstractmethod
@@ -630,6 +636,21 @@ class _SignalDefinition:
     def from_fn(fn: Callable) -> Optional[_SignalDefinition]:
         return getattr(fn, "__temporal_signal_definition", None)
 
+    @staticmethod
+    def must_name_from_fn_or_str(signal: Union[str, Callable]) -> str:
+        if callable(signal):
+            defn = _SignalDefinition.from_fn(signal)
+            if not defn:
+                raise RuntimeError(
+                    f"Signal definition not found on {signal.__qualname__}, "
+                    "is it decorated with @workflow.signal?"
+                )
+            elif not defn.name:
+                raise RuntimeError("Cannot invoke dynamic signal definition")
+            # TODO(cretz): Check count/type of args at runtime?
+            return defn.name
+        return str(signal)
+
 
 @dataclass(frozen=True)
 class _QueryDefinition:
@@ -804,7 +825,7 @@ def start_activity(
     Args:
         activity: Activity name or function reference.
         arg: Single argument to the activity.
-        args: Multiple arguments to the activity.
+        args: Multiple arguments to the activity. Cannot be set if arg is.
         activity_id: Optional unique identifier for the activity.
         task_queue: Task queue to run the activity on. Defaults to the current
             workflow's task queue.
@@ -1082,7 +1103,7 @@ def start_local_activity(
     Args:
         activity: Activity name or function reference.
         arg: Single argument to the activity.
-        args: Multiple arguments to the activity.
+        args: Multiple arguments to the activity. Cannot be set if arg is.
         activity_id: Optional unique identifier for the activity.
         schedule_to_close_timeout: Max amount of time the activity can take from
             first being scheduled to being completed before it times out. This
@@ -1230,12 +1251,11 @@ async def execute_local_activity(
 
 
 class ChildWorkflowHandle(
-    _AsyncioTask[WorkflowReturnType], Generic[ChildWorkflowClass, WorkflowReturnType]
+    _AsyncioTask[WorkflowReturnType], Generic[ExternalWorkflowClass, WorkflowReturnType]
 ):
     """Handle for interacting with a child workflow.
 
-    This is usually created via :py:meth:`Client.get_workflow_handle` or
-    returned from :py:meth:`Client.start_workflow`.
+    This is created via :py:func:`start_child_workflow`.
 
     This extends :py:class:`asyncio.Task` and supports all task features.
     """
@@ -1246,14 +1266,14 @@ class ChildWorkflowHandle(
         raise NotImplementedError
 
     @property
-    def original_run_id(self) -> Optional[str]:
+    def first_execution_run_id(self) -> Optional[str]:
         """Run ID for the workflow."""
         raise NotImplementedError
 
     @overload
     async def signal(
         self,
-        signal: Callable[[ChildWorkflowClass], Union[Awaitable[None], None]],
+        signal: Callable[[ExternalWorkflowClass], Union[Awaitable[None], None]],
     ) -> None:
         ...
 
@@ -1261,7 +1281,7 @@ class ChildWorkflowHandle(
     async def signal(
         self,
         signal: Callable[
-            [ChildWorkflowClass, LocalParamType], Union[Awaitable[None], None]
+            [ExternalWorkflowClass, LocalParamType], Union[Awaitable[None], None]
         ],
         arg: LocalParamType,
     ) -> None:
@@ -1289,7 +1309,7 @@ class ChildWorkflowHandle(
         Args:
             signal: Name or method reference for the signal.
             arg: Single argument to the signal.
-            args: Multiple arguments to the signal.
+            args: Multiple arguments to the signal. Cannot be set if arg is.
 
         """
         raise NotImplementedError
@@ -1352,7 +1372,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
 # Overload for no-param workflow
 @overload
 async def start_child_workflow(
-    workflow: Callable[[ChildWorkflowClass], Awaitable[WorkflowReturnType]],
+    workflow: Callable[[ExternalWorkflowClass], Awaitable[WorkflowReturnType]],
     *,
     id: str,
     task_queue: Optional[str] = None,
@@ -1367,7 +1387,7 @@ async def start_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[Mapping[str, Any]] = None,
-) -> ChildWorkflowHandle[ChildWorkflowClass, WorkflowReturnType]:
+) -> ChildWorkflowHandle[ExternalWorkflowClass, WorkflowReturnType]:
     ...
 
 
@@ -1375,7 +1395,7 @@ async def start_child_workflow(
 @overload
 async def start_child_workflow(
     workflow: Callable[
-        [ChildWorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
+        [ExternalWorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
     ],
     arg: LocalParamType,
     *,
@@ -1392,7 +1412,7 @@ async def start_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[Mapping[str, Any]] = None,
-) -> ChildWorkflowHandle[ChildWorkflowClass, WorkflowReturnType]:
+) -> ChildWorkflowHandle[ExternalWorkflowClass, WorkflowReturnType]:
     ...
 
 
@@ -1445,7 +1465,7 @@ async def start_child_workflow(
         workflow: String name or class method decorated with ``@workflow.run``
             for the workflow to start.
         arg: Single argument to the child workflow.
-        args: Multiple arguments to the child workflow.
+        args: Multiple arguments to the child workflow. Cannot be set if arg is.
         id: Unique identifier for the workflow execution.
         task_queue: Task queue to run the workflow on. Defaults to the current
             workflow's task queue.
@@ -1489,7 +1509,7 @@ async def start_child_workflow(
 # Overload for no-param workflow
 @overload
 async def execute_child_workflow(
-    workflow: Callable[[ChildWorkflowClass], Awaitable[WorkflowReturnType]],
+    workflow: Callable[[ExternalWorkflowClass], Awaitable[WorkflowReturnType]],
     *,
     id: str,
     task_queue: Optional[str] = None,
@@ -1512,7 +1532,7 @@ async def execute_child_workflow(
 @overload
 async def execute_child_workflow(
     workflow: Callable[
-        [ChildWorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
+        [ExternalWorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
     ],
     arg: LocalParamType,
     *,
@@ -1602,6 +1622,120 @@ async def execute_child_workflow(
     return await handle
 
 
+class ExternalWorkflowHandle(Generic[ExternalWorkflowClass]):
+    """Handle for interacting with an external workflow.
+
+    This is created via :py:func:`get_external_workflow_handle` or
+    :py:func:`get_external_workflow_handle_for`.
+    """
+
+    @property
+    def id(self) -> str:
+        """ID for the workflow."""
+        raise NotImplementedError
+
+    @property
+    def run_id(self) -> Optional[str]:
+        """Run ID for the workflow if any."""
+        raise NotImplementedError
+
+    @overload
+    async def signal(
+        self,
+        signal: Callable[[ExternalWorkflowClass], Union[Awaitable[None], None]],
+    ) -> None:
+        ...
+
+    @overload
+    async def signal(
+        self,
+        signal: Callable[
+            [ExternalWorkflowClass, LocalParamType], Union[Awaitable[None], None]
+        ],
+        arg: LocalParamType,
+    ) -> None:
+        ...
+
+    @overload
+    async def signal(
+        self,
+        signal: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
+        ...
+
+    async def signal(
+        self,
+        signal: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Iterable[Any] = [],
+    ) -> None:
+        """Signal this external workflow.
+
+        Args:
+            signal: Name or method reference for the signal.
+            arg: Single argument to the signal.
+            args: Multiple arguments to the signal. Cannot be set if arg is.
+
+        """
+        raise NotImplementedError
+
+    async def cancel(self) -> None:
+        """Send a cancellation request to this external workflow.
+
+        This will fail if the workflow cannot accept the request (e.g. if the
+        workflow is not found).
+        """
+        raise NotImplementedError
+
+
+def get_external_workflow_handle(
+    workflow_id: str,
+    *,
+    run_id: Optional[str] = None,
+) -> ExternalWorkflowHandle[Any]:
+    """Get a workflow handle to an existing workflow by its ID.
+
+    Args:
+        workflow_id: Workflow ID to get a handle to.
+        run_id: Optional run ID for the workflow.
+
+    Returns:
+        The external workflow handle.
+    """
+    return _Runtime.current().workflow_get_external_workflow_handle(
+        workflow_id, run_id=run_id
+    )
+
+
+def get_external_workflow_handle_for(
+    workflow: Union[
+        Callable[[ExternalWorkflowClass, LocalParamType], Awaitable[Any]],
+        Callable[[ExternalWorkflowClass], Awaitable[Any]],
+    ],
+    workflow_id: str,
+    *,
+    run_id: Optional[str] = None,
+) -> ExternalWorkflowHandle[ExternalWorkflowClass]:
+    """Get a typed workflow handle to an existing workflow by its ID.
+
+    This is the same as :py:func:`get_external_workflow_handle` but typed. Note,
+    the workflow type given is not validated, it is only for typing.
+
+    Args:
+        workflow: The workflow run method to use for typing the handle.
+        workflow_id: Workflow ID to get a handle to.
+        run_id: Optional run ID for the workflow.
+
+    Returns:
+        The external workflow handle.
+    """
+    return get_external_workflow_handle(workflow_id, run_id=run_id)
+
+
 # Overload for self (unfortunately, cannot type args)
 @overload
 async def continue_as_new(
@@ -1676,7 +1810,8 @@ async def continue_as_new(
 
     Args:
         arg: Single argument to the continued workflow.
-        args: Multiple arguments to the continued workflow.
+        args: Multiple arguments to the continued workflow. Cannot be set if arg
+            is.
         workflow: Specific workflow to continue to. Defaults to the current
             workflow.
         task_queue: Task queue to run the workflow on. Defaults to the current

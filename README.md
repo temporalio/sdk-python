@@ -75,7 +75,7 @@ if __name__ == "__main__":
 Assuming you have a [Temporal server running on localhost](https://docs.temporal.io/docs/server/quick-install/), this
 will run the worker:
 
-    python run_workflow.py
+    python run_worker.py
 
 ### Running a Workflow
 
@@ -133,7 +133,9 @@ async def main():
 Some things to note about the above code:
 
 * A `Client` does not have an explicit "close"
-* Positional arguments can be passed to `start_workflow`
+* A single positional argument can be passed to `start_workflow`. If there are multiple arguments, only the
+  non-type-safe form of `start_workflow` can be used (i.e. the one accepting a string workflow name) and it must be in
+  the `args` keyword argument.
 * The `handle` represents the workflow that was started and can be used for more than just getting the result
 * Since we are just getting the handle and waiting on the result, we could have called `client.execute_workflow` which
   does the same thing
@@ -331,9 +333,11 @@ Some things to note about the above code:
 #### Invoking Activities
 
 * Activities are started with non-async `workflow.start_activity()` which accepts either an activity function reference
-  or a string name. The arguments to the activity are positional.
-* Activity options are set as keyword arguments after the positional activity arguments. At least one of
-  `start_to_close_timeout` or `schedule_to_close_timeout` must be provided.
+  or a string name.
+* A single argument to the activity is positional. Multiple arguments are not supported in the type-safe form of
+  start/execute activity and must be supplied via the `args` keyword argument.
+* Activity options are set as keyword arguments after the activity arguments. At least one of `start_to_close_timeout`
+  or `schedule_to_close_timeout` must be provided.
 * The result is an activity handle which is an `asyncio.Task` and supports basic task features
 * An async `workflow.execute_activity()` helper is provided which takes the same arguments as
   `workflow.start_activity()` and `await`s on the result. This should be used in most cases unless advanced task
@@ -345,7 +349,9 @@ Some things to note about the above code:
 
 * Child workflows are started with async `workflow.start_child_workflow()` which accepts either a workflow run method
   reference or a string name. The arguments to the workflow are positional.
-* Child workflow options are set as keyword arguments after the positional arguments. At least `id` must be provided.
+* A single argument to the child workflow is positional. Multiple arguments are not supported in the type-safe form of
+  start/execute child workflow and must be supplied via the `args` keyword argument.
+* Child workflow options are set as keyword arguments after the arguments. At least `id` must be provided.
 * The `await` of the start does not complete until the workflow has confirmed to be started
 * The result is a child workflow handle which is an `asyncio.Task` and supports basic task features. The handle also has
   some child info and supports signalling the child workflow
@@ -383,7 +389,7 @@ protect against cancellation. The following tasks, when cancelled, perform a Tem
 * Activities - when the task executing an activity is cancelled, a cancellation request is sent to the activity
 * Child workflows - when the task starting or executing a child workflow is cancelled, a cancellation request is sent to
   cancel the child workflow
-* Timers - when the task executing a timer is canceller (whether started via sleep or timeout), the timer is cancelled
+* Timers - when the task executing a timer is cancelled (whether started via sleep or timeout), the timer is cancelled
 
 When the workflow itself is requested to cancel, `Task.cancel` is called on the main workflow task. Therefore,
 `asyncio.CancelledError` can be caught in order to handle the cancel gracefully.
