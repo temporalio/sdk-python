@@ -172,6 +172,8 @@ class _ActivityWorker:
                     )
                     activity.cancel()
                     break
+        # Now we have to wait on them to complete
+        await asyncio.wait(still_running)
 
     def _cancel(
         self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
@@ -477,9 +479,9 @@ class _ActivityWorker:
                     )
 
             # Send task completion to core
-            del self._running_activities[task_token]
             logger.debug("Completing activity with completion: %s", completion)
             await self._bridge_worker().complete_activity_task(completion)
+            del self._running_activities[task_token]
         except Exception:
             temporalio.activity.logger.exception("Failed completing activity task")
 
@@ -508,7 +510,7 @@ class _RunningActivity:
         if self.cancelled_event:
             self.cancelled_event.set()
         # We do not cancel the task of sync activities
-        if not self.sync and self.task:
+        if not self.sync and self.task and not self.done:
             # TODO(cretz): Check that Python >= 3.9 and set msg?
             self.task.cancel()
 

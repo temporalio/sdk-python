@@ -4,8 +4,8 @@ use pyo3_asyncio::tokio::future_into_py;
 use std::collections::HashMap;
 use std::time::Duration;
 use temporal_client::{
-    ConfiguredClient, RetryConfig, RetryClient, ClientOptions, ClientOptionsBuilder,
-    TlsConfig, WorkflowService, WorkflowServiceClientWithMetrics,
+    ClientOptions, ClientOptionsBuilder, ConfiguredClient, RetryClient, RetryConfig, TlsConfig,
+    WorkflowService, WorkflowServiceClientWithMetrics,
 };
 use tonic;
 use url::Url;

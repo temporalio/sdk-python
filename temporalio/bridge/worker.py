@@ -94,6 +94,16 @@ class Worker:
         """Shutdown the worker, waiting for completion."""
         await self._ref.shutdown()
 
+    async def finalize_shutdown(self) -> None:
+        """Finalize the worker.
+
+        This will fail if shutdown hasn't completed fully due to internal
+        reference count checks.
+        """
+        ref = self._ref
+        self._ref = None
+        await ref.finalize_shutdown()
+
 
 def retry_policy_from_proto(
     p: temporalio.bridge.proto.common.RetryPolicy,
@@ -176,6 +186,7 @@ async def _apply_to_bridge_payloads(
         Awaitable[List[temporalio.api.common.v1.Payload]],
     ],
 ) -> None:
+    """Apply API payload callback to bridge payloads."""
     if len(payloads) == 0:
         return
     new_payloads = to_bridge_payloads(await cb(from_bridge_payloads(payloads)))
@@ -191,6 +202,7 @@ async def _apply_to_bridge_payload(
         Awaitable[List[temporalio.api.common.v1.Payload]],
     ],
 ) -> None:
+    """Apply API payload callback to bridge payload."""
     new_payload = (await cb([from_bridge_payload(payload)]))[0]
     payload.metadata.clear()
     payload.metadata.update(new_payload.metadata)
@@ -201,6 +213,7 @@ async def _decode_bridge_payloads(
     payloads: BridgePayloadContainer,
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
+    """Decode bridge payloads with the given codec."""
     return await _apply_to_bridge_payloads(payloads, codec.decode)
 
 
@@ -208,6 +221,7 @@ async def _decode_bridge_payload(
     payload: temporalio.bridge.proto.common.Payload,
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
+    """Decode a bridge payload with the given codec."""
     return await _apply_to_bridge_payload(payload, codec.decode)
 
 
@@ -215,6 +229,7 @@ async def _encode_bridge_payloads(
     payloads: BridgePayloadContainer,
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
+    """Encode bridge payloads with the given codec."""
     return await _apply_to_bridge_payloads(payloads, codec.encode)
 
 
@@ -222,6 +237,7 @@ async def _encode_bridge_payload(
     payload: temporalio.bridge.proto.common.Payload,
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
+    """Decode a bridge payload with the given codec."""
     return await _apply_to_bridge_payload(payload, codec.encode)
 
 

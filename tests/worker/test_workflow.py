@@ -1,6 +1,9 @@
 import asyncio
 import dataclasses
 import json
+import logging
+import logging.handlers
+import queue
 import time
 import uuid
 from dataclasses import dataclass
@@ -689,9 +692,88 @@ async def test_workflow_continue_as_new(client: Client):
         assert result[0] == handle.first_execution_run_id
 
 
+@workflow.defn
+class LoggingWorkflow:
+    def __init__(self) -> None:
+        self._last_signal = "<none>"
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._last_signal == "finish")
+
+    @workflow.signal
+    def my_signal(self, value: str) -> None:
+        self._last_signal = value
+        workflow.logger.info(f"Signal: {value}")
+
+    @workflow.query
+    def last_signal(self) -> str:
+        return self._last_signal
+
+
+async def test_workflow_logging(client: Client):
+    # Use queue to capture log statements
+    log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
+    handler = logging.handlers.QueueHandler(log_queue)
+    workflow.logger.base_logger.addHandler(handler)
+    prev_level = workflow.logger.base_logger.level
+    workflow.logger.base_logger.setLevel(logging.INFO)
+
+    def find_log(starts_with: str) -> Optional[logging.LogRecord]:
+        for record in cast(List[logging.LogRecord], log_queue.queue):
+            if record.message.startswith(starts_with):
+                return record
+        return None
+
+    try:
+        # Log two signals and kill worker before completing
+        async with new_worker(client, LoggingWorkflow) as worker:
+            handle = await client.start_workflow(
+                LoggingWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            # Send a couple signals
+            async def last_event() -> str:
+                return await handle.query(LoggingWorkflow.last_signal)
+
+            await handle.signal(LoggingWorkflow.my_signal, "signal 1")
+            await handle.signal(LoggingWorkflow.my_signal, "signal 2")
+            await assert_eq_eventually("signal 2", last_event)
+
+        # Confirm two logs happened
+        assert find_log("Signal: signal 1 ({'workflow_id':")
+        assert find_log("Signal: signal 2")
+        assert not find_log("Signal: signal 3")
+        # Also make sure it has some workflow info
+        record = find_log("Signal: signal 1")
+        assert (
+            record
+            and record.__dict__["workflow_info"].workflow_type == "LoggingWorkflow"
+        )
+
+        # Clear queue and start a new one with more signals
+        log_queue.queue.clear()
+        async with new_worker(
+            client, LoggingWorkflow, task_queue=worker.task_queue
+        ) as worker:
+            # Send a couple signals
+            await handle.signal(LoggingWorkflow.my_signal, "signal 3")
+            await handle.signal(LoggingWorkflow.my_signal, "finish")
+            await handle.result()
+
+        # Confirm replayed logs are not present but new ones are
+        assert not find_log("Signal: signal 1")
+        assert not find_log("Signal: signal 2")
+        assert find_log("Signal: signal 3")
+        assert find_log("Signal: finish")
+    finally:
+        workflow.logger.base_logger.removeHandler(handler)
+        workflow.logger.base_logger.setLevel(prev_level)
+
+
 # TODO:
 # * Activity timeout behavior
-# * Workflow logger
 # * Data class params and return types
 # * Separate protocol and impl
 # * Separate ABC and impl
@@ -708,16 +790,20 @@ async def test_workflow_continue_as_new(client: Client):
 # * In-workflow signal/query handler registration
 # * Exception details with codec
 # * Custom workflow runner that also confirms WorkflowInstanceDetails can be pickled
-# * "is replaying" check
-# * External workflow handle for cancel and signal
 # * Deadlock detection
 
 
 def new_worker(
-    client: Client, *workflows: Type, activities: Iterable[Callable] = []
+    client: Client,
+    *workflows: Type,
+    activities: Iterable[Callable] = [],
+    task_queue: Optional[str] = None,
 ) -> Worker:
     return Worker(
-        client, task_queue=str(uuid.uuid4()), workflows=workflows, activities=activities
+        client,
+        task_queue=task_queue or str(uuid.uuid4()),
+        workflows=workflows,
+        activities=activities,
     )
 
 

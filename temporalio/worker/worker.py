@@ -306,6 +306,8 @@ class Worker:
 
         This will initiate a shutdown and optionally wait for a grace period
         before sending cancels to all activities.
+
+        This worker should not be used in any way once this is called.
         """
         if not self._task:
             raise RuntimeError("Never started")
@@ -322,6 +324,8 @@ class Worker:
             await self._activity_worker.shutdown(graceful_timeout)
         # Wait for the bridge to report everything is completed
         await bridge_shutdown_task
+        # Do final shutdown
+        await self._bridge_worker.finalize_shutdown()
 
 
 class WorkerConfig(TypedDict, total=False):

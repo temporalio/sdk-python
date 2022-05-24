@@ -16,7 +16,7 @@ pyo3::create_exception!(temporal_sdk_bridge, PollShutdownError, PyException);
 
 #[pyclass]
 pub struct WorkerRef {
-    worker: Arc<temporal_sdk_core::Worker>,
+    worker: Option<Arc<temporal_sdk_core::Worker>>,
 }
 
 #[derive(FromPyObject)]
@@ -41,17 +41,17 @@ pub fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> PyResult<
     let _guard = pyo3_asyncio::tokio::get_runtime().enter();
     let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
     Ok(WorkerRef {
-        worker: Arc::new(temporal_sdk_core::init_worker(
+        worker: Some(Arc::new(temporal_sdk_core::init_worker(
             config,
             client.retry_client.clone().into_inner(),
-        )),
+        ))),
     })
 }
 
 #[pymethods]
 impl WorkerRef {
     fn poll_workflow_activation<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let worker = self.worker.clone();
+        let worker = self.worker.as_ref().unwrap().clone();
         future_into_py(py, async move {
             let bytes = match worker.poll_workflow_activation().await {
                 Ok(act) => act.encode_to_vec(),
@@ -64,7 +64,7 @@ impl WorkerRef {
     }
 
     fn poll_activity_task<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let worker = self.worker.clone();
+        let worker = self.worker.as_ref().unwrap().clone();
         future_into_py(py, async move {
             let bytes = match worker.poll_activity_task().await {
                 Ok(task) => task.encode_to_vec(),
@@ -81,7 +81,7 @@ impl WorkerRef {
         py: Python<'p>,
         proto: &PyBytes,
     ) -> PyResult<&'p PyAny> {
-        let worker = self.worker.clone();
+        let worker = self.worker.as_ref().unwrap().clone();
         let completion = WorkflowActivationCompletion::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
         future_into_py(py, async move {
@@ -96,7 +96,7 @@ impl WorkerRef {
     }
 
     fn complete_activity_task<'p>(&self, py: Python<'p>, proto: &PyBytes) -> PyResult<&'p PyAny> {
-        let worker = self.worker.clone();
+        let worker = self.worker.as_ref().unwrap().clone();
         let completion = ActivityTaskCompletion::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
         future_into_py(py, async move {
@@ -113,27 +113,43 @@ impl WorkerRef {
     fn record_activity_heartbeat(&self, proto: &pyo3::types::PyBytes) -> PyResult<()> {
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
-        self.worker.record_activity_heartbeat(heartbeat);
+        self.worker
+            .as_ref()
+            .unwrap()
+            .record_activity_heartbeat(heartbeat);
         Ok(())
     }
 
     fn request_workflow_eviction(&self, run_id: &str) -> PyResult<()> {
-        self.worker.request_workflow_eviction(run_id);
+        self.worker
+            .as_ref()
+            .unwrap()
+            .request_workflow_eviction(run_id);
         Ok(())
     }
 
     fn shutdown<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let worker = self.worker.clone();
+        let worker = self.worker.as_ref().unwrap().clone();
         future_into_py(py, async move {
             worker.shutdown().await;
             Ok(())
         })
     }
 
-    // TODO(cretz): Python won't let self take ownership. How to do this best?
-    // Make self.worker an option and move out? I don't think it's necessarily
-    // clear we can use https://pyo3.rs/v0.15.1/class/protocols.html#garbage-collector-integration-1.
-    // fn finalize_shutdown<'p>(self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn finalize_shutdown<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        // Take the worker out of the option and leave None. This should be the
+        // only reference remaining to the worker so try_unwrap will work.
+        let worker = Arc::try_unwrap(self.worker.take().unwrap()).map_err(|arc| {
+            PyValueError::new_err(format!(
+                "Cannot finalize, expected 1 reference, got {}",
+                Arc::strong_count(&arc)
+            ))
+        })?;
+        future_into_py(py, async move {
+            worker.finalize_shutdown().await;
+            Ok(())
+        })
+    }
 }
 
 impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {

@@ -163,6 +163,7 @@ class _WorkflowInstanceImpl(
         self._exception_handler: Optional[_ExceptionHandler] = None
         # The actual instance, instantiated on first _run_once
         self._object: Any = None
+        self._is_replaying: bool = False
 
         # We maintain signals and queries on this class since handlers can be
         # added during workflow execution
@@ -199,9 +200,10 @@ class _WorkflowInstanceImpl(
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> Iterable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]:
-        # Reset pending commands and time
+        # Reset pending commands, time, and whether replaying
         self._pending_commands = []
         self._time = act.timestamp.ToMicroseconds() / 1e6
+        self._is_replaying = act.is_replaying
 
         # Split into job sets with patches, then signals, then non-queries, then
         # queries
@@ -635,6 +637,9 @@ class _WorkflowInstanceImpl(
 
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
+
+    def workflow_is_replaying(self) -> bool:
+        return self._is_replaying
 
     def workflow_now(self) -> datetime:
         return datetime.utcfromtimestamp(asyncio.get_running_loop().time())

@@ -341,6 +341,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_is_replaying(self) -> bool:
+        ...
+
+    @abstractmethod
     def workflow_now(self) -> datetime:
         ...
 
@@ -437,6 +441,24 @@ async def wait_condition(
     await _Runtime.current().workflow_wait_condition(fn, timeout=timeout)
 
 
+class unsafe:
+    """Contains static methods that should not normally be called during
+    workflow execution except in advanced cases.
+    """
+
+    def __init__(self) -> None:  # noqa: D107
+        raise NotImplementedError
+
+    @staticmethod
+    def is_replaying() -> bool:
+        """Whether the workflow is currently replaying.
+
+        Returns:
+            True if the workflow is currently replaying
+        """
+        return _Runtime.current().workflow_is_replaying()
+
+
 class LoggerAdapter(logging.LoggerAdapter):
     """Adapter that adds details to the log about the running workflow.
 
@@ -447,6 +469,8 @@ class LoggerAdapter(logging.LoggerAdapter):
         workflow_info_on_extra: Boolean for whether a ``workflow_info`` value
             will be added to the ``extra`` dictionary, making it present on the
             ``LogRecord.__dict__`` for use by others.
+        log_during_replay: Boolean for whether logs should occur during replay.
+            Default is False.
     """
 
     def __init__(
@@ -456,6 +480,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         super().__init__(logger, extra or {})
         self.workflow_info_on_message = True
         self.workflow_info_on_extra = True
+        self.log_during_replay = False
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
@@ -473,6 +498,11 @@ class LoggerAdapter(logging.LoggerAdapter):
                     extra["workflow_info"] = runtime.workflow_info()
                     kwargs["extra"] = extra
         return (msg, kwargs)
+
+    def log(self, *args, **kwargs) -> None:
+        """Override to ignore replay logs."""
+        if self.log_during_replay or not unsafe.is_replaying():
+            super().log(*args, **kwargs)
 
     @property
     def base_logger(self) -> logging.Logger:
