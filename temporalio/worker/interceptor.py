@@ -279,9 +279,9 @@ class WorkflowOutboundInterceptor:
         """
         self.next = next
 
-    async def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
+    def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         """Called for every :py:func:`temporalio.workflow.continue_as_new` call."""
-        await self.next.continue_as_new(input)
+        self.next.continue_as_new(input)
 
     def get_external_workflow_handle(
         self, input: GetExternalWorkflowHandleInput

@@ -100,7 +100,8 @@ def run(fn: WorkflowRunFunc) -> WorkflowRunFunc:
     """
     if not inspect.iscoroutinefunction(fn):
         raise ValueError("Workflow run method must be an async function")
-    # Disallow local classes
+    # Disallow local classes because we need to have the class globally
+    # referenceable by name
     if "<locals>" in fn.__qualname__:
         raise ValueError(
             "Local classes unsupported, @workflow.run cannot be on a local class"
@@ -318,7 +319,7 @@ class _Runtime(ABC):
         return self._logger_details
 
     @abstractmethod
-    async def workflow_continue_as_new(
+    def workflow_continue_as_new(
         self,
         *args: Any,
         workflow: Union[None, Callable, str],
@@ -1766,9 +1767,24 @@ def get_external_workflow_handle_for(
     return get_external_workflow_handle(workflow_id, run_id=run_id)
 
 
+class ContinueAsNewError(BaseException):
+    """Error thrown by :py:func:`continue_as_new`.
+
+    This should not be caught, but instead be allowed to throw out of the
+    workflow which then triggers the continue as new. This should never be
+    instantiated directly.
+    """
+
+    def __init__(self, *args: object) -> None:
+        """Direct instantiation is disabled. Use :py:func:`continue_as_new`."""
+        if type(self) == ContinueAsNewError:
+            raise RuntimeError("Cannot instantiate ContinueAsNewError directly")
+        super().__init__(*args)
+
+
 # Overload for self (unfortunately, cannot type args)
 @overload
-async def continue_as_new(
+def continue_as_new(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Iterable[Any] = [],
@@ -1783,7 +1799,7 @@ async def continue_as_new(
 
 # Overload for no-param workflow
 @overload
-async def continue_as_new(
+def continue_as_new(
     *,
     workflow: Callable[[WorkflowClass], Any],
     task_queue: Optional[str] = None,
@@ -1797,7 +1813,7 @@ async def continue_as_new(
 
 # Overload for single-param workflow
 @overload
-async def continue_as_new(
+def continue_as_new(
     arg: LocalParamType,
     *,
     workflow: Callable[[WorkflowClass, LocalParamType], Any],
@@ -1812,7 +1828,7 @@ async def continue_as_new(
 
 # Overload for string-name workflow
 @overload
-async def continue_as_new(
+def continue_as_new(
     *,
     workflow: str,
     args: Iterable[Any] = [],
@@ -1825,7 +1841,7 @@ async def continue_as_new(
     ...
 
 
-async def continue_as_new(
+def continue_as_new(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Iterable[Any] = [],
@@ -1853,8 +1869,15 @@ async def continue_as_new(
         memo: Memo for the workflow. Defaults to the current workflow's memo.
         search_attributes: Search attributes for the workflow. Defaults to the
             current workflow's search attributes.
+
+    Returns:
+        Never returns, always raises a :py:class:`ContinueAsNewError`.
+
+    Raises:
+        ContinueAsNewError: Always raised by this function. Should not be caught
+            but instead be allowed to
     """
-    await _Runtime.current().workflow_continue_as_new(
+    _Runtime.current().workflow_continue_as_new(
         *temporalio.common._arg_or_args(arg, args),
         workflow=workflow,
         task_queue=task_queue,

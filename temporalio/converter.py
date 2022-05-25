@@ -151,7 +151,7 @@ class CompositePayloadConverter(PayloadConverter):
         Args:
             converters: Payload converters to delegate to, in order.
         """
-        # Insertion order preserved here
+        # Insertion order preserved here since Python 3.7
         self.converters = {c.encoding.encode(): c for c in converters}
 
     def to_payloads(

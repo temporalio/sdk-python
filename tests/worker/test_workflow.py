@@ -675,8 +675,7 @@ class ContinueAsNewWorkflow:
         info = workflow.info()
         if info.continued_run_id:
             past_run_ids.append(info.continued_run_id)
-        await workflow.continue_as_new(past_run_ids)
-        raise RuntimeError("Unreachable")
+        workflow.continue_as_new(past_run_ids)
 
 
 async def test_workflow_continue_as_new(client: Client):

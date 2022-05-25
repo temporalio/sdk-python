@@ -40,6 +40,7 @@ import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
+import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
@@ -98,14 +99,17 @@ class WorkflowInstance(ABC):
     @abstractmethod
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
-    ) -> Iterable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]:
-        """Handle an activation and return a list of resulting commands.
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        """Handle an activation and return completion.
+
+        This should never raise an exception, but instead catch all exceptions
+        and set as completion failure.
 
         Args:
             act: Protobuf activation.
 
         Returns:
-            Set of protobuf commands.
+            Completion object with successful commands set or failure info set.
         """
         raise NotImplementedError
 
@@ -137,9 +141,6 @@ class _WorkflowInstanceImpl(
         self._payload_converter = det.payload_converter_class()
         self._defn = det.defn
         self._info = det.info
-        self._pending_commands: List[
-            temporalio.bridge.proto.workflow_commands.WorkflowCommand
-        ] = []
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time = 0.0
         # Handles which are ready to run on the next event loop iteration
@@ -199,40 +200,61 @@ class _WorkflowInstanceImpl(
 
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
-    ) -> Iterable[temporalio.bridge.proto.workflow_commands.WorkflowCommand]:
-        # Reset pending commands, time, and whether replaying
-        self._pending_commands = []
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        # Reset current completion, time, and whether replaying
+        self._current_completion = (
+            temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
+        )
+        self._current_completion.run_id = act.run_id
+        self._current_completion.successful.SetInParent()
         self._time = act.timestamp.ToMicroseconds() / 1e6
         self._is_replaying = act.is_replaying
 
-        # Split into job sets with patches, then signals, then non-queries, then
-        # queries
-        job_sets: List[
-            List[temporalio.bridge.proto.workflow_activation.WorkflowActivationJob]
-        ] = [[], [], [], []]
-        for job in act.jobs:
-            if job.HasField("notify_has_patch"):
-                job_sets[0].append(job)
-            elif job.HasField("signal_workflow"):
-                job_sets[1].append(job)
-            elif not job.HasField("query_workflow"):
-                job_sets[2].append(job)
-            else:
-                job_sets[3].append(job)
+        try:
 
-        # Apply every job set, running after each set
-        for job_set in job_sets:
-            if not job_set:
-                continue
-            for job in job_set:
-                # Let errors bubble out of these to the caller to fail the task
-                self._apply(job)
+            # Split into job sets with patches, then signals, then non-queries, then
+            # queries
+            job_sets: List[
+                List[temporalio.bridge.proto.workflow_activation.WorkflowActivationJob]
+            ] = [[], [], [], []]
+            for job in act.jobs:
+                if job.HasField("notify_has_patch"):
+                    job_sets[0].append(job)
+                elif job.HasField("signal_workflow"):
+                    job_sets[1].append(job)
+                elif not job.HasField("query_workflow"):
+                    job_sets[2].append(job)
+                else:
+                    job_sets[3].append(job)
 
-            # Run one iteration of the loop
-            self._run_once()
+            # Apply every job set, running after each set
+            for job_set in job_sets:
+                if not job_set:
+                    continue
+                for job in job_set:
+                    # Let errors bubble out of these to the caller to fail the task
+                    self._apply(job)
 
-        # Return pending commands
-        return self._pending_commands
+                # Run one iteration of the loop
+                self._run_once()
+        except Exception as err:
+            logger.exception(f"Failed activation on workflow with run ID {act.run_id}")
+            # Set completion failure
+            self._current_completion.failed.failure.SetInParent()
+            try:
+                temporalio.exceptions.apply_exception_to_failure(
+                    err,
+                    self._payload_converter,
+                    self._current_completion.failed.failure,
+                )
+            except Exception as inner_err:
+                logger.exception(
+                    f"Failed converting activation exception on workflow with run ID {act.run_id}"
+                )
+                self._current_completion.failed.failure.message = (
+                    f"Failed converting activation exception: {inner_err}"
+                )
+        return self._current_completion
 
     def _apply(
         self, job: temporalio.bridge.proto.workflow_activation.WorkflowActivationJob
@@ -300,7 +322,7 @@ class _WorkflowInstanceImpl(
     ) -> None:
         # Async call to run on the scheduler thread
         async def run_query(input: HandleQueryInput) -> None:
-            command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+            command = self._add_command()
             command.respond_to_query.query_id = job.query_id
             try:
                 success = await self._inbound.handle_query(input)
@@ -312,7 +334,6 @@ class _WorkflowInstanceImpl(
                 command.respond_to_query.succeeded.response.CopyFrom(
                     temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
                 )
-                self._pending_commands.append(command)
             except Exception as err:
                 try:
                     temporalio.exceptions.apply_exception_to_failure(
@@ -320,7 +341,6 @@ class _WorkflowInstanceImpl(
                         self._payload_converter,
                         command.respond_to_query.failed,
                     )
-                    self._pending_commands.append(command)
                 except Exception as inner_err:
                     raise ValueError(
                         "Failed converting application error"
@@ -391,9 +411,7 @@ class _WorkflowInstanceImpl(
                     self._pending_activities.pop(job.seq)
                     handle._resolve_failure(err)
                     return
-                self._pending_commands.append(
-                    handle._build_schedule_command(job.result.backoff)
-                )
+                handle._apply_schedule_command(self._add_command(), job.result.backoff)
 
             # Schedule it
             # TODO(cretz): Do we need to do this inside the activity task so it
@@ -447,6 +465,8 @@ class _WorkflowInstanceImpl(
                 f"Failed finding child workflow handle for sequence {job.seq}"
             )
         if job.HasField("succeeded"):
+            # We intentionally do not pop here because this same handle is used
+            # for waiting on the entire workflow to complete
             handle._resolve_start_success(job.succeeded.run_id)
         elif job.HasField("failed"):
             self._pending_child_workflows.pop(job.seq)
@@ -471,7 +491,7 @@ class _WorkflowInstanceImpl(
                 )
             )
         else:
-            raise RuntimeError("Child workflow start did not have status")
+            raise RuntimeError("Child workflow start did not have a known status")
 
     def _apply_resolve_request_cancel_external_workflow(
         self,
@@ -541,9 +561,11 @@ class _WorkflowInstanceImpl(
     ) -> None:
         # Async call to run on the scheduler thread
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
-            command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
             # We intentionally don't catch all errors, instead we bubble those
             # out as task failures
+            command: Optional[
+                temporalio.bridge.proto.workflow_commands.WorkflowCommand
+            ] = None
             try:
                 success = await self._inbound.execute_workflow(input)
                 result_payloads = self._payload_converter.to_payloads([success])
@@ -551,15 +573,22 @@ class _WorkflowInstanceImpl(
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
                     )
+                command = self._add_command()
                 command.complete_workflow_execution.result.CopyFrom(
                     temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
                 )
-                self._pending_commands.append(command)
+            except _ContinueAsNewError as err:
+                logger.debug("Workflow requested continue as new")
+                if not command:
+                    command = self._add_command()
+                err._apply_command(command)
             except temporalio.exceptions.FailureError as err:
                 logger.debug(
                     f"Workflow raised failure with run ID {self._info.run_id}",
                     exc_info=True,
                 )
+                if not command:
+                    command = self._add_command()
                 command.fail_workflow_execution.failure.SetInParent()
                 try:
                     temporalio.exceptions.apply_exception_to_failure(
@@ -567,19 +596,19 @@ class _WorkflowInstanceImpl(
                         self._payload_converter,
                         command.fail_workflow_execution.failure,
                     )
-                    self._pending_commands.append(command)
                 except Exception as inner_err:
                     raise ValueError(
                         "Failed converting workflow exception"
                     ) from inner_err
             except asyncio.CancelledError as err:
+                if not command:
+                    command = self._add_command()
                 command.fail_workflow_execution.failure.SetInParent()
                 temporalio.exceptions.apply_exception_to_failure(
                     temporalio.exceptions.CancelledError(str(err)),
                     self._payload_converter,
                     command.fail_workflow_execution.failure,
                 )
-                self._pending_commands.append(command)
 
         # Schedule it
         arg_types, _ = self._type_lookup.get_type_hints(self._defn.run_fn)
@@ -594,7 +623,7 @@ class _WorkflowInstanceImpl(
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
 
-    async def workflow_continue_as_new(
+    def workflow_continue_as_new(
         self,
         *args: Any,
         workflow: Union[None, Callable, str],
@@ -616,7 +645,7 @@ class _WorkflowInstanceImpl(
         elif workflow is not None:
             raise TypeError("Workflow must be None, a string, or callable")
 
-        await self._outbound.continue_as_new(
+        self._outbound.continue_as_new(
             ContinueAsNewInput(
                 workflow=name,
                 args=args,
@@ -628,6 +657,7 @@ class _WorkflowInstanceImpl(
                 arg_types=arg_types,
             )
         )
+        # TODO(cretz): Why can't MyPy infer the above never returns?
         raise RuntimeError("Unreachable")
 
     def workflow_get_external_workflow_handle(
@@ -791,44 +821,9 @@ class _WorkflowInstanceImpl(
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
 
-    async def _outbound_continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
-        # Just add the command, force stop the loop, and wait on a
-        # never-resolved future
-        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
-        v = command.continue_as_new_workflow_execution
-        if input.workflow:
-            v.workflow_type = input.workflow
-        if input.task_queue:
-            v.task_queue = input.task_queue
-        if input.args:
-            v.arguments.extend(
-                temporalio.bridge.worker.to_bridge_payloads(
-                    self._payload_converter.to_payloads(input.args)
-                )
-            )
-        if input.run_timeout:
-            v.workflow_run_timeout.FromTimedelta(input.run_timeout)
-        if input.task_timeout:
-            v.workflow_task_timeout.FromTimedelta(input.task_timeout)
-        # TODO(cretz): Headers
-        # v.headers = input.he
-        if input.memo:
-            for k, val in input.memo.items():
-                v.memo[k] = temporalio.bridge.worker.to_bridge_payload(
-                    self._payload_converter.to_payloads([val])[0]
-                )
-        if input.search_attributes:
-            for k, val in input.search_attributes.items():
-                v.search_attributes[k] = temporalio.bridge.worker.to_bridge_payload(
-                    # We have to use the default data converter for this
-                    temporalio.converter.default().payload_converter.to_payloads([val])[
-                        0
-                    ]
-                )
-        self._pending_commands.append(command)
-        self._force_stop_loop = True
-        await self.create_future()
-        raise RuntimeError("Unreachable")
+    def _outbound_continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
+        # Just throw
+        raise _ContinueAsNewError(self, input)
 
     def _outbound_schedule_activity(
         self,
@@ -857,12 +852,12 @@ class _WorkflowInstanceImpl(
                     # TODO(cretz): What if the schedule command hasn't been sent yet?
                     handle = self._pending_activities.get(seq)
                     if handle and not handle.done():
-                        self._pending_commands.append(handle._build_cancel_command())
+                        handle._apply_cancel_command(self._add_command())
 
         # Create the handle and set as pending
         handle = _ActivityHandle(self, seq, input, result_fut, run_activity())
         self._pending_activities[seq] = handle
-        self._pending_commands.append(handle._build_schedule_command())
+        handle._apply_schedule_command(self._add_command())
         return handle
 
     async def _outbound_start_child_workflow(
@@ -886,7 +881,8 @@ class _WorkflowInstanceImpl(
                     # already) or is already done
                     # TODO(cretz): What if the schedule command hasn't been sent yet?
                     if handle and not handle.done():
-                        cancel_command = handle._build_cancel_command()
+                        cancel_command = self._add_command()
+                        handle._apply_cancel_command(cancel_command)
                         # If the cancel command is for external workflow, we
                         # have to add a seq and mark it pending
                         if cancel_command.HasField(
@@ -902,14 +898,13 @@ class _WorkflowInstanceImpl(
                             self._pending_external_cancels[
                                 cancel_seq
                             ] = self.create_future()
-                        self._pending_commands.append(cancel_command)
 
         # Create the handle and set as pending
         handle = _ChildWorkflowHandle(
             self, seq, input, start_fut, result_fut, run_child()
         )
         self._pending_child_workflows[seq] = handle
-        self._pending_commands.append(handle._build_start_command())
+        handle._apply_start_command(self._add_command())
 
         # Wait on start
         await start_fut
@@ -917,6 +912,9 @@ class _WorkflowInstanceImpl(
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
+
+    def _add_command(self) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+        return self._current_completion.successful.commands.add()
 
     async def _cancel_external_workflow(
         self,
@@ -926,7 +924,6 @@ class _WorkflowInstanceImpl(
         seq = self._next_seq("external_cancel")
         done_fut = self.create_future()
         command.request_cancel_external_workflow_execution.seq = seq
-        self._pending_commands.append(command)
 
         # Set as pending
         self._pending_external_cancels[seq] = done_fut
@@ -995,7 +992,6 @@ class _WorkflowInstanceImpl(
         seq = self._next_seq("external_signal")
         done_fut = self.create_future()
         command.signal_external_workflow_execution.seq = seq
-        self._pending_commands.append(command)
 
         # Set as pending
         self._pending_external_signals[seq] = done_fut
@@ -1007,11 +1003,8 @@ class _WorkflowInstanceImpl(
                 # to be cancelled
                 return await asyncio.shield(done_fut)
             except asyncio.CancelledError:
-                cancel_command = (
-                    temporalio.bridge.proto.workflow_commands.WorkflowCommand()
-                )
+                cancel_command = self._add_command()
                 cancel_command.cancel_signal_workflow.seq = seq
-                self._pending_commands.append(command)
 
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many
@@ -1022,7 +1015,7 @@ class _WorkflowInstanceImpl(
             raise TypeError("Expected Temporal timer handle")
         if not self._pending_timers.pop(handle._seq, None):
             return
-        self._pending_commands.append(handle._build_cancel_command())
+        handle._apply_cancel_command(self._add_command())
 
     def call_soon(
         self,
@@ -1048,7 +1041,7 @@ class _WorkflowInstanceImpl(
         # Create, schedule, and return
         seq = self._next_seq("timer")
         handle = _TimerHandle(seq, self._time + delay, callback, args, self, context)
-        self._pending_commands.append(handle._build_start_command(delay))
+        handle._apply_start_command(self._add_command(), delay)
         self._pending_timers[seq] = handle
         return handle
 
@@ -1220,8 +1213,8 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
         # We are intentionally not calling the base class's __init__ here
         self._instance = instance
 
-    async def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
-        await self._instance._outbound_continue_as_new(input)
+    def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
+        self._instance._outbound_continue_as_new(input)
 
     def info(self) -> temporalio.workflow.Info:
         return self._instance._info
@@ -1255,22 +1248,19 @@ class _TimerHandle(asyncio.TimerHandle):
         super().__init__(when, callback, args, loop, context)
         self._seq = seq
 
-    def _build_start_command(
-        self, delay: float
-    ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
-        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+    def _apply_start_command(
+        self,
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+        delay: float,
+    ) -> None:
         command.start_timer.seq = self._seq
         command.start_timer.start_to_fire_timeout.FromNanoseconds(int(delay * 1e9))
-        return command
 
-    def _build_cancel_command(
+    def _apply_cancel_command(
         self,
-    ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
-        return temporalio.bridge.proto.workflow_commands.WorkflowCommand(
-            cancel_timer=temporalio.bridge.proto.workflow_commands.CancelTimer(
-                seq=self._seq
-            ),
-        )
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
+        command.cancel_timer.seq = self._seq
 
 
 class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
@@ -1297,13 +1287,13 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         if not self._result_fut.done():
             self._result_fut.set_exception(err)
 
-    def _build_schedule_command(
+    def _apply_schedule_command(
         self,
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
         local_backoff: Optional[
             temporalio.bridge.proto.activity_result.DoBackoff
         ] = None,
-    ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
-        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+    ) -> None:
         # TODO(cretz): Why can't MyPy infer this?
         v: Union[
             temporalio.bridge.proto.workflow_commands.ScheduleActivity,
@@ -1364,22 +1354,15 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 )
             # TODO(cretz): Remove when https://github.com/temporalio/sdk-core/issues/316 fixed
             command.schedule_local_activity.retry_policy.SetInParent()
-        return command
 
-    def _build_cancel_command(
+    def _apply_cancel_command(
         self,
-    ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
         if isinstance(self._input, StartActivityInput):
-            return temporalio.bridge.proto.workflow_commands.WorkflowCommand(
-                request_cancel_activity=temporalio.bridge.proto.workflow_commands.RequestCancelActivity(
-                    seq=self._seq
-                ),
-            )
-        return temporalio.bridge.proto.workflow_commands.WorkflowCommand(
-            request_cancel_local_activity=temporalio.bridge.proto.workflow_commands.RequestCancelLocalActivity(
-                seq=self._seq
-            ),
-        )
+            command.request_cancel_activity.seq = self._seq
+        else:
+            command.request_cancel_local_activity.seq = self._seq
 
 
 class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
@@ -1416,7 +1399,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         *,
         args: Iterable[Any] = [],
     ) -> None:
-        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        command = self._instance._add_command()
         v = command.signal_external_workflow_execution
         v.child_workflow_id = self._input.id
         v.signal_name = temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
@@ -1447,10 +1430,10 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         if not self._result_fut.done():
             self._result_fut.set_exception(err)
 
-    def _build_start_command(
+    def _apply_start_command(
         self,
-    ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
-        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
         v = command.start_child_workflow_execution
         v.seq = self._seq
         v.namespace = self._input.namespace or self._instance._info.namespace
@@ -1503,24 +1486,21 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             "temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType",
             int(self._input.cancellation_type),
         )
-        return command
 
     # If request cancel external, result does _not_ have seq
-    def _build_cancel_command(
+    def _apply_cancel_command(
         self,
-    ) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
         if self._start_fut.done():
-            return temporalio.bridge.proto.workflow_commands.WorkflowCommand(
-                request_cancel_external_workflow_execution=temporalio.bridge.proto.workflow_commands.RequestCancelExternalWorkflowExecution(
-                    seq=self._seq,
-                    child_workflow_id=self._input.id,
-                ),
+            command.request_cancel_external_workflow_execution.seq = self._seq
+            command.request_cancel_external_workflow_execution.child_workflow_id = (
+                self._input.id
             )
-        return temporalio.bridge.proto.workflow_commands.WorkflowCommand(
-            cancel_unstarted_child_workflow_execution=temporalio.bridge.proto.workflow_commands.CancelUnstartedChildWorkflowExecution(
-                child_workflow_seq=self._seq,
-            ),
-        )
+        else:
+            command.cancel_unstarted_child_workflow_execution.child_workflow_seq = (
+                self._seq
+            )
 
 
 class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
@@ -1550,7 +1530,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         *,
         args: Iterable[Any] = [],
     ) -> None:
-        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        command = self._instance._add_command()
         v = command.signal_external_workflow_execution
         v.workflow_execution.namespace = self._instance._info.namespace
         v.workflow_execution.workflow_id = self._id
@@ -1570,10 +1550,54 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         await self._instance._signal_external_workflow(command)
 
     async def cancel(self) -> None:
-        command = temporalio.bridge.proto.workflow_commands.WorkflowCommand()
+        command = self._instance._add_command()
         v = command.request_cancel_external_workflow_execution
         v.workflow_execution.namespace = self._instance._info.namespace
         v.workflow_execution.workflow_id = self._id
         if self._run_id:
             v.workflow_execution.run_id = self._run_id
         await self._instance._cancel_external_workflow(command)
+
+
+class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
+    def __init__(
+        self, instance: _WorkflowInstanceImpl, input: ContinueAsNewInput
+    ) -> None:
+        super().__init__("Continue as new")
+        self._instance = instance
+        self._input = input
+
+    def _apply_command(
+        self, command: temporalio.bridge.proto.workflow_commands.WorkflowCommand
+    ) -> None:
+        v = command.continue_as_new_workflow_execution
+        v.SetInParent()
+        if self._input.workflow:
+            v.workflow_type = self._input.workflow
+        if self._input.task_queue:
+            v.task_queue = self._input.task_queue
+        if self._input.args:
+            v.arguments.extend(
+                temporalio.bridge.worker.to_bridge_payloads(
+                    self._instance._payload_converter.to_payloads(self._input.args)
+                )
+            )
+        if self._input.run_timeout:
+            v.workflow_run_timeout.FromTimedelta(self._input.run_timeout)
+        if self._input.task_timeout:
+            v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
+        # TODO(cretz): Headers
+        # v.headers = input.he
+        if self._input.memo:
+            for k, val in self._input.memo.items():
+                v.memo[k] = temporalio.bridge.worker.to_bridge_payload(
+                    self._instance._payload_converter.to_payloads([val])[0]
+                )
+        if self._input.search_attributes:
+            for k, val in self._input.search_attributes.items():
+                v.search_attributes[k] = temporalio.bridge.worker.to_bridge_payload(
+                    # We have to use the default data converter for this
+                    temporalio.converter.default().payload_converter.to_payloads([val])[
+                        0
+                    ]
+                )

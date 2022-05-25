@@ -31,7 +31,11 @@ from .workflow_instance import WorkflowInstance, WorkflowInstanceDetails, Workfl
 
 logger = logging.getLogger(__name__)
 
+# Set to true to log all activations and completions
 LOG_PROTOS = False
+
+# Maximum amount of seconds a thread can run a workflow activation before a
+# deadlock is assumed
 DEADLOCK_TIMEOUT_SECONDS = 2
 
 
@@ -115,6 +119,9 @@ class _WorkflowWorker:
         global LOG_PROTOS, DEADLOCK_TIMEOUT_SECONDS
 
         # Build completion
+        completion: Optional[
+            temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion
+        ] = None
         try:
             # Decode the activation if there's a codec
             if self._data_converter.payload_codec:
@@ -124,9 +131,6 @@ class _WorkflowWorker:
 
             if LOG_PROTOS:
                 logger.debug("Received workflow activation: %s", act)
-            completion = temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
-                run_id=act.run_id
-            )
 
             # If the workflow is not running yet, create it
             workflow = self._running_workflows.get(act.run_id)
@@ -149,18 +153,22 @@ class _WorkflowWorker:
 
                 # Wait for deadlock timeout and set commands if successful
                 try:
-                    commands = await asyncio.wait_for(
+                    completion = await asyncio.wait_for(
                         activate_task, DEADLOCK_TIMEOUT_SECONDS
                     )
-                    # TODO(cretz): Is this copy too expensive?
-                    completion.successful.commands.extend(commands)
                 except asyncio.TimeoutError:
                     raise RuntimeError(
                         f"Potential deadlock detected, workflow didn't yield within {DEADLOCK_TIMEOUT_SECONDS} second(s)"
                     )
         except Exception as err:
-            logger.exception(f"Failed activation on workflow with run ID {act.run_id}")
+            logger.exception(
+                f"Failed handling activation on workflow with run ID {act.run_id}"
+            )
             # Set completion failure
+            if not completion:
+                completion = (
+                    temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
+                )
             completion.failed.failure.SetInParent()
             try:
                 temporalio.exceptions.apply_exception_to_failure(
@@ -175,12 +183,25 @@ class _WorkflowWorker:
                 completion.failed.failure.message = (
                     f"Failed converting activation exception: {inner_err}"
                 )
+        # Make sure a completion always exists (technically will only be absent
+        # on remove-job-only activations)
+        if not completion:
+            completion = (
+                temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
+            )
 
         # Encode the completion if there's a codec
         if self._data_converter.payload_codec:
-            await temporalio.bridge.worker.encode_completion(
-                completion, self._data_converter.payload_codec
-            )
+            try:
+                await temporalio.bridge.worker.encode_completion(
+                    completion, self._data_converter.payload_codec
+                )
+            except Exception as err:
+                logger.exception(
+                    f"Failed encoding completion on workflow with run ID {act.run_id}"
+                )
+                completion.failed.Clear()
+                completion.failed.failure.message = f"Failed encoding completion: {err}"
 
         # Send off completion
         if LOG_PROTOS:

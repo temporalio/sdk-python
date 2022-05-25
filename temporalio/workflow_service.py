@@ -29,6 +29,7 @@ WorkflowServiceResponse = TypeVar(
 
 logger = logging.getLogger(__name__)
 
+# Set to true to log all requests and responses
 LOG_PROTOS = False
 
 
