@@ -12,6 +12,7 @@ import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from typing import (
     Any,
     Awaitable,
@@ -168,13 +169,15 @@ class _WorkflowInstanceImpl(
 
         # We maintain signals and queries on this class since handlers can be
         # added during workflow execution
-        self._signals = dict(self._defn.signals)
-        self._queries = dict(self._defn.queries)
+        self._signals: Dict[
+            Optional[str], Union[temporalio.workflow._SignalDefinition, Callable]
+        ] = dict(self._defn.signals)
+        self._queries: Dict[
+            Optional[str], Union[temporalio.workflow._QueryDefinition, Callable]
+        ] = dict(self._defn.queries)
 
         # Maintain buffered signals for later-added dynamic handlers
-        self._buffered_signals: Dict[
-            str, List[temporalio.bridge.proto.workflow_activation.SignalWorkflow]
-        ] = {}
+        self._buffered_signals: Dict[str, List[HandleSignalInput]] = {}
 
         # Create interceptors. We do this with our runtime on the loop just in
         # case they want to access info() during init().
@@ -348,12 +351,12 @@ class _WorkflowInstanceImpl(
 
         # Just find the arg types for now. The interceptor will be responsible
         # for checking whether the query definition actually exists.
+        arg_types: Optional[List[Type]] = None
         query_defn = self._queries.get(job.query_type)
-        arg_types, _ = (
-            self._type_lookup.get_type_hints(query_defn.fn)
-            if query_defn
-            else (None, None)
-        )
+        if isinstance(query_defn, temporalio.workflow._QueryDefinition):
+            arg_types, _ = self._type_lookup.get_type_hints(query_defn.fn)
+        elif callable(query_defn):
+            arg_types, _ = self._type_lookup.get_type_hints(query_defn)
         args = self._convert_payloads(job.arguments, arg_types)
 
         # Schedule it
@@ -536,79 +539,44 @@ class _WorkflowInstanceImpl(
     def _apply_signal_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.SignalWorkflow
     ) -> None:
-        # If there is no definition or dynamic, we buffer and ignore
-        if job.signal_name not in self._signals and None not in self._signals:
-            self._buffered_signals.setdefault(job.signal_name, []).append(job)
-            return
-
         # Just find the arg types for now. The interceptor will be responsible
         # for checking whether the signal definition actually exists.
-        signal_defn = self._defn.signals.get(job.signal_name)
         arg_types: Optional[List[Type]] = None
-        if signal_defn:
+        signal_defn = self._signals.get(job.signal_name)
+        if isinstance(signal_defn, temporalio.workflow._SignalDefinition):
             arg_types, _ = self._type_lookup.get_type_hints(signal_defn.fn)
-        args = self._convert_payloads(job.input, arg_types)
+        elif callable(signal_defn):
+            arg_types, _ = self._type_lookup.get_type_hints(signal_defn)
+        input = HandleSignalInput(
+            name=job.signal_name, args=self._convert_payloads(job.input, arg_types)
+        )
+
+        # If there is no definition or dynamic, we buffer and ignore
+        if not signal_defn and None not in self._signals:
+            self._buffered_signals.setdefault(job.signal_name, []).append(input)
+            return
 
         # Schedule the handler
         self.create_task(
-            self._inbound.handle_signal(
-                HandleSignalInput(name=job.signal_name, args=args)
-            )
+            self._run_top_level_workflow_function(self._inbound.handle_signal(input))
         )
 
     def _apply_start_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.StartWorkflow
     ) -> None:
-        # Async call to run on the scheduler thread
+        # Async call to run on the scheduler thread. This will be wrapped in
+        # another function which applies exception handling.
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
-            # We intentionally don't catch all errors, instead we bubble those
-            # out as task failures
-            command: Optional[
-                temporalio.bridge.proto.workflow_commands.WorkflowCommand
-            ] = None
-            try:
-                success = await self._inbound.execute_workflow(input)
-                result_payloads = self._payload_converter.to_payloads([success])
-                if len(result_payloads) != 1:
-                    raise ValueError(
-                        f"Expected 1 result payload, got {len(result_payloads)}"
-                    )
-                command = self._add_command()
-                command.complete_workflow_execution.result.CopyFrom(
-                    temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
+            result = await self._inbound.execute_workflow(input)
+            result_payloads = self._payload_converter.to_payloads([result])
+            if len(result_payloads) != 1:
+                raise ValueError(
+                    f"Expected 1 result payload, got {len(result_payloads)}"
                 )
-            except _ContinueAsNewError as err:
-                logger.debug("Workflow requested continue as new")
-                if not command:
-                    command = self._add_command()
-                err._apply_command(command)
-            except temporalio.exceptions.FailureError as err:
-                logger.debug(
-                    f"Workflow raised failure with run ID {self._info.run_id}",
-                    exc_info=True,
-                )
-                if not command:
-                    command = self._add_command()
-                command.fail_workflow_execution.failure.SetInParent()
-                try:
-                    temporalio.exceptions.apply_exception_to_failure(
-                        err,
-                        self._payload_converter,
-                        command.fail_workflow_execution.failure,
-                    )
-                except Exception as inner_err:
-                    raise ValueError(
-                        "Failed converting workflow exception"
-                    ) from inner_err
-            except asyncio.CancelledError as err:
-                if not command:
-                    command = self._add_command()
-                command.fail_workflow_execution.failure.SetInParent()
-                temporalio.exceptions.apply_exception_to_failure(
-                    temporalio.exceptions.CancelledError(str(err)),
-                    self._payload_converter,
-                    command.fail_workflow_execution.failure,
-                )
+            command = self._add_command()
+            command.complete_workflow_execution.result.CopyFrom(
+                temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
+            )
 
         # Schedule it
         arg_types, _ = self._type_lookup.get_type_hints(self._defn.run_fn)
@@ -618,7 +586,9 @@ class _WorkflowInstanceImpl(
             run_fn=cast(Callable[..., Awaitable[Any]], self._defn.run_fn),
             args=self._convert_payloads(job.arguments, arg_types),
         )
-        self._primary_task = self.create_task(run_workflow(input))
+        self._primary_task = self.create_task(
+            self._run_top_level_workflow_function(run_workflow(input))
+        )
 
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
@@ -665,6 +635,24 @@ class _WorkflowInstanceImpl(
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
         return _ExternalWorkflowHandle(self, id, run_id)
 
+    def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
+        defn = self._queries.get(name)
+        if not defn or callable(defn):
+            # TODO(cretz): Why can't MyPy infer this?
+            return cast(Optional[Callable], defn)
+        # Curry instance on the definition function since that represents an
+        # unbound method
+        return partial(defn.fn, self._object)
+
+    def workflow_get_signal_handler(self, name: Optional[str]) -> Optional[Callable]:
+        defn = self._signals.get(name)
+        if not defn or callable(defn):
+            # TODO(cretz): Why can't MyPy infer this?
+            return cast(Optional[Callable], defn)
+        # Curry instance on the definition function since that represents an
+        # unbound method
+        return partial(defn.fn, self._object)
+
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
 
@@ -673,6 +661,39 @@ class _WorkflowInstanceImpl(
 
     def workflow_now(self) -> datetime:
         return datetime.utcfromtimestamp(asyncio.get_running_loop().time())
+
+    def workflow_set_query_handler(
+        self, name: Optional[str], handler: Optional[Callable]
+    ) -> None:
+        if handler:
+            self._queries[name] = handler
+        else:
+            self._queries.pop(name, None)
+
+    def workflow_set_signal_handler(
+        self, name: Optional[str], handler: Optional[Callable]
+    ) -> None:
+        if handler:
+            self._signals[name] = handler
+            # We have to send buffered signals to the handler if they apply
+            if name:
+                for input in self._buffered_signals.pop(name, []):
+                    self.create_task(
+                        self._run_top_level_workflow_function(
+                            self._inbound.handle_signal(input)
+                        )
+                    )
+            else:
+                for _, inputs in self._buffered_signals.items():
+                    for input in inputs:
+                        self.create_task(
+                            self._run_top_level_workflow_function(
+                                self._inbound.handle_signal(input)
+                            )
+                        )
+                self._buffered_signals.clear()
+        else:
+            self._signals.pop(name, None)
 
     def workflow_start_activity(
         self,
@@ -984,6 +1005,43 @@ class _WorkflowInstanceImpl(
         finally:
             asyncio._set_running_loop(None)
 
+    # This is used for the primary workflow function and signal handlers in
+    # order to apply common exception handling to each
+    async def _run_top_level_workflow_function(self, coro: Awaitable[None]) -> None:
+        # We intentionally don't catch all errors, instead we bubble those
+        # out as task failures
+        try:
+            await coro
+        except _ContinueAsNewError as err:
+            logger.debug("Workflow requested continue as new")
+            err._apply_command(self._add_command())
+            self._force_stop_loop = True
+        except temporalio.exceptions.FailureError as err:
+            logger.debug(
+                f"Workflow raised failure with run ID {self._info.run_id}",
+                exc_info=True,
+            )
+            command = self._add_command()
+            command.fail_workflow_execution.failure.SetInParent()
+            try:
+                temporalio.exceptions.apply_exception_to_failure(
+                    err,
+                    self._payload_converter,
+                    command.fail_workflow_execution.failure,
+                )
+            except Exception as inner_err:
+                raise ValueError("Failed converting workflow exception") from inner_err
+            self._force_stop_loop = True
+        except asyncio.CancelledError as err:
+            command = self._add_command()
+            command.fail_workflow_execution.failure.SetInParent()
+            temporalio.exceptions.apply_exception_to_failure(
+                temporalio.exceptions.CancelledError(str(err)),
+                self._payload_converter,
+                command.fail_workflow_execution.failure,
+            )
+            self._force_stop_loop = True
+
     async def _signal_external_workflow(
         self,
         # Should not have seq set
@@ -1163,49 +1221,43 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
 
     async def handle_signal(self, input: HandleSignalInput) -> None:
         # Get the definition or fall through to dynamic
-        signal_defn = self._instance._signals.get(
-            input.name
-        ) or self._instance._signals.get(None)
-        # Presence of the signal handler was already checked, but they could
-        # change the name so we re-check
-        if not signal_defn:
-            raise RuntimeError(
-                f"signal handler for {input.name} expected but not found"
-            )
-        # Put self as arg first, then name only if dynamic
-        args: Iterable[Any]
-        if signal_defn.name:
-            args = [self._instance._object] + list(input.args)
+        handler = self._instance.workflow_get_signal_handler(input.name)
+        dynamic = False
+        if not handler:
+            handler = self._instance.workflow_get_signal_handler(None)
+            dynamic = True
+            # Technically this is checked before the interceptor is invoked, but
+            # an # interceptor could have changed the name
+            if not handler:
+                raise RuntimeError(
+                    f"Signal handler for {input.name} expected but not found"
+                )
+        # Put name first if dynamic
+        args = list(input.args) if not dynamic else [input.name] + list(input.args)
+        if inspect.iscoroutinefunction(handler):
+            await handler(*args)
         else:
-            args = [self._instance._object, input.name] + list(input.args)
-        if inspect.iscoroutinefunction(signal_defn.fn):
-            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
-            signal_fn = cast(Callable[..., Awaitable[None]], signal_defn.fn)
-            await signal_fn(*args)
-        else:
-            signal_fn = cast(Callable, signal_defn.fn)
-            signal_fn(*args)
+            handler(*args)
 
     async def handle_query(self, input: HandleQueryInput) -> Any:
         # Get the definition or fall through to dynamic
-        query_defn = self._instance._queries.get(
-            input.name
-        ) or self._instance._queries.get(None)
-        if not query_defn:
-            raise RuntimeError(f"Workflow did not register a handler for {input.name}")
-        # Put self as arg first, then name only if dynamic
-        args: Iterable[Any]
-        if query_defn.name:
-            args = [self._instance._object] + list(input.args)
+        handler = self._instance.workflow_get_query_handler(input.name)
+        dynamic = False
+        if not handler:
+            handler = self._instance.workflow_get_query_handler(None)
+            dynamic = True
+            # Technically this is checked before the interceptor is invoked, but
+            # an # interceptor could have changed the name
+            if not handler:
+                raise RuntimeError(
+                    f"Query handler for {input.name} expected but not found"
+                )
+        # Put name first if dynamic
+        args = list(input.args) if not dynamic else [input.name] + list(input.args)
+        if inspect.iscoroutinefunction(handler):
+            return await handler(*args)
         else:
-            args = [self._instance._object, input.name] + list(input.args)
-        if inspect.iscoroutinefunction(query_defn.fn):
-            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
-            query_fn = cast(Callable[..., Awaitable[None]], query_defn.fn)
-            return await query_fn(*args)
-        else:
-            query_fn = cast(Callable, query_defn.fn)
-            return query_fn(*args)
+            return handler(*args)
 
 
 class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):

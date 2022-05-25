@@ -78,6 +78,9 @@ async def test_workflow_info(client: Client):
 
 @workflow.defn
 class SignalAndQueryWorkflow:
+    def __init__(self) -> None:
+        self._last_event: Optional[str] = None
+
     @workflow.run
     async def run(self) -> None:
         # Wait forever
@@ -140,6 +143,93 @@ async def test_workflow_signal_and_query(client: Client):
         )
         assert "query_custom: custom arg1" == await handle.query(
             SignalAndQueryWorkflow.query_custom, "custom arg1"
+        )
+
+
+@workflow.defn
+class SignalAndQueryHandlersWorkflow:
+    def __init__(self) -> None:
+        self._last_event: Optional[str] = None
+
+    @workflow.run
+    async def run(self) -> None:
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.query
+    def last_event(self) -> str:
+        return self._last_event or "<no event>"
+
+    @workflow.signal
+    def set_signal_handler(self, signal_name: str) -> None:
+        def new_handler(arg: str) -> None:
+            self._last_event = f"signal {signal_name}: {arg}"
+
+        workflow.set_signal_handler(signal_name, new_handler)
+
+    @workflow.signal
+    def set_query_handler(self, query_name: str) -> None:
+        def new_handler(arg: str) -> str:
+            return f"query {query_name}: {arg}"
+
+        workflow.set_query_handler(query_name, new_handler)
+
+    @workflow.signal
+    def set_dynamic_signal_handler(self) -> None:
+        def new_handler(name: str, *args: Any) -> None:
+            self._last_event = f"signal dynamic {name}: {args[0]}"
+
+        workflow.set_dynamic_signal_handler(new_handler)
+
+    @workflow.signal
+    def set_dynamic_query_handler(self) -> None:
+        def new_handler(name: str, *args: Any) -> str:
+            return f"query dynamic {name}: {args[0]}"
+
+        workflow.set_dynamic_query_handler(new_handler)
+
+
+async def test_workflow_signal_and_query_handlers(client: Client):
+    async with new_worker(client, SignalAndQueryHandlersWorkflow) as worker:
+        handle = await client.start_workflow(
+            SignalAndQueryHandlersWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def last_event() -> str:
+            return await handle.query(SignalAndQueryHandlersWorkflow.last_event)
+
+        # Confirm signals buffered when not found
+        await handle.signal("unknown_signal1", "val1")
+        await handle.signal(
+            SignalAndQueryHandlersWorkflow.set_signal_handler, "unknown_signal1"
+        )
+        await assert_eq_eventually("signal unknown_signal1: val1", last_event)
+
+        # Normal signal handling
+        await handle.signal("unknown_signal1", "val2")
+        await assert_eq_eventually("signal unknown_signal1: val2", last_event)
+
+        # Dynamic signal handling buffered and new
+        await handle.signal("unknown_signal2", "val3")
+        await handle.signal(SignalAndQueryHandlersWorkflow.set_dynamic_signal_handler)
+        await assert_eq_eventually("signal dynamic unknown_signal2: val3", last_event)
+        await handle.signal("unknown_signal3", "val4")
+        await assert_eq_eventually("signal dynamic unknown_signal3: val4", last_event)
+
+        # Normal query handling
+        await handle.signal(
+            SignalAndQueryHandlersWorkflow.set_query_handler, "unknown_query1"
+        )
+        assert "query unknown_query1: val5" == await handle.query(
+            "unknown_query1", "val5"
+        )
+
+        # Dynamic query handling
+        await handle.signal(SignalAndQueryHandlersWorkflow.set_dynamic_query_handler)
+        assert "query dynamic unknown_query2: val6" == await handle.query(
+            "unknown_query2", "val6"
         )
 
 
@@ -786,7 +876,7 @@ async def test_workflow_logging(client: Client):
 # * Cancel unstarted child from a signal in the same WFT that "child started" may be in later
 # * Explicit create_task and create_future cancelling
 # * Cancel only after N attempts (i.e. showing cancel is an event not a state)
-# * In-workflow signal/query handler registration
+# * Signal handler errors (treated as workflow errors)
 # * Exception details with codec
 # * Custom workflow runner that also confirms WorkflowInstanceDetails can be pickled
 # * Deadlock detection

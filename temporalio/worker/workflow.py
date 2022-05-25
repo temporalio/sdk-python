@@ -118,10 +118,11 @@ class _WorkflowWorker:
     ) -> None:
         global LOG_PROTOS, DEADLOCK_TIMEOUT_SECONDS
 
-        # Build completion
-        completion: Optional[
-            temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion
-        ] = None
+        # Build default success completion (e.g. remove-job-only activations)
+        completion = (
+            temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
+        )
+        completion.successful.SetInParent()
         try:
             # Decode the activation if there's a codec
             if self._data_converter.payload_codec:
@@ -165,10 +166,6 @@ class _WorkflowWorker:
                 f"Failed handling activation on workflow with run ID {act.run_id}"
             )
             # Set completion failure
-            if not completion:
-                completion = (
-                    temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
-                )
             completion.failed.failure.SetInParent()
             try:
                 temporalio.exceptions.apply_exception_to_failure(
@@ -183,12 +180,6 @@ class _WorkflowWorker:
                 completion.failed.failure.message = (
                     f"Failed converting activation exception: {inner_err}"
                 )
-        # Make sure a completion always exists (technically will only be absent
-        # on remove-job-only activations)
-        if not completion:
-            completion = (
-                temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
-            )
 
         # Encode the completion if there's a codec
         if self._data_converter.payload_codec:

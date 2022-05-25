@@ -338,6 +338,14 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
+        ...
+
+    @abstractmethod
+    def workflow_get_signal_handler(self, name: Optional[str]) -> Optional[Callable]:
+        ...
+
+    @abstractmethod
     def workflow_info(self) -> Info:
         ...
 
@@ -347,6 +355,18 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_now(self) -> datetime:
+        ...
+
+    @abstractmethod
+    def workflow_set_query_handler(
+        self, name: Optional[str], handler: Optional[Callable]
+    ) -> None:
+        ...
+
+    @abstractmethod
+    def workflow_set_signal_handler(
+        self, name: Optional[str], handler: Optional[Callable]
+    ) -> None:
         ...
 
     @abstractmethod
@@ -1886,6 +1906,115 @@ def continue_as_new(
         memo=memo,
         search_attributes=search_attributes,
     )
+
+
+def get_signal_handler(name: str) -> Optional[Callable]:
+    """Get the signal handler for the given name if any.
+
+    This includes handlers created via the ``@workflow.signal`` decorator.
+
+    Args:
+        name: Name of the signal.
+
+    Returns:
+        Callable for the signal if any. If a handler is not found for the name,
+        this will not return the dynamic handler even if there is one.
+    """
+    return _Runtime.current().workflow_get_signal_handler(name)
+
+
+def set_signal_handler(name: str, handler: Optional[Callable]) -> None:
+    """Set or unset the signal handler for the given name.
+
+    This overrides any existing handlers for the given name, including handlers
+    created via the ``@workflow.signal`` decorator.
+
+    When set, all unhandled past signals for the given name are immediately sent
+    to the handler.
+
+    Args:
+        name: Name of the signal.
+        handler: Callable to set or None to unset.
+    """
+    _Runtime.current().workflow_set_signal_handler(name, handler)
+
+
+def get_dynamic_signal_handler() -> Optional[Callable]:
+    """Get the dynamic signal handler if any.
+
+    This includes dynamic handlers created via the ``@workflow.signal``
+    decorator.
+
+    Returns:
+        Callable for the dynamic signal handler if any.
+    """
+    return _Runtime.current().workflow_get_signal_handler(None)
+
+
+def set_dynamic_signal_handler(handler: Optional[Callable]) -> None:
+    """Set or unset the dynamic signal handler.
+
+    This overrides the existing dynamic handler even if it was created via the
+    ``@workflow.signal`` decorator.
+
+    When set, all unhandled past signals are immediately sent to the handler.
+
+    Args:
+        handler: Callable to set or None to unset.
+    """
+    _Runtime.current().workflow_set_signal_handler(None, handler)
+
+
+def get_query_handler(name: str) -> Optional[Callable]:
+    """Get the query handler for the given name if any.
+
+    This includes handlers created via the ``@workflow.query`` decorator.
+
+    Args:
+        name: Name of the query.
+
+    Returns:
+        Callable for the query if any. If a handler is not found for the name,
+        this will not return the dynamic handler even if there is one.
+    """
+    return _Runtime.current().workflow_get_query_handler(name)
+
+
+def set_query_handler(name: str, handler: Optional[Callable]) -> None:
+    """Set or unset the query handler for the given name.
+
+    This overrides any existing handlers for the given name, including handlers
+    created via the ``@workflow.query`` decorator.
+
+    Args:
+        name: Name of the query.
+        handler: Callable to set or None to unset.
+    """
+    _Runtime.current().workflow_set_query_handler(name, handler)
+
+
+def get_dynamic_query_handler() -> Optional[Callable]:
+    """Get the dynamic query handler if any.
+
+    This includes dynamic handlers created via the ``@workflow.query``
+    decorator.
+
+    Returns:
+        Callable for the dynamic query handler if any.
+    """
+    return _Runtime.current().workflow_get_query_handler(None)
+
+
+def set_dynamic_query_handler(handler: Optional[Callable]) -> None:
+    """Set or unset the dynamic query handler.
+
+    This overrides the existing dynamic handler even if it was created via the
+    ``@workflow.query`` decorator.
+
+    Args:
+        handler: Callable to set or None to unset.
+    """
+    _Runtime.current().workflow_set_query_handler(None, handler)
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:
