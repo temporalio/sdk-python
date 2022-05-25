@@ -186,10 +186,8 @@ synchronous multithreaded activities.
 
 ###### Synchronous Multiprocess/Other Activities
 
-Synchronous activities, i.e. functions that do not have `async def`, can be used with workers, but the
-`activity_executor` worker parameter must be set with a `concurrent.futures.Executor` instance to use for executing the
-activities. If this is _not_ set to an instance of `concurrent.futures.ThreadPoolExecutor` then the synchronous
-activities are considered multiprocess/other activities.
+If `activity_executor` is set to an instance of `concurrent.futures.Executor` that is _not_ 
+`concurrent.futures.ThreadPoolExecutor`, then the synchronous activities are considered multiprocess/other activities.
 
 These require special primitives for heartbeating and cancellation. The `shared_state_manager` worker parameter must be
 set to an instance of `temporalio.worker.SharedStateManager`. The most common implementation can be created by passing a
