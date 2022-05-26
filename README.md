@@ -238,10 +238,9 @@ class GreetingWorkflow:
                 [self._greeting_info_update.wait(), self._complete.wait()],
                 return_when=asyncio.FIRST_COMPLETED,
             )
-            if self._greeting_info_update.is_set():
-                self._greeting_info_update.clear()
-            elif self._complete.is_set():
+            if self._complete.is_set():
                 return self._current_greeting
+            self._greeting_info_update.clear()
 
     @workflow.signal
     async def update_salutation(self, salutation: str) -> None:
@@ -284,8 +283,8 @@ Here are the decorators that can be applied:
   * Exactly one method name must have this decorator, no more or less
   * Must be defined on an `async def` method
   * The method's arguments are the workflow's arguments
-  * Can only have argument for `self` followed by positional arguments. Best practice is to only take a single argument
-    that is an object/dataclass of fields that can be added to as needed.
+  * The first parameter must be `self`, followed by positional arguments. Best practice is to only take a single
+    argument that is an object/dataclass of fields that can be added to as needed.
 * `@workflow.signal` - Defines a method as a signal
   * Can be defined on an `async` or non-`async` function at any hierarchy depth, but if decorated method is overridden,
     the override must also be decorated
@@ -352,7 +351,7 @@ Some things to note about the above code:
 * A single argument to the child workflow is positional. Multiple arguments are not supported in the type-safe form of
   start/execute child workflow and must be supplied via the `args` keyword argument.
 * Child workflow options are set as keyword arguments after the arguments. At least `id` must be provided.
-* The `await` of the start does not complete until the workflow has confirmed to be started
+* The `await` of the start does not complete until the start has been accepted by the server
 * The result is a child workflow handle which is an `asyncio.Task` and supports basic task features. The handle also has
   some child info and supports signalling the child workflow
 * An async `workflow.execute_child_workflow()` helper is provided which takes the same arguments as
@@ -431,8 +430,8 @@ Some things to note about activity definitions:
 * The `say_hello_activity` is `async` which is the recommended activity type (see "Types of Activities" below)
 * A custom name for the activity can be set with a decorator argument, e.g. `@activity.defn(name="my activity")`
 * Long running activities should regularly heartbeat and handle cancellation
-* Can only have positional arguments. Best practice is to only take a single argument that is an object/dataclass of
-  fields that can be added to as needed.
+* Activities can only have positional arguments. Best practice is to only take a single argument that is an
+  object/dataclass of fields that can be added to as needed.
 
 #### Types of Activities
 

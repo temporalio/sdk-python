@@ -50,6 +50,26 @@ async def test_workflow_hello(client: Client):
 
 
 @workflow.defn
+class MultiParamWorkflow:
+    @workflow.run
+    async def run(self, param1: int, param2: str) -> str:
+        return f"param1: {param1}, param2: {param2}"
+
+
+async def test_workflow_multi_param(client: Client):
+    # This test is mostly just here to confirm MyPy type checks the multi-param
+    # overload approach properly
+    async with new_worker(client, MultiParamWorkflow) as worker:
+        result = await client.execute_workflow(
+            MultiParamWorkflow.run,
+            args=[123, "val1"],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "param1: 123, param2: val1"
+
+
+@workflow.defn
 class InfoWorkflow:
     @workflow.run
     async def run(self) -> Dict:
@@ -365,7 +385,7 @@ async def test_workflow_simple_local_activity(client: Client):
 async def wait_cancel() -> str:
     try:
         while True:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
             activity.heartbeat()
     except asyncio.CancelledError:
         return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
@@ -861,6 +881,56 @@ async def test_workflow_logging(client: Client):
         workflow.logger.base_logger.setLevel(prev_level)
 
 
+@workflow.defn
+class StackTraceWorkflow:
+    def __init__(self) -> None:
+        self._status = "created"
+
+    @workflow.run
+    async def run(self) -> None:
+        # Start several tasks
+        awaitables = [
+            asyncio.sleep(1000),
+            workflow.execute_activity(
+                wait_cancel, schedule_to_close_timeout=timedelta(seconds=1000)
+            ),
+            workflow.execute_child_workflow(
+                LongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child"
+            ),
+            self.never_completing_coroutine(),
+        ]
+        await asyncio.wait([asyncio.create_task(v) for v in awaitables])
+
+    async def never_completing_coroutine(self) -> None:
+        self._status = "waiting"
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.query
+    def status(self) -> str:
+        return self._status
+
+
+async def test_workflow_stack_trace(client: Client):
+    async with new_worker(
+        client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+    ) as worker:
+        handle = await client.start_workflow(
+            StackTraceWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait until waiting
+        async def status() -> str:
+            return await handle.query(StackTraceWorkflow.status)
+
+        await assert_eq_eventually("waiting", status)
+
+        # Send stack trace query
+        trace = await handle.query("__stack_trace")
+        # TODO(cretz): Do more specific checks once we clean up traces
+        assert "never_completing_coroutine" in trace
+
+
 # TODO:
 # * Activity timeout behavior
 # * Data class params and return types
@@ -880,6 +950,7 @@ async def test_workflow_logging(client: Client):
 # * Exception details with codec
 # * Custom workflow runner that also confirms WorkflowInstanceDetails can be pickled
 # * Deadlock detection
+# * Non-query commands after workflow complete
 
 
 def new_worker(

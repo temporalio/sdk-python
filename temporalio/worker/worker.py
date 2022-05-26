@@ -84,10 +84,10 @@ class Worker:
             workflow_task_executor: Thread pool executor for workflow tasks. If
                 this is not present, a new
                 :py:class:`concurrent.futures.ThreadPoolExecutor` will be
-                created with ``max_workers`` set to
-                ``max_concurrent_workflow_tasks``. The default one will be
-                properly shutdown, but if one is provided, the caller is
-                responsible for shutting down after the worker is shut down.
+                created with ``max_workers`` set to ``max(os.cpu_count(), 4)``.
+                The default one will be properly shutdown, but if one is
+                provided, the caller is responsible for shutting it down after
+                the worker is shut down.
             workflow_runner: Runner for workflows.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement

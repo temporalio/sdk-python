@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
+import os
 from datetime import timezone
 from typing import Callable, Dict, Iterable, List, Optional, Type
 
@@ -60,7 +61,7 @@ class _WorkflowWorker:
         self._workflow_task_executor = (
             workflow_task_executor
             or concurrent.futures.ThreadPoolExecutor(
-                max_workers=max_concurrent_workflow_tasks,
+                max_workers=max(os.cpu_count() or 4, 4),
                 thread_name_prefix="temporal_workflow_",
             )
         )

@@ -25,7 +25,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import TypedDict
+from typing_extensions import Concatenate, ParamSpec, TypedDict
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -46,6 +46,7 @@ LocalParamType = TypeVar("LocalParamType")
 LocalReturnType = TypeVar("LocalReturnType")
 WorkflowClass = TypeVar("WorkflowClass")
 WorkflowReturnType = TypeVar("WorkflowReturnType")
+MultiParamSpec = ParamSpec("MultiParamSpec")
 
 
 class Client:
@@ -198,6 +199,7 @@ class Client:
         """Data converter used by this client."""
         return self._config["data_converter"]
 
+    # Overload for no-param workflow
     @overload
     async def start_workflow(
         self,
@@ -219,6 +221,7 @@ class Client:
     ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
         ...
 
+    # Overload for single-param workflow
     @overload
     async def start_workflow(
         self,
@@ -243,6 +246,32 @@ class Client:
     ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
         ...
 
+    # Overload for multi-param workflow
+    @overload
+    async def start_workflow(
+        self,
+        workflow: Callable[
+            Concatenate[WorkflowClass, MultiParamSpec], Awaitable[WorkflowReturnType]
+        ],
+        *,
+        args: Iterable[Any],
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+        ...
+
+    # Overload for string-name workflow
     @overload
     async def start_workflow(
         self,
@@ -351,6 +380,29 @@ class Client:
             )
         )
 
+    # Overload for no-param workflow
+    @overload
+    async def execute_workflow(
+        self,
+        workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[Mapping[str, Any]] = None,
+        header: Optional[Mapping[str, Any]] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Iterable[Any] = [],
+    ) -> WorkflowReturnType:
+        ...
+
+    # Overload for single-param workflow
     @overload
     async def execute_workflow(
         self,
@@ -375,11 +427,15 @@ class Client:
     ) -> WorkflowReturnType:
         ...
 
+    # Overload for multi-param workflow
     @overload
     async def execute_workflow(
         self,
-        workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+        workflow: Callable[
+            Concatenate[WorkflowClass, MultiParamSpec], Awaitable[WorkflowReturnType]
+        ],
         *,
+        args: Iterable[Any],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -396,6 +452,7 @@ class Client:
     ) -> WorkflowReturnType:
         ...
 
+    # Overload for string-name workflow
     @overload
     async def execute_workflow(
         self,
@@ -826,6 +883,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             )
         )
 
+    # Overload for no-param query
     @overload
     async def query(
         self,
@@ -837,6 +895,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     ) -> LocalReturnType:
         ...
 
+    # Overload for single-param query
     @overload
     async def query(
         self,
@@ -850,6 +909,21 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     ) -> LocalReturnType:
         ...
 
+    # Overload for multi-param query
+    @overload
+    async def query(
+        self,
+        query: Callable[
+            Concatenate[WorkflowClass, MultiParamSpec],
+            Union[Awaitable[LocalReturnType], LocalReturnType],
+        ],
+        *,
+        args: Iterable[Any],
+        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+    ) -> LocalReturnType:
+        ...
+
+    # Overload for string-name query
     @overload
     async def query(
         self,
@@ -920,6 +994,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             )
         )
 
+    # Overload for no-param signal
     @overload
     async def signal(
         self,
@@ -927,6 +1002,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     ) -> None:
         ...
 
+    # Overload for single-param signal
     @overload
     async def signal(
         self,
@@ -935,6 +1011,19 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     ) -> None:
         ...
 
+    # Overload for multi-param signal
+    @overload
+    async def signal(
+        self,
+        signal: Callable[
+            Concatenate[WorkflowClass, MultiParamSpec], Union[Awaitable[None], None]
+        ],
+        *,
+        args: Iterable[Any],
+    ) -> None:
+        ...
+
+    # Overload for string-name signal
     @overload
     async def signal(
         self,

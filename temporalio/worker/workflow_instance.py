@@ -147,8 +147,6 @@ class _WorkflowInstanceImpl(
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
-        # Only set for continue-as-new
-        self._force_stop_loop: bool = False
         # Keyed by seq
         self._pending_timers: Dict[int, _TimerHandle] = {}
         self._pending_activities: Dict[int, _ActivityHandle] = {}
@@ -175,6 +173,13 @@ class _WorkflowInstanceImpl(
         self._queries: Dict[
             Optional[str], Union[temporalio.workflow._QueryDefinition, Callable]
         ] = dict(self._defn.queries)
+
+        # Add stack trace handler
+        # TODO(cretz): Is it ok that this can be forcefully overridden by the
+        # workflow author? They could technically override in interceptor
+        # anyways. Putting here ensures it ends up in the query list on
+        # query-not-found error.
+        self._queries["__stack_trace"] = self._stack_trace
 
         # Maintain buffered signals for later-added dynamic handlers
         self._buffered_signals: Dict[str, List[HandleSignalInput]] = {}
@@ -257,6 +262,25 @@ class _WorkflowInstanceImpl(
                 self._current_completion.failed.failure.message = (
                     f"Failed converting activation exception: {inner_err}"
                 )
+
+        # If there are successful commands, we must remove all
+        # non-query-responses after terminal workflow commands. We must do this
+        # in place to avoid the copy-on-write that occurs when you reassign.
+        seen_completion = False
+        i = 0
+        while i < len(self._current_completion.successful.commands):
+            command = self._current_completion.successful.commands[i]
+            if not seen_completion:
+                seen_completion = (
+                    command.HasField("complete_workflow_execution")
+                    or command.HasField("continue_as_new_workflow_execution")
+                    or command.HasField("fail_workflow_execution")
+                )
+            elif not command.HasField("respond_to_query"):
+                del self._current_completion.successful.commands[i]
+                continue
+            i += 1
+
         return self._current_completion
 
     def _apply(
@@ -373,11 +397,10 @@ class _WorkflowInstanceImpl(
     def _apply_resolve_activity(
         self, job: temporalio.bridge.proto.workflow_activation.ResolveActivity
     ) -> None:
-        handle = self._pending_activities.get(job.seq)
+        handle = self._pending_activities.pop(job.seq, None)
         if not handle:
             raise RuntimeError(f"Failed finding activity handle for sequence {job.seq}")
         if job.result.HasField("completed"):
-            self._pending_activities.pop(job.seq)
             ret: Optional[Any] = None
             if job.result.completed.HasField("result"):
                 ret_types = [handle._input.ret_type] if handle._input.ret_type else None
@@ -388,38 +411,19 @@ class _WorkflowInstanceImpl(
                 ret = ret_vals[0]
             handle._resolve_success(ret)
         elif job.result.HasField("failed"):
-            self._pending_activities.pop(job.seq)
             handle._resolve_failure(
                 temporalio.exceptions.failure_to_error(
                     job.result.failed.failure, self._payload_converter
                 )
             )
         elif job.result.HasField("cancelled"):
-            self._pending_activities.pop(job.seq)
             handle._resolve_failure(
                 temporalio.exceptions.failure_to_error(
                     job.result.cancelled.failure, self._payload_converter
                 )
             )
         elif job.result.HasField("backoff"):
-            # Async call to wait for the timer then execute the activity again
-            async def backoff_then_reschedule() -> None:
-                # Don't pop, we want this to remain as pending
-                handle = self._pending_activities[job.seq]
-                try:
-                    await asyncio.sleep(
-                        job.result.backoff.backoff_duration.ToTimedelta().total_seconds()
-                    )
-                except Exception as err:
-                    self._pending_activities.pop(job.seq)
-                    handle._resolve_failure(err)
-                    return
-                handle._apply_schedule_command(self._add_command(), job.result.backoff)
-
-            # Schedule it
-            # TODO(cretz): Do we need to do this inside the activity task so it
-            # can be cancelled?
-            self.create_task(backoff_then_reschedule())
+            handle._resolve_backoff(job.result.backoff)
         else:
             raise RuntimeError("Activity did not have result")
 
@@ -505,8 +509,7 @@ class _WorkflowInstanceImpl(
             raise RuntimeError(
                 f"Failed finding pending external cancel for sequence {job.seq}"
             )
-        elif fut.done():
-            return
+        # We intentionally let this error if future is already done
         if job.HasField("failure"):
             fut.set_exception(
                 temporalio.exceptions.failure_to_error(
@@ -525,8 +528,7 @@ class _WorkflowInstanceImpl(
             raise RuntimeError(
                 f"Failed finding pending external signal for sequence {job.seq}"
             )
-        elif fut.done():
-            return
+        # We intentionally let this error if future is already done
         if job.HasField("failure"):
             fut.set_exception(
                 temporalio.exceptions.failure_to_error(
@@ -684,7 +686,7 @@ class _WorkflowInstanceImpl(
                         )
                     )
             else:
-                for _, inputs in self._buffered_signals.items():
+                for inputs in self._buffered_signals.values():
                     for input in inputs:
                         self.create_task(
                             self._run_top_level_workflow_function(
@@ -856,80 +858,91 @@ class _WorkflowInstanceImpl(
                 "Activity must have start_to_close_timeout or schedule_to_close_timeout"
             )
 
-        seq = self._next_seq("activity")
-        result_fut = self.create_future()
+        handle: Optional[_ActivityHandle] = None
 
         # Function that runs in the handle
         async def run_activity() -> Any:
-            nonlocal result_fut
+            nonlocal handle
             while True:
+                assert handle
                 try:
-                    # We have to shield because we don't want the future itself
-                    # to be cancelled
-                    return await asyncio.shield(result_fut)
+                    # We have to shield because we don't want the underlying
+                    # result future to be cancelled
+                    return await asyncio.shield(handle._result_fut)
+                except _ActivityDoBackoffError as err:
+                    # We have to sleep then reschedule. Note this sleep can be
+                    # cancelled like any other timer.
+                    await asyncio.sleep(
+                        err.backoff.backoff_duration.ToTimedelta().total_seconds()
+                    )
+                    handle._apply_schedule_command(self._add_command(), err.backoff)
+                    # We have to put the handle back on the pending activity
+                    # dict with its new seq
+                    self._pending_activities[handle._seq] = handle
                 except asyncio.CancelledError:
-                    # Do nothing if the activity isn't known (may have completed
-                    # already) or is already done
+                    # Send a cancel request to the activity
                     # TODO(cretz): What if the schedule command hasn't been sent yet?
-                    handle = self._pending_activities.get(seq)
-                    if handle and not handle.done():
-                        handle._apply_cancel_command(self._add_command())
+                    handle._apply_cancel_command(self._add_command())
 
         # Create the handle and set as pending
-        handle = _ActivityHandle(self, seq, input, result_fut, run_activity())
-        self._pending_activities[seq] = handle
+        handle = _ActivityHandle(self, input, run_activity())
         handle._apply_schedule_command(self._add_command())
+        self._pending_activities[handle._seq] = handle
         return handle
 
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> _ChildWorkflowHandle:
-        seq = self._next_seq("child_workflow")
-        start_fut = self.create_future()
-        result_fut = self.create_future()
+        handle: Optional[_ChildWorkflowHandle] = None
+
+        # Common code for handling cancel for start and run
+        def apply_child_cancel_error() -> None:
+            nonlocal handle
+            assert handle
+            # Send a cancel request to the child
+            # TODO(cretz): What if the schedule command hasn't been sent yet?
+            cancel_command = self._add_command()
+            handle._apply_cancel_command(cancel_command)
+            # If the cancel command is for external workflow, we
+            # have to add a seq and mark it pending
+            if cancel_command.HasField("request_cancel_external_workflow_execution"):
+                cancel_seq = self._next_seq("external_cancel")
+                cancel_command.request_cancel_external_workflow_execution.seq = (
+                    cancel_seq
+                )
+                # TODO(cretz): Nothing waits on this future, so how
+                # if at all should we report child-workflow cancel
+                # request failure?
+                self._pending_external_cancels[cancel_seq] = self.create_future()
 
         # Function that runs in the handle
         async def run_child() -> Any:
-            nonlocal start_fut, result_fut
+            nonlocal handle
             while True:
+                assert handle
                 try:
                     # We have to shield because we don't want the future itself
                     # to be cancelled
-                    await asyncio.shield(start_fut)
-                    return await asyncio.shield(result_fut)
+                    return await asyncio.shield(handle._result_fut)
                 except asyncio.CancelledError:
-                    # Do nothing if the child isn't known (may have completed
-                    # already) or is already done
-                    # TODO(cretz): What if the schedule command hasn't been sent yet?
-                    if handle and not handle.done():
-                        cancel_command = self._add_command()
-                        handle._apply_cancel_command(cancel_command)
-                        # If the cancel command is for external workflow, we
-                        # have to add a seq and mark it pending
-                        if cancel_command.HasField(
-                            "request_cancel_external_workflow_execution"
-                        ):
-                            cancel_seq = self._next_seq("external_cancel")
-                            cancel_command.request_cancel_external_workflow_execution.seq = (
-                                cancel_seq
-                            )
-                            # TODO(cretz): Nothing waits on this future, so how
-                            # if at all should we report child-workflow cancel
-                            # request failure?
-                            self._pending_external_cancels[
-                                cancel_seq
-                            ] = self.create_future()
+                    apply_child_cancel_error()
 
         # Create the handle and set as pending
         handle = _ChildWorkflowHandle(
-            self, seq, input, start_fut, result_fut, run_child()
+            self, self._next_seq("child_workflow"), input, run_child()
         )
-        self._pending_child_workflows[seq] = handle
         handle._apply_start_command(self._add_command())
+        self._pending_child_workflows[handle._seq] = handle
 
-        # Wait on start
-        await start_fut
-        return handle
+        # Wait on start before returning
+        while True:
+            try:
+                # We have to shield because we don't want the future itself
+                # to be cancelled
+                await asyncio.shield(handle._start_fut)
+                return handle
+            except asyncio.CancelledError:
+                apply_child_cancel_error()
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
@@ -991,10 +1004,10 @@ class _WorkflowInstanceImpl(
                 self._object = self._defn.cls()
 
             # Run while there is anything ready
-            while self._ready and not self._force_stop_loop:
+            while self._ready:
 
                 # Run and remove all ready ones
-                while self._ready and not self._force_stop_loop:
+                while self._ready:
                     handle = self._ready.popleft()
                     handle._run()
 
@@ -1015,7 +1028,6 @@ class _WorkflowInstanceImpl(
         except _ContinueAsNewError as err:
             logger.debug("Workflow requested continue as new")
             err._apply_command(self._add_command())
-            self._force_stop_loop = True
         except temporalio.exceptions.FailureError as err:
             logger.debug(
                 f"Workflow raised failure with run ID {self._info.run_id}",
@@ -1031,7 +1043,6 @@ class _WorkflowInstanceImpl(
                 )
             except Exception as inner_err:
                 raise ValueError("Failed converting workflow exception") from inner_err
-            self._force_stop_loop = True
         except asyncio.CancelledError as err:
             command = self._add_command()
             command.fail_workflow_execution.failure.SetInParent()
@@ -1040,7 +1051,6 @@ class _WorkflowInstanceImpl(
                 self._payload_converter,
                 command.fail_workflow_execution.failure,
             )
-            self._force_stop_loop = True
 
     async def _signal_external_workflow(
         self,
@@ -1063,6 +1073,23 @@ class _WorkflowInstanceImpl(
             except asyncio.CancelledError:
                 cancel_command = self._add_command()
                 cancel_command.cancel_signal_workflow.seq = seq
+
+    def _stack_trace(self) -> str:
+        stacks = []
+        for task in asyncio.all_tasks(self):
+            # TODO(cretz): These stacks are not very clean currently
+            frames = []
+            for frame in task.get_stack():
+                frames.append(
+                    traceback.FrameSummary(
+                        frame.f_code.co_filename, frame.f_lineno, frame.f_code.co_name
+                    )
+                )
+            stacks.append(
+                f"Stack for {task!r} (most recent call last):\n"
+                + "\n".join(traceback.format_list(frames))
+            )
+        return "\n\n".join(stacks)
 
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many
@@ -1315,29 +1342,44 @@ class _TimerHandle(asyncio.TimerHandle):
         command.cancel_timer.seq = self._seq
 
 
+class _ActivityDoBackoffError(BaseException):
+    def __init__(
+        self, backoff: temporalio.bridge.proto.activity_result.DoBackoff
+    ) -> None:
+        super().__init__("Backoff")
+        self.backoff = backoff
+
+
 class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     def __init__(
         self,
         instance: _WorkflowInstanceImpl,
-        seq: int,
         input: Union[StartActivityInput, StartLocalActivityInput],
-        result_fut: asyncio.Future,
         fn: Awaitable[Any],
     ) -> None:
         # TODO(cretz): Customize name in 3.9+?
         super().__init__(fn)
         self._instance = instance
-        self._seq = seq
+        self._seq = instance._next_seq("activity")
         self._input = input
-        self._result_fut = result_fut
+        self._result_fut = instance.create_future()
 
     def _resolve_success(self, result: Any) -> None:
-        if not self._result_fut.done():
-            self._result_fut.set_result(result)
+        # We intentionally let this error if already done
+        self._result_fut.set_result(result)
 
     def _resolve_failure(self, err: Exception) -> None:
-        if not self._result_fut.done():
-            self._result_fut.set_exception(err)
+        # We intentionally let this error if already done
+        self._result_fut.set_exception(err)
+
+    def _resolve_backoff(
+        self, backoff: temporalio.bridge.proto.activity_result.DoBackoff
+    ) -> None:
+        # Change the sequence and set backoff exception on the current future
+        self._seq = self._instance._next_seq("activity")
+        self._result_fut.set_exception(_ActivityDoBackoffError(backoff))
+        # Replace the result future since that one is resolved now
+        self._result_fut = self._instance.create_future()
 
     def _apply_schedule_command(
         self,
@@ -1423,8 +1465,6 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         instance: _WorkflowInstanceImpl,
         seq: int,
         input: StartChildWorkflowInput,
-        start_fut: asyncio.Future[None],
-        result_fut: asyncio.Future[Any],
         fn: Awaitable[Any],
     ) -> None:
         # TODO(cretz): Customize name in 3.9+?
@@ -1432,8 +1472,8 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._instance = instance
         self._seq = seq
         self._input = input
-        self._start_fut = start_fut
-        self._result_fut = result_fut
+        self._start_fut: asyncio.Future[None] = instance.create_future()
+        self._result_fut: asyncio.Future[Any] = instance.create_future()
         self._first_execution_run_id = "<unknown>"
 
     @property
@@ -1469,18 +1509,18 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
 
     def _resolve_start_success(self, run_id: str) -> None:
         self._first_execution_run_id = run_id
-        if not self._start_fut.done():
-            self._start_fut.set_result(None)
+        # We intentionally let this error if already done
+        self._start_fut.set_result(None)
 
     def _resolve_success(self, result: Any) -> None:
-        if not self._result_fut.done():
-            self._result_fut.set_result(result)
+        # We intentionally let this error if already done
+        self._result_fut.set_result(result)
 
     def _resolve_failure(self, err: Exception) -> None:
         if not self._start_fut.done():
             self._start_fut.set_exception(err)
-        if not self._result_fut.done():
-            self._result_fut.set_exception(err)
+        # We intentionally let this error if already done
+        self._result_fut.set_exception(err)
 
     def _apply_start_command(
         self,
