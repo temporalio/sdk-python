@@ -37,9 +37,10 @@ black = "^21.12b0"
 furo = "^2022.3.4"
 grpcio-tools = "^1.43.0"
 isort = "^5.10.1"
-mypy = "^0.931"
+mypy = "^0.950"
 mypy-protobuf = "^3.2.0"
 pydocstyle = "^6.1.1"
+pydoctor = "^22.5.1"
 pytest = "^7.1.1"
 pytest-asyncio = "^0.18.0"
 pytest-timeout = "^2.1.0"
@@ -56,6 +57,7 @@ build-bridge-develop = "python scripts/setup_bridge.py develop"
 fix-wheel = "python scripts/fix_wheel.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-docs = "sphinx-build docs docs/_build"
+gen-docs-pydoctor = "pydoctor"
 gen-protos = "python scripts/gen_protos.py"
 lint = [
   {cmd = "black --check ."},
@@ -63,7 +65,9 @@ lint = [
   {ref = "lint-types"},
   {ref = "lint-docs"},
 ]
-lint-docs = "pydocstyle"
+# TODO(cretz): Why does pydocstyle complain about @overload missing docs after
+# https://github.com/PyCQA/pydocstyle/pull/511?
+lint-docs = "pydocstyle --ignore-decorators=overload"
 lint-types = "mypy ."
 test = "pytest"
 
@@ -86,7 +90,7 @@ asyncio_mode = "auto"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-timeout = 60
+timeout = 600
 timeout_func_only = true
 
 [tool.isort]
@@ -110,6 +114,15 @@ add_ignore = [
   # https://github.com/PyCQA/pydocstyle/issues/184
   "D205", "D415"
 ]
+
+[tool.pydoctor]
+add-package = ["temporalio"]
+docformat = "google"
+html-output = "docs/_build_pydoctor"
+intersphinx = ["https://docs.python.org/3/objects.inv", "https://googleapis.dev/python/protobuf/latest/objects.inv"]
+privacy = ["PRIVATE:temporalio.bridge", "HIDDEN:**.*_pb2*"]
+project-name = "Temporal"
+sidebar-expand-depth = 40
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

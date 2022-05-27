@@ -15,18 +15,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
@@ -63,9 +52,9 @@ class _ActivityWorker:
         activities: Iterable[Callable],
         activity_executor: Optional[concurrent.futures.Executor],
         shared_state_manager: Optional[SharedStateManager],
-        type_hint_eval_str: bool,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
+        type_lookup: temporalio.converter._FunctionTypeLookup,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
@@ -74,6 +63,7 @@ class _ActivityWorker:
         self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._data_converter = data_converter
         self._interceptors = interceptors
+        self._type_lookup = type_lookup
         # Lazily created on first activity
         self._worker_shutdown_event: Optional[
             temporalio.activity._CompositeEvent
@@ -81,21 +71,19 @@ class _ActivityWorker:
         self._seen_sync_activity = False
 
         # Validate and build activity dict
-        self._activities: Dict[str, _ActivityDefinition] = {}
+        self._activities: Dict[str, temporalio.activity._Definition] = {}
         for activity in activities:
-            # Confirm name is present
-            name: Optional[str] = getattr(activity, "__temporal_activity_name", None)
-            if not name:
-                fn_name = getattr(activity, "__name__", "<unknown>")
-                raise TypeError(
-                    f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
-                )
+            # Get definition
+            defn = temporalio.activity._Definition.must_from_callable(activity)
+            # Confirm name unique
+            if defn.name in self._activities:
+                raise ValueError(f"More than one activity named {defn.name}")
 
             # Some extra requirements for sync functions
-            if not inspect.iscoroutinefunction(activity):
+            if not defn.is_async:
                 if not activity_executor:
                     raise ValueError(
-                        f"Activity {name} is not async so an activity_executor must be present"
+                        f"Activity {defn.name} is not async so an activity_executor must be present"
                     )
                 if (
                     not isinstance(
@@ -104,7 +92,7 @@ class _ActivityWorker:
                     and not shared_state_manager
                 ):
                     raise ValueError(
-                        f"Activity {name} is not async and executor is not thread-pool executor, "
+                        f"Activity {defn.name} is not async and executor is not thread-pool executor, "
                         "so a shared_state_manager must be present"
                     )
                 if isinstance(
@@ -118,14 +106,9 @@ class _ActivityWorker:
                         pickle.dumps(activity)
                     except Exception as err:
                         raise TypeError(
-                            f"Activity {name} must be picklable when using a process executor"
+                            f"Activity {defn.name} must be picklable when using a process executor"
                         ) from err
-            arg_types, ret_type = temporalio.converter._type_hints_from_func(
-                activity, eval_str=type_hint_eval_str
-            )
-            self._activities[name] = _ActivityDefinition(
-                name=name, fn=activity, arg_types=arg_types, ret_type=ret_type
-            )
+            self._activities[defn.name] = defn
 
     async def run(self) -> None:
         # Continually poll for activity work
@@ -189,6 +172,8 @@ class _ActivityWorker:
                     )
                     activity.cancel()
                     break
+        # Now we have to wait on them to complete
+        await asyncio.wait(still_running)
 
     def _cancel(
         self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
@@ -321,10 +306,8 @@ class _ActivityWorker:
 
             # Convert arguments. We only use arg type hints if they match the
             # input count.
-            arg_types = activity_def.arg_types
-            if activity_def.arg_types is not None and len(
-                activity_def.arg_types
-            ) != len(start.input):
+            arg_types, _ = self._type_lookup.get_type_hints(activity_def.fn)
+            if arg_types is not None and len(arg_types) != len(start.input):
                 arg_types = None
             try:
                 args = (
@@ -373,7 +356,7 @@ class _ActivityWorker:
                 heartbeat_timeout=start.heartbeat_timeout.ToTimedelta()
                 if start.HasField("heartbeat_timeout")
                 else None,
-                is_local=False,
+                is_local=start.is_local,
                 retry_policy=temporalio.bridge.worker.retry_policy_from_proto(
                     start.retry_policy
                 )
@@ -447,7 +430,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.debug(
                         f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
                     )
-                    await temporalio.exceptions.apply_exception_to_failure(
+                    await temporalio.exceptions.encode_exception_to_failure(
                         err,
                         self._data_converter,
                         completion.result.failed.failure,
@@ -457,7 +440,7 @@ class _ActivityWorker:
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
-                    await temporalio.exceptions.apply_error_to_failure(
+                    await temporalio.exceptions.encode_error_to_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
                         self._data_converter,
@@ -467,7 +450,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.debug(
                         "Completing as failed", exc_info=True
                     )
-                    await temporalio.exceptions.apply_exception_to_failure(
+                    await temporalio.exceptions.encode_exception_to_failure(
                         err,
                         self._data_converter,
                         completion.result.failed.failure,
@@ -496,19 +479,11 @@ class _ActivityWorker:
                     )
 
             # Send task completion to core
-            del self._running_activities[task_token]
             logger.debug("Completing activity with completion: %s", completion)
             await self._bridge_worker().complete_activity_task(completion)
+            del self._running_activities[task_token]
         except Exception:
             temporalio.activity.logger.exception("Failed completing activity task")
-
-
-@dataclass
-class _ActivityDefinition:
-    name: str
-    fn: Callable[..., Any]
-    arg_types: Optional[List[Type]]
-    ret_type: Optional[Type]
 
 
 @dataclass
@@ -535,7 +510,7 @@ class _RunningActivity:
         if self.cancelled_event:
             self.cancelled_event.set()
         # We do not cancel the task of sync activities
-        if not self.sync and self.task:
+        if not self.sync and self.task and not self.done:
             # TODO(cretz): Check that Python >= 3.9 and set msg?
             self.task.cancel()
 

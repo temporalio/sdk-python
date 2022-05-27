@@ -433,7 +433,7 @@ async def test_activity_heartbeat_details_converter_fail(
     with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(client, worker, some_activity)
     assert str(assert_activity_application_error(err.value)).endswith(
-        "has no known converter"
+        "is not JSON serializable"
     )
 
 

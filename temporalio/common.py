@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -87,3 +87,16 @@ class QueryRejectCondition(IntEnum):
         temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY
     )
     """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY`."""
+
+
+# Should be set as the "arg" argument for _arg_or_args checks where the argument
+# is unset. This is different than None which is a legitimate argument.
+_arg_unset = object()
+
+
+def _arg_or_args(arg: Any, args: Iterable[Any]) -> Iterable[Any]:
+    if arg is not _arg_unset:
+        if args:
+            raise ValueError("Cannot have arg and args")
+        args = [arg]
+    return args

@@ -7,7 +7,7 @@ import concurrent.futures
 import itertools
 import logging
 from datetime import timedelta
-from typing import Callable, Iterable, List, Mapping, Optional, cast
+from typing import Callable, Iterable, List, Optional, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -26,6 +26,8 @@ import temporalio.workflow_service
 
 from .activity import SharedStateManager, _ActivityWorker
 from .interceptor import Interceptor
+from .workflow import _WorkflowWorker
+from .workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +45,12 @@ class Worker:
         *,
         task_queue: str,
         activities: Iterable[Callable] = [],
+        workflows: Iterable[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
+        workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         interceptors: Iterable[Interceptor] = [],
-        max_cached_workflows: int = 0,
+        max_cached_workflows: int = 1000,
         max_concurrent_workflow_tasks: int = 100,
         max_concurrent_activities: int = 100,
         max_concurrent_local_activities: int = 100,
@@ -70,10 +75,20 @@ class Worker:
             activities: Set of activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
+            workflows: Set of workflow classes decorated with
+                :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async. If
                 this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
                 all non-async activities must be picklable.
+            workflow_task_executor: Thread pool executor for workflow tasks. If
+                this is not present, a new
+                :py:class:`concurrent.futures.ThreadPoolExecutor` will be
+                created with ``max_workers`` set to ``max(os.cpu_count(), 4)``.
+                The default one will be properly shutdown, but if one is
+                provided, the caller is responsible for shutting it down after
+                the worker is shut down.
+            workflow_runner: Runner for workflows.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
@@ -119,9 +134,8 @@ class Worker:
                 :py:class:`concurrent.futures.ThreadPoolExecutor`. Reuse of
                 these across workers is encouraged.
         """
-        # TODO(cretz): Support workflows
-        if not activities:
-            raise ValueError("At least one activity must be specified")
+        if not activities and not workflows:
+            raise ValueError("At least one activity or workflow must be specified")
 
         # Prepend applicable client interceptors to the given ones
         client_config = client.config()
@@ -130,6 +144,12 @@ class Worker:
             [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
         )
         interceptors = itertools.chain(interceptors_from_client, interceptors)
+
+        # Instead of using the _type_lookup on the client, we create a separate
+        # one here so we can continue to only use the public API of the client
+        type_lookup = temporalio.converter._FunctionTypeLookup(
+            client_config["type_hint_eval_str"]
+        )
 
         # Extract the bridge workflow service. We try the service on the client
         # first, then we support a worker_workflow_service on the client's
@@ -158,7 +178,10 @@ class Worker:
             client=client,
             task_queue=task_queue,
             activities=activities,
+            workflows=workflows,
             activity_executor=activity_executor,
+            workflow_task_executor=workflow_task_executor,
+            workflow_runner=workflow_runner,
             interceptors=interceptors,
             max_cached_workflows=max_cached_workflows,
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
@@ -176,7 +199,7 @@ class Worker:
         )
         self._task: Optional[asyncio.Task] = None
 
-        # Create activity worker
+        # Create activity and workflow worker
         self._activity_worker: Optional[_ActivityWorker] = None
         if activities:
             self._activity_worker = _ActivityWorker(
@@ -185,9 +208,22 @@ class Worker:
                 activities=activities,
                 activity_executor=activity_executor,
                 shared_state_manager=shared_state_manager,
-                type_hint_eval_str=client_config["type_hint_eval_str"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
+                type_lookup=type_lookup,
+            )
+        self._workflow_worker: Optional[_WorkflowWorker] = None
+        if workflows:
+            self._workflow_worker = _WorkflowWorker(
+                bridge_worker=lambda: self._bridge_worker,
+                namespace=client.namespace,
+                task_queue=task_queue,
+                workflows=workflows,
+                workflow_task_executor=workflow_task_executor,
+                workflow_runner=workflow_runner,
+                data_converter=client_config["data_converter"],
+                interceptors=interceptors,
+                type_hint_eval_str=client_config["type_hint_eval_str"],
             )
 
         # Create bridge worker last. We have empirically observed that if it is
@@ -259,7 +295,8 @@ class Worker:
         worker_tasks: List[asyncio.Task] = []
         if self._activity_worker:
             worker_tasks.append(asyncio.create_task(self._activity_worker.run()))
-        # TODO(cretz): Support workflow worker
+        if self._workflow_worker:
+            worker_tasks.append(asyncio.create_task(self._workflow_worker.run()))
         self._task = asyncio.create_task(asyncio.wait(worker_tasks))
         return self._task
 
@@ -268,6 +305,8 @@ class Worker:
 
         This will initiate a shutdown and optionally wait for a grace period
         before sending cancels to all activities.
+
+        This worker should not be used in any way once this is called.
         """
         if not self._task:
             raise RuntimeError("Never started")
@@ -279,16 +318,13 @@ class Worker:
         bridge_shutdown_task = asyncio.create_task(self._bridge_worker.shutdown())
         # Wait for the poller loops to stop
         await self._task
-        # Shutdown the workers
-        worker_tasks: List[asyncio.Task] = []
+        # Shutdown the activity worker (there is no workflow worker shutdown)
         if self._activity_worker:
-            worker_tasks.append(
-                asyncio.create_task(self._activity_worker.shutdown(graceful_timeout))
-            )
-        # TODO(cretz): Support workflow worker
-        await asyncio.wait(worker_tasks)
+            await self._activity_worker.shutdown(graceful_timeout)
         # Wait for the bridge to report everything is completed
         await bridge_shutdown_task
+        # Do final shutdown
+        await self._bridge_worker.finalize_shutdown()
 
 
 class WorkerConfig(TypedDict, total=False):
@@ -297,7 +333,10 @@ class WorkerConfig(TypedDict, total=False):
     client: temporalio.client.Client
     task_queue: str
     activities: Iterable[Callable]
+    workflows: Iterable[Type]
     activity_executor: Optional[concurrent.futures.Executor]
+    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    workflow_runner: WorkflowRunner
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int
     max_concurrent_workflow_tasks: int

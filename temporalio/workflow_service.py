@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import socket
 import sys
@@ -25,6 +26,11 @@ WorkflowServiceRequest = TypeVar(
 WorkflowServiceResponse = TypeVar(
     "WorkflowServiceResponse", bound=google.protobuf.message.Message
 )
+
+logger = logging.getLogger(__name__)
+
+# Set to true to log all requests and responses
+LOG_PROTOS = False
 
 
 @dataclass
@@ -421,8 +427,14 @@ class _BridgeWorkflowService(WorkflowService):
         *,
         retry: bool = False,
     ) -> WorkflowServiceResponse:
+        global LOG_PROTOS
+        if LOG_PROTOS:
+            logger.debug("WorkflowService request to %s: %s", rpc, req)
         try:
-            return await self._bridge_client.rpc_call(rpc, req, resp_type, retry=retry)
+            resp = await self._bridge_client.rpc_call(rpc, req, resp_type, retry=retry)
+            if LOG_PROTOS:
+                logger.debug("WorkflowService response from %s: %s", rpc, resp)
+            return resp
         except temporalio.bridge.client.RPCError as err:
             # Intentionally swallowing the cause instead of using "from"
             status, message, details = err.args

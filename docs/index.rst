@@ -12,6 +12,7 @@ Modules
 
    temporalio.client
    temporalio.worker
+   temporalio.workflow
    temporalio.activity
    temporalio.converter
    temporalio.exceptions

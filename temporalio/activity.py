@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import inspect
 import logging
 import threading
 from dataclasses import dataclass
@@ -57,15 +58,8 @@ def defn(fn: Optional[ActivityFunc] = None, *, name: Optional[str] = None):
     """
 
     def with_name(name: str, fn: ActivityFunc) -> ActivityFunc:
-        # Validate the activity
-        if not callable(fn):
-            raise TypeError("Activity is not callable")
-        elif not fn.__code__:
-            raise TypeError("Activity callable missing __code__")
-        elif fn.__code__.co_kwonlyargcount:
-            raise TypeError("Activity cannot have keyword-only arguments")
-        # Set the name
-        setattr(fn, "__temporal_activity_name", name)
+        # This performs validation
+        _Definition._apply_to_callable(fn, name)
         return fn
 
     # If name option is available, return decorator function
@@ -320,7 +314,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     ) -> Tuple[Any, MutableMapping[str, Any]]:
         """Override to add activity details."""
         msg, kwargs = super().process(msg, kwargs)
-        if self.activity_info_on_extra or self.activity_info_on_extra:
+        if self.activity_info_on_message or self.activity_info_on_extra:
             context = _current_context.get(None)
             if context:
                 if self.activity_info_on_message:
@@ -342,3 +336,45 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 #: Logger that will have contextual activity details embedded.
 logger = LoggerAdapter(logging.getLogger(__name__), None)
+
+
+@dataclass
+class _Definition:
+    name: str
+    fn: Callable
+    is_async: bool
+
+    @staticmethod
+    def from_callable(fn: Callable) -> Optional[_Definition]:
+        return getattr(fn, "__temporal_activity_definition", None)
+
+    @staticmethod
+    def must_from_callable(fn: Callable) -> _Definition:
+        ret = _Definition.from_callable(fn)
+        if ret:
+            return ret
+        fn_name = getattr(fn, "__name__", "<unknown>")
+        raise TypeError(
+            f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
+        )
+
+    @staticmethod
+    def _apply_to_callable(fn: Callable, activity_name: str) -> None:
+        # Validate the activity
+        if hasattr(fn, "__temporal_activity_definition"):
+            raise ValueError("Function already contains activity definition")
+        elif not callable(fn):
+            raise TypeError("Activity is not callable")
+        elif not fn.__code__:
+            raise TypeError("Activity callable missing __code__")
+        elif fn.__code__.co_kwonlyargcount:
+            raise TypeError("Activity cannot have keyword-only arguments")
+        setattr(
+            fn,
+            "__temporal_activity_definition",
+            _Definition(
+                name=activity_name,
+                fn=fn,
+                is_async=inspect.iscoroutinefunction(fn),
+            ),
+        )
