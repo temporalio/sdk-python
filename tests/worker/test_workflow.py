@@ -139,25 +139,30 @@ async def test_workflow_signal_and_query(client: Client):
             task_queue=worker.task_queue,
         )
 
-        async def last_event() -> str:
-            return await handle.query(SignalAndQueryWorkflow.last_event)
-
         # Simple signals and queries
         await handle.signal(SignalAndQueryWorkflow.signal1, "some arg")
-        await assert_eq_eventually("signal1: some arg", last_event)
+        assert "signal1: some arg" == await handle.query(
+            SignalAndQueryWorkflow.last_event
+        )
 
         # Dynamic signals and queries
         await handle.signal("signal2", "dyn arg")
-        await assert_eq_eventually("signal_dynamic signal2: dyn arg", last_event)
+        assert "signal_dynamic signal2: dyn arg" == await handle.query(
+            SignalAndQueryWorkflow.last_event
+        )
         assert "query_dynamic query2: dyn arg" == await handle.query(
             "query2", "dyn arg"
         )
 
         # Custom named signals and queries
         await handle.signal("Custom Name", "custom arg1")
-        await assert_eq_eventually("signal_custom: custom arg1", last_event)
+        assert "signal_custom: custom arg1" == await handle.query(
+            SignalAndQueryWorkflow.last_event
+        )
         await handle.signal(SignalAndQueryWorkflow.signal_custom, "custom arg2")
-        await assert_eq_eventually("signal_custom: custom arg2", last_event)
+        assert "signal_custom: custom arg2" == await handle.query(
+            SignalAndQueryWorkflow.last_event
+        )
         assert "query_custom: custom arg1" == await handle.query(
             "Custom Name", "custom arg1"
         )
@@ -217,26 +222,31 @@ async def test_workflow_signal_and_query_handlers(client: Client):
             task_queue=worker.task_queue,
         )
 
-        async def last_event() -> str:
-            return await handle.query(SignalAndQueryHandlersWorkflow.last_event)
-
         # Confirm signals buffered when not found
         await handle.signal("unknown_signal1", "val1")
         await handle.signal(
             SignalAndQueryHandlersWorkflow.set_signal_handler, "unknown_signal1"
         )
-        await assert_eq_eventually("signal unknown_signal1: val1", last_event)
+        assert "signal unknown_signal1: val1" == await handle.query(
+            SignalAndQueryHandlersWorkflow.last_event
+        )
 
         # Normal signal handling
         await handle.signal("unknown_signal1", "val2")
-        await assert_eq_eventually("signal unknown_signal1: val2", last_event)
+        assert "signal unknown_signal1: val2" == await handle.query(
+            SignalAndQueryHandlersWorkflow.last_event
+        )
 
         # Dynamic signal handling buffered and new
         await handle.signal("unknown_signal2", "val3")
         await handle.signal(SignalAndQueryHandlersWorkflow.set_dynamic_signal_handler)
-        await assert_eq_eventually("signal dynamic unknown_signal2: val3", last_event)
+        assert "signal dynamic unknown_signal2: val3" == await handle.query(
+            SignalAndQueryHandlersWorkflow.last_event
+        )
         await handle.signal("unknown_signal3", "val4")
-        await assert_eq_eventually("signal dynamic unknown_signal3: val4", last_event)
+        assert "signal dynamic unknown_signal3: val4" == await handle.query(
+            SignalAndQueryHandlersWorkflow.last_event
+        )
 
         # Normal query handling
         await handle.signal(
@@ -435,6 +445,8 @@ async def test_workflow_cancel_activity(client: Client):
         )
         assert "Got cancelled error, cancelled? True" == result
 
+        # TODO(cretz): Test cancellation type ABANDON
+
 
 @activity.defn
 async def wait_local_cancel() -> str:
@@ -464,7 +476,6 @@ class CancelLocalActivityWorkflow:
         return await handle
 
 
-# # @pytest.mark.skip(reason="Make test to timeout WFT better")
 async def test_workflow_cancel_local_activity(client: Client):
     async with new_worker(
         client, CancelLocalActivityWorkflow, activities=[wait_local_cancel]
@@ -848,7 +859,7 @@ async def test_workflow_logging(client: Client):
 
             await handle.signal(LoggingWorkflow.my_signal, "signal 1")
             await handle.signal(LoggingWorkflow.my_signal, "signal 2")
-            await assert_eq_eventually("signal 2", last_event)
+            assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
 
         # Confirm two logs happened
         assert find_log("Signal: signal 1 ({'workflow_id':")
@@ -951,6 +962,7 @@ async def test_workflow_stack_trace(client: Client):
 # * Custom workflow runner that also confirms WorkflowInstanceDetails can be pickled
 # * Deadlock detection
 # * Non-query commands after workflow complete
+# * Query after workflow (succeed and fail)
 
 
 def new_worker(

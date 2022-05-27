@@ -339,9 +339,6 @@ class _WorkflowInstanceImpl(
         handle = self._pending_timers.pop(job.seq, None)
         if not handle:
             raise RuntimeError(f"Failed finding timer handle for sequence {job.seq}")
-        # Mark cancelled so the cancel() from things like asyncio.sleep() don't
-        # invoke _timer_handle_cancelled
-        handle._cancelled = True
         self._ready.append(handle)
 
     def _apply_query_workflow(
@@ -1013,7 +1010,7 @@ class _WorkflowInstanceImpl(
 
                 # Check conditions which may add to the ready list
                 self._conditions[:] = [
-                    t for t in self._conditions if not self._check_condition(t[0], t[1])
+                    t for t in self._conditions if not self._check_condition(*t)
                 ]
         finally:
             asyncio._set_running_loop(None)

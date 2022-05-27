@@ -68,9 +68,17 @@ def fix_generated_output(base_path: Path):
                 f.write(content)
     # Write init
     with (base_path / "__init__.py").open("w") as f:
+        # Imports
+        message_names = []
         for stem, messages in imports.items():
             for message in messages:
                 f.write(f"from .{stem} import {message}\n")
+                message_names.append(message)
+        # __all__
+        if message_names:
+            f.write(
+                f'\n__all__ = [\n    "' + '",\n    "'.join(message_names) + '",\n]\n'
+            )
 
 
 if __name__ == "__main__":
