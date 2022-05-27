@@ -213,8 +213,8 @@ class _WorkflowInstanceImpl(
         self._current_completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
-        self._current_completion.run_id = act.run_id
         self._current_completion.successful.SetInParent()
+        self._current_activation_error: Optional[Exception] = None
         self._time = act.timestamp.ToMicroseconds() / 1e6
         self._is_replaying = act.is_replaying
 
@@ -641,6 +641,15 @@ class _WorkflowInstanceImpl(
             return cast(Optional[Callable], defn)
         # Curry instance on the definition function since that represents an
         # unbound method
+        if inspect.iscoroutinefunction(defn.fn):
+            # We cannot use functools.partial here because in <= 3.7 that isn't
+            # considered an inspect.iscoroutinefunction
+            fn = cast(Callable[..., Awaitable[Any]], defn.fn)
+
+            async def with_object(*args, **kwargs) -> Any:
+                return await fn(self._object, *args, **kwargs)
+
+            return with_object
         return partial(defn.fn, self._object)
 
     def workflow_get_signal_handler(self, name: Optional[str]) -> Optional[Callable]:
@@ -650,6 +659,15 @@ class _WorkflowInstanceImpl(
             return cast(Optional[Callable], defn)
         # Curry instance on the definition function since that represents an
         # unbound method
+        if inspect.iscoroutinefunction(defn.fn):
+            # We cannot use functools.partial here because in <= 3.7 that isn't
+            # considered an inspect.iscoroutinefunction
+            fn = cast(Callable[..., Awaitable[Any]], defn.fn)
+
+            async def with_object(*args, **kwargs) -> Any:
+                return await fn(self._object, *args, **kwargs)
+
+            return with_object
         return partial(defn.fn, self._object)
 
     def workflow_info(self) -> temporalio.workflow.Info:
@@ -1008,6 +1026,11 @@ class _WorkflowInstanceImpl(
                     handle = self._ready.popleft()
                     handle._run()
 
+                    # Must throw here. Only really set inside
+                    # _run_top_level_workflow_function.
+                    if self._current_activation_error:
+                        raise self._current_activation_error
+
                 # Check conditions which may add to the ready list
                 self._conditions[:] = [
                     t for t in self._conditions if not self._check_condition(*t)
@@ -1018,8 +1041,6 @@ class _WorkflowInstanceImpl(
     # This is used for the primary workflow function and signal handlers in
     # order to apply common exception handling to each
     async def _run_top_level_workflow_function(self, coro: Awaitable[None]) -> None:
-        # We intentionally don't catch all errors, instead we bubble those
-        # out as task failures
         try:
             await coro
         except _ContinueAsNewError as err:
@@ -1048,6 +1069,8 @@ class _WorkflowInstanceImpl(
                 self._payload_converter,
                 command.fail_workflow_execution.failure,
             )
+        except Exception as err:
+            self._current_activation_error = err
 
     async def _signal_external_workflow(
         self,
@@ -1514,10 +1537,14 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._result_fut.set_result(result)
 
     def _resolve_failure(self, err: Exception) -> None:
-        if not self._start_fut.done():
+        if self._start_fut.done():
+            # We intentionally let this error if already done
+            self._result_fut.set_exception(err)
+        else:
             self._start_fut.set_exception(err)
-        # We intentionally let this error if already done
-        self._result_fut.set_exception(err)
+            # Set the result as none to avoid Python warning about unhandled
+            # future
+            self._result_fut.set_result(None)
 
     def _apply_start_command(
         self,

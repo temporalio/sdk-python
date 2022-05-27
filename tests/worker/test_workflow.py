@@ -6,6 +6,7 @@ import logging.handlers
 import queue
 import time
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import (
@@ -22,13 +23,23 @@ from typing import (
 )
 
 import pytest
+from typing_extensions import Protocol, runtime_checkable
 
 import temporalio.api.common.v1
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
+from temporalio.common import RetryPolicy
 from temporalio.converter import DataConverter, PayloadCodec
-from temporalio.exceptions import ActivityError, CancelledError, ChildWorkflowError
+from temporalio.exceptions import (
+    ActivityError,
+    ApplicationError,
+    CancelledError,
+    ChildWorkflowError,
+    TimeoutError,
+    WorkflowAlreadyStartedError,
+)
 from temporalio.worker import Worker
+from temporalio.workflow_service import RPCError, RPCStatusCode
 
 
 @workflow.defn
@@ -391,119 +402,144 @@ async def test_workflow_simple_local_activity(client: Client):
         assert result == "Hello, Temporal!"
 
 
+wait_cancel_complete: asyncio.Event
+
+
 @activity.defn
 async def wait_cancel() -> str:
+    global wait_cancel_complete
+    wait_cancel_complete.clear()
     try:
-        while True:
-            await asyncio.sleep(0.3)
-            activity.heartbeat()
+        if activity.info().is_local:
+            await asyncio.sleep(1000)
+        else:
+            while True:
+                await asyncio.sleep(0.3)
+                activity.heartbeat()
+        return "Manually stopped"
     except asyncio.CancelledError:
         return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
+    finally:
+        wait_cancel_complete.set()
+
+
+@dataclass
+class CancelActivityWorkflowParams:
+    cancellation_type: str
+    local: bool
 
 
 @workflow.defn
 class CancelActivityWorkflow:
+    def __init__(self) -> None:
+        self._activity_result = "<none>"
+
     @workflow.run
-    async def run(self, wait_for_cancel: bool) -> str:
-        cancellation_type = workflow.ActivityCancellationType.TRY_CANCEL
-        if wait_for_cancel:
-            cancellation_type = (
-                workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+    async def run(self, params: CancelActivityWorkflowParams) -> None:
+        if params.local:
+            handle = workflow.start_local_activity(
+                wait_cancel,
+                schedule_to_close_timeout=timedelta(seconds=5),
+                cancellation_type=workflow.ActivityCancellationType[
+                    params.cancellation_type
+                ],
             )
-        handle = workflow.start_activity(
-            wait_cancel,
-            schedule_to_close_timeout=timedelta(seconds=5),
-            heartbeat_timeout=timedelta(seconds=1),
-            cancellation_type=cancellation_type,
-        )
+        else:
+            handle = workflow.start_activity(
+                wait_cancel,
+                schedule_to_close_timeout=timedelta(seconds=5),
+                heartbeat_timeout=timedelta(seconds=1),
+                cancellation_type=workflow.ActivityCancellationType[
+                    params.cancellation_type
+                ],
+            )
         await asyncio.sleep(0.01)
-        handle.cancel()
-        return await handle
+        try:
+            handle.cancel()
+            self._activity_result = await handle
+        except ActivityError as err:
+            self._activity_result = f"Error: {err.cause.__class__.__name__}"
+        # TODO(cretz): Remove when https://github.com/temporalio/sdk-core/issues/323 is fixed
+        except CancelledError as err:
+            self._activity_result = f"Error: {err.__class__.__name__}"
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.query
+    def activity_result(self) -> str:
+        return self._activity_result
 
 
-async def test_workflow_cancel_activity(client: Client):
+@pytest.mark.parametrize("local", [True, False])
+async def test_workflow_cancel_activity(client: Client, local: bool):
+    global wait_cancel_complete
+    wait_cancel_complete = asyncio.Event()
+    # Need short task timeout to timeout LA task and longer assert timeout
+    # so the task can timeout
+    task_timeout = timedelta(seconds=1)
+    assert_timeout = timedelta(seconds=10)
+
     async with new_worker(
         client, CancelActivityWorkflow, activities=[wait_cancel]
     ) as worker:
-        # Do not wait for cancel
-        with pytest.raises(WorkflowFailureError) as err:
-            await client.execute_workflow(
-                CancelActivityWorkflow.run,
-                False,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
-        assert isinstance(err.value.cause, ActivityError)
-        assert isinstance(err.value.cause.cause, CancelledError)
-
-        # Wait for cancel
-        result = await client.execute_workflow(
+        # Try cancel - confirm error and activity was sent the cancel
+        handle = await client.start_workflow(
             CancelActivityWorkflow.run,
-            True,
+            CancelActivityWorkflowParams(
+                cancellation_type=workflow.ActivityCancellationType.TRY_CANCEL.name,
+                local=local,
+            ),
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            task_timeout=task_timeout,
         )
-        assert "Got cancelled error, cancelled? True" == result
 
-        # TODO(cretz): Test cancellation type ABANDON
+        async def activity_result() -> str:
+            return await handle.query(CancelActivityWorkflow.activity_result)
 
-
-@activity.defn
-async def wait_local_cancel() -> str:
-    try:
-        await asyncio.sleep(1000)
-        raise RuntimeError("Should not get here")
-    except asyncio.CancelledError:
-        return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
-
-
-@workflow.defn
-class CancelLocalActivityWorkflow:
-    @workflow.run
-    async def run(self, wait_for_cancel: bool) -> str:
-        cancellation_type = workflow.ActivityCancellationType.TRY_CANCEL
-        if wait_for_cancel:
-            cancellation_type = (
-                workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
-            )
-        handle = workflow.start_local_activity(
-            wait_local_cancel,
-            schedule_to_close_timeout=timedelta(seconds=5),
-            cancellation_type=cancellation_type,
+        await assert_eq_eventually(
+            "Error: CancelledError", activity_result, timeout=assert_timeout
         )
-        await asyncio.sleep(0.01)
-        handle.cancel()
-        return await handle
+        await wait_cancel_complete.wait()
+        await handle.cancel()
 
-
-async def test_workflow_cancel_local_activity(client: Client):
-    async with new_worker(
-        client, CancelLocalActivityWorkflow, activities=[wait_local_cancel]
-    ) as worker:
-        # Do not wait for cancel
-        with pytest.raises(WorkflowFailureError) as err:
-            await client.execute_workflow(
-                CancelLocalActivityWorkflow.run,
-                False,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                # This has to be low to timeout the LA task
-                task_timeout=timedelta(seconds=1),
-            )
-        # TODO(cretz): Fix when https://github.com/temporalio/sdk-core/issues/323 is fixed
-        # assert isinstance(err.value.cause, ActivityError)
-        assert isinstance(err.value.cause, CancelledError)
-
-        # Wait for cancel
-        result = await client.execute_workflow(
-            CancelLocalActivityWorkflow.run,
-            True,
+        # Wait cancel - confirm no error due to graceful cancel handling
+        handle = await client.start_workflow(
+            CancelActivityWorkflow.run,
+            CancelActivityWorkflowParams(
+                cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED.name,
+                local=local,
+            ),
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            # This has to be low to timeout the LA task
-            task_timeout=timedelta(seconds=1),
+            task_timeout=task_timeout,
         )
-        assert "Got cancelled error, cancelled? True" == result
+        await assert_eq_eventually(
+            "Got cancelled error, cancelled? True",
+            activity_result,
+            timeout=assert_timeout,
+        )
+        await wait_cancel_complete.wait()
+        await handle.cancel()
+
+        # Abandon - confirm error and that activity stays running
+        handle = await client.start_workflow(
+            CancelActivityWorkflow.run,
+            CancelActivityWorkflowParams(
+                cancellation_type=workflow.ActivityCancellationType.ABANDON.name,
+                local=local,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=task_timeout,
+        )
+        await assert_eq_eventually(
+            "Error: CancelledError", activity_result, timeout=assert_timeout
+        )
+        await asyncio.sleep(0.5)
+        assert not wait_cancel_complete.is_set()
+        await handle.cancel()
+        await wait_cancel_complete.wait()
 
 
 @dataclass
@@ -753,6 +789,31 @@ async def test_workflow_cancel_multi(client: Client):
         ]
 
 
+@workflow.defn
+class ActivityTimeoutWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            wait_cancel,
+            start_to_close_timeout=timedelta(milliseconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+
+async def test_workflow_activity_timeout(client: Client):
+    async with new_worker(
+        client, ActivityTimeoutWorkflow, activities=[wait_cancel]
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                ActivityTimeoutWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, TimeoutError)
+
+
 # Just serializes in a "payloads" wrapper
 class SimpleCodec(PayloadCodec):
     async def encode(
@@ -942,15 +1003,252 @@ async def test_workflow_stack_trace(client: Client):
         assert "never_completing_coroutine" in trace
 
 
+@dataclass
+class MyDataClass:
+    field1: str
+
+    def assert_expected(self) -> None:
+        # Part of the assertion is that this is the right type, which is
+        # confirmed just by calling the method. We also check the field.
+        assert self.field1 == "some value"
+
+
+@activity.defn
+async def data_class_typed_activity(param: MyDataClass) -> MyDataClass:
+    param.assert_expected()
+    return param
+
+
+@runtime_checkable
+@workflow.defn(name="DataClassTypedWorkflow")
+class DataClassTypedWorkflowProto(Protocol):
+    @workflow.run
+    async def run(self, arg: MyDataClass) -> MyDataClass:
+        ...
+
+    @workflow.signal
+    def signal_sync(self, param: MyDataClass) -> None:
+        ...
+
+    @workflow.query
+    def query_sync(self, param: MyDataClass) -> MyDataClass:
+        ...
+
+    @workflow.signal
+    def complete(self) -> None:
+        ...
+
+
+@workflow.defn(name="DataClassTypedWorkflow")
+class DataClassTypedWorkflowAbstract(ABC):
+    @workflow.run
+    @abstractmethod
+    async def run(self, arg: MyDataClass) -> MyDataClass:
+        ...
+
+    @workflow.signal
+    @abstractmethod
+    def signal_sync(self, param: MyDataClass) -> None:
+        ...
+
+    @workflow.query
+    @abstractmethod
+    def query_sync(self, param: MyDataClass) -> MyDataClass:
+        ...
+
+    @workflow.signal
+    @abstractmethod
+    def complete(self) -> None:
+        ...
+
+
+@workflow.defn
+class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
+    def __init__(self) -> None:
+        self._should_complete = asyncio.Event()
+
+    @workflow.run
+    async def run(self, param: MyDataClass) -> MyDataClass:
+        param.assert_expected()
+        # Only do activities and child workflows on top level
+        if not workflow.info().parent:
+            param = await workflow.execute_activity(
+                data_class_typed_activity,
+                param,
+                schedule_to_close_timeout=timedelta(seconds=2),
+            )
+            param.assert_expected()
+            param = await workflow.execute_local_activity(
+                data_class_typed_activity,
+                param,
+                schedule_to_close_timeout=timedelta(seconds=2),
+            )
+            param.assert_expected()
+            child_handle = await workflow.start_child_workflow(
+                DataClassTypedWorkflow.run,
+                param,
+                id=f"{workflow.info().workflow_id}_child",
+            )
+            await child_handle.signal(DataClassTypedWorkflow.signal_sync, param)
+            await child_handle.signal(DataClassTypedWorkflow.signal_async, param)
+            await child_handle.signal(DataClassTypedWorkflow.complete)
+            param = await child_handle
+            param.assert_expected()
+        await self._should_complete.wait()
+        return param
+
+    @workflow.signal
+    def signal_sync(self, param: MyDataClass) -> None:
+        param.assert_expected()
+
+    @workflow.signal
+    async def signal_async(self, param: MyDataClass) -> None:
+        param.assert_expected()
+
+    @workflow.query
+    def query_sync(self, param: MyDataClass) -> MyDataClass:
+        param.assert_expected()
+        return param
+
+    @workflow.query
+    async def query_async(self, param: MyDataClass) -> MyDataClass:
+        return param
+
+    @workflow.signal
+    def complete(self) -> None:
+        self._should_complete.set()
+
+
+async def test_workflow_dataclass_typed(client: Client):
+    async with new_worker(
+        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+    ) as worker:
+        val = MyDataClass(field1="some value")
+        handle = await client.start_workflow(
+            DataClassTypedWorkflow.run,
+            val,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(DataClassTypedWorkflow.signal_sync, val)
+        await handle.signal(DataClassTypedWorkflow.signal_async, val)
+        (await handle.query(DataClassTypedWorkflow.query_sync, val)).assert_expected()
+        # TODO(cretz): Why does MyPy need this annotated?
+        query_result: MyDataClass = await handle.query(
+            DataClassTypedWorkflow.query_async, val
+        )
+        query_result.assert_expected()
+        await handle.signal(DataClassTypedWorkflow.complete)
+        (await handle.result()).assert_expected()
+
+
+async def test_workflow_separate_protocol(client: Client):
+    # This test is to confirm that protocols can be used as "interfaces" for
+    # when the workflow impl is absent
+    async with new_worker(
+        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+    ) as worker:
+        # Our decorators add attributes on the class, but protocols don't allow
+        # you to use issubclass with any attributes other than their fixed ones.
+        # We are asserting that this invariant holds so we can document it and
+        # revisit in a later version if they change this.
+        # TODO(cretz): If we document how to use protocols as workflow
+        # interfaces/contracts, we should mention that they can't use
+        # @runtime_checkable with issubclass.
+        with pytest.raises(TypeError) as err:
+            assert issubclass(DataClassTypedWorkflow, DataClassTypedWorkflowProto)
+        assert "non-method members" in str(err.value)
+
+        assert isinstance(DataClassTypedWorkflow(), DataClassTypedWorkflowProto)
+        val = MyDataClass(field1="some value")
+        handle = await client.start_workflow(
+            DataClassTypedWorkflowProto.run,
+            val,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(DataClassTypedWorkflowProto.signal_sync, val)
+        (
+            await handle.query(DataClassTypedWorkflowProto.query_sync, val)
+        ).assert_expected()
+        await handle.signal(DataClassTypedWorkflowProto.complete)
+        (await handle.result()).assert_expected()
+
+
+async def test_workflow_separate_abstract(client: Client):
+    # This test is to confirm that abstract classes can be used as "interfaces"
+    # for when the workflow impl is absent
+    async with new_worker(
+        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+    ) as worker:
+        assert issubclass(DataClassTypedWorkflow, DataClassTypedWorkflowAbstract)
+        val = MyDataClass(field1="some value")
+        handle = await client.start_workflow(
+            DataClassTypedWorkflowAbstract.run,
+            val,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(DataClassTypedWorkflowAbstract.signal_sync, val)
+        (
+            await handle.query(DataClassTypedWorkflowAbstract.query_sync, val)
+        ).assert_expected()
+        await handle.signal(DataClassTypedWorkflowAbstract.complete)
+        (await handle.result()).assert_expected()
+
+
+async def test_workflow_already_started(client: Client):
+    async with new_worker(client, LongSleepWorkflow) as worker:
+        id = f"workflow-{uuid.uuid4()}"
+        # Try to start it twice
+        with pytest.raises(RPCError) as err:
+            await client.start_workflow(
+                LongSleepWorkflow.run,
+                id=id,
+                task_queue=worker.task_queue,
+            )
+            await client.start_workflow(
+                LongSleepWorkflow.run,
+                id=id,
+                task_queue=worker.task_queue,
+            )
+        assert err.value.status == RPCStatusCode.ALREADY_EXISTS
+
+
+@workflow.defn
+class ChildAlreadyStartedWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Try to start it twice
+        id = f"{workflow.info().workflow_id}_child"
+        await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
+        # TODO(cretz): If we just let this throw, it is a WFT failure and not a
+        # workflow failure since WorkflowAlreadyStartedError isn't a "failure
+        # error". Is this ok?
+        try:
+            await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
+        except WorkflowAlreadyStartedError:
+            raise ApplicationError("Already started")
+
+
+async def test_workflow_child_already_started(client: Client):
+    async with new_worker(
+        client, ChildAlreadyStartedWorkflow, LongSleepWorkflow
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                ChildAlreadyStartedWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.message == "Already started"
+
+
 # TODO:
-# * Activity timeout behavior
-# * Data class params and return types
-# * Separate protocol and impl
-# * Separate ABC and impl
-# * Workflow execution already started error (from client _and_ child workflow)
 # * Use typed dicts for activity, local activity, and child workflow configs
 # * Local activity invalid options
-# * Local activity backoff
+# * Local activity backoff (and cancel during backoff)
 # * Cancelling things whose commands haven't been sent
 # * Starting something on an already-cancelled cancelled task
 # * Cancel unstarted child
@@ -963,6 +1261,7 @@ async def test_workflow_stack_trace(client: Client):
 # * Deadlock detection
 # * Non-query commands after workflow complete
 # * Query after workflow (succeed and fail)
+# * More workflow info data
 
 
 def new_worker(

@@ -571,14 +571,16 @@ class DataConverter:
         return temporalio.api.common.v1.Payloads(payloads=(await self.encode(values)))
 
     async def decode_wrapper(
-        self, payloads: Optional[temporalio.api.common.v1.Payloads]
+        self,
+        payloads: Optional[temporalio.api.common.v1.Payloads],
+        type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """:py:meth:`decode` for the
         :py:class:`temporalio.api.common.v1.Payloads` wrapper.
         """
         if not payloads or not payloads.payloads:
             return []
-        return await self.decode(payloads.payloads)
+        return await self.decode(payloads.payloads, type_hints)
 
 
 _default: Optional[DataConverter] = None

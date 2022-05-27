@@ -265,6 +265,7 @@ class Info:
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
     namespace: str
+    parent: Optional[ParentInfo]
     run_id: str
     run_timeout: Optional[timedelta]
     start_time: datetime
@@ -274,9 +275,6 @@ class Info:
     workflow_type: str
 
     # TODO(cretz): memo
-    # TODO(cretz): parent_namespace
-    # TODO(cretz): parent_run_id
-    # TODO(cretz): parent_workflow_id
     # TODO(cretz): retry_policy
     # TODO(cretz): search_attributes
 
@@ -286,6 +284,15 @@ class Info:
             "workflow_type": self.workflow_type,
             # TODO(cretz): more
         }
+
+
+@dataclass(frozen=True)
+class ParentInfo:
+    """Information about the parent workflow."""
+
+    namespace: str
+    run_id: str
+    workflow_id: str
 
 
 class _Runtime(ABC):
@@ -548,7 +555,11 @@ class _Definition:
 
     @staticmethod
     def from_class(cls: Type) -> Optional[_Definition]:
-        return getattr(cls, "__temporal_workflow_definition", None)
+        # We make sure to only return it if it's on _this_ class
+        defn = getattr(cls, "__temporal_workflow_definition", None)
+        if defn and defn.cls == cls:
+            return defn
+        return None
 
     @staticmethod
     def must_from_class(cls: Type) -> _Definition:
@@ -576,7 +587,8 @@ class _Definition:
 
     @staticmethod
     def _apply_to_class(cls: Type, workflow_name: str) -> None:
-        if hasattr(cls, "__temporal_workflow_definition"):
+        # Check it's not being doubly applied
+        if _Definition.from_class(cls):
             raise ValueError("Class already contains workflow definition")
         issues: List[str] = []
 

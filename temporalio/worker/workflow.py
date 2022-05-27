@@ -53,7 +53,6 @@ class _WorkflowWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
         type_hint_eval_str: bool,
-        max_concurrent_workflow_tasks: int,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -182,6 +181,9 @@ class _WorkflowWorker:
                     f"Failed converting activation exception: {inner_err}"
                 )
 
+        # Always set the run ID on the completion
+        completion.run_id = act.run_id
+
         # Encode the completion if there's a codec
         if self._data_converter.payload_codec:
             try:
@@ -234,6 +236,13 @@ class _WorkflowWorker:
 
         # Build info
         start = start_job.start_workflow
+        parent: Optional[temporalio.workflow.ParentInfo] = None
+        if start.HasField("parent_workflow_info"):
+            parent = temporalio.workflow.ParentInfo(
+                namespace=start.parent_workflow_info.namespace,
+                run_id=start.parent_workflow_info.run_id,
+                workflow_id=start.parent_workflow_info.workflow_id,
+            )
         info = temporalio.workflow.Info(
             attempt=start.attempt,
             continued_run_id=start.continued_from_execution_run_id or None,
@@ -242,6 +251,7 @@ class _WorkflowWorker:
             if start.HasField("workflow_execution_timeout")
             else None,
             namespace=self._namespace,
+            parent=parent,
             run_id=act.run_id,
             run_timeout=start.workflow_run_timeout.ToTimedelta()
             if start.HasField("workflow_run_timeout")

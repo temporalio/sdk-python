@@ -347,14 +347,13 @@ class Client:
         """
         # Use definition if callable
         name: str
-        arg_types: Optional[List[Type]] = None
         ret_type: Optional[Type] = None
         if isinstance(workflow, str):
             name = workflow
         elif callable(workflow):
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
             name = defn.name
-            arg_types, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
+            _, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
         else:
             raise TypeError("Workflow must be a string or callable")
 
@@ -375,7 +374,6 @@ class Client:
                 header=header,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
-                arg_types=arg_types,
                 ret_type=ret_type,
             )
         )
@@ -646,6 +644,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         run_id: Optional[str] = None,
         result_run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
+        result_type: Optional[Type] = None,
     ) -> None:
         """Create workflow handle."""
         self._client = client
@@ -653,6 +652,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         self._run_id = run_id
         self._result_run_id = result_run_id
         self._first_execution_run_id = first_execution_run_id
+        self._result_type = result_type
 
     @property
     def id(self) -> str:
@@ -754,9 +754,10 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     req.next_page_token = b""
                     continue
                 # Ignoring anything after the first response like TypeScript
-                # TODO(cretz): Support type hints
+                type_hints = [self._result_type] if self._result_type else None
                 results = await self._client.data_converter.decode_wrapper(
-                    complete_attr.result
+                    complete_attr.result,
+                    type_hints,
                 )
                 if not results:
                     return cast(WorkflowReturnType, None)
@@ -969,6 +970,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
             RPCError: Workflow details could not be fetched.
         """
         query_name: str
+        ret_type: Optional[Type] = None
         if callable(query):
             defn = temporalio.workflow._QueryDefinition.from_fn(query)
             if not defn:
@@ -980,6 +982,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                 raise RuntimeError("Cannot invoke dynamic query definition")
             # TODO(cretz): Check count/type of args at runtime?
             query_name = defn.name
+            _, ret_type = self._client._type_lookup.get_type_hints(defn.fn)
         else:
             query_name = str(query)
 
@@ -991,6 +994,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                 args=temporalio.common._arg_or_args(arg, args),
                 reject_condition=reject_condition
                 or self._client._config["default_workflow_query_reject_condition"],
+                ret_type=ret_type,
             )
         )
 
@@ -1245,8 +1249,7 @@ class StartWorkflowInput:
     header: Optional[Mapping[str, Any]]
     start_signal: Optional[str]
     start_signal_args: Iterable[Any]
-    # The types may be absent
-    arg_types: Optional[List[Type]]
+    # Type may be absent
     ret_type: Optional[Type]
 
 
@@ -1268,6 +1271,8 @@ class QueryWorkflowInput:
     query: str
     args: Iterable[Any]
     reject_condition: Optional[temporalio.common.QueryRejectCondition]
+    # Type may be absent
+    ret_type: Optional[Type]
 
 
 @dataclass
@@ -1429,6 +1434,7 @@ class _ClientImpl(OutboundInterceptor):
             req.workflow_id,
             result_run_id=resp.run_id,
             first_execution_run_id=first_execution_run_id,
+            result_type=input.ret_type,
         )
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
@@ -1474,7 +1480,10 @@ class _ClientImpl(OutboundInterceptor):
             )
         if not resp.query_result.payloads:
             return None
-        results = await self._client.data_converter.decode(resp.query_result.payloads)
+        type_hints = [input.ret_type] if input.ret_type else None
+        results = await self._client.data_converter.decode(
+            resp.query_result.payloads, type_hints
+        )
         if not results:
             return None
         elif len(results) > 1:

@@ -356,7 +356,7 @@ class _ActivityWorker:
                 heartbeat_timeout=start.heartbeat_timeout.ToTimedelta()
                 if start.HasField("heartbeat_timeout")
                 else None,
-                is_local=False,
+                is_local=start.is_local,
                 retry_policy=temporalio.bridge.worker.retry_policy_from_proto(
                     start.retry_policy
                 )

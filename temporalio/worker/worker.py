@@ -224,7 +224,6 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 type_hint_eval_str=client_config["type_hint_eval_str"],
-                max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             )
 
         # Create bridge worker last. We have empirically observed that if it is
