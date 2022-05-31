@@ -1,7 +1,9 @@
+use parking_lot::RwLock;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3_asyncio::tokio::future_into_py;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 use temporal_client::{
     ClientOptions, ClientOptionsBuilder, ConfiguredClient, RetryClient, RetryConfig, TlsConfig,
@@ -51,12 +53,20 @@ struct ClientRetryConfig {
 
 pub fn connect_client(py: Python, config: ClientConfig) -> PyResult<&PyAny> {
     // TODO(cretz): Add metrics_meter?
+    let headers = if config.static_headers.is_empty() {
+        None
+    } else {
+        Some(Arc::new(RwLock::new(config.static_headers.clone())))
+    };
     let opts: ClientOptions = config.try_into()?;
     future_into_py(py, async move {
         Ok(ClientRef {
-            retry_client: opts.connect_no_namespace(None).await.map_err(|err| {
-                PyRuntimeError::new_err(format!("Failed client connect: {}", err))
-            })?,
+            retry_client: opts
+                .connect_no_namespace(None, headers)
+                .await
+                .map_err(|err| {
+                    PyRuntimeError::new_err(format!("Failed client connect: {}", err))
+                })?,
         })
     })
 }
@@ -96,9 +106,14 @@ impl ClientRef {
                 "get_search_attributes" => {
                     rpc_call!(retry_client, retry, get_search_attributes, req)
                 }
+                "get_system_info" => rpc_call!(retry_client, retry, get_system_info, req),
                 "get_workflow_execution_history" => {
                     rpc_call!(retry_client, retry, get_workflow_execution_history, req)
                 }
+                // TODO(cretz): Fix when https://github.com/temporalio/sdk-core/issues/335 fixed
+                // "get_workflow_execution_history_reverse" => {
+                //     rpc_call!(retry_client, retry, get_workflow_execution_history_reverse, req)
+                // }
                 "list_archived_workflow_executions" => {
                     rpc_call!(retry_client, retry, list_archived_workflow_executions, req)
                 }
@@ -238,7 +253,6 @@ impl TryFrom<ClientConfig> for ClientOptions {
             )
             .client_name(opts.client_name)
             .client_version(opts.client_version)
-            .static_headers(opts.static_headers)
             .identity(opts.identity)
             .worker_binary_id(opts.worker_binary_id)
             .retry_config(

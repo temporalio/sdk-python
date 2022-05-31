@@ -1,8 +1,10 @@
 """Telemetry for SDK Core."""
 
+from __future__ import annotations
+
 import warnings
 from dataclasses import dataclass
-from typing import Optional
+from typing import Mapping, Optional
 
 import temporalio.bridge.temporal_sdk_bridge
 
@@ -11,10 +13,27 @@ import temporalio.bridge.temporal_sdk_bridge
 class TelemetryConfig:
     """Python representation of the Rust struct for configuring telemetry."""
 
-    otel_collector_url: Optional[str] = None
     tracing_filter: Optional[str] = None
+    otel_tracing: Optional[OtelCollectorConfig] = None
+    log_console: bool = False
     log_forwarding_level: Optional[str] = None
-    prometheus_export_bind_address: Optional[str] = None
+    otel_metrics: Optional[OtelCollectorConfig] = None
+    prometheus_metrics: Optional[PrometheusMetricsConfig] = None
+
+
+@dataclass
+class OtelCollectorConfig:
+    """Python representation of the Rust struct for configuring OTel."""
+
+    url: str
+    headers: Mapping[str, str]
+
+
+@dataclass
+class PrometheusMetricsConfig:
+    """Python representation of the Rust struct for configuring Prometheus."""
+
+    bind_address: str
 
 
 _inited = False

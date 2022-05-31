@@ -171,11 +171,22 @@ class WorkflowService(ABC):
             wsv1.GetSearchAttributesRequest,
             wsv1.GetSearchAttributesResponse,
         )
+        self.get_system_info = self._new_call(
+            "get_system_info",
+            wsv1.GetSystemInfoRequest,
+            wsv1.GetSystemInfoResponse,
+        )
         self.get_workflow_execution_history = self._new_call(
             "get_workflow_execution_history",
             wsv1.GetWorkflowExecutionHistoryRequest,
             wsv1.GetWorkflowExecutionHistoryResponse,
         )
+        # TODO(cretz): Fix when https://github.com/temporalio/sdk-core/issues/335 fixed
+        # self.get_workflow_execution_history_reverse = self._new_call(
+        #     "get_workflow_execution_history_reverse",
+        #     wsv1.GetWorkflowExecutionHistoryReverseRequest,
+        #     wsv1.GetWorkflowExecutionHistoryReverseResponse,
+        # )
         self.list_archived_workflow_executions = self._new_call(
             "list_archived_workflow_executions",
             wsv1.ListArchivedWorkflowExecutionsRequest,

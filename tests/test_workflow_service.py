@@ -27,8 +27,8 @@ def test_all_grpc_calls_present(client: Client):
     # Collect gRPC service calls with a fake channel
     channel = CallCollectingChannel()
     temporalio.api.workflowservice.v1.WorkflowServiceStub(channel)
-    # TODO(cretz): Remove once get_system_info is in core
-    del channel.calls["get_system_info"]
+    # TODO(cretz): Remove once https://github.com/temporalio/sdk-core/issues/335 fixed
+    del channel.calls["get_workflow_execution_history_reverse"]
 
     assert channel.calls == workflow_service_calls
 
