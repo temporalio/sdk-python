@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import dataclasses
 import inspect
 import logging
 import threading
@@ -346,7 +347,14 @@ class _Definition:
 
     @staticmethod
     def from_callable(fn: Callable) -> Optional[_Definition]:
-        return getattr(fn, "__temporal_activity_definition", None)
+        defn = getattr(fn, "__temporal_activity_definition", None)
+        if isinstance(defn, _Definition):
+            # We have to replace the function with the given callable here
+            # because the one passed in may be a method or some other partial
+            # that represents the real callable instead of what the decorator
+            # used.
+            defn = dataclasses.replace(defn, fn=fn)
+        return defn
 
     @staticmethod
     def must_from_callable(fn: Callable) -> _Definition:

@@ -417,7 +417,11 @@ class _ActivityWorker:
                 completion.result.completed.result.CopyFrom(
                     temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
                 )
-        except (Exception, asyncio.CancelledError) as err:
+        except (
+            Exception,
+            asyncio.CancelledError,
+            temporalio.activity._CompleteAsyncError,
+        ) as err:
             try:
                 if isinstance(err, temporalio.activity._CompleteAsyncError):
                     temporalio.activity.logger.debug("Completing asynchronously")
