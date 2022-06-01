@@ -13,7 +13,12 @@ from typing import Any, Callable, Iterable, List, Optional, Tuple
 import pytest
 
 from temporalio import activity
-from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.client import (
+    AsyncActivityHandle,
+    Client,
+    WorkflowFailureError,
+    WorkflowHandle,
+)
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -748,6 +753,105 @@ async def test_activity_interceptor(client: Client, worker: ExternalWorker):
     assert traces["activity.inbound.execute_activity"].args[0] == "Temporal"
     assert "activity.outbound.info" in traces
     assert traces["activity.outbound.heartbeat"][0] == "some details!"
+
+
+class AsyncActivityWrapper:
+    def __init__(self) -> None:
+        self._info: Optional[activity.Info] = None
+        self._info_set = asyncio.Event()
+
+    @activity.defn
+    async def run(self) -> str:
+        self._info = activity.info()
+        self._info_set.set()
+        activity.raise_complete_async()
+
+    async def wait_info(self) -> activity.Info:
+        await asyncio.wait_for(self._info_set.wait(), timeout=3)
+        self._info_set.clear()
+        assert self._info
+        return self._info
+
+    def async_handle(self, client: Client, use_task_token: bool) -> AsyncActivityHandle:
+        assert self._info
+        if use_task_token:
+            return client.get_async_activity_handle(task_token=self._info.task_token)
+        return client.get_async_activity_handle(
+            workflow_id=self._info.workflow_id,
+            run_id=self._info.workflow_run_id,
+            activity_id=self._info.activity_id,
+        )
+
+
+@pytest.mark.parametrize("use_task_token", [True, False])
+async def test_activity_async_success(
+    client: Client, worker: ExternalWorker, use_task_token: bool
+):
+    wrapper = AsyncActivityWrapper()
+    # Start task, wait for info, complete with value, wait on workflow
+    task = asyncio.create_task(
+        _execute_workflow_with_activity(client, worker, wrapper.run)
+    )
+    await wrapper.wait_info()
+    await wrapper.async_handle(client, use_task_token).complete("some value")
+    assert "some value" == (await task).result
+
+
+@pytest.mark.parametrize("use_task_token", [True, False])
+async def test_activity_async_heartbeat_and_fail(
+    client: Client, worker: ExternalWorker, use_task_token: bool
+):
+    wrapper = AsyncActivityWrapper()
+    # Start task w/ max attempts 2, wait for info, send heartbeat, fail
+    task = asyncio.create_task(
+        _execute_workflow_with_activity(
+            client, worker, wrapper.run, retry_max_attempts=2
+        )
+    )
+    info = await wrapper.wait_info()
+    assert info.attempt == 1
+    await wrapper.async_handle(client, use_task_token).heartbeat("heartbeat details")
+    await wrapper.async_handle(client, use_task_token).fail(
+        ApplicationError("err message", "err details")
+    )
+    # Since we know it will retry, wait for the info again
+    info = await wrapper.wait_info()
+    # Confirm the heartbeat details and attempt
+    assert info.attempt == 2
+    assert list(info.heartbeat_details) == ["heartbeat details"]
+    # Fail again which won't retry
+    await wrapper.async_handle(client, use_task_token).fail(
+        ApplicationError("err message 2", "err details 2")
+    )
+    with pytest.raises(WorkflowFailureError) as err:
+        await task
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, ApplicationError)
+    assert err.value.cause.cause.message == "err message 2"
+    assert list(err.value.cause.cause.details) == ["err details 2"]
+
+
+@pytest.mark.parametrize("use_task_token", [True, False])
+async def test_activity_async_cancel(
+    client: Client, worker: ExternalWorker, use_task_token: bool
+):
+    wrapper = AsyncActivityWrapper()
+    # Start task, wait for info, cancel, wait on workflow
+    task = asyncio.create_task(
+        _execute_workflow_with_activity(
+            client, worker, wrapper.run, cancel_after_ms=50, wait_for_cancellation=True
+        )
+    )
+    await wrapper.wait_info()
+    # Sleep 1s before trying to cancel
+    await asyncio.sleep(1)
+    await wrapper.async_handle(client, use_task_token).report_cancellation(
+        "cancel details"
+    )
+    with pytest.raises(WorkflowFailureError) as err:
+        await task
+    assert isinstance(err.value.cause, CancelledError)
+    assert list(err.value.cause.details) == ["cancel details"]
 
 
 @dataclass

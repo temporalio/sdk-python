@@ -579,38 +579,50 @@ class Client:
         )
 
     @overload
-    def get_activity_completion_handle(
+    def get_async_activity_handle(
         self, *, workflow_id: str, run_id: str, activity_id: str
-    ) -> ActivityCompletionHandle:
+    ) -> AsyncActivityHandle:
         pass
 
     @overload
-    def get_activity_completion_handle(
-        self, *, task_token: bytes
-    ) -> ActivityCompletionHandle:
+    def get_async_activity_handle(self, *, task_token: bytes) -> AsyncActivityHandle:
         pass
 
-    def get_activity_completion_handle(
+    def get_async_activity_handle(
         self,
         *,
         workflow_id: Optional[str] = None,
         run_id: Optional[str] = None,
         activity_id: Optional[str] = None,
         task_token: Optional[bytes] = None,
-    ) -> ActivityCompletionHandle:
-        """Get an activity completion handle."""
+    ) -> AsyncActivityHandle:
+        """Get an async activity handle.
+
+        Either the workflow_id, run_id, and activity_id can be provided, or a
+        singular task_token can be provided.
+
+        Args:
+            workflow_id: Workflow ID for the activity. Cannot be set if
+                task_token is set.
+            run_id: Run ID for the activity. Cannot be set if task_token is set.
+            activity_id: ID for the activity. Cannot be set if task_token is
+                set.
+            task_token: Task token for the activity. Cannot be set if any of the
+                id parameters are set.
+
+        Returns:
+            A handle that can be used for completion or heartbeat.
+        """
         if task_token is not None:
             if workflow_id is not None or run_id is not None or activity_id is not None:
                 raise ValueError("Task token cannot be present with other IDs")
-            return ActivityCompletionHandle(id_or_token=task_token)
+            return AsyncActivityHandle(self, task_token)
         elif workflow_id is not None:
             if run_id is None or activity_id is None:
                 raise ValueError(
                     "Workflow ID, run ID, and activity ID must all be given together"
                 )
-            return ActivityCompletionHandle(
-                id_or_token=(workflow_id, run_id, activity_id)
-            )
+            return AsyncActivityHandle(self, (workflow_id, run_id, activity_id))
         raise ValueError("Task token or workflow/run/activity ID must be present")
 
 
@@ -871,17 +883,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         Raises:
             RPCError: Workflow details could not be fetched.
         """
-        return WorkflowDescription(
-            await self._client.service.describe_workflow_execution(
-                temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
-                    namespace=self._client.namespace,
-                    execution=temporalio.api.common.v1.WorkflowExecution(
-                        workflow_id=self._id,
-                        run_id=self._run_id or "",
-                    ),
-                ),
-                retry=True,
-            )
+        return await self._client._impl.describe_workflow(
+            DescribeWorkflowInput(id=self._id, run_id=self._run_id)
         )
 
     # Overload for no-param query
@@ -1110,15 +1113,47 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         )
 
 
-class ActivityCompletionHandle:
+class AsyncActivityHandle:
     """Handle representing an external activity for completion and heartbeat."""
 
-    def __init__(self, id_or_token: Union[Tuple[str, str, str], bytes]) -> None:
-        """Create an activity completion handle."""
-        raise NotImplementedError
+    def __init__(
+        self, client: Client, id_or_token: Union[Tuple[str, str, str], bytes]
+    ) -> None:
+        """Create an async activity handle."""
+        self._client = client
+        self._id_or_token = id_or_token
 
-    # TODO(cretz): The async methods here and the interceptor methods to support
-    # them
+    async def heartbeat(self, *details: Any) -> None:
+        """Record a heartbeat for the activity."""
+        await self._client._impl.heartbeat_async_activity(
+            HeartbeatAsyncActivityInput(id_or_token=self._id_or_token, details=details),
+        )
+
+    async def complete(self, result: Optional[Any] = None) -> None:
+        """Complete the activity."""
+        await self._client._impl.complete_async_activity(
+            CompleteAsyncActivityInput(id_or_token=self._id_or_token, result=result),
+        )
+
+    async def fail(
+        self, error: Exception, *, last_heartbeat_details: Iterable[Any] = []
+    ) -> None:
+        """Fail the activity."""
+        await self._client._impl.fail_async_activity(
+            FailAsyncActivityInput(
+                id_or_token=self._id_or_token,
+                error=error,
+                last_heartbeat_details=last_heartbeat_details,
+            ),
+        )
+
+    async def report_cancellation(self, *details: Any) -> None:
+        """Report the activity as cancelled."""
+        await self._client._impl.report_cancellation_async_activity(
+            ReportCancellationAsyncActivityInput(
+                id_or_token=self._id_or_token, details=details
+            ),
+        )
 
 
 class WorkflowDescription:
@@ -1230,6 +1265,14 @@ class WorkflowQueryRejectedError(temporalio.exceptions.TemporalError):
         return self._status
 
 
+class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
+    """Error that occurs when async activity attempted heartbeat but was cancelled."""
+
+    def __init__(self) -> None:
+        """Create async activity cancelled error."""
+        super().__init__("Activity cancelled")
+
+
 @dataclass
 class StartWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow`."""
@@ -1260,6 +1303,14 @@ class CancelWorkflowInput:
     id: str
     run_id: Optional[str]
     first_execution_run_id: Optional[str]
+
+
+@dataclass
+class DescribeWorkflowInput:
+    """Input for :py:meth:`OutboundInterceptor.describe_workflow`."""
+
+    id: str
+    run_id: Optional[str]
 
 
 @dataclass
@@ -1296,6 +1347,39 @@ class TerminateWorkflowInput:
     reason: Optional[str]
 
 
+@dataclass
+class HeartbeatAsyncActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.heartbeat_async_activity`."""
+
+    id_or_token: Union[Tuple[str, str, str], bytes]
+    details: Iterable[Any]
+
+
+@dataclass
+class CompleteAsyncActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.complete_async_activity`."""
+
+    id_or_token: Union[Tuple[str, str, str], bytes]
+    result: Optional[Any]
+
+
+@dataclass
+class FailAsyncActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.fail_async_activity`."""
+
+    id_or_token: Union[Tuple[str, str, str], bytes]
+    error: Exception
+    last_heartbeat_details: Iterable[Any]
+
+
+@dataclass
+class ReportCancellationAsyncActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.report_cancellation_async_activity`."""
+
+    id_or_token: Union[Tuple[str, str, str], bytes]
+    details: Iterable[Any]
+
+
 class Interceptor:
     """Interceptor for clients.
 
@@ -1330,6 +1414,8 @@ class OutboundInterceptor:
         """
         self.next = next
 
+    ### Workflow calls
+
     async def start_workflow(
         self, input: StartWorkflowInput
     ) -> WorkflowHandle[Any, Any]:
@@ -1339,6 +1425,11 @@ class OutboundInterceptor:
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         """Called for every :py:meth:`WorkflowHandle.cancel` call."""
         await self.next.cancel_workflow(input)
+
+    async def describe_workflow(
+        self, input: DescribeWorkflowInput
+    ) -> WorkflowDescription:
+        """Called for every :py:meth:`WorkflowHandle.describe` call."""
 
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
         """Called for every :py:meth:`WorkflowHandle.query` call."""
@@ -1352,11 +1443,35 @@ class OutboundInterceptor:
         """Called for every :py:meth:`WorkflowHandle.terminate` call."""
         await self.next.terminate_workflow(input)
 
+    ### Async activity calls
+
+    async def heartbeat_async_activity(
+        self, input: HeartbeatAsyncActivityInput
+    ) -> None:
+        """Called for every :py:meth:`AsyncActivityHandle.heartbeat` call."""
+        await self.next.heartbeat_async_activity(input)
+
+    async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
+        """Called for every :py:meth:`AsyncActivityHandle.complete` call."""
+        await self.next.complete_async_activity(input)
+
+    async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
+        """Called for every :py:meth:`AsyncActivityHandle.fail` call."""
+        await self.next.fail_async_activity(input)
+
+    async def report_cancellation_async_activity(
+        self, input: ReportCancellationAsyncActivityInput
+    ) -> None:
+        """Called for every :py:meth:`AsyncActivityHandle.report_cancellation` call."""
+        await self.next.report_cancellation_async_activity(input)
+
 
 class _ClientImpl(OutboundInterceptor):
     def __init__(self, client: Client) -> None:
         # We are intentionally not calling the base class's __init__ here
         self._client = client
+
+    ### Workflow calls
 
     async def start_workflow(
         self, input: StartWorkflowInput
@@ -1452,6 +1567,22 @@ class _ClientImpl(OutboundInterceptor):
             retry=True,
         )
 
+    async def describe_workflow(
+        self, input: DescribeWorkflowInput
+    ) -> WorkflowDescription:
+        return WorkflowDescription(
+            await self._client.service.describe_workflow_execution(
+                temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
+                    namespace=self._client.namespace,
+                    execution=temporalio.api.common.v1.WorkflowExecution(
+                        workflow_id=input.id,
+                        run_id=input.run_id or "",
+                    ),
+                ),
+                retry=True,
+            )
+        )
+
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
         req = temporalio.api.workflowservice.v1.QueryWorkflowRequest(
             namespace=self._client.namespace,
@@ -1524,3 +1655,137 @@ class _ClientImpl(OutboundInterceptor):
                 await self._client.data_converter.encode(input.args)
             )
         await self._client.service.terminate_workflow_execution(req, retry=True)
+
+    ### Async activity calls
+
+    async def heartbeat_async_activity(
+        self, input: HeartbeatAsyncActivityInput
+    ) -> None:
+        details = (
+            None
+            if not input.details
+            else await self._client.data_converter.encode_wrapper(input.details)
+        )
+        if isinstance(input.id_or_token, tuple):
+            resp_by_id = await self._client.service.record_activity_task_heartbeat_by_id(
+                temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest(
+                    workflow_id=input.id_or_token[0],
+                    run_id=input.id_or_token[1],
+                    activity_id=input.id_or_token[2],
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    details=details,
+                ),
+                retry=True,
+            )
+            if resp_by_id.cancel_requested:
+                raise AsyncActivityCancelledError()
+        else:
+            resp = await self._client.service.record_activity_task_heartbeat(
+                temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest(
+                    task_token=input.id_or_token,
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    details=details,
+                ),
+                retry=True,
+            )
+            if resp.cancel_requested:
+                raise AsyncActivityCancelledError()
+
+    async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
+        result = (
+            None
+            if not input.result
+            else await self._client.data_converter.encode_wrapper([input.result])
+        )
+        if isinstance(input.id_or_token, tuple):
+            await self._client.service.respond_activity_task_completed_by_id(
+                temporalio.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest(
+                    workflow_id=input.id_or_token[0],
+                    run_id=input.id_or_token[1],
+                    activity_id=input.id_or_token[2],
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    result=result,
+                ),
+                retry=True,
+            )
+        else:
+            await self._client.service.respond_activity_task_completed(
+                temporalio.api.workflowservice.v1.RespondActivityTaskCompletedRequest(
+                    task_token=input.id_or_token,
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    result=result,
+                ),
+                retry=True,
+            )
+
+    async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
+        failure = temporalio.api.failure.v1.Failure()
+        await temporalio.exceptions.encode_exception_to_failure(
+            input.error, self._client.data_converter, failure
+        )
+        last_heartbeat_details = (
+            None
+            if not input.last_heartbeat_details
+            else await self._client.data_converter.encode_wrapper(
+                input.last_heartbeat_details
+            )
+        )
+        if isinstance(input.id_or_token, tuple):
+            await self._client.service.respond_activity_task_failed_by_id(
+                temporalio.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest(
+                    workflow_id=input.id_or_token[0],
+                    run_id=input.id_or_token[1],
+                    activity_id=input.id_or_token[2],
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    failure=failure,
+                    last_heartbeat_details=last_heartbeat_details,
+                ),
+                retry=True,
+            )
+        else:
+            await self._client.service.respond_activity_task_failed(
+                temporalio.api.workflowservice.v1.RespondActivityTaskFailedRequest(
+                    task_token=input.id_or_token,
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    failure=failure,
+                    last_heartbeat_details=last_heartbeat_details,
+                ),
+                retry=True,
+            )
+
+    async def report_cancellation_async_activity(
+        self, input: ReportCancellationAsyncActivityInput
+    ) -> None:
+        details = (
+            None
+            if not input.details
+            else await self._client.data_converter.encode_wrapper(input.details)
+        )
+        if isinstance(input.id_or_token, tuple):
+            await self._client.service.respond_activity_task_canceled_by_id(
+                temporalio.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest(
+                    workflow_id=input.id_or_token[0],
+                    run_id=input.id_or_token[1],
+                    activity_id=input.id_or_token[2],
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    details=details,
+                ),
+                retry=True,
+            )
+        else:
+            await self._client.service.respond_activity_task_canceled(
+                temporalio.api.workflowservice.v1.RespondActivityTaskCanceledRequest(
+                    task_token=input.id_or_token,
+                    namespace=self._client.namespace,
+                    identity=self._client.identity,
+                    details=details,
+                ),
+                retry=True,
+            )

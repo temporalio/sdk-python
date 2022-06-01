@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import dataclasses
 import inspect
 import logging
 import threading
@@ -352,7 +353,11 @@ class _Definition:
     def must_from_callable(fn: Callable) -> _Definition:
         ret = _Definition.from_callable(fn)
         if ret:
-            return ret
+            # We have to replace the function with the given callable here
+            # because the one passed in may be a method or some other partial
+            # that represents the real callable instead of what the decorator
+            # used.
+            return dataclasses.replace(ret, fn=fn)
         fn_name = getattr(fn, "__name__", "<unknown>")
         raise TypeError(
             f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
