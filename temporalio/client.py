@@ -14,10 +14,8 @@ from typing import (
     Callable,
     Generic,
     Iterable,
-    List,
     Mapping,
     Optional,
-    Tuple,
     Type,
     TypeVar,
     Union,
@@ -580,7 +578,7 @@ class Client:
 
     @overload
     def get_async_activity_handle(
-        self, *, workflow_id: str, run_id: str, activity_id: str
+        self, *, workflow_id: str, run_id: Optional[str], activity_id: str
     ) -> AsyncActivityHandle:
         pass
 
@@ -618,11 +616,16 @@ class Client:
                 raise ValueError("Task token cannot be present with other IDs")
             return AsyncActivityHandle(self, task_token)
         elif workflow_id is not None:
-            if run_id is None or activity_id is None:
+            if activity_id is None:
                 raise ValueError(
                     "Workflow ID, run ID, and activity ID must all be given together"
                 )
-            return AsyncActivityHandle(self, (workflow_id, run_id, activity_id))
+            return AsyncActivityHandle(
+                self,
+                AsyncActivityIDReference(
+                    workflow_id=workflow_id, run_id=run_id, activity_id=activity_id
+                ),
+            )
         raise ValueError("Task token or workflow/run/activity ID must be present")
 
 
@@ -1113,11 +1116,20 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         )
 
 
+@dataclass(frozen=True)
+class AsyncActivityIDReference:
+    """Reference to an async activity by its qualified ID."""
+
+    workflow_id: str
+    run_id: Optional[str]
+    activity_id: str
+
+
 class AsyncActivityHandle:
     """Handle representing an external activity for completion and heartbeat."""
 
     def __init__(
-        self, client: Client, id_or_token: Union[Tuple[str, str, str], bytes]
+        self, client: Client, id_or_token: Union[AsyncActivityIDReference, bytes]
     ) -> None:
         """Create an async activity handle."""
         self._client = client
@@ -1351,7 +1363,7 @@ class TerminateWorkflowInput:
 class HeartbeatAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.heartbeat_async_activity`."""
 
-    id_or_token: Union[Tuple[str, str, str], bytes]
+    id_or_token: Union[AsyncActivityIDReference, bytes]
     details: Iterable[Any]
 
 
@@ -1359,7 +1371,7 @@ class HeartbeatAsyncActivityInput:
 class CompleteAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.complete_async_activity`."""
 
-    id_or_token: Union[Tuple[str, str, str], bytes]
+    id_or_token: Union[AsyncActivityIDReference, bytes]
     result: Optional[Any]
 
 
@@ -1367,7 +1379,7 @@ class CompleteAsyncActivityInput:
 class FailAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.fail_async_activity`."""
 
-    id_or_token: Union[Tuple[str, str, str], bytes]
+    id_or_token: Union[AsyncActivityIDReference, bytes]
     error: Exception
     last_heartbeat_details: Iterable[Any]
 
@@ -1376,7 +1388,7 @@ class FailAsyncActivityInput:
 class ReportCancellationAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.report_cancellation_async_activity`."""
 
-    id_or_token: Union[Tuple[str, str, str], bytes]
+    id_or_token: Union[AsyncActivityIDReference, bytes]
     details: Iterable[Any]
 
 
@@ -1666,12 +1678,12 @@ class _ClientImpl(OutboundInterceptor):
             if not input.details
             else await self._client.data_converter.encode_wrapper(input.details)
         )
-        if isinstance(input.id_or_token, tuple):
+        if isinstance(input.id_or_token, AsyncActivityIDReference):
             resp_by_id = await self._client.service.record_activity_task_heartbeat_by_id(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest(
-                    workflow_id=input.id_or_token[0],
-                    run_id=input.id_or_token[1],
-                    activity_id=input.id_or_token[2],
+                    workflow_id=input.id_or_token.workflow_id,
+                    run_id=input.id_or_token.run_id or "",
+                    activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,
                     identity=self._client.identity,
                     details=details,
@@ -1699,12 +1711,12 @@ class _ClientImpl(OutboundInterceptor):
             if not input.result
             else await self._client.data_converter.encode_wrapper([input.result])
         )
-        if isinstance(input.id_or_token, tuple):
+        if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.service.respond_activity_task_completed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest(
-                    workflow_id=input.id_or_token[0],
-                    run_id=input.id_or_token[1],
-                    activity_id=input.id_or_token[2],
+                    workflow_id=input.id_or_token.workflow_id,
+                    run_id=input.id_or_token.run_id or "",
+                    activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,
                     identity=self._client.identity,
                     result=result,
@@ -1734,12 +1746,12 @@ class _ClientImpl(OutboundInterceptor):
                 input.last_heartbeat_details
             )
         )
-        if isinstance(input.id_or_token, tuple):
+        if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.service.respond_activity_task_failed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest(
-                    workflow_id=input.id_or_token[0],
-                    run_id=input.id_or_token[1],
-                    activity_id=input.id_or_token[2],
+                    workflow_id=input.id_or_token.workflow_id,
+                    run_id=input.id_or_token.run_id or "",
+                    activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,
                     identity=self._client.identity,
                     failure=failure,
@@ -1767,12 +1779,12 @@ class _ClientImpl(OutboundInterceptor):
             if not input.details
             else await self._client.data_converter.encode_wrapper(input.details)
         )
-        if isinstance(input.id_or_token, tuple):
+        if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.service.respond_activity_task_canceled_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest(
-                    workflow_id=input.id_or_token[0],
-                    run_id=input.id_or_token[1],
-                    activity_id=input.id_or_token[2],
+                    workflow_id=input.id_or_token.workflow_id,
+                    run_id=input.id_or_token.run_id or "",
+                    activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,
                     identity=self._client.identity,
                     details=details,

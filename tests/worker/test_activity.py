@@ -843,8 +843,8 @@ async def test_activity_async_cancel(
         )
     )
     await wrapper.wait_info()
-    # Sleep 1s before trying to cancel
-    await asyncio.sleep(1)
+    # Sleep 2s before trying to cancel
+    await asyncio.sleep(2)
     await wrapper.async_handle(client, use_task_token).report_cancellation(
         "cancel details"
     )
