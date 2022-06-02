@@ -335,8 +335,8 @@ class LoggerAdapter(logging.LoggerAdapter):
         return self.logger
 
 
-#: Logger that will have contextual activity details embedded.
 logger = LoggerAdapter(logging.getLogger(__name__), None)
+"""Logger that will have contextual activity details embedded."""
 
 
 @dataclass
