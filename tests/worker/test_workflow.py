@@ -27,7 +27,7 @@ from typing_extensions import Protocol, runtime_checkable
 
 import temporalio.api.common.v1
 from temporalio import activity, workflow
-from temporalio.client import Client, WorkflowFailureError
+from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.common import RetryPolicy
 from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import (
@@ -1243,6 +1243,135 @@ async def test_workflow_child_already_started(client: Client):
             )
         assert isinstance(err.value.cause, ApplicationError)
         assert err.value.cause.message == "Already started"
+
+
+class PatchWorkflowBase:
+    def __init__(self) -> None:
+        self._result = "<unset>"
+
+    @workflow.query
+    def result(self) -> str:
+        return self._result
+
+
+@workflow.defn(name="patch-workflow")
+class PrePatchWorkflow(PatchWorkflowBase):
+    @workflow.run
+    async def run(self) -> None:
+        self._result = "pre-patch"
+
+
+@workflow.defn(name="patch-workflow")
+class PatchWorkflow(PatchWorkflowBase):
+    @workflow.run
+    async def run(self) -> None:
+        if workflow.patched("my-patch"):
+            self._result = "post-patch"
+        else:
+            self._result = "pre-patch"
+
+
+@workflow.defn(name="patch-workflow")
+class DeprecatePatchWorkflow(PatchWorkflowBase):
+    @workflow.run
+    async def run(self) -> None:
+        workflow.deprecate_patch("my-patch")
+        self._result = "post-patch"
+
+
+@workflow.defn(name="patch-workflow")
+class PostPatchWorkflow(PatchWorkflowBase):
+    @workflow.run
+    async def run(self) -> None:
+        self._result = "post-patch"
+
+
+async def test_workflow_patch(client: Client):
+    workflow_run = PrePatchWorkflow.run
+    task_queue = str(uuid.uuid4())
+
+    async def execute() -> WorkflowHandle:
+        handle = await client.start_workflow(
+            workflow_run, id=f"workflow-{uuid.uuid4()}", task_queue=task_queue
+        )
+        await handle.result()
+        return handle
+
+    async def query_result(handle: WorkflowHandle) -> str:
+        return await handle.query(PatchWorkflowBase.result)
+
+    # Run a simple pre-patch workflow
+    async with new_worker(client, PrePatchWorkflow, task_queue=task_queue):
+        pre_patch_handle = await execute()
+        assert "pre-patch" == await query_result(pre_patch_handle)
+
+    # Confirm patched workflow gives old result for pre-patched but new result
+    # for patched
+    async with new_worker(client, PatchWorkflow, task_queue=task_queue):
+        patch_handle = await execute()
+        assert "post-patch" == await query_result(patch_handle)
+        assert "pre-patch" == await query_result(pre_patch_handle)
+
+    # Confirm what works during deprecated
+    async with new_worker(client, DeprecatePatchWorkflow, task_queue=task_queue):
+        deprecate_patch_handle = await execute()
+        assert "post-patch" == await query_result(deprecate_patch_handle)
+        assert "post-patch" == await query_result(patch_handle)
+
+    # Confirm what works when deprecation gone
+    async with new_worker(client, PostPatchWorkflow, task_queue=task_queue):
+        post_patch_handle = await execute()
+        assert "post-patch" == await query_result(post_patch_handle)
+        assert "post-patch" == await query_result(deprecate_patch_handle)
+        # TODO(cretz): This causes a non-determinism failure due to having the
+        # patch marker, but we don't have an easy way to test it
+        # await query_result(patch_handle)
+
+
+@workflow.defn
+class UUIDWorkflow:
+    def __init__(self) -> None:
+        self._result = "<unset>"
+
+    @workflow.run
+    async def run(self) -> None:
+        self._result = str(workflow.uuid4())
+
+    @workflow.query
+    def result(self) -> str:
+        return self._result
+
+
+async def test_workflow_uuid(client: Client):
+    task_queue = str(uuid.uuid4())
+    async with new_worker(client, UUIDWorkflow, task_queue=task_queue):
+        # Get two handle UUID results
+        handle1 = await client.start_workflow(
+            UUIDWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        await handle1.result()
+        handle1_query_result = await handle1.query(UUIDWorkflow.result)
+
+        handle2 = await client.start_workflow(
+            UUIDWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        await handle2.result()
+        handle2_query_result = await handle2.query(UUIDWorkflow.result)
+
+        # Confirm they aren't equal to each other but they are equal to retries
+        # of the same query
+        assert handle1_query_result != handle2_query_result
+        assert handle1_query_result == await handle1.query(UUIDWorkflow.result)
+        assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
+
+    # Now confirm those results are the same even on a new worker
+    async with new_worker(client, UUIDWorkflow, task_queue=task_queue):
+        assert handle1_query_result == await handle1.query(UUIDWorkflow.result)
+        assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
 
 
 # TODO:

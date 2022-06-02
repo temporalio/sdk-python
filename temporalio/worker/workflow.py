@@ -271,5 +271,6 @@ class _WorkflowWorker:
                 defn=defn,
                 info=info,
                 type_hint_eval_str=self._type_hint_eval_str,
+                randomness_seed=start.randomness_seed,
             )
         )
