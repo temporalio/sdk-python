@@ -14,6 +14,10 @@ jobs:
       matrix:
         python: ["3.7", "3.10"]
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            python: 3.10
+            docsTarget: true
     runs-on: ${{ matrix.os }}
     steps:
       - name: Print build information
@@ -36,6 +40,27 @@ jobs:
       - run: poe lint
       - run: poe build-develop
       - run: poe test -s -o log_cli_level=DEBUG
+
+      # Do docs stuff (only on one host)
+      - name: Build API docs
+        if: ${{ matrix.docsTarget }}
+        run: poe gen-docs
+      - name: Deploy prod API docs
+        if: ${{ github.ref == 'refs/heads/main' && matrix.docsTarget }}
+        uses: netlify/actions/cli@master
+        with:
+          args: deploy --dir=build/apidocs --prod
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      - name: Deploy draft API docs
+        if: ${{ github.ref != 'refs/heads/main' && matrix.docsTarget }}
+        uses: netlify/actions/cli@master
+        with:
+          args: deploy --dir=build/apidocs
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   # Compile the binaries and upload artifacts
   compile-binaries:
