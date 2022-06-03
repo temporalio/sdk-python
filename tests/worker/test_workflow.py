@@ -25,8 +25,10 @@ from typing import (
 import pytest
 from typing_extensions import Protocol, runtime_checkable
 
-import temporalio.api.common.v1
 from temporalio import activity, workflow
+from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
+from temporalio.api.enums.v1 import EventType
+from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
 from temporalio.converter import DataConverter, PayloadCodec
@@ -402,7 +404,7 @@ async def test_workflow_simple_local_activity(client: Client):
         assert result == "Hello, Temporal!"
 
 
-wait_cancel_complete: asyncio.Event
+wait_cancel_complete = asyncio.Event()
 
 
 @activity.defn
@@ -472,8 +474,7 @@ class CancelActivityWorkflow:
 
 @pytest.mark.parametrize("local", [True, False])
 async def test_workflow_cancel_activity(client: Client, local: bool):
-    global wait_cancel_complete
-    wait_cancel_complete = asyncio.Event()
+    wait_cancel_complete.clear()
     # Need short task timeout to timeout LA task and longer assert timeout
     # so the task can timeout
     task_timeout = timedelta(seconds=1)
@@ -769,6 +770,11 @@ class MultiCancelWorkflow:
         await asyncio.sleep(0.1)
         fut.cancel()
         await workflow.wait_condition(lambda: len(events) == 4, timeout=4)
+        # Wait on the future just to make asyncio happy
+        try:
+            await fut
+        except:
+            pass
         return events
 
 
@@ -816,25 +822,21 @@ async def test_workflow_activity_timeout(client: Client):
 
 # Just serializes in a "payloads" wrapper
 class SimpleCodec(PayloadCodec):
-    async def encode(
-        self, payloads: Iterable[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
-        wrapper = temporalio.api.common.v1.Payloads(payloads=payloads)
+    async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
+        wrapper = Payloads(payloads=payloads)
         return [
-            temporalio.api.common.v1.Payload(
+            Payload(
                 metadata={"simple-codec": b"true"}, data=wrapper.SerializeToString()
             )
         ]
 
-    async def decode(
-        self, payloads: Iterable[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
         payloads = list(payloads)
         if len(payloads) != 1:
             raise RuntimeError("Expected only a single payload")
         elif payloads[0].metadata.get("simple-codec") != b"true":
             raise RuntimeError("Not encoded with this codec")
-        wrapper = temporalio.api.common.v1.Payloads()
+        wrapper = Payloads()
         wrapper.ParseFromString(payloads[0].data)
         return list(wrapper.payloads)
 
@@ -1245,10 +1247,115 @@ async def test_workflow_child_already_started(client: Client):
         assert err.value.cause.message == "Already started"
 
 
+@activity.defn
+async def fail_until_attempt_activity(until_attempt: int) -> str:
+    if activity.info().attempt < until_attempt:
+        raise ApplicationError("Attempt too low")
+    return f"attempt: {activity.info().attempt}"
+
+
+@workflow.defn
+class FailUntilAttemptWorkflow:
+    @workflow.run
+    async def run(self, until_attempt: int) -> str:
+        if workflow.info().attempt < until_attempt:
+            raise ApplicationError("Attempt too low")
+        return f"attempt: {workflow.info().attempt}"
+
+
+@workflow.defn
+class TypedConfigWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        retry_policy = RetryPolicy(initial_interval=timedelta(milliseconds=1))
+        # Activity
+        activity_config = workflow.ActivityConfig(
+            retry_policy=retry_policy,
+            schedule_to_close_timeout=timedelta(seconds=5),
+        )
+        result = await workflow.execute_activity(
+            fail_until_attempt_activity, 2, **activity_config
+        )
+        assert result == "attempt: 2"
+        # Local activity
+        local_activity_config = workflow.LocalActivityConfig(
+            retry_policy=retry_policy,
+            schedule_to_close_timeout=timedelta(seconds=5),
+        )
+        result = await workflow.execute_local_activity(
+            fail_until_attempt_activity, 2, **local_activity_config
+        )
+        assert result == "attempt: 2"
+        # Child workflow
+        child_config = workflow.ChildWorkflowConfig(
+            id=f"{workflow.info().workflow_id}_child",
+            retry_policy=retry_policy,
+        )
+        result = await workflow.execute_child_workflow(
+            FailUntilAttemptWorkflow.run, 2, **child_config
+        )
+        assert result == "attempt: 2"
+
+
+async def test_workflow_typed_config(client: Client):
+    async with new_worker(
+        client,
+        TypedConfigWorkflow,
+        FailUntilAttemptWorkflow,
+        activities=[fail_until_attempt_activity],
+    ) as worker:
+        await client.execute_workflow(
+            TypedConfigWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
+@workflow.defn
+class LocalActivityBackoffWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_local_activity(
+            fail_until_attempt_activity,
+            2,
+            start_to_close_timeout=timedelta(minutes=1),
+            local_retry_threshold=timedelta(seconds=1),
+            retry_policy=RetryPolicy(
+                maximum_attempts=2, initial_interval=timedelta(seconds=2)
+            ),
+        )
+
+
+async def test_workflow_local_activity_backoff(client: Client):
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    async with new_worker(
+        client, LocalActivityBackoffWorkflow, activities=[fail_until_attempt_activity]
+    ) as worker:
+        await client.execute_workflow(
+            LocalActivityBackoffWorkflow.run,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+            task_timeout=timedelta(seconds=3),
+        )
+    resp = await client.service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=workflow_id),
+        )
+    )
+    assert 1 == sum(
+        1
+        for e in resp.history.events
+        if e.event_type is EventType.EVENT_TYPE_TIMER_FIRED
+    )
+    assert 2 == sum(
+        1
+        for e in resp.history.events
+        if e.event_type is EventType.EVENT_TYPE_MARKER_RECORDED
+    )
+
+
 # TODO:
-# * Use typed dicts for activity, local activity, and child workflow configs
-# * Local activity invalid options
-# * Local activity backoff (and cancel during backoff)
 # * Cancelling things whose commands haven't been sent
 # * Starting something on an already-cancelled cancelled task
 # * Cancel unstarted child

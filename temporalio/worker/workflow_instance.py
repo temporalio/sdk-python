@@ -26,6 +26,7 @@ from typing import (
     NoReturn,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -164,6 +165,12 @@ class _WorkflowInstanceImpl(
         # The actual instance, instantiated on first _run_once
         self._object: Any = None
         self._is_replaying: bool = False
+
+        # Tasks stored by asyncio are weak references and therefore can get GC'd
+        # which can cause warnings like "Task was destroyed but it is pending!".
+        # So we store the tasks ourselves.
+        # See https://bugs.python.org/issue21163 and others.
+        self._tasks: Set[asyncio.Task] = set()
 
         # We maintain signals and queries on this class since handlers can be
         # added during workflow execution
@@ -388,7 +395,8 @@ class _WorkflowInstanceImpl(
                     name=job.query_type,
                     args=args,
                 )
-            )
+            ),
+            name=f"query: {job.query_type}",
         )
 
     def _apply_resolve_activity(
@@ -557,7 +565,8 @@ class _WorkflowInstanceImpl(
 
         # Schedule the handler
         self.create_task(
-            self._run_top_level_workflow_function(self._inbound.handle_signal(input))
+            self._run_top_level_workflow_function(self._inbound.handle_signal(input)),
+            name=f"signal: {job.signal_name}",
         )
 
     def _apply_start_workflow(
@@ -586,7 +595,8 @@ class _WorkflowInstanceImpl(
             args=self._convert_payloads(job.arguments, arg_types),
         )
         self._primary_task = self.create_task(
-            self._run_top_level_workflow_function(run_workflow(input))
+            self._run_top_level_workflow_function(run_workflow(input)),
+            name=f"run",
         )
 
     #### _Runtime direct workflow call overrides ####
@@ -698,7 +708,8 @@ class _WorkflowInstanceImpl(
                     self.create_task(
                         self._run_top_level_workflow_function(
                             self._inbound.handle_signal(input)
-                        )
+                        ),
+                        name=f"signal: {input.name} (buffered)",
                     )
             else:
                 for inputs in self._buffered_signals.values():
@@ -706,7 +717,8 @@ class _WorkflowInstanceImpl(
                         self.create_task(
                             self._run_top_level_workflow_function(
                                 self._inbound.handle_signal(input)
-                            )
+                            ),
+                            name=f"signal: {input.name} (buffered)",
                         )
                 self._buffered_signals.clear()
         else:
@@ -1009,6 +1021,24 @@ class _WorkflowInstanceImpl(
         self._curr_seqs[type] = seq
         return seq
 
+    def _register_task(self, task: asyncio.Task, *, name: Optional[str]) -> None:
+        # Name not supported on older Python versions
+        if sys.version_info >= (3, 8):
+            # Put the workflow info at the end of the task name
+            name = name or task.get_name()
+            name += f" (workflow: {self._info.workflow_type}, id: {self._info.workflow_id}, run: {self._info.run_id})"
+            task.set_name(name)
+        # Add to and remove from our own non-weak set instead of relying on
+        # Python's weak set which can collect these too early
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.remove)
+        # When the workflow is GC'd (for whatever reason, e.g. eviction or
+        # worker shutdown), still-open tasks get a message logged to the
+        # exception handler about still pending. We disable this if the
+        # attribute is available.
+        if hasattr(task, "_log_destroy_pending"):
+            setattr(task, "_log_destroy_pending", False)
+
     def _run_once(self) -> None:
         try:
             asyncio._set_running_loop(self)
@@ -1096,7 +1126,7 @@ class _WorkflowInstanceImpl(
 
     def _stack_trace(self) -> str:
         stacks = []
-        for task in asyncio.all_tasks(self):
+        for task in self._tasks:
             # TODO(cretz): These stacks are not very clean currently
             frames = []
             for frame in task.get_stack():
@@ -1162,10 +1192,9 @@ class _WorkflowInstanceImpl(
         *,
         name: Optional[str] = None,
     ) -> asyncio.Task[_T]:
-        # Name not supported in older Python versions
-        if sys.version_info < (3, 8):
-            return asyncio.Task(coro, loop=self)
-        return asyncio.Task(coro, loop=self, name=name)
+        task = asyncio.Task(coro, loop=self)
+        self._register_task(task, name=name)
+        return task
 
     def get_exception_handler(self) -> Optional[_ExceptionHandler]:
         return self._exception_handler
@@ -1383,6 +1412,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self._seq = instance._next_seq("activity")
         self._input = input
         self._result_fut = instance.create_future()
+        instance._register_task(self, name=f"activity: {input.activity}")
 
     def _resolve_success(self, result: Any) -> None:
         # We intentionally let this error if already done
@@ -1495,6 +1525,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._start_fut: asyncio.Future[None] = instance.create_future()
         self._result_fut: asyncio.Future[Any] = instance.create_future()
         self._first_execution_run_id = "<unknown>"
+        instance._register_task(self, name=f"child: {input.workflow}")
 
     @property
     def id(self) -> str:

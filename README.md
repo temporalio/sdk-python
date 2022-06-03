@@ -9,8 +9,10 @@ execute asynchronous long-running business logic in a scalable and resilient way
 
 "Temporal Python SDK" is the framework for authoring workflows and activities using the Python programming language.
 
-In addition to this documentation, see the [samples](https://github.com/temporalio/samples-python) repository for code
-examples.
+In addition to this documentation, see:
+
+* [Code Samples](https://github.com/temporalio/samples-python)
+* [API Documentation](https://python.temporal.io)
 
 **⚠️ UNDER DEVELOPMENT**
 
@@ -35,7 +37,7 @@ These steps can be followed to use with a virtual environment and `pip`:
   * Needed because older versions of `pip` may not pick the right wheel
 * Install Temporal SDK - `python -m pip install temporalio`
 
-The SDK is now ready for use.
+The SDK is now ready for use. To build from source, see "Building" near the end of this documentation.
 
 ### Implementing a Workflow
 
@@ -526,6 +528,24 @@ respect cancellation, the shutdown may never complete.
 
 The Python SDK is built to work with Python 3.7 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
+
+### Building
+
+- Install the system dependencies:
+
+  - Python >=3.7
+  - [pipx](https://github.com/pypa/pipx#install-pipx) (only needed for installing the two dependencies below)
+  - [poetry](https://github.com/python-poetry/poetry) `pipx install poetry`
+  - [poe](https://github.com/nat-n/poethepoet) `pipx install poethepoet`
+
+- Clone the project recursively:
+
+  ```bash
+  git clone --recursive git@github.com:temporalio/sdk-python.git
+  cd sdk-python
+  ```
+
+TODO(cretz): The rest
 
 ### Local development environment
 
