@@ -34,20 +34,19 @@ typing-extensions = "^4.0.1"
 
 [tool.poetry.dev-dependencies]
 black = "^21.12b0"
-furo = "^2022.3.4"
 grpcio-tools = "^1.43.0"
 isort = "^5.10.1"
 mypy = "^0.950"
 mypy-protobuf = "^3.2.0"
 pydocstyle = "^6.1.1"
-pydoctor = "^22.5.1"
+# TODO(cretz): Update when https://github.com/twisted/pydoctor/pull/595 released
+# pydoctor = "^22.5.1"
+pydoctor = { git = "https://github.com/cretz/pydoctor.git", branch = "overloads" }
 pytest = "^7.1.1"
 pytest-asyncio = "^0.18.0"
 pytest-timeout = "^2.1.0"
 setuptools = "^60.9.3"
 setuptools-rust = "^1.1.2"
-Sphinx = "^4.4.0"
-sphinxcontrib-napoleon = "^0.7"
 toml = "^0.10.2"
 twine = "^3.8.0"
 
@@ -56,8 +55,7 @@ build-develop = ["gen-protos", "build-bridge-develop"]
 build-bridge-develop = "python scripts/setup_bridge.py develop"
 fix-wheel = "python scripts/fix_wheel.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
-gen-docs = "sphinx-build docs docs/_build"
-gen-docs-pydoctor = "pydoctor"
+gen-docs = "pydoctor"
 gen-protos = "python scripts/gen_protos.py"
 lint = [
   {cmd = "black --check ."},
@@ -118,11 +116,19 @@ add_ignore = [
 [tool.pydoctor]
 add-package = ["temporalio"]
 docformat = "google"
-html-output = "docs/_build_pydoctor"
+html-output = "build/apidocs"
 intersphinx = ["https://docs.python.org/3/objects.inv", "https://googleapis.dev/python/protobuf/latest/objects.inv"]
-privacy = ["PRIVATE:temporalio.bridge", "HIDDEN:**.*_pb2*"]
+privacy = [
+  "PRIVATE:temporalio.bridge",
+  "HIDDEN:temporalio.worker.activity",
+  "HIDDEN:temporalio.worker.interceptor",
+  "HIDDEN:temporalio.worker.worker",
+  "HIDDEN:temporalio.worker.workflow",
+  "HIDDEN:temporalio.worker.workflow_instance",
+  "HIDDEN:**.*_pb2*",
+]
 project-name = "Temporal"
-sidebar-expand-depth = 40
+sidebar-expand-depth = 2
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

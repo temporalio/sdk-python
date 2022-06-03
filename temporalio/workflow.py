@@ -610,8 +610,11 @@ class LoggerAdapter(logging.LoggerAdapter):
         return self.logger
 
 
-#: Logger that will have contextual workflow details embedded.
 logger = LoggerAdapter(logging.getLogger(__name__), None)
+"""Logger that will have contextual workflow details embedded.
+
+Logs are skipped during replay by default.
+"""
 
 
 @dataclass(frozen=True)

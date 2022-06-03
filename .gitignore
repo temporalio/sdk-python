@@ -2,9 +2,6 @@
 __pycache__
 /build
 /dist
-/docs/_autosummary
-/docs/_build
-/docs/_build_pydoctor
 temporalio/api/*
 !temporalio/api/__init__.py
 temporalio/bridge/proto/*
