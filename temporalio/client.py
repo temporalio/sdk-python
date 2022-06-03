@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import uuid
 import warnings
 from dataclasses import dataclass
@@ -37,8 +36,6 @@ import temporalio.exceptions
 import temporalio.workflow
 import temporalio.workflow_service
 from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
-
-logger = logging.getLogger(__name__)
 
 LocalParamType = TypeVar("LocalParamType")
 LocalReturnType = TypeVar("LocalReturnType")
