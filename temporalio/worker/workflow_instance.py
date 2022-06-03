@@ -603,7 +603,7 @@ class _WorkflowInstanceImpl(
     def _apply_update_random_seed(
         self, job: temporalio.bridge.proto.workflow_activation.UpdateRandomSeed
     ) -> None:
-        self._random = random.Random(job.randomness_seed)
+        self._random.seed(job.randomness_seed)
 
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
