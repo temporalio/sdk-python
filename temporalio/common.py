@@ -1,5 +1,7 @@
 """Common code used in the Temporal SDK."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
@@ -34,6 +36,21 @@ class RetryPolicy:
 
     non_retryable_error_types: Optional[Iterable[str]] = None
     """List of error types that are not retryable."""
+
+    @staticmethod
+    def from_proto(proto: temporalio.api.common.v1.RetryPolicy) -> RetryPolicy:
+        """Create a retry policy from the proto object."""
+        return RetryPolicy(
+            initial_interval=proto.initial_interval.ToTimedelta(),
+            backoff_coefficient=proto.backoff_coefficient,
+            maximum_interval=proto.maximum_interval.ToTimedelta()
+            if proto.HasField("maximum_interval")
+            else None,
+            maximum_attempts=proto.maximum_attempts,
+            non_retryable_error_types=proto.non_retryable_error_types
+            if proto.non_retryable_error_types
+            else None,
+        )
 
     def apply_to_proto(self, proto: temporalio.api.common.v1.RetryPolicy) -> None:
         """Apply the fields in this policy to the given proto object."""

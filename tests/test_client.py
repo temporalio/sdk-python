@@ -50,7 +50,6 @@ async def test_start_id_reuse(client: Client, worker: ExternalWorker):
         task_queue=worker.task_queue,
     )
     assert "some result" == await handle.result()
-
     # Run again with reject duplicate
     with pytest.raises(RPCError) as err:
         handle = await client.start_workflow(
@@ -396,7 +395,3 @@ async def test_tls_config(tls_client: Optional[Client]):
         )
     )
     assert resp.namespace_info.name == tls_client.namespace
-
-
-# TODO:
-# * Payload codec applying to results and errors

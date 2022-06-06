@@ -3,7 +3,9 @@ import dataclasses
 import json
 import logging
 import logging.handlers
+import pickle
 import queue
+import threading
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -16,7 +18,9 @@ from typing import (
     Dict,
     Iterable,
     List,
+    NoReturn,
     Optional,
+    Tuple,
     Type,
     TypeVar,
     cast,
@@ -29,6 +33,8 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
+from temporalio.bridge.proto.workflow_activation import WorkflowActivation
+from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
 from temporalio.converter import DataConverter, PayloadCodec
@@ -40,7 +46,13 @@ from temporalio.exceptions import (
     TimeoutError,
     WorkflowAlreadyStartedError,
 )
-from temporalio.worker import Worker
+from temporalio.worker import (
+    UnsandboxedWorkflowRunner,
+    Worker,
+    WorkflowInstance,
+    WorkflowInstanceDetails,
+    WorkflowRunner,
+)
 from temporalio.workflow_service import RPCError, RPCStatusCode
 
 
@@ -93,13 +105,25 @@ class InfoWorkflow:
 async def test_workflow_info(client: Client):
     async with new_worker(client, InfoWorkflow) as worker:
         workflow_id = f"workflow-{uuid.uuid4()}"
+        retry_policy = RetryPolicy(
+            initial_interval=timedelta(seconds=3),
+            backoff_coefficient=4.0,
+            maximum_interval=timedelta(seconds=5),
+            maximum_attempts=6,
+        )
         info = await client.execute_workflow(
-            InfoWorkflow.run, id=workflow_id, task_queue=worker.task_queue
+            InfoWorkflow.run,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+            retry_policy=retry_policy,
         )
         assert info["attempt"] == 1
         assert info["cron_schedule"] is None
         assert info["execution_timeout"] is None
         assert info["namespace"] == client.namespace
+        assert info["retry_policy"] == json.loads(
+            json.dumps(dataclasses.asdict(retry_policy), default=str)
+        )
         assert uuid.UUID(info["run_id"]).version == 4
         assert info["run_timeout"] is None
         datetime.fromisoformat(info["start_time"])
@@ -277,6 +301,43 @@ async def test_workflow_signal_and_query_handlers(client: Client):
 
 
 @workflow.defn
+class SignalAndQueryErrorsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.signal
+    def bad_signal(self) -> NoReturn:
+        raise ApplicationError("signal fail", 123)
+
+    @workflow.query
+    def bad_query(self) -> NoReturn:
+        raise ApplicationError("query fail", 456)
+
+
+async def test_workflow_signal_and_query_errors(client: Client):
+    async with new_worker(client, SignalAndQueryErrorsWorkflow) as worker:
+        handle = await client.start_workflow(
+            SignalAndQueryErrorsWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Send bad signal
+        await handle.signal(SignalAndQueryErrorsWorkflow.bad_signal)
+        # Wait on workflow
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, ApplicationError)
+        assert list(err.value.cause.details) == [123]
+        # Fail query (no details on query failure)
+        with pytest.raises(RPCError) as rpc_err:
+            await handle.query(SignalAndQueryErrorsWorkflow.bad_query)
+        assert rpc_err.value.status is RPCStatusCode.INVALID_ARGUMENT
+        assert str(rpc_err.value) == "query fail"
+
+
+@workflow.defn
 class AsyncUtilWorkflow:
     def __init__(self) -> None:
         self._status = "starting"
@@ -409,7 +470,6 @@ wait_cancel_complete = asyncio.Event()
 
 @activity.defn
 async def wait_cancel() -> str:
-    global wait_cancel_complete
     wait_cancel_complete.clear()
     try:
         if activity.info().is_local:
@@ -603,25 +663,65 @@ async def test_workflow_simple_cancel(client: Client):
 
 @workflow.defn
 class CancelChildWorkflow:
+    def __init__(self) -> None:
+        self._ready = False
+
     @workflow.run
-    async def run(self, child_id: str) -> None:
-        handle = await workflow.start_child_workflow(LongSleepWorkflow.run, id=child_id)
-        await asyncio.sleep(0.1)
-        handle.cancel()
-        await handle
+    async def run(self, use_execute: bool) -> None:
+        if use_execute:
+            self._task = asyncio.create_task(
+                workflow.execute_child_workflow(
+                    LongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child"
+                )
+            )
+        else:
+            self._task = await workflow.start_child_workflow(
+                LongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child"
+            )
+        self._ready = True
+        await self._task
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.signal
+    async def cancel_child(self) -> None:
+        self._task.cancel()
 
 
-async def test_workflow_cancel_child(client: Client):
+@pytest.mark.parametrize("use_execute", [True, False])
+async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
     async with new_worker(client, CancelChildWorkflow, LongSleepWorkflow) as worker:
         with pytest.raises(WorkflowFailureError) as err:
-            await client.execute_workflow(
+            # Start workflow
+            handle = await client.start_workflow(
                 CancelChildWorkflow.run,
-                f"child-workflow-{uuid.uuid4()}",
+                use_execute,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
+            # Wait until child started
+            async def child_started() -> bool:
+                return await handle.query(
+                    CancelChildWorkflow.ready
+                ) and await client.get_workflow_handle_for(
+                    LongSleepWorkflow.run, workflow_id=f"{handle.id}_child"
+                ).query(
+                    LongSleepWorkflow.started
+                )
+
+            await assert_eq_eventually(True, child_started)
+            # Send cancel signal and wait on the handle
+            await handle.signal(CancelChildWorkflow.cancel_child)
+            await handle.result()
         assert isinstance(err.value.cause, ChildWorkflowError)
         assert isinstance(err.value.cause.cause, CancelledError)
+
+
+@pytest.mark.skip(reason="unable to easily prevent child start currently")
+async def test_workflow_cancel_child_unstarted(client: Client):
+    raise NotImplementedError
 
 
 @workflow.defn
@@ -796,6 +896,255 @@ async def test_workflow_cancel_multi(client: Client):
 
 
 @workflow.defn
+class CancelUnsentWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Timer
+        def raise_error():
+            raise RuntimeError("should not get here")
+
+        timer_handle = asyncio.get_running_loop().call_later(1, raise_error)
+        timer_handle.cancel()
+
+        async def wait_timer():
+            await timer_handle
+
+        await self.wait_and_swallow(wait_timer())
+
+        # Start activity
+        activity_handle = workflow.start_activity(
+            wait_cancel, schedule_to_close_timeout=timedelta(seconds=5)
+        )
+        activity_handle.cancel()
+        await self.wait_and_swallow(activity_handle)
+
+        # Execute activity
+        activity_task = asyncio.create_task(
+            workflow.execute_activity(
+                wait_cancel, schedule_to_close_timeout=timedelta(seconds=5)
+            )
+        )
+        activity_task.cancel()
+        await self.wait_and_swallow(activity_task)
+
+        # Start local activity
+        activity_handle = workflow.start_local_activity(
+            wait_cancel, schedule_to_close_timeout=timedelta(seconds=5)
+        )
+        activity_handle.cancel()
+        await self.wait_and_swallow(activity_handle)
+
+        # Execute local activity
+        activity_task = asyncio.create_task(
+            workflow.execute_local_activity(
+                wait_cancel, schedule_to_close_timeout=timedelta(seconds=5)
+            )
+        )
+        activity_task.cancel()
+        await self.wait_and_swallow(activity_task)
+
+        # Start child
+        child_task1 = asyncio.create_task(
+            workflow.start_child_workflow(
+                LongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child1"
+            )
+        )
+        child_task1.cancel()
+        await self.wait_and_swallow(child_task1)
+
+        # Execute child
+        child_task2 = asyncio.create_task(
+            workflow.execute_child_workflow(
+                LongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child2"
+            )
+        )
+        child_task2.cancel()
+        await self.wait_and_swallow(child_task2)
+
+        # Sleep for a short bit to force another task to run so we know that
+        # workflow completion isn't saving us here
+        await asyncio.sleep(0.01)
+
+    async def wait_and_swallow(self, aw: Awaitable) -> None:
+        try:
+            await aw
+        except:
+            pass
+
+
+async def test_workflow_cancel_unsent(client: Client):
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    async with new_worker(
+        client, CancelUnsentWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+    ) as worker:
+        await client.execute_workflow(
+            CancelUnsentWorkflow.run,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+    # Check history
+    resp = await client.service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=workflow_id),
+        )
+    )
+    found_timer = False
+    for event in resp.history.events:
+        # No activities or children scheduled
+        assert event.event_type is not EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+        assert (
+            event.event_type
+            is not EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED
+        )
+        # Make sure timer is just our 0.01 timer
+        if event.event_type is EventType.EVENT_TYPE_TIMER_STARTED:
+            assert (
+                event.timer_started_event_attributes.start_to_fire_timeout.ToMilliseconds()
+                == 10
+            )
+            found_timer = True
+    assert found_timer
+
+
+@workflow.defn
+class CancelMultipleAttemptWorkflow:
+    def __init__(self) -> None:
+        self._cancel_attempts = 0
+
+    @workflow.run
+    async def run(self, attempts_until_reraise: int) -> None:
+        timer_task: asyncio.Task = asyncio.create_task(asyncio.sleep(1000))
+        while True:
+            try:
+                await asyncio.shield(timer_task)
+            except asyncio.CancelledError:
+                self._cancel_attempts += 1
+                if self._cancel_attempts >= attempts_until_reraise:
+                    raise ApplicationError(
+                        f"cancelled after {self._cancel_attempts} attempts"
+                    )
+
+    @workflow.query
+    def cancel_attempts(self) -> int:
+        return self._cancel_attempts
+
+
+@workflow.defn
+class CancelMultipleAttemptParentWorkflow:
+    def __init__(self) -> None:
+        self._ready = False
+
+    @workflow.run
+    async def run(self, attempts_until_reraise: int) -> None:
+        self._child = await workflow.start_child_workflow(
+            CancelMultipleAttemptWorkflow.run,
+            attempts_until_reraise,
+            id=f"{workflow.info().workflow_id}_child",
+        )
+        self._ready = True
+        await self._child
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.signal
+    def cancel_child(self) -> None:
+        self._child.cancel()
+
+
+@pytest.mark.skip(reason="repeated cancellation not sent")
+async def test_workflow_cancel_multiple_attempt_child(client: Client):
+    # Cancelling with multiple attempts demonstrates that unlike other SDKs,
+    # cancellation is an event not a one-time attempted state
+    async with new_worker(
+        client, CancelMultipleAttemptParentWorkflow, CancelMultipleAttemptWorkflow
+    ) as worker:
+        # Start workflow
+        handle = await client.start_workflow(
+            CancelMultipleAttemptParentWorkflow.run,
+            3,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait until ready
+        async def ready() -> bool:
+            return await handle.query(CancelMultipleAttemptParentWorkflow.ready)
+
+        await assert_eq_eventually(True, ready)
+        # Cancel child repeatedly until it succeeds
+        async def cancel_attempts() -> int:
+            return await client.get_workflow_handle_for(
+                CancelMultipleAttemptWorkflow.run, workflow_id=f"{handle.id}_child"
+            ).query(CancelMultipleAttemptWorkflow.cancel_attempts)
+
+        await handle.signal(CancelMultipleAttemptParentWorkflow.cancel_child)
+        await assert_eq_eventually(1, cancel_attempts)
+        try:
+            await handle.signal(CancelMultipleAttemptParentWorkflow.cancel_child)
+            await assert_eq_eventually(2, cancel_attempts)
+            await handle.signal(CancelMultipleAttemptParentWorkflow.cancel_child)
+            await assert_eq_eventually(3, cancel_attempts)
+            await handle.result()
+        finally:
+            resp = await client.service.get_workflow_execution_history(
+                GetWorkflowExecutionHistoryRequest(
+                    namespace=client.namespace,
+                    execution=WorkflowExecution(workflow_id=handle.id),
+                )
+            )
+            logging.info("Parent history: %s" % resp)
+            resp = await client.service.get_workflow_execution_history(
+                GetWorkflowExecutionHistoryRequest(
+                    namespace=client.namespace,
+                    execution=WorkflowExecution(workflow_id=f"{handle.id}_child"),
+                )
+            )
+            logging.info("Child history: %s" % resp)
+        # TODO(cretz): Capture error
+        # with pytest.raises(WorkflowFailureError) as err:
+        # assert isinstance(err.value.cause, ChildWorkflowError)
+        # assert isinstance(err.value.cause.cause, CancelledError)
+
+
+@pytest.mark.skip(reason="repeated cancellation not sent")
+async def test_workflow_cancel_multiple_attempt_client(client: Client):
+    async with new_worker(client, CancelMultipleAttemptWorkflow) as worker:
+        # Start workflow
+        handle = await client.start_workflow(
+            CancelMultipleAttemptWorkflow.run,
+            3,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Cancel child repeatedly until it succeeds
+        async def cancel_attempts() -> int:
+            return await handle.query(CancelMultipleAttemptWorkflow.cancel_attempts)
+
+        await handle.cancel()
+        await assert_eq_eventually(1, cancel_attempts)
+        try:
+            await handle.cancel()
+            await assert_eq_eventually(2, cancel_attempts)
+            await handle.cancel()
+            await assert_eq_eventually(3, cancel_attempts)
+            await handle.result()
+        finally:
+            resp = await client.service.get_workflow_execution_history(
+                GetWorkflowExecutionHistoryRequest(
+                    namespace=client.namespace,
+                    execution=WorkflowExecution(workflow_id=handle.id),
+                )
+            )
+            logging.info("History: %s" % resp)
+        # TODO(cretz): Capture error
+        # with pytest.raises(WorkflowFailureError) as err:
+        # assert isinstance(err.value.cause, ChildWorkflowError)
+        # assert isinstance(err.value.cause.cause, CancelledError)
+
+
+@workflow.defn
 class ActivityTimeoutWorkflow:
     @workflow.run
     async def run(self) -> None:
@@ -847,7 +1196,57 @@ async def test_workflow_with_codec(client: Client):
     config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
     client = Client(**config)
     await test_workflow_signal_and_query(client)
+    await test_workflow_signal_and_query_errors(client)
     await test_workflow_simple_activity(client)
+
+
+class CustomWorkflowRunner(WorkflowRunner):
+    def __init__(self) -> None:
+        super().__init__()
+        self._unsandboxed = UnsandboxedWorkflowRunner()
+        self._pairs: List[Tuple[WorkflowActivation, WorkflowActivationCompletion]] = []
+
+    async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+        # We need to assert details can be pickled for potential sandbox use
+        det_pickled = pickle.loads(pickle.dumps(det))
+        assert det == det_pickled
+        return CustomWorkflowInstance(
+            self, await self._unsandboxed.create_instance(det)
+        )
+
+
+class CustomWorkflowInstance(WorkflowInstance):
+    def __init__(
+        self, runner: CustomWorkflowRunner, unsandboxed: WorkflowInstance
+    ) -> None:
+        super().__init__()
+        self._runner = runner
+        self._unsandboxed = unsandboxed
+
+    def activate(self, act: WorkflowActivation) -> WorkflowActivationCompletion:
+        comp = self._unsandboxed.activate(act)
+        self._runner._pairs.append((act, comp))
+        return comp
+
+
+async def test_workflow_with_custom_runner(client: Client):
+    runner = CustomWorkflowRunner()
+    async with new_worker(client, HelloWorkflow, workflow_runner=runner) as worker:
+        result = await client.execute_workflow(
+            HelloWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "Hello, Temporal!"
+    # Confirm first activation and last completion
+    assert runner._pairs[0][0].jobs[0].start_workflow.workflow_type == "HelloWorkflow"
+    assert (
+        runner._pairs[-1][-1]
+        .successful.commands[0]
+        .complete_workflow_execution.result.data
+        == b'"Hello, Temporal!"'
+    )
 
 
 @workflow.defn
@@ -917,15 +1316,12 @@ async def test_workflow_logging(client: Client):
                 task_queue=worker.task_queue,
             )
             # Send a couple signals
-            async def last_event() -> str:
-                return await handle.query(LoggingWorkflow.last_signal)
-
             await handle.signal(LoggingWorkflow.my_signal, "signal 1")
             await handle.signal(LoggingWorkflow.my_signal, "signal 2")
             assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
 
         # Confirm two logs happened
-        assert find_log("Signal: signal 1 ({'workflow_id':")
+        assert find_log("Signal: signal 1 ({'attempt':")
         assert find_log("Signal: signal 2")
         assert not find_log("Signal: signal 3")
         # Also make sure it has some workflow info
@@ -1214,7 +1610,7 @@ async def test_workflow_already_started(client: Client):
                 id=id,
                 task_queue=worker.task_queue,
             )
-        assert err.value.status == RPCStatusCode.ALREADY_EXISTS
+        assert err.value.status is RPCStatusCode.ALREADY_EXISTS
 
 
 @workflow.defn
@@ -1337,6 +1733,7 @@ async def test_workflow_local_activity_backoff(client: Client):
             task_queue=worker.task_queue,
             task_timeout=timedelta(seconds=3),
         )
+    # Check history
     resp = await client.service.get_workflow_execution_history(
         GetWorkflowExecutionHistoryRequest(
             namespace=client.namespace,
@@ -1355,20 +1752,47 @@ async def test_workflow_local_activity_backoff(client: Client):
     )
 
 
-# TODO:
-# * Cancelling things whose commands haven't been sent
-# * Starting something on an already-cancelled cancelled task
-# * Cancel unstarted child
-# * Cancel unstarted child from a signal in the same WFT that "child started" may be in later
-# * Explicit create_task and create_future cancelling
-# * Cancel only after N attempts (i.e. showing cancel is an event not a state)
-# * Signal handler errors (treated as workflow errors)
-# * Exception details with codec
-# * Custom workflow runner that also confirms WorkflowInstanceDetails can be pickled
-# * Deadlock detection
-# * Non-query commands after workflow complete
-# * Query after workflow (succeed and fail)
-# * More workflow info data
+deadlock_thread_event = threading.Event()
+
+
+@workflow.defn
+class DeadlockedWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Block on threading event
+        deadlock_thread_event.wait()
+
+
+async def test_workflow_deadlock(client: Client):
+    async with new_worker(client, DeadlockedWorkflow) as worker:
+        deadlock_thread_event.clear()
+        handle = await client.start_workflow(
+            DeadlockedWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def last_history_task_failure() -> str:
+            resp = await client.service.get_workflow_execution_history(
+                GetWorkflowExecutionHistoryRequest(
+                    namespace=client.namespace,
+                    execution=WorkflowExecution(workflow_id=handle.id),
+                ),
+            )
+            for event in reversed(resp.history.events):
+                if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
+                    return event.workflow_task_failed_event_attributes.failure.message
+            return "<no failure>"
+
+        try:
+            await assert_eq_eventually(
+                "Potential deadlock detected, workflow didn't yield within 2 second(s)",
+                last_history_task_failure,
+                timeout=timedelta(seconds=5),
+                interval=timedelta(seconds=1),
+            )
+        finally:
+            deadlock_thread_event.set()
 
 
 def new_worker(
@@ -1376,12 +1800,14 @@ def new_worker(
     *workflows: Type,
     activities: Iterable[Callable] = [],
     task_queue: Optional[str] = None,
+    workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
 ) -> Worker:
     return Worker(
         client,
         task_queue=task_queue or str(uuid.uuid4()),
         workflows=workflows,
         activities=activities,
+        workflow_runner=workflow_runner,
     )
 
 
@@ -1401,6 +1827,7 @@ async def assert_eq_eventually(
         last_value = await fn()
         if expected == last_value:
             return
+        print("COMPARED", expected, last_value)
         await asyncio.sleep(interval.total_seconds())
     assert (
         expected == last_value
