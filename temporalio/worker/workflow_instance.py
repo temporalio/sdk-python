@@ -7,6 +7,7 @@ import collections
 import contextvars
 import inspect
 import logging
+import random
 import sys
 import traceback
 from abc import ABC, abstractmethod
@@ -93,6 +94,7 @@ class WorkflowInstanceDetails:
     defn: temporalio.workflow._Definition
     info: temporalio.workflow.Info
     type_hint_eval_str: bool
+    randomness_seed: int
 
 
 class WorkflowInstance(ABC):
@@ -165,6 +167,11 @@ class _WorkflowInstanceImpl(
         # The actual instance, instantiated on first _run_once
         self._object: Any = None
         self._is_replaying: bool = False
+        self._random = random.Random(det.randomness_seed)
+
+        # Patches we have been notified of and patches that have been sent
+        self._patches_notified: Set[str] = set()
+        self._patches_sent: Set[str] = set()
 
         # Tasks stored by asyncio are weak references and therefore can get GC'd
         # which can cause warnings like "Task was destroyed but it is pending!".
@@ -300,8 +307,7 @@ class _WorkflowInstanceImpl(
         elif job.HasField("query_workflow"):
             self._apply_query_workflow(job.query_workflow)
         elif job.HasField("notify_has_patch"):
-            # TODO(cretz): This
-            pass
+            self._apply_notify_has_patch(job.notify_has_patch)
         elif job.HasField("remove_from_cache"):
             # Ignore, handled externally
             pass
@@ -328,8 +334,7 @@ class _WorkflowInstanceImpl(
         elif job.HasField("start_workflow"):
             self._apply_start_workflow(job.start_workflow)
         elif job.HasField("update_random_seed"):
-            # TODO(cretz): This
-            pass
+            self._apply_update_random_seed(job.update_random_seed)
         else:
             raise RuntimeError(f"Unrecognized job: {job.WhichOneof('variant')}")
 
@@ -398,6 +403,11 @@ class _WorkflowInstanceImpl(
             ),
             name=f"query: {job.query_type}",
         )
+
+    def _apply_notify_has_patch(
+        self, job: temporalio.bridge.proto.workflow_activation.NotifyHasPatch
+    ) -> None:
+        self._patches_notified.add(job.patch_id)
 
     def _apply_resolve_activity(
         self, job: temporalio.bridge.proto.workflow_activation.ResolveActivity
@@ -599,6 +609,11 @@ class _WorkflowInstanceImpl(
             name=f"run",
         )
 
+    def _apply_update_random_seed(
+        self, job: temporalio.bridge.proto.workflow_activation.UpdateRandomSeed
+    ) -> None:
+        self._random.seed(job.randomness_seed)
+
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
 
@@ -688,6 +703,19 @@ class _WorkflowInstanceImpl(
 
     def workflow_now(self) -> datetime:
         return datetime.utcfromtimestamp(asyncio.get_running_loop().time())
+
+    def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
+        use_patch = not self._is_replaying or id in self._patches_notified
+        # Only add patch command if never sent before for this ID
+        if use_patch and not id in self._patches_sent:
+            command = self._add_command()
+            command.set_patch_marker.patch_id = id
+            command.set_patch_marker.deprecated = deprecated
+            self._patches_sent.add(id)
+        return use_patch
+
+    def workflow_random(self) -> random.Random:
+        return self._random
 
     def workflow_set_query_handler(
         self, name: Optional[str], handler: Optional[Callable]

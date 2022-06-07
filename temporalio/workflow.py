@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum
 from functools import partial
+from random import Random
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -370,6 +372,14 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
+        ...
+
+    @abstractmethod
+    def workflow_random(self) -> Random:
+        ...
+
+    @abstractmethod
     def workflow_set_query_handler(
         self, name: Optional[str], handler: Optional[Callable]
     ) -> None:
@@ -440,6 +450,20 @@ class _Runtime(ABC):
         ...
 
 
+def deprecate_patch(id: str) -> None:
+    """Mark a patch as deprecated.
+
+    This marks a workflow that had :py:func:`patched` in a previous version of
+    the code as no longer applicable because all workflows that use the old code
+    path are done and will never be queried again. Therefore the old code path
+    is removed as well.
+
+    Args:
+        id: The identifier originally used with :py:func:`patched`.
+    """
+    _Runtime.current().workflow_patch(id, deprecated=True)
+
+
 def info() -> Info:
     """Current workflow's info.
 
@@ -456,6 +480,51 @@ def now() -> datetime:
         UTC datetime for the current workflow time
     """
     return _Runtime.current().workflow_now()
+
+
+def patched(id: str) -> bool:
+    """Patch a workflow.
+
+    When called, this will only return true if code should take the newer path
+    which means this is either not replaying or is replaying and has seen this
+    patch before.
+
+    Use :py:func:`deprecate_patch` when all workflows are done and will never be
+    queried again. The old code path can be used at that time too.
+
+    Args:
+        id: The identifier for this patch. This identifier may be used
+            repeatedly in the same workflow to represent the same patch
+
+    Returns:
+        True if this should take the newer path, false if it should take the
+        older path.
+    """
+    return _Runtime.current().workflow_patch(id, deprecated=False)
+
+
+def random() -> Random:
+    """Get a deterministic pseudo-random number generator.
+
+    Note, this random number generator is not cryptographically safe and should
+    not be used for security purposes.
+
+    Returns:
+        The deterministically-seeded pseudo-random number generator.
+    """
+    return _Runtime.current().workflow_random()
+
+
+def uuid4() -> uuid.UUID:
+    """Get a new, determinism-safe v4 UUID based on :py:func:`random`.
+
+    Note, this UUID is not cryptographically safe and should not be used for
+    security purposes.
+
+    Returns:
+        A deterministically-seeded v4 UUID.
+    """
+    return uuid.UUID(bytes=random().getrandbits(16 * 8).to_bytes(16, "big"), version=4)
 
 
 async def wait_condition(
