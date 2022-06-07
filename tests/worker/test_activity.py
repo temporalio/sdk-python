@@ -4,6 +4,7 @@ import logging
 import logging.handlers
 import multiprocessing
 import queue
+import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -289,6 +290,11 @@ def picklable_activity_wait_cancel() -> str:
     return "Cancelled"
 
 
+# TODO(cretz): Investigate
+@pytest.mark.skipif(
+    sys.version_info < (3, 10) and sys.platform.startswith("darwin"),
+    reason="CI on 3.7 with macOS fails here intermittently due to GC issues",
+)
 async def test_sync_activity_process_cancel(client: Client, worker: ExternalWorker):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(

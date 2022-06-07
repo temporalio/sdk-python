@@ -465,7 +465,9 @@ async def test_workflow_simple_local_activity(client: Client):
         assert result == "Hello, Temporal!"
 
 
-wait_cancel_complete = asyncio.Event()
+# Cannot create until later so it's in the proper event loop in older Python
+# version (newer Python versions don't put the loop on the event eagerly)
+wait_cancel_complete: asyncio.Event
 
 
 @activity.defn
@@ -534,6 +536,8 @@ class CancelActivityWorkflow:
 
 @pytest.mark.parametrize("local", [True, False])
 async def test_workflow_cancel_activity(client: Client, local: bool):
+    global wait_cancel_complete
+    wait_cancel_complete = asyncio.Event()
     wait_cancel_complete.clear()
     # Need short task timeout to timeout LA task and longer assert timeout
     # so the task can timeout
@@ -1643,22 +1647,6 @@ async def test_workflow_child_already_started(client: Client):
         assert err.value.cause.message == "Already started"
 
 
-@activity.defn
-async def fail_until_attempt_activity(until_attempt: int) -> str:
-    if activity.info().attempt < until_attempt:
-        raise ApplicationError("Attempt too low")
-    return f"attempt: {activity.info().attempt}"
-
-
-@workflow.defn
-class FailUntilAttemptWorkflow:
-    @workflow.run
-    async def run(self, until_attempt: int) -> str:
-        if workflow.info().attempt < until_attempt:
-            raise ApplicationError("Attempt too low")
-        return f"attempt: {workflow.info().attempt}"
-
-
 @workflow.defn
 class TypedConfigWorkflow:
     @workflow.run
@@ -1705,6 +1693,22 @@ async def test_workflow_typed_config(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
+
+@activity.defn
+async def fail_until_attempt_activity(until_attempt: int) -> str:
+    if activity.info().attempt < until_attempt:
+        raise ApplicationError("Attempt too low")
+    return f"attempt: {activity.info().attempt}"
+
+
+@workflow.defn
+class FailUntilAttemptWorkflow:
+    @workflow.run
+    async def run(self, until_attempt: int) -> str:
+        if workflow.info().attempt < until_attempt:
+            raise ApplicationError("Attempt too low")
+        return f"attempt: {workflow.info().attempt}"
 
 
 @workflow.defn
@@ -1956,7 +1960,6 @@ async def assert_eq_eventually(
         last_value = await fn()
         if expected == last_value:
             return
-        print("COMPARED", expected, last_value)
         await asyncio.sleep(interval.total_seconds())
     assert (
         expected == last_value
