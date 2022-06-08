@@ -24,6 +24,7 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    MutableMapping,
     NoReturn,
     Optional,
     Sequence,
@@ -625,7 +626,7 @@ class _WorkflowInstanceImpl(
         run_timeout: Optional[timedelta],
         task_timeout: Optional[timedelta],
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[Mapping[str, Any]],
+        search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> NoReturn:
         # Use definition if callable
         name: Optional[str] = None
@@ -811,7 +812,7 @@ class _WorkflowInstanceImpl(
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cron_schedule: str,
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[Mapping[str, Any]],
+        search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
         name: str
@@ -888,6 +889,20 @@ class _WorkflowInstanceImpl(
                 ret_type=ret_type,
             )
         )
+
+    def workflow_upsert_search_attributes(
+        self, attributes: temporalio.common.SearchAttributes
+    ) -> None:
+        v = self._add_command().upsert_workflow_search_attributes_command_attributes
+        v.seq = self._next_seq("upsert_search_attributes")
+        temporalio.bridge.worker.encode_search_attributes(
+            attributes, v.search_attributes
+        )
+        # Update the keys in the existing dictionary. We keep exact values sent
+        # in instead of any kind of normalization. This means empty lists remain
+        # as empty lists which matches what the server does. We know this is
+        # mutable, so we can cast it as such.
+        cast(MutableMapping, self._info.search_attributes).update(attributes)
 
     async def workflow_wait_condition(
         self, fn: Callable[[], bool], *, timeout: Optional[float] = None
@@ -1665,15 +1680,9 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                     self._instance._payload_converter.to_payloads([val])[0]
                 )
         if self._input.search_attributes:
-            for k, val in self._input.search_attributes.items():
-                v.search_attributes[k] = temporalio.bridge.worker.to_bridge_payload(
-                    # We have to use the default data converter for this
-                    (
-                        temporalio.converter.default().payload_converter.to_payloads(
-                            [val]
-                        )
-                    )[0]
-                )
+            temporalio.bridge.worker.encode_search_attributes(
+                self._input.search_attributes, v.search_attributes
+            )
         v.cancellation_type = cast(
             "temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType",
             int(self._input.cancellation_type),
@@ -1786,10 +1795,6 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
                     self._instance._payload_converter.to_payloads([val])[0]
                 )
         if self._input.search_attributes:
-            for k, val in self._input.search_attributes.items():
-                v.search_attributes[k] = temporalio.bridge.worker.to_bridge_payload(
-                    # We have to use the default data converter for this
-                    temporalio.converter.default().payload_converter.to_payloads([val])[
-                        0
-                    ]
-                )
+            temporalio.bridge.worker.encode_search_attributes(
+                self._input.search_attributes, v.search_attributes
+            )

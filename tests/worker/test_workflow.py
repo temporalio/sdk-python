@@ -10,7 +10,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
     Awaitable,
@@ -18,6 +18,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     NoReturn,
     Optional,
     Tuple,
@@ -26,18 +27,27 @@ from typing import (
     cast,
 )
 
+import grpc
 import pytest
 from typing_extensions import Protocol, runtime_checkable
 
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
-from temporalio.api.enums.v1 import EventType
-from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
+from temporalio.api.enums.v1 import EventType, IndexedValueType
+from temporalio.api.operatorservice.v1 import (
+    AddSearchAttributesRequest,
+    ListSearchAttributesRequest,
+    OperatorServiceStub,
+)
+from temporalio.api.workflowservice.v1 import (
+    GetSearchAttributesRequest,
+    GetWorkflowExecutionHistoryRequest,
+)
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
-from temporalio.common import RetryPolicy
-from temporalio.converter import DataConverter, PayloadCodec
+from temporalio.common import RetryPolicy, SearchAttributes
+from temporalio.converter import DataConverter, PayloadCodec, decode_search_attributes
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -54,6 +64,7 @@ from temporalio.worker import (
     WorkflowRunner,
 )
 from temporalio.workflow_service import RPCError, RPCStatusCode
+from tests.helpers.server import ExternalServer
 
 
 @workflow.defn
@@ -1276,6 +1287,139 @@ async def test_workflow_continue_as_new(client: Client):
         result = await handle.result()
         assert len(result) == 5
         assert result[0] == handle.first_execution_run_id
+
+
+sa_prefix = "python_test_"
+
+
+def search_attrs_to_dict_with_type(attrs: SearchAttributes) -> Mapping[str, Any]:
+    return {
+        k: {
+            "type": type(vals[0]).__name__ if vals else "<unknown>",
+            "values": [str(v) if isinstance(v, datetime) else v for v in vals],
+        }
+        for k, vals in attrs.items()
+    }
+
+
+@workflow.defn
+class SearchAttributeWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.query
+    def get_search_attributes(self) -> Mapping[str, Mapping[str, Any]]:
+        return search_attrs_to_dict_with_type(workflow.info().search_attributes or {})
+
+    @workflow.signal
+    def do_search_attribute_update(self) -> None:
+        workflow.upsert_search_attributes(
+            {
+                f"{sa_prefix}text": ["text3"],
+                # We intentionally leave keyword off to confirm it still comes back
+                f"{sa_prefix}int": [123, 456],
+                # Empty list to confirm removed
+                f"{sa_prefix}double": [],
+                f"{sa_prefix}bool": [False],
+                f"{sa_prefix}datetime": [
+                    datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9)))
+                ],
+            }
+        )
+
+
+async def test_workflow_search_attributes(server: ExternalServer, client: Client):
+    if not server.supports_custom_search_attributes:
+        pytest.skip("Custom search attributes not supported")
+
+    # Add search attributes if not already present
+    async def search_attributes_present() -> bool:
+        resp = await client.service.get_search_attributes(GetSearchAttributesRequest())
+        return any(k for k in resp.keys.keys() if k.startswith(sa_prefix))
+
+    if not await search_attributes_present():
+        async with grpc.aio.insecure_channel(server.host_port) as channel:
+            stub = OperatorServiceStub(channel)
+            await stub.AddSearchAttributes(
+                AddSearchAttributesRequest(
+                    search_attributes={
+                        f"{sa_prefix}text": IndexedValueType.INDEXED_VALUE_TYPE_TEXT,
+                        f"{sa_prefix}keyword": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+                        f"{sa_prefix}int": IndexedValueType.INDEXED_VALUE_TYPE_INT,
+                        f"{sa_prefix}double": IndexedValueType.INDEXED_VALUE_TYPE_DOUBLE,
+                        f"{sa_prefix}bool": IndexedValueType.INDEXED_VALUE_TYPE_BOOL,
+                        f"{sa_prefix}datetime": IndexedValueType.INDEXED_VALUE_TYPE_DATETIME,
+                    },
+                )
+            )
+            # TODO(cretz): Why is it required to issue this list call before it
+            # will appear in the other RPC list call?
+            await stub.ListSearchAttributes(ListSearchAttributesRequest())
+    # Confirm now present
+    assert await search_attributes_present()
+
+    async with new_worker(client, SearchAttributeWorkflow) as worker:
+        handle = await client.start_workflow(
+            SearchAttributeWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            search_attributes={
+                f"{sa_prefix}text": ["text1", "text2", "text0"],
+                f"{sa_prefix}keyword": ["keyword1"],
+                f"{sa_prefix}int": [123],
+                f"{sa_prefix}double": [456.78],
+                f"{sa_prefix}bool": [True],
+                f"{sa_prefix}datetime": [
+                    # With UTC
+                    datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc),
+                    # With other offset
+                    datetime(2002, 3, 4, 5, 6, 7, tzinfo=timezone(timedelta(hours=8))),
+                ],
+            },
+        )
+        # Make sure it started with the right attributes
+        expected = {
+            f"{sa_prefix}text": {"type": "str", "values": ["text1", "text2", "text0"]},
+            f"{sa_prefix}keyword": {"type": "str", "values": ["keyword1"]},
+            f"{sa_prefix}int": {"type": "int", "values": [123]},
+            f"{sa_prefix}double": {"type": "float", "values": [456.78]},
+            f"{sa_prefix}bool": {"type": "bool", "values": [True]},
+            f"{sa_prefix}datetime": {
+                "type": "datetime",
+                "values": ["2001-02-03 04:05:06+00:00", "2002-03-04 05:06:07+08:00"],
+            },
+        }
+        assert expected == await handle.query(
+            SearchAttributeWorkflow.get_search_attributes
+        )
+
+        # Do an attribute update and check query
+        await handle.signal(SearchAttributeWorkflow.do_search_attribute_update)
+        expected = {
+            f"{sa_prefix}text": {"type": "str", "values": ["text3"]},
+            f"{sa_prefix}keyword": {"type": "str", "values": ["keyword1"]},
+            f"{sa_prefix}int": {"type": "int", "values": [123, 456]},
+            f"{sa_prefix}double": {"type": "<unknown>", "values": []},
+            f"{sa_prefix}bool": {"type": "bool", "values": [False]},
+            f"{sa_prefix}datetime": {
+                "type": "datetime",
+                "values": ["2003-04-05 06:07:08+09:00"],
+            },
+        }
+        assert expected == await handle.query(
+            SearchAttributeWorkflow.get_search_attributes
+        )
+
+        # Also confirm it matches describe from the server
+        desc = await handle.describe()
+        attrs = decode_search_attributes(
+            desc.raw_message.workflow_execution_info.search_attributes
+        )
+        # Remove attrs without our prefix
+        attrs = {k: v for k, v in attrs.items() if k.startswith(sa_prefix)}
+        assert expected == search_attrs_to_dict_with_type(attrs)
 
 
 @workflow.defn

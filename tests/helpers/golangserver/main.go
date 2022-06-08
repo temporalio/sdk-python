@@ -12,6 +12,7 @@ import (
 
 	"github.com/DataDog/temporalite"
 	"go.temporal.io/server/common/config"
+	"go.temporal.io/server/common/dynamicconfig"
 	serverlog "go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/rpc/encryption"
 	"go.temporal.io/server/temporal"
@@ -25,6 +26,10 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+// TODO(cretz): No longer works in newer Temporalite versions, waiting on
+// https://github.com/DataDog/temporalite/pull/75
+const supportsTLS = false
 
 func run(portStr, namespace string) error {
 	port, err := strconv.Atoi(portStr)
@@ -41,6 +46,9 @@ func run(portStr, namespace string) error {
 		temporalite.WithFrontendPort(port),
 		// TODO(cretz): Allow verbose output?
 		temporalite.WithLogger(serverlog.NewNoopLogger()),
+		// This is needed so that tests can run without search attribute cache
+		temporalite.WithUpstreamOptions(temporal.WithDynamicConfigClient(dynamicconfig.NewMutableEphemeralClient(
+			dynamicconfig.Set(dynamicconfig.ForceSearchAttributesCacheRefreshOnRead, true)))),
 	)
 	if err != nil {
 		return err
@@ -50,32 +58,34 @@ func run(portStr, namespace string) error {
 	}
 	defer server.Stop()
 
-	// Start TLS server
-	_, thisFile, _, _ := runtime.Caller(0)
-	certsDir := filepath.Join(thisFile, "..", "certs")
-	var rootTLS config.RootTLS
-	rootTLS.Frontend.Server.CertFile = filepath.Join(certsDir, "server-cert.pem")
-	rootTLS.Frontend.Server.KeyFile = filepath.Join(certsDir, "server-key.pem")
-	rootTLS.Frontend.Server.ClientCAFiles = []string{filepath.Join(certsDir, "client-ca-cert.pem")}
-	rootTLS.Frontend.Server.RequireClientAuth = true
-	tlsConfigProvider, err := encryption.NewTLSConfigProviderFromConfig(rootTLS, nil, serverlog.NewNoopLogger(), nil)
-	if err != nil {
-		return err
+	if supportsTLS {
+		// Start TLS server
+		_, thisFile, _, _ := runtime.Caller(0)
+		certsDir := filepath.Join(thisFile, "..", "certs")
+		var rootTLS config.RootTLS
+		rootTLS.Frontend.Server.CertFile = filepath.Join(certsDir, "server-cert.pem")
+		rootTLS.Frontend.Server.KeyFile = filepath.Join(certsDir, "server-key.pem")
+		rootTLS.Frontend.Server.ClientCAFiles = []string{filepath.Join(certsDir, "client-ca-cert.pem")}
+		rootTLS.Frontend.Server.RequireClientAuth = true
+		tlsConfigProvider, err := encryption.NewTLSConfigProviderFromConfig(rootTLS, nil, serverlog.NewNoopLogger(), nil)
+		if err != nil {
+			return err
+		}
+		tlsServer, err := temporalite.NewServer(
+			temporalite.WithNamespaces(namespace),
+			temporalite.WithPersistenceDisabled(),
+			temporalite.WithFrontendPort(port+1000),
+			temporalite.WithLogger(serverlog.NewNoopLogger()),
+			temporalite.WithUpstreamOptions(temporal.WithTLSConfigFactory(tlsConfigProvider)),
+		)
+		if err != nil {
+			return err
+		}
+		if err := tlsServer.Start(); err != nil {
+			return err
+		}
+		defer tlsServer.Stop()
 	}
-	tlsServer, err := temporalite.NewServer(
-		temporalite.WithNamespaces(namespace),
-		temporalite.WithPersistenceDisabled(),
-		temporalite.WithFrontendPort(port+1000),
-		temporalite.WithLogger(serverlog.NewNoopLogger()),
-		temporalite.WithUpstreamOptions(temporal.WithTLSConfigFactory(tlsConfigProvider)),
-	)
-	if err != nil {
-		return err
-	}
-	if err := tlsServer.Start(); err != nil {
-		return err
-	}
-	defer tlsServer.Stop()
 
 	defer log.Printf("Stopping servers")
 	sigCh := make(chan os.Signal, 1)

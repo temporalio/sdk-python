@@ -1,7 +1,7 @@
 """Worker using SDK Core."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List, Mapping
 
 import google.protobuf.internal.containers
 
@@ -366,3 +366,14 @@ async def encode_completion(
                 )
                 for val in command.start_child_workflow_execution.memo.values():
                     await _encode_bridge_payload(val, codec)
+
+
+def encode_search_attributes(
+    attrs: temporalio.common.SearchAttributes,
+    payloads: Mapping[str, temporalio.bridge.proto.common.Payload],
+) -> None:
+    """Encode search attributes as bridge payloads."""
+    for k, vals in attrs.items():
+        payloads[k].CopyFrom(
+            to_bridge_payload(temporalio.converter.encode_search_attribute_values(vals))
+        )
