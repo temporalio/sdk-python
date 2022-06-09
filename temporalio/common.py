@@ -56,6 +56,9 @@ class RetryPolicy:
 
     def apply_to_proto(self, proto: temporalio.api.common.v1.RetryPolicy) -> None:
         """Apply the fields in this policy to the given proto object."""
+        # Do validation before converting
+        self._validate()
+        # Convert
         proto.initial_interval.FromTimedelta(self.initial_interval)
         proto.backoff_coefficient = self.backoff_coefficient
         proto.maximum_interval.FromTimedelta(
@@ -64,6 +67,25 @@ class RetryPolicy:
         proto.maximum_attempts = self.maximum_attempts
         if self.non_retryable_error_types:
             proto.non_retryable_error_types.extend(self.non_retryable_error_types)
+
+    def _validate(self) -> None:
+        # Validation taken from Go SDK's test suite
+        if self.maximum_attempts == 1:
+            # Ignore other validation if disabling retries
+            return
+        if self.initial_interval.total_seconds() < 0:
+            raise ValueError("Initial interval cannot be negative")
+        if self.backoff_coefficient < 1:
+            raise ValueError("Backoff coefficient cannot be less than 1")
+        if self.maximum_interval:
+            if self.maximum_interval.total_seconds() < 0:
+                raise ValueError("Maximum interval cannot be negative")
+            if self.maximum_interval < self.initial_interval:
+                raise ValueError(
+                    "Maximum interval cannot be less than initial interval"
+                )
+        if self.maximum_attempts < 0:
+            raise ValueError("Maximum attempts cannot be negative")
 
 
 class WorkflowIDReusePolicy(IntEnum):

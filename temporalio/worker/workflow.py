@@ -49,6 +49,7 @@ class _WorkflowWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
         type_hint_eval_str: bool,
+        debug_mode: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -71,8 +72,11 @@ class _WorkflowWorker:
         self._type_hint_eval_str = type_hint_eval_str
         self._running_workflows: Dict[str, WorkflowInstance] = {}
 
-        # Unless there's a truthy TEMPORAL_DEBUG env var, set deadlock timeout
-        self._deadlock_timeout_seconds = None if os.environ.get("TEMPORAL_DEBUG") else 2
+        # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
+        # deadlock detection, otherwise set to 2 seconds
+        self._deadlock_timeout_seconds = (
+            None if debug_mode or os.environ.get("TEMPORAL_DEBUG") else 2
+        )
 
         # Validate and build workflow dict
         self._workflows: Dict[str, temporalio.workflow._Definition] = {}
@@ -122,6 +126,7 @@ class _WorkflowWorker:
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         completion.successful.SetInParent()
+        remove_job = None
         try:
             # Decode the activation if there's a codec
             if self._data_converter.payload_codec:

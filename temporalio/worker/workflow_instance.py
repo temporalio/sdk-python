@@ -54,6 +54,7 @@ import temporalio.workflow
 from .interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
+    GetExternalWorkflowHandleInput,
     HandleQueryInput,
     HandleSignalInput,
     StartActivityInput,
@@ -658,7 +659,9 @@ class _WorkflowInstanceImpl(
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        return _ExternalWorkflowHandle(self, id, run_id)
+        return self._outbound.get_external_workflow_handle(
+            GetExternalWorkflowHandleInput(id=id, run_id=run_id)
+        )
 
     def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
         defn = self._queries.get(name)
@@ -1387,6 +1390,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
 
     def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         self._instance._outbound_continue_as_new(input)
+
+    def get_external_workflow_handle(
+        self, input: GetExternalWorkflowHandleInput
+    ) -> temporalio.workflow.ExternalWorkflowHandle:
+        return _ExternalWorkflowHandle(self._instance, input.id, input.run_id)
 
     def info(self) -> temporalio.workflow.Info:
         return self._instance._info
