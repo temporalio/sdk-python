@@ -451,13 +451,8 @@ While running in a workflow, in addition to features documented elsewhere, the f
 
 * `workflow.get_external_workflow_handle()` inside a workflow returns a handle to interact with another workflow
 * `workflow.get_external_workflow_handle_for()` can be used instead for a type safe handle
-<<<<<<< HEAD
-* `await signal()` can be called on the handle to signal the external workflow
-* `await cancel()` can be called on the handle to send a cancel to the external workflow
-=======
 * `await handle.signal()` can be called on the handle to signal the external workflow
 * `await handle.cancel()` can be called on the handle to send a cancel to the external workflow
->>>>>>> remotes/origin/main
 
 ### Activities
 
