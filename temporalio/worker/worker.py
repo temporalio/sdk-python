@@ -63,6 +63,7 @@ class Worker:
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
         graceful_shutdown_timeout: timedelta = timedelta(),
         shared_state_manager: Optional[SharedStateManager] = None,
+        debug_mode: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -133,6 +134,10 @@ class Worker:
                 activities where the activity_executor is not a
                 :py:class:`concurrent.futures.ThreadPoolExecutor`. Reuse of
                 these across workers is encouraged.
+            debug_mode: If true, will disable deadlock detection and may disable
+                sandboxing in order to make using a debugger easier. If false
+                but the environment variable ``TEMPORAL_DEBUG`` is truthy, this
+                will be set to true.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
@@ -143,7 +148,7 @@ class Worker:
             List[Interceptor],
             [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
         )
-        interceptors = itertools.chain(interceptors_from_client, interceptors)
+        interceptors = interceptors_from_client + list(interceptors)
 
         # Instead of using the _type_lookup on the client, we create a separate
         # one here so we can continue to only use the public API of the client
@@ -196,6 +201,7 @@ class Worker:
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             shared_state_manager=shared_state_manager,
+            debug_mode=debug_mode,
         )
         self._task: Optional[asyncio.Task] = None
 
@@ -224,6 +230,7 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 type_hint_eval_str=client_config["type_hint_eval_str"],
+                debug_mode=debug_mode,
             )
 
         # Create bridge worker last. We have empirically observed that if it is
@@ -351,3 +358,4 @@ class WorkerConfig(TypedDict, total=False):
     default_heartbeat_throttle_interval: timedelta
     graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
+    debug_mode: bool

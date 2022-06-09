@@ -451,8 +451,8 @@ While running in a workflow, in addition to features documented elsewhere, the f
 
 * `workflow.get_external_workflow_handle()` inside a workflow returns a handle to interact with another workflow
 * `workflow.get_external_workflow_handle_for()` can be used instead for a type safe handle
-* `await signal()` can be called on the handle to signal the external workflow
-* `await cancel()` can be called on the handle to send a cancel to the external workflow
+* `await handle.signal()` can be called on the handle to signal the external workflow
+* `await handle.cancel()` can be called on the handle to send a cancel to the external workflow
 
 ### Activities
 
@@ -578,9 +578,8 @@ To build the SDK from source for use as a dependency, the following prerequisite
 
 * [Python](https://www.python.org/) >= 3.7
 * [Rust](https://www.rust-lang.org/)
-* [pipx](https://github.com/pypa/pipx#install-pipx) (only needed for installing the two dependencies below)
-* [poetry](https://github.com/python-poetry/poetry) `pipx install poetry`
-* [poe](https://github.com/nat-n/poethepoet) `pipx install poethepoet`
+* [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
+* [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
 
 With the prerequisites installed, first clone the SDK repository recursively:
 
@@ -589,7 +588,8 @@ git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
 ```
 
-Use `poetry` to install the dependencies with `--no-root` to not install this package:
+Use `poetry` to install the dependencies with `--no-root` to not install this package (because we still need to build
+it):
 
 ```bash
 poetry install --no-root
