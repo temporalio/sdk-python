@@ -51,7 +51,7 @@ toml = "^0.10.2"
 twine = "^3.8.0"
 
 [tool.poe.tasks]
-build-develop = ["gen-protos", "build-bridge-develop"]
+build-develop = ["build-bridge-develop"]
 build-bridge-develop = "python scripts/setup_bridge.py develop"
 fix-wheel = "python scripts/fix_wheel.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]

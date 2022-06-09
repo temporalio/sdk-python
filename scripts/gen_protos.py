@@ -68,13 +68,22 @@ def fix_generated_output(base_path: Path):
                 f.write(content)
     # Write init
     with (base_path / "__init__.py").open("w") as f:
+        # Add docstring to API's init
+        if str(base_path.as_posix()).endswith("/temporal/api"):
+            f.write('"""gRPC API."""\n')
         # Imports
         message_names = []
         for stem, messages in imports.items():
             for message in messages:
-                f.write(f"from .{stem} import {message}\n")
+                # MyPy protobuf does not document this experimental class, see
+                # https://github.com/nipunn1313/mypy-protobuf/issues/212#issuecomment-885300106
+                import_suffix = ""
+                if stem == "service_pb2_grpc" and message == "WorkflowService":
+                    import_suffix = " # type: ignore"
+                f.write(f"from .{stem} import {message}{import_suffix}\n")
                 message_names.append(message)
         # __all__
+        message_names = sorted(message_names)
         if message_names:
             f.write(
                 f'\n__all__ = [\n    "' + '",\n    "'.join(message_names) + '",\n]\n'

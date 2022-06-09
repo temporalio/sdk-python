@@ -595,12 +595,6 @@ it):
 poetry install --no-root
 ```
 
-Now generate the protobuf code:
-
-```bash
-poe gen-protos
-```
-
 #### Build
 
 Now perform the release build:
@@ -680,7 +674,6 @@ installing dependencies, and generating the protobuf code:
 git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
 poetry install --no-root
-poe gen-protos
 ```
 
 Now compile the Rust extension in develop mode which is quicker than release mode:
