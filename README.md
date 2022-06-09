@@ -9,8 +9,29 @@ execute asynchronous long-running business logic in a scalable and resilient way
 
 "Temporal Python SDK" is the framework for authoring workflows and activities using the Python programming language.
 
-In addition to this documentation, see the [samples](https://github.com/temporalio/samples-python) repository for code
-examples.
+Also see:
+
+* [Code Samples](https://github.com/temporalio/samples-python)
+* [API Documentation](https://python.temporal.io)
+
+In addition to features common across all Temporal SDKs, the Python SDK also has the following interesting features:
+
+**Type Safe**
+
+This library uses the latest typing and MyPy support with generics to ensure all calls can be typed. For example,
+starting a workflow with an `int` parameter when it accepts a `str` parameter would cause MyPy to fail.
+
+**Different Activity Types**
+
+The activity worker has been developed to work with `async def`, threaded, and multiprocess activities. While
+`async def` activities are the easiest and recommended, care has been taken to make heartbeating and cancellation also
+work across threads/processes.
+
+**Custom `asyncio` Event Loop**
+
+The workflow implementation basically turns `async def` functions into workflows backed by a distributed, fault-tolerant
+event loop. This means task management, sleep, cancellation, etc have all been developed to seamlessly integrate with
+`asyncio` concepts.
 
 **⚠️ UNDER DEVELOPMENT**
 
@@ -18,7 +39,6 @@ The Python SDK is under development. There are no compatibility guarantees nor p
 
 Currently missing features:
 
-* Async activity support (in client or worker)
 * Support for Windows arm, macOS arm (i.e. M1), Linux arm, and Linux x64 glibc < 2.31.
 * Full documentation
 
@@ -35,7 +55,7 @@ These steps can be followed to use with a virtual environment and `pip`:
   * Needed because older versions of `pip` may not pick the right wheel
 * Install Temporal SDK - `python -m pip install temporalio`
 
-The SDK is now ready for use.
+The SDK is now ready for use. To build from source, see "Building" near the end of this documentation.
 
 ### Implementing a Workflow
 
@@ -141,6 +161,15 @@ Some things to note about the above code:
   does the same thing
 * Clients can have many more options not shown here (e.g. data converters and interceptors)
 * A string can be used instead of the method reference to call a workflow by name (e.g. if defined in another language)
+
+Clients also provide a shallow copy of their config for use in making slightly different clients backed by the same
+connection. For instance, given the `client` above, this is how to have a client in another namespace:
+
+```python
+config = client.config()
+config["namespace"] = "my-other-namespace"
+other_ns_client = Client(**config)
+```
 
 #### Data Conversion
 
@@ -393,6 +422,16 @@ protect against cancellation. The following tasks, when cancelled, perform a Tem
 When the workflow itself is requested to cancel, `Task.cancel` is called on the main workflow task. Therefore,
 `asyncio.CancelledError` can be caught in order to handle the cancel gracefully.
 
+Workflows follow `asyncio` cancellation rules exactly which can cause confusion among Python developers. Cancelling a
+task doesn't always cancel the thing it created. For example, given
+`task = asyncio.create_task(workflow.start_child_workflow(...`, calling `task.cancel` does not cancel the child
+workflow, it only cancels the starting of it, which has no effect if it has already started. However, cancelling the
+result of `handle = await workflow.start_child_workflow(...` or
+`task = asyncio.create_task(workflow.execute_child_workflow(...` _does_ cancel the child workflow.
+
+Also, due to Temporal rules, a cancellation request is a state not an event. Therefore, repeated cancellation requests
+are not delivered, only the first. If the workflow chooses swallow a cancellation, it cannot be requested again.
+
 #### Workflow Utilities
 
 While running in a workflow, in addition to features documented elsewhere, the following items are available from the
@@ -405,11 +444,15 @@ While running in a workflow, in addition to features documented elsewhere, the f
 
 #### Exceptions
 
-TODO
+* Workflows can raise exceptions to fail the workflow
+* Using `temporalio.exceptions.ApplicationError`, exceptions can be marked as non-retryable or include details
 
 #### External Workflows
 
-TODO
+* `workflow.get_external_workflow_handle()` inside a workflow returns a handle to interact with another workflow
+* `workflow.get_external_workflow_handle_for()` can be used instead for a type safe handle
+* `await handle.signal()` can be called on the handle to signal the external workflow
+* `await handle.cancel()` can be called on the handle to send a cancel to the external workflow
 
 ### Activities
 
@@ -527,38 +570,137 @@ respect cancellation, the shutdown may never complete.
 The Python SDK is built to work with Python 3.7 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
 
-### Local development environment
+### Building
 
-- Install the system dependencies:
+#### Prepare
 
-  - Python >=3.7
-  - [pipx](https://github.com/pypa/pipx#install-pipx) (only needed for installing the two dependencies below)
-  - [poetry](https://github.com/python-poetry/poetry) `pipx install poetry`
-  - [poe](https://github.com/nat-n/poethepoet) `pipx install poethepoet`
+To build the SDK from source for use as a dependency, the following prerequisites are required:
 
-- Use a local virtual env environment (helps IDEs and Windows):
+* [Python](https://www.python.org/) >= 3.7
+* [Rust](https://www.rust-lang.org/)
+* [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
+* [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
 
-  ```bash
-  poetry config virtualenvs.in-project true
-  ```
+With the prerequisites installed, first clone the SDK repository recursively:
 
-- Install the package dependencies (requires Rust):
+```bash
+git clone --recursive https://github.com/temporalio/sdk-python.git
+cd sdk-python
+```
 
-  ```bash
-  poetry install
-  ```
+Use `poetry` to install the dependencies with `--no-root` to not install this package (because we still need to build
+it):
 
-- Build the project (requires Rust):
+```bash
+poetry install --no-root
+```
 
-  ```bash
-  poe build-develop
-  ```
+Now generate the protobuf code:
 
-- Run the tests (requires Go):
+```bash
+poe gen-protos
+```
 
-  ```bash
-  poe test
-  ```
+#### Build
+
+Now perform the release build:
+
+```bash
+poetry build
+```
+
+This will take a while because Rust will compile the core project in release mode (see "Local SDK development
+environment" for the quicker approach to local development).
+
+The compiled wheel doesn't have the exact right tags yet for use, so run this script to fix it:
+
+```bash
+poe fix-wheel
+```
+
+The `whl` wheel file in `dist/` is now ready to use.
+
+#### Use
+
+The wheel can now be installed into any virtual environment.
+
+For example,
+[create a virtual environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)
+somewhere and then run the following inside the virtual environment:
+
+```bash
+pip install /path/to/cloned/sdk-python/dist/*.whl
+```
+
+Create this Python file at `example.py`:
+
+```python
+import asyncio
+from temporalio import workflow, activity
+from temporalio.client import Client
+from temporalio.worker import Worker
+
+@workflow.defn
+class SayHello:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return f"Hello, {name}!"
+
+async def main():
+    client = await Client.connect("http://localhost:7233")
+    async with Worker(client, task_queue="my-task-queue", workflows=[SayHello]):
+        result = await client.execute_workflow(SayHello.run, "Temporal",
+            id="my-workflow-id", task_queue="my-task-queue")
+        print(f"Result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Assuming there is a [local Temporal server](https://docs.temporal.io/docs/server/quick-install/) running, executing the
+file with `python` (or `python3` if necessary) will give:
+
+    Result: Hello, Temporal!
+
+### Local SDK development environment
+
+For local development, it is often quicker to use debug builds and a local virtual environment.
+
+While not required, it often helps IDEs if we put the virtual environment `.venv` directory in the project itself. This
+can be configured system-wide via:
+
+```bash
+poetry config virtualenvs.in-project true
+```
+
+Now perform the same steps as the "Prepare" section above by installing the prerequisites, cloning the project,
+installing dependencies, and generating the protobuf code:
+
+```bash
+git clone --recursive https://github.com/temporalio/sdk-python.git
+cd sdk-python
+poetry install --no-root
+poe gen-protos
+```
+
+Now compile the Rust extension in develop mode which is quicker than release mode:
+
+```bash
+poe build-develop
+```
+
+That step can be repeated for any Rust changes made.
+
+The environment is now ready to develop in.
+
+#### Testing
+
+Tests currently require [Go](https://go.dev/) to be installed since they use an embedded Temporal server as a library.
+With `Go` installed, run the following to execute tests:
+
+```bash
+poe test
+```
 
 ### Style
 

@@ -4,11 +4,12 @@ import logging
 import logging.handlers
 import multiprocessing
 import queue
+import sys
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Optional
 
 import pytest
 
@@ -26,15 +27,7 @@ from temporalio.exceptions import (
     TimeoutError,
     TimeoutType,
 )
-from temporalio.worker import (
-    ActivityInboundInterceptor,
-    ActivityOutboundInterceptor,
-    ExecuteActivityInput,
-    Interceptor,
-    SharedStateManager,
-    Worker,
-    WorkerConfig,
-)
+from temporalio.worker import SharedStateManager, Worker, WorkerConfig
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -289,6 +282,11 @@ def picklable_activity_wait_cancel() -> str:
     return "Cancelled"
 
 
+# TODO(cretz): Investigate
+@pytest.mark.skipif(
+    sys.version_info < (3, 10) and sys.platform.startswith("darwin"),
+    reason="CI on 3.7 with macOS fails here intermittently due to GC issues",
+)
 async def test_sync_activity_process_cancel(client: Client, worker: ExternalWorker):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
@@ -730,31 +728,6 @@ async def test_sync_activity_process_worker_shutdown_graceful(
     assert "Worker graceful shutdown" == await handle.result()
 
 
-async def test_activity_interceptor(client: Client, worker: ExternalWorker):
-    @activity.defn
-    async def say_hello(name: str) -> str:
-        # Get info and record a heartbeat
-        activity.info()
-        activity.heartbeat("some details!")
-        return f"Hello, {name}!"
-
-    interceptor = TracingWorkerInterceptor()
-    result = await _execute_workflow_with_activity(
-        client,
-        worker,
-        say_hello,
-        "Temporal",
-        worker_config={"interceptors": [interceptor]},
-    )
-    assert result.result == "Hello, Temporal!"
-    # Since "info" is called multiple times (called in logger to provide
-    # context), we just get traces by key
-    traces = {trace[0]: trace[1] for trace in interceptor.traces}
-    assert traces["activity.inbound.execute_activity"].args[0] == "Temporal"
-    assert "activity.outbound.info" in traces
-    assert traces["activity.outbound.heartbeat"][0] == "some details!"
-
-
 class AsyncActivityWrapper:
     def __init__(self) -> None:
         self._info: Optional[activity.Info] = None
@@ -934,48 +907,3 @@ def assert_activity_application_error(
     ret = assert_activity_error(err)
     assert isinstance(ret, ApplicationError)
     return ret
-
-
-class TracingWorkerInterceptor(Interceptor):
-    def intercept_activity(
-        self, next: ActivityInboundInterceptor
-    ) -> ActivityInboundInterceptor:
-        self.traces: List[Tuple[str, Any]] = []
-        return TracingWorkerActivityInboundInterceptor(self, next)
-
-
-class TracingWorkerActivityInboundInterceptor(ActivityInboundInterceptor):
-    def __init__(
-        self,
-        parent: TracingWorkerInterceptor,
-        next: ActivityInboundInterceptor,
-    ) -> None:
-        super().__init__(next)
-        self._parent = parent
-
-    def init(self, outbound: ActivityOutboundInterceptor) -> None:
-        return super().init(
-            TracingWorkerActivityOutboundInterceptor(self._parent, outbound)
-        )
-
-    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
-        self._parent.traces.append(("activity.inbound.execute_activity", input))
-        return await super().execute_activity(input)
-
-
-class TracingWorkerActivityOutboundInterceptor(ActivityOutboundInterceptor):
-    def __init__(
-        self,
-        parent: TracingWorkerInterceptor,
-        next: ActivityOutboundInterceptor,
-    ) -> None:
-        super().__init__(next)
-        self._parent = parent
-
-    def info(self) -> activity.Info:
-        self._parent.traces.append(("activity.outbound.info", None))
-        return super().info()
-
-    def heartbeat(self, *details: Any) -> None:
-        self._parent.traces.append(("activity.outbound.heartbeat", details))
-        return super().heartbeat(*details)

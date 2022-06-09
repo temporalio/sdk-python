@@ -35,10 +35,6 @@ logger = logging.getLogger(__name__)
 # Set to true to log all activations and completions
 LOG_PROTOS = False
 
-# Maximum amount of seconds a thread can run a workflow activation before a
-# deadlock is assumed
-DEADLOCK_TIMEOUT_SECONDS = 2
-
 
 class _WorkflowWorker:
     def __init__(
@@ -53,6 +49,7 @@ class _WorkflowWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
         type_hint_eval_str: bool,
+        debug_mode: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -74,6 +71,12 @@ class _WorkflowWorker:
                 self._interceptor_classes.append(interceptor_class)
         self._type_hint_eval_str = type_hint_eval_str
         self._running_workflows: Dict[str, WorkflowInstance] = {}
+
+        # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
+        # deadlock detection, otherwise set to 2 seconds
+        self._deadlock_timeout_seconds = (
+            None if debug_mode or os.environ.get("TEMPORAL_DEBUG") else 2
+        )
 
         # Validate and build workflow dict
         self._workflows: Dict[str, temporalio.workflow._Definition] = {}
@@ -116,13 +119,14 @@ class _WorkflowWorker:
     async def _handle_activation(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> None:
-        global LOG_PROTOS, DEADLOCK_TIMEOUT_SECONDS
+        global LOG_PROTOS
 
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         completion.successful.SetInParent()
+        remove_job = None
         try:
             # Decode the activation if there's a codec
             if self._data_converter.payload_codec:
@@ -155,11 +159,11 @@ class _WorkflowWorker:
                 # Wait for deadlock timeout and set commands if successful
                 try:
                     completion = await asyncio.wait_for(
-                        activate_task, DEADLOCK_TIMEOUT_SECONDS
+                        activate_task, self._deadlock_timeout_seconds
                     )
                 except asyncio.TimeoutError:
                     raise RuntimeError(
-                        f"Potential deadlock detected, workflow didn't yield within {DEADLOCK_TIMEOUT_SECONDS} second(s)"
+                        f"Potential deadlock detected, workflow didn't yield within {self._deadlock_timeout_seconds} second(s)"
                     )
         except Exception as err:
             logger.exception(
@@ -252,6 +256,9 @@ class _WorkflowWorker:
             else None,
             namespace=self._namespace,
             parent=parent,
+            retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
+            if start.HasField("retry_policy")
+            else None,
             run_id=act.run_id,
             run_timeout=start.workflow_run_timeout.ToTimedelta()
             if start.HasField("workflow_run_timeout")

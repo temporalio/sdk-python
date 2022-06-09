@@ -1,3 +1,3 @@
 [submodule "sdk-core"]
 	path = temporalio/bridge/sdk-core
-	url = git@github.com:temporalio/sdk-core.git
+	url = https://github.com/temporalio/sdk-core.git

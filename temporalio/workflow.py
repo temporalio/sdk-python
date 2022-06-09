@@ -268,6 +268,7 @@ class Info:
     execution_timeout: Optional[timedelta]
     namespace: str
     parent: Optional[ParentInfo]
+    retry_policy: Optional[temporalio.common.RetryPolicy]
     run_id: str
     run_timeout: Optional[timedelta]
     start_time: datetime
@@ -277,14 +278,17 @@ class Info:
     workflow_type: str
 
     # TODO(cretz): memo
-    # TODO(cretz): retry_policy
     # TODO(cretz): search_attributes
 
     def _logger_details(self) -> Mapping[str, Any]:
         return {
+            # TODO(cretz): worker ID?
+            "attempt": self.attempt,
+            "namespace": self.namespace,
+            "run_id": self.run_id,
+            "task_queue": self.task_queue,
             "workflow_id": self.workflow_id,
             "workflow_type": self.workflow_type,
-            # TODO(cretz): more
         }
 
 

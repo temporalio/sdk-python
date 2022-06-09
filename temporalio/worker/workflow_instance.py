@@ -53,6 +53,7 @@ import temporalio.workflow
 from .interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
+    GetExternalWorkflowHandleInput,
     HandleQueryInput,
     HandleSignalInput,
     StartActivityInput,
@@ -172,6 +173,12 @@ class _WorkflowInstanceImpl(
         # Patches we have been notified of and patches that have been sent
         self._patches_notified: Set[str] = set()
         self._patches_sent: Set[str] = set()
+
+        # Tasks stored by asyncio are weak references and therefore can get GC'd
+        # which can cause warnings like "Task was destroyed but it is pending!".
+        # So we store the tasks ourselves.
+        # See https://bugs.python.org/issue21163 and others.
+        self._tasks: Set[asyncio.Task] = set()
 
         # We maintain signals and queries on this class since handlers can be
         # added during workflow execution
@@ -394,7 +401,8 @@ class _WorkflowInstanceImpl(
                     name=job.query_type,
                     args=args,
                 )
-            )
+            ),
+            name=f"query: {job.query_type}",
         )
 
     def _apply_notify_has_patch(
@@ -568,7 +576,8 @@ class _WorkflowInstanceImpl(
 
         # Schedule the handler
         self.create_task(
-            self._run_top_level_workflow_function(self._inbound.handle_signal(input))
+            self._run_top_level_workflow_function(self._inbound.handle_signal(input)),
+            name=f"signal: {job.signal_name}",
         )
 
     def _apply_start_workflow(
@@ -597,7 +606,8 @@ class _WorkflowInstanceImpl(
             args=self._convert_payloads(job.arguments, arg_types),
         )
         self._primary_task = self.create_task(
-            self._run_top_level_workflow_function(run_workflow(input))
+            self._run_top_level_workflow_function(run_workflow(input)),
+            name=f"run",
         )
 
     def _apply_update_random_seed(
@@ -648,7 +658,9 @@ class _WorkflowInstanceImpl(
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        return _ExternalWorkflowHandle(self, id, run_id)
+        return self._outbound.get_external_workflow_handle(
+            GetExternalWorkflowHandleInput(id=id, run_id=run_id)
+        )
 
     def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
         defn = self._queries.get(name)
@@ -727,7 +739,8 @@ class _WorkflowInstanceImpl(
                     self.create_task(
                         self._run_top_level_workflow_function(
                             self._inbound.handle_signal(input)
-                        )
+                        ),
+                        name=f"signal: {input.name} (buffered)",
                     )
             else:
                 for inputs in self._buffered_signals.values():
@@ -735,7 +748,8 @@ class _WorkflowInstanceImpl(
                         self.create_task(
                             self._run_top_level_workflow_function(
                                 self._inbound.handle_signal(input)
-                            )
+                            ),
+                            name=f"signal: {input.name} (buffered)",
                         )
                 self._buffered_signals.clear()
         else:
@@ -907,8 +921,11 @@ class _WorkflowInstanceImpl(
         # Function that runs in the handle
         async def run_activity() -> Any:
             nonlocal handle
+            assert handle
             while True:
-                assert handle
+                # Mark it as started each loop because backoff could cause it to
+                # be marked as unstarted
+                handle._started = True
                 try:
                     # We have to shield because we don't want the underlying
                     # result future to be cancelled
@@ -925,7 +942,6 @@ class _WorkflowInstanceImpl(
                     self._pending_activities[handle._seq] = handle
                 except asyncio.CancelledError:
                     # Send a cancel request to the activity
-                    # TODO(cretz): What if the schedule command hasn't been sent yet?
                     handle._apply_cancel_command(self._add_command())
 
         # Create the handle and set as pending
@@ -944,7 +960,6 @@ class _WorkflowInstanceImpl(
             nonlocal handle
             assert handle
             # Send a cancel request to the child
-            # TODO(cretz): What if the schedule command hasn't been sent yet?
             cancel_command = self._add_command()
             handle._apply_cancel_command(cancel_command)
             # If the cancel command is for external workflow, we
@@ -1038,6 +1053,24 @@ class _WorkflowInstanceImpl(
         self._curr_seqs[type] = seq
         return seq
 
+    def _register_task(self, task: asyncio.Task, *, name: Optional[str]) -> None:
+        # Name not supported on older Python versions
+        if sys.version_info >= (3, 8):
+            # Put the workflow info at the end of the task name
+            name = name or task.get_name()
+            name += f" (workflow: {self._info.workflow_type}, id: {self._info.workflow_id}, run: {self._info.run_id})"
+            task.set_name(name)
+        # Add to and remove from our own non-weak set instead of relying on
+        # Python's weak set which can collect these too early
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.remove)
+        # When the workflow is GC'd (for whatever reason, e.g. eviction or
+        # worker shutdown), still-open tasks get a message logged to the
+        # exception handler about still pending. We disable this if the
+        # attribute is available.
+        if hasattr(task, "_log_destroy_pending"):
+            setattr(task, "_log_destroy_pending", False)
+
     def _run_once(self) -> None:
         try:
             asyncio._set_running_loop(self)
@@ -1125,7 +1158,7 @@ class _WorkflowInstanceImpl(
 
     def _stack_trace(self) -> str:
         stacks = []
-        for task in asyncio.all_tasks(self):
+        for task in self._tasks:
             # TODO(cretz): These stacks are not very clean currently
             frames = []
             for frame in task.get_stack():
@@ -1191,10 +1224,9 @@ class _WorkflowInstanceImpl(
         *,
         name: Optional[str] = None,
     ) -> asyncio.Task[_T]:
-        # Name not supported in older Python versions
-        if sys.version_info < (3, 8):
-            return asyncio.Task(coro, loop=self)
-        return asyncio.Task(coro, loop=self, name=name)
+        task = asyncio.Task(coro, loop=self)
+        self._register_task(task, name=name)
+        return task
 
     def get_exception_handler(self) -> Optional[_ExceptionHandler]:
         return self._exception_handler
@@ -1344,6 +1376,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         self._instance._outbound_continue_as_new(input)
 
+    def get_external_workflow_handle(
+        self, input: GetExternalWorkflowHandleInput
+    ) -> temporalio.workflow.ExternalWorkflowHandle:
+        return _ExternalWorkflowHandle(self._instance, input.id, input.run_id)
+
     def info(self) -> temporalio.workflow.Info:
         return self._instance._info
 
@@ -1406,20 +1443,36 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         input: Union[StartActivityInput, StartLocalActivityInput],
         fn: Awaitable[Any],
     ) -> None:
-        # TODO(cretz): Customize name in 3.9+?
         super().__init__(fn)
         self._instance = instance
         self._seq = instance._next_seq("activity")
         self._input = input
         self._result_fut = instance.create_future()
+        self._started = False
+        instance._register_task(self, name=f"activity: {input.activity}")
+
+    def cancel(self, msg: Optional[Any] = None) -> bool:
+        # We override this because if it's not yet started and not done, we need
+        # to send a cancel command because the async function won't run to trap
+        # the cancel (i.e. cancelled before started)
+        if not self._started and not self.done():
+            self._apply_cancel_command(self._instance._add_command())
+        # Message not supported in older versions
+        if sys.version_info < (3, 9):
+            return super().cancel()
+        return super().cancel(msg)
 
     def _resolve_success(self, result: Any) -> None:
         # We intentionally let this error if already done
         self._result_fut.set_result(result)
 
     def _resolve_failure(self, err: Exception) -> None:
-        # We intentionally let this error if already done
-        self._result_fut.set_exception(err)
+        # If it was never started, we don't need to set this failure. In cases
+        # where this is cancelled before started, setting this exception causes
+        # a Python warning to be emitted because this future is never awaited
+        # on.
+        if self._started:
+            self._result_fut.set_exception(err)
 
     def _resolve_backoff(
         self, backoff: temporalio.bridge.proto.activity_result.DoBackoff
@@ -1429,6 +1482,8 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self._result_fut.set_exception(_ActivityDoBackoffError(backoff))
         # Replace the result future since that one is resolved now
         self._result_fut = self._instance.create_future()
+        # Mark this as not started since it's a new future
+        self._started = False
 
     def _apply_schedule_command(
         self,
@@ -1516,7 +1571,6 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         input: StartChildWorkflowInput,
         fn: Awaitable[Any],
     ) -> None:
-        # TODO(cretz): Customize name in 3.9+?
         super().__init__(fn)
         self._instance = instance
         self._seq = seq
@@ -1524,6 +1578,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._start_fut: asyncio.Future[None] = instance.create_future()
         self._result_fut: asyncio.Future[Any] = instance.create_future()
         self._first_execution_run_id = "<unknown>"
+        instance._register_task(self, name=f"child: {input.workflow}")
 
     @property
     def id(self) -> str:
