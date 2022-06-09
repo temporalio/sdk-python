@@ -629,6 +629,10 @@ def encode_search_attribute_values(
                     "Timezone must be present on all search attribute dates"
                 )
             v = v.isoformat()
+        elif not isinstance(v, (str, int, float, bool)):
+            raise TypeError(
+                f"Search attribute value of type {type(v).__name__} not one of str, int, float, bool, or datetime"
+            )
         safe_vals.append(v)
     return default().payload_converter.to_payloads([safe_vals])[0]
 

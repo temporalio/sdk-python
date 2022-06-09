@@ -78,7 +78,9 @@ def fix_generated_output(base_path: Path):
                 # MyPy protobuf does not document this experimental class, see
                 # https://github.com/nipunn1313/mypy-protobuf/issues/212#issuecomment-885300106
                 import_suffix = ""
-                if stem == "service_pb2_grpc" and message == "WorkflowService":
+                if stem == "service_pb2_grpc" and (
+                    message == "WorkflowService" or message == "OperatorService"
+                ):
                     import_suffix = " # type: ignore"
                 f.write(f"from .{stem} import {message}{import_suffix}\n")
                 message_names.append(message)
