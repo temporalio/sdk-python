@@ -884,7 +884,7 @@ class MultiCancelWorkflow:
         )
         await asyncio.sleep(0.1)
         fut.cancel()
-        await workflow.wait_condition(lambda: len(events) == 4, timeout=4)
+        await workflow.wait_condition(lambda: len(events) == 4, timeout=30)
         # Wait on the future just to make asyncio happy
         try:
             await fut
@@ -1197,11 +1197,11 @@ async def test_workflow_search_attributes(server: ExternalServer, client: Client
     if not server.supports_custom_search_attributes:
         pytest.skip("Custom search attributes not supported")
 
-    # Add search attributes if not already present
     async def search_attributes_present() -> bool:
         resp = await client.service.get_search_attributes(GetSearchAttributesRequest())
         return any(k for k in resp.keys.keys() if k.startswith(sa_prefix))
 
+    # Add search attributes if not already present
     if not await search_attributes_present():
         async with grpc.aio.insecure_channel(server.host_port) as channel:
             stub = OperatorServiceStub(channel)

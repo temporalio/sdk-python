@@ -526,9 +526,9 @@ def random() -> Random:
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
     """Upsert search attributes for this workflow.
 
-    The keys will be added/replaced on top of the existing search attributes in
-    the same manner as :py:meth:`dict.update`. :py:attr:`Info.search_attributes`
-    will also be updated with these values.
+    The keys will be added or replaced on top of the existing search attributes
+    in the same manner as :py:meth:`dict.update`.
+    :py:attr:`Info.search_attributes` will also be updated with these values.
 
     Technically an existing search attribute cannot be deleted, but an empty
     list can be provided for the values which is effectively the same thing.
