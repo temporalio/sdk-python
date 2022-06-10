@@ -597,16 +597,16 @@ def default() -> DataConverter:
 
 
 def encode_search_attributes(
-    attrs: temporalio.common.SearchAttributes,
+    attributes: temporalio.common.SearchAttributes,
     api: temporalio.api.common.v1.SearchAttributes,
 ) -> None:
     """Convert search attributes into an API message.
 
     Args:
-        attrs: Search attributes to convert.
+        attributes: Search attributes to convert.
         api: API message to set converted attributes on.
     """
-    for k, v in attrs.items():
+    for k, v in attributes.items():
         api.indexed_fields[k].CopyFrom(encode_search_attribute_values(v))
 
 

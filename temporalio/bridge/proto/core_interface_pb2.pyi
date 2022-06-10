@@ -6,8 +6,8 @@ import builtins
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
+import temporalio.api.common.v1.message_pb2
 import temporalio.bridge.proto.activity_result.activity_result_pb2
-import temporalio.bridge.proto.common.common_pb2
 import typing
 import typing_extensions
 
@@ -24,14 +24,14 @@ class ActivityHeartbeat(google.protobuf.message.Message):
     def details(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.bridge.proto.common.common_pb2.Payload
+        temporalio.api.common.v1.message_pb2.Payload
     ]: ...
     def __init__(
         self,
         *,
         task_token: builtins.bytes = ...,
         details: typing.Optional[
-            typing.Iterable[temporalio.bridge.proto.common.common_pb2.Payload]
+            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
     ) -> None: ...
     def ClearField(

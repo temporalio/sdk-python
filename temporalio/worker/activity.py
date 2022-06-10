@@ -29,6 +29,7 @@ import temporalio.bridge.proto.activity_task
 import temporalio.bridge.proto.common
 import temporalio.bridge.worker
 import temporalio.client
+import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow_service
@@ -219,11 +220,8 @@ class _ActivityWorker:
         try:
             heartbeat = temporalio.bridge.proto.ActivityHeartbeat(task_token=task_token)
             if details:
-                converted_details = await self._data_converter.encode(details)
                 # Convert to core payloads
-                heartbeat.details.extend(
-                    temporalio.bridge.worker.to_bridge_payloads(converted_details)
-                )
+                heartbeat.details.extend(await self._data_converter.encode(details))
             logger.debug("Recording heartbeat with details %s", details)
             self._bridge_worker().record_activity_heartbeat(heartbeat)
         except Exception as err:
@@ -314,8 +312,7 @@ class _ActivityWorker:
                     []
                     if not start.input
                     else await self._data_converter.decode(
-                        temporalio.bridge.worker.from_bridge_payloads(start.input),
-                        type_hints=arg_types,
+                        start.input, type_hints=arg_types
                     )
                 )
             except Exception as err:
@@ -329,11 +326,7 @@ class _ActivityWorker:
                 heartbeat_details = (
                     []
                     if not start.heartbeat_details
-                    else await self._data_converter.decode(
-                        temporalio.bridge.worker.from_bridge_payloads(
-                            start.heartbeat_details
-                        )
-                    )
+                    else await self._data_converter.decode(start.heartbeat_details)
                 )
             except Exception as err:
                 raise temporalio.exceptions.ApplicationError(
@@ -348,16 +341,12 @@ class _ActivityWorker:
                 current_attempt_scheduled_time=_proto_to_datetime(
                     start.current_attempt_scheduled_time
                 ),
-                header={
-                    k: temporalio.bridge.worker.from_bridge_payload(v)
-                    for k, v in start.header_fields.items()
-                },
                 heartbeat_details=heartbeat_details,
                 heartbeat_timeout=start.heartbeat_timeout.ToTimedelta()
                 if start.HasField("heartbeat_timeout")
                 else None,
                 is_local=start.is_local,
-                retry_policy=temporalio.bridge.worker.retry_policy_from_proto(
+                retry_policy=temporalio.common.RetryPolicy.from_proto(
                     start.retry_policy
                 )
                 if start.HasField("retry_policy")
@@ -413,9 +402,8 @@ class _ActivityWorker:
             if result is None:
                 completion.result.completed.SetInParent()
             else:
-                result_payloads = await self._data_converter.encode([result])
                 completion.result.completed.result.CopyFrom(
-                    temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
+                    (await self._data_converter.encode([result]))[0]
                 )
         except (
             Exception,

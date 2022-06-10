@@ -7,8 +7,8 @@ import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
+import temporalio.api.common.v1.message_pb2
 import temporalio.api.failure.v1.message_pb2
-import temporalio.bridge.proto.common.common_pb2
 import typing
 import typing_extensions
 
@@ -150,13 +150,11 @@ class Success(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     RESULT_FIELD_NUMBER: builtins.int
     @property
-    def result(self) -> temporalio.bridge.proto.common.common_pb2.Payload: ...
+    def result(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
     def __init__(
         self,
         *,
-        result: typing.Optional[
-            temporalio.bridge.proto.common.common_pb2.Payload
-        ] = ...,
+        result: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["result", b"result"]
@@ -246,6 +244,7 @@ class DoBackoff(google.protobuf.message.Message):
     """The attempt number that lang should provide when scheduling the retry. If the LA failed
     on attempt 4 and we told lang to back off with a timer, this number will be 5.
     """
+
     @property
     def backoff_duration(self) -> google.protobuf.duration_pb2.Duration: ...
     @property

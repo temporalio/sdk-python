@@ -583,6 +583,9 @@ To build the SDK from source for use as a dependency, the following prerequisite
 * [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
 * [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
 
+macOS note: If errors are encountered, it may be better to install Python and Rust as recommended from their websites
+instead of via `brew`.
+
 With the prerequisites installed, first clone the SDK repository recursively:
 
 ```bash
@@ -623,6 +626,10 @@ The wheel can now be installed into any virtual environment.
 For example,
 [create a virtual environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)
 somewhere and then run the following inside the virtual environment:
+
+```bash
+pip install wheel
+```
 
 ```bash
 pip install /path/to/cloned/sdk-python/dist/*.whl

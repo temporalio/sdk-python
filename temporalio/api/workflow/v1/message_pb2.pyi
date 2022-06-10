@@ -327,6 +327,7 @@ class PendingChildExecutionInfo(google.protobuf.message.Message):
     initiated_id: builtins.int
     parent_close_policy: temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
     """Default: PARENT_CLOSE_POLICY_TERMINATE."""
+
     def __init__(
         self,
         *,
@@ -457,6 +458,7 @@ class ResetPointInfo(google.protobuf.message.Message):
         pass
     resettable: builtins.bool
     """false if the reset point has pending childWFs/reqCancels/signalExternals."""
+
     def __init__(
         self,
         *,

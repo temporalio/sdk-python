@@ -80,13 +80,13 @@ class ExternalGolangServer(ExternalServer):
         )
         # Try to get the client multiple times to check whether server is online
         last_err: RuntimeError
-        for _ in range(10):
+        for _ in range(30):
             try:
                 await server.new_client()
                 return server
             except RuntimeError as err:
                 last_err = err
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(1)
         raise last_err
 
     def __init__(

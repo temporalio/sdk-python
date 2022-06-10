@@ -39,13 +39,13 @@ from typing import (
 from typing_extensions import TypeAlias
 
 import temporalio.activity
+import temporalio.api.common.v1
+import temporalio.api.enums.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
-import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
-import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
@@ -369,9 +369,7 @@ class _WorkflowInstanceImpl(
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
                     )
-                command.respond_to_query.succeeded.response.CopyFrom(
-                    temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
-                )
+                command.respond_to_query.succeeded.response.CopyFrom(result_payloads[0])
             except Exception as err:
                 try:
                     temporalio.exceptions.apply_exception_to_failure(
@@ -594,9 +592,7 @@ class _WorkflowInstanceImpl(
                     f"Expected 1 result payload, got {len(result_payloads)}"
                 )
             command = self._add_command()
-            command.complete_workflow_execution.result.CopyFrom(
-                temporalio.bridge.worker.to_bridge_payload(result_payloads[0])
-            )
+            command.complete_workflow_execution.result.CopyFrom(result_payloads[0])
 
         # Schedule it
         arg_types, _ = self._type_lookup.get_type_hints(self._defn.run_fn)
@@ -896,11 +892,8 @@ class _WorkflowInstanceImpl(
     def workflow_upsert_search_attributes(
         self, attributes: temporalio.common.SearchAttributes
     ) -> None:
-        v = self._add_command().upsert_workflow_search_attributes_command_attributes
-        v.seq = self._next_seq("upsert_search_attributes")
-        temporalio.bridge.worker.encode_search_attributes(
-            attributes, v.search_attributes
-        )
+        v = self._add_command().upsert_workflow_search_attributes
+        _encode_search_attributes(attributes, v.search_attributes)
         # Update the keys in the existing dictionary. We keep exact values sent
         # in instead of any kind of normalization. This means empty lists remain
         # as empty lists which matches what the server does. We know this is
@@ -1047,7 +1040,7 @@ class _WorkflowInstanceImpl(
 
     def _convert_payloads(
         self,
-        payloads: Sequence[temporalio.bridge.proto.common.Payload],
+        payloads: Sequence[temporalio.api.common.v1.Payload],
         types: Optional[List[Type]],
     ) -> List[Any]:
         if not payloads:
@@ -1057,7 +1050,7 @@ class _WorkflowInstanceImpl(
             types = None
         try:
             return self._payload_converter.from_payloads(
-                temporalio.bridge.worker.from_bridge_payloads(payloads),
+                payloads,
                 type_hints=types,
             )
         except Exception as err:
@@ -1523,9 +1516,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         # v.headers = input.he
         if self._input.args:
             v.arguments.extend(
-                temporalio.bridge.worker.to_bridge_payloads(
-                    self._instance._payload_converter.to_payloads(self._input.args)
-                )
+                self._instance._payload_converter.to_payloads(self._input.args)
             )
         if self._input.schedule_to_close_timeout:
             v.schedule_to_close_timeout.FromTimedelta(
@@ -1538,9 +1529,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         if self._input.start_to_close_timeout:
             v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         if self._input.retry_policy:
-            temporalio.bridge.worker.retry_policy_to_proto(
-                self._input.retry_policy, v.retry_policy
-            )
+            self._input.retry_policy.apply_to_proto(v.retry_policy)
         v.cancellation_type = cast(
             "temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType",
             int(self._input.cancellation_type),
@@ -1618,11 +1607,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         )
         args = temporalio.common._arg_or_args(arg, args)
         if args:
-            v.args.extend(
-                temporalio.bridge.worker.to_bridge_payloads(
-                    self._instance._payload_converter.to_payloads(args)
-                )
-            )
+            v.args.extend(self._instance._payload_converter.to_payloads(args))
         # TODO(cretz): Headers
         await self._instance._signal_external_workflow(command)
 
@@ -1657,9 +1642,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         v.task_queue = self._input.task_queue or self._instance._info.task_queue
         if self._input.args:
             v.input.extend(
-                temporalio.bridge.worker.to_bridge_payloads(
-                    self._instance._payload_converter.to_payloads(self._input.args)
-                )
+                self._instance._payload_converter.to_payloads(self._input.args)
             )
         if self._input.execution_timeout:
             v.workflow_execution_timeout.FromTimedelta(self._input.execution_timeout)
@@ -1672,23 +1655,19 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             int(self._input.parent_close_policy),
         )
         v.workflow_id_reuse_policy = cast(
-            "temporalio.bridge.proto.common.WorkflowIdReusePolicy.ValueType",
+            "temporalio.api.enums.v1.WorkflowIdReusePolicy.ValueType",
             int(self._input.id_reuse_policy),
         )
         if self._input.retry_policy:
-            temporalio.bridge.worker.retry_policy_to_proto(
-                self._input.retry_policy, v.retry_policy
-            )
+            self._input.retry_policy.apply_to_proto(v.retry_policy)
         v.cron_schedule = self._input.cron_schedule
         # TODO(cretz): Headers
         # v.headers = input.he
         if self._input.memo:
             for k, val in self._input.memo.items():
-                v.memo[k] = temporalio.bridge.worker.to_bridge_payload(
-                    self._instance._payload_converter.to_payloads([val])[0]
-                )
+                v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]
         if self._input.search_attributes:
-            temporalio.bridge.worker.encode_search_attributes(
+            _encode_search_attributes(
                 self._input.search_attributes, v.search_attributes
             )
         v.cancellation_type = cast(
@@ -1750,11 +1729,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         )
         args = temporalio.common._arg_or_args(arg, args)
         if args:
-            v.args.extend(
-                temporalio.bridge.worker.to_bridge_payloads(
-                    self._instance._payload_converter.to_payloads(args)
-                )
-            )
+            v.args.extend(self._instance._payload_converter.to_payloads(args))
         # TODO(cretz): Headers
         await self._instance._signal_external_workflow(command)
 
@@ -1787,9 +1762,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             v.task_queue = self._input.task_queue
         if self._input.args:
             v.arguments.extend(
-                temporalio.bridge.worker.to_bridge_payloads(
-                    self._instance._payload_converter.to_payloads(self._input.args)
-                )
+                self._instance._payload_converter.to_payloads(self._input.args)
             )
         if self._input.run_timeout:
             v.workflow_run_timeout.FromTimedelta(self._input.run_timeout)
@@ -1799,10 +1772,17 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
         # v.headers = input.he
         if self._input.memo:
             for k, val in self._input.memo.items():
-                v.memo[k] = temporalio.bridge.worker.to_bridge_payload(
-                    self._instance._payload_converter.to_payloads([val])[0]
-                )
+                v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]
         if self._input.search_attributes:
-            temporalio.bridge.worker.encode_search_attributes(
+            _encode_search_attributes(
                 self._input.search_attributes, v.search_attributes
             )
+
+
+def _encode_search_attributes(
+    attributes: temporalio.common.SearchAttributes,
+    payloads: Mapping[str, temporalio.api.common.v1.Payload],
+) -> None:
+    """Encode search attributes as bridge payloads."""
+    for k, vals in attributes.items():
+        payloads[k].CopyFrom(temporalio.converter.encode_search_attribute_values(vals))

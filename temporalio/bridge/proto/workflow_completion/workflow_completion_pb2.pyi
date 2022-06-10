@@ -22,6 +22,7 @@ class WorkflowActivationCompletion(google.protobuf.message.Message):
     FAILED_FIELD_NUMBER: builtins.int
     run_id: typing.Text
     """The run id from the workflow activation you are completing"""
+
     @property
     def successful(self) -> global___Success: ...
     @property
