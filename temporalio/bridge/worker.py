@@ -1,7 +1,7 @@
 """Worker using SDK Core."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List, Mapping
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias

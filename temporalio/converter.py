@@ -620,6 +620,8 @@ def encode_search_attribute_values(
     """
     if not isinstance(vals, list):
         raise TypeError("Search attribute values must be lists")
+    # Confirm all types are the same
+    val_type: Optional[Type] = None
     # Convert dates to strings
     safe_vals = []
     for v in vals:
@@ -633,6 +635,12 @@ def encode_search_attribute_values(
             raise TypeError(
                 f"Search attribute value of type {type(v).__name__} not one of str, int, float, bool, or datetime"
             )
+        elif val_type and type(v) is not val_type:
+            raise TypeError(
+                f"Search attribute values must have the same type for the same key"
+            )
+        elif not val_type:
+            val_type = type(v)
         safe_vals.append(v)
     return default().payload_converter.to_payloads([safe_vals])[0]
 
