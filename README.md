@@ -628,6 +628,10 @@ For example,
 somewhere and then run the following inside the virtual environment:
 
 ```bash
+pip install wheel
+```
+
+```bash
 pip install /path/to/cloned/sdk-python/dist/*.whl
 ```
 
