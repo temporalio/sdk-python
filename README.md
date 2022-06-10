@@ -601,12 +601,12 @@ poetry install --no-root
 
 Now perform the release build:
 
+> This will take a while because Rust will compile the core project in release mode (see [Local SDK development
+environment](#local-sdk-development-environment) for the quicker approach to local development).
+
 ```bash
 poetry build
 ```
-
-This will take a while because Rust will compile the core project in release mode (see "Local SDK development
-environment" for the quicker approach to local development).
 
 The compiled wheel doesn't have the exact right tags yet for use, so run this script to fix it:
 
@@ -653,8 +653,14 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Assuming there is a [local Temporal server](https://docs.temporal.io/docs/server/quick-install/) running, executing the
-file with `python` (or `python3` if necessary) will give:
+Assuming there is a [local Temporal server](https://docs.temporal.io/docs/server/quick-install/) running, execute the
+file with `python` (or `python3` if necessary):
+
+```bash
+python example.py
+```
+
+It should output:
 
     Result: Hello, Temporal!
 
