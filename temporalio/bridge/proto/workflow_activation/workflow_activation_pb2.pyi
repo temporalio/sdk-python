@@ -29,17 +29,25 @@ class WorkflowActivation(google.protobuf.message.Message):
     RUN_ID_FIELD_NUMBER: builtins.int
     TIMESTAMP_FIELD_NUMBER: builtins.int
     IS_REPLAYING_FIELD_NUMBER: builtins.int
+    HISTORY_LENGTH_FIELD_NUMBER: builtins.int
     JOBS_FIELD_NUMBER: builtins.int
     run_id: typing.Text
     """/ The id of the currently active run of the workflow. Also used as a cache key. There may
     / only ever be one active workflow task (and hence activation) of a run at one time.
     """
+
     @property
     def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """/ The current time as understood by the workflow, which is set by workflow task started events"""
         pass
     is_replaying: builtins.bool
     """/ Whether or not the activation is replaying past events"""
+
+    history_length: builtins.int
+    """/ Current history length as determined by the event id of the most recently processed event.
+    / This ensures that the number is always deterministic
+    """
+
     @property
     def jobs(
         self,
@@ -54,6 +62,7 @@ class WorkflowActivation(google.protobuf.message.Message):
         run_id: typing.Text = ...,
         timestamp: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
         is_replaying: builtins.bool = ...,
+        history_length: builtins.int = ...,
         jobs: typing.Optional[typing.Iterable[global___WorkflowActivationJob]] = ...,
     ) -> None: ...
     def HasField(
@@ -62,6 +71,8 @@ class WorkflowActivation(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "history_length",
+            b"history_length",
             "is_replaying",
             b"is_replaying",
             "jobs",
@@ -275,20 +286,19 @@ class StartWorkflow(google.protobuf.message.Message):
     """Start a new workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: typing.Text
         @property
-        def value(self) -> temporalio.bridge.proto.common.common_pb2.Payload: ...
+        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
         def __init__(
             self,
             *,
             key: typing.Text = ...,
-            value: typing.Optional[
-                temporalio.bridge.proto.common.common_pb2.Payload
-            ] = ...,
+            value: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
         ) -> None: ...
         def HasField(
             self, field_name: typing_extensions.Literal["value", b"value"]
@@ -297,6 +307,7 @@ class StartWorkflow(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     WORKFLOW_ID_FIELD_NUMBER: builtins.int
     ARGUMENTS_FIELD_NUMBER: builtins.int
@@ -324,11 +335,12 @@ class StartWorkflow(google.protobuf.message.Message):
 
     workflow_id: typing.Text
     """The workflow id used on the temporal server"""
+
     @property
     def arguments(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.bridge.proto.common.common_pb2.Payload
+        temporalio.api.common.v1.message_pb2.Payload
     ]:
         """Inputs to the workflow code"""
         pass
@@ -336,16 +348,18 @@ class StartWorkflow(google.protobuf.message.Message):
     """The seed must be used to initialize the random generator used by SDK.
     RandomSeedUpdatedAttributes are used to deliver seed updates.
     """
+
     @property
     def headers(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
+        typing.Text, temporalio.api.common.v1.message_pb2.Payload
     ]:
         """Used to add metadata e.g. for tracing and auth, meant to be read and written to by interceptors."""
         pass
     identity: typing.Text
     """Identity of the client who requested this execution"""
+
     @property
     def parent_workflow_info(
         self,
@@ -371,6 +385,7 @@ class StartWorkflow(google.protobuf.message.Message):
 
     continued_initiator: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
     """If this workflow was a continuation, indicates the type of continuation."""
+
     @property
     def continued_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """If this workflow was a continuation and that continuation failed, the details of that."""
@@ -381,6 +396,7 @@ class StartWorkflow(google.protobuf.message.Message):
         pass
     first_execution_run_id: typing.Text
     """This is the very first run id the workflow ever had, following continuation chains."""
+
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """This workflow's retry policy"""
@@ -390,6 +406,7 @@ class StartWorkflow(google.protobuf.message.Message):
 
     cron_schedule: typing.Text
     """If this workflow runs on a cron schedule, it will appear here"""
+
     @property
     def workflow_execution_expiration_time(
         self,
@@ -422,13 +439,11 @@ class StartWorkflow(google.protobuf.message.Message):
         workflow_type: typing.Text = ...,
         workflow_id: typing.Text = ...,
         arguments: typing.Optional[
-            typing.Iterable[temporalio.bridge.proto.common.common_pb2.Payload]
+            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
         randomness_seed: builtins.int = ...,
         headers: typing.Optional[
-            typing.Mapping[
-                typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
-            ]
+            typing.Mapping[typing.Text, temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
         identity: typing.Text = ...,
         parent_workflow_info: typing.Optional[
@@ -554,6 +569,7 @@ class FireTimer(google.protobuf.message.Message):
     SEQ_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """/ Sequence number as provided by lang in the corresponding StartTimer command"""
+
     def __init__(
         self,
         *,
@@ -573,6 +589,7 @@ class ResolveActivity(google.protobuf.message.Message):
     RESULT_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """/ Sequence number as provided by lang in the corresponding ScheduleActivity command"""
+
     @property
     def result(
         self,
@@ -606,6 +623,7 @@ class ResolveChildWorkflowExecutionStart(google.protobuf.message.Message):
     CANCELLED_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """/ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command"""
+
     @property
     def succeeded(self) -> global___ResolveChildWorkflowExecutionStartSuccess: ...
     @property
@@ -751,6 +769,7 @@ class ResolveChildWorkflowExecution(google.protobuf.message.Message):
     RESULT_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """/ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command"""
+
     @property
     def result(
         self,
@@ -794,20 +813,19 @@ class QueryWorkflow(google.protobuf.message.Message):
     """/ Query a workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: typing.Text
         @property
-        def value(self) -> temporalio.bridge.proto.common.common_pb2.Payload: ...
+        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
         def __init__(
             self,
             *,
             key: typing.Text = ...,
-            value: typing.Optional[
-                temporalio.bridge.proto.common.common_pb2.Payload
-            ] = ...,
+            value: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
         ) -> None: ...
         def HasField(
             self, field_name: typing_extensions.Literal["value", b"value"]
@@ -816,6 +834,7 @@ class QueryWorkflow(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     QUERY_ID_FIELD_NUMBER: builtins.int
     QUERY_TYPE_FIELD_NUMBER: builtins.int
     ARGUMENTS_FIELD_NUMBER: builtins.int
@@ -828,17 +847,18 @@ class QueryWorkflow(google.protobuf.message.Message):
 
     query_type: typing.Text
     """/ The query's function/method/etc name"""
+
     @property
     def arguments(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.bridge.proto.common.common_pb2.Payload
+        temporalio.api.common.v1.message_pb2.Payload
     ]: ...
     @property
     def headers(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
+        typing.Text, temporalio.api.common.v1.message_pb2.Payload
     ]:
         """/ Headers attached to the query"""
         pass
@@ -848,12 +868,10 @@ class QueryWorkflow(google.protobuf.message.Message):
         query_id: typing.Text = ...,
         query_type: typing.Text = ...,
         arguments: typing.Optional[
-            typing.Iterable[temporalio.bridge.proto.common.common_pb2.Payload]
+            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
         headers: typing.Optional[
-            typing.Mapping[
-                typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
-            ]
+            typing.Mapping[typing.Text, temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
     ) -> None: ...
     def ClearField(
@@ -881,7 +899,7 @@ class CancelWorkflow(google.protobuf.message.Message):
     def details(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.bridge.proto.common.common_pb2.Payload
+        temporalio.api.common.v1.message_pb2.Payload
     ]:
         """/ Information from the cancellation request"""
         pass
@@ -889,7 +907,7 @@ class CancelWorkflow(google.protobuf.message.Message):
         self,
         *,
         details: typing.Optional[
-            typing.Iterable[temporalio.bridge.proto.common.common_pb2.Payload]
+            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
     ) -> None: ...
     def ClearField(
@@ -902,20 +920,19 @@ class SignalWorkflow(google.protobuf.message.Message):
     """Send a signal to a workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: typing.Text
         @property
-        def value(self) -> temporalio.bridge.proto.common.common_pb2.Payload: ...
+        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
         def __init__(
             self,
             *,
             key: typing.Text = ...,
-            value: typing.Optional[
-                temporalio.bridge.proto.common.common_pb2.Payload
-            ] = ...,
+            value: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
         ) -> None: ...
         def HasField(
             self, field_name: typing_extensions.Literal["value", b"value"]
@@ -924,6 +941,7 @@ class SignalWorkflow(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     SIGNAL_NAME_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
@@ -933,15 +951,16 @@ class SignalWorkflow(google.protobuf.message.Message):
     def input(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.bridge.proto.common.common_pb2.Payload
+        temporalio.api.common.v1.message_pb2.Payload
     ]: ...
     identity: typing.Text
     """Identity of the sender of the signal"""
+
     @property
     def headers(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
+        typing.Text, temporalio.api.common.v1.message_pb2.Payload
     ]:
         """Headers attached to the signal"""
         pass
@@ -950,13 +969,11 @@ class SignalWorkflow(google.protobuf.message.Message):
         *,
         signal_name: typing.Text = ...,
         input: typing.Optional[
-            typing.Iterable[temporalio.bridge.proto.common.common_pb2.Payload]
+            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
         identity: typing.Text = ...,
         headers: typing.Optional[
-            typing.Mapping[
-                typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
-            ]
+            typing.Mapping[typing.Text, temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
     ) -> None: ...
     def ClearField(
@@ -1002,6 +1019,7 @@ class ResolveSignalExternalWorkflow(google.protobuf.message.Message):
     """/ Sequence number as provided by lang in the corresponding SignalExternalWorkflowExecution
     / command
     """
+
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """/ If populated, this signal either failed to be sent or was cancelled depending on failure
@@ -1032,6 +1050,7 @@ class ResolveRequestCancelExternalWorkflow(google.protobuf.message.Message):
     """/ Sequence number as provided by lang in the corresponding
     / RequestCancelExternalWorkflowExecution command
     """
+
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """/ If populated, this signal either failed to be sent or was cancelled depending on failure
@@ -1056,9 +1075,11 @@ global___ResolveRequestCancelExternalWorkflow = ResolveRequestCancelExternalWork
 
 class RemoveFromCache(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class _EvictionReason:
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
+
     class _EvictionReasonEnumTypeWrapper(
         google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
             RemoveFromCache._EvictionReason.ValueType
@@ -1098,6 +1119,7 @@ class RemoveFromCache(google.protobuf.message.Message):
         """There was some fatal error processing the workflow, typically an internal error, but
         can also happen if then network drops out while paginating. Check message string.
         """
+
     class EvictionReason(_EvictionReason, metaclass=_EvictionReasonEnumTypeWrapper):
         pass
     UNSPECIFIED: RemoveFromCache.EvictionReason.ValueType  # 0

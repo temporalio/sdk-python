@@ -33,6 +33,7 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class RegisterNamespaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class DataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -49,6 +50,7 @@ class RegisterNamespaceRequest(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     NAMESPACE_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     OWNER_EMAIL_FIELD_NUMBER: builtins.int
@@ -342,6 +344,7 @@ class UpdateNamespaceRequest(google.protobuf.message.Message):
     delete_bad_binary: typing.Text
     promote_namespace: builtins.bool
     """promote local namespace to global namespace. Ignored if namespace is already global namespace."""
+
     def __init__(
         self,
         *,
@@ -536,12 +539,14 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
 
     workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
     """Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
+
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """The retry policy for the workflow. Will never exceed `workflow_execution_timeout`."""
         pass
     cron_schedule: typing.Text
     """See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/"""
+
     @property
     def memo(self) -> temporalio.api.common.v1.message_pb2.Memo: ...
     @property
@@ -832,6 +837,7 @@ class GetWorkflowExecutionHistoryReverseResponse(google.protobuf.message.Message
     def history(self) -> temporalio.api.history.v1.message_pb2.History: ...
     next_page_token: builtins.bytes
     """Will be set if there are more history events than were included in this response"""
+
     def __init__(
         self,
         *,
@@ -866,6 +872,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
 
     binary_checksum: typing.Text
     """Each worker process should provide an ID unique to the specific set of code it is running"""
+
     def __init__(
         self,
         *,
@@ -897,6 +904,7 @@ global___PollWorkflowTaskQueueRequest = PollWorkflowTaskQueueRequest
 
 class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class QueriesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -919,6 +927,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
@@ -935,6 +944,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     QUERIES_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
+
     @property
     def workflow_execution(
         self,
@@ -958,6 +968,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     """A hint that there are more tasks already present in this task queue. Can be used to
     prioritize draining a sticky queue before polling from a normal queue.
     """
+
     @property
     def history(self) -> temporalio.api.history.v1.message_pb2.History:
         """The history for this workflow, which will either be complete or partial. Partial histories
@@ -969,6 +980,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     """Will be set if there are more history events than were included in this response. Such events
     should be fetched via `GetWorkflowExecutionHistory`.
     """
+
     @property
     def query(self) -> temporalio.api.query.v1.message_pb2.WorkflowQuery:
         """Legacy queries appear in this field. The query must be responded to via
@@ -1088,6 +1100,7 @@ global___PollWorkflowTaskQueueResponse = PollWorkflowTaskQueueResponse
 
 class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class QueryResultsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -1110,6 +1123,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     COMMANDS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
@@ -1121,6 +1135,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollWorkflowTaskQueueResponse`"""
+
     @property
     def commands(
         self,
@@ -1131,6 +1146,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         pass
     identity: typing.Text
     """The identity of the worker/client"""
+
     @property
     def sticky_attributes(
         self,
@@ -1153,6 +1169,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
 
     binary_checksum: typing.Text
     """Worker process' unique binary id"""
+
     @property
     def query_results(
         self,
@@ -1266,6 +1283,7 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
     """Why did the task fail? It's important to note that many of the variants in this enum cannot
     apply to worker responses. See the type's doc for more.
     """
+
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """Failure details"""
@@ -1329,6 +1347,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     identity: typing.Text
     """The identity of the worker/client"""
+
     @property
     def task_queue_metadata(
         self,
@@ -1391,6 +1410,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
 
     workflow_namespace: typing.Text
     """The namespace the workflow which requested this activity lives in"""
+
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType:
         """Type of the requesting workflow"""
@@ -1408,6 +1428,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
     activity via `RespondActivityTaskCompletedById`. May be re-used as long as the last usage
     has resolved, but unique IDs for every activity invocation is a good idea.
     """
+
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
         """Headers specified by the scheduling workflow. Commonly used to propagate contextual info
@@ -1438,6 +1459,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
         pass
     attempt: builtins.int
     """Starting at 1, the number of attempts to perform this activity"""
+
     @property
     def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """First scheduled -> final result reported timeout
@@ -1583,6 +1605,7 @@ class RecordActivityTaskHeartbeatRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollActivityTaskQueueResponse`"""
+
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Arbitrary data, of which the most recent call is kept, to store for this activity"""
@@ -1625,6 +1648,7 @@ class RecordActivityTaskHeartbeatResponse(google.protobuf.message.Message):
     """Will be set to true if the activity has been asked to cancel itself. The SDK should then
     notify the activity of cancellation if it is still running.
     """
+
     def __init__(
         self,
         *,
@@ -1656,12 +1680,14 @@ class RecordActivityTaskHeartbeatByIdRequest(google.protobuf.message.Message):
 
     activity_id: typing.Text
     """Id of the activity we're heartbeating"""
+
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Arbitrary data, of which the most recent call is kept, to store for this activity"""
         pass
     identity: typing.Text
     """The identity of the worker/client"""
+
     def __init__(
         self,
         *,
@@ -1702,6 +1728,7 @@ class RecordActivityTaskHeartbeatByIdResponse(google.protobuf.message.Message):
     """Will be set to true if the activity has been asked to cancel itself. The SDK should then
     notify the activity of cancellation if it is still running.
     """
+
     def __init__(
         self,
         *,
@@ -1724,6 +1751,7 @@ class RespondActivityTaskCompletedRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollActivityTaskQueueResponse`"""
+
     @property
     def result(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """The result of successfully executing the activity"""
@@ -1786,12 +1814,14 @@ class RespondActivityTaskCompletedByIdRequest(google.protobuf.message.Message):
 
     activity_id: typing.Text
     """Id of the activity to complete"""
+
     @property
     def result(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """The serialized result of activity execution"""
         pass
     identity: typing.Text
     """The identity of the worker/client"""
+
     def __init__(
         self,
         *,
@@ -1846,6 +1876,7 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
     LAST_HEARTBEAT_DETAILS_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollActivityTaskQueueResponse`"""
+
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """Detailed failure information"""
@@ -1939,12 +1970,14 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
 
     activity_id: typing.Text
     """Id of the activity to fail"""
+
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """Detailed failure information"""
         pass
     identity: typing.Text
     """The identity of the worker/client"""
+
     @property
     def last_heartbeat_details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Additional details to be stored as last activity heartbeat"""
@@ -2024,6 +2057,7 @@ class RespondActivityTaskCanceledRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollActivityTaskQueueResponse`"""
+
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized additional information to attach to the cancellation"""
@@ -2086,12 +2120,14 @@ class RespondActivityTaskCanceledByIdRequest(google.protobuf.message.Message):
 
     activity_id: typing.Text
     """Id of the activity to confirm is cancelled"""
+
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized additional information to attach to the cancellation"""
         pass
     identity: typing.Text
     """The identity of the worker/client"""
+
     def __init__(
         self,
         *,
@@ -2162,6 +2198,7 @@ class RequestCancelWorkflowExecutionRequest(google.protobuf.message.Message):
 
     reason: typing.Text
     """Reason for requesting the cancellation"""
+
     def __init__(
         self,
         *,
@@ -2225,6 +2262,7 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     signal_name: typing.Text
     """The workflow author-defined name of the signal to send to the workflow"""
+
     @property
     def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized value(s) to provide with the signal"""
@@ -2237,6 +2275,7 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
 
     control: typing.Text
     """Deprecated"""
+
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
         """Headers that are passed with the signal to the processing workflow.
@@ -2354,18 +2393,21 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
     signal_name: typing.Text
     """The workflow author-defined name of the signal to send to the workflow"""
+
     @property
     def signal_input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized value(s) to provide with the signal"""
         pass
     control: typing.Text
     """Deprecated"""
+
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """Retry policy for the workflow Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
         pass
     cron_schedule: typing.Text
     """See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/"""
+
     @property
     def memo(self) -> temporalio.api.common.v1.message_pb2.Memo: ...
     @property
@@ -2529,6 +2571,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
 
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
     """Should be removed. Appears unused."""
+
     def __init__(
         self,
         *,
@@ -2608,6 +2651,7 @@ class TerminateWorkflowExecutionRequest(google.protobuf.message.Message):
     `workflow_execution`), or specified (if it is) workflow execution is not part of the same
     execution chain as this id.
     """
+
     def __init__(
         self,
         *,
@@ -3120,6 +3164,7 @@ global___GetSearchAttributesRequest = GetSearchAttributesRequest
 
 class GetSearchAttributesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class KeysEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -3136,6 +3181,7 @@ class GetSearchAttributesResponse(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     KEYS_FIELD_NUMBER: builtins.int
     @property
     def keys(
@@ -3262,6 +3308,7 @@ class QueryWorkflowRequest(google.protobuf.message.Message):
     """QueryRejectCondition can used to reject the query if workflow state does not satisfy condition.
     Default: QUERY_REJECT_CONDITION_NONE.
     """
+
     def __init__(
         self,
         *,
@@ -3526,6 +3573,7 @@ class GetClusterInfoResponse(google.protobuf.message.Message):
     """GetClusterInfoResponse contains information about Temporal cluster."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class SupportedClientsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -3542,6 +3590,7 @@ class GetClusterInfoResponse(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     SUPPORTED_CLIENTS_FIELD_NUMBER: builtins.int
     SERVER_VERSION_FIELD_NUMBER: builtins.int
     CLUSTER_ID_FIELD_NUMBER: builtins.int
@@ -3619,6 +3668,7 @@ global___GetSystemInfoRequest = GetSystemInfoRequest
 
 class GetSystemInfoResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Capabilities(google.protobuf.message.Message):
         """System capability details."""
 
@@ -3639,6 +3689,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
 
         activity_failure_include_heartbeat: builtins.bool
         """True if RespondActivityTaskFailed API supports including heartbeat details"""
+
         def __init__(
             self,
             *,
@@ -3657,10 +3708,12 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
                 b"signal_and_query_header",
             ],
         ) -> None: ...
+
     SERVER_VERSION_FIELD_NUMBER: builtins.int
     CAPABILITIES_FIELD_NUMBER: builtins.int
     server_version: typing.Text
     """Version of the server."""
+
     @property
     def capabilities(self) -> global___GetSystemInfoResponse.Capabilities:
         """All capabilities the system supports."""

@@ -17,6 +17,9 @@ from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
+from temporalio.api.common.v1 import (
+    message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
+)
 from temporalio.bridge.proto.activity_result import (
     activity_result_pb2 as temporal_dot_sdk_dot_core_dot_activity__result_dot_activity__result__pb2,
 )
@@ -40,7 +43,7 @@ from temporalio.bridge.proto.workflow_completion import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n&temporal/sdk/core/core_interface.proto\x12\x07\x63oresdk\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x37temporal/sdk/core/activity_result/activity_result.proto\x1a\x33temporal/sdk/core/activity_task/activity_task.proto\x1a%temporal/sdk/core/common/common.proto\x1a\x33temporal/sdk/core/external_data/external_data.proto\x1a?temporal/sdk/core/workflow_activation/workflow_activation.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto\x1a?temporal/sdk/core/workflow_completion/workflow_completion.proto"Q\n\x11\x41\x63tivityHeartbeat\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12(\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x17.coresdk.common.Payload"n\n\x16\x41\x63tivityTaskCompletion\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12@\n\x06result\x18\x02 \x01(\x0b\x32\x30.coresdk.activity_result.ActivityExecutionResultb\x06proto3'
+    b'\n&temporal/sdk/core/core_interface.proto\x12\x07\x63oresdk\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a\x37temporal/sdk/core/activity_result/activity_result.proto\x1a\x33temporal/sdk/core/activity_task/activity_task.proto\x1a%temporal/sdk/core/common/common.proto\x1a\x33temporal/sdk/core/external_data/external_data.proto\x1a?temporal/sdk/core/workflow_activation/workflow_activation.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto\x1a?temporal/sdk/core/workflow_completion/workflow_completion.proto"Y\n\x11\x41\x63tivityHeartbeat\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload"n\n\x16\x41\x63tivityTaskCompletion\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12@\n\x06result\x18\x02 \x01(\x0b\x32\x30.coresdk.activity_result.ActivityExecutionResultb\x06proto3'
 )
 
 
@@ -71,8 +74,8 @@ _sym_db.RegisterMessage(ActivityTaskCompletion)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
-    _ACTIVITYHEARTBEAT._serialized_start = 538
-    _ACTIVITYHEARTBEAT._serialized_end = 619
-    _ACTIVITYTASKCOMPLETION._serialized_start = 621
-    _ACTIVITYTASKCOMPLETION._serialized_end = 731
+    _ACTIVITYHEARTBEAT._serialized_start = 576
+    _ACTIVITYHEARTBEAT._serialized_end = 665
+    _ACTIVITYTASKCOMPLETION._serialized_start = 667
+    _ACTIVITYTASKCOMPLETION._serialized_end = 777
 # @@protoc_insertion_point(module_scope)

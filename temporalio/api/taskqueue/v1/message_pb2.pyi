@@ -23,6 +23,7 @@ class TaskQueue(google.protobuf.message.Message):
     name: typing.Text
     kind: temporalio.api.enums.v1.task_queue_pb2.TaskQueueKind.ValueType
     """Default: TASK_QUEUE_KIND_NORMAL."""
+
     def __init__(
         self,
         *,

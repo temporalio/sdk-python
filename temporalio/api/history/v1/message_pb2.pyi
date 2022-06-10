@@ -53,12 +53,14 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     parent_workflow_namespace: typing.Text
     """If this workflow is a child, the namespace our parent lives in"""
+
     @property
     def parent_workflow_execution(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     parent_initiated_event_id: builtins.int
     """TODO: What is this? ID of the event that requested this workflow execution if we are a child?"""
+
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     @property
@@ -97,10 +99,12 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
 
     first_execution_run_id: typing.Text
     """This is the very first runId along the chain of ContinueAsNew and Reset."""
+
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
     attempt: builtins.int
     """Starting at 1, the number of times we have tried to execute this workflow"""
+
     @property
     def workflow_execution_expiration_time(
         self,
@@ -111,6 +115,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         pass
     cron_schedule: typing.Text
     """If this workflow runs on a cron schedule, it will appear here"""
+
     @property
     def first_workflow_task_backoff(self) -> google.protobuf.duration_pb2.Duration:
         """For a cron workflow, this contains the amount of time between when this iteration of
@@ -295,6 +300,7 @@ class WorkflowExecutionCompletedEventAttributes(google.protobuf.message.Message)
 
     new_execution_run_id: typing.Text
     """If another run is started by cron, this contains the new run id."""
+
     def __init__(
         self,
         *,
@@ -337,6 +343,7 @@ class WorkflowExecutionFailedEventAttributes(google.protobuf.message.Message):
 
     new_execution_run_id: typing.Text
     """If another run is started by cron or retry, this contains the new run id."""
+
     def __init__(
         self,
         *,
@@ -371,6 +378,7 @@ class WorkflowExecutionTimedOutEventAttributes(google.protobuf.message.Message):
     retry_state: temporalio.api.enums.v1.workflow_pb2.RetryState.ValueType
     new_execution_run_id: typing.Text
     """If another run is started by cron or retry, this contains the new run id."""
+
     def __init__(
         self,
         *,
@@ -409,6 +417,7 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     new_execution_run_id: typing.Text
     """The run ID of the new workflow started by this continue-as-new"""
+
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     @property
@@ -425,6 +434,7 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
         pass
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     @property
     def backoff_start_interval(self) -> google.protobuf.duration_pb2.Duration:
         """TODO: How and is this used?"""
@@ -566,6 +576,7 @@ class WorkflowTaskScheduledEventAttributes(google.protobuf.message.Message):
         pass
     attempt: builtins.int
     """Starting at 1, how many attempts there have been to complete this task"""
+
     def __init__(
         self,
         *,
@@ -613,6 +624,7 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
 
     request_id: typing.Text
     """TODO: ? Appears unused?"""
+
     def __init__(
         self,
         *,
@@ -651,6 +663,7 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
 
     binary_checksum: typing.Text
     """Binary ID of the worker who completed this task"""
+
     def __init__(
         self,
         *,
@@ -744,6 +757,7 @@ class WorkflowTaskFailedEventAttributes(google.protobuf.message.Message):
 
     binary_checksum: typing.Text
     """If a worker explicitly failed this task, it's binary id"""
+
     def __init__(
         self,
         *,
@@ -802,6 +816,7 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     activity_id: typing.Text
     """The worker/user assigned identifier for the activity"""
+
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
     namespace: typing.Text
@@ -847,6 +862,7 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
         pass
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """Activities are assigned a default retry policy controlled by the service's dynamic
@@ -955,6 +971,7 @@ class ActivityTaskStartedEventAttributes(google.protobuf.message.Message):
 
     attempt: builtins.int
     """Starting at 1, the number of times this task has been attempted"""
+
     @property
     def last_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """Will be set to the most recent failure details, if this task has previously failed and then
@@ -1011,6 +1028,7 @@ class ActivityTaskCompletedEventAttributes(google.protobuf.message.Message):
 
     identity: typing.Text
     """id of the worker that completed this task"""
+
     def __init__(
         self,
         *,
@@ -1144,6 +1162,7 @@ class ActivityTaskCancelRequestedEventAttributes(google.protobuf.message.Message
 
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     def __init__(
         self,
         *,
@@ -1188,6 +1207,7 @@ class ActivityTaskCanceledEventAttributes(google.protobuf.message.Message):
 
     identity: typing.Text
     """id of the worker who canceled this activity"""
+
     def __init__(
         self,
         *,
@@ -1225,6 +1245,7 @@ class TimerStartedEventAttributes(google.protobuf.message.Message):
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
     timer_id: typing.Text
     """The worker/user assigned id for this timer"""
+
     @property
     def start_to_fire_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """How long until this timer fires
@@ -1235,6 +1256,7 @@ class TimerStartedEventAttributes(google.protobuf.message.Message):
         pass
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     def __init__(
         self,
         *,
@@ -1273,6 +1295,7 @@ class TimerFiredEventAttributes(google.protobuf.message.Message):
 
     started_event_id: builtins.int
     """The id of the `TIMER_STARTED` event itself"""
+
     def __init__(
         self,
         *,
@@ -1305,6 +1328,7 @@ class TimerCanceledEventAttributes(google.protobuf.message.Message):
 
     identity: typing.Text
     """The id of the worker who requested this cancel"""
+
     def __init__(
         self,
         *,
@@ -1342,12 +1366,14 @@ class WorkflowExecutionCancelRequestedEventAttributes(google.protobuf.message.Me
 
     external_initiated_event_id: builtins.int
     """TODO: Is this the ID of the event in the workflow which initiated this cancel, if there was one?"""
+
     @property
     def external_workflow_execution(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     identity: typing.Text
     """id of the worker or client who requested this cancel"""
+
     def __init__(
         self,
         *,
@@ -1388,6 +1414,7 @@ class WorkflowExecutionCanceledEventAttributes(google.protobuf.message.Message):
     DETAILS_FIELD_NUMBER: builtins.int
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     def __init__(
@@ -1415,6 +1442,7 @@ global___WorkflowExecutionCanceledEventAttributes = (
 
 class MarkerRecordedEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class DetailsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -1435,6 +1463,7 @@ class MarkerRecordedEventAttributes(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     MARKER_NAME_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
@@ -1442,6 +1471,7 @@ class MarkerRecordedEventAttributes(google.protobuf.message.Message):
     FAILURE_FIELD_NUMBER: builtins.int
     marker_name: typing.Text
     """Workers use this to identify the "types" of various markers. Ex: Local activity, side effect."""
+
     @property
     def details(
         self,
@@ -1452,6 +1482,7 @@ class MarkerRecordedEventAttributes(google.protobuf.message.Message):
         pass
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
     @property
@@ -1501,12 +1532,14 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
     HEADER_FIELD_NUMBER: builtins.int
     signal_name: typing.Text
     """The name/type of the signal to fire"""
+
     @property
     def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Will be deserialized and provided as argument(s) to the signal handler"""
         pass
     identity: typing.Text
     """id of the worker/client who sent this signal"""
+
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
         """Headers that were passed by the sender of the signal and copied by temporal
@@ -1550,10 +1583,12 @@ class WorkflowExecutionTerminatedEventAttributes(google.protobuf.message.Message
     IDENTITY_FIELD_NUMBER: builtins.int
     reason: typing.Text
     """User/client provided reason for termination"""
+
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     identity: typing.Text
     """id of the client who requested termination"""
+
     def __init__(
         self,
         *,
@@ -1590,6 +1625,7 @@ class RequestCancelExternalWorkflowExecutionInitiatedEventAttributes(
 
     namespace: typing.Text
     """The namespace the workflow to be cancelled lives in"""
+
     @property
     def workflow_execution(
         self,
@@ -1604,6 +1640,7 @@ class RequestCancelExternalWorkflowExecutionInitiatedEventAttributes(
 
     reason: typing.Text
     """Reason for requesting the cancellation"""
+
     def __init__(
         self,
         *,
@@ -1660,6 +1697,7 @@ class RequestCancelExternalWorkflowExecutionFailedEventAttributes(
 
     namespace: typing.Text
     """namespace of the workflow which failed to cancel"""
+
     @property
     def workflow_execution(
         self,
@@ -1671,6 +1709,7 @@ class RequestCancelExternalWorkflowExecutionFailedEventAttributes(
 
     control: typing.Text
     """Deprecated"""
+
     def __init__(
         self,
         *,
@@ -1725,6 +1764,7 @@ class ExternalWorkflowExecutionCancelRequestedEventAttributes(
 
     namespace: typing.Text
     """namespace of the to-be-cancelled workflow"""
+
     @property
     def workflow_execution(
         self,
@@ -1777,12 +1817,14 @@ class SignalExternalWorkflowExecutionInitiatedEventAttributes(
 
     namespace: typing.Text
     """namespace of the to-be-signalled workflow"""
+
     @property
     def workflow_execution(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     signal_name: typing.Text
     """name/type of the signal to fire in the external workflow"""
+
     @property
     def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized arguments to provide to the signal handler"""
@@ -1794,6 +1836,7 @@ class SignalExternalWorkflowExecutionInitiatedEventAttributes(
     """Workers are expected to set this to true if the workflow they are requesting to cancel is
     a child of the workflow which issued the request
     """
+
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
     def __init__(
@@ -1869,6 +1912,7 @@ class SignalExternalWorkflowExecutionFailedEventAttributes(
     initiated_event_id: builtins.int
     control: typing.Text
     """Deprecated"""
+
     def __init__(
         self,
         *,
@@ -1920,12 +1964,14 @@ class ExternalWorkflowExecutionSignaledEventAttributes(google.protobuf.message.M
 
     namespace: typing.Text
     """namespace of the workflow which was signaled"""
+
     @property
     def workflow_execution(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     control: typing.Text
     """Deprecated"""
+
     def __init__(
         self,
         *,
@@ -1966,6 +2012,7 @@ class UpsertWorkflowSearchAttributesEventAttributes(google.protobuf.message.Mess
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     @property
     def search_attributes(
         self,
@@ -2052,10 +2099,12 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
 
     workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
     """Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
+
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
     cron_schedule: typing.Text
     """If this child runs on a cron schedule, it will appear here"""
+
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
     @property
@@ -2192,6 +2241,7 @@ class StartChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.M
 
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+
     def __init__(
         self,
         *,
@@ -2244,6 +2294,7 @@ class ChildWorkflowExecutionStartedEventAttributes(google.protobuf.message.Messa
 
     initiated_event_id: builtins.int
     """Id of the `START_CHILD_WORKFLOW_EXECUTION_INITIATED` event which this event corresponds to"""
+
     @property
     def workflow_execution(
         self,
@@ -2308,6 +2359,7 @@ class ChildWorkflowExecutionCompletedEventAttributes(google.protobuf.message.Mes
     def result(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     namespace: typing.Text
     """Namespace of the child workflow"""
+
     @property
     def workflow_execution(
         self,
@@ -2319,6 +2371,7 @@ class ChildWorkflowExecutionCompletedEventAttributes(google.protobuf.message.Mes
 
     started_event_id: builtins.int
     """Id of the `CHILD_WORKFLOW_EXECUTION_STARTED` event which this event corresponds to"""
+
     def __init__(
         self,
         *,
@@ -2379,6 +2432,7 @@ class ChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.Messag
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     namespace: typing.Text
     """Namespace of the child workflow"""
+
     @property
     def workflow_execution(
         self,
@@ -2454,6 +2508,7 @@ class ChildWorkflowExecutionCanceledEventAttributes(google.protobuf.message.Mess
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     namespace: typing.Text
     """Namespace of the child workflow"""
+
     @property
     def workflow_execution(
         self,
@@ -2465,6 +2520,7 @@ class ChildWorkflowExecutionCanceledEventAttributes(google.protobuf.message.Mess
 
     started_event_id: builtins.int
     """Id of the `CHILD_WORKFLOW_EXECUTION_STARTED` event which this event corresponds to"""
+
     def __init__(
         self,
         *,
@@ -2522,6 +2578,7 @@ class ChildWorkflowExecutionTimedOutEventAttributes(google.protobuf.message.Mess
     RETRY_STATE_FIELD_NUMBER: builtins.int
     namespace: typing.Text
     """Namespace of the child workflow"""
+
     @property
     def workflow_execution(
         self,
@@ -2589,6 +2646,7 @@ class ChildWorkflowExecutionTerminatedEventAttributes(google.protobuf.message.Me
     STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
     namespace: typing.Text
     """Namespace of the child workflow"""
+
     @property
     def workflow_execution(
         self,
@@ -2600,6 +2658,7 @@ class ChildWorkflowExecutionTerminatedEventAttributes(google.protobuf.message.Me
 
     started_event_id: builtins.int
     """Id of the `CHILD_WORKFLOW_EXECUTION_STARTED` event which this event corresponds to"""
+
     def __init__(
         self,
         *,
@@ -2695,6 +2754,7 @@ class HistoryEvent(google.protobuf.message.Message):
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
+
     @property
     def event_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     event_type: temporalio.api.enums.v1.event_type_pb2.EventType.ValueType
@@ -2703,6 +2763,7 @@ class HistoryEvent(google.protobuf.message.Message):
 
     task_id: builtins.int
     """TODO: What is this? Appears unused by SDKs"""
+
     @property
     def workflow_execution_started_event_attributes(
         self,

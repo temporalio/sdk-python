@@ -6,8 +6,8 @@ import builtins
 import google.protobuf.descriptor
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import temporalio.api.common.v1.message_pb2
 import temporalio.api.failure.v1.message_pb2
-import temporalio.bridge.proto.common.common_pb2
 import typing
 import typing_extensions
 
@@ -197,13 +197,11 @@ class Success(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     RESULT_FIELD_NUMBER: builtins.int
     @property
-    def result(self) -> temporalio.bridge.proto.common.common_pb2.Payload: ...
+    def result(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
     def __init__(
         self,
         *,
-        result: typing.Optional[
-            temporalio.bridge.proto.common.common_pb2.Payload
-        ] = ...,
+        result: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["result", b"result"]

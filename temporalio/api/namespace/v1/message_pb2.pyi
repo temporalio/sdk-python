@@ -16,6 +16,7 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class NamespaceInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class DataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -32,6 +33,7 @@ class NamespaceInfo(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     NAME_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
@@ -144,6 +146,7 @@ global___NamespaceConfig = NamespaceConfig
 
 class BadBinaries(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class BinariesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -164,6 +167,7 @@ class BadBinaries(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     BINARIES_FIELD_NUMBER: builtins.int
     @property
     def binaries(
@@ -214,6 +218,7 @@ global___BadBinaryInfo = BadBinaryInfo
 
 class UpdateNamespaceInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class DataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -230,6 +235,7 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     DESCRIPTION_FIELD_NUMBER: builtins.int
     OWNER_EMAIL_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
@@ -249,6 +255,7 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
      Handover -> [ Registered ]
     Default is NAMESPACE_STATE_UNSPECIFIED which is do not change state.
     """
+
     def __init__(
         self,
         *,
@@ -281,6 +288,7 @@ class NamespaceFilter(google.protobuf.message.Message):
     Setting include_deleted to true will include deleted namespaces.
     Note: Namespace is in NAMESPACE_STATE_DELETED state when it was deleted from the system but associated data is not deleted yet.
     """
+
     def __init__(
         self,
         *,

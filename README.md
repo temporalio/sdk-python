@@ -583,6 +583,9 @@ To build the SDK from source for use as a dependency, the following prerequisite
 * [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
 * [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
 
+macOS note: If errors are encountered, it may be better to install Python and Rust as recommended from their websites
+instead of via `brew`.
+
 With the prerequisites installed, first clone the SDK repository recursively:
 
 ```bash

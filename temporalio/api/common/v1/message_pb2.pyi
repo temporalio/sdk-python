@@ -63,6 +63,7 @@ class Payload(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -79,6 +80,7 @@ class Payload(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     METADATA_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
     @property
@@ -105,6 +107,7 @@ class SearchAttributes(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class IndexedFieldsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -125,6 +128,7 @@ class SearchAttributes(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     INDEXED_FIELDS_FIELD_NUMBER: builtins.int
     @property
     def indexed_fields(
@@ -149,6 +153,7 @@ class Memo(google.protobuf.message.Message):
     """A user-defined set of *unindexed* fields that are exposed when listing/searching workflows"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class FieldsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -169,6 +174,7 @@ class Memo(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     FIELDS_FIELD_NUMBER: builtins.int
     @property
     def fields(
@@ -193,6 +199,7 @@ class Header(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class FieldsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -213,6 +220,7 @@ class Header(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     FIELDS_FIELD_NUMBER: builtins.int
     @property
     def fields(
@@ -313,6 +321,7 @@ class RetryPolicy(google.protobuf.message.Message):
     The next retry interval is previous interval multiplied by the coefficient.
     Must be 1 or larger.
     """
+
     @property
     def maximum_interval(self) -> google.protobuf.duration_pb2.Duration:
         """Maximum interval between retries. Exponential backoff leads to interval increase.
@@ -323,6 +332,7 @@ class RetryPolicy(google.protobuf.message.Message):
     """Maximum number of attempts. When exceeded the retries stop even if not expired yet.
     1 disables retries. 0 means unlimited (up to the timeouts)
     """
+
     @property
     def non_retryable_error_types(
         self,

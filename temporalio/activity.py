@@ -83,7 +83,6 @@ class Info:
     activity_type: str
     attempt: int
     current_attempt_scheduled_time: datetime
-    header: Mapping[str, temporalio.api.common.v1.Payload]
     heartbeat_details: Iterable[Any]
     heartbeat_timeout: Optional[timedelta]
     is_local: bool

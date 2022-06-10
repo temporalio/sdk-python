@@ -22,6 +22,7 @@ class WorkflowQuery(google.protobuf.message.Message):
     HEADER_FIELD_NUMBER: builtins.int
     query_type: typing.Text
     """The workflow-author-defined identifier of the query. Typically a function name."""
+
     @property
     def query_args(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized arguments that will be provided to the query handler."""
@@ -70,12 +71,14 @@ class WorkflowQueryResult(google.protobuf.message.Message):
     ERROR_MESSAGE_FIELD_NUMBER: builtins.int
     result_type: temporalio.api.enums.v1.query_pb2.QueryResultType.ValueType
     """Did the query succeed or fail?"""
+
     @property
     def answer(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Set when the query succeeds with the results"""
         pass
     error_message: typing.Text
     """Mutually exclusive with `answer`. Set when the query fails."""
+
     def __init__(
         self,
         *,

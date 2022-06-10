@@ -204,6 +204,7 @@ class SystemWorkflowFailure(google.protobuf.message.Message):
         pass
     workflow_error: typing.Text
     """Serialized error returned by the system workflow performing the underlying operation."""
+
     def __init__(
         self,
         *,

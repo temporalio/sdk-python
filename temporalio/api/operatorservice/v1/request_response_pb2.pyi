@@ -16,6 +16,7 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
     """(-- Search Attribute --)"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class SearchAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -32,6 +33,7 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     @property
     def search_attributes(
@@ -109,6 +111,7 @@ global___ListSearchAttributesRequest = ListSearchAttributesRequest
 
 class ListSearchAttributesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class CustomAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -125,6 +128,7 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     class SystemAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -141,6 +145,7 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     class StorageSchemaEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
@@ -157,6 +162,7 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     CUSTOM_ATTRIBUTES_FIELD_NUMBER: builtins.int
     SYSTEM_ATTRIBUTES_FIELD_NUMBER: builtins.int
     STORAGE_SCHEMA_FIELD_NUMBER: builtins.int
@@ -239,6 +245,7 @@ class DeleteNamespaceResponse(google.protobuf.message.Message):
     DELETED_NAMESPACE_FIELD_NUMBER: builtins.int
     deleted_namespace: typing.Text
     """Temporary namespace name that is used during reclaim resources step."""
+
     def __init__(
         self,
         *,

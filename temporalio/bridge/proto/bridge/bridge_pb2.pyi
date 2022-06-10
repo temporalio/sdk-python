@@ -50,11 +50,13 @@ global___LogLevel = LogLevel
 
 class InitTelemetryRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class ConsoleLoggerOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         def __init__(
             self,
         ) -> None: ...
+
     class ForwardLoggerOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         LEVEL_FIELD_NUMBER: builtins.int
@@ -67,8 +69,10 @@ class InitTelemetryRequest(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["level", b"level"]
         ) -> None: ...
+
     class OtelCollectorOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         class HeadersEntry(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
             KEY_FIELD_NUMBER: builtins.int
@@ -85,6 +89,7 @@ class InitTelemetryRequest(google.protobuf.message.Message):
                 self,
                 field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
             ) -> None: ...
+
         URL_FIELD_NUMBER: builtins.int
         HEADERS_FIELD_NUMBER: builtins.int
         url: typing.Text
@@ -104,6 +109,7 @@ class InitTelemetryRequest(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["headers", b"headers", "url", b"url"],
         ) -> None: ...
+
     class PrometheusOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         EXPORT_BIND_ADDRESS_FIELD_NUMBER: builtins.int
@@ -119,6 +125,7 @@ class InitTelemetryRequest(google.protobuf.message.Message):
                 "export_bind_address", b"export_bind_address"
             ],
         ) -> None: ...
+
     TRACING_FILTER_FIELD_NUMBER: builtins.int
     CONSOLE_FIELD_NUMBER: builtins.int
     FORWARD_FIELD_NUMBER: builtins.int
@@ -217,6 +224,7 @@ global___InitTelemetryRequest = InitTelemetryRequest
 
 class CreateClientRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class TlsConfig(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         SERVER_ROOT_CA_CERT_FIELD_NUMBER: builtins.int
@@ -248,6 +256,7 @@ class CreateClientRequest(google.protobuf.message.Message):
                 b"server_root_ca_cert",
             ],
         ) -> None: ...
+
     class RetryConfig(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         INITIAL_INTERVAL_FIELD_NUMBER: builtins.int
@@ -320,6 +329,7 @@ class CreateClientRequest(google.protobuf.message.Message):
                 b"randomization_factor",
             ],
         ) -> None: ...
+
     TARGET_URL_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
     CLIENT_NAME_FIELD_NUMBER: builtins.int
@@ -382,6 +392,7 @@ global___CreateClientRequest = CreateClientRequest
 
 class InitResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -394,6 +405,7 @@ class InitResponse(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
         ) -> None: ...
+
     ERROR_FIELD_NUMBER: builtins.int
     @property
     def error(self) -> global___InitResponse.Error: ...
@@ -556,6 +568,7 @@ global___CreateWorkerRequest = CreateWorkerRequest
 
 class RegisterWorkerResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -568,6 +581,7 @@ class RegisterWorkerResponse(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
         ) -> None: ...
+
     ERROR_FIELD_NUMBER: builtins.int
     @property
     def error(self) -> global___RegisterWorkerResponse.Error: ...
@@ -595,6 +609,7 @@ global___PollWorkflowActivationRequest = PollWorkflowActivationRequest
 
 class PollWorkflowActivationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -613,6 +628,7 @@ class PollWorkflowActivationResponse(google.protobuf.message.Message):
                 "message", b"message", "shutdown", b"shutdown"
             ],
         ) -> None: ...
+
     ACTIVATION_FIELD_NUMBER: builtins.int
     ERROR_FIELD_NUMBER: builtins.int
     @property
@@ -657,6 +673,7 @@ global___PollActivityTaskRequest = PollActivityTaskRequest
 
 class PollActivityTaskResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -675,6 +692,7 @@ class PollActivityTaskResponse(google.protobuf.message.Message):
                 "message", b"message", "shutdown", b"shutdown"
             ],
         ) -> None: ...
+
     TASK_FIELD_NUMBER: builtins.int
     ERROR_FIELD_NUMBER: builtins.int
     @property
@@ -734,6 +752,7 @@ global___CompleteWorkflowActivationRequest = CompleteWorkflowActivationRequest
 
 class CompleteWorkflowActivationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -746,6 +765,7 @@ class CompleteWorkflowActivationResponse(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
         ) -> None: ...
+
     ERROR_FIELD_NUMBER: builtins.int
     @property
     def error(self) -> global___CompleteWorkflowActivationResponse.Error: ...
@@ -788,6 +808,7 @@ global___CompleteActivityTaskRequest = CompleteActivityTaskRequest
 
 class CompleteActivityTaskResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -800,6 +821,7 @@ class CompleteActivityTaskResponse(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
         ) -> None: ...
+
     ERROR_FIELD_NUMBER: builtins.int
     @property
     def error(self) -> global___CompleteActivityTaskResponse.Error: ...
@@ -842,6 +864,7 @@ global___RecordActivityHeartbeatRequest = RecordActivityHeartbeatRequest
 
 class RecordActivityHeartbeatResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -854,6 +877,7 @@ class RecordActivityHeartbeatResponse(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
         ) -> None: ...
+
     ERROR_FIELD_NUMBER: builtins.int
     @property
     def error(self) -> global___RecordActivityHeartbeatResponse.Error: ...
@@ -888,6 +912,7 @@ global___RequestWorkflowEvictionRequest = RequestWorkflowEvictionRequest
 
 class RequestWorkflowEvictionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -900,6 +925,7 @@ class RequestWorkflowEvictionResponse(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
         ) -> None: ...
+
     ERROR_FIELD_NUMBER: builtins.int
     @property
     def error(self) -> global___RequestWorkflowEvictionResponse.Error: ...
@@ -927,6 +953,7 @@ global___ShutdownWorkerRequest = ShutdownWorkerRequest
 
 class ShutdownWorkerResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -939,6 +966,7 @@ class ShutdownWorkerResponse(google.protobuf.message.Message):
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
         ) -> None: ...
+
     ERROR_FIELD_NUMBER: builtins.int
     @property
     def error(self) -> global___ShutdownWorkerResponse.Error: ...
@@ -966,6 +994,7 @@ global___FetchBufferedLogsRequest = FetchBufferedLogsRequest
 
 class FetchBufferedLogsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class LogEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         MESSAGE_FIELD_NUMBER: builtins.int
@@ -991,6 +1020,7 @@ class FetchBufferedLogsResponse(google.protobuf.message.Message):
                 "level", b"level", "message", b"message", "timestamp", b"timestamp"
             ],
         ) -> None: ...
+
     ENTRIES_FIELD_NUMBER: builtins.int
     @property
     def entries(

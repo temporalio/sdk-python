@@ -9,7 +9,7 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import temporalio.bridge.proto.common.common_pb2
+import temporalio.api.common.v1.message_pb2
 import typing
 import typing_extensions
 
@@ -58,6 +58,7 @@ class ActivityTask(google.protobuf.message.Message):
     CANCEL_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """/ A unique identifier for this task"""
+
     @property
     def start(self) -> global___Start:
         """/ Start activity execution."""
@@ -102,20 +103,19 @@ class Start(google.protobuf.message.Message):
     """Begin executing an activity"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     class HeaderFieldsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: typing.Text
         @property
-        def value(self) -> temporalio.bridge.proto.common.common_pb2.Payload: ...
+        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
         def __init__(
             self,
             *,
             key: typing.Text = ...,
-            value: typing.Optional[
-                temporalio.bridge.proto.common.common_pb2.Payload
-            ] = ...,
+            value: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
         ) -> None: ...
         def HasField(
             self, field_name: typing_extensions.Literal["value", b"value"]
@@ -124,6 +124,7 @@ class Start(google.protobuf.message.Message):
             self,
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
+
     WORKFLOW_NAMESPACE_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
@@ -146,10 +147,11 @@ class Start(google.protobuf.message.Message):
 
     workflow_type: typing.Text
     """The workflow's type name or function identifier"""
+
     @property
     def workflow_execution(
         self,
-    ) -> temporalio.bridge.proto.common.common_pb2.WorkflowExecution:
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
         """The workflow execution which requested this activity"""
         pass
     activity_id: typing.Text
@@ -157,17 +159,18 @@ class Start(google.protobuf.message.Message):
 
     activity_type: typing.Text
     """The activity's type name or function identifier"""
+
     @property
     def header_fields(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
+        typing.Text, temporalio.api.common.v1.message_pb2.Payload
     ]: ...
     @property
     def input(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.bridge.proto.common.common_pb2.Payload
+        temporalio.api.common.v1.message_pb2.Payload
     ]:
         """Arguments to the activity"""
         pass
@@ -175,7 +178,7 @@ class Start(google.protobuf.message.Message):
     def heartbeat_details(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.bridge.proto.common.common_pb2.Payload
+        temporalio.api.common.v1.message_pb2.Payload
     ]:
         """The last details that were recorded by a heartbeat when this task was generated"""
         pass
@@ -205,7 +208,7 @@ class Start(google.protobuf.message.Message):
         """If set a heartbeat must be reported within this interval"""
         pass
     @property
-    def retry_policy(self) -> temporalio.bridge.proto.common.common_pb2.RetryPolicy:
+    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """This is an actual retry policy the service uses. It can be different from the one provided
         (or not) during activity scheduling as the service can override the provided one in case its
         values are not specified or exceed configured system limits.
@@ -215,26 +218,25 @@ class Start(google.protobuf.message.Message):
     """Set to true if this is a local activity. Note that heartbeating does not apply to local
     activities.
     """
+
     def __init__(
         self,
         *,
         workflow_namespace: typing.Text = ...,
         workflow_type: typing.Text = ...,
         workflow_execution: typing.Optional[
-            temporalio.bridge.proto.common.common_pb2.WorkflowExecution
+            temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
         activity_id: typing.Text = ...,
         activity_type: typing.Text = ...,
         header_fields: typing.Optional[
-            typing.Mapping[
-                typing.Text, temporalio.bridge.proto.common.common_pb2.Payload
-            ]
+            typing.Mapping[typing.Text, temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
         input: typing.Optional[
-            typing.Iterable[temporalio.bridge.proto.common.common_pb2.Payload]
+            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
         heartbeat_details: typing.Optional[
-            typing.Iterable[temporalio.bridge.proto.common.common_pb2.Payload]
+            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         ] = ...,
         scheduled_time: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
         current_attempt_scheduled_time: typing.Optional[
@@ -250,7 +252,7 @@ class Start(google.protobuf.message.Message):
         ] = ...,
         heartbeat_timeout: typing.Optional[google.protobuf.duration_pb2.Duration] = ...,
         retry_policy: typing.Optional[
-            temporalio.bridge.proto.common.common_pb2.RetryPolicy
+            temporalio.api.common.v1.message_pb2.RetryPolicy
         ] = ...,
         is_local: builtins.bool = ...,
     ) -> None: ...
