@@ -107,3 +107,5 @@ def test_encode_search_attribute_values():
         temporalio.converter.encode_search_attribute_values([("bad type",)])
     with pytest.raises(ValueError, match="Timezone must be present"):
         temporalio.converter.encode_search_attribute_values([datetime.utcnow()])
+    with pytest.raises(TypeError, match="must have the same type"):
+        temporalio.converter.encode_search_attribute_values(["foo", 123])
