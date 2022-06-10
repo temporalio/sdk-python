@@ -8,6 +8,7 @@ import json
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Type
 
 import dacite
@@ -16,6 +17,7 @@ import google.protobuf.message
 import google.protobuf.symbol_database
 
 import temporalio.api.common.v1
+import temporalio.common
 
 
 class PayloadConverter(ABC):
@@ -592,6 +594,80 @@ def default() -> DataConverter:
     if not _default:
         _default = DataConverter()
     return _default
+
+
+def encode_search_attributes(
+    attrs: temporalio.common.SearchAttributes,
+    api: temporalio.api.common.v1.SearchAttributes,
+) -> None:
+    """Convert search attributes into an API message.
+
+    Args:
+        attrs: Search attributes to convert.
+        api: API message to set converted attributes on.
+    """
+    for k, v in attrs.items():
+        api.indexed_fields[k].CopyFrom(encode_search_attribute_values(v))
+
+
+def encode_search_attribute_values(
+    vals: List[temporalio.common.SearchAttributeValue],
+) -> temporalio.api.common.v1.Payload:
+    """Convert search attribute values into a payload.
+
+    Args:
+        vals: List of values to convert.
+    """
+    if not isinstance(vals, list):
+        raise TypeError("Search attribute values must be lists")
+    # Confirm all types are the same
+    val_type: Optional[Type] = None
+    # Convert dates to strings
+    safe_vals = []
+    for v in vals:
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                raise ValueError(
+                    "Timezone must be present on all search attribute dates"
+                )
+            v = v.isoformat()
+        elif not isinstance(v, (str, int, float, bool)):
+            raise TypeError(
+                f"Search attribute value of type {type(v).__name__} not one of str, int, float, bool, or datetime"
+            )
+        elif val_type and type(v) is not val_type:
+            raise TypeError(
+                f"Search attribute values must have the same type for the same key"
+            )
+        elif not val_type:
+            val_type = type(v)
+        safe_vals.append(v)
+    return default().payload_converter.to_payloads([safe_vals])[0]
+
+
+def decode_search_attributes(
+    api: temporalio.api.common.v1.SearchAttributes,
+) -> temporalio.common.SearchAttributes:
+    """Decode API search attributes to values.
+
+    Args:
+        api: API message with search attribute values to convert.
+
+    Returns:
+        Converted search attribute values.
+    """
+    conv = default().payload_converter
+    ret = {}
+    for k, v in api.indexed_fields.items():
+        val = conv.from_payloads([v])[0]
+        # If a value did not come back as a list, make it a single-item list
+        if not isinstance(val, list):
+            val = [val]
+        # Convert each item to datetime if necessary
+        if v.metadata.get("type") == b"Datetime":
+            val = [datetime.fromisoformat(v) for v in val]
+        ret[k] = val
+    return ret
 
 
 class _FunctionTypeLookup:

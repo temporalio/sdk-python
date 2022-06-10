@@ -6,6 +6,8 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 
+import pytest
+
 from temporalio.client import Client, TLSConfig
 from tests.helpers.golang import start_external_go_process
 
@@ -23,6 +25,11 @@ class ExternalServer(ABC):
     @property
     @abstractmethod
     def namespace(self) -> str:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def supports_custom_search_attributes(self) -> bool:
         raise NotImplementedError
 
     @abstractmethod
@@ -44,6 +51,10 @@ class LocalhostDefaultServer(ExternalServer):
     @property
     def namespace(self):
         return "default"
+
+    @property
+    def supports_custom_search_attributes(self) -> bool:
+        return False
 
     async def close(self):
         pass
@@ -100,11 +111,18 @@ class ExternalGolangServer(ExternalServer):
     def namespace(self) -> str:
         return self._namespace
 
+    @property
+    def supports_custom_search_attributes(self) -> bool:
+        return True
+
     async def close(self):
         self._process.terminate()
         await self._process.wait()
 
     async def new_tls_client(self) -> Optional[Client]:
+        # TODO(cretz): No longer works in newer Temporalite versions, waiting on
+        # https://github.com/DataDog/temporalite/pull/75
+        pytest.skip("Temporalite does not currently support TLS")
         # Read certs
         certs_dir = os.path.join(os.path.dirname(__file__), "golangserver", "certs")
         with open(os.path.join(certs_dir, "server-ca-cert.pem"), "rb") as f:

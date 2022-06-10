@@ -259,7 +259,9 @@ def _assert_dynamic_signature(fn: Callable) -> None:
 class Info:
     """Information about the running workflow.
 
-    Retrieved inside a workflow via :py:func:`info`.
+    Retrieved inside a workflow via :py:func:`info`. This object is immutable
+    with the exception of the :py:attr:`search_attributes` mapping which is
+    updated on :py:func:`upsert_search_attributes`.
     """
 
     attempt: int
@@ -271,6 +273,7 @@ class Info:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     run_id: str
     run_timeout: Optional[timedelta]
+    search_attributes: temporalio.common.SearchAttributes
     start_time: datetime
     task_queue: str
     task_timeout: timedelta
@@ -278,7 +281,6 @@ class Info:
     workflow_type: str
 
     # TODO(cretz): memo
-    # TODO(cretz): search_attributes
 
     def _logger_details(self) -> Mapping[str, Any]:
         return {
@@ -341,7 +343,7 @@ class _Runtime(ABC):
         run_timeout: Optional[timedelta],
         task_timeout: Optional[timedelta],
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[Mapping[str, Any]],
+        search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> NoReturn:
         ...
 
@@ -424,7 +426,7 @@ class _Runtime(ABC):
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cron_schedule: str,
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[Mapping[str, Any]],
+        search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> ChildWorkflowHandle[Any, Any]:
         ...
 
@@ -441,6 +443,12 @@ class _Runtime(ABC):
         local_retry_threshold: Optional[timedelta],
         cancellation_type: ActivityCancellationType,
     ) -> ActivityHandle[Any]:
+        ...
+
+    @abstractmethod
+    def workflow_upsert_search_attributes(
+        self, attributes: temporalio.common.SearchAttributes
+    ) -> None:
         ...
 
     @abstractmethod
@@ -513,6 +521,23 @@ def random() -> Random:
         The deterministically-seeded pseudo-random number generator.
     """
     return _Runtime.current().workflow_random()
+
+
+def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
+    """Upsert search attributes for this workflow.
+
+    The keys will be added or replaced on top of the existing search attributes
+    in the same manner as :py:meth:`dict.update`.
+    :py:attr:`Info.search_attributes` will also be updated with these values.
+
+    Technically an existing search attribute cannot be deleted, but an empty
+    list can be provided for the values which is effectively the same thing.
+
+    Args:
+        attributes: The attributes to set. Keys are search attribute names and
+            values are a :py:class:`list` of values.
+    """
+    _Runtime.current().workflow_upsert_search_attributes(attributes)
 
 
 def uuid4() -> uuid.UUID:
@@ -1646,7 +1671,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[Mapping[str, Any]]
+    search_attributes: Optional[temporalio.common.SearchAttributes]
 
 
 # Overload for no-param workflow
@@ -1666,7 +1691,7 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> ChildWorkflowHandle[ExternalWorkflowClass, WorkflowReturnType]:
     ...
 
@@ -1691,7 +1716,7 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> ChildWorkflowHandle[ExternalWorkflowClass, WorkflowReturnType]:
     ...
 
@@ -1717,7 +1742,7 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> ChildWorkflowHandle[ExternalWorkflowClass, WorkflowReturnType]:
     ...
 
@@ -1741,7 +1766,7 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     ...
 
@@ -1763,7 +1788,7 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
 
@@ -1829,7 +1854,7 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> WorkflowReturnType:
     ...
 
@@ -1854,7 +1879,7 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> WorkflowReturnType:
     ...
 
@@ -1880,7 +1905,7 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> WorkflowReturnType:
     ...
 
@@ -1904,7 +1929,7 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> Any:
     ...
 
@@ -1926,7 +1951,7 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> Any:
     """Start a child workflow and wait for completion.
 
@@ -2093,7 +2118,7 @@ def continue_as_new(
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
     ...
 
@@ -2107,7 +2132,7 @@ def continue_as_new(
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
     ...
 
@@ -2122,7 +2147,7 @@ def continue_as_new(
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
     ...
 
@@ -2137,7 +2162,7 @@ def continue_as_new(
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
     ...
 
@@ -2152,7 +2177,7 @@ def continue_as_new(
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
     ...
 
@@ -2166,7 +2191,7 @@ def continue_as_new(
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[Mapping[str, Any]] = None,
+    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
 

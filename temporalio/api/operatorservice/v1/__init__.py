@@ -8,8 +8,8 @@ from .request_response_pb2 import (
     RemoveSearchAttributesRequest,
     RemoveSearchAttributesResponse,
 )
+from .service_pb2_grpc import OperatorService  # type: ignore
 from .service_pb2_grpc import (
-    OperatorService,
     OperatorServiceServicer,
     OperatorServiceStub,
     add_OperatorServiceServicer_to_server,

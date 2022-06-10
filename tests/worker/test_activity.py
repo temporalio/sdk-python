@@ -356,7 +356,7 @@ async def test_max_concurrent_activities(client: Client, worker: ExternalWorker)
         )
     timeout = assert_activity_error(err.value)
     assert isinstance(timeout, TimeoutError)
-    assert str(timeout) == "activity timeout"
+    assert str(timeout) == "activity ScheduleToStart timeout"
     assert timeout.type == TimeoutType.SCHEDULE_TO_START
 
 
@@ -457,7 +457,7 @@ async def test_activity_heartbeat_details_timeout(
         )
     timeout = assert_activity_error(err.value)
     assert isinstance(timeout, TimeoutError)
-    assert str(timeout) == "activity timeout"
+    assert str(timeout) == "activity Heartbeat timeout"
     assert timeout.type == TimeoutType.HEARTBEAT
     assert list(timeout.last_heartbeat_details) == ["some details!"]
 

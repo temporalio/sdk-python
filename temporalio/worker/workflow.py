@@ -263,6 +263,9 @@ class _WorkflowWorker:
             run_timeout=start.workflow_run_timeout.ToTimedelta()
             if start.HasField("workflow_run_timeout")
             else None,
+            search_attributes=temporalio.converter.decode_search_attributes(
+                start.search_attributes
+            ),
             start_time=act.timestamp.ToDatetime().replace(tzinfo=timezone.utc),
             task_queue=self._task_queue,
             task_timeout=start.workflow_task_timeout.ToTimedelta(),

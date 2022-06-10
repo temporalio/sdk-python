@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from enum import IntEnum
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, List, Mapping, Optional, Union
+
+from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -126,6 +128,14 @@ class QueryRejectCondition(IntEnum):
         temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY
     )
     """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY`."""
+
+
+SearchAttributeValue: TypeAlias = Union[str, int, float, bool, datetime]
+
+# We choose to make this a list instead of an iterable so we can catch if people
+# are not sending lists each time but maybe accidentally sending a string (which
+# is iterable)
+SearchAttributes: TypeAlias = Mapping[str, List[SearchAttributeValue]]
 
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument

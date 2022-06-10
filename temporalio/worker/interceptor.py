@@ -126,7 +126,7 @@ class ContinueAsNewInput:
     run_timeout: Optional[timedelta]
     task_timeout: Optional[timedelta]
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[Mapping[str, Any]]
+    search_attributes: Optional[temporalio.common.SearchAttributes]
     # The types may be absent
     arg_types: Optional[List[Type]]
 
@@ -203,7 +203,7 @@ class StartChildWorkflowInput:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[Mapping[str, Any]]
+    search_attributes: Optional[temporalio.common.SearchAttributes]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]

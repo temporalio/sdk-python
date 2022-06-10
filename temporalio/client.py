@@ -209,7 +209,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -234,7 +234,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -259,7 +259,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -283,7 +283,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -305,7 +305,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -388,7 +388,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -413,7 +413,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -438,7 +438,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -462,7 +462,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -484,7 +484,7 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
@@ -1297,7 +1297,7 @@ class StartWorkflowInput:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[Mapping[str, Any]]
+    search_attributes: Optional[temporalio.common.SearchAttributes]
     header: Optional[Mapping[str, Any]]
     start_signal: Optional[str]
     start_signal_args: Iterable[Any]
@@ -1527,10 +1527,9 @@ class _ClientImpl(OutboundInterceptor):
             for k, v in input.memo.items():
                 req.memo.fields[k] = (await self._client.data_converter.encode([v]))[0]
         if input.search_attributes is not None:
-            for k, v in input.search_attributes.items():
-                req.search_attributes.indexed_fields[k] = (
-                    await self._client.data_converter.encode([v])
-                )[0]
+            temporalio.converter.encode_search_attributes(
+                input.search_attributes, req.search_attributes
+            )
         if input.header is not None:
             for k, v in input.header.items():
                 req.header.fields[k] = (await self._client.data_converter.encode([v]))[

@@ -57,6 +57,8 @@ These steps can be followed to use with a virtual environment and `pip`:
 
 The SDK is now ready for use. To build from source, see "Building" near the end of this documentation.
 
+**NOTE: This README is for the current branch and not necessarily what's released on `PyPI`.**
+
 ### Implementing a Workflow
 
 Create the following script at `run_worker.py`:
