@@ -1484,13 +1484,13 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
             param = await workflow.execute_activity(
                 data_class_typed_activity,
                 param,
-                start_to_close_timeout=timedelta(seconds=5),
+                start_to_close_timeout=timedelta(seconds=30),
             )
             param.assert_expected()
             param = await workflow.execute_local_activity(
                 data_class_typed_activity,
                 param,
-                start_to_close_timeout=timedelta(seconds=5),
+                start_to_close_timeout=timedelta(seconds=30),
             )
             param.assert_expected()
             child_handle = await workflow.start_child_workflow(
