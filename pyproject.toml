@@ -28,14 +28,11 @@ script = "build.py"
 dacite = "^1.6.0"
 # Due to grpcio binaries not supporting macOS ARM currently (see
 # https://github.com/grpc/grpc/issues/27506,
-# https://github.com/grpc/grpc/issues/28387, etc) we have to use non-binary. But
-# until Poetry 1.2 is released and
-# https://github.com/python-poetry/poetry/pull/5609 merged, we have to specify
-# the tarball instead.
-grpcio = [
-  { version = "^1.46.0", markers = "sys_platform != 'darwin' or platform_machine != 'arm64'" },
-  { url = "https://files.pythonhosted.org/packages/61/dd/d8eda79197a1275e06621850775c7bbf34a141ff92553754dde4e87d7551/grpcio-1.46.3.tar.gz", markers = "sys_platform == 'darwin' and platform_machine == 'arm64'" },
-]
+# https://github.com/grpc/grpc/issues/28387, etc) we would have to use
+# non-binary. But until Poetry 1.2 is released and
+# https://github.com/python-poetry/poetry/pull/5609 merged, it is not supported.
+# We cannot use a direct dependency because PyPI fails the upload.
+grpcio = "^1.46.3"
 protobuf = "^3.20.1"
 python = "^3.7"
 types-protobuf = "^3.19.21"
