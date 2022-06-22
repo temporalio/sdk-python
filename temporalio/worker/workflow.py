@@ -135,7 +135,7 @@ class _WorkflowWorker:
                 )
 
             if LOG_PROTOS:
-                logger.debug("Received workflow activation: %s", act)
+                logger.debug(f"Received workflow activation: {act}")
 
             # If the workflow is not running yet, create it
             workflow = self._running_workflows.get(act.run_id)
@@ -203,7 +203,7 @@ class _WorkflowWorker:
 
         # Send off completion
         if LOG_PROTOS:
-            logger.debug("Sending workflow completion: %s", completion)
+            logger.debug(f"Sending workflow completion: {completion}")
         try:
             await self._bridge_worker().complete_workflow_activation(completion)
         except Exception:

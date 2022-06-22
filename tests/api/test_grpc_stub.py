@@ -29,7 +29,7 @@ async def test_python_grpc_stub():
         SimpleServer(), server
     )
     port = server.add_insecure_port("[::]:0")
-    logging.info("Starting server on %s", port)
+    logging.info(f"Starting server on {port}")
     await server.start()
 
     async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:

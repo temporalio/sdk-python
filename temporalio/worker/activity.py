@@ -183,7 +183,7 @@ class _ActivityWorker:
         if not activity:
             warnings.warn(f"Cannot find activity to cancel for token {task_token!r}")
             return
-        logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
+        logger.debug(f"Cancelling activity {task_token}, reason: {cancel.reason}")
         activity.cancel(cancelled_by_request=True)
 
     def _heartbeat(self, task_token: bytes, *details: Any) -> None:
@@ -222,7 +222,7 @@ class _ActivityWorker:
             if details:
                 # Convert to core payloads
                 heartbeat.details.extend(await self._data_converter.encode(details))
-            logger.debug("Recording heartbeat with details %s", details)
+            logger.debug(f"Recording heartbeat with details {details}")
             self._bridge_worker().record_activity_heartbeat(heartbeat)
         except Exception as err:
             # If the activity is done, nothing we can do but log
@@ -243,7 +243,7 @@ class _ActivityWorker:
         start: temporalio.bridge.proto.activity_task.Start,
         running_activity: _RunningActivity,
     ) -> None:
-        logger.debug("Running activity %s (token %s)", start.activity_type, task_token)
+        logger.debug(f"Running activity {start.activity_type} (token {task_token})")
         # We choose to surround interceptor creation and activity invocation in
         # a try block so we can mark the workflow as failed on any error instead
         # of having error handling in the interceptor
@@ -471,7 +471,7 @@ class _ActivityWorker:
                     )
 
             # Send task completion to core
-            logger.debug("Completing activity with completion: %s", completion)
+            logger.debug(f"Completing activity with completion: {completion}")
             await self._bridge_worker().complete_activity_task(completion)
             del self._running_activities[task_token]
         except Exception:

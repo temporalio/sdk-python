@@ -440,11 +440,11 @@ class _BridgeWorkflowService(WorkflowService):
     ) -> WorkflowServiceResponse:
         global LOG_PROTOS
         if LOG_PROTOS:
-            logger.debug("WorkflowService request to %s: %s", rpc, req)
+            logger.debug(f"WorkflowService request to {rpc}: {req}")
         try:
             resp = await self._bridge_client.rpc_call(rpc, req, resp_type, retry=retry)
             if LOG_PROTOS:
-                logger.debug("WorkflowService response from %s: %s", rpc, resp)
+                logger.debug(f"WorkflowService response from {rpc}: {resp}")
             return resp
         except temporalio.bridge.client.RPCError as err:
             # Intentionally swallowing the cause instead of using "from"

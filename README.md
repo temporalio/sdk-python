@@ -265,7 +265,7 @@ class GreetingWorkflow:
                 self._greeting_info,
                 start_to_close_timeout=timedelta(seconds=5),
             )
-            workflow.logger.debug("Greeting set to %s", self._current_greeting)
+            workflow.logger.debug(f"Greeting set to {self.current_greeting}")
             
             # Wait for salutation update or complete signal (this can be
             # cancelled)

@@ -401,7 +401,7 @@ async def test_activity_heartbeat_details(client: Client, worker: ExternalWorker
     async def some_activity() -> str:
         info = activity.info()
         count = int(next(iter(info.heartbeat_details))) if info.heartbeat_details else 0
-        activity.logger.debug("Changing count from %s to %s", count, count + 9)
+        activity.logger.debug(f"Changing count from {count} to {count + 9}")
         count += 9
         activity.heartbeat(count)
         if count < 30:
@@ -469,7 +469,7 @@ def picklable_heartbeat_details_activity() -> str:
         next(iter(info.heartbeat_details)) if info.heartbeat_details else []
     )
     some_list.append(f"attempt: {info.attempt}")
-    activity.logger.debug("Heartbeating with value: %s", some_list)
+    activity.logger.debug(f"Heartbeating with value: {some_list}")
     activity.heartbeat(some_list)
     if len(some_list) < 2:
         raise RuntimeError(f"Try again, list contains: {some_list}")

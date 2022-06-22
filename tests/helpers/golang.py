@@ -12,9 +12,9 @@ async def start_external_go_process(
 ) -> asyncio.subprocess.Process:
     # First, build the executable. We accept the performance issues of building
     # this each run.
-    logger.info("Building %s", exe_name)
+    logger.info(f"Building {exe_name}")
     subprocess.run(["go", "build", "-o", exe_name, "."], cwd=source_dir, check=True)
-    logger.info("Starting %s", exe_name)
+    logger.info(f"Starting {exe_name}")
     return await asyncio.create_subprocess_exec(
         os.path.join(source_dir, exe_name), *args
     )
