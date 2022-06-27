@@ -39,7 +39,7 @@ The Python SDK is under development. There are no compatibility guarantees nor p
 
 Currently missing features:
 
-* Support for Windows arm, macOS arm (i.e. M1), Linux arm, and Linux x64 glibc < 2.31.
+* Support for Windows arm, Linux arm, and Linux x64 glibc < 2.31.
 * Full documentation
 
 ## Quick Start
