@@ -77,15 +77,12 @@ jobs:
   # Compile the binaries and upload artifacts
   compile-binaries:
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - os: ubuntu-latest
             package-suffix: linux-amd64
             ci-arch: auto
-          - os: ubuntu-latest
-            package-suffix: linux-aarch64
-            ci-arch: aarch64
           - os: macos-latest
             package-suffix: macos-amd64
             ci-arch: auto
@@ -97,7 +94,6 @@ jobs:
             package-suffix: windows-amd64
             ci-arch: auto
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v2
         with:
@@ -118,13 +114,6 @@ jobs:
         uses: Swatinem/rust-cache@v1
         with:
           working-directory: temporalio/bridge
-
-      # Need QEMU for ARM build on Linux
-      - if: ${{ matrix.package-suffix == 'linux-aarch64' }}
-        uses: docker/setup-qemu-action@v1
-        with:
-          image: tonistiigi/binfmt:latest
-          platforms: arm64
 
       # Prepare
       - run: python -m pip install --upgrade wheel poetry poethepoet
@@ -150,5 +139,40 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: packages-${{ matrix.package-suffix }}
+          path: dist
+
+  # We separate out Linux aarch64 so we can choose not to run it during PR since
+  # it is so slow in cibuildwheel (uses QEMU emulation). We can put this back in
+  # the above matrix when Linux ARM runners are available.
+  compile-binaries-linux-aarch64:
+    # Skip compiling Linux aarch64 on PR
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v1
+        with:
+          python-version: "3.10"
+
+      # Need QEMU for ARM build on Linux
+      - uses: docker/setup-qemu-action@v1
+        with:
+          image: tonistiigi/binfmt:latest
+          platforms: arm64
+
+      # Prepare
+      - run: python -m pip install --upgrade wheel poetry poethepoet
+      - run: poetry install --no-root
+
+      # Build and fix the wheel
+      - run: poetry run cibuildwheel --output-dir dist --arch aarch64
+      - run: poe fix-wheel
+
+      # Upload dist
+      - uses: actions/upload-artifact@v2
+        with:
+          name: packages-linux-aarch64
           path: dist
 
