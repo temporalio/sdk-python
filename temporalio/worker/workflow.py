@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 import os
 from datetime import timezone
-from typing import Callable, Dict, Iterable, List, Optional, Type
+from typing import Callable, Dict, Iterable, List, Mapping, Optional, Type
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -27,7 +27,11 @@ import temporalio.exceptions
 import temporalio.workflow
 import temporalio.workflow_service
 
-from .interceptor import Interceptor, WorkflowInboundInterceptor
+from .interceptor import (
+    Interceptor,
+    WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
+)
 from .workflow_instance import WorkflowInstance, WorkflowInstanceDetails, WorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -46,6 +50,7 @@ class _WorkflowWorker:
         workflows: Iterable[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor],
         workflow_runner: WorkflowRunner,
+        workflow_extern_functions: Optional[Mapping[str, Callable]],
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
         type_hint_eval_str: bool,
@@ -64,9 +69,16 @@ class _WorkflowWorker:
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
         self._workflow_runner = workflow_runner
         self._data_converter = data_converter
+        # Build the interceptor classes and collect extern functions
+        self._extern_functions = (
+            {} if workflow_extern_functions is None else dict(workflow_extern_functions)
+        )
         self._interceptor_classes: List[Type[WorkflowInboundInterceptor]] = []
+        interceptor_class_input = WorkflowInterceptorClassInput(
+            extern_functions=self._extern_functions
+        )
         for i in interceptors:
-            interceptor_class = i.workflow_interceptor_class()
+            interceptor_class = i.workflow_interceptor_class(interceptor_class_input)
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
         self._type_hint_eval_str = type_hint_eval_str
@@ -282,5 +294,6 @@ class _WorkflowWorker:
                 info=info,
                 type_hint_eval_str=self._type_hint_eval_str,
                 randomness_seed=start.randomness_seed,
+                extern_functions=self._extern_functions,
             )
         )

@@ -15,6 +15,7 @@ from .interceptor import (
     StartChildWorkflowInput,
     StartLocalActivityInput,
     WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
 from .worker import Worker, WorkerConfig
@@ -39,12 +40,13 @@ __all__ = [
     "ContinueAsNewInput",
     "ExecuteActivityInput",
     "ExecuteWorkflowInput",
-    "HandleSignalInput",
+    "GetExternalWorkflowHandleInput",
     "HandleQueryInput",
+    "HandleSignalInput",
     "StartActivityInput",
     "StartChildWorkflowInput",
     "StartLocalActivityInput",
-    "GetExternalWorkflowHandleInput",
+    "WorkflowInterceptorClassInput",
     # Advanced activity classes
     "SharedStateManager",
     "SharedHeartbeatSender",

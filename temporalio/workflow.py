@@ -348,6 +348,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_extern_functions(self) -> Mapping[str, Callable]:
+        ...
+
+    @abstractmethod
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
     ) -> ExternalWorkflowHandle[Any]:
@@ -470,6 +474,10 @@ def deprecate_patch(id: str) -> None:
         id: The identifier originally used with :py:func:`patched`.
     """
     _Runtime.current().workflow_patch(id, deprecated=True)
+
+
+def extern_functions() -> Mapping[str, Callable]:
+    return _Runtime.current().workflow_extern_functions()
 
 
 def info() -> Info:

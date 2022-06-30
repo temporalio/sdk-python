@@ -371,6 +371,7 @@ class _ActivityWorker:
                 fn=activity_def.fn,
                 args=args,
                 executor=None if not running_activity.sync else self._activity_executor,
+                headers=start.header_fields,
                 _cancelled_event=running_activity.cancelled_event,
             )
 

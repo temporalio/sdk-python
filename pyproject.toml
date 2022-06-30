@@ -33,6 +33,8 @@ dacite = "^1.6.0"
 # https://github.com/python-poetry/poetry/pull/5609 merged, it is not supported.
 # We cannot use a direct dependency because PyPI fails the upload.
 grpcio = "^1.46.3"
+opentelemetry-api = { version = "^1.11.1", optional = true }
+opentelemetry-sdk = { version = "^1.11.1", optional = true }
 protobuf = "^3.20.1"
 python = "^3.7"
 types-protobuf = "^3.19.21"
@@ -55,6 +57,9 @@ setuptools = "^62.3.3"
 setuptools-rust = "^1.3.0"
 toml = "^0.10.2"
 twine = "^4.0.1"
+
+[tool.poetry.extras]
+opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 
 [tool.poe.tasks]
 build-develop = ["build-bridge-develop"]

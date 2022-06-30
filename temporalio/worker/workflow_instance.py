@@ -57,6 +57,7 @@ from .interceptor import (
     GetExternalWorkflowHandleInput,
     HandleQueryInput,
     HandleSignalInput,
+    SignalExternalWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
@@ -97,6 +98,7 @@ class WorkflowInstanceDetails:
     info: temporalio.workflow.Info
     type_hint_eval_str: bool
     randomness_seed: int
+    extern_functions: Mapping[str, Callable]
 
 
 class WorkflowInstance(ABC):
@@ -397,8 +399,9 @@ class _WorkflowInstanceImpl(
             run_query(
                 HandleQueryInput(
                     id=job.query_id,
-                    name=job.query_type,
+                    query=job.query_type,
                     args=args,
+                    headers=job.headers,
                 )
             ),
             name=f"query: {job.query_type}",
@@ -565,7 +568,9 @@ class _WorkflowInstanceImpl(
         elif callable(signal_defn):
             arg_types, _ = self._type_lookup.get_type_hints(signal_defn)
         input = HandleSignalInput(
-            name=job.signal_name, args=self._convert_payloads(job.input, arg_types)
+            signal=job.signal_name,
+            args=self._convert_payloads(job.input, arg_types),
+            headers=job.headers,
         )
 
         # If there is no definition or dynamic, we buffer and ignore
@@ -601,6 +606,7 @@ class _WorkflowInstanceImpl(
             # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
             run_fn=cast(Callable[..., Awaitable[Any]], self._defn.run_fn),
             args=self._convert_payloads(job.arguments, arg_types),
+            headers=job.headers,
         )
         self._primary_task = self.create_task(
             self._run_top_level_workflow_function(run_workflow(input)),
@@ -646,6 +652,7 @@ class _WorkflowInstanceImpl(
                 task_timeout=task_timeout,
                 memo=memo,
                 search_attributes=search_attributes,
+                headers=None,
                 arg_types=arg_types,
             )
         )
@@ -737,7 +744,7 @@ class _WorkflowInstanceImpl(
                         self._run_top_level_workflow_function(
                             self._inbound.handle_signal(input)
                         ),
-                        name=f"signal: {input.name} (buffered)",
+                        name=f"signal: {input.signal} (buffered)",
                     )
             else:
                 for inputs in self._buffered_signals.values():
@@ -746,7 +753,7 @@ class _WorkflowInstanceImpl(
                             self._run_top_level_workflow_function(
                                 self._inbound.handle_signal(input)
                             ),
-                            name=f"signal: {input.name} (buffered)",
+                            name=f"signal: {input.signal} (buffered)",
                         )
                 self._buffered_signals.clear()
         else:
@@ -790,6 +797,7 @@ class _WorkflowInstanceImpl(
                 heartbeat_timeout=heartbeat_timeout,
                 retry_policy=retry_policy,
                 cancellation_type=cancellation_type,
+                headers=None,
                 arg_types=arg_types,
                 ret_type=ret_type,
             )
@@ -843,6 +851,7 @@ class _WorkflowInstanceImpl(
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
+                headers=None,
                 arg_types=arg_types,
                 ret_type=ret_type,
             )
@@ -884,6 +893,7 @@ class _WorkflowInstanceImpl(
                 retry_policy=retry_policy,
                 local_retry_threshold=local_retry_threshold,
                 cancellation_type=cancellation_type,
+                headers=None,
                 arg_types=arg_types,
                 ret_type=ret_type,
             )
@@ -957,6 +967,22 @@ class _WorkflowInstanceImpl(
         handle._apply_schedule_command(self._add_command())
         self._pending_activities[handle._seq] = handle
         return handle
+
+    async def _outbound_signal_external_workflow(
+        self, input: SignalExternalWorkflowInput
+    ) -> None:
+        command = self._add_command()
+        v = command.signal_external_workflow_execution
+        v.workflow_execution.namespace = input.namespace
+        v.workflow_execution.workflow_id = input.workflow_id
+        if input.workflow_run_id:
+            v.workflow_execution.run_id = input.workflow_run_id
+        v.signal_name = input.signal
+        if input.args:
+            v.args.extend(self._payload_converter.to_payloads(input.args))
+        if input.headers:
+            v.headers.update(input.headers)
+        await self._signal_external_workflow(command)
 
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
@@ -1337,7 +1363,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
 
     async def handle_signal(self, input: HandleSignalInput) -> None:
         # Get the definition or fall through to dynamic
-        handler = self._instance.workflow_get_signal_handler(input.name)
+        handler = self._instance.workflow_get_signal_handler(input.signal)
         dynamic = False
         if not handler:
             handler = self._instance.workflow_get_signal_handler(None)
@@ -1346,10 +1372,10 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             # an # interceptor could have changed the name
             if not handler:
                 raise RuntimeError(
-                    f"Signal handler for {input.name} expected but not found"
+                    f"Signal handler for {input.signal} expected but not found"
                 )
         # Put name first if dynamic
-        args = list(input.args) if not dynamic else [input.name] + list(input.args)
+        args = list(input.args) if not dynamic else [input.signal] + list(input.args)
         if inspect.iscoroutinefunction(handler):
             await handler(*args)
         else:
@@ -1357,7 +1383,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
 
     async def handle_query(self, input: HandleQueryInput) -> Any:
         # Get the definition or fall through to dynamic
-        handler = self._instance.workflow_get_query_handler(input.name)
+        handler = self._instance.workflow_get_query_handler(input.query)
         dynamic = False
         if not handler:
             handler = self._instance.workflow_get_query_handler(None)
@@ -1366,10 +1392,10 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             # an # interceptor could have changed the name
             if not handler:
                 raise RuntimeError(
-                    f"Query handler for {input.name} expected but not found"
+                    f"Query handler for {input.query} expected but not found"
                 )
         # Put name first if dynamic
-        args = list(input.args) if not dynamic else [input.name] + list(input.args)
+        args = list(input.args) if not dynamic else [input.query] + list(input.args)
         if inspect.iscoroutinefunction(handler):
             return await handler(*args)
         else:
@@ -1391,6 +1417,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
 
     def info(self) -> temporalio.workflow.Info:
         return self._instance._info
+
+    async def signal_external_workflow(
+        self, input: SignalExternalWorkflowInput
+    ) -> None:
+        await self._instance._outbound_signal_external_workflow(input)
 
     def start_activity(
         self, input: StartActivityInput
@@ -1512,8 +1543,8 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         v.seq = self._seq
         v.activity_id = self._input.activity_id or str(self._seq)
         v.activity_type = self._input.activity
-        # TODO(cretz): Headers
-        # v.headers = input.he
+        if self._input.headers:
+            v.headers.update(self._input.headers)
         if self._input.args:
             v.arguments.extend(
                 self._instance._payload_converter.to_payloads(self._input.args)
@@ -1661,8 +1692,8 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
         v.cron_schedule = self._input.cron_schedule
-        # TODO(cretz): Headers
-        # v.headers = input.he
+        if self._input.headers:
+            v.headers.update(self._input.headers)
         if self._input.memo:
             for k, val in self._input.memo.items():
                 v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]
@@ -1718,20 +1749,18 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         *,
         args: Iterable[Any] = [],
     ) -> None:
-        command = self._instance._add_command()
-        v = command.signal_external_workflow_execution
-        v.workflow_execution.namespace = self._instance._info.namespace
-        v.workflow_execution.workflow_id = self._id
-        if self._run_id:
-            v.workflow_execution.run_id = self._run_id
-        v.signal_name = temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
-            signal
+        await self._instance._outbound.signal_external_workflow(
+            SignalExternalWorkflowInput(
+                signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
+                    signal
+                ),
+                args=temporalio.common._arg_or_args(arg, args),
+                namespace=self._instance._info.namespace,
+                workflow_id=self._id,
+                workflow_run_id=self._run_id,
+                headers=None,
+            )
         )
-        args = temporalio.common._arg_or_args(arg, args)
-        if args:
-            v.args.extend(self._instance._payload_converter.to_payloads(args))
-        # TODO(cretz): Headers
-        await self._instance._signal_external_workflow(command)
 
     async def cancel(self) -> None:
         command = self._instance._add_command()
@@ -1768,8 +1797,8 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             v.workflow_run_timeout.FromTimedelta(self._input.run_timeout)
         if self._input.task_timeout:
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
-        # TODO(cretz): Headers
-        # v.headers = input.he
+        if self._input.headers:
+            v.headers.update(self._input.headers)
         if self._input.memo:
             for k, val in self._input.memo.items():
                 v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]
