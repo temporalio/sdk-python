@@ -161,14 +161,6 @@ class ExecuteWorkflowInput:
 
 
 @dataclass
-class GetExternalWorkflowHandleInput:
-    """Input for :py:meth:`WorkflowOutboundInterceptor.get_external_workflow_handle`."""
-
-    id: str
-    run_id: Optional[str]
-
-
-@dataclass
 class HandleSignalInput:
     """Input for :py:meth:`WorkflowInboundInterceptor.handle_signal`."""
 
@@ -185,6 +177,14 @@ class HandleQueryInput:
     query: str
     args: Iterable[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+
+
+@dataclass
+class SignalChildWorkflowInput:
+    signal: str
+    args: Iterable[Any]
+    child_workflow_id: str
+    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
 
 @dataclass
@@ -317,18 +317,12 @@ class WorkflowOutboundInterceptor:
         """Called for every :py:func:`temporalio.workflow.continue_as_new` call."""
         self.next.continue_as_new(input)
 
-    def get_external_workflow_handle(
-        self, input: GetExternalWorkflowHandleInput
-    ) -> temporalio.workflow.ExternalWorkflowHandle:
-        """Called for every
-        :py:func:`temporalio.workflow.get_external_workflow_handle` and
-        :py:func:`temporalio.workflow.get_external_workflow_handle_for` call.
-        """
-        return self.next.get_external_workflow_handle(input)
-
     def info(self) -> temporalio.workflow.Info:
         """Called for every :py:func:`temporalio.workflow.info` call."""
         return self.next.info()
+
+    async def signal_child_workflow(self, input: SignalChildWorkflowInput) -> None:
+        return await self.next.signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: SignalExternalWorkflowInput

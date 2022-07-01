@@ -54,9 +54,9 @@ import temporalio.workflow
 from .interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
-    GetExternalWorkflowHandleInput,
     HandleQueryInput,
     HandleSignalInput,
+    SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
@@ -149,6 +149,7 @@ class _WorkflowInstanceImpl(
         self._payload_converter = det.payload_converter_class()
         self._defn = det.defn
         self._info = det.info
+        self._extern_functions = det.extern_functions
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time = 0.0
         # Handles which are ready to run on the next event loop iteration
@@ -659,12 +660,13 @@ class _WorkflowInstanceImpl(
         # TODO(cretz): Why can't MyPy infer the above never returns?
         raise RuntimeError("Unreachable")
 
+    def workflow_extern_functions(self) -> Mapping[str, Callable]:
+        return self._extern_functions
+
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        return self._outbound.get_external_workflow_handle(
-            GetExternalWorkflowHandleInput(id=id, run_id=run_id)
-        )
+        return _ExternalWorkflowHandle(self, id, run_id)
 
     def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
         defn = self._queries.get(name)
@@ -967,6 +969,19 @@ class _WorkflowInstanceImpl(
         handle._apply_schedule_command(self._add_command())
         self._pending_activities[handle._seq] = handle
         return handle
+
+    async def _outbound_signal_child_workflow(
+        self, input: SignalChildWorkflowInput
+    ) -> None:
+        command = self._add_command()
+        v = command.signal_external_workflow_execution
+        v.child_workflow_id = input.child_workflow_id
+        v.signal_name = input.signal
+        if input.args:
+            v.args.extend(self._payload_converter.to_payloads(input.args))
+        if input.headers:
+            v.headers.update(input.headers)
+        await self._signal_external_workflow(command)
 
     async def _outbound_signal_external_workflow(
         self, input: SignalExternalWorkflowInput
@@ -1410,13 +1425,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         self._instance._outbound_continue_as_new(input)
 
-    def get_external_workflow_handle(
-        self, input: GetExternalWorkflowHandleInput
-    ) -> temporalio.workflow.ExternalWorkflowHandle:
-        return _ExternalWorkflowHandle(self._instance, input.id, input.run_id)
-
     def info(self) -> temporalio.workflow.Info:
         return self._instance._info
+
+    async def signal_child_workflow(self, input: SignalChildWorkflowInput) -> None:
+        return await self._instance._outbound_signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: SignalExternalWorkflowInput
@@ -1630,17 +1643,16 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         *,
         args: Iterable[Any] = [],
     ) -> None:
-        command = self._instance._add_command()
-        v = command.signal_external_workflow_execution
-        v.child_workflow_id = self._input.id
-        v.signal_name = temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
-            signal
+        await self._instance._outbound.signal_child_workflow(
+            SignalChildWorkflowInput(
+                signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
+                    signal
+                ),
+                args=temporalio.common._arg_or_args(arg, args),
+                child_workflow_id=self._input.id,
+                headers=None,
+            )
         )
-        args = temporalio.common._arg_or_args(arg, args)
-        if args:
-            v.args.extend(self._instance._payload_converter.to_payloads(args))
-        # TODO(cretz): Headers
-        await self._instance._signal_external_workflow(command)
 
     def _resolve_start_success(self, run_id: str) -> None:
         self._first_execution_run_id = run_id
