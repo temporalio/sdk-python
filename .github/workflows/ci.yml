@@ -82,35 +82,97 @@ jobs:
         include:
           - os: ubuntu-latest
             package-suffix: linux-amd64
+            ci-arch: auto
           - os: macos-latest
             package-suffix: macos-amd64
+            ci-arch: auto
+          - os: macos-latest
+            package-suffix: macos-arm64
+            ci-arch: arm64
+            rust-add-target: aarch64-apple-darwin
           - os: windows-latest
             package-suffix: windows-amd64
+            ci-arch: auto
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-        with:
-          working-directory: temporalio/bridge
       - uses: actions/setup-python@v1
         with:
           python-version: "3.10"
-      # Needed for tests since they use external server
-      - uses: actions/setup-go@v2
+
+      # Install Rust locally for non-Linux (Linux uses an internal docker
+      # command to build with cibuildwheel which uses rustup install defined
+      # in pyproject.toml)
+      - if: ${{ runner.os != 'Linux' }}
+        uses: actions-rs/toolchain@v1
         with:
-          go-version: "1.18"
+          toolchain: stable
+          target: ${{ matrix.rust-add-target }}
+      - if: ${{ runner.os != 'Linux' }}
+        uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: temporalio/bridge
+
+      # Prepare
       - run: python -m pip install --upgrade wheel poetry poethepoet
       - run: poetry install --no-root
-      - run: poetry build
+
+      # Add the source dist only for Linux x64 for now
+      - if: ${{ matrix.package-suffix == 'linux-amd64' }}
+        run: poetry build --format sdist
+
+      # Build and fix the wheel
+      - run: poetry run cibuildwheel --output-dir dist --arch ${{ matrix.ci-arch }}
       - run: poe fix-wheel
-      - run: poe test-dist-single
+
+      # Do test only for ci-arch auto (i.e. local machine)
+      - if: ${{ matrix.ci-arch == 'auto' }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.18"
+      - if: ${{ matrix.ci-arch == 'auto' }}
+        run: poe test-dist-single
+
+      # Upload dist
       - uses: actions/upload-artifact@v2
         with:
           name: packages-${{ matrix.package-suffix }}
+          path: dist
+
+  # We separate out Linux aarch64 so we can choose not to run it during PR since
+  # it is so slow in cibuildwheel (uses QEMU emulation). We can put this back in
+  # the above matrix when Linux ARM runners are available.
+  compile-binaries-linux-aarch64:
+    # Skip compiling Linux aarch64 on PR
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v1
+        with:
+          python-version: "3.10"
+
+      # Need QEMU for ARM build on Linux
+      - uses: docker/setup-qemu-action@v1
+        with:
+          image: tonistiigi/binfmt:latest
+          platforms: arm64
+
+      # Prepare
+      - run: python -m pip install --upgrade wheel poetry poethepoet
+      - run: poetry install --no-root
+
+      # Build and fix the wheel
+      - run: poetry run cibuildwheel --output-dir dist --arch aarch64
+      - run: poe fix-wheel
+
+      # Upload dist
+      - uses: actions/upload-artifact@v2
+        with:
+          name: packages-linux-aarch64
           path: dist
 
