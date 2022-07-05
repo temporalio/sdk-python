@@ -26,13 +26,7 @@ script = "build.py"
 
 [tool.poetry.dependencies]
 dacite = "^1.6.0"
-# Due to grpcio binaries not supporting macOS ARM currently (see
-# https://github.com/grpc/grpc/issues/27506,
-# https://github.com/grpc/grpc/issues/28387, etc) we would have to use
-# non-binary. But until Poetry 1.2 is released and
-# https://github.com/python-poetry/poetry/pull/5609 merged, it is not supported.
-# We cannot use a direct dependency because PyPI fails the upload.
-grpcio = "^1.46.3"
+grpcio = "^1.47.0"
 opentelemetry-api = { version = "^1.11.1", optional = true }
 opentelemetry-sdk = { version = "^1.11.1", optional = true }
 protobuf = "^3.20.1"
@@ -42,7 +36,8 @@ typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3.0"
-grpcio-tools = "^1.46.0"
+cibuildwheel = "^2.7.0"
+grpcio-tools = "^1.47.0"
 isort = "^5.10.1"
 mypy = "^0.961"
 mypy-protobuf = "^3.2.0"
@@ -101,6 +96,21 @@ log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 timeout = 600
 timeout_func_only = true
+
+[tool.cibuildwheel]
+# We only want the 3.7 64-bit build of each type. There is no 3.7 build of macOS
+# arm, so we have to use 3.8+ there.
+build = "cp37-win_amd64 cp37-manylinux_x86_64 cp37-manylinux_aarch64 cp37-macosx_x86_64 cp38-macosx_arm64"
+build-verbosity = "1"
+
+[tool.cibuildwheel.linux]
+before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
+environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
+
+[[tool.cibuildwheel.overrides]]
+# We need the aarch64 target for Rust
+before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable --target aarch64-unknown-linux-gnu -y && yum install -y openssl-devel"
+select = "*_aarch64"
 
 [tool.isort]
 profile = "black"

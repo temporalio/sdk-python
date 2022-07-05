@@ -52,6 +52,14 @@ six = "*"
 visualize = ["graphviz (>0.5.1)", "Twisted (>=16.1.1)"]
 
 [[package]]
+name = "bashlex"
+version = "0.16"
+description = "Python parser for bash"
+category = "dev"
+optional = false
+python-versions = ">=2.7, !=3.0, !=3.1, !=3.2, !=3.3, !=3.4"
+
+[[package]]
 name = "black"
 version = "22.6.0"
 description = "The uncompromising code formatter."
@@ -89,6 +97,14 @@ webencodings = "*"
 [package.extras]
 css = ["tinycss2 (>=1.1.0,<1.2)"]
 dev = ["build (==0.8.0)", "flake8 (==4.0.1)", "hashin (==0.17.0)", "pip-tools (==6.6.2)", "pytest (==7.1.2)", "Sphinx (==4.3.2)", "tox (==3.25.0)", "twine (==4.0.1)", "wheel (==0.37.1)", "black (==22.3.0)", "mypy (==0.961)"]
+
+[[package]]
+name = "bracex"
+version = "2.3.post1"
+description = "Bash style brace expander."
+category = "dev"
+optional = false
+python-versions = ">=3.7"
 
 [[package]]
 name = "cachecontrol"
@@ -136,6 +152,32 @@ python-versions = ">=3.6.0"
 
 [package.extras]
 unicode_backport = ["unicodedata2"]
+
+[[package]]
+name = "cibuildwheel"
+version = "2.7.0"
+description = "Build Python wheels on CI with minimal configuration."
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+bashlex = "!=0.13"
+bracex = "*"
+certifi = "*"
+filelock = "*"
+packaging = ">=20.9"
+platformdirs = "*"
+tomli = {version = "*", markers = "python_version < \"3.11\""}
+typing-extensions = {version = ">=3.10.0.0", markers = "python_version < \"3.8\""}
+
+[package.extras]
+all = ["mkdocs-include-markdown-plugin (==2.8.0)", "mkdocs (==1.0.4)", "jinja2 (==3.0.3)", "pymdown-extensions", "mkdocs-macros-plugin", "jinja2", "pytest (>=6)", "pytest-timeout", "pytest-xdist", "build", "click", "ghapi", "pip-tools", "pygithub", "pyyaml", "requests", "rich (>=9.6)", "packaging (>=21.0)", "mypy (>=0.901)", "types-jinja2", "types-certifi", "types-toml", "types-pyyaml", "types-click", "types-requests"]
+bin = ["click", "ghapi", "pip-tools", "pygithub", "pyyaml", "requests", "rich (>=9.6)", "packaging (>=21.0)"]
+dev = ["mypy (>=0.901)", "types-jinja2", "types-certifi", "types-toml", "types-pyyaml", "types-click", "types-requests", "jinja2", "pytest (>=6)", "pytest-timeout", "pytest-xdist", "build", "click", "ghapi", "pip-tools", "pygithub", "pyyaml", "requests", "rich (>=9.6)", "packaging (>=21.0)"]
+docs = ["mkdocs-include-markdown-plugin (==2.8.0)", "mkdocs (==1.0.4)", "jinja2 (==3.0.3)", "pymdown-extensions", "mkdocs-macros-plugin"]
+mypy = ["mypy (>=0.901)", "types-jinja2", "types-certifi", "types-toml", "types-pyyaml", "types-click", "types-requests"]
+test = ["jinja2", "pytest (>=6)", "pytest-timeout", "pytest-xdist", "build"]
 
 [[package]]
 name = "click"
@@ -239,6 +281,18 @@ description = "Docutils -- Python Documentation Utilities"
 category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+
+[[package]]
+name = "filelock"
+version = "3.7.1"
+description = "A platform independent file lock."
+category = "dev"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+docs = ["furo (>=2021.8.17b43)", "sphinx (>=4.1)", "sphinx-autodoc-typehints (>=1.12)"]
+testing = ["covdefaults (>=1.2.0)", "coverage (>=4)", "pytest (>=4)", "pytest-cov", "pytest-timeout (>=1.4.2)"]
 
 [[package]]
 name = "grpcio"
@@ -967,7 +1021,7 @@ opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "7e46bf7b50a55f86c050907b7853fb8bc07c82a2c78a1fc2c0e4fa6899bb4ff0"
+content-hash = "381397888989e2a21d67df4ab5f3879d0e89ad2c2c868a24cf193b2776860121"
 
 [metadata.files]
 appdirs = [
@@ -989,6 +1043,10 @@ attrs = [
 automat = [
     {file = "Automat-20.2.0-py2.py3-none-any.whl", hash = "sha256:b6feb6455337df834f6c9962d6ccf771515b7d939bca142b29c20c2376bc6111"},
     {file = "Automat-20.2.0.tar.gz", hash = "sha256:7979803c74610e11ef0c0d68a2942b152df52da55336e0c9d58daf1831cbdf33"},
+]
+bashlex = [
+    {file = "bashlex-0.16-py2.py3-none-any.whl", hash = "sha256:ff89fc743ccdef978792784d74d698a9236a862939bb4af471c0c3faf92c21bb"},
+    {file = "bashlex-0.16.tar.gz", hash = "sha256:dc6f017e49ce2d0fe30ad9f5206da9cd13ded073d365688c9fda525354e8c373"},
 ]
 black = [
     {file = "black-22.6.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:f586c26118bc6e714ec58c09df0157fe2d9ee195c764f630eb0d8e7ccce72e69"},
@@ -1018,6 +1076,10 @@ black = [
 bleach = [
     {file = "bleach-5.0.1-py3-none-any.whl", hash = "sha256:085f7f33c15bd408dd9b17a4ad77c577db66d76203e5984b1bd59baeee948b2a"},
     {file = "bleach-5.0.1.tar.gz", hash = "sha256:0d03255c47eb9bd2f26aa9bb7f2107732e7e8fe195ca2f64709fcf3b0a4a085c"},
+]
+bracex = [
+    {file = "bracex-2.3.post1-py3-none-any.whl", hash = "sha256:351b7f20d56fb9ea91f9b9e9e7664db466eb234188c175fd943f8f755c807e73"},
+    {file = "bracex-2.3.post1.tar.gz", hash = "sha256:e7b23fc8b2cd06d3dec0692baabecb249dda94e06a617901ff03a6c56fd71693"},
 ]
 cachecontrol = [
     {file = "CacheControl-0.12.11-py2.py3-none-any.whl", hash = "sha256:2c75d6a8938cb1933c75c50184549ad42728a27e9f6b92fd677c3151aa72555b"},
@@ -1083,6 +1145,10 @@ charset-normalizer = [
     {file = "charset-normalizer-2.1.0.tar.gz", hash = "sha256:575e708016ff3a5e3681541cb9d79312c416835686d054a23accb873b254f413"},
     {file = "charset_normalizer-2.1.0-py3-none-any.whl", hash = "sha256:5189b6f22b01957427f35b6a08d9a0bc45b46d3788ef5a92e978433c7a35f8a5"},
 ]
+cibuildwheel = [
+    {file = "cibuildwheel-2.7.0-py3-none-any.whl", hash = "sha256:56ce62eec4b25e0670bb79e75b0f8ec1c3bb68a93ea2674b8e9355ee91dade49"},
+    {file = "cibuildwheel-2.7.0.tar.gz", hash = "sha256:38f5d6f3456b05dd09459a78e4eaa0248b1cc6520b41ff5c6314b5a9bdbb4410"},
+]
 click = [
     {file = "click-8.1.3-py3-none-any.whl", hash = "sha256:bb4d8133cb15a609f44e8213d9b391b0809795062913b383c62be0ee95b1db48"},
     {file = "click-8.1.3.tar.gz", hash = "sha256:7682dc8afb30297001674575ea00d1814d808d6a36af415a82bd481d37ba7b8e"},
@@ -1138,6 +1204,10 @@ deprecated = [
 docutils = [
     {file = "docutils-0.18.1-py2.py3-none-any.whl", hash = "sha256:23010f129180089fbcd3bc08cfefccb3b890b0050e1ca00c867036e9d161b98c"},
     {file = "docutils-0.18.1.tar.gz", hash = "sha256:679987caf361a7539d76e584cbeddc311e3aee937877c87346f31debc63e9d06"},
+]
+filelock = [
+    {file = "filelock-3.7.1-py3-none-any.whl", hash = "sha256:37def7b658813cda163b56fc564cdc75e86d338246458c4c28ae84cabefa2404"},
+    {file = "filelock-3.7.1.tar.gz", hash = "sha256:3a0fd85166ad9dbab54c9aec96737b744106dc5f15c0b09a6744a445299fcf04"},
 ]
 grpcio = [
     {file = "grpcio-1.47.0-cp310-cp310-linux_armv7l.whl", hash = "sha256:544da3458d1d249bb8aed5504adf3e194a931e212017934bf7bfa774dad37fb3"},
