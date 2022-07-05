@@ -13,7 +13,6 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
-    Protocol,
     Sequence,
     Type,
     cast,
@@ -29,7 +28,7 @@ import opentelemetry.sdk.util.instrumentation
 import opentelemetry.trace
 import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
-from typing_extensions import TypeAlias, TypedDict
+from typing_extensions import Protocol, TypeAlias, TypedDict
 
 import temporalio.activity
 import temporalio.api.common.v1
