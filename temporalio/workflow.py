@@ -477,6 +477,12 @@ def deprecate_patch(id: str) -> None:
 
 
 def extern_functions() -> Mapping[str, Callable]:
+    """External functions available in the workflow sandbox.
+
+    Returns:
+        Mapping of external functions that can be called from inside a workflow
+        sandbox.
+    """
     return _Runtime.current().workflow_extern_functions()
 
 

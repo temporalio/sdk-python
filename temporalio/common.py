@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum
-from typing import Any, Iterable, List, Mapping, Optional, Union
+from typing import Any, Iterable, List, Mapping, Optional, Text, Union
 
+import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
@@ -149,3 +150,21 @@ def _arg_or_args(arg: Any, args: Iterable[Any]) -> Iterable[Any]:
             raise ValueError("Cannot have arg and args")
         args = [arg]
     return args
+
+
+def _apply_headers(
+    source: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
+    dest: google.protobuf.internal.containers.MessageMap[
+        Text, temporalio.api.common.v1.Payload
+    ],
+) -> None:
+    if source is None:
+        return
+    # Due to how protobuf maps of messages work, we cannot just set these or
+    # "update" these, instead they expect a shallow copy
+    # TODO(cretz): We could make this cheaper where we use it by precreating the
+    # command, but that forces proto commands to be embedded into interceptor
+    # inputs.
+    for k, v in source.items():
+        # This does not copy bytes, just messages
+        dest[k].CopyFrom(v)

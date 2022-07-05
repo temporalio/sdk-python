@@ -1524,7 +1524,7 @@ class _ClientImpl(OutboundInterceptor):
                 input.search_attributes, req.search_attributes
             )
         if input.headers is not None:
-            req.header.fields.update(input.headers)
+            temporalio.common._apply_headers(input.headers, req.header.fields)
 
         # Start with signal or just normal start
         resp: Union[
@@ -1600,7 +1600,7 @@ class _ClientImpl(OutboundInterceptor):
                 await self._client.data_converter.encode(input.args)
             )
         if input.headers is not None:
-            req.query.header.fields.update(input.headers)
+            temporalio.common._apply_headers(input.headers, req.query.header.fields)
         resp = await self._client.service.query_workflow(req, retry=True)
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
@@ -1636,7 +1636,7 @@ class _ClientImpl(OutboundInterceptor):
                 await self._client.data_converter.encode(input.args)
             )
         if input.headers is not None:
-            req.header.fields.update(input.headers)
+            temporalio.common._apply_headers(input.headers, req.header.fields)
         await self._client.service.signal_workflow_execution(req, retry=True)
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:

@@ -980,7 +980,7 @@ class _WorkflowInstanceImpl(
         if input.args:
             v.args.extend(self._payload_converter.to_payloads(input.args))
         if input.headers:
-            v.headers.update(input.headers)
+            temporalio.common._apply_headers(input.headers, v.headers)
         await self._signal_external_workflow(command)
 
     async def _outbound_signal_external_workflow(
@@ -996,7 +996,7 @@ class _WorkflowInstanceImpl(
         if input.args:
             v.args.extend(self._payload_converter.to_payloads(input.args))
         if input.headers:
-            v.headers.update(input.headers)
+            temporalio.common._apply_headers(input.headers, v.headers)
         await self._signal_external_workflow(command)
 
     async def _outbound_start_child_workflow(
@@ -1557,7 +1557,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         v.activity_id = self._input.activity_id or str(self._seq)
         v.activity_type = self._input.activity
         if self._input.headers:
-            v.headers.update(self._input.headers)
+            temporalio.common._apply_headers(self._input.headers, v.headers)
         if self._input.args:
             v.arguments.extend(
                 self._instance._payload_converter.to_payloads(self._input.args)
@@ -1705,7 +1705,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             self._input.retry_policy.apply_to_proto(v.retry_policy)
         v.cron_schedule = self._input.cron_schedule
         if self._input.headers:
-            v.headers.update(self._input.headers)
+            temporalio.common._apply_headers(self._input.headers, v.headers)
         if self._input.memo:
             for k, val in self._input.memo.items():
                 v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]
@@ -1810,7 +1810,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
         if self._input.task_timeout:
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
         if self._input.headers:
-            v.headers.update(self._input.headers)
+            temporalio.common._apply_headers(self._input.headers, v.headers)
         if self._input.memo:
             for k, val in self._input.memo.items():
                 v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]

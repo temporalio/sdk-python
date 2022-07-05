@@ -181,6 +181,8 @@ class HandleQueryInput:
 
 @dataclass
 class SignalChildWorkflowInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.signal_child_workflow`."""
+
     signal: str
     args: Iterable[Any]
     child_workflow_id: str
@@ -189,6 +191,8 @@ class SignalChildWorkflowInput:
 
 @dataclass
 class SignalExternalWorkflowInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.signal_external_workflow`."""
+
     signal: str
     args: Iterable[Any]
     namespace: str
@@ -322,11 +326,17 @@ class WorkflowOutboundInterceptor:
         return self.next.info()
 
     async def signal_child_workflow(self, input: SignalChildWorkflowInput) -> None:
+        """Called for every
+        :py:meth:`temporalio.workflow.ChildWorkflowHandle.signal` call.
+        """
         return await self.next.signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: SignalExternalWorkflowInput
     ) -> None:
+        """Called for every
+        :py:meth:`temporalio.workflow.ExternalWorkflowHandle.signal` call.
+        """
         return await self.next.signal_external_workflow(input)
 
     def start_activity(
