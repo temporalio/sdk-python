@@ -681,11 +681,18 @@ class _FunctionTypeLookup:
         # Due to MyPy issues, we cannot type "fn" as callable
         if not callable(fn):
             return (None, None)
-        ret = self._cache.get(fn.__qualname__)
-        if not ret:
-            # TODO(cretz): Do we even need to cache?
-            ret = _type_hints_from_func(fn, eval_str=self._type_hint_eval_str)
-            self._cache[fn.__qualname__] = ret
+        # We base the cache key on the qualified name of the function. However,
+        # since some callables are not functions, we assume we can never cache
+        # these just in case the type hints are dynamic for some strange reason.
+        cache_key = getattr(fn, "__qualname__", None)
+        if cache_key:
+            ret = self._cache.get(cache_key)
+            if ret:
+                return ret
+        # TODO(cretz): Do we even need to cache?
+        ret = _type_hints_from_func(fn, eval_str=self._type_hint_eval_str)
+        if cache_key:
+            self._cache[cache_key] = ret
         return ret
 
 

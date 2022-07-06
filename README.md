@@ -379,6 +379,8 @@ Some things to note about the above code:
   capabilities are needed.
 * Local activities work very similarly except the functions are `workflow.start_local_activity()` and
   `workflow.execute_local_activity()`
+* Activities that are defined on a callable class (i.e. with `__call__`) or a class method, have to use that callable
+  as the first parameter. That means a do-nothing class may need to be instantiated to have access to the callable.
 
 #### Invoking Child Workflows
 
@@ -482,6 +484,13 @@ Some things to note about activity definitions:
 * Long running activities should regularly heartbeat and handle cancellation
 * Activities can only have positional arguments. Best practice is to only take a single argument that is an
   object/dataclass of fields that can be added to as needed.
+* Callable classes (i.e. with `__call__` defined) may be defined as activities, but then an _instance_ of the class must
+  be what is registered with the worker which will be used during invocation. Similarly, an _instance_ of the class must
+  be what is used to call the activity from the workflow even though that instance is a dummy instance and is not the
+  one used for invocation.
+* Methods on classes may be defined as activities. Similar to callable classes above, it is the method reference that
+  must be used during worker registration and during workflow invocation. The latter means that there will likely need
+  to be a dummy instance during workflow to have access to the method reference.
 
 #### Types of Activities
 

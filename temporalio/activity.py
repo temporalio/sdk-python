@@ -372,16 +372,19 @@ class _Definition:
             raise ValueError("Function already contains activity definition")
         elif not callable(fn):
             raise TypeError("Activity is not callable")
-        elif not fn.__code__:
-            raise TypeError("Activity callable missing __code__")
-        elif fn.__code__.co_kwonlyargcount:
-            raise TypeError("Activity cannot have keyword-only arguments")
+        # We do not allow keyword only arguments in activities
+        sig = inspect.signature(fn)
+        for param in sig.parameters.values():
+            if param.kind == inspect.Parameter.KEYWORD_ONLY:
+                raise TypeError("Activity cannot have keyword-only arguments")
         setattr(
             fn,
             "__temporal_activity_definition",
             _Definition(
                 name=activity_name,
                 fn=fn,
-                is_async=inspect.iscoroutinefunction(fn),
+                # iscoroutinefunction does not return true for async __call__
+                # TODO(cretz): Why can't MyPy handle this?
+                is_async=inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
             ),
         )

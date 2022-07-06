@@ -1935,6 +1935,72 @@ async def test_workflow_uuid(client: Client):
         assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
 
 
+@activity.defn
+class CallableClassActivity:
+    def __init__(self, orig: MyDataClass) -> None:
+        self.orig = orig
+
+    async def __call__(self, to_add: MyDataClass) -> MyDataClass:
+        return MyDataClass(field1=self.orig.field1 + to_add.field1)
+
+
+@workflow.defn
+class ActivityCallableClassWorkflow:
+    @workflow.run
+    async def run(self, to_add: MyDataClass) -> MyDataClass:
+        activity_instance = CallableClassActivity(MyDataClass(field1="in workflow"))
+        return await workflow.execute_activity(
+            activity_instance, to_add, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+async def test_workflow_activity_callable_class(client: Client):
+    activity_instance = CallableClassActivity(MyDataClass(field1="in worker"))
+    async with new_worker(
+        client, ActivityCallableClassWorkflow, activities=[activity_instance]
+    ) as worker:
+        result = await client.execute_workflow(
+            ActivityCallableClassWorkflow.run,
+            MyDataClass(field1=", workflow param"),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == MyDataClass(field1="in worker, workflow param")
+
+
+class MethodActivity:
+    def __init__(self, orig: MyDataClass) -> None:
+        self.orig = orig
+
+    @activity.defn
+    async def add(self, to_add: MyDataClass) -> MyDataClass:
+        return MyDataClass(field1=self.orig.field1 + to_add.field1)
+
+
+@workflow.defn
+class ActivityMethodWorkflow:
+    @workflow.run
+    async def run(self, to_add: MyDataClass) -> MyDataClass:
+        activity_instance = MethodActivity(MyDataClass(field1="in workflow"))
+        return await workflow.execute_activity(
+            activity_instance.add, to_add, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+async def test_workflow_activity_method(client: Client):
+    activity_instance = MethodActivity(MyDataClass(field1="in worker"))
+    async with new_worker(
+        client, ActivityMethodWorkflow, activities=[activity_instance.add]
+    ) as worker:
+        result = await client.execute_workflow(
+            ActivityMethodWorkflow.run,
+            MyDataClass(field1=", workflow param"),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == MyDataClass(field1="in worker, workflow param")
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
