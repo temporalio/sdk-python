@@ -43,9 +43,8 @@ class ClientConfig:
     worker_binary_id: str
     tls_config: Optional[ClientTlsConfig]
     retry_config: Optional[ClientRetryConfig]
-    client_name: str = "temporal-python"
-    # TODO(cretz): Take from importlib ref https://stackoverflow.com/a/54869712
-    client_version: str = "0.1.0"
+    client_name: str
+    client_version: str
 
 
 ProtoMessage = TypeVar("ProtoMessage", bound=google.protobuf.message.Message)
