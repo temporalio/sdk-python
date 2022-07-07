@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 import os
 from datetime import timezone
-from typing import Callable, Dict, Iterable, List, Mapping, Optional, Type
+from typing import Callable, Dict, Iterable, List, MutableMapping, Optional, Type
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -50,7 +50,6 @@ class _WorkflowWorker:
         workflows: Iterable[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor],
         workflow_runner: WorkflowRunner,
-        workflow_extern_functions: Optional[Mapping[str, Callable]],
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
         type_hint_eval_str: bool,
@@ -70,12 +69,10 @@ class _WorkflowWorker:
         self._workflow_runner = workflow_runner
         self._data_converter = data_converter
         # Build the interceptor classes and collect extern functions
-        self._extern_functions = (
-            {} if workflow_extern_functions is None else dict(workflow_extern_functions)
-        )
+        self._extern_functions: MutableMapping[str, Callable] = {}
         self._interceptor_classes: List[Type[WorkflowInboundInterceptor]] = []
         interceptor_class_input = WorkflowInterceptorClassInput(
-            extern_functions=self._extern_functions
+            unsafe_extern_functions=self._extern_functions
         )
         for i in interceptors:
             interceptor_class = i.workflow_interceptor_class(interceptor_class_input)

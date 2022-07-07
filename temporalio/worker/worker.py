@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import itertools
 import logging
 from datetime import timedelta
-from typing import Callable, Iterable, List, Mapping, Optional, Type, cast
+from typing import Callable, Iterable, List, Optional, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -49,7 +48,6 @@ class Worker:
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
-        workflow_extern_functions: Optional[Mapping[str, Callable]] = None,
         interceptors: Iterable[Interceptor] = [],
         max_cached_workflows: int = 1000,
         max_concurrent_workflow_tasks: int = 100,
@@ -91,10 +89,6 @@ class Worker:
                 provided, the caller is responsible for shutting it down after
                 the worker is shut down.
             workflow_runner: Runner for workflows.
-            workflow_extern_functions: Functions that are bound to this outside
-                environment when called from inside the workflow runner
-                environment. The serialization requirements of these functions
-                differ per runner.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
@@ -192,7 +186,6 @@ class Worker:
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
             workflow_runner=workflow_runner,
-            workflow_extern_functions=workflow_extern_functions,
             interceptors=interceptors,
             max_cached_workflows=max_cached_workflows,
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
@@ -233,7 +226,6 @@ class Worker:
                 workflows=workflows,
                 workflow_task_executor=workflow_task_executor,
                 workflow_runner=workflow_runner,
-                workflow_extern_functions=workflow_extern_functions,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 type_hint_eval_str=client_config["type_hint_eval_str"],
@@ -351,7 +343,6 @@ class WorkerConfig(TypedDict, total=False):
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
-    workflow_extern_functions: Optional[Mapping[str, Callable]]
     interceptors: Iterable[Interceptor]
     max_cached_workflows: int
     max_concurrent_workflow_tasks: int

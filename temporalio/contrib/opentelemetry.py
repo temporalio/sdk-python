@@ -119,7 +119,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         """
         # Set the externs needed
         # TODO(cretz): MyPy works w/ spread kwargs instead of direct passing
-        input.extern_functions.update(
+        input.unsafe_extern_functions.update(
             **_WorkflowExternFunctions(
                 __temporal_opentelemetry_start_span=self._start_workflow_span,
                 __temporal_opentelemetry_end_span=self._end_workflow_span,
@@ -476,9 +476,6 @@ class _PicklableSpan:
         # to avoid unnecessary copies
         if not isinstance(span, opentelemetry.sdk.trace.ReadableSpan):
             raise TypeError(f"Expected span to be SDK span, was {type(span)}")
-        # pickle.dumps(span.name)
-        # pickle.dumps(span.context)
-        # pickle.dumps(span._parent)
         # Attribute wrapper is not picklable
         attributes = span._attributes
         if attributes is not None:

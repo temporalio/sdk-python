@@ -67,7 +67,16 @@ class Interceptor:
 class WorkflowInterceptorClassInput:
     """Input for :py:meth:`Interceptor.workflow_interceptor_class`."""
 
-    extern_functions: MutableMapping[str, Callable]
+    unsafe_extern_functions: MutableMapping[str, Callable]
+    """Set of external functions that can be called from the sandbox.
+
+    .. warning::
+        Exposing external functions to the workflow sandbox is dangerous and
+        should be avoided. Use at your own risk.
+
+    .. warning::
+        This API is experimental and subject to removal.
+    """
 
 
 @dataclass
