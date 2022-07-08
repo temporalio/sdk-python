@@ -379,8 +379,12 @@ Some things to note about the above code:
   capabilities are needed.
 * Local activities work very similarly except the functions are `workflow.start_local_activity()` and
   `workflow.execute_local_activity()`
-* Activities that are defined on a callable class (i.e. with `__call__`) or a class method, have to use that callable
-  as the first parameter. That means a do-nothing class may need to be instantiated to have access to the callable.
+* Activities can be methods of a class. Invokers should use `workflow.start_activity_method()`,
+  `workflow.execute_activity_method()`, `workflow.start_local_activity_method()`, and
+  `workflow.execute_local_activity_method()` instead.
+* Activities can callable classes (i.e. that define `__call__`). Invokers should use `workflow.start_activity_class()`,
+  `workflow.execute_activity_class()`, `workflow.start_local_activity_class()`, and
+  `workflow.execute_local_activity_class()` instead.
 
 #### Invoking Child Workflows
 
@@ -467,7 +471,7 @@ While running in a workflow, in addition to features documented elsewhere, the f
 
 #### Definition
 
-Activities are functions decorated with `@activity.defn` like so:
+Activities are decorated with `@activity.defn` like so:
 
 ```python
 from temporalio import activity
@@ -484,13 +488,10 @@ Some things to note about activity definitions:
 * Long running activities should regularly heartbeat and handle cancellation
 * Activities can only have positional arguments. Best practice is to only take a single argument that is an
   object/dataclass of fields that can be added to as needed.
-* Callable classes (i.e. with `__call__` defined) may be defined as activities, but then an _instance_ of the class must
-  be what is registered with the worker which will be used during invocation. Similarly, an _instance_ of the class must
-  be what is used to call the activity from the workflow even though that instance is a dummy instance and is not the
-  one used for invocation.
-* Methods on classes may be defined as activities. Similar to callable classes above, it is the method reference that
-  must be used during worker registration and during workflow invocation. The latter means that there will likely need
-  to be a dummy instance during workflow to have access to the method reference.
+* Activities can be defined on methods instead of top-level functions. This allows the instance to carry state that an
+  activity may need (e.g. a DB connection). The instance method should be what is registered with the worker.
+* Activities can also be defined on callable classes (i.e. classes with `__call__`). An instance of the class should be
+  what is registered with the worker.
 
 #### Types of Activities
 
@@ -730,6 +731,6 @@ poe test
   * We use [Black](https://github.com/psf/black) for formatting, so that takes precedence
   * In tests and example code, can import individual classes/functions to make it more readable. Can also do this for
     rarely in library code for some Python common items (e.g. `dataclass` or `partial`), but not allowed to do this for
-    any `temporalio` packages or any classes/functions that aren't clear when unqualified.
+    any `temporalio` packages (except `temporalio.types`) or any classes/functions that aren't clear when unqualified.
   * We allow relative imports for private packages
   * We allow `@staticmethod`

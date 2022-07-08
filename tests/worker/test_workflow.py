@@ -85,17 +85,28 @@ async def test_workflow_hello(client: Client):
         assert result == "Hello, Temporal!"
 
 
+@activity.defn
+async def multi_param_activity(param1: int, param2: str) -> str:
+    return f"param1: {param1}, param2: {param2}"
+
+
 @workflow.defn
 class MultiParamWorkflow:
     @workflow.run
     async def run(self, param1: int, param2: str) -> str:
-        return f"param1: {param1}, param2: {param2}"
+        return await workflow.execute_activity(
+            multi_param_activity,
+            args=[param1, param2],
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
 
 
 async def test_workflow_multi_param(client: Client):
     # This test is mostly just here to confirm MyPy type checks the multi-param
     # overload approach properly
-    async with new_worker(client, MultiParamWorkflow) as worker:
+    async with new_worker(
+        client, MultiParamWorkflow, activities=[multi_param_activity]
+    ) as worker:
         result = await client.execute_workflow(
             MultiParamWorkflow.run,
             args=[123, "val1"],
@@ -1935,27 +1946,26 @@ async def test_workflow_uuid(client: Client):
         assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
 
 
-@activity.defn
+@activity.defn(name="custom-name")
 class CallableClassActivity:
-    def __init__(self, orig: MyDataClass) -> None:
-        self.orig = orig
+    def __init__(self, orig_field1: str) -> None:
+        self.orig_field1 = orig_field1
 
     async def __call__(self, to_add: MyDataClass) -> MyDataClass:
-        return MyDataClass(field1=self.orig.field1 + to_add.field1)
+        return MyDataClass(field1=self.orig_field1 + to_add.field1)
 
 
 @workflow.defn
 class ActivityCallableClassWorkflow:
     @workflow.run
     async def run(self, to_add: MyDataClass) -> MyDataClass:
-        activity_instance = CallableClassActivity(MyDataClass(field1="in workflow"))
-        return await workflow.execute_activity(
-            activity_instance, to_add, start_to_close_timeout=timedelta(seconds=30)
+        return await workflow.execute_activity_class(
+            CallableClassActivity, to_add, start_to_close_timeout=timedelta(seconds=30)
         )
 
 
 async def test_workflow_activity_callable_class(client: Client):
-    activity_instance = CallableClassActivity(MyDataClass(field1="in worker"))
+    activity_instance = CallableClassActivity("in worker")
     async with new_worker(
         client, ActivityCallableClassWorkflow, activities=[activity_instance]
     ) as worker:
@@ -1969,28 +1979,38 @@ async def test_workflow_activity_callable_class(client: Client):
 
 
 class MethodActivity:
-    def __init__(self, orig: MyDataClass) -> None:
-        self.orig = orig
+    def __init__(self, orig_field1: str) -> None:
+        self.orig_field1 = orig_field1
+
+    @activity.defn(name="custom-name")
+    async def add(self, to_add: MyDataClass) -> MyDataClass:
+        return MyDataClass(field1=self.orig_field1 + to_add.field1)
 
     @activity.defn
-    async def add(self, to_add: MyDataClass) -> MyDataClass:
-        return MyDataClass(field1=self.orig.field1 + to_add.field1)
+    async def add_multi(self, source: MyDataClass, to_add: str) -> MyDataClass:
+        return MyDataClass(field1=source.field1 + to_add)
 
 
 @workflow.defn
 class ActivityMethodWorkflow:
     @workflow.run
     async def run(self, to_add: MyDataClass) -> MyDataClass:
-        activity_instance = MethodActivity(MyDataClass(field1="in workflow"))
-        return await workflow.execute_activity(
-            activity_instance.add, to_add, start_to_close_timeout=timedelta(seconds=30)
+        ret = await workflow.execute_activity_method(
+            MethodActivity.add, to_add, start_to_close_timeout=timedelta(seconds=30)
+        )
+        return await workflow.execute_activity_method(
+            MethodActivity.add_multi,
+            args=[ret, ", in workflow"],
+            start_to_close_timeout=timedelta(seconds=30),
         )
 
 
 async def test_workflow_activity_method(client: Client):
-    activity_instance = MethodActivity(MyDataClass(field1="in worker"))
+    activity_instance = MethodActivity("in worker")
     async with new_worker(
-        client, ActivityMethodWorkflow, activities=[activity_instance.add]
+        client,
+        ActivityMethodWorkflow,
+        activities=[activity_instance.add, activity_instance.add_multi],
     ) as worker:
         result = await client.execute_workflow(
             ActivityMethodWorkflow.run,
@@ -1998,7 +2018,7 @@ async def test_workflow_activity_method(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        assert result == MyDataClass(field1="in worker, workflow param")
+        assert result == MyDataClass(field1="in worker, workflow param, in workflow")
 
 
 def new_worker(

@@ -27,7 +27,6 @@ from typing import (
     NoReturn,
     Optional,
     Tuple,
-    TypeVar,
     overload,
 )
 
@@ -35,20 +34,20 @@ import temporalio.api.common.v1
 import temporalio.common
 import temporalio.exceptions
 
-ActivityFunc = TypeVar("ActivityFunc", bound=Callable[..., Any])
+from .types import CallableType
 
 
 @overload
-def defn(fn: ActivityFunc) -> ActivityFunc:
+def defn(fn: CallableType) -> CallableType:
     ...
 
 
 @overload
-def defn(*, name: str) -> Callable[[ActivityFunc], ActivityFunc]:
+def defn(*, name: str) -> Callable[[CallableType], CallableType]:
     ...
 
 
-def defn(fn: Optional[ActivityFunc] = None, *, name: Optional[str] = None):
+def defn(fn: Optional[CallableType] = None, *, name: Optional[str] = None):
     """Decorator for activity functions.
 
     Activities can be async or non-async.
@@ -58,7 +57,7 @@ def defn(fn: Optional[ActivityFunc] = None, *, name: Optional[str] = None):
         name: Name to use for the activity. Defaults to function ``__name__``.
     """
 
-    def with_name(name: str, fn: ActivityFunc) -> ActivityFunc:
+    def with_name(name: str, fn: CallableType) -> CallableType:
         # This performs validation
         _Definition._apply_to_callable(fn, name)
         return fn
