@@ -1189,6 +1189,7 @@ class WorkflowExecutionDescription:
         raw: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
         converter: temporalio.converter.DataConverter,
     ) -> WorkflowExecutionDescription:
+        """Create a description from a raw description response."""
         return WorkflowExecutionDescription(
             close_time=raw.workflow_execution_info.close_time.ToDatetime().replace(
                 tzinfo=timezone.utc
