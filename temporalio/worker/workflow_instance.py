@@ -149,6 +149,7 @@ class _WorkflowInstanceImpl(
         self._info = det.info
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time = 0.0
+        self._current_history_length = 0
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
@@ -231,6 +232,7 @@ class _WorkflowInstanceImpl(
         )
         self._current_completion.successful.SetInParent()
         self._current_activation_error: Optional[Exception] = None
+        self._current_history_length = act.history_length
         self._time = act.timestamp.ToMicroseconds() / 1e6
         self._is_replaying = act.is_replaying
 
@@ -651,6 +653,9 @@ class _WorkflowInstanceImpl(
         )
         # TODO(cretz): Why can't MyPy infer the above never returns?
         raise RuntimeError("Unreachable")
+
+    def workflow_get_current_history_length(self) -> int:
+        return self._current_history_length
 
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
