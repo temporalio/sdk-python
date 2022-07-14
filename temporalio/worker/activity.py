@@ -267,7 +267,7 @@ class _ActivityWorker:
                 )
 
             # Setup events
-            if not inspect.iscoroutinefunction(activity_def.fn):
+            if not activity_def.is_async:
                 running_activity.sync = True
                 # If we're in a thread-pool executor we can use threading events
                 # otherwise we must use manager events
@@ -342,20 +342,19 @@ class _ActivityWorker:
                     start.current_attempt_scheduled_time
                 ),
                 heartbeat_details=heartbeat_details,
-                heartbeat_timeout=start.heartbeat_timeout.ToTimedelta()
+                heartbeat_timeout=_proto_to_non_zero_timedelta(start.heartbeat_timeout)
                 if start.HasField("heartbeat_timeout")
                 else None,
                 is_local=start.is_local,
-                retry_policy=temporalio.common.RetryPolicy.from_proto(
-                    start.retry_policy
+                schedule_to_close_timeout=_proto_to_non_zero_timedelta(
+                    start.schedule_to_close_timeout
                 )
-                if start.HasField("retry_policy")
-                else None,
-                schedule_to_close_timeout=start.schedule_to_close_timeout.ToTimedelta()
                 if start.HasField("schedule_to_close_timeout")
                 else None,
                 scheduled_time=_proto_to_datetime(start.scheduled_time),
-                start_to_close_timeout=start.start_to_close_timeout.ToTimedelta()
+                start_to_close_timeout=_proto_to_non_zero_timedelta(
+                    start.start_to_close_timeout
+                )
                 if start.HasField("start_to_close_timeout")
                 else None,
                 started_time=_proto_to_datetime(start.started_time),
@@ -521,7 +520,8 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         # Handle synchronous activity
-        if not inspect.iscoroutinefunction(input.fn):
+        is_async = inspect.iscoroutinefunction(input.fn) or inspect.iscoroutinefunction(input.fn.__call__)  # type: ignore
+        if not is_async:
             # We execute a top-level function via the executor. It is top-level
             # because it needs to be picklable. Also, by default Python does not
             # propagate contextvars into executor futures so we don't either
@@ -796,3 +796,11 @@ def _proto_to_datetime(
 ) -> datetime:
     # Protobuf doesn't set the timezone but we want to
     return ts.ToDatetime().replace(tzinfo=timezone.utc)
+
+
+def _proto_to_non_zero_timedelta(
+    dur: google.protobuf.duration_pb2.Duration,
+) -> Optional[timedelta]:
+    if dur.nanos == 0 and dur.seconds == 0:
+        return None
+    return dur.ToTimedelta()

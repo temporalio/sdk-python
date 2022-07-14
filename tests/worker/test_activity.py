@@ -98,14 +98,18 @@ async def test_activity_info(client: Client, worker: ExternalWorker):
     assert info.activity_id
     assert info.activity_type == "capture_info"
     assert info.attempt == 1
+    assert abs(
+        info.current_attempt_scheduled_time - datetime.now(timezone.utc)
+    ) < timedelta(seconds=5)
     assert info.heartbeat_details == []
-    assert info.heartbeat_timeout == timedelta()
-    # TODO(cretz): Broken?
-    # assert info.schedule_to_close_timeout is None
+    assert info.heartbeat_timeout is None
+    assert not info.is_local
+    assert info.schedule_to_close_timeout is None
     assert abs(info.scheduled_time - datetime.now(timezone.utc)) < timedelta(seconds=5)
     assert info.start_to_close_timeout == timedelta(seconds=4)
     assert abs(info.started_time - datetime.now(timezone.utc)) < timedelta(seconds=5)
     assert info.task_queue == result.act_task_queue
+    assert info.task_token
     assert info.workflow_id == result.handle.id
     assert info.workflow_namespace == client.namespace
     assert info.workflow_run_id == result.handle.first_execution_run_id
