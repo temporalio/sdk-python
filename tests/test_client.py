@@ -190,7 +190,7 @@ async def test_describe(client: Client, worker: ExternalWorker):
     assert abs(desc.start_time - datetime.now(timezone.utc)) < timedelta(seconds=20)
     assert desc.status == WorkflowExecutionStatus.COMPLETED
     assert desc.task_queue == worker.task_queue
-    assert desc.workflow == "kitchen_sink"
+    assert desc.workflow_type == "kitchen_sink"
 
 
 async def test_query(client: Client, worker: ExternalWorker):

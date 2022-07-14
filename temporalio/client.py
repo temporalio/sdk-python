@@ -1167,22 +1167,49 @@ class AsyncActivityHandle:
 
 @dataclass
 class WorkflowExecutionDescription:
-    """Description for a workflow execution."""
+    """Description for a single workflow execution run."""
 
     close_time: Optional[datetime]
+    """When the workflow was closed if closed."""
+
     execution_time: Optional[datetime]
+    """When this workflow run started or should start."""
+
     history_length: int
+    """Number of events in the history."""
+
     id: str
+    """ID for the workflow."""
+
     memo: Mapping[str, Any]
+    """Memo values on the workflow if any."""
+
     parent_id: Optional[str]
+    """ID for the parent workflow if this was started as a child."""
+
     parent_run_id: Optional[str]
+    """Run ID for the parent workflow if this was started as a child."""
+
     raw: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse
+    """Underlying API describe response."""
+
     run_id: str
+    """Run ID for this workflow run."""
+
     search_attributes: temporalio.common.SearchAttributes
+    """Current set of search attributes if any."""
+
     start_time: datetime
+    """When the workflow was created."""
+
     status: Optional[WorkflowExecutionStatus]
+    """Status for the workflow."""
+
     task_queue: str
-    workflow: str
+    """Task queue for the workflow."""
+
+    workflow_type: str
+    """Type name for the workflow."""
 
     @staticmethod
     async def from_raw(
@@ -1225,7 +1252,7 @@ class WorkflowExecutionDescription:
             if raw.workflow_execution_info.status
             else None,
             task_queue=raw.workflow_execution_info.task_queue,
-            workflow=raw.workflow_execution_info.type.name,
+            workflow_type=raw.workflow_execution_info.type.name,
         )
 
 
