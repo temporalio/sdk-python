@@ -136,6 +136,7 @@ html-output = "build/apidocs"
 intersphinx = ["https://docs.python.org/3/objects.inv", "https://googleapis.dev/python/protobuf/latest/objects.inv"]
 privacy = [
   "PRIVATE:temporalio.bridge",
+  "PRIVATE:temporalio.types",
   "HIDDEN:temporalio.worker.activity",
   "HIDDEN:temporalio.worker.interceptor",
   "HIDDEN:temporalio.worker.worker",
