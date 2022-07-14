@@ -267,7 +267,7 @@ class _ActivityWorker:
                 )
 
             # Setup events
-            if not inspect.iscoroutinefunction(activity_def.fn):
+            if not activity_def.is_async:
                 running_activity.sync = True
                 # If we're in a thread-pool executor we can use threading events
                 # otherwise we must use manager events
@@ -520,7 +520,8 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         # Handle synchronous activity
-        if not inspect.iscoroutinefunction(input.fn):
+        is_async = inspect.iscoroutinefunction(input.fn) or inspect.iscoroutinefunction(input.fn.__call__)  # type: ignore
+        if not is_async:
             # We execute a top-level function via the executor. It is top-level
             # because it needs to be picklable. Also, by default Python does not
             # propagate contextvars into executor futures so we don't either
