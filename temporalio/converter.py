@@ -620,7 +620,7 @@ def encode_search_attributes(
 
 
 def encode_search_attribute_values(
-    vals: List[temporalio.common.SearchAttributeValue],
+    vals: temporalio.common.SearchAttributeValues,
 ) -> temporalio.api.common.v1.Payload:
     """Convert search attribute values into a payload.
 
