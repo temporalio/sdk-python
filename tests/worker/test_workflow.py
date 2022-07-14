@@ -1292,11 +1292,10 @@ async def test_workflow_search_attributes(server: ExternalServer, client: Client
 
         # Also confirm it matches describe from the server
         desc = await handle.describe()
-        attrs = decode_search_attributes(
-            desc.raw_message.workflow_execution_info.search_attributes
-        )
         # Remove attrs without our prefix
-        attrs = {k: v for k, v in attrs.items() if k.startswith(sa_prefix)}
+        attrs = {
+            k: v for k, v in desc.search_attributes.items() if k.startswith(sa_prefix)
+        }
         assert expected == search_attrs_to_dict_with_type(attrs)
 
 

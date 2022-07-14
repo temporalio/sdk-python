@@ -1,5 +1,5 @@
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Tuple
 
 import pytest
@@ -172,14 +172,25 @@ async def test_describe(client: Client, worker: ExternalWorker):
         KSWorkflowParams(actions=[KSAction(result=KSResultAction(value="some value"))]),
         id=str(uuid.uuid4()),
         task_queue=worker.task_queue,
+        memo={"foo": "bar"},
     )
     assert "some value" == await handle.result()
     desc = await handle.describe()
+    assert desc.close_time and abs(
+        desc.close_time - datetime.now(timezone.utc)
+    ) < timedelta(seconds=20)
+    assert desc.execution_time and abs(
+        desc.execution_time - datetime.now(timezone.utc)
+    ) < timedelta(seconds=20)
+    assert desc.id == handle.id
+    assert desc.memo == {"foo": "bar"}
+    assert not desc.parent_id
+    assert not desc.parent_run_id
+    assert desc.run_id == handle.first_execution_run_id
+    assert abs(desc.start_time - datetime.now(timezone.utc)) < timedelta(seconds=20)
     assert desc.status == WorkflowExecutionStatus.COMPLETED
-    assert (
-        desc.raw_message.workflow_execution_info.status
-        == temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED
-    )
+    assert desc.task_queue == worker.task_queue
+    assert desc.workflow_type == "kitchen_sink"
 
 
 async def test_query(client: Client, worker: ExternalWorker):
