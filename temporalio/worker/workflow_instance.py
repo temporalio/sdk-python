@@ -149,6 +149,7 @@ class _WorkflowInstanceImpl(
         self._info = det.info
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time = 0.0
+        self._cancel_requested = False
         self._current_history_length = 0
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
@@ -345,6 +346,7 @@ class _WorkflowInstanceImpl(
     def _apply_cancel_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
     ) -> None:
+        self._cancel_requested = True
         # TODO(cretz): Details or cancel message or whatever?
         if self._primary_task:
             self._primary_task.cancel()
@@ -1126,6 +1128,20 @@ class _WorkflowInstanceImpl(
                 f"Workflow raised failure with run ID {self._info.run_id}",
                 exc_info=True,
             )
+            # If a cancel was requested, and the failure is from an activity or
+            # child, and its cause was a cancellation, we want to use that cause
+            # instead because it means a cancel bubbled up while waiting on an
+            # activity or child.
+            if (
+                self._cancel_requested
+                and (
+                    isinstance(err, temporalio.exceptions.ActivityError)
+                    or isinstance(err, temporalio.exceptions.ChildWorkflowError)
+                )
+                and isinstance(err.cause, temporalio.exceptions.CancelledError)
+            ):
+                err = err.cause
+
             command = self._add_command()
             command.fail_workflow_execution.failure.SetInParent()
             try:

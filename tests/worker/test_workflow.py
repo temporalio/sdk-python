@@ -45,7 +45,13 @@ from temporalio.api.workflowservice.v1 import (
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
-from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.client import (
+    Client,
+    RPCError,
+    RPCStatusCode,
+    WorkflowFailureError,
+    WorkflowHandle,
+)
 from temporalio.common import RetryPolicy, SearchAttributes
 from temporalio.converter import DataConverter, PayloadCodec, decode_search_attributes
 from temporalio.exceptions import (
@@ -690,6 +696,58 @@ async def test_workflow_simple_cancel(client: Client):
         assert isinstance(err.value.cause, CancelledError)
 
 
+@activity.defn
+async def wait_forever() -> NoReturn:
+    await asyncio.Future()
+    raise RuntimeError("Unreachable")
+
+
+@workflow.defn
+class UncaughtCancelWorkflow:
+    @workflow.run
+    async def run(self, activity: bool) -> NoReturn:
+        self._started = True
+        # Wait forever on activity or child workflow
+        if activity:
+            await workflow.execute_activity(
+                wait_forever, start_to_close_timeout=timedelta(seconds=1000)
+            )
+        else:
+            await workflow.execute_child_workflow(
+                UncaughtCancelWorkflow.run,
+                True,
+                id=f"{workflow.info().workflow_id}_child",
+            )
+
+    @workflow.query
+    def started(self) -> bool:
+        return self._started
+
+
+@pytest.mark.parametrize("activity", [True, False])
+async def test_workflow_uncaught_cancel(client: Client, activity: bool):
+    async with new_worker(
+        client, UncaughtCancelWorkflow, activities=[wait_forever]
+    ) as worker:
+        # Start workflow waiting on activity or child workflow, cancel it, and
+        # confirm the workflow is shown as cancelled
+        handle = await client.start_workflow(
+            UncaughtCancelWorkflow.run,
+            activity,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def started() -> bool:
+            return await handle.query(UncaughtCancelWorkflow.started)
+
+        await assert_eq_eventually(True, started)
+        await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+
 @workflow.defn
 class CancelChildWorkflow:
     def __init__(self) -> None:
@@ -732,13 +790,19 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
             )
             # Wait until child started
             async def child_started() -> bool:
-                return await handle.query(
-                    CancelChildWorkflow.ready
-                ) and await client.get_workflow_handle_for(
-                    LongSleepWorkflow.run, workflow_id=f"{handle.id}_child"
-                ).query(
-                    LongSleepWorkflow.started
-                )
+                try:
+                    return await handle.query(
+                        CancelChildWorkflow.ready
+                    ) and await client.get_workflow_handle_for(
+                        LongSleepWorkflow.run, workflow_id=f"{handle.id}_child"
+                    ).query(
+                        LongSleepWorkflow.started
+                    )
+                except RPCError as err:
+                    # Ignore not-found because child may not have started yet
+                    if err.status == RPCStatusCode.NOT_FOUND:
+                        return False
+                    raise
 
             await assert_eq_eventually(True, child_started)
             # Send cancel signal and wait on the handle
