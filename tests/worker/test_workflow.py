@@ -1192,13 +1192,14 @@ class SearchAttributeWorkflow:
 
     @workflow.signal
     def do_search_attribute_update(self) -> None:
+        empty_float_list: List[float] = []
         workflow.upsert_search_attributes(
             {
                 f"{sa_prefix}text": ["text3"],
                 # We intentionally leave keyword off to confirm it still comes back
                 f"{sa_prefix}int": [123, 456],
                 # Empty list to confirm removed
-                f"{sa_prefix}double": [],
+                f"{sa_prefix}double": empty_float_list,
                 f"{sa_prefix}bool": [False],
                 f"{sa_prefix}datetime": [
                     datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9)))
