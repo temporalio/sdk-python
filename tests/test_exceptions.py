@@ -45,7 +45,6 @@ def test_exception_format():
     apply_exception_to_failure(
         actual_err, temporalio.converter.default().payload_converter, failure
     )
-    print("FAILURE", failure)
     failure_error = failure_to_error(
         failure, temporalio.converter.default().payload_converter
     )
@@ -57,7 +56,11 @@ def test_exception_format():
 
     # Append the stack and format the exception and check the output
     append_temporal_stack(failure_error)
-    output = "".join(traceback.format_exception(failure_error))
+    output = "".join(
+        traceback.format_exception(
+            type(failure_error), failure_error, failure_error.__traceback__
+        )
+    )
     assert "temporalio.exceptions.ApplicationError: ValueError: error1" in output
     assert "temporalio.exceptions.ApplicationError: RuntimeError: error" in output
     assert output.count("\nStack:\n") == 2
