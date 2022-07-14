@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum, IntEnum
 
 import pytest
 
@@ -8,7 +9,26 @@ import temporalio.converter
 from temporalio.api.common.v1 import Payload as AnotherNameForPayload
 
 
-async def test_default():
+class NonSerializableClass:
+    pass
+
+
+class NonSerializableEnum(Enum):
+    FOO = "foo"
+
+
+class SerializableEnum(IntEnum):
+    FOO = 1
+
+
+@dataclass
+class MyDataClass:
+    foo: str
+    bar: int
+    baz: SerializableEnum
+
+
+async def test_converter_default():
     async def assert_payload(
         input,
         expected_encoding,
@@ -33,6 +53,7 @@ async def test_default():
         assert len(actual_inputs) == 1
         if expected_decoded_input is None:
             expected_decoded_input = input
+        assert type(actual_inputs[0]) is type(expected_decoded_input)
         assert actual_inputs[0] == expected_decoded_input
         return payloads[0]
 
@@ -58,31 +79,38 @@ async def test_default():
 
     # Unknown type
     with pytest.raises(TypeError) as excinfo:
-
-        class NonSerializableClass:
-            pass
-
         await assert_payload(NonSerializableClass(), None, None)
     assert "not JSON serializable" in str(excinfo.value)
 
-    @dataclass
-    class MyDataClass:
-        foo: str
-        bar: int
+    # Bad enum type. We do not allow non-int enums due to ambiguity in
+    # rebuilding and other confusion.
+    with pytest.raises(TypeError) as excinfo:
+        await assert_payload(NonSerializableEnum.FOO, None, None)
+    assert "not JSON serializable" in str(excinfo.value)
+
+    # Good enum no type hint
+    await assert_payload(
+        SerializableEnum.FOO, "json/plain", "1", expected_decoded_input=1
+    )
+
+    # Good enum type hint
+    await assert_payload(
+        SerializableEnum.FOO, "json/plain", "1", type_hint=SerializableEnum
+    )
 
     # Data class without type hint is just dict
     await assert_payload(
-        MyDataClass(foo="somestr", bar=123),
+        MyDataClass(foo="somestr", bar=123, baz=SerializableEnum.FOO),
         "json/plain",
-        '{"bar":123,"foo":"somestr"}',
-        expected_decoded_input={"foo": "somestr", "bar": 123},
+        '{"bar":123,"baz":1,"foo":"somestr"}',
+        expected_decoded_input={"foo": "somestr", "bar": 123, "baz": 1},
     )
 
     # Data class with type hint reconstructs the class
     await assert_payload(
-        MyDataClass(foo="somestr", bar=123),
+        MyDataClass(foo="somestr", bar=123, baz=SerializableEnum.FOO),
         "json/plain",
-        '{"bar":123,"foo":"somestr"}',
+        '{"bar":123,"baz":1,"foo":"somestr"}',
         type_hint=MyDataClass,
     )
 

@@ -27,7 +27,6 @@ from typing import (
     NoReturn,
     Optional,
     Tuple,
-    TypeVar,
     overload,
 )
 
@@ -35,20 +34,20 @@ import temporalio.api.common.v1
 import temporalio.common
 import temporalio.exceptions
 
-ActivityFunc = TypeVar("ActivityFunc", bound=Callable[..., Any])
+from .types import CallableType
 
 
 @overload
-def defn(fn: ActivityFunc) -> ActivityFunc:
+def defn(fn: CallableType) -> CallableType:
     ...
 
 
 @overload
-def defn(*, name: str) -> Callable[[ActivityFunc], ActivityFunc]:
+def defn(*, name: str) -> Callable[[CallableType], CallableType]:
     ...
 
 
-def defn(fn: Optional[ActivityFunc] = None, *, name: Optional[str] = None):
+def defn(fn: Optional[CallableType] = None, *, name: Optional[str] = None):
     """Decorator for activity functions.
 
     Activities can be async or non-async.
@@ -58,7 +57,7 @@ def defn(fn: Optional[ActivityFunc] = None, *, name: Optional[str] = None):
         name: Name to use for the activity. Defaults to function ``__name__``.
     """
 
-    def with_name(name: str, fn: ActivityFunc) -> ActivityFunc:
+    def with_name(name: str, fn: CallableType) -> CallableType:
         # This performs validation
         _Definition._apply_to_callable(fn, name)
         return fn
@@ -86,7 +85,6 @@ class Info:
     heartbeat_details: Iterable[Any]
     heartbeat_timeout: Optional[timedelta]
     is_local: bool
-    retry_policy: Optional[temporalio.common.RetryPolicy]
     schedule_to_close_timeout: Optional[timedelta]
     scheduled_time: datetime
     start_to_close_timeout: Optional[timedelta]
@@ -372,16 +370,19 @@ class _Definition:
             raise ValueError("Function already contains activity definition")
         elif not callable(fn):
             raise TypeError("Activity is not callable")
-        elif not fn.__code__:
-            raise TypeError("Activity callable missing __code__")
-        elif fn.__code__.co_kwonlyargcount:
-            raise TypeError("Activity cannot have keyword-only arguments")
+        # We do not allow keyword only arguments in activities
+        sig = inspect.signature(fn)
+        for param in sig.parameters.values():
+            if param.kind == inspect.Parameter.KEYWORD_ONLY:
+                raise TypeError("Activity cannot have keyword-only arguments")
         setattr(
             fn,
             "__temporal_activity_definition",
             _Definition(
                 name=activity_name,
                 fn=fn,
-                is_async=inspect.iscoroutinefunction(fn),
+                # iscoroutinefunction does not return true for async __call__
+                # TODO(cretz): Why can't MyPy handle this?
+                is_async=inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
             ),
         )

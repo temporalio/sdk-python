@@ -37,11 +37,17 @@ import temporalio.workflow
 import temporalio.workflow_service
 from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
-LocalParamType = TypeVar("LocalParamType")
-LocalReturnType = TypeVar("LocalReturnType")
-WorkflowClass = TypeVar("WorkflowClass")
-WorkflowReturnType = TypeVar("WorkflowReturnType")
-MultiParamSpec = ParamSpec("MultiParamSpec")
+from .types import (
+    LocalReturnType,
+    MethodAsyncNoParam,
+    MethodAsyncSingleParam,
+    MethodSyncOrAsyncNoParam,
+    MethodSyncOrAsyncSingleParam,
+    MultiParamSpec,
+    ParamType,
+    ReturnType,
+    SelfType,
+)
 
 
 class Client:
@@ -198,7 +204,7 @@ class Client:
     @overload
     async def start_workflow(
         self,
-        workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+        workflow: MethodAsyncNoParam[SelfType, ReturnType],
         *,
         id: str,
         task_queue: str,
@@ -213,17 +219,15 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+    ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
     # Overload for single-param workflow
     @overload
     async def start_workflow(
         self,
-        workflow: Callable[
-            [WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
-        ],
-        arg: LocalParamType,
+        workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
+        arg: ParamType,
         *,
         id: str,
         task_queue: str,
@@ -238,7 +242,7 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+    ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
     # Overload for multi-param workflow
@@ -246,7 +250,7 @@ class Client:
     async def start_workflow(
         self,
         workflow: Callable[
-            Concatenate[WorkflowClass, MultiParamSpec], Awaitable[WorkflowReturnType]
+            Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
         ],
         *,
         args: Iterable[Any],
@@ -263,7 +267,7 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+    ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
     # Overload for string-name workflow
@@ -377,7 +381,7 @@ class Client:
     @overload
     async def execute_workflow(
         self,
-        workflow: Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+        workflow: MethodAsyncNoParam[SelfType, ReturnType],
         *,
         id: str,
         task_queue: str,
@@ -392,17 +396,15 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowReturnType:
+    ) -> ReturnType:
         ...
 
     # Overload for single-param workflow
     @overload
     async def execute_workflow(
         self,
-        workflow: Callable[
-            [WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]
-        ],
-        arg: LocalParamType,
+        workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
+        arg: ParamType,
         *,
         id: str,
         task_queue: str,
@@ -417,7 +419,7 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowReturnType:
+    ) -> ReturnType:
         ...
 
     # Overload for multi-param workflow
@@ -425,7 +427,7 @@ class Client:
     async def execute_workflow(
         self,
         workflow: Callable[
-            Concatenate[WorkflowClass, MultiParamSpec], Awaitable[WorkflowReturnType]
+            Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
         ],
         *,
         args: Iterable[Any],
@@ -442,7 +444,7 @@ class Client:
         header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
-    ) -> WorkflowReturnType:
+    ) -> ReturnType:
         ...
 
     # Overload for string-name workflow
@@ -546,14 +548,14 @@ class Client:
     def get_workflow_handle_for(
         self,
         workflow: Union[
-            Callable[[WorkflowClass, LocalParamType], Awaitable[WorkflowReturnType]],
-            Callable[[WorkflowClass], Awaitable[WorkflowReturnType]],
+            MethodAsyncNoParam[SelfType, ReturnType],
+            MethodAsyncSingleParam[SelfType, Any, ReturnType],
         ],
         workflow_id: str,
         *,
         run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
-    ) -> WorkflowHandle[WorkflowClass, WorkflowReturnType]:
+    ) -> WorkflowHandle[SelfType, ReturnType]:
         """Get a typed workflow handle to an existing workflow by its ID.
 
         This is the same as :py:meth:`get_workflow_handle` but typed. Note, the
@@ -641,7 +643,7 @@ class ClientConfig(TypedDict, total=False):
     type_hint_eval_str: bool
 
 
-class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
+class WorkflowHandle(Generic[SelfType, ReturnType]):
     """Handle for interacting with a workflow.
 
     This is usually created via :py:meth:`Client.get_workflow_handle` or
@@ -714,7 +716,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
         """
         return self._first_execution_run_id
 
-    async def result(self, *, follow_runs: bool = True) -> WorkflowReturnType:
+    async def result(self, *, follow_runs: bool = True) -> ReturnType:
         """Wait for result of the workflow.
 
         This will use :py:attr:`result_run_id` if present to base the result on.
@@ -772,10 +774,10 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
                     type_hints,
                 )
                 if not results:
-                    return cast(WorkflowReturnType, None)
+                    return cast(ReturnType, None)
                 elif len(results) > 1:
                     warnings.warn(f"Expected single result, got {len(results)}")
-                return cast(WorkflowReturnType, results[0])
+                return cast(ReturnType, results[0])
             elif event.HasField("workflow_execution_failed_event_attributes"):
                 fail_attr = event.workflow_execution_failed_event_attributes
                 # Follow execution
@@ -891,9 +893,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     @overload
     async def query(
         self,
-        query: Callable[
-            [WorkflowClass], Union[Awaitable[LocalReturnType], LocalReturnType]
-        ],
+        query: MethodSyncOrAsyncNoParam[SelfType, LocalReturnType],
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> LocalReturnType:
@@ -903,11 +903,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     @overload
     async def query(
         self,
-        query: Callable[
-            [WorkflowClass, LocalParamType],
-            Union[Awaitable[LocalReturnType], LocalReturnType],
-        ],
-        arg: LocalParamType,
+        query: MethodSyncOrAsyncSingleParam[SelfType, ParamType, LocalReturnType],
+        arg: ParamType,
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
     ) -> LocalReturnType:
@@ -918,7 +915,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     async def query(
         self,
         query: Callable[
-            Concatenate[WorkflowClass, MultiParamSpec],
+            Concatenate[SelfType, MultiParamSpec],
             Union[Awaitable[LocalReturnType], LocalReturnType],
         ],
         *,
@@ -1005,7 +1002,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     @overload
     async def signal(
         self,
-        signal: Callable[[WorkflowClass], Union[Awaitable[None], None]],
+        signal: MethodSyncOrAsyncNoParam[SelfType, None],
     ) -> None:
         ...
 
@@ -1013,8 +1010,8 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     @overload
     async def signal(
         self,
-        signal: Callable[[WorkflowClass, LocalParamType], Union[Awaitable[None], None]],
-        arg: LocalParamType,
+        signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
+        arg: ParamType,
     ) -> None:
         ...
 
@@ -1023,7 +1020,7 @@ class WorkflowHandle(Generic[WorkflowClass, WorkflowReturnType]):
     async def signal(
         self,
         signal: Callable[
-            Concatenate[WorkflowClass, MultiParamSpec], Union[Awaitable[None], None]
+            Concatenate[SelfType, MultiParamSpec], Union[Awaitable[None], None]
         ],
         *,
         args: Iterable[Any],
