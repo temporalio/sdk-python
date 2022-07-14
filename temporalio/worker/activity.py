@@ -418,7 +418,7 @@ class _ActivityWorker:
                     and running_activity.cancelled_due_to_heartbeat_error
                 ):
                     err = running_activity.cancelled_due_to_heartbeat_error
-                    temporalio.activity.logger.debug(
+                    temporalio.activity.logger.warning(
                         f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
                     )
                     await temporalio.exceptions.encode_exception_to_failure(
@@ -438,8 +438,8 @@ class _ActivityWorker:
                         completion.result.cancelled.failure,
                     )
                 else:
-                    temporalio.activity.logger.debug(
-                        "Completing as failed", exc_info=True
+                    temporalio.activity.logger.warning(
+                        "Completing activity as failed", exc_info=True
                     )
                     await temporalio.exceptions.encode_exception_to_failure(
                         err,

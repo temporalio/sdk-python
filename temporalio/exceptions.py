@@ -2,7 +2,7 @@
 
 import traceback
 from enum import IntEnum
-from typing import Any, Awaitable, Callable, Iterable, Optional
+from typing import Any, Awaitable, Callable, Iterable, Optional, Tuple
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -39,10 +39,13 @@ class FailureError(TemporalError):
         self,
         message: str,
         *,
-        failure: Optional[temporalio.api.failure.v1.Failure] = None
+        failure: Optional[temporalio.api.failure.v1.Failure] = None,
+        exc_args: Optional[Tuple] = None,
     ) -> None:
         """Initialize a failure error."""
-        super().__init__(message)
+        if exc_args is None:
+            exc_args = (message,)
+        super().__init__(*exc_args)
         self._message = message
         self._failure = failure
 
@@ -65,10 +68,14 @@ class ApplicationError(FailureError):
         message: str,
         *details: Any,
         type: Optional[str] = None,
-        non_retryable: bool = False
+        non_retryable: bool = False,
     ) -> None:
         """Initialize an application error."""
-        super().__init__(message)
+        super().__init__(
+            message,
+            # If there is a type, prepend it to the message on the string repr
+            exc_args=(message if not type else f"{type}: {message}",),
+        )
         self._details = details
         self._type = type
         self._non_retryable = non_retryable
@@ -140,7 +147,7 @@ class TimeoutError(FailureError):
         message: str,
         *,
         type: Optional[TimeoutType],
-        last_heartbeat_details: Iterable[Any]
+        last_heartbeat_details: Iterable[Any],
     ) -> None:
         """Initialize a timeout error."""
         super().__init__(message)
@@ -206,7 +213,7 @@ class ActivityError(FailureError):
         identity: str,
         activity_type: str,
         activity_id: str,
-        retry_state: Optional[RetryState]
+        retry_state: Optional[RetryState],
     ) -> None:
         """Initialize an activity error."""
         super().__init__(message)
@@ -261,7 +268,7 @@ class ChildWorkflowError(FailureError):
         workflow_type: str,
         initiated_event_id: int,
         started_event_id: int,
-        retry_state: Optional[RetryState]
+        retry_state: Optional[RetryState],
     ) -> None:
         """Initialize a child workflow error."""
         super().__init__(message)
@@ -404,7 +411,7 @@ def apply_error_to_failure(
 
     # Set message, stack, and cause. Obtaining cause follows rules from
     # https://docs.python.org/3/library/exceptions.html#exception-context
-    failure.message = str(error)
+    failure.message = error.message
     if error.__traceback__:
         failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
     if error.__cause__:
@@ -490,6 +497,7 @@ def apply_exception_to_failure(
             str(exception), type=exception.__class__.__name__
         )
         failure_error.__traceback__ = exception.__traceback__
+        failure_error.__cause__ = exception.__cause__
         apply_error_to_failure(failure_error, converter, failure)
 
 
