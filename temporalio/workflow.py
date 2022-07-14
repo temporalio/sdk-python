@@ -297,6 +297,14 @@ class Info:
             "workflow_type": self.workflow_type,
         }
 
+    def get_current_history_length(self) -> int:
+        """Get the current number of events in history.
+
+        Returns:
+            Current number of events in history (up until the current task).
+        """
+        return _Runtime.current().workflow_get_current_history_length()
+
 
 @dataclass(frozen=True)
 class ParentInfo:
@@ -349,6 +357,10 @@ class _Runtime(ABC):
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> NoReturn:
+        ...
+
+    @abstractmethod
+    def workflow_get_current_history_length(self) -> int:
         ...
 
     @abstractmethod

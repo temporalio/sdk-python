@@ -121,7 +121,9 @@ class InfoWorkflow:
     @workflow.run
     async def run(self) -> Dict:
         # Convert to JSON and back so it'll stringify un-JSON-able pieces
-        return json.loads(json.dumps(dataclasses.asdict(workflow.info()), default=str))
+        ret = dataclasses.asdict(workflow.info())
+        ret["current_history_length"] = workflow.info().get_current_history_length()
+        return json.loads(json.dumps(ret, default=str))
 
 
 async def test_workflow_info(client: Client):
@@ -141,6 +143,7 @@ async def test_workflow_info(client: Client):
         )
         assert info["attempt"] == 1
         assert info["cron_schedule"] is None
+        assert info["current_history_length"] == 3
         assert info["execution_timeout"] is None
         assert info["namespace"] == client.namespace
         assert info["retry_policy"] == json.loads(

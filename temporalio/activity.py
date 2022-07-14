@@ -85,7 +85,6 @@ class Info:
     heartbeat_details: Iterable[Any]
     heartbeat_timeout: Optional[timedelta]
     is_local: bool
-    retry_policy: Optional[temporalio.common.RetryPolicy]
     schedule_to_close_timeout: Optional[timedelta]
     scheduled_time: datetime
     start_to_close_timeout: Optional[timedelta]
