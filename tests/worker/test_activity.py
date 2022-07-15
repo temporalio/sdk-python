@@ -98,14 +98,18 @@ async def test_activity_info(client: Client, worker: ExternalWorker):
     assert info.activity_id
     assert info.activity_type == "capture_info"
     assert info.attempt == 1
+    assert abs(
+        info.current_attempt_scheduled_time - datetime.now(timezone.utc)
+    ) < timedelta(seconds=5)
     assert info.heartbeat_details == []
-    assert info.heartbeat_timeout == timedelta()
-    # TODO(cretz): Broken?
-    # assert info.schedule_to_close_timeout is None
+    assert info.heartbeat_timeout is None
+    assert not info.is_local
+    assert info.schedule_to_close_timeout is None
     assert abs(info.scheduled_time - datetime.now(timezone.utc)) < timedelta(seconds=5)
     assert info.start_to_close_timeout == timedelta(seconds=4)
     assert abs(info.started_time - datetime.now(timezone.utc)) < timedelta(seconds=5)
     assert info.task_queue == result.act_task_queue
+    assert info.task_token
     assert info.workflow_id == result.handle.id
     assert info.workflow_namespace == client.namespace
     assert info.workflow_run_id == result.handle.first_execution_run_id
@@ -168,7 +172,7 @@ async def test_activity_failure(client: Client, worker: ExternalWorker):
 
     with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(client, worker, raise_error)
-    assert str(assert_activity_application_error(err.value)) == "oh no!"
+    assert str(assert_activity_application_error(err.value)) == "RuntimeError: oh no!"
 
 
 @activity.defn
@@ -185,7 +189,7 @@ async def test_sync_activity_process_failure(client: Client, worker: ExternalWor
                 picklable_activity_failure,
                 worker_config={"activity_executor": executor},
             )
-    assert str(assert_activity_application_error(err.value)) == "oh no!"
+    assert str(assert_activity_application_error(err.value)) == "RuntimeError: oh no!"
 
 
 async def test_activity_bad_params(client: Client, worker: ExternalWorker):
@@ -324,7 +328,7 @@ async def test_activity_does_not_exist(client: Client, worker: ExternalWorker):
                 task_queue=worker.task_queue,
             )
     assert str(assert_activity_application_error(err.value)) == (
-        "Activity function wrong_activity is not registered on this worker, "
+        "NotFoundError: Activity function wrong_activity is not registered on this worker, "
         "available activities: say_hello"
     )
 
@@ -561,7 +565,10 @@ async def test_activity_error_non_retryable_type(
             retry_max_attempts=100,
             non_retryable_error_types=["Cannot retry me"],
         )
-    assert str(assert_activity_application_error(err.value)) == "Do not retry me"
+    assert (
+        str(assert_activity_application_error(err.value))
+        == "Cannot retry me: Do not retry me"
+    )
 
 
 async def test_activity_logging(client: Client, worker: ExternalWorker):

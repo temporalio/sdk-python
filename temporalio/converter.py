@@ -9,6 +9,7 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from enum import IntEnum
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Type
 
 import dacite
@@ -386,6 +387,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
     _encoder: Optional[Type[json.JSONEncoder]]
     _decoder: Optional[Type[json.JSONDecoder]]
     _encoding: str
+    _dacite_config: dacite.Config
 
     def __init__(
         self,
@@ -405,6 +407,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         self._encoder = encoder
         self._decoder = decoder
         self._encoding = encoding
+        self._dacite_config = dacite.Config(cast=[IntEnum])
 
     @property
     def encoding(self) -> str:
@@ -431,6 +434,11 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         try:
             obj = json.loads(payload.data, cls=self._decoder)
+
+            # If the object is an int and the type hint is an IntEnum, convert
+            if isinstance(obj, int) and type_hint and issubclass(type_hint, IntEnum):
+                obj = type_hint(obj)
+
             # If the object is a dict and the type hint is present for a data
             # class, we instantiate the data class with the value
             if (
@@ -439,7 +447,8 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
                 and dataclasses.is_dataclass(type_hint)
             ):
                 # We have to use dacite here to handle nested dataclasses
-                obj = dacite.from_dict(type_hint, obj)
+                obj = dacite.from_dict(type_hint, obj, self._dacite_config)
+
             return obj
         except json.JSONDecodeError as err:
             raise RuntimeError("Failed parsing") from err
@@ -611,7 +620,7 @@ def encode_search_attributes(
 
 
 def encode_search_attribute_values(
-    vals: List[temporalio.common.SearchAttributeValue],
+    vals: temporalio.common.SearchAttributeValues,
 ) -> temporalio.api.common.v1.Payload:
     """Convert search attribute values into a payload.
 
@@ -681,11 +690,18 @@ class _FunctionTypeLookup:
         # Due to MyPy issues, we cannot type "fn" as callable
         if not callable(fn):
             return (None, None)
-        ret = self._cache.get(fn.__qualname__)
-        if not ret:
-            # TODO(cretz): Do we even need to cache?
-            ret = _type_hints_from_func(fn, eval_str=self._type_hint_eval_str)
-            self._cache[fn.__qualname__] = ret
+        # We base the cache key on the qualified name of the function. However,
+        # since some callables are not functions, we assume we can never cache
+        # these just in case the type hints are dynamic for some strange reason.
+        cache_key = getattr(fn, "__qualname__", None)
+        if cache_key:
+            ret = self._cache.get(cache_key)
+            if ret:
+                return ret
+        # TODO(cretz): Do we even need to cache?
+        ret = _type_hints_from_func(fn, eval_str=self._type_hint_eval_str)
+        if cache_key:
+            self._cache[cache_key] = ret
         return ret
 
 

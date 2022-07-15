@@ -131,12 +131,14 @@ class QueryRejectCondition(IntEnum):
     """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY`."""
 
 
-SearchAttributeValue: TypeAlias = Union[str, int, float, bool, datetime]
-
 # We choose to make this a list instead of an iterable so we can catch if people
 # are not sending lists each time but maybe accidentally sending a string (which
 # is iterable)
-SearchAttributes: TypeAlias = Mapping[str, List[SearchAttributeValue]]
+SearchAttributeValues: TypeAlias = Union[
+    List[str], List[int], List[float], List[bool], List[datetime]
+]
+
+SearchAttributes: TypeAlias = Mapping[str, SearchAttributeValues]
 
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument

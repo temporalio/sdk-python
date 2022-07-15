@@ -18,6 +18,8 @@ import temporalio.bridge.client
 import temporalio.bridge.telemetry
 import temporalio.exceptions
 
+__version__ = "0.1a2"
+
 WorkflowServiceRequest = TypeVar(
     "WorkflowServiceRequest", bound=google.protobuf.message.Message
 )
@@ -112,6 +114,8 @@ class ConnectConfig:
             else None,
             static_headers=self.static_headers,
             identity=self.identity,
+            client_name="temporal-python",
+            client_version=__version__,
         )
 
 

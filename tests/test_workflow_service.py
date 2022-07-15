@@ -1,9 +1,11 @@
 import inspect
+import os
 import re
 from typing import Dict, Tuple, Type
 
 import grpc
 
+import temporalio
 import temporalio.api.workflowservice.v1
 import temporalio.workflow_service
 from temporalio.client import Client
@@ -42,3 +44,15 @@ class CallCollectingChannel(grpc.Channel):
 
 
 CallCollectingChannel.__abstractmethods__ = set()
+
+
+def test_version():
+    # Extract version from pyproject.toml
+    with open(
+        os.path.join(os.path.dirname(__file__), "..", "pyproject.toml"), "r"
+    ) as f:
+        pyproject = f.read()
+    version = pyproject[pyproject.find('version = "') + 11 :]
+    version = version[: version.find('"')]
+    assert temporalio.workflow_service.__version__ == version
+    assert temporalio.__version__ == version

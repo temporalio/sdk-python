@@ -46,7 +46,13 @@ from temporalio.api.workflowservice.v1 import (
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
-from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.client import (
+    Client,
+    RPCError,
+    RPCStatusCode,
+    WorkflowFailureError,
+    WorkflowHandle,
+)
 from temporalio.common import RetryPolicy, SearchAttributes
 from temporalio.converter import DataConverter, PayloadCodec, decode_search_attributes
 from temporalio.exceptions import (
@@ -86,17 +92,28 @@ async def test_workflow_hello(client: Client):
         assert result == "Hello, Temporal!"
 
 
+@activity.defn
+async def multi_param_activity(param1: int, param2: str) -> str:
+    return f"param1: {param1}, param2: {param2}"
+
+
 @workflow.defn
 class MultiParamWorkflow:
     @workflow.run
     async def run(self, param1: int, param2: str) -> str:
-        return f"param1: {param1}, param2: {param2}"
+        return await workflow.execute_activity(
+            multi_param_activity,
+            args=[param1, param2],
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
 
 
 async def test_workflow_multi_param(client: Client):
     # This test is mostly just here to confirm MyPy type checks the multi-param
     # overload approach properly
-    async with new_worker(client, MultiParamWorkflow) as worker:
+    async with new_worker(
+        client, MultiParamWorkflow, activities=[multi_param_activity]
+    ) as worker:
         result = await client.execute_workflow(
             MultiParamWorkflow.run,
             args=[123, "val1"],
@@ -111,7 +128,9 @@ class InfoWorkflow:
     @workflow.run
     async def run(self) -> Dict:
         # Convert to JSON and back so it'll stringify un-JSON-able pieces
-        return json.loads(json.dumps(dataclasses.asdict(workflow.info()), default=str))
+        ret = dataclasses.asdict(workflow.info())
+        ret["current_history_length"] = workflow.info().get_current_history_length()
+        return json.loads(json.dumps(ret, default=str))
 
 
 async def test_workflow_info(client: Client):
@@ -131,6 +150,7 @@ async def test_workflow_info(client: Client):
         )
         assert info["attempt"] == 1
         assert info["cron_schedule"] is None
+        assert info["current_history_length"] == 3
         assert info["execution_timeout"] is None
         assert info["namespace"] == client.namespace
         assert info["retry_policy"] == json.loads(
@@ -702,6 +722,58 @@ async def test_workflow_simple_cancel(client: Client):
         assert isinstance(err.value.cause, CancelledError)
 
 
+@activity.defn
+async def wait_forever() -> NoReturn:
+    await asyncio.Future()
+    raise RuntimeError("Unreachable")
+
+
+@workflow.defn
+class UncaughtCancelWorkflow:
+    @workflow.run
+    async def run(self, activity: bool) -> NoReturn:
+        self._started = True
+        # Wait forever on activity or child workflow
+        if activity:
+            await workflow.execute_activity(
+                wait_forever, start_to_close_timeout=timedelta(seconds=1000)
+            )
+        else:
+            await workflow.execute_child_workflow(
+                UncaughtCancelWorkflow.run,
+                True,
+                id=f"{workflow.info().workflow_id}_child",
+            )
+
+    @workflow.query
+    def started(self) -> bool:
+        return self._started
+
+
+@pytest.mark.parametrize("activity", [True, False])
+async def test_workflow_uncaught_cancel(client: Client, activity: bool):
+    async with new_worker(
+        client, UncaughtCancelWorkflow, activities=[wait_forever]
+    ) as worker:
+        # Start workflow waiting on activity or child workflow, cancel it, and
+        # confirm the workflow is shown as cancelled
+        handle = await client.start_workflow(
+            UncaughtCancelWorkflow.run,
+            activity,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def started() -> bool:
+            return await handle.query(UncaughtCancelWorkflow.started)
+
+        await assert_eq_eventually(True, started)
+        await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+
 @workflow.defn
 class CancelChildWorkflow:
     def __init__(self) -> None:
@@ -744,13 +816,19 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
             )
             # Wait until child started
             async def child_started() -> bool:
-                return await handle.query(
-                    CancelChildWorkflow.ready
-                ) and await client.get_workflow_handle_for(
-                    LongSleepWorkflow.run, workflow_id=f"{handle.id}_child"
-                ).query(
-                    LongSleepWorkflow.started
-                )
+                try:
+                    return await handle.query(
+                        CancelChildWorkflow.ready
+                    ) and await client.get_workflow_handle_for(
+                        LongSleepWorkflow.run, workflow_id=f"{handle.id}_child"
+                    ).query(
+                        LongSleepWorkflow.started
+                    )
+                except RPCError as err:
+                    # Ignore not-found because child may not have started yet
+                    if err.status == RPCStatusCode.NOT_FOUND:
+                        return False
+                    raise
 
             await assert_eq_eventually(True, child_started)
             # Send cancel signal and wait on the handle
@@ -1204,13 +1282,14 @@ class SearchAttributeWorkflow:
 
     @workflow.signal
     def do_search_attribute_update(self) -> None:
+        empty_float_list: List[float] = []
         workflow.upsert_search_attributes(
             {
                 f"{sa_prefix}text": ["text3"],
                 # We intentionally leave keyword off to confirm it still comes back
                 f"{sa_prefix}int": [123, 456],
                 # Empty list to confirm removed
-                f"{sa_prefix}double": [],
+                f"{sa_prefix}double": empty_float_list,
                 f"{sa_prefix}bool": [False],
                 f"{sa_prefix}datetime": [
                     datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9)))
@@ -1303,11 +1382,10 @@ async def test_workflow_search_attributes(server: ExternalServer, client: Client
 
         # Also confirm it matches describe from the server
         desc = await handle.describe()
-        attrs = decode_search_attributes(
-            desc.raw_message.workflow_execution_info.search_attributes
-        )
         # Remove attrs without our prefix
-        attrs = {k: v for k, v in attrs.items() if k.startswith(sa_prefix)}
+        attrs = {
+            k: v for k, v in desc.search_attributes.items() if k.startswith(sa_prefix)
+        }
         assert expected == search_attrs_to_dict_with_type(attrs)
 
 
@@ -1959,6 +2037,81 @@ async def test_workflow_uuid(client: Client):
     async with new_worker(client, UUIDWorkflow, task_queue=task_queue):
         assert handle1_query_result == await handle1.query(UUIDWorkflow.result)
         assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
+
+
+@activity.defn(name="custom-name")
+class CallableClassActivity:
+    def __init__(self, orig_field1: str) -> None:
+        self.orig_field1 = orig_field1
+
+    async def __call__(self, to_add: MyDataClass) -> MyDataClass:
+        return MyDataClass(field1=self.orig_field1 + to_add.field1)
+
+
+@workflow.defn
+class ActivityCallableClassWorkflow:
+    @workflow.run
+    async def run(self, to_add: MyDataClass) -> MyDataClass:
+        return await workflow.execute_activity_class(
+            CallableClassActivity, to_add, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+async def test_workflow_activity_callable_class(client: Client):
+    activity_instance = CallableClassActivity("in worker")
+    async with new_worker(
+        client, ActivityCallableClassWorkflow, activities=[activity_instance]
+    ) as worker:
+        result = await client.execute_workflow(
+            ActivityCallableClassWorkflow.run,
+            MyDataClass(field1=", workflow param"),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == MyDataClass(field1="in worker, workflow param")
+
+
+class MethodActivity:
+    def __init__(self, orig_field1: str) -> None:
+        self.orig_field1 = orig_field1
+
+    @activity.defn(name="custom-name")
+    async def add(self, to_add: MyDataClass) -> MyDataClass:
+        return MyDataClass(field1=self.orig_field1 + to_add.field1)
+
+    @activity.defn
+    async def add_multi(self, source: MyDataClass, to_add: str) -> MyDataClass:
+        return MyDataClass(field1=source.field1 + to_add)
+
+
+@workflow.defn
+class ActivityMethodWorkflow:
+    @workflow.run
+    async def run(self, to_add: MyDataClass) -> MyDataClass:
+        ret = await workflow.execute_activity_method(
+            MethodActivity.add, to_add, start_to_close_timeout=timedelta(seconds=30)
+        )
+        return await workflow.execute_activity_method(
+            MethodActivity.add_multi,
+            args=[ret, ", in workflow"],
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+
+
+async def test_workflow_activity_method(client: Client):
+    activity_instance = MethodActivity("in worker")
+    async with new_worker(
+        client,
+        ActivityMethodWorkflow,
+        activities=[activity_instance.add, activity_instance.add_multi],
+    ) as worker:
+        result = await client.execute_workflow(
+            ActivityMethodWorkflow.run,
+            MyDataClass(field1=", workflow param"),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == MyDataClass(field1="in worker, workflow param, in workflow")
 
 
 def new_worker(
