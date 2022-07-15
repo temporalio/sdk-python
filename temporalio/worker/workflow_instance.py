@@ -12,7 +12,7 @@ import sys
 import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import partial
 from typing import (
     Any,
@@ -151,7 +151,7 @@ class _WorkflowInstanceImpl(
         self._info = det.info
         self._extern_functions = det.extern_functions
         self._primary_task: Optional[asyncio.Task[None]] = None
-        self._time = 0.0
+        self._time_ns = 0
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
@@ -234,7 +234,7 @@ class _WorkflowInstanceImpl(
         )
         self._current_completion.successful.SetInParent()
         self._current_activation_error: Optional[Exception] = None
-        self._time = act.timestamp.ToMicroseconds() / 1e6
+        self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
 
         try:
@@ -710,9 +710,6 @@ class _WorkflowInstanceImpl(
     def workflow_is_replaying(self) -> bool:
         return self._is_replaying
 
-    def workflow_now(self) -> datetime:
-        return datetime.utcfromtimestamp(asyncio.get_running_loop().time())
-
     def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
         use_patch = not self._is_replaying or id in self._patches_notified
         # Only add patch command if never sent before for this ID
@@ -900,6 +897,9 @@ class _WorkflowInstanceImpl(
                 ret_type=ret_type,
             )
         )
+
+    def workflow_time_ns(self) -> int:
+        return self._time_ns
 
     def workflow_upsert_search_attributes(
         self, attributes: temporalio.common.SearchAttributes
@@ -1256,13 +1256,13 @@ class _WorkflowInstanceImpl(
 
         # Create, schedule, and return
         seq = self._next_seq("timer")
-        handle = _TimerHandle(seq, self._time + delay, callback, args, self, context)
+        handle = _TimerHandle(seq, self.time() + delay, callback, args, self, context)
         handle._apply_start_command(self._add_command(), delay)
         self._pending_timers[seq] = handle
         return handle
 
     def time(self) -> float:
-        return self._time
+        return self._time_ns / 1e9
 
     def create_future(self) -> asyncio.Future[Any]:
         return asyncio.Future(loop=self)

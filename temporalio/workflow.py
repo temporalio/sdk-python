@@ -8,7 +8,7 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from functools import partial
 from random import Random
@@ -374,10 +374,6 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
-    def workflow_now(self) -> datetime:
-        ...
-
-    @abstractmethod
     def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
         ...
 
@@ -450,6 +446,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_time_ns(self) -> int:
+        ...
+
+    @abstractmethod
     def workflow_upsert_search_attributes(
         self, attributes: temporalio.common.SearchAttributes
     ) -> None:
@@ -498,10 +498,14 @@ def info() -> Info:
 def now() -> datetime:
     """Current time from the workflow perspective.
 
+    This is the workflow equivalent of :py:func:`datetime.now` with the
+    :py:attr:`timezone.utc` parameter.
+
     Returns:
-        UTC datetime for the current workflow time
+        UTC datetime for the current workflow time. The datetime does have UTC
+        set as the time zone.
     """
-    return _Runtime.current().workflow_now()
+    return datetime.fromtimestamp(time(), timezone.utc)
 
 
 def patched(id: str) -> bool:
@@ -535,6 +539,28 @@ def random() -> Random:
         The deterministically-seeded pseudo-random number generator.
     """
     return _Runtime.current().workflow_random()
+
+
+def time() -> float:
+    """Current seconds since the epoch from the workflow perspective.
+
+    This is the workflow equivalent of :py:func:`time.time`.
+
+    Returns:
+        Seconds since the epoch as a float.
+    """
+    return time_ns() / 1e9
+
+
+def time_ns() -> int:
+    """Current nanoseconds since the epoch from the workflow perspective.
+
+    This is the workflow equivalent of :py:func:`time.time_ns`.
+
+    Returns:
+        Nanoseconds since the epoch
+    """
+    return _Runtime.current().workflow_time_ns()
 
 
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:

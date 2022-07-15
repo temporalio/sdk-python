@@ -144,19 +144,18 @@ class _WorkflowWorker:
                 )
 
             if LOG_PROTOS:
-                logger.debug("Received workflow activation: %s", act)
-
-            # If the workflow is not running yet, create it
-            workflow = self._running_workflows.get(act.run_id)
-            if not workflow:
-                workflow = await self._create_workflow_instance(act)
-                self._running_workflows[act.run_id] = workflow
+                logger.debug("Received workflow activation:\n%s", act)
 
             # We only have to run if there are any non-remove-from-cache jobs
             remove_job = next(
                 (j for j in act.jobs if j.HasField("remove_from_cache")), None
             )
             if len(act.jobs) > 1 or not remove_job:
+                # If the workflow is not running yet, create it
+                workflow = self._running_workflows.get(act.run_id)
+                if not workflow:
+                    workflow = await self._create_workflow_instance(act)
+                    self._running_workflows[act.run_id] = workflow
                 # Run activation in separate thread so we can check if it's
                 # deadlocked
                 activate_task = asyncio.get_running_loop().run_in_executor(
@@ -212,7 +211,7 @@ class _WorkflowWorker:
 
         # Send off completion
         if LOG_PROTOS:
-            logger.debug("Sending workflow completion: %s", completion)
+            logger.debug("Sending workflow completion:\n%s", completion)
         try:
             await self._bridge_worker().complete_workflow_activation(completion)
         except Exception:
@@ -223,10 +222,15 @@ class _WorkflowWorker:
 
         # If there is a remove-from-cache job, do so
         if remove_job:
-            logger.debug(
-                f"Evicting workflow with run ID {act.run_id}, message: {remove_job.remove_from_cache.message}"
-            )
-            del self._running_workflows[act.run_id]
+            if act.run_id in self._running_workflows:
+                logger.debug(
+                    f"Evicting workflow with run ID {act.run_id}, message: {remove_job.remove_from_cache.message}"
+                )
+                del self._running_workflows[act.run_id]
+            else:
+                logger.debug(
+                    f"Eviction request on unknown workflow with run ID {act.run_id}, message: {remove_job.remove_from_cache.message}"
+                )
 
     async def _create_workflow_instance(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation

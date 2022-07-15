@@ -397,15 +397,12 @@ class _ActivityWorker:
             impl.init(_ActivityOutboundImpl(self, running_activity.info))
             # Exec
             result = await impl.execute_activity(input)
-            # Convert result if not none. Since Python essentially only supports
-            # single result types (even if they are tuples), we will do the
-            # same.
-            if result is None:
-                completion.result.completed.SetInParent()
-            else:
-                completion.result.completed.result.CopyFrom(
-                    (await self._data_converter.encode([result]))[0]
-                )
+            # Convert result even if none. Since Python essentially only
+            # supports single result types (even if they are tuples), we will do
+            # the same.
+            completion.result.completed.result.CopyFrom(
+                (await self._data_converter.encode([result]))[0]
+            )
         except (
             Exception,
             asyncio.CancelledError,
