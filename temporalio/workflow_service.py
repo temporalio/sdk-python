@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import socket
-import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Generic, Mapping, Optional, Type, TypeVar
+from typing import Generic, Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
 import grpc
@@ -99,14 +97,11 @@ class ConnectConfig:
     retry_config: Optional[RetryConfig] = None
     static_headers: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
-    worker_binary_id: str = ""
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
         if not self.identity:
             self.identity = f"{os.getpid()}@{socket.gethostname()}"
-        if not self.worker_binary_id:
-            self.worker_binary_id = load_default_worker_binary_id()
 
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientConfig:
         return temporalio.bridge.client.ClientConfig(
@@ -117,7 +112,6 @@ class ConnectConfig:
             else None,
             static_headers=self.static_headers,
             identity=self.identity,
-            worker_binary_id=self.worker_binary_id or "",
         )
 
 
@@ -492,82 +486,3 @@ class RPCError(temporalio.exceptions.TemporalError):
     def details(self) -> bytes:
         """Any details on the error."""
         return self._details
-
-
-_default_worker_binary_id: Optional[str] = None
-
-
-def load_default_worker_binary_id(*, memoize: bool = True) -> str:
-    """Load the default worker binary ID.
-
-    The worker binary ID is a unique hash representing the entire set of code
-    including Temporal code and external code. The default here is currently
-    implemented by walking loaded modules and hashing their bytecode into a
-    common hash.
-
-    Args:
-        memoize: If true, the default, this will cache to a global variable to
-            keep from having to run again on successive calls.
-
-    Returns:
-        Unique identifier representing the set of running code.
-    """
-    # Memoize
-    global _default_worker_binary_id
-    if memoize and _default_worker_binary_id:
-        return _default_worker_binary_id
-
-    # The goal is to get a hash representing the set of runtime code, both
-    # Temporal's and the user's. After all options were explored, we have
-    # decided to default to hashing all bytecode of imported modules. We accept
-    # that this has the following limitations:
-    #
-    # * Dynamic imports later on can affect this value
-    # * Dynamic imports based on env var, platform, etc can affect this value
-    # * Using the loader's get_code seems to use get_data which does a disk read
-    # * Using the loader's get_code in rare cases can cause a compile()
-
-    got_temporal_code = False
-    m = hashlib.md5()
-    for mod_name in sorted(sys.modules):
-        # Try to read code
-        code = _get_module_code(mod_name)
-        if not code:
-            continue
-        if mod_name == "temporalio":
-            got_temporal_code = True
-        # Add to MD5 digest
-        m.update(code)
-    # If we didn't even get the temporalio module from this approach, this
-    # approach is flawed and we prefer to return an error forcing user to
-    # explicitly set the worker binary ID instead of silently using a value that
-    # may never change
-    if not got_temporal_code:
-        raise RuntimeError(
-            "Cannot get default unique worker binary ID, the value should be explicitly set"
-        )
-    # Return the hex digest
-    digest = m.hexdigest()
-    if memoize:
-        _default_worker_binary_id = digest
-    return digest
-
-
-def _get_module_code(mod_name: str) -> Optional[bytes]:
-    # First try the module's loader and if that fails, try __cached__ file
-    try:
-        loader: Any = sys.modules[mod_name].__loader__
-        code = loader.get_code(mod_name).co_code
-        if code:
-            return code
-    except Exception:
-        pass
-    try:
-        # Technically we could read smaller chunks per file here and update the
-        # hash, but the benefit is negligible especially since many non-built-in
-        # modules will use get_code above
-        with open(sys.modules[mod_name].__cached__, "rb") as f:
-            return f.read()
-    except Exception:
-        pass
-    return None

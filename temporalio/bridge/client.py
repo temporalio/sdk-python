@@ -40,7 +40,6 @@ class ClientConfig:
     target_url: str
     static_headers: Mapping[str, str]
     identity: str
-    worker_binary_id: str
     tls_config: Optional[ClientTlsConfig]
     retry_config: Optional[ClientRetryConfig]
     client_name: str = "temporal-python"

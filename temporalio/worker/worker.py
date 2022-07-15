@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
 import logging
+import sys
 from datetime import timedelta
-from typing import Callable, Iterable, List, Optional, Type, cast
+from typing import Any, Callable, Iterable, List, Optional, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -49,6 +51,8 @@ class Worker:
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         interceptors: Iterable[Interceptor] = [],
+        build_id: Optional[str] = None,
+        identity: Optional[str] = None,
         max_cached_workflows: int = 1000,
         max_concurrent_workflow_tasks: int = 100,
         max_concurrent_activities: int = 100,
@@ -93,6 +97,11 @@ class Worker:
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
                 not be explicitly given here.
+            build_id: Unique identifier for the current runtime. This is best
+                set as a hash of all code and should change only when code does.
+                If unset, a best-effort identifier is generated.
+            identity: Identity for this worker client. If unset, the client
+                identity is used.
             max_cached_workflows: If nonzero, workflows will be cached and
                 sticky task queues will be used.
             max_concurrent_workflow_tasks: Maximum allowed number of workflow
@@ -187,6 +196,8 @@ class Worker:
             workflow_task_executor=workflow_task_executor,
             workflow_runner=workflow_runner,
             interceptors=interceptors,
+            build_id=build_id,
+            identity=identity,
             max_cached_workflows=max_cached_workflows,
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             max_concurrent_activities=max_concurrent_activities,
@@ -243,6 +254,8 @@ class Worker:
             temporalio.bridge.worker.WorkerConfig(
                 namespace=client.namespace,
                 task_queue=task_queue,
+                build_id=build_id or load_default_build_id(),
+                identity_override=identity,
                 max_cached_workflows=max_cached_workflows,
                 max_outstanding_workflow_tasks=max_concurrent_workflow_tasks,
                 max_outstanding_activities=max_concurrent_activities,
@@ -344,6 +357,8 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
     interceptors: Iterable[Interceptor]
+    build_id: Optional[str]
+    identity: Optional[str]
     max_cached_workflows: int
     max_concurrent_workflow_tasks: int
     max_concurrent_activities: int
@@ -358,3 +373,82 @@ class WorkerConfig(TypedDict, total=False):
     graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
     debug_mode: bool
+
+
+_default_build_id: Optional[str] = None
+
+
+def load_default_build_id(*, memoize: bool = True) -> str:
+    """Load the default worker build ID.
+
+    The worker build ID is a unique hash representing the entire set of code
+    including Temporal code and external code. The default here is currently
+    implemented by walking loaded modules and hashing their bytecode into a
+    common hash.
+
+    Args:
+        memoize: If true, the default, this will cache to a global variable to
+            keep from having to run again on successive calls.
+
+    Returns:
+        Unique identifier representing the set of running code.
+    """
+    # Memoize
+    global _default_build_id
+    if memoize and _default_build_id:
+        return _default_build_id
+
+    # The goal is to get a hash representing the set of runtime code, both
+    # Temporal's and the user's. After all options were explored, we have
+    # decided to default to hashing all bytecode of imported modules. We accept
+    # that this has the following limitations:
+    #
+    # * Dynamic imports later on can affect this value
+    # * Dynamic imports based on env var, platform, etc can affect this value
+    # * Using the loader's get_code seems to use get_data which does a disk read
+    # * Using the loader's get_code in rare cases can cause a compile()
+
+    got_temporal_code = False
+    m = hashlib.md5()
+    for mod_name in sorted(sys.modules):
+        # Try to read code
+        code = _get_module_code(mod_name)
+        if not code:
+            continue
+        if mod_name == "temporalio":
+            got_temporal_code = True
+        # Add to MD5 digest
+        m.update(code)
+    # If we didn't even get the temporalio module from this approach, this
+    # approach is flawed and we prefer to return an error forcing user to
+    # explicitly set the worker binary ID instead of silently using a value that
+    # may never change
+    if not got_temporal_code:
+        raise RuntimeError(
+            "Cannot get default unique worker binary ID, the value should be explicitly set"
+        )
+    # Return the hex digest
+    digest = m.hexdigest()
+    if memoize:
+        _default_build_id = digest
+    return digest
+
+
+def _get_module_code(mod_name: str) -> Optional[bytes]:
+    # First try the module's loader and if that fails, try __cached__ file
+    try:
+        loader: Any = sys.modules[mod_name].__loader__
+        code = loader.get_code(mod_name).co_code
+        if code:
+            return code
+    except Exception:
+        pass
+    try:
+        # Technically we could read smaller chunks per file here and update the
+        # hash, but the benefit is negligible especially since many non-built-in
+        # modules will use get_code above
+        with open(sys.modules[mod_name].__cached__, "rb") as f:
+            return f.read()
+    except Exception:
+        pass
+    return None

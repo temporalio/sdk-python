@@ -28,7 +28,6 @@ pub struct ClientConfig {
     client_version: String,
     static_headers: HashMap<String, String>,
     identity: String,
-    worker_binary_id: String,
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
 }
@@ -254,7 +253,6 @@ impl TryFrom<ClientConfig> for ClientOptions {
             .client_name(opts.client_name)
             .client_version(opts.client_version)
             .identity(opts.identity)
-            .worker_binary_id(opts.worker_binary_id)
             .retry_config(
                 opts.retry_config
                     .map_or(RetryConfig::default(), |c| c.into()),

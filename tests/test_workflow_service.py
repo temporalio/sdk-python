@@ -9,13 +9,6 @@ import temporalio.workflow_service
 from temporalio.client import Client
 
 
-def test_load_default_worker_binary_id():
-    # Just run it twice and confirm it didn't change
-    val1 = temporalio.workflow_service.load_default_worker_binary_id(memoize=False)
-    val2 = temporalio.workflow_service.load_default_worker_binary_id(memoize=False)
-    assert val1 == val2
-
-
 def test_all_grpc_calls_present(client: Client):
     # Collect workflow service calls
     workflow_service_calls: Dict[str, Tuple[Type, Type]] = {}

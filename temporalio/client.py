@@ -70,7 +70,6 @@ class Client:
         retry_config: Optional[RetryConfig] = None,
         static_headers: Mapping[str, str] = {},
         identity: Optional[str] = None,
-        worker_binary_id: Optional[str] = None,
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -105,9 +104,6 @@ class Client:
             static_headers: Static headers to use for all calls to the server.
             identity: Identity for this client. If unset, a default is created
                 based on the version of the SDK.
-            worker_binary_id: Unique identifier for the current runtime. This is
-                best set as a hash of all code and should change only when code
-                does. If unset, a best-effort identifier is generated.
         """
         connect_config = temporalio.workflow_service.ConnectConfig(
             target_url=target_url,
@@ -115,7 +111,6 @@ class Client:
             retry_config=retry_config,
             static_headers=static_headers,
             identity=identity or "",
-            worker_binary_id=worker_binary_id or "",
         )
         return Client(
             await temporalio.workflow_service.WorkflowService.connect(connect_config),
