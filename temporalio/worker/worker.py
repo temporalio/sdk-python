@@ -160,9 +160,7 @@ class Worker:
 
         # Instead of using the _type_lookup on the client, we create a separate
         # one here so we can continue to only use the public API of the client
-        type_lookup = temporalio.converter._FunctionTypeLookup(
-            client_config["type_hint_eval_str"]
-        )
+        type_lookup = temporalio.converter._FunctionTypeLookup()
 
         # Extract the bridge workflow service. We try the service on the client
         # first, then we support a worker_workflow_service on the client's
@@ -239,7 +237,6 @@ class Worker:
                 workflow_runner=workflow_runner,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
-                type_hint_eval_str=client_config["type_hint_eval_str"],
                 debug_mode=debug_mode,
             )
 

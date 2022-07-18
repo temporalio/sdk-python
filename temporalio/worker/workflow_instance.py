@@ -96,7 +96,6 @@ class WorkflowInstanceDetails:
     interceptor_classes: Iterable[Type[WorkflowInboundInterceptor]]
     defn: temporalio.workflow._Definition
     info: temporalio.workflow.Info
-    type_hint_eval_str: bool
     randomness_seed: int
     extern_functions: Mapping[str, Callable]
 
@@ -167,9 +166,7 @@ class _WorkflowInstanceImpl(
         self._curr_seqs: Dict[str, int] = {}
         # TODO(cretz): Any concerns about not sharing this? Maybe the types I
         # need to lookup should be done at definition time?
-        self._type_lookup = temporalio.converter._FunctionTypeLookup(
-            det.type_hint_eval_str
-        )
+        self._type_lookup = temporalio.converter._FunctionTypeLookup()
         self._exception_handler: Optional[_ExceptionHandler] = None
         # The actual instance, instantiated on first _run_once
         self._object: Any = None

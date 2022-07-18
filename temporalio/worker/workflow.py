@@ -52,7 +52,6 @@ class _WorkflowWorker:
         workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
-        type_hint_eval_str: bool,
         debug_mode: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
@@ -78,7 +77,6 @@ class _WorkflowWorker:
             interceptor_class = i.workflow_interceptor_class(interceptor_class_input)
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
-        self._type_hint_eval_str = type_hint_eval_str
         self._running_workflows: Dict[str, WorkflowInstance] = {}
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
@@ -293,7 +291,6 @@ class _WorkflowWorker:
                 interceptor_classes=self._interceptor_classes,
                 defn=defn,
                 info=info,
-                type_hint_eval_str=self._type_hint_eval_str,
                 randomness_seed=start.randomness_seed,
                 extern_functions=self._extern_functions,
             )

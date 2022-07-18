@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, IntEnum
+from typing import Any
 
 import pytest
 
@@ -35,7 +38,7 @@ async def test_converter_default():
         expected_data,
         *,
         expected_decoded_input=None,
-        type_hint=None
+        type_hint=None,
     ):
         payloads = await temporalio.converter.DataConverter().encode([input])
         # Check encoding and data
@@ -137,3 +140,37 @@ def test_encode_search_attribute_values():
         temporalio.converter.encode_search_attribute_values([datetime.utcnow()])
     with pytest.raises(TypeError, match="must have the same type"):
         temporalio.converter.encode_search_attribute_values(["foo", 123])
+
+
+def some_hinted_func(foo: str) -> DefinedLater:
+    return DefinedLater()
+
+
+async def some_hinted_func_async(foo: str) -> DefinedLater:
+    return DefinedLater()
+
+
+class MyCallableClass:
+    def __call__(self, foo: str) -> DefinedLater:
+        pass
+
+    def some_method(self, foo: str) -> DefinedLater:
+        pass
+
+
+@dataclass
+class DefinedLater:
+    pass
+
+
+def test_type_hints_from_func():
+    def assert_hints(func: Any):
+        args, return_hint = temporalio.converter._type_hints_from_func(func)
+        assert args == [str]
+        assert return_hint is DefinedLater
+
+    assert_hints(some_hinted_func)
+    assert_hints(some_hinted_func_async)
+    assert_hints(MyCallableClass())
+    assert_hints(MyCallableClass.some_method)
+    assert_hints(MyCallableClass().some_method)
