@@ -262,6 +262,10 @@ def dump_spans(
             span_str = f"{'  ' * indent_depth}{span.name}"
             if with_attributes:
                 span_str += f" (attributes: {dict(span.attributes or {})}"
+            # Signals can duplicate in rare situations, so we make sure not to
+            # re-add
+            if "Signal" in span_str and span_str in ret:
+                continue
             ret.append(span_str)
             ret += dump_spans(
                 spans,
