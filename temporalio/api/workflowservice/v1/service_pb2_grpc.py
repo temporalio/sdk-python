@@ -227,6 +227,41 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListTaskQueuePartitionsRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListTaskQueuePartitionsResponse.FromString,
         )
+        self.CreateSchedule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateSchedule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateScheduleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateScheduleResponse.FromString,
+        )
+        self.DescribeSchedule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeSchedule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeScheduleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeScheduleResponse.FromString,
+        )
+        self.UpdateSchedule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateSchedule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateScheduleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateScheduleResponse.FromString,
+        )
+        self.PatchSchedule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/PatchSchedule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PatchScheduleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PatchScheduleResponse.FromString,
+        )
+        self.ListScheduleMatchingTimes = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListScheduleMatchingTimes",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListScheduleMatchingTimesRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListScheduleMatchingTimesResponse.FromString,
+        )
+        self.DeleteSchedule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteSchedule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteScheduleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteScheduleResponse.FromString,
+        )
+        self.ListSchedules = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListSchedules",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.FromString,
+        )
 
 
 class WorkflowServiceServicer(object):
@@ -470,9 +505,9 @@ class WorkflowServiceServicer(object):
         """RequestCancelWorkflowExecution is called by workers when they want to request cancellation of
         a workflow execution.
 
-        This result in a new `WORKFLOW_EXECUTION_CANCEL_REQUESTED` event being written to the
-        workflow history and a new workflow task created for the workflow. Fails with `NotFound` if
-        the workflow is already completed or doesn't exist.
+        This results in a new `WORKFLOW_EXECUTION_CANCEL_REQUESTED` event being written to the
+        workflow history and a new workflow task created for the workflow. It returns success if the requested
+        workflow is already closed. It fails with 'NotFound' if the requested workflow doesn't exist.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -623,6 +658,68 @@ class WorkflowServiceServicer(object):
 
     def ListTaskQueuePartitions(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CreateSchedule(self, request, context):
+        """Creates a new schedule.
+        (-- api-linter: core::0133::method-signature=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+        (-- api-linter: core::0133::response-message-name=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+        (-- api-linter: core::0133::http-uri-parent=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeSchedule(self, request, context):
+        """Returns the schedule description and current state of an existing schedule."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateSchedule(self, request, context):
+        """Changes the configuration or state of an existing schedule.
+        (-- api-linter: core::0134::response-message-name=disabled
+        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0134::method-signature=disabled
+        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def PatchSchedule(self, request, context):
+        """Makes a specific change to a schedule or triggers an immediate action.
+        (-- api-linter: core::0134::synonyms=disabled
+        aip.dev/not-precedent: we have both patch and update. --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListScheduleMatchingTimes(self, request, context):
+        """Lists matching times within a range."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteSchedule(self, request, context):
+        """Deletes a schedule, removing it from the system.
+        (-- api-linter: core::0135::method-signature=disabled
+        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+        (-- api-linter: core::0135::response-message-name=disabled
+        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListSchedules(self, request, context):
+        """List all schedules in a namespace."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -829,6 +926,41 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.ListTaskQueuePartitions,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListTaskQueuePartitionsRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListTaskQueuePartitionsResponse.SerializeToString,
+        ),
+        "CreateSchedule": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateSchedule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateScheduleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateScheduleResponse.SerializeToString,
+        ),
+        "DescribeSchedule": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeSchedule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeScheduleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeScheduleResponse.SerializeToString,
+        ),
+        "UpdateSchedule": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateSchedule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateScheduleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateScheduleResponse.SerializeToString,
+        ),
+        "PatchSchedule": grpc.unary_unary_rpc_method_handler(
+            servicer.PatchSchedule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PatchScheduleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PatchScheduleResponse.SerializeToString,
+        ),
+        "ListScheduleMatchingTimes": grpc.unary_unary_rpc_method_handler(
+            servicer.ListScheduleMatchingTimes,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListScheduleMatchingTimesRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListScheduleMatchingTimesResponse.SerializeToString,
+        ),
+        "DeleteSchedule": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteSchedule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteScheduleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteScheduleResponse.SerializeToString,
+        ),
+        "ListSchedules": grpc.unary_unary_rpc_method_handler(
+            servicer.ListSchedules,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2002,6 +2134,209 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/ListTaskQueuePartitions",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListTaskQueuePartitionsRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListTaskQueuePartitionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CreateSchedule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateSchedule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateScheduleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateScheduleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeSchedule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeSchedule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeScheduleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeScheduleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateSchedule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateSchedule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateScheduleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateScheduleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def PatchSchedule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/PatchSchedule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PatchScheduleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PatchScheduleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListScheduleMatchingTimes(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListScheduleMatchingTimes",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListScheduleMatchingTimesRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListScheduleMatchingTimesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteSchedule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteSchedule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteScheduleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteScheduleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListSchedules(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListSchedules",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.FromString,
             options,
             channel_credentials,
             insecure,

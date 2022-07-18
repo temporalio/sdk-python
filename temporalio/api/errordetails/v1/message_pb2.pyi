@@ -4,9 +4,11 @@ isort:skip_file
 """
 import builtins
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.message
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.failed_cause_pb2
+import temporalio.api.enums.v1.namespace_pb2
 import typing
 import typing_extensions
 
@@ -83,6 +85,73 @@ class NamespaceNotActiveFailure(google.protobuf.message.Message):
 
 global___NamespaceNotActiveFailure = NamespaceNotActiveFailure
 
+class NamespaceInvalidStateFailure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    ALLOWED_STATES_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
+    """Current state of the requested namespace."""
+
+    @property
+    def allowed_states(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
+    ]:
+        """Allowed namespace states for requested operation.
+        For example NAMESPACE_STATE_DELETED is forbidden for most operations but allowed for DescribeNamespace.
+        """
+        pass
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType = ...,
+        allowed_states: typing.Optional[
+            typing.Iterable[
+                temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
+            ]
+        ] = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "allowed_states",
+            b"allowed_states",
+            "namespace",
+            b"namespace",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
+
+global___NamespaceInvalidStateFailure = NamespaceInvalidStateFailure
+
+class NamespaceNotFoundFailure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["namespace", b"namespace"]
+    ) -> None: ...
+
+global___NamespaceNotFoundFailure = NamespaceNotFoundFailure
+
+class NamespaceAlreadyExistsFailure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___NamespaceAlreadyExistsFailure = NamespaceAlreadyExistsFailure
+
 class ClientVersionNotSupportedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     CLIENT_VERSION_FIELD_NUMBER: builtins.int
@@ -135,14 +204,6 @@ class ServerVersionNotSupportedFailure(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ServerVersionNotSupportedFailure = ServerVersionNotSupportedFailure
-
-class NamespaceAlreadyExistsFailure(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___NamespaceAlreadyExistsFailure = NamespaceAlreadyExistsFailure
 
 class CancellationAlreadyRequestedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -230,3 +291,11 @@ class SystemWorkflowFailure(google.protobuf.message.Message):
     ) -> None: ...
 
 global___SystemWorkflowFailure = SystemWorkflowFailure
+
+class WorkflowNotReadyFailure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___WorkflowNotReadyFailure = WorkflowNotReadyFailure

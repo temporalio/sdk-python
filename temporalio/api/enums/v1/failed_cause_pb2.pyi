@@ -121,6 +121,7 @@ class _StartChildWorkflowExecutionFailedCauseEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: _StartChildWorkflowExecutionFailedCause.ValueType  # 0
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: _StartChildWorkflowExecutionFailedCause.ValueType  # 1
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: _StartChildWorkflowExecutionFailedCause.ValueType  # 2
 
 class StartChildWorkflowExecutionFailedCause(
     _StartChildWorkflowExecutionFailedCause,
@@ -130,6 +131,7 @@ class StartChildWorkflowExecutionFailedCause(
 
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: StartChildWorkflowExecutionFailedCause.ValueType  # 0
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: StartChildWorkflowExecutionFailedCause.ValueType  # 1
+START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: StartChildWorkflowExecutionFailedCause.ValueType  # 2
 global___StartChildWorkflowExecutionFailedCause = StartChildWorkflowExecutionFailedCause
 
 class _CancelExternalWorkflowExecutionFailedCause:
@@ -145,6 +147,7 @@ class _CancelExternalWorkflowExecutionFailedCauseEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: _CancelExternalWorkflowExecutionFailedCause.ValueType  # 0
     CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND: _CancelExternalWorkflowExecutionFailedCause.ValueType  # 1
+    CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: _CancelExternalWorkflowExecutionFailedCause.ValueType  # 2
 
 class CancelExternalWorkflowExecutionFailedCause(
     _CancelExternalWorkflowExecutionFailedCause,
@@ -154,6 +157,7 @@ class CancelExternalWorkflowExecutionFailedCause(
 
 CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: CancelExternalWorkflowExecutionFailedCause.ValueType  # 0
 CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND: CancelExternalWorkflowExecutionFailedCause.ValueType  # 1
+CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: CancelExternalWorkflowExecutionFailedCause.ValueType  # 2
 global___CancelExternalWorkflowExecutionFailedCause = (
     CancelExternalWorkflowExecutionFailedCause
 )
@@ -171,6 +175,7 @@ class _SignalExternalWorkflowExecutionFailedCauseEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: _SignalExternalWorkflowExecutionFailedCause.ValueType  # 0
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND: _SignalExternalWorkflowExecutionFailedCause.ValueType  # 1
+    SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: _SignalExternalWorkflowExecutionFailedCause.ValueType  # 2
 
 class SignalExternalWorkflowExecutionFailedCause(
     _SignalExternalWorkflowExecutionFailedCause,
@@ -180,6 +185,7 @@ class SignalExternalWorkflowExecutionFailedCause(
 
 SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: SignalExternalWorkflowExecutionFailedCause.ValueType  # 0
 SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND: SignalExternalWorkflowExecutionFailedCause.ValueType  # 1
+SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: SignalExternalWorkflowExecutionFailedCause.ValueType  # 2
 global___SignalExternalWorkflowExecutionFailedCause = (
     SignalExternalWorkflowExecutionFailedCause
 )

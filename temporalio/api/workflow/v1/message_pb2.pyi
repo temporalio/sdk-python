@@ -494,3 +494,151 @@ class ResetPointInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ResetPointInfo = ResetPointInfo
+
+class NewWorkflowExecutionInfo(google.protobuf.message.Message):
+    """NewWorkflowExecutionInfo is a shared message that encapsulates all the
+    required arguments to starting a workflow in different contexts.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    INPUT_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_TIMEOUT_FIELD_NUMBER: builtins.int
+    WORKFLOW_RUN_TIMEOUT_FIELD_NUMBER: builtins.int
+    WORKFLOW_TASK_TIMEOUT_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_REUSE_POLICY_FIELD_NUMBER: builtins.int
+    RETRY_POLICY_FIELD_NUMBER: builtins.int
+    CRON_SCHEDULE_FIELD_NUMBER: builtins.int
+    MEMO_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    HEADER_FIELD_NUMBER: builtins.int
+    workflow_id: typing.Text
+    @property
+    def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
+    @property
+    def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
+    @property
+    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
+        """Serialized arguments to the workflow."""
+        pass
+    @property
+    def workflow_execution_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Total workflow execution timeout including retries and continue as new."""
+        pass
+    @property
+    def workflow_run_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Timeout of a single workflow run."""
+        pass
+    @property
+    def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Timeout of a single workflow task."""
+        pass
+    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    """Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
+
+    @property
+    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
+        """The retry policy for the workflow. Will never exceed `workflow_execution_timeout`."""
+        pass
+    cron_schedule: typing.Text
+    """See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/"""
+
+    @property
+    def memo(self) -> temporalio.api.common.v1.message_pb2.Memo: ...
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    @property
+    def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    def __init__(
+        self,
+        *,
+        workflow_id: typing.Text = ...,
+        workflow_type: typing.Optional[
+            temporalio.api.common.v1.message_pb2.WorkflowType
+        ] = ...,
+        task_queue: typing.Optional[
+            temporalio.api.taskqueue.v1.message_pb2.TaskQueue
+        ] = ...,
+        input: typing.Optional[temporalio.api.common.v1.message_pb2.Payloads] = ...,
+        workflow_execution_timeout: typing.Optional[
+            google.protobuf.duration_pb2.Duration
+        ] = ...,
+        workflow_run_timeout: typing.Optional[
+            google.protobuf.duration_pb2.Duration
+        ] = ...,
+        workflow_task_timeout: typing.Optional[
+            google.protobuf.duration_pb2.Duration
+        ] = ...,
+        workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType = ...,
+        retry_policy: typing.Optional[
+            temporalio.api.common.v1.message_pb2.RetryPolicy
+        ] = ...,
+        cron_schedule: typing.Text = ...,
+        memo: typing.Optional[temporalio.api.common.v1.message_pb2.Memo] = ...,
+        search_attributes: typing.Optional[
+            temporalio.api.common.v1.message_pb2.SearchAttributes
+        ] = ...,
+        header: typing.Optional[temporalio.api.common.v1.message_pb2.Header] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "header",
+            b"header",
+            "input",
+            b"input",
+            "memo",
+            b"memo",
+            "retry_policy",
+            b"retry_policy",
+            "search_attributes",
+            b"search_attributes",
+            "task_queue",
+            b"task_queue",
+            "workflow_execution_timeout",
+            b"workflow_execution_timeout",
+            "workflow_run_timeout",
+            b"workflow_run_timeout",
+            "workflow_task_timeout",
+            b"workflow_task_timeout",
+            "workflow_type",
+            b"workflow_type",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cron_schedule",
+            b"cron_schedule",
+            "header",
+            b"header",
+            "input",
+            b"input",
+            "memo",
+            b"memo",
+            "retry_policy",
+            b"retry_policy",
+            "search_attributes",
+            b"search_attributes",
+            "task_queue",
+            b"task_queue",
+            "workflow_execution_timeout",
+            b"workflow_execution_timeout",
+            "workflow_id",
+            b"workflow_id",
+            "workflow_id_reuse_policy",
+            b"workflow_id_reuse_policy",
+            "workflow_run_timeout",
+            b"workflow_run_timeout",
+            "workflow_task_timeout",
+            b"workflow_task_timeout",
+            "workflow_type",
+            b"workflow_type",
+        ],
+    ) -> None: ...
+
+global___NewWorkflowExecutionInfo = NewWorkflowExecutionInfo

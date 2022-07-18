@@ -2,7 +2,9 @@ from .message_pb2 import (
     CancellationAlreadyRequestedFailure,
     ClientVersionNotSupportedFailure,
     NamespaceAlreadyExistsFailure,
+    NamespaceInvalidStateFailure,
     NamespaceNotActiveFailure,
+    NamespaceNotFoundFailure,
     NotFoundFailure,
     PermissionDeniedFailure,
     QueryFailedFailure,
@@ -10,13 +12,16 @@ from .message_pb2 import (
     ServerVersionNotSupportedFailure,
     SystemWorkflowFailure,
     WorkflowExecutionAlreadyStartedFailure,
+    WorkflowNotReadyFailure,
 )
 
 __all__ = [
     "CancellationAlreadyRequestedFailure",
     "ClientVersionNotSupportedFailure",
     "NamespaceAlreadyExistsFailure",
+    "NamespaceInvalidStateFailure",
     "NamespaceNotActiveFailure",
+    "NamespaceNotFoundFailure",
     "NotFoundFailure",
     "PermissionDeniedFailure",
     "QueryFailedFailure",
@@ -24,4 +29,5 @@ __all__ = [
     "ServerVersionNotSupportedFailure",
     "SystemWorkflowFailure",
     "WorkflowExecutionAlreadyStartedFailure",
+    "WorkflowNotReadyFailure",
 ]

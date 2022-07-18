@@ -23,6 +23,7 @@ import temporalio.api.history.v1.message_pb2
 import temporalio.api.namespace.v1.message_pb2
 import temporalio.api.query.v1.message_pb2
 import temporalio.api.replication.v1.message_pb2
+import temporalio.api.schedule.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
@@ -2570,7 +2571,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     """Used to de-dupe reset requests"""
 
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """Should be removed. Appears unused."""
+    """Reset reapplay(replay) options."""
 
     def __init__(
         self,
@@ -3676,6 +3677,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         SIGNAL_AND_QUERY_HEADER_FIELD_NUMBER: builtins.int
         INTERNAL_ERROR_DIFFERENTIATION_FIELD_NUMBER: builtins.int
         ACTIVITY_FAILURE_INCLUDE_HEARTBEAT_FIELD_NUMBER: builtins.int
+        SUPPORTS_SCHEDULES_FIELD_NUMBER: builtins.int
         signal_and_query_header: builtins.bool
         """True if signal and query headers are supported."""
 
@@ -3690,12 +3692,16 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         activity_failure_include_heartbeat: builtins.bool
         """True if RespondActivityTaskFailed API supports including heartbeat details"""
 
+        supports_schedules: builtins.bool
+        """Supports scheduled workflow features."""
+
         def __init__(
             self,
             *,
             signal_and_query_header: builtins.bool = ...,
             internal_error_differentiation: builtins.bool = ...,
             activity_failure_include_heartbeat: builtins.bool = ...,
+            supports_schedules: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -3706,6 +3712,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
                 b"internal_error_differentiation",
                 "signal_and_query_header",
                 b"signal_and_query_header",
+                "supports_schedules",
+                b"supports_schedules",
             ],
         ) -> None: ...
 
@@ -3806,3 +3814,548 @@ class ListTaskQueuePartitionsResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ListTaskQueuePartitionsResponse = ListTaskQueuePartitionsResponse
+
+class CreateScheduleRequest(google.protobuf.message.Message):
+    """(-- api-linter: core::0133::request-parent-required=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+    (-- api-linter: core::0133::request-unknown-fields=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+    (-- api-linter: core::0133::request-resource-behavior=disabled
+        aip.dev/not-precedent: field_behavior annotation not available in our gogo fork --)
+    (-- api-linter: core::0203::optional=disabled
+        aip.dev/not-precedent: field_behavior annotation not available in our gogo fork --)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    SCHEDULE_ID_FIELD_NUMBER: builtins.int
+    SCHEDULE_FIELD_NUMBER: builtins.int
+    INITIAL_PATCH_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    MEMO_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    """The namespace the schedule should be created in."""
+
+    schedule_id: typing.Text
+    """The id of the new schedule."""
+
+    @property
+    def schedule(self) -> temporalio.api.schedule.v1.message_pb2.Schedule:
+        """The schedule spec, policies, action, and initial state."""
+        pass
+    @property
+    def initial_patch(self) -> temporalio.api.schedule.v1.message_pb2.SchedulePatch:
+        """Optional initial patch (e.g. to run the action once immediately)."""
+        pass
+    identity: typing.Text
+    """The identity of the client who initiated this request."""
+
+    request_id: typing.Text
+    """A unique identifier for this create request for idempotence. Typically UUIDv4."""
+
+    @property
+    def memo(self) -> temporalio.api.common.v1.message_pb2.Memo:
+        """Memo and search attributes to attach to the schedule itself."""
+        pass
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        schedule_id: typing.Text = ...,
+        schedule: typing.Optional[
+            temporalio.api.schedule.v1.message_pb2.Schedule
+        ] = ...,
+        initial_patch: typing.Optional[
+            temporalio.api.schedule.v1.message_pb2.SchedulePatch
+        ] = ...,
+        identity: typing.Text = ...,
+        request_id: typing.Text = ...,
+        memo: typing.Optional[temporalio.api.common.v1.message_pb2.Memo] = ...,
+        search_attributes: typing.Optional[
+            temporalio.api.common.v1.message_pb2.SearchAttributes
+        ] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "initial_patch",
+            b"initial_patch",
+            "memo",
+            b"memo",
+            "schedule",
+            b"schedule",
+            "search_attributes",
+            b"search_attributes",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "initial_patch",
+            b"initial_patch",
+            "memo",
+            b"memo",
+            "namespace",
+            b"namespace",
+            "request_id",
+            b"request_id",
+            "schedule",
+            b"schedule",
+            "schedule_id",
+            b"schedule_id",
+            "search_attributes",
+            b"search_attributes",
+        ],
+    ) -> None: ...
+
+global___CreateScheduleRequest = CreateScheduleRequest
+
+class CreateScheduleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    CONFLICT_TOKEN_FIELD_NUMBER: builtins.int
+    conflict_token: builtins.bytes
+    def __init__(
+        self,
+        *,
+        conflict_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["conflict_token", b"conflict_token"]
+    ) -> None: ...
+
+global___CreateScheduleResponse = CreateScheduleResponse
+
+class DescribeScheduleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    SCHEDULE_ID_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    """The namespace of the schedule to describe."""
+
+    schedule_id: typing.Text
+    """The id of the schedule to describe."""
+
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        schedule_id: typing.Text = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace", b"namespace", "schedule_id", b"schedule_id"
+        ],
+    ) -> None: ...
+
+global___DescribeScheduleRequest = DescribeScheduleRequest
+
+class DescribeScheduleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    SCHEDULE_FIELD_NUMBER: builtins.int
+    INFO_FIELD_NUMBER: builtins.int
+    MEMO_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    CONFLICT_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def schedule(self) -> temporalio.api.schedule.v1.message_pb2.Schedule:
+        """The complete current schedule details. This may not match the schedule as
+        created because:
+        - some fields in the state are modified automatically
+        - the schedule may have been modified by UpdateSchedule or PatchSchedule
+        """
+        pass
+    @property
+    def info(self) -> temporalio.api.schedule.v1.message_pb2.ScheduleInfo:
+        """Extra schedule state info."""
+        pass
+    @property
+    def memo(self) -> temporalio.api.common.v1.message_pb2.Memo:
+        """The memo and search attributes that the schedule was created with."""
+        pass
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    conflict_token: builtins.bytes
+    """This value can be passed back to UpdateSchedule to ensure that the
+    schedule was not modified between a Describe and an Update, which could
+    lead to lost updates and other confusion.
+    """
+
+    def __init__(
+        self,
+        *,
+        schedule: typing.Optional[
+            temporalio.api.schedule.v1.message_pb2.Schedule
+        ] = ...,
+        info: typing.Optional[
+            temporalio.api.schedule.v1.message_pb2.ScheduleInfo
+        ] = ...,
+        memo: typing.Optional[temporalio.api.common.v1.message_pb2.Memo] = ...,
+        search_attributes: typing.Optional[
+            temporalio.api.common.v1.message_pb2.SearchAttributes
+        ] = ...,
+        conflict_token: builtins.bytes = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "info",
+            b"info",
+            "memo",
+            b"memo",
+            "schedule",
+            b"schedule",
+            "search_attributes",
+            b"search_attributes",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "conflict_token",
+            b"conflict_token",
+            "info",
+            b"info",
+            "memo",
+            b"memo",
+            "schedule",
+            b"schedule",
+            "search_attributes",
+            b"search_attributes",
+        ],
+    ) -> None: ...
+
+global___DescribeScheduleResponse = DescribeScheduleResponse
+
+class UpdateScheduleRequest(google.protobuf.message.Message):
+    """(-- api-linter: core::0134::request-mask-required=disabled
+    aip.dev/not-precedent: UpdateSchedule doesn't follow Google API format --)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    SCHEDULE_ID_FIELD_NUMBER: builtins.int
+    SCHEDULE_FIELD_NUMBER: builtins.int
+    CONFLICT_TOKEN_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    """The namespace of the schedule to update."""
+
+    schedule_id: typing.Text
+    """The id of the schedule to update."""
+
+    @property
+    def schedule(self) -> temporalio.api.schedule.v1.message_pb2.Schedule:
+        """The new schedule. The four main fields of the schedule (spec, action,
+        policies, state) are replaced completely by the values in this message.
+        """
+        pass
+    conflict_token: builtins.bytes
+    """This can be the value of conflict_token from a DescribeScheduleResponse,
+    which will cause this request to fail if the schedule has been modified
+    between the Describe and this Update.
+    If missing, the schedule will be updated unconditionally.
+    """
+
+    identity: typing.Text
+    """The identity of the client who initiated this request."""
+
+    request_id: typing.Text
+    """A unique identifier for this update request for idempotence. Typically UUIDv4."""
+
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        schedule_id: typing.Text = ...,
+        schedule: typing.Optional[
+            temporalio.api.schedule.v1.message_pb2.Schedule
+        ] = ...,
+        conflict_token: builtins.bytes = ...,
+        identity: typing.Text = ...,
+        request_id: typing.Text = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["schedule", b"schedule"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "conflict_token",
+            b"conflict_token",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "request_id",
+            b"request_id",
+            "schedule",
+            b"schedule",
+            "schedule_id",
+            b"schedule_id",
+        ],
+    ) -> None: ...
+
+global___UpdateScheduleRequest = UpdateScheduleRequest
+
+class UpdateScheduleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___UpdateScheduleResponse = UpdateScheduleResponse
+
+class PatchScheduleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    SCHEDULE_ID_FIELD_NUMBER: builtins.int
+    PATCH_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    """The namespace of the schedule to patch."""
+
+    schedule_id: typing.Text
+    """The id of the schedule to patch."""
+
+    @property
+    def patch(self) -> temporalio.api.schedule.v1.message_pb2.SchedulePatch: ...
+    identity: typing.Text
+    """The identity of the client who initiated this request."""
+
+    request_id: typing.Text
+    """A unique identifier for this update request for idempotence. Typically UUIDv4."""
+
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        schedule_id: typing.Text = ...,
+        patch: typing.Optional[
+            temporalio.api.schedule.v1.message_pb2.SchedulePatch
+        ] = ...,
+        identity: typing.Text = ...,
+        request_id: typing.Text = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["patch", b"patch"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "patch",
+            b"patch",
+            "request_id",
+            b"request_id",
+            "schedule_id",
+            b"schedule_id",
+        ],
+    ) -> None: ...
+
+global___PatchScheduleRequest = PatchScheduleRequest
+
+class PatchScheduleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PatchScheduleResponse = PatchScheduleResponse
+
+class ListScheduleMatchingTimesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    SCHEDULE_ID_FIELD_NUMBER: builtins.int
+    START_TIME_FIELD_NUMBER: builtins.int
+    END_TIME_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    """The namespace of the schedule to query."""
+
+    schedule_id: typing.Text
+    """The id of the schedule to query."""
+
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time range to query."""
+        pass
+    @property
+    def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        schedule_id: typing.Text = ...,
+        start_time: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
+        end_time: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end_time", b"end_time", "start_time", b"start_time"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end_time",
+            b"end_time",
+            "namespace",
+            b"namespace",
+            "schedule_id",
+            b"schedule_id",
+            "start_time",
+            b"start_time",
+        ],
+    ) -> None: ...
+
+global___ListScheduleMatchingTimesRequest = ListScheduleMatchingTimesRequest
+
+class ListScheduleMatchingTimesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    START_TIME_FIELD_NUMBER: builtins.int
+    @property
+    def start_time(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        google.protobuf.timestamp_pb2.Timestamp
+    ]: ...
+    def __init__(
+        self,
+        *,
+        start_time: typing.Optional[
+            typing.Iterable[google.protobuf.timestamp_pb2.Timestamp]
+        ] = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["start_time", b"start_time"]
+    ) -> None: ...
+
+global___ListScheduleMatchingTimesResponse = ListScheduleMatchingTimesResponse
+
+class DeleteScheduleRequest(google.protobuf.message.Message):
+    """(-- api-linter: core::0135::request-name-required=disabled
+        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+    (-- api-linter: core::0135::request-unknown-fields=disabled
+        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    SCHEDULE_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    """The namespace of the schedule to delete."""
+
+    schedule_id: typing.Text
+    """The id of the schedule to delete."""
+
+    identity: typing.Text
+    """The identity of the client who initiated this request."""
+
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        schedule_id: typing.Text = ...,
+        identity: typing.Text = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "schedule_id",
+            b"schedule_id",
+        ],
+    ) -> None: ...
+
+global___DeleteScheduleRequest = DeleteScheduleRequest
+
+class DeleteScheduleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteScheduleResponse = DeleteScheduleResponse
+
+class ListSchedulesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    MAXIMUM_PAGE_SIZE_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    """The namespace to list schedules in."""
+
+    maximum_page_size: builtins.int
+    """How many to return at once."""
+
+    next_page_token: builtins.bytes
+    """Token to get the next page of results."""
+
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        maximum_page_size: builtins.int = ...,
+        next_page_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "maximum_page_size",
+            b"maximum_page_size",
+            "namespace",
+            b"namespace",
+            "next_page_token",
+            b"next_page_token",
+        ],
+    ) -> None: ...
+
+global___ListSchedulesRequest = ListSchedulesRequest
+
+class ListSchedulesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    SCHEDULES_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def schedules(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.schedule.v1.message_pb2.ScheduleListEntry
+    ]: ...
+    next_page_token: builtins.bytes
+    def __init__(
+        self,
+        *,
+        schedules: typing.Optional[
+            typing.Iterable[temporalio.api.schedule.v1.message_pb2.ScheduleListEntry]
+        ] = ...,
+        next_page_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "next_page_token", b"next_page_token", "schedules", b"schedules"
+        ],
+    ) -> None: ...
+
+global___ListSchedulesResponse = ListSchedulesResponse

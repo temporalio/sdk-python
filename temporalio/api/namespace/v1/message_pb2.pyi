@@ -40,6 +40,7 @@ class NamespaceInfo(google.protobuf.message.Message):
     OWNER_EMAIL_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
+    SUPPORTS_SCHEDULES_FIELD_NUMBER: builtins.int
     name: typing.Text
     state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
     description: typing.Text
@@ -51,6 +52,11 @@ class NamespaceInfo(google.protobuf.message.Message):
         """A key-value map for any customized purpose."""
         pass
     id: typing.Text
+    supports_schedules: builtins.bool
+    """Whether scheduled workflows are supported on this namespace. This is only needed
+    temporarily while the feature is experimental, so we can give it a high tag.
+    """
+
     def __init__(
         self,
         *,
@@ -60,6 +66,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         owner_email: typing.Text = ...,
         data: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
         id: typing.Text = ...,
+        supports_schedules: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -76,6 +83,8 @@ class NamespaceInfo(google.protobuf.message.Message):
             b"owner_email",
             "state",
             b"state",
+            "supports_schedules",
+            b"supports_schedules",
         ],
     ) -> None: ...
 
@@ -246,7 +255,10 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
     def data(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[typing.Text, typing.Text]:
-        """A key-value map for any customized purpose."""
+        """A key-value map for any customized purpose.
+        If data already exists on the namespace,
+        this will merge with the existing key values.
+        """
         pass
     state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
     """New namespace state, server will reject if transition is not allowed.

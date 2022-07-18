@@ -139,6 +139,16 @@ class WorkflowService(ABC):
             wsv1.CountWorkflowExecutionsRequest,
             wsv1.CountWorkflowExecutionsResponse,
         )
+        self.create_schedule = self._new_call(
+            "create_schedule",
+            wsv1.CreateScheduleRequest,
+            wsv1.CreateScheduleResponse,
+        )
+        self.delete_schedule = self._new_call(
+            "delete_schedule",
+            wsv1.DeleteScheduleRequest,
+            wsv1.DeleteScheduleResponse,
+        )
         self.deprecate_namespace = self._new_call(
             "deprecate_namespace",
             wsv1.DeprecateNamespaceRequest,
@@ -148,6 +158,11 @@ class WorkflowService(ABC):
             "describe_namespace",
             wsv1.DescribeNamespaceRequest,
             wsv1.DescribeNamespaceResponse,
+        )
+        self.describe_schedule = self._new_call(
+            "describe_schedule",
+            wsv1.DescribeScheduleRequest,
+            wsv1.DescribeScheduleResponse,
         )
         self.describe_task_queue = self._new_call(
             "describe_task_queue",
@@ -179,12 +194,11 @@ class WorkflowService(ABC):
             wsv1.GetWorkflowExecutionHistoryRequest,
             wsv1.GetWorkflowExecutionHistoryResponse,
         )
-        # TODO(cretz): Fix when https://github.com/temporalio/sdk-core/issues/335 fixed
-        # self.get_workflow_execution_history_reverse = self._new_call(
-        #     "get_workflow_execution_history_reverse",
-        #     wsv1.GetWorkflowExecutionHistoryReverseRequest,
-        #     wsv1.GetWorkflowExecutionHistoryReverseResponse,
-        # )
+        self.get_workflow_execution_history_reverse = self._new_call(
+            "get_workflow_execution_history_reverse",
+            wsv1.GetWorkflowExecutionHistoryReverseRequest,
+            wsv1.GetWorkflowExecutionHistoryReverseResponse,
+        )
         self.list_archived_workflow_executions = self._new_call(
             "list_archived_workflow_executions",
             wsv1.ListArchivedWorkflowExecutionsRequest,
@@ -205,6 +219,16 @@ class WorkflowService(ABC):
             wsv1.ListOpenWorkflowExecutionsRequest,
             wsv1.ListOpenWorkflowExecutionsResponse,
         )
+        self.list_schedule_matching_times = self._new_call(
+            "list_schedule_matching_times",
+            wsv1.ListScheduleMatchingTimesRequest,
+            wsv1.ListScheduleMatchingTimesResponse,
+        )
+        self.list_schedules = self._new_call(
+            "list_schedules",
+            wsv1.ListSchedulesRequest,
+            wsv1.ListSchedulesResponse,
+        )
         self.list_task_queue_partitions = self._new_call(
             "list_task_queue_partitions",
             wsv1.ListTaskQueuePartitionsRequest,
@@ -214,6 +238,11 @@ class WorkflowService(ABC):
             "list_workflow_executions",
             wsv1.ListWorkflowExecutionsRequest,
             wsv1.ListWorkflowExecutionsResponse,
+        )
+        self.patch_schedule = self._new_call(
+            "patch_schedule",
+            wsv1.PatchScheduleRequest,
+            wsv1.PatchScheduleResponse,
         )
         self.poll_activity_task_queue = self._new_call(
             "poll_activity_task_queue",
@@ -334,6 +363,11 @@ class WorkflowService(ABC):
             "update_namespace",
             wsv1.UpdateNamespaceRequest,
             wsv1.UpdateNamespaceResponse,
+        )
+        self.update_schedule = self._new_call(
+            "update_schedule",
+            wsv1.UpdateScheduleRequest,
+            wsv1.UpdateScheduleResponse,
         )
 
     @property

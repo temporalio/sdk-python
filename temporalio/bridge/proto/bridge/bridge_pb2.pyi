@@ -335,7 +335,6 @@ class CreateClientRequest(google.protobuf.message.Message):
     CLIENT_NAME_FIELD_NUMBER: builtins.int
     CLIENT_VERSION_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
-    WORKER_BINARY_ID_FIELD_NUMBER: builtins.int
     TLS_CONFIG_FIELD_NUMBER: builtins.int
     RETRY_CONFIG_FIELD_NUMBER: builtins.int
     target_url: typing.Text
@@ -343,7 +342,6 @@ class CreateClientRequest(google.protobuf.message.Message):
     client_name: typing.Text
     client_version: typing.Text
     identity: typing.Text
-    worker_binary_id: typing.Text
     @property
     def tls_config(self) -> global___CreateClientRequest.TlsConfig: ...
     @property
@@ -356,7 +354,6 @@ class CreateClientRequest(google.protobuf.message.Message):
         client_name: typing.Text = ...,
         client_version: typing.Text = ...,
         identity: typing.Text = ...,
-        worker_binary_id: typing.Text = ...,
         tls_config: typing.Optional[global___CreateClientRequest.TlsConfig] = ...,
         retry_config: typing.Optional[global___CreateClientRequest.RetryConfig] = ...,
     ) -> None: ...
@@ -383,8 +380,6 @@ class CreateClientRequest(google.protobuf.message.Message):
             b"target_url",
             "tls_config",
             b"tls_config",
-            "worker_binary_id",
-            b"worker_binary_id",
         ],
     ) -> None: ...
 

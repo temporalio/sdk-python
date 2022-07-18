@@ -1,3 +1,4 @@
+from .cluster_pb2 import ClusterMemberRole
 from .command_type_pb2 import CommandType
 from .common_pb2 import EncodingType, IndexedValueType, Severity
 from .event_type_pb2 import EventType
@@ -11,6 +12,7 @@ from .failed_cause_pb2 import (
 from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
 from .query_pb2 import QueryRejectCondition, QueryResultType
 from .reset_pb2 import ResetReapplyType
+from .schedule_pb2 import ScheduleOverlapPolicy
 from .task_queue_pb2 import TaskQueueKind, TaskQueueType
 from .workflow_pb2 import (
     ContinueAsNewInitiator,
@@ -27,6 +29,7 @@ from .workflow_pb2 import (
 __all__ = [
     "ArchivalState",
     "CancelExternalWorkflowExecutionFailedCause",
+    "ClusterMemberRole",
     "CommandType",
     "ContinueAsNewInitiator",
     "EncodingType",
@@ -43,6 +46,7 @@ __all__ = [
     "ResetReapplyType",
     "ResourceExhaustedCause",
     "RetryState",
+    "ScheduleOverlapPolicy",
     "Severity",
     "SignalExternalWorkflowExecutionFailedCause",
     "StartChildWorkflowExecutionFailedCause",

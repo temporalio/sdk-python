@@ -1,4 +1,5 @@
 from .message_pb2 import (
+    NewWorkflowExecutionInfo,
     PendingActivityInfo,
     PendingChildExecutionInfo,
     PendingWorkflowTaskInfo,
@@ -9,6 +10,7 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "NewWorkflowExecutionInfo",
     "PendingActivityInfo",
     "PendingChildExecutionInfo",
     "PendingWorkflowTaskInfo",

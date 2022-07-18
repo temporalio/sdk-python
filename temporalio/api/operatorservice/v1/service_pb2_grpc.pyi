@@ -51,6 +51,48 @@ class OperatorServiceStub:
         aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
     """
 
+    DeleteWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
+    ]
+    """DeleteWorkflowExecution deletes a closed workflow execution asynchronously (workflow must be completed or terminated before).
+    This method is EXPERIMENTAL and may be changed or removed in a later release.
+    (-- api-linter: core::0135::method-signature=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+    (-- api-linter: core::0135::response-message-name=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+    """
+
+    AddOrUpdateRemoteCluster: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+    ]
+    """AddOrUpdateRemoteCluster adds or updates remote cluster."""
+
+    RemoveRemoteCluster: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+    ]
+    """RemoveRemoteCluster removes remote cluster."""
+
+    DescribeCluster: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DescribeClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DescribeClusterResponse,
+    ]
+    """DescribeCluster returns information about Temporal cluster."""
+
+    ListClusters: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+    ]
+    """ListClusters returns information about Temporal clusters."""
+
+    ListClusterMembers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClusterMembersRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClusterMembersResponse,
+    ]
+    """ListClusterMembers returns information about Temporal cluster members."""
+
 class OperatorServiceServicer(metaclass=abc.ABCMeta):
     """OperatorService API defines how Temporal SDKs and other clients interact with the Temporal server
     to perform administrative functions like registering a search attribute or a namespace.
@@ -102,6 +144,60 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0135::response-message-name=disabled
             aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
         """
+        pass
+    @abc.abstractmethod
+    def DeleteWorkflowExecution(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse:
+        """DeleteWorkflowExecution deletes a closed workflow execution asynchronously (workflow must be completed or terminated before).
+        This method is EXPERIMENTAL and may be changed or removed in a later release.
+        (-- api-linter: core::0135::method-signature=disabled
+            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0135::response-message-name=disabled
+            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        """
+        pass
+    @abc.abstractmethod
+    def AddOrUpdateRemoteCluster(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse:
+        """AddOrUpdateRemoteCluster adds or updates remote cluster."""
+        pass
+    @abc.abstractmethod
+    def RemoveRemoteCluster(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse:
+        """RemoveRemoteCluster removes remote cluster."""
+        pass
+    @abc.abstractmethod
+    def DescribeCluster(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.DescribeClusterRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.DescribeClusterResponse:
+        """DescribeCluster returns information about Temporal cluster."""
+        pass
+    @abc.abstractmethod
+    def ListClusters(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse:
+        """ListClusters returns information about Temporal clusters."""
+        pass
+    @abc.abstractmethod
+    def ListClusterMembers(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.ListClusterMembersRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListClusterMembersResponse:
+        """ListClusterMembers returns information about Temporal cluster members."""
         pass
 
 def add_OperatorServiceServicer_to_server(

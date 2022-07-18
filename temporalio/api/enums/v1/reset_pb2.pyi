@@ -26,7 +26,10 @@ class _ResetReapplyTypeEnumTypeWrapper(
     RESET_REAPPLY_TYPE_NONE: _ResetReapplyType.ValueType  # 2
 
 class ResetReapplyType(_ResetReapplyType, metaclass=_ResetReapplyTypeEnumTypeWrapper):
-    """TODO: What is this?"""
+    """Reset reapplay(replay) options
+    * RESET_REAPPLY_TYPE_SIGNAL (default) - Signals are reapplied when workflow is reset
+    * RESET_REAPPLY_TYPE_NONE - nothing is reapplied
+    """
 
     pass
 
