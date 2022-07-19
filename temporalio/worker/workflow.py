@@ -265,6 +265,7 @@ class _WorkflowWorker:
             execution_timeout=start.workflow_execution_timeout.ToTimedelta()
             if start.HasField("workflow_execution_timeout")
             else None,
+            headers=dict(start.headers),
             namespace=self._namespace,
             parent=parent,
             retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)

@@ -34,6 +34,7 @@ from typing import (
 
 from typing_extensions import Concatenate, Literal, TypedDict
 
+import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.workflow_commands
 import temporalio.common
@@ -272,6 +273,7 @@ class Info:
     continued_run_id: Optional[str]
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
     retry_policy: Optional[temporalio.common.RetryPolicy]

@@ -16,6 +16,7 @@ from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
+from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.worker import Worker
 
 
@@ -75,6 +76,7 @@ class TracingWorkflow:
 
     @workflow.run
     async def run(self, param: TracingWorkflowParam) -> None:
+        otel_workflow.completed_span("MyCustomSpan", attributes={"foo": "bar"})
         for action in param.actions:
             if action.fail_on_non_replay:
                 await self._raise_on_non_replay()
@@ -222,28 +224,36 @@ async def test_opentelemetry_tracing(client: Client):
         await handle.result()
 
     # Dump debug with attributes, but do string assertion test without
-    logging.debug("Spans:\n%s", "\n".join(dump_spans(exporter.get_finished_spans())))
+    logging.debug(
+        "Spans:\n%s",
+        "\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)),
+    )
     assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
         "StartWorkflow:TracingWorkflow",
         "  RunWorkflow:TracingWorkflow",
+        "  MyCustomSpan",
+        "  HandleSignal:signal (links: SignalWorkflow:signal)",
         "  StartActivity:tracing_activity",
         "    RunActivity:tracing_activity",
         "    RunActivity:tracing_activity",
         "  StartChildWorkflow:TracingWorkflow",
         "    RunWorkflow:TracingWorkflow",
-        "      StartActivity:tracing_activity",
-        "        RunActivity:tracing_activity",
-        "  SignalChildWorkflow:signal",
-        "    HandleSignal:signal",
-        "  SignalExternalWorkflow:signal",
-        "    HandleSignal:signal",
-        "  RunWorkflow:TracingWorkflow",
+        "    MyCustomSpan",
         "    StartActivity:tracing_activity",
         "      RunActivity:tracing_activity",
+        "    HandleSignal:signal (links: SignalChildWorkflow:signal)",
+        "    HandleSignal:signal (links: SignalExternalWorkflow:signal)",
+        "    CompleteWorkflow:TracingWorkflow",
+        "  SignalChildWorkflow:signal",
+        "  SignalExternalWorkflow:signal",
+        "  RunWorkflow:TracingWorkflow",
+        "  MyCustomSpan",
+        "  StartActivity:tracing_activity",
+        "    RunActivity:tracing_activity",
+        "  CompleteWorkflow:TracingWorkflow",
         "QueryWorkflow:query",
-        "  HandleQuery:query",
+        "  HandleQuery:query (links: StartWorkflow:TracingWorkflow)",
         "SignalWorkflow:signal",
-        "  HandleSignal:signal",
     ]
 
 
@@ -261,7 +271,15 @@ def dump_spans(
         ):
             span_str = f"{'  ' * indent_depth}{span.name}"
             if with_attributes:
-                span_str += f" (attributes: {dict(span.attributes or {})}"
+                span_str += f" (attributes: {dict(span.attributes or {})})"
+            # Add links
+            if span.links:
+                span_links: List[str] = []
+                for link in span.links:
+                    for link_span in spans:
+                        if link_span.context.span_id == link.context.span_id:
+                            span_links.append(link_span.name)
+                span_str += f" (links: {', '.join(span_links)})"
             # Signals can duplicate in rare situations, so we make sure not to
             # re-add
             if "Signal" in span_str and span_str in ret:
@@ -274,3 +292,11 @@ def dump_spans(
                 indent_depth=indent_depth + 1,
             )
     return ret
+
+
+# TODO(cretz): Additional tests to write
+# * query without interceptor (no headers)
+# * workflow without interceptor (no headers) but query with interceptor (headers)
+# * workflow failure and wft failure
+# * signal with start
+# * signal failure and wft failure from signal

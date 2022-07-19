@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
@@ -11,6 +12,7 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
+    Sequence,
     Type,
     cast,
 )
@@ -20,8 +22,6 @@ import opentelemetry.context
 import opentelemetry.context.context
 import opentelemetry.propagators.composite
 import opentelemetry.propagators.textmap
-import opentelemetry.sdk.trace
-import opentelemetry.sdk.util.instrumentation
 import opentelemetry.trace
 import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
@@ -31,6 +31,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.client
 import temporalio.converter
+import temporalio.exceptions
 import temporalio.worker
 import temporalio.workflow
 
@@ -110,7 +111,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         # TODO(cretz): MyPy works w/ spread kwargs instead of direct passing
         input.unsafe_extern_functions.update(
             **_WorkflowExternFunctions(
-                __temporal_opentelemetry_new_completed_span=self._new_completed_workflow_span,
+                __temporal_opentelemetry_completed_span=self._completed_workflow_span,
             )
         )
         return TracingWorkflowInboundInterceptor
@@ -154,32 +155,41 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                 input.headers = self._context_to_headers(input.headers)
             yield None
 
-    def _new_completed_workflow_span(
-        self,
-        carrier: _CarrierDict,
-        name: str,
-        attrs: opentelemetry.util.types.Attributes,
-        start_time_ns: int,
+    def _completed_workflow_span(
+        self, params: _CompletedWorkflowSpanParams
     ) -> _CarrierDict:
         # Carrier to context, start span, set span as current on context,
         # context back to carrier
-        context = self.text_map_propagator.extract(carrier)
+
+        # Extract the context
+        context = self.text_map_propagator.extract(params.context)
+        # Create link if there is a span present
+        links: Optional[Sequence[opentelemetry.trace.Link]] = []
+        if params.link_context:
+            link_span = opentelemetry.trace.get_current_span(
+                self.text_map_propagator.extract(params.link_context)
+            )
+            if link_span is not opentelemetry.trace.INVALID_SPAN:
+                links = [opentelemetry.trace.Link(link_span.get_span_context())]
+
         # We start and end the span immediately because it is not replay-safe to
         # keep an unended long-running span. We set the end time the same as the
         # start time to make it clear it has no duration.
         span = self.tracer.start_span(
-            name, context, attributes=attrs, start_time=start_time_ns
+            params.name,
+            context,
+            attributes=params.attributes,
+            links=links,
+            start_time=params.time_ns,
         )
         context = opentelemetry.trace.set_span_in_context(span, context)
-        span.end(end_time=start_time_ns)
+        if params.exception:
+            span.record_exception(params.exception)
+        span.end(end_time=params.time_ns)
         # Back to carrier
-        carrier = {}
+        carrier: _CarrierDict = {}
         self.text_map_propagator.inject(carrier, context)
         return carrier
-
-
-class _InputWithMutableHeaders(Protocol):
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
 
 class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
@@ -246,10 +256,29 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
             return await super().execute_activity(input)
 
 
+class _InputWithMutableHeaders(Protocol):
+    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+
+
 class _WorkflowExternFunctions(TypedDict):
-    __temporal_opentelemetry_new_completed_span: Callable[
-        [_CarrierDict, str, opentelemetry.util.types.Attributes, int], _CarrierDict
+    __temporal_opentelemetry_completed_span: Callable[
+        [_CompletedWorkflowSpanParams], _CarrierDict
     ]
+
+
+@dataclass(frozen=True)
+class _CompletedWorkflowSpanParams:
+    context: _CarrierDict
+    name: str
+    attributes: opentelemetry.util.types.Attributes
+    time_ns: int
+    link_context: Optional[_CarrierDict]
+    exception: Optional[Exception]
+
+
+_interceptor_context_key = opentelemetry.context.create_key(
+    "__temporal_opentelemetry_workflow_interceptor"
+)
 
 
 class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterceptor):
@@ -258,6 +287,13 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
     See :py:class:`TracingInterceptor` docs on why one might want to subclass
     this class.
     """
+
+    @staticmethod
+    def _from_context() -> Optional[TracingWorkflowInboundInterceptor]:
+        ret = opentelemetry.context.get_value(_interceptor_context_key)
+        if ret and isinstance(ret, TracingWorkflowInboundInterceptor):
+            return ret
+        return None
 
     def __init__(self, next: temporalio.worker.WorkflowInboundInterceptor) -> None:
         """Initialize a tracing workflow interceptor."""
@@ -273,6 +309,8 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         )
         # TODO(cretz): Should I be using the configured one for this workflow?
         self.payload_converter = temporalio.converter.default().payload_converter
+        # This is the context for the overall workflow, lazily created
+        self._workflow_context_carrier: Optional[_CarrierDict] = None
 
     def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
         """Implementation of
@@ -286,32 +324,112 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.execute_workflow`.
         """
-        with self._instrument(
-            f"RunWorkflow:{temporalio.workflow.info().workflow_type}",
-            parent_headers=input.headers,
-        ):
+        with self._top_level_workflow_context(success_is_complete=True):
+            self._completed_span(
+                f"RunWorkflow:{temporalio.workflow.info().workflow_type}"
+            )
             return await super().execute_workflow(input)
 
     async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_signal`.
         """
-        with self._instrument(
-            f"HandleSignal:{input.signal}",
-            parent_headers=input.headers,
-        ):
+        # Create a span in the current context for the signal and link any
+        # header given
+        link_context_header = input.headers.get(self.header_key)
+        link_context_carrier: Optional[_CarrierDict] = None
+        if link_context_header:
+            link_context_carrier = self.payload_converter.from_payloads(
+                [link_context_header]
+            )[0]
+        with self._top_level_workflow_context(success_is_complete=False):
+            self._completed_span(
+                f"HandleSignal:{input.signal}",
+                link_context_carrier=link_context_carrier,
+            )
             await super().handle_signal(input)
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_query`.
         """
-        with self._instrument(
-            f"HandleQuery:{input.query}",
-            parent_headers=input.headers,
-            new_span_even_on_replay=True,
-        ):
+        # Only trace this if there is a header, and make that span the parent.
+        # We do not put anything that happens in a query handler on the workflow
+        # span.
+        context_header = input.headers.get(self.header_key)
+        context: opentelemetry.context.Context
+        link_context_carrier: Optional[_CarrierDict] = None
+        if context_header:
+            context_carrier = self.payload_converter.from_payloads([context_header])[0]
+            context = self.text_map_propagator.extract(context_carrier)
+            # If there is a workflow span, use it as the link
+            link_context_carrier = self._load_workflow_context_carrier()
+        else:
+            # Use an empty context
+            context = opentelemetry.context.Context()
+
+        # We need to put this interceptor on the context too
+        context = self._set_on_context(context)
+        # Run under context with new span
+        token = opentelemetry.context.attach(context)
+        try:
+            # This won't be created if there was no context header
+            self._completed_span(
+                f"HandleQuery:{input.query}",
+                link_context_carrier=link_context_carrier,
+                # Create even on replay for queries
+                new_span_even_on_replay=True,
+            )
             return await super().handle_query(input)
+        finally:
+            opentelemetry.context.detach(token)
+
+    def _load_workflow_context_carrier(self) -> Optional[_CarrierDict]:
+        if self._workflow_context_carrier:
+            return self._workflow_context_carrier
+        context_header = temporalio.workflow.info().headers.get(self.header_key)
+        if not context_header:
+            return None
+        self._workflow_context_carrier = self.payload_converter.from_payloads(
+            [context_header]
+        )[0]
+        return self._workflow_context_carrier
+
+    @contextmanager
+    def _top_level_workflow_context(
+        self, *, success_is_complete: bool
+    ) -> Iterator[None]:
+        # Load context only if there is a carrier, otherwise use empty context
+        context_carrier = self._load_workflow_context_carrier()
+        context: opentelemetry.context.Context
+        if context_carrier:
+            context = self.text_map_propagator.extract(context_carrier)
+        else:
+            context = opentelemetry.context.Context()
+        # We need to put this interceptor on the context too
+        context = self._set_on_context(context)
+        # Need to know whether completed and whether there was a fail-workflow
+        # exception
+        success = False
+        exception: Optional[Exception] = None
+        # Run under this context
+        token = opentelemetry.context.attach(context)
+        try:
+            yield None
+            success = True
+        except temporalio.exceptions.FailureError as err:
+            # We only record the failure errors since those are the only ones
+            # that lead to workflow completions
+            exception = err
+            raise
+        finally:
+            # Create a completed span before detaching context
+            if exception or (success and success_is_complete):
+                self._completed_span(
+                    f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
+                    exception=exception,
+                )
+            opentelemetry.context.detach(token)
 
     def _context_to_headers(
         self, headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
@@ -331,54 +449,59 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         new_headers[self.header_key] = self.payload_converter.to_payloads([carrier])[0]
         return new_headers
 
-    @contextmanager
-    def _instrument(
+    def _completed_span(
         self,
         span_name: str,
         *,
-        parent_headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None,
-        input: Optional[_InputWithMutableHeaders] = None,
+        link_context_carrier: Optional[_CarrierDict] = None,
+        add_to_outbound: Optional[_InputWithMutableHeaders] = None,
         new_span_even_on_replay: bool = False,
-    ) -> Iterator[None]:
-        context = opentelemetry.context.get_current()
+        additional_attributes: opentelemetry.util.types.Attributes = None,
+        exception: Optional[Exception] = None,
+    ) -> None:
+        # If there is no span on the context, we do not create a span
+        if opentelemetry.trace.get_current_span() is opentelemetry.trace.INVALID_SPAN:
+            return None
 
-        # If there are parent headers, we need to extract it
-        if parent_headers and self.header_key in parent_headers:
-            carrier = self.payload_converter.from_payloads(
-                [parent_headers[self.header_key]]
-            )[0]
-            context = self.text_map_propagator.extract(carrier, context)
+        # If we are replaying and they don't want a span on replay, no span
+        if temporalio.workflow.unsafe.is_replaying() and not new_span_even_on_replay:
+            return None
 
-        # If a span is warranted, create via extern, and replace context with
-        # result
-        if new_span_even_on_replay or not temporalio.workflow.unsafe.is_replaying():
-            # First serialize current context to carrier
-            carrier = {}
-            self.text_map_propagator.inject(carrier, context)
-            # Always set span attributes as workflow ID and run ID
-            info = temporalio.workflow.info()
-            attrs = {
-                "temporalWorkflowID": info.workflow_id,
-                "temporalRunID": info.run_id,
-            }
-            # Invoke extern and recreate context from it
-            carrier = self._extern_functions[
-                "__temporal_opentelemetry_new_completed_span"
-            ](carrier, span_name, attrs, temporalio.workflow.time_ns())
-            context = self.text_map_propagator.extract(carrier, context)
+        # Create the span. First serialize current context to carrier.
+        context_carrier: _CarrierDict = {}
+        self.text_map_propagator.inject(context_carrier)
+        # Invoke
+        info = temporalio.workflow.info()
+        attributes: Dict[str, opentelemetry.util.types.AttributeValue] = {
+            "temporalWorkflowID": info.workflow_id,
+            "temporalRunID": info.run_id,
+        }
+        if additional_attributes:
+            attributes.update(additional_attributes)
+        context_carrier = self._extern_functions[
+            "__temporal_opentelemetry_completed_span"
+        ](
+            _CompletedWorkflowSpanParams(
+                context=context_carrier,
+                name=span_name,
+                # Always set span attributes as workflow ID and run ID
+                attributes=attributes,
+                time_ns=temporalio.workflow.time_ns(),
+                link_context=link_context_carrier,
+                exception=exception,
+            )
+        )
 
-        # If there is input, put the context as the header
-        if input:
-            carrier = {}
-            self.text_map_propagator.inject(carrier, context)
-            input.headers = self._context_carrier_to_headers(carrier, input.headers)
+        # Add to outbound if needed
+        if add_to_outbound:
+            add_to_outbound.headers = self._context_carrier_to_headers(
+                context_carrier, add_to_outbound.headers
+            )
 
-        # Attach the context, yield, then detach
-        token = opentelemetry.context.attach(context)
-        try:
-            yield None
-        finally:
-            opentelemetry.context.detach(token)
+    def _set_on_context(
+        self, context: opentelemetry.context.Context
+    ) -> opentelemetry.context.Context:
+        return opentelemetry.context.set_value(_interceptor_context_key, self, context)
 
 
 class _TracingWorkflowOutboundInterceptor(
@@ -393,47 +516,91 @@ class _TracingWorkflowOutboundInterceptor(
         self.root = root
 
     def continue_as_new(self, input: temporalio.worker.ContinueAsNewInput) -> NoReturn:
+        # Put the current context on to the continue as new
         input.headers = self.root._context_to_headers(input.headers)
         super().continue_as_new(input)
 
     async def signal_child_workflow(
         self, input: temporalio.worker.SignalChildWorkflowInput
     ) -> None:
-        with self.root._instrument(
-            f"SignalChildWorkflow:{input.signal}",
-            input=input,
-        ):
-            return await super().signal_child_workflow(input)
+        # Create new span and put on outbound input
+        self.root._completed_span(
+            f"SignalChildWorkflow:{input.signal}", add_to_outbound=input
+        )
+        await super().signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: temporalio.worker.SignalExternalWorkflowInput
     ) -> None:
-        with self.root._instrument(
-            f"SignalExternalWorkflow:{input.signal}",
-            input=input,
-        ):
-            return await super().signal_external_workflow(input)
+        # Create new span and put on outbound input
+        self.root._completed_span(
+            f"SignalExternalWorkflow:{input.signal}", add_to_outbound=input
+        )
+        await super().signal_external_workflow(input)
 
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        with self.root._instrument(f"StartActivity:{input.activity}", input=input):
-            return super().start_activity(input)
+        # Create new span and put on outbound input
+        self.root._completed_span(
+            f"StartActivity:{input.activity}", add_to_outbound=input
+        )
+        return super().start_activity(input)
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
-        with self.root._instrument(
-            f"StartChildWorkflow:{input.workflow}",
-            input=input,
-        ):
-            return await super().start_child_workflow(input)
+        # Create new span and put on outbound input
+        self.root._completed_span(
+            f"StartChildWorkflow:{input.workflow}", add_to_outbound=input
+        )
+        return await super().start_child_workflow(input)
 
     def start_local_activity(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        with self.root._instrument(
-            f"StartActivity:{input.activity}",
-            input=input,
-        ):
-            return super().start_local_activity(input)
+        # Create new span and put on outbound input
+        self.root._completed_span(
+            f"StartActivity:{input.activity}", add_to_outbound=input
+        )
+        return super().start_local_activity(input)
+
+
+class workflow:
+    """Contains static methods that are safe to call from within a workflow.
+
+    .. warning::
+        Using any other ``opentelemetry`` API could cause non-determinism.
+    """
+
+    def __init__(self) -> None:  # noqa: D107
+        raise NotImplementedError
+
+    @staticmethod
+    def completed_span(
+        name: str,
+        *,
+        attributes: opentelemetry.util.types.Attributes = None,
+        exception: Optional[Exception] = None,
+    ) -> None:
+        """Create and end an OpenTelemetry span.
+
+        Note, this will only create and record when the workflow is not
+        replaying and if there is a current span (meaning the client started a
+        span and this interceptor is configured on the worker and the span is on
+        the context).
+
+        There is currently no way to create a long-running span or to create a
+        span that actually spans other code.
+
+        Args:
+            name: Name of the span.
+            attributes: Attributes to set on the span if any. Workflow ID and
+                run ID are automatically added.
+            exception: Optional exception to record on the span.
+        """
+        interceptor = TracingWorkflowInboundInterceptor._from_context()
+        if interceptor:
+            interceptor._completed_span(
+                name, additional_attributes=attributes, exception=exception
+            )
