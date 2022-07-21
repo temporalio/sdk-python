@@ -1,7 +1,7 @@
 """Worker using SDK Core."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List, Mapping
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List, Mapping, Optional
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
@@ -24,6 +24,8 @@ class WorkerConfig:
 
     namespace: str
     task_queue: str
+    build_id: str
+    identity_override: Optional[str]
     max_cached_workflows: int
     max_outstanding_workflow_tasks: int
     max_outstanding_activities: int

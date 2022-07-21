@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import socket
-import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Generic, Mapping, Optional, Type, TypeVar
+from typing import Generic, Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
 import grpc
@@ -101,14 +99,11 @@ class ConnectConfig:
     retry_config: Optional[RetryConfig] = None
     static_headers: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
-    worker_binary_id: str = ""
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
         if not self.identity:
             self.identity = f"{os.getpid()}@{socket.gethostname()}"
-        if not self.worker_binary_id:
-            self.worker_binary_id = load_default_worker_binary_id()
 
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientConfig:
         return temporalio.bridge.client.ClientConfig(
@@ -119,7 +114,6 @@ class ConnectConfig:
             else None,
             static_headers=self.static_headers,
             identity=self.identity,
-            worker_binary_id=self.worker_binary_id or "",
             client_name="temporal-python",
             client_version=__version__,
         )
@@ -145,6 +139,16 @@ class WorkflowService(ABC):
             wsv1.CountWorkflowExecutionsRequest,
             wsv1.CountWorkflowExecutionsResponse,
         )
+        self.create_schedule = self._new_call(
+            "create_schedule",
+            wsv1.CreateScheduleRequest,
+            wsv1.CreateScheduleResponse,
+        )
+        self.delete_schedule = self._new_call(
+            "delete_schedule",
+            wsv1.DeleteScheduleRequest,
+            wsv1.DeleteScheduleResponse,
+        )
         self.deprecate_namespace = self._new_call(
             "deprecate_namespace",
             wsv1.DeprecateNamespaceRequest,
@@ -154,6 +158,11 @@ class WorkflowService(ABC):
             "describe_namespace",
             wsv1.DescribeNamespaceRequest,
             wsv1.DescribeNamespaceResponse,
+        )
+        self.describe_schedule = self._new_call(
+            "describe_schedule",
+            wsv1.DescribeScheduleRequest,
+            wsv1.DescribeScheduleResponse,
         )
         self.describe_task_queue = self._new_call(
             "describe_task_queue",
@@ -185,12 +194,11 @@ class WorkflowService(ABC):
             wsv1.GetWorkflowExecutionHistoryRequest,
             wsv1.GetWorkflowExecutionHistoryResponse,
         )
-        # TODO(cretz): Fix when https://github.com/temporalio/sdk-core/issues/335 fixed
-        # self.get_workflow_execution_history_reverse = self._new_call(
-        #     "get_workflow_execution_history_reverse",
-        #     wsv1.GetWorkflowExecutionHistoryReverseRequest,
-        #     wsv1.GetWorkflowExecutionHistoryReverseResponse,
-        # )
+        self.get_workflow_execution_history_reverse = self._new_call(
+            "get_workflow_execution_history_reverse",
+            wsv1.GetWorkflowExecutionHistoryReverseRequest,
+            wsv1.GetWorkflowExecutionHistoryReverseResponse,
+        )
         self.list_archived_workflow_executions = self._new_call(
             "list_archived_workflow_executions",
             wsv1.ListArchivedWorkflowExecutionsRequest,
@@ -211,6 +219,16 @@ class WorkflowService(ABC):
             wsv1.ListOpenWorkflowExecutionsRequest,
             wsv1.ListOpenWorkflowExecutionsResponse,
         )
+        self.list_schedule_matching_times = self._new_call(
+            "list_schedule_matching_times",
+            wsv1.ListScheduleMatchingTimesRequest,
+            wsv1.ListScheduleMatchingTimesResponse,
+        )
+        self.list_schedules = self._new_call(
+            "list_schedules",
+            wsv1.ListSchedulesRequest,
+            wsv1.ListSchedulesResponse,
+        )
         self.list_task_queue_partitions = self._new_call(
             "list_task_queue_partitions",
             wsv1.ListTaskQueuePartitionsRequest,
@@ -220,6 +238,11 @@ class WorkflowService(ABC):
             "list_workflow_executions",
             wsv1.ListWorkflowExecutionsRequest,
             wsv1.ListWorkflowExecutionsResponse,
+        )
+        self.patch_schedule = self._new_call(
+            "patch_schedule",
+            wsv1.PatchScheduleRequest,
+            wsv1.PatchScheduleResponse,
         )
         self.poll_activity_task_queue = self._new_call(
             "poll_activity_task_queue",
@@ -340,6 +363,11 @@ class WorkflowService(ABC):
             "update_namespace",
             wsv1.UpdateNamespaceRequest,
             wsv1.UpdateNamespaceResponse,
+        )
+        self.update_schedule = self._new_call(
+            "update_schedule",
+            wsv1.UpdateScheduleRequest,
+            wsv1.UpdateScheduleResponse,
         )
 
     @property
@@ -496,82 +524,3 @@ class RPCError(temporalio.exceptions.TemporalError):
     def details(self) -> bytes:
         """Any details on the error."""
         return self._details
-
-
-_default_worker_binary_id: Optional[str] = None
-
-
-def load_default_worker_binary_id(*, memoize: bool = True) -> str:
-    """Load the default worker binary ID.
-
-    The worker binary ID is a unique hash representing the entire set of code
-    including Temporal code and external code. The default here is currently
-    implemented by walking loaded modules and hashing their bytecode into a
-    common hash.
-
-    Args:
-        memoize: If true, the default, this will cache to a global variable to
-            keep from having to run again on successive calls.
-
-    Returns:
-        Unique identifier representing the set of running code.
-    """
-    # Memoize
-    global _default_worker_binary_id
-    if memoize and _default_worker_binary_id:
-        return _default_worker_binary_id
-
-    # The goal is to get a hash representing the set of runtime code, both
-    # Temporal's and the user's. After all options were explored, we have
-    # decided to default to hashing all bytecode of imported modules. We accept
-    # that this has the following limitations:
-    #
-    # * Dynamic imports later on can affect this value
-    # * Dynamic imports based on env var, platform, etc can affect this value
-    # * Using the loader's get_code seems to use get_data which does a disk read
-    # * Using the loader's get_code in rare cases can cause a compile()
-
-    got_temporal_code = False
-    m = hashlib.md5()
-    for mod_name in sorted(sys.modules):
-        # Try to read code
-        code = _get_module_code(mod_name)
-        if not code:
-            continue
-        if mod_name == "temporalio":
-            got_temporal_code = True
-        # Add to MD5 digest
-        m.update(code)
-    # If we didn't even get the temporalio module from this approach, this
-    # approach is flawed and we prefer to return an error forcing user to
-    # explicitly set the worker binary ID instead of silently using a value that
-    # may never change
-    if not got_temporal_code:
-        raise RuntimeError(
-            "Cannot get default unique worker binary ID, the value should be explicitly set"
-        )
-    # Return the hex digest
-    digest = m.hexdigest()
-    if memoize:
-        _default_worker_binary_id = digest
-    return digest
-
-
-def _get_module_code(mod_name: str) -> Optional[bytes]:
-    # First try the module's loader and if that fails, try __cached__ file
-    try:
-        loader: Any = sys.modules[mod_name].__loader__
-        code = loader.get_code(mod_name).co_code
-        if code:
-            return code
-    except Exception:
-        pass
-    try:
-        # Technically we could read smaller chunks per file here and update the
-        # hash, but the benefit is negligible especially since many non-built-in
-        # modules will use get_code above
-        with open(sys.modules[mod_name].__cached__, "rb") as f:
-            return f.read()
-    except Exception:
-        pass
-    return None

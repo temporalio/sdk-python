@@ -12,12 +12,14 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    MutableMapping,
     NoReturn,
     Optional,
     Type,
 )
 
 import temporalio.activity
+import temporalio.api.common.v1
 import temporalio.common
 import temporalio.workflow
 
@@ -42,16 +44,39 @@ class Interceptor:
         """
         return next
 
-    def workflow_interceptor_class(self) -> Optional[Type[WorkflowInboundInterceptor]]:
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> Optional[Type[WorkflowInboundInterceptor]]:
         """Class that will be instantiated and used to intercept workflows.
 
-        The class must have the same init as
-        :py:meth:`WorkflowInboundInterceptor.__init__`.
+        This method is called on workflow start. The class must have the same
+        init as :py:meth:`WorkflowInboundInterceptor.__init__`. The input can be
+        altered to do things like add additional extern functions.
+
+        Args:
+            input: Input to this method that contains mutable properties that
+                can be altered by this interceptor.
 
         Returns:
             The class to construct to intercept each workflow.
         """
         return None
+
+
+@dataclass(frozen=True)
+class WorkflowInterceptorClassInput:
+    """Input for :py:meth:`Interceptor.workflow_interceptor_class`."""
+
+    unsafe_extern_functions: MutableMapping[str, Callable]
+    """Set of external functions that can be called from the sandbox.
+
+    .. warning::
+        Exposing external functions to the workflow sandbox is dangerous and
+        should be avoided. Use at your own risk.
+
+    .. warning::
+        This API is experimental and subject to removal.
+    """
 
 
 @dataclass
@@ -61,6 +86,7 @@ class ExecuteActivityInput:
     fn: Callable[..., Any]
     args: Iterable[Any]
     executor: Optional[concurrent.futures.Executor]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     _cancelled_event: temporalio.activity._CompositeEvent
 
 
@@ -127,6 +153,7 @@ class ContinueAsNewInput:
     task_timeout: Optional[timedelta]
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
 
@@ -139,22 +166,16 @@ class ExecuteWorkflowInput:
     # Note, this is an unbound method
     run_fn: Callable[..., Awaitable[Any]]
     args: Iterable[Any]
-
-
-@dataclass
-class GetExternalWorkflowHandleInput:
-    """Input for :py:meth:`WorkflowOutboundInterceptor.get_external_workflow_handle`."""
-
-    id: str
-    run_id: Optional[str]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass
 class HandleSignalInput:
     """Input for :py:meth:`WorkflowInboundInterceptor.handle_signal`."""
 
-    name: str
+    signal: str
     args: Iterable[Any]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass
@@ -162,8 +183,31 @@ class HandleQueryInput:
     """Input for :py:meth:`WorkflowInboundInterceptor.handle_query`."""
 
     id: str
-    name: str
+    query: str
     args: Iterable[Any]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
+
+
+@dataclass
+class SignalChildWorkflowInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.signal_child_workflow`."""
+
+    signal: str
+    args: Iterable[Any]
+    child_workflow_id: str
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
+
+
+@dataclass
+class SignalExternalWorkflowInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.signal_external_workflow`."""
+
+    signal: str
+    args: Iterable[Any]
+    namespace: str
+    workflow_id: str
+    workflow_run_id: Optional[str]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass
@@ -180,6 +224,7 @@ class StartActivityInput:
     heartbeat_timeout: Optional[timedelta]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cancellation_type: temporalio.workflow.ActivityCancellationType
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
@@ -204,6 +249,7 @@ class StartChildWorkflowInput:
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
@@ -222,6 +268,7 @@ class StartLocalActivityInput:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     local_retry_threshold: Optional[timedelta]
     cancellation_type: temporalio.workflow.ActivityCancellationType
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
@@ -283,18 +330,23 @@ class WorkflowOutboundInterceptor:
         """Called for every :py:func:`temporalio.workflow.continue_as_new` call."""
         self.next.continue_as_new(input)
 
-    def get_external_workflow_handle(
-        self, input: GetExternalWorkflowHandleInput
-    ) -> temporalio.workflow.ExternalWorkflowHandle:
-        """Called for every
-        :py:func:`temporalio.workflow.get_external_workflow_handle` and
-        :py:func:`temporalio.workflow.get_external_workflow_handle_for` call.
-        """
-        return self.next.get_external_workflow_handle(input)
-
     def info(self) -> temporalio.workflow.Info:
         """Called for every :py:func:`temporalio.workflow.info` call."""
         return self.next.info()
+
+    async def signal_child_workflow(self, input: SignalChildWorkflowInput) -> None:
+        """Called for every
+        :py:meth:`temporalio.workflow.ChildWorkflowHandle.signal` call.
+        """
+        return await self.next.signal_child_workflow(input)
+
+    async def signal_external_workflow(
+        self, input: SignalExternalWorkflowInput
+    ) -> None:
+        """Called for every
+        :py:meth:`temporalio.workflow.ExternalWorkflowHandle.signal` call.
+        """
+        return await self.next.signal_external_workflow(input)
 
     def start_activity(
         self, input: StartActivityInput

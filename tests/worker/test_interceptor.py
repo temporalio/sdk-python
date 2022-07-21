@@ -11,15 +11,17 @@ from temporalio.worker import (
     ContinueAsNewInput,
     ExecuteActivityInput,
     ExecuteWorkflowInput,
-    GetExternalWorkflowHandleInput,
     HandleQueryInput,
     HandleSignalInput,
     Interceptor,
+    SignalChildWorkflowInput,
+    SignalExternalWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
     Worker,
     WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
 
@@ -32,7 +34,9 @@ class TracingWorkerInterceptor(Interceptor):
     ) -> ActivityInboundInterceptor:
         return TracingActivityInboundInterceptor(super().intercept_activity(next))
 
-    def workflow_interceptor_class(self) -> Optional[Type[WorkflowInboundInterceptor]]:
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> Optional[Type[WorkflowInboundInterceptor]]:
         return TracingWorkflowInboundInterceptor
 
 
@@ -77,15 +81,19 @@ class TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         interceptor_traces.append(("workflow.continue_as_new", input))
         super().continue_as_new(input)
 
-    def get_external_workflow_handle(
-        self, input: GetExternalWorkflowHandleInput
-    ) -> workflow.ExternalWorkflowHandle:
-        interceptor_traces.append(("workflow.get_external_workflow_handle", input))
-        return super().get_external_workflow_handle(input)
-
     def info(self) -> workflow.Info:
         interceptor_traces.append(("workflow.info", super().info()))
         return super().info()
+
+    async def signal_child_workflow(self, input: SignalChildWorkflowInput) -> None:
+        interceptor_traces.append(("workflow.signal_child_workflow", input))
+        await super().signal_child_workflow(input)
+
+    async def signal_external_workflow(
+        self, input: SignalExternalWorkflowInput
+    ) -> None:
+        interceptor_traces.append(("workflow.signal_external_workflow", input))
+        await super().signal_external_workflow(input)
 
     def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle:
         interceptor_traces.append(("workflow.start_activity", input))
@@ -117,21 +125,36 @@ class InterceptedWorkflow:
         self.finish = asyncio.Event()
 
     @workflow.run
-    async def run(self, initial_run: bool) -> None:
-        if not initial_run:
+    async def run(self, style: str) -> None:
+        if style == "continue-as-new":
             return
+        if style == "child" or style == "external":
+            await self.finish.wait()
+            return
+
         await workflow.execute_activity(
             intercepted_activity, "val1", schedule_to_close_timeout=timedelta(seconds=5)
         )
         await workflow.execute_local_activity(
             intercepted_activity, "val2", schedule_to_close_timeout=timedelta(seconds=5)
         )
-        await workflow.execute_child_workflow(
-            InterceptedWorkflow.run, False, id=f"{workflow.info().workflow_id}_child"
+        my_id = workflow.info().workflow_id
+        child_handle = await workflow.start_child_workflow(
+            InterceptedWorkflow.run, "child", id=f"{my_id}_child"
         )
-        workflow.get_external_workflow_handle("some-id")
+        await child_handle.signal(InterceptedWorkflow.signal, "child-signal-val")
+        await child_handle
+        # Create another child so we can use it for external handle
+        child_handle = await workflow.start_child_workflow(
+            InterceptedWorkflow.run, "external", id=f"{my_id}_external"
+        )
+        await workflow.get_external_workflow_handle(child_handle.id).signal(
+            InterceptedWorkflow.signal, "external-signal-val"
+        )
+        await child_handle
+
         await self.finish.wait()
-        workflow.continue_as_new(False)
+        workflow.continue_as_new("continue-as-new")
 
     @workflow.query
     def query(self, param: str) -> str:
@@ -154,7 +177,7 @@ async def test_worker_interceptor(client: Client):
         # Run workflow
         handle = await client.start_workflow(
             InterceptedWorkflow.run,
-            True,
+            "initial",
             id=f"workflow_{uuid.uuid4()}",
             task_queue=task_queue,
         )
@@ -187,19 +210,33 @@ async def test_worker_interceptor(client: Client):
             activity_infos += 1
         assert activity_infos >= 2
         assert pop_trace("activity.heartbeat", lambda v: v[0] == "details")
-        # One initial, one child, one continue as new
-        assert pop_trace("workflow.execute", lambda v: v.args[0] is True)
-        assert pop_trace("workflow.execute", lambda v: v.args[0] is False)
-        assert pop_trace("workflow.execute", lambda v: v.args[0] is False)
+        # One initial, one child, one external, one continue as new
+        assert pop_trace("workflow.execute", lambda v: v.args[0] == "initial")
+        assert pop_trace("workflow.execute", lambda v: v.args[0] == "child")
+        assert pop_trace("workflow.execute", lambda v: v.args[0] == "external")
+        assert pop_trace("workflow.execute", lambda v: v.args[0] == "continue-as-new")
         assert pop_trace("workflow.signal", lambda v: v.args[0] == "signal-val")
         assert pop_trace("workflow.query", lambda v: v.args[0] == "query-val")
-        assert pop_trace("workflow.continue_as_new", lambda v: v.args[0] is False)
-        assert pop_trace(
-            "workflow.get_external_workflow_handle", lambda v: v.id == "some-id"
-        )
+        assert pop_trace("workflow.continue_as_new")
         assert pop_trace("workflow.info")
         assert pop_trace("workflow.start_activity", lambda v: v.args[0] == "val1")
-        assert pop_trace("workflow.start_child_workflow", lambda v: v.args[0] is False)
         assert pop_trace("workflow.start_local_activity", lambda v: v.args[0] == "val2")
+        assert pop_trace(
+            "workflow.start_child_workflow", lambda v: v.args[0] == "child"
+        )
+        assert pop_trace(
+            "workflow.signal_child_workflow", lambda v: v.args[0] == "child-signal-val"
+        )
+        assert pop_trace("workflow.signal", lambda v: v.args[0] == "child-signal-val")
+        assert pop_trace(
+            "workflow.start_child_workflow", lambda v: v.args[0] == "external"
+        )
+        assert pop_trace(
+            "workflow.signal_external_workflow",
+            lambda v: v.args[0] == "external-signal-val",
+        )
+        assert pop_trace(
+            "workflow.signal", lambda v: v.args[0] == "external-signal-val"
+        )
         # Confirm no unexpected traces
         assert not interceptor_traces

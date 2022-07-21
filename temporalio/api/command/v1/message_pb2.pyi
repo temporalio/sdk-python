@@ -21,7 +21,6 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
-    NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -34,7 +33,6 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     activity_id: typing.Text
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
-    namespace: typing.Text
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     @property
@@ -98,7 +96,6 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         activity_type: typing.Optional[
             temporalio.api.common.v1.message_pb2.ActivityType
         ] = ...,
-        namespace: typing.Text = ...,
         task_queue: typing.Optional[
             temporalio.api.taskqueue.v1.message_pb2.TaskQueue
         ] = ...,
@@ -155,8 +152,6 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "input",
             b"input",
-            "namespace",
-            b"namespace",
             "request_eager_execution",
             b"request_eager_execution",
             "retry_policy",

@@ -582,6 +582,18 @@ cancellation of all outstanding activities.
 The `shutdown()` invocation will wait on all activities to complete, so if a long-running activity does not at least
 respect cancellation, the shutdown may never complete.
 
+### OpenTelemetry Support
+
+OpenTelemetry support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra.
+When using `pip`, running
+
+    pip install temporalio[opentelemetry]
+
+will install needed dependencies. Then the `temporalio.contrib.opentelemetry.TracingInterceptor` can be created and set
+as an interceptor on the `interceptors` argument of `Client.connect`. When set, spans will be created for all client
+calls and for all activity and workflow invocations on the worker, spans will be created and properly serialized through
+the server to give one proper trace for a workflow execution.
+
 ## Development
 
 The Python SDK is built to work with Python 3.7 and newer. It is built using

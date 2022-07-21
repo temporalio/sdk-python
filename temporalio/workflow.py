@@ -8,7 +8,7 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from functools import partial
 from random import Random
@@ -34,6 +34,7 @@ from typing import (
 
 from typing_extensions import Concatenate, Literal, TypedDict
 
+import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.workflow_commands
 import temporalio.common
@@ -272,6 +273,7 @@ class Info:
     continued_run_id: Optional[str]
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
     retry_policy: Optional[temporalio.common.RetryPolicy]
@@ -360,6 +362,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_extern_functions(self) -> Mapping[str, Callable]:
+        ...
+
+    @abstractmethod
     def workflow_get_current_history_length(self) -> int:
         ...
 
@@ -383,10 +389,6 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_replaying(self) -> bool:
-        ...
-
-    @abstractmethod
-    def workflow_now(self) -> datetime:
         ...
 
     @abstractmethod
@@ -462,6 +464,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_time_ns(self) -> int:
+        ...
+
+    @abstractmethod
     def workflow_upsert_search_attributes(
         self, attributes: temporalio.common.SearchAttributes
     ) -> None:
@@ -488,6 +494,16 @@ def deprecate_patch(id: str) -> None:
     _Runtime.current().workflow_patch(id, deprecated=True)
 
 
+def extern_functions() -> Mapping[str, Callable]:
+    """External functions available in the workflow sandbox.
+
+    Returns:
+        Mapping of external functions that can be called from inside a workflow
+        sandbox.
+    """
+    return _Runtime.current().workflow_extern_functions()
+
+
 def info() -> Info:
     """Current workflow's info.
 
@@ -500,10 +516,14 @@ def info() -> Info:
 def now() -> datetime:
     """Current time from the workflow perspective.
 
+    This is the workflow equivalent of :py:func:`datetime.now` with the
+    :py:attr:`timezone.utc` parameter.
+
     Returns:
-        UTC datetime for the current workflow time
+        UTC datetime for the current workflow time. The datetime does have UTC
+        set as the time zone.
     """
-    return _Runtime.current().workflow_now()
+    return datetime.fromtimestamp(time(), timezone.utc)
 
 
 def patched(id: str) -> bool:
@@ -537,6 +557,28 @@ def random() -> Random:
         The deterministically-seeded pseudo-random number generator.
     """
     return _Runtime.current().workflow_random()
+
+
+def time() -> float:
+    """Current seconds since the epoch from the workflow perspective.
+
+    This is the workflow equivalent of :py:func:`time.time`.
+
+    Returns:
+        Seconds since the epoch as a float.
+    """
+    return time_ns() / 1e9
+
+
+def time_ns() -> int:
+    """Current nanoseconds since the epoch from the workflow perspective.
+
+    This is the workflow equivalent of :py:func:`time.time_ns`.
+
+    Returns:
+        Nanoseconds since the epoch
+    """
+    return _Runtime.current().workflow_time_ns()
 
 
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:

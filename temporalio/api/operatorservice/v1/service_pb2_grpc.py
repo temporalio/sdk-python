@@ -41,6 +41,36 @@ class OperatorServiceStub(object):
             request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceResponse.FromString,
         )
+        self.DeleteWorkflowExecution = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/DeleteWorkflowExecution",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionResponse.FromString,
+        )
+        self.AddOrUpdateRemoteCluster = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/AddOrUpdateRemoteCluster",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.AddOrUpdateRemoteClusterRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.AddOrUpdateRemoteClusterResponse.FromString,
+        )
+        self.RemoveRemoteCluster = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/RemoveRemoteCluster",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RemoveRemoteClusterRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RemoveRemoteClusterResponse.FromString,
+        )
+        self.DescribeCluster = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/DescribeCluster",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeClusterRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeClusterResponse.FromString,
+        )
+        self.ListClusters = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/ListClusters",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClustersRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClustersResponse.FromString,
+        )
+        self.ListClusterMembers = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/ListClusterMembers",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClusterMembersRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClusterMembersResponse.FromString,
+        )
 
 
 class OperatorServiceServicer(object):
@@ -87,6 +117,48 @@ class OperatorServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def DeleteWorkflowExecution(self, request, context):
+        """DeleteWorkflowExecution deletes a closed workflow execution asynchronously (workflow must be completed or terminated before).
+        This method is EXPERIMENTAL and may be changed or removed in a later release.
+        (-- api-linter: core::0135::method-signature=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0135::response-message-name=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def AddOrUpdateRemoteCluster(self, request, context):
+        """AddOrUpdateRemoteCluster adds or updates remote cluster."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def RemoveRemoteCluster(self, request, context):
+        """RemoveRemoteCluster removes remote cluster."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeCluster(self, request, context):
+        """DescribeCluster returns information about Temporal cluster."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListClusters(self, request, context):
+        """ListClusters returns information about Temporal clusters."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListClusterMembers(self, request, context):
+        """ListClusterMembers returns information about Temporal cluster members."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_OperatorServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -109,6 +181,36 @@ def add_OperatorServiceServicer_to_server(servicer, server):
             servicer.DeleteNamespace,
             request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRequest.FromString,
             response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceResponse.SerializeToString,
+        ),
+        "DeleteWorkflowExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteWorkflowExecution,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionResponse.SerializeToString,
+        ),
+        "AddOrUpdateRemoteCluster": grpc.unary_unary_rpc_method_handler(
+            servicer.AddOrUpdateRemoteCluster,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.AddOrUpdateRemoteClusterRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.AddOrUpdateRemoteClusterResponse.SerializeToString,
+        ),
+        "RemoveRemoteCluster": grpc.unary_unary_rpc_method_handler(
+            servicer.RemoveRemoteCluster,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RemoveRemoteClusterRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RemoveRemoteClusterResponse.SerializeToString,
+        ),
+        "DescribeCluster": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeCluster,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeClusterRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeClusterResponse.SerializeToString,
+        ),
+        "ListClusters": grpc.unary_unary_rpc_method_handler(
+            servicer.ListClusters,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClustersRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClustersResponse.SerializeToString,
+        ),
+        "ListClusterMembers": grpc.unary_unary_rpc_method_handler(
+            servicer.ListClusterMembers,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClusterMembersRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClusterMembersResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -232,6 +334,180 @@ class OperatorService(object):
             "/temporal.api.operatorservice.v1.OperatorService/DeleteNamespace",
             temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRequest.SerializeToString,
             temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteWorkflowExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/DeleteWorkflowExecution",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def AddOrUpdateRemoteCluster(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/AddOrUpdateRemoteCluster",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.AddOrUpdateRemoteClusterRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.AddOrUpdateRemoteClusterResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def RemoveRemoteCluster(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/RemoveRemoteCluster",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RemoveRemoteClusterRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RemoveRemoteClusterResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeCluster(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/DescribeCluster",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeClusterRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeClusterResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListClusters(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/ListClusters",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClustersRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClustersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListClusterMembers(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/ListClusterMembers",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClusterMembersRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.ListClusterMembersResponse.FromString,
             options,
             channel_credentials,
             insecure,

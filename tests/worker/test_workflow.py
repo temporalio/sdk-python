@@ -29,6 +29,7 @@ from typing import (
 
 import grpc
 import pytest
+from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Protocol, runtime_checkable
 
 from temporalio import activity, workflow
@@ -381,6 +382,8 @@ class AsyncUtilWorkflow:
         ret = {
             # "now" timestamp and current event loop monotonic time
             "start": str(workflow.now()),
+            "start_time": workflow.time(),
+            "start_time_ns": workflow.time_ns(),
             "event_loop_start": asyncio.get_running_loop().time(),
         }
 
@@ -398,8 +401,7 @@ class AsyncUtilWorkflow:
 
         # Record completion times
         self._status = "done"
-        ret["end"] = str(workflow.now())
-        ret["event_loop_end"] = asyncio.get_running_loop().time()
+        ret["end_time_ns"] = workflow.time_ns()
         return ret
 
     @workflow.signal
@@ -438,13 +440,37 @@ async def test_workflow_async_utils(client: Client):
         result = await handle.result()
         assert "done" == await status()
 
-        # Check the result
-        assert datetime.fromisoformat(result["start"]) <= datetime.fromisoformat(
-            result["end"]
+        # Get the actual start time out of history
+        resp = await client.service.get_workflow_execution_history(
+            GetWorkflowExecutionHistoryRequest(
+                namespace=client.namespace,
+                execution=WorkflowExecution(workflow_id=handle.id),
+            )
         )
-        assert isinstance(result["event_loop_start"], float)
-        assert isinstance(result["event_loop_end"], float)
-        assert result["event_loop_start"] <= result["event_loop_end"]
+        first_timestamp: Optional[Timestamp] = None
+        last_timestamp: Optional[Timestamp] = None
+        for event in resp.history.events:
+            # Get timestamp from first workflow task started
+            if event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED:
+                if not first_timestamp:
+                    first_timestamp = event.event_time
+                last_timestamp = event.event_time
+        assert first_timestamp and last_timestamp
+
+        # Check the times. We have to ignore type here because typeshed has
+        # wrong type for Protobuf ToDatetime.
+        first_timestamp_datetime = first_timestamp.ToDatetime(tzinfo=timezone.utc)  # type: ignore
+        # We take off subsecond because Protobuf rounds nanos
+        # differently than we do (they round toward zero, we use
+        # utcfromtimestamp which suffers float precision issues).
+        assert datetime.fromisoformat(result["start"]).replace(
+            microsecond=0
+        ) == first_timestamp_datetime.replace(microsecond=0)
+        assert result["start_time"] == first_timestamp.ToNanoseconds() / 1e9
+        assert result["start_time_ns"] == first_timestamp.ToNanoseconds()
+        assert result["event_loop_start"] == result["start_time"]
+        assert result["start_time_ns"] < result["end_time_ns"]
+        assert result["end_time_ns"] == last_timestamp.ToNanoseconds()
 
 
 @activity.defn

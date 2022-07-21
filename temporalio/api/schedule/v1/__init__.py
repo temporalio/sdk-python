@@ -1,0 +1,33 @@
+from .message_pb2 import (
+    BackfillRequest,
+    CalendarSpec,
+    IntervalSpec,
+    Schedule,
+    ScheduleAction,
+    ScheduleActionResult,
+    ScheduleInfo,
+    ScheduleListEntry,
+    ScheduleListInfo,
+    SchedulePatch,
+    SchedulePolicies,
+    ScheduleSpec,
+    ScheduleState,
+    TriggerImmediatelyRequest,
+)
+
+__all__ = [
+    "BackfillRequest",
+    "CalendarSpec",
+    "IntervalSpec",
+    "Schedule",
+    "ScheduleAction",
+    "ScheduleActionResult",
+    "ScheduleInfo",
+    "ScheduleListEntry",
+    "ScheduleListInfo",
+    "SchedulePatch",
+    "SchedulePolicies",
+    "ScheduleSpec",
+    "ScheduleState",
+    "TriggerImmediatelyRequest",
+]

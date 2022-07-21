@@ -28,7 +28,6 @@ pub struct ClientConfig {
     client_version: String,
     static_headers: HashMap<String, String>,
     identity: String,
-    worker_binary_id: String,
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
 }
@@ -96,8 +95,15 @@ impl ClientRef {
                 "count_workflow_executions" => {
                     rpc_call!(retry_client, retry, count_workflow_executions, req)
                 }
+                "create_schedule" => {
+                    rpc_call!(retry_client, retry, create_schedule, req)
+                }
+                "delete_schedule" => {
+                    rpc_call!(retry_client, retry, delete_schedule, req)
+                }
                 "deprecate_namespace" => rpc_call!(retry_client, retry, deprecate_namespace, req),
                 "describe_namespace" => rpc_call!(retry_client, retry, describe_namespace, req),
+                "describe_schedule" => rpc_call!(retry_client, retry, describe_schedule, req),
                 "describe_task_queue" => rpc_call!(retry_client, retry, describe_task_queue, req),
                 "describe_workflow_execution" => {
                     rpc_call!(retry_client, retry, describe_workflow_execution, req)
@@ -110,10 +116,14 @@ impl ClientRef {
                 "get_workflow_execution_history" => {
                     rpc_call!(retry_client, retry, get_workflow_execution_history, req)
                 }
-                // TODO(cretz): Fix when https://github.com/temporalio/sdk-core/issues/335 fixed
-                // "get_workflow_execution_history_reverse" => {
-                //     rpc_call!(retry_client, retry, get_workflow_execution_history_reverse, req)
-                // }
+                "get_workflow_execution_history_reverse" => {
+                    rpc_call!(
+                        retry_client,
+                        retry,
+                        get_workflow_execution_history_reverse,
+                        req
+                    )
+                }
                 "list_archived_workflow_executions" => {
                     rpc_call!(retry_client, retry, list_archived_workflow_executions, req)
                 }
@@ -124,11 +134,20 @@ impl ClientRef {
                 "list_open_workflow_executions" => {
                     rpc_call!(retry_client, retry, list_open_workflow_executions, req)
                 }
+                "list_schedule_matching_times" => {
+                    rpc_call!(retry_client, retry, list_schedule_matching_times, req)
+                }
+                "list_schedules" => {
+                    rpc_call!(retry_client, retry, list_schedules, req)
+                }
                 "list_task_queue_partitions" => {
                     rpc_call!(retry_client, retry, list_task_queue_partitions, req)
                 }
                 "list_workflow_executions" => {
                     rpc_call!(retry_client, retry, list_workflow_executions, req)
+                }
+                "patch_schedule" => {
+                    rpc_call!(retry_client, retry, patch_schedule, req)
                 }
                 "poll_activity_task_queue" => {
                     rpc_call!(retry_client, retry, poll_activity_task_queue, req)
@@ -208,6 +227,7 @@ impl ClientRef {
                     rpc_call!(retry_client, retry, terminate_workflow_execution, req)
                 }
                 "update_namespace" => rpc_call!(retry_client, retry, update_namespace, req),
+                "update_schedule" => rpc_call!(retry_client, retry, update_schedule, req),
                 _ => return Err(PyValueError::new_err(format!("Unknown RPC call {}", rpc))),
             }?;
             let bytes: &[u8] = &bytes;
@@ -254,7 +274,6 @@ impl TryFrom<ClientConfig> for ClientOptions {
             .client_name(opts.client_name)
             .client_version(opts.client_version)
             .identity(opts.identity)
-            .worker_binary_id(opts.worker_binary_id)
             .retry_config(
                 opts.retry_config
                     .map_or(RetryConfig::default(), |c| c.into()),

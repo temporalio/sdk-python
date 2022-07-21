@@ -5,7 +5,8 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import json
-import sys
+import types
+import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -680,10 +681,9 @@ def decode_search_attributes(
 
 
 class _FunctionTypeLookup:
-    def __init__(self, type_hint_eval_str: bool) -> None:
+    def __init__(self) -> None:
         # Keyed by callable __qualname__, value is optional arg types and
         # optional ret type
-        self._type_hint_eval_str = type_hint_eval_str
         self._cache: Dict[str, Tuple[Optional[List[Type]], Optional[Type]]] = {}
 
     def get_type_hints(self, fn: Any) -> Tuple[Optional[List[Type]], Optional[Type]]:
@@ -699,20 +699,28 @@ class _FunctionTypeLookup:
             if ret:
                 return ret
         # TODO(cretz): Do we even need to cache?
-        ret = _type_hints_from_func(fn, eval_str=self._type_hint_eval_str)
+        ret = _type_hints_from_func(fn)
         if cache_key:
             self._cache[cache_key] = ret
         return ret
 
 
+# Same as inspect._NonUserDefinedCallables
+_non_user_defined_callables = (
+    type(type.__call__),
+    type(all.__call__),  # type: ignore
+    type(int.__dict__["from_bytes"]),
+    types.BuiltinFunctionType,
+)
+
+
 def _type_hints_from_func(
-    func: Callable, *, eval_str: bool
+    func: Callable,
 ) -> Tuple[Optional[List[Type]], Optional[Type]]:
     """Extracts the type hints from the function.
 
     Args:
         func: Function to extract hints from.
-        eval_str: Whether to use ``eval_str`` (only supported on Python >= 3.10)
 
     Returns:
         Tuple containing parameter types and return type. The parameter types
@@ -720,17 +728,36 @@ def _type_hints_from_func(
         parameters to not have an annotation that represents a class. If the
         first parameter is "self" with no attribute, it is not included.
     """
-    # eval_str only supported on >= 3.10
-    if sys.version_info >= (3, 10):
-        sig = inspect.signature(func, eval_str=eval_str)
-    else:
-        sig = inspect.signature(func)
-    ret: Optional[Type] = None
-    if inspect.isclass(sig.return_annotation):
-        ret = sig.return_annotation
+    # If this is a class instance with user-defined __call__, then use that as
+    # the func. This mimics inspect logic inside Python.
+    if (
+        not inspect.isfunction(func)
+        and not isinstance(func, type)
+        and not isinstance(func, _non_user_defined_callables)
+        and not isinstance(func, types.MethodType)
+    ):
+        # Callable instance
+        call_func = getattr(type(func), "__call__", None)
+        if call_func is not None and not isinstance(
+            type(func), _non_user_defined_callables
+        ):
+            func = call_func
+    # We use inspect.signature for the parameter names and kinds, but we cannot
+    # use it for annotations because those that are using deferred hinting (i.e.
+    # from __future__ import annotations) only work with the eval_str parameter
+    # which is only supported in >= 3.10. But typing.get_type_hints is supported
+    # in >= 3.7.
+    sig = inspect.signature(func)
+    hints = typing.get_type_hints(func)
+    ret_hint = hints.get("return")
+    ret = (
+        ret_hint
+        if inspect.isclass(ret_hint) and ret_hint is not inspect.Signature.empty
+        else None
+    )
     args: List[Type] = []
     for index, value in enumerate(sig.parameters.values()):
-        # Ignore self
+        # Ignore self on methods
         if (
             index == 0
             and value.name == "self"
@@ -743,7 +770,9 @@ def _type_hints_from_func(
             and value.kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD
         ):
             return (None, ret)
-        if not inspect.isclass(value.annotation):
+        # All params must have annotations or we consider none to have them
+        arg_hint = hints.get(value.name)
+        if not inspect.isclass(arg_hint) or arg_hint is inspect.Parameter.empty:
             return (None, ret)
-        args.append(value.annotation)
+        args.append(arg_hint)
     return args, ret

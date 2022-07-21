@@ -251,9 +251,9 @@ class WorkflowServiceStub:
     """RequestCancelWorkflowExecution is called by workers when they want to request cancellation of
     a workflow execution.
 
-    This result in a new `WORKFLOW_EXECUTION_CANCEL_REQUESTED` event being written to the
-    workflow history and a new workflow task created for the workflow. Fails with `NotFound` if
-    the workflow is already completed or doesn't exist.
+    This results in a new `WORKFLOW_EXECUTION_CANCEL_REQUESTED` event being written to the
+    workflow history and a new workflow task created for the workflow. It returns success if the requested
+    workflow is already closed. It fails with 'NotFound' if the requested workflow doesn't exist.
     """
 
     SignalWorkflowExecution: grpc.UnaryUnaryMultiCallable[
@@ -403,6 +403,68 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
     ]
+
+    CreateSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
+    ]
+    """Creates a new schedule.
+    (-- api-linter: core::0133::method-signature=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+    (-- api-linter: core::0133::response-message-name=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+    (-- api-linter: core::0133::http-uri-parent=disabled
+        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+    """
+
+    DescribeSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
+    ]
+    """Returns the schedule description and current state of an existing schedule."""
+
+    UpdateSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
+    ]
+    """Changes the configuration or state of an existing schedule.
+    (-- api-linter: core::0134::response-message-name=disabled
+        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
+    (-- api-linter: core::0134::method-signature=disabled
+        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
+    """
+
+    PatchSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
+    ]
+    """Makes a specific change to a schedule or triggers an immediate action.
+    (-- api-linter: core::0134::synonyms=disabled
+        aip.dev/not-precedent: we have both patch and update. --)
+    """
+
+    ListScheduleMatchingTimes: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
+    ]
+    """Lists matching times within a range."""
+
+    DeleteSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
+    ]
+    """Deletes a schedule, removing it from the system.
+    (-- api-linter: core::0135::method-signature=disabled
+        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+    (-- api-linter: core::0135::response-message-name=disabled
+        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+    """
+
+    ListSchedules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
+    ]
+    """List all schedules in a namespace."""
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -690,9 +752,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         """RequestCancelWorkflowExecution is called by workers when they want to request cancellation of
         a workflow execution.
 
-        This result in a new `WORKFLOW_EXECUTION_CANCEL_REQUESTED` event being written to the
-        workflow history and a new workflow task created for the workflow. Fails with `NotFound` if
-        the workflow is already completed or doesn't exist.
+        This results in a new `WORKFLOW_EXECUTION_CANCEL_REQUESTED` event being written to the
+        workflow history and a new workflow task created for the workflow. It returns success if the requested
+        workflow is already closed. It fails with 'NotFound' if the requested workflow doesn't exist.
         """
         pass
     @abc.abstractmethod
@@ -880,6 +942,82 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse: ...
+    @abc.abstractmethod
+    def CreateSchedule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse:
+        """Creates a new schedule.
+        (-- api-linter: core::0133::method-signature=disabled
+            aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+        (-- api-linter: core::0133::response-message-name=disabled
+            aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+        (-- api-linter: core::0133::http-uri-parent=disabled
+            aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
+        """
+        pass
+    @abc.abstractmethod
+    def DescribeSchedule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse:
+        """Returns the schedule description and current state of an existing schedule."""
+        pass
+    @abc.abstractmethod
+    def UpdateSchedule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse:
+        """Changes the configuration or state of an existing schedule.
+        (-- api-linter: core::0134::response-message-name=disabled
+            aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0134::method-signature=disabled
+            aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
+        """
+        pass
+    @abc.abstractmethod
+    def PatchSchedule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse:
+        """Makes a specific change to a schedule or triggers an immediate action.
+        (-- api-linter: core::0134::synonyms=disabled
+            aip.dev/not-precedent: we have both patch and update. --)
+        """
+        pass
+    @abc.abstractmethod
+    def ListScheduleMatchingTimes(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse:
+        """Lists matching times within a range."""
+        pass
+    @abc.abstractmethod
+    def DeleteSchedule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse:
+        """Deletes a schedule, removing it from the system.
+        (-- api-linter: core::0135::method-signature=disabled
+            aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+        (-- api-linter: core::0135::response-message-name=disabled
+            aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
+        """
+        pass
+    @abc.abstractmethod
+    def ListSchedules(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse:
+        """List all schedules in a namespace."""
+        pass
 
 def add_WorkflowServiceServicer_to_server(
     servicer: WorkflowServiceServicer, server: grpc.Server

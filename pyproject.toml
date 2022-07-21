@@ -27,6 +27,8 @@ script = "build.py"
 [tool.poetry.dependencies]
 dacite = "^1.6.0"
 grpcio = "^1.47.0"
+opentelemetry-api = { version = "^1.11.1", optional = true }
+opentelemetry-sdk = { version = "^1.11.1", optional = true }
 protobuf = "^3.20.1"
 python = "^3.7"
 types-protobuf = "^3.19.21"
@@ -51,6 +53,9 @@ setuptools-rust = "^1.3.0"
 toml = "^0.10.2"
 twine = "^4.0.1"
 
+[tool.poetry.extras]
+opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
+
 [tool.poe.tasks]
 build-develop = ["build-bridge-develop"]
 build-bridge-develop = "python scripts/setup_bridge.py develop"
@@ -67,7 +72,7 @@ lint = [
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "pydocstyle --ignore-decorators=overload"
-lint-types = "mypy ."
+lint-types = "mypy --namespace-packages ."
 test = "pytest"
 
 # Install local, run single pytest with env var, uninstall local
@@ -133,7 +138,11 @@ add_ignore = [
 add-package = ["temporalio"]
 docformat = "google"
 html-output = "build/apidocs"
-intersphinx = ["https://docs.python.org/3/objects.inv", "https://googleapis.dev/python/protobuf/latest/objects.inv"]
+intersphinx = [
+  "https://docs.python.org/3/objects.inv",
+  "https://googleapis.dev/python/protobuf/latest/objects.inv",
+  "https://opentelemetry-python.readthedocs.io/en/latest/objects.inv",
+]
 privacy = [
   "PRIVATE:temporalio.bridge",
   "PRIVATE:temporalio.types",

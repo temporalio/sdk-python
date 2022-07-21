@@ -13,9 +13,9 @@ import temporalio.bridge.temporal_sdk_bridge
 class TelemetryConfig:
     """Python representation of the Rust struct for configuring telemetry."""
 
-    tracing_filter: Optional[str] = None
+    tracing_filter: Optional[str] = "temporal_sdk_core=WARN"
     otel_tracing: Optional[OtelCollectorConfig] = None
-    log_console: bool = False
+    log_console: bool = True
     log_forwarding_level: Optional[str] = None
     otel_metrics: Optional[OtelCollectorConfig] = None
     prometheus_metrics: Optional[PrometheusMetricsConfig] = None

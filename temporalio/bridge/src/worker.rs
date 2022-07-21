@@ -23,6 +23,8 @@ pub struct WorkerRef {
 pub struct WorkerConfig {
     namespace: String,
     task_queue: String,
+    build_id: String,
+    identity_override: Option<String>,
     max_cached_workflows: usize,
     max_outstanding_workflow_tasks: usize,
     max_outstanding_activities: usize,
@@ -159,6 +161,8 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
         temporal_sdk_core::WorkerConfigBuilder::default()
             .namespace(conf.namespace)
             .task_queue(conf.task_queue)
+            .worker_build_id(conf.build_id)
+            .client_identity_override(conf.identity_override)
             .max_cached_workflows(conf.max_cached_workflows)
             .max_outstanding_workflow_tasks(conf.max_outstanding_workflow_tasks)
             .max_outstanding_activities(conf.max_outstanding_activities)

@@ -71,12 +71,10 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
-        type_hint_eval_str: bool = True,
         tls_config: Optional[TLSConfig] = None,
         retry_config: Optional[RetryConfig] = None,
         static_headers: Mapping[str, str] = {},
         identity: Optional[str] = None,
-        worker_binary_id: Optional[str] = None,
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -98,10 +96,6 @@ class Client:
                 condition for workflow queries if not set during query. See
                 :py:meth:`WorkflowHandle.query` for details on the rejection
                 condition.
-            type_hint_eval_str: Whether the type hinting that is used to
-                determine dataclass parameters for decoding uses evaluation on
-                stringified annotations. This corresponds to the eval_str
-                parameter on :py:meth:`inspect.get_annotations`.
             tls_config: TLS configuration for connecting to the server. If unset
                 no TLS connection will be used.
             retry_config: Retry configuration for direct service calls (when
@@ -111,9 +105,6 @@ class Client:
             static_headers: Static headers to use for all calls to the server.
             identity: Identity for this client. If unset, a default is created
                 based on the version of the SDK.
-            worker_binary_id: Unique identifier for the current runtime. This is
-                best set as a hash of all code and should change only when code
-                does. If unset, a best-effort identifier is generated.
         """
         connect_config = temporalio.workflow_service.ConnectConfig(
             target_url=target_url,
@@ -121,7 +112,6 @@ class Client:
             retry_config=retry_config,
             static_headers=static_headers,
             identity=identity or "",
-            worker_binary_id=worker_binary_id or "",
         )
         return Client(
             await temporalio.workflow_service.WorkflowService.connect(connect_config),
@@ -129,7 +119,6 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
-            type_hint_eval_str=type_hint_eval_str,
         )
 
     def __init__(
@@ -144,13 +133,12 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
-        type_hint_eval_str: bool = True,
     ):
         """Create a Temporal client from a workflow service.
 
         See :py:meth:`connect` for details on the parameters.
         """
-        self._type_lookup = temporalio.converter._FunctionTypeLookup(type_hint_eval_str)
+        self._type_lookup = temporalio.converter._FunctionTypeLookup()
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
         for interceptor in reversed(list(interceptors)):
@@ -168,7 +156,6 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
-            type_hint_eval_str=type_hint_eval_str,
         )
 
     def config(self) -> ClientConfig:
@@ -216,7 +203,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -239,7 +225,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -264,7 +249,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -288,7 +272,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> WorkflowHandle[Any, Any]:
@@ -310,7 +293,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> WorkflowHandle[Any, Any]:
@@ -332,7 +314,6 @@ class Client:
             cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
             memo: Memo for the workflow.
             search_attributes: Search attributes for the workflow.
-            header: Header for the workflow.
             start_signal: If present, this signal is sent as signal-with-start
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
@@ -370,7 +351,7 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
-                header=header,
+                headers={},
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
                 ret_type=ret_type,
@@ -393,7 +374,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> ReturnType:
@@ -416,7 +396,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> ReturnType:
@@ -441,7 +420,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> ReturnType:
@@ -465,7 +443,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> Any:
@@ -487,7 +464,6 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
-        header: Optional[Mapping[str, Any]] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
     ) -> Any:
@@ -513,7 +489,6 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
-                header=header,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
             )
@@ -640,7 +615,6 @@ class ClientConfig(TypedDict, total=False):
     default_workflow_query_reject_condition: Optional[
         temporalio.common.QueryRejectCondition
     ]
-    type_hint_eval_str: bool
 
 
 class WorkflowHandle(Generic[SelfType, ReturnType]):
@@ -994,6 +968,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 args=temporalio.common._arg_or_args(arg, args),
                 reject_condition=reject_condition
                 or self._client._config["default_workflow_query_reject_condition"],
+                headers={},
                 ret_type=ret_type,
             )
         )
@@ -1072,6 +1047,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                     signal
                 ),
                 args=temporalio.common._arg_or_args(arg, args),
+                headers={},
             )
         )
 
@@ -1361,7 +1337,7 @@ class StartWorkflowInput:
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
-    header: Optional[Mapping[str, Any]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
     start_signal_args: Iterable[Any]
     # Type may be absent
@@ -1394,6 +1370,7 @@ class QueryWorkflowInput:
     query: str
     args: Iterable[Any]
     reject_condition: Optional[temporalio.common.QueryRejectCondition]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # Type may be absent
     ret_type: Optional[Type]
 
@@ -1406,6 +1383,7 @@ class SignalWorkflowInput:
     run_id: Optional[str]
     signal: str
     args: Iterable[Any]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass
@@ -1502,6 +1480,7 @@ class OutboundInterceptor:
         self, input: DescribeWorkflowInput
     ) -> WorkflowExecutionDescription:
         """Called for every :py:meth:`WorkflowHandle.describe` call."""
+        return await self.next.describe_workflow(input)
 
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
         """Called for every :py:meth:`WorkflowHandle.query` call."""
@@ -1595,11 +1574,8 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.converter.encode_search_attributes(
                 input.search_attributes, req.search_attributes
             )
-        if input.header is not None:
-            for k, v in input.header.items():
-                req.header.fields[k].CopyFrom(
-                    (await self._client.data_converter.encode([v]))[0]
-                )
+        if input.headers is not None:
+            temporalio.common._apply_headers(input.headers, req.header.fields)
 
         # Start with signal or just normal start
         resp: Union[
@@ -1663,8 +1639,7 @@ class _ClientImpl(OutboundInterceptor):
             execution=temporalio.api.common.v1.WorkflowExecution(
                 workflow_id=input.id,
                 run_id=input.run_id or "",
-            )
-            # TODO(cretz): Headers here and elsewhere
+            ),
         )
         if input.reject_condition:
             req.query_reject_condition = cast(
@@ -1676,6 +1651,8 @@ class _ClientImpl(OutboundInterceptor):
             req.query.query_args.payloads.extend(
                 await self._client.data_converter.encode(input.args)
             )
+        if input.headers is not None:
+            temporalio.common._apply_headers(input.headers, req.query.header.fields)
         resp = await self._client.service.query_workflow(req, retry=True)
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
@@ -1705,12 +1682,13 @@ class _ClientImpl(OutboundInterceptor):
             signal_name=input.signal,
             identity=self._client.identity,
             request_id=str(uuid.uuid4()),
-            # TODO(cretz): Headers here and elsewhere
         )
         if input.args:
             req.input.payloads.extend(
                 await self._client.data_converter.encode(input.args)
             )
+        if input.headers is not None:
+            temporalio.common._apply_headers(input.headers, req.header.fields)
         await self._client.service.signal_workflow_execution(req, retry=True)
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:

@@ -26,6 +26,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     PARENT_WORKFLOW_NAMESPACE_FIELD_NUMBER: builtins.int
+    PARENT_WORKFLOW_NAMESPACE_ID_FIELD_NUMBER: builtins.int
     PARENT_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     PARENT_INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
@@ -49,17 +50,25 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     PREV_AUTO_RESET_POINTS_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
+    PARENT_INITIATED_EVENT_VERSION_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     parent_workflow_namespace: typing.Text
-    """If this workflow is a child, the namespace our parent lives in"""
+    """If this workflow is a child, the namespace our parent lives in.
+    SDKs and UI tools should use `parent_workflow_namespace` field but server must use `parent_workflow_namespace_id` only.
+    """
 
+    parent_workflow_namespace_id: typing.Text
     @property
     def parent_workflow_execution(
         self,
-    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """Contains information about parent workflow execution that initiated the child workflow these attributes belong to.
+        If the workflow these attributes belong to is not a child workflow of any other execution, this field will not be populated.
+        """
+        pass
     parent_initiated_event_id: builtins.int
-    """TODO: What is this? ID of the event that requested this workflow execution if we are a child?"""
+    """EventID of the child execution initiated event in parent workflow"""
 
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -92,13 +101,17 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     original_execution_run_id: typing.Text
-    """This is the run id when the WorkflowExecutionStarted event was written"""
+    """This is the run id when the WorkflowExecutionStarted event was written.
+    A workflow reset changes the execution run_id, but preserves this field.
+    """
 
     identity: typing.Text
     """Identity of the client who requested this execution"""
 
     first_execution_run_id: typing.Text
-    """This is the very first runId along the chain of ContinueAsNew and Reset."""
+    """This is the very first runId along the chain of ContinueAsNew, Retry, Cron and Reset.
+    Used to identify a chain.
+    """
 
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
@@ -134,6 +147,12 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     ) -> temporalio.api.workflow.v1.message_pb2.ResetPoints: ...
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    parent_initiated_event_version: builtins.int
+    """Version of the child execution initiated event in parent workflow
+    It should be used together with parent_initiated_event_id to identify
+    a child initiated event for global namespace
+    """
+
     def __init__(
         self,
         *,
@@ -141,6 +160,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             temporalio.api.common.v1.message_pb2.WorkflowType
         ] = ...,
         parent_workflow_namespace: typing.Text = ...,
+        parent_workflow_namespace_id: typing.Text = ...,
         parent_workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -188,6 +208,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             temporalio.api.workflow.v1.message_pb2.ResetPoints
         ] = ...,
         header: typing.Optional[temporalio.api.common.v1.message_pb2.Header] = ...,
+        parent_initiated_event_version: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -257,10 +278,14 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"original_execution_run_id",
             "parent_initiated_event_id",
             b"parent_initiated_event_id",
+            "parent_initiated_event_version",
+            b"parent_initiated_event_version",
             "parent_workflow_execution",
             b"parent_workflow_execution",
             "parent_workflow_namespace",
             b"parent_workflow_namespace",
+            "parent_workflow_namespace_id",
+            b"parent_workflow_namespace_id",
             "prev_auto_reset_points",
             b"prev_auto_reset_points",
             "retry_policy",
@@ -616,6 +641,8 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
     SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
+    SUGGEST_CONTINUE_AS_NEW_FIELD_NUMBER: builtins.int
+    HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     scheduled_event_id: builtins.int
     """The id of the `WORKFLOW_TASK_SCHEDULED` event this task corresponds to"""
 
@@ -625,22 +652,39 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
     request_id: typing.Text
     """TODO: ? Appears unused?"""
 
+    suggest_continue_as_new: builtins.bool
+    """True if this workflow should continue-as-new soon because its history size (in
+    either event count or bytes) is getting large.
+    """
+
+    history_size_bytes: builtins.int
+    """Total history size in bytes, which the workflow might use to decide when to
+    continue-as-new regardless of the suggestion. Note that history event count is
+    just the event id of this event, so we don't include it explicitly here.
+    """
+
     def __init__(
         self,
         *,
         scheduled_event_id: builtins.int = ...,
         identity: typing.Text = ...,
         request_id: typing.Text = ...,
+        suggest_continue_as_new: builtins.bool = ...,
+        history_size_bytes: builtins.int = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "history_size_bytes",
+            b"history_size_bytes",
             "identity",
             b"identity",
             "request_id",
             b"request_id",
             "scheduled_event_id",
             b"scheduled_event_id",
+            "suggest_continue_as_new",
+            b"suggest_continue_as_new",
         ],
     ) -> None: ...
 
@@ -804,7 +848,6 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
-    NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -819,7 +862,6 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
 
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
-    namespace: typing.Text
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     @property
@@ -877,7 +919,6 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
         activity_type: typing.Optional[
             temporalio.api.common.v1.message_pb2.ActivityType
         ] = ...,
-        namespace: typing.Text = ...,
         task_queue: typing.Optional[
             temporalio.api.taskqueue.v1.message_pb2.TaskQueue
         ] = ...,
@@ -934,8 +975,6 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "input",
             b"input",
-            "namespace",
-            b"namespace",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -1616,6 +1655,7 @@ class RequestCancelExternalWorkflowExecutionInitiatedEventAttributes(
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     CONTROL_FIELD_NUMBER: builtins.int
     CHILD_WORKFLOW_ONLY_FIELD_NUMBER: builtins.int
@@ -1624,8 +1664,11 @@ class RequestCancelExternalWorkflowExecutionInitiatedEventAttributes(
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
 
     namespace: typing.Text
-    """The namespace the workflow to be cancelled lives in"""
+    """The namespace the workflow to be cancelled lives in.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -1646,6 +1689,7 @@ class RequestCancelExternalWorkflowExecutionInitiatedEventAttributes(
         *,
         workflow_task_completed_event_id: builtins.int = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -1668,6 +1712,8 @@ class RequestCancelExternalWorkflowExecutionInitiatedEventAttributes(
             b"control",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "reason",
             b"reason",
             "workflow_execution",
@@ -1688,6 +1734,7 @@ class RequestCancelExternalWorkflowExecutionFailedEventAttributes(
     CAUSE_FIELD_NUMBER: builtins.int
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     CONTROL_FIELD_NUMBER: builtins.int
@@ -1696,8 +1743,11 @@ class RequestCancelExternalWorkflowExecutionFailedEventAttributes(
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
 
     namespace: typing.Text
-    """namespace of the workflow which failed to cancel"""
+    """Namespace of the workflow which failed to cancel.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -1716,6 +1766,7 @@ class RequestCancelExternalWorkflowExecutionFailedEventAttributes(
         cause: temporalio.api.enums.v1.failed_cause_pb2.CancelExternalWorkflowExecutionFailedCause.ValueType = ...,
         workflow_task_completed_event_id: builtins.int = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -1739,6 +1790,8 @@ class RequestCancelExternalWorkflowExecutionFailedEventAttributes(
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "workflow_execution",
             b"workflow_execution",
             "workflow_task_completed_event_id",
@@ -1756,6 +1809,7 @@ class ExternalWorkflowExecutionCancelRequestedEventAttributes(
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     initiated_event_id: builtins.int
     """id of the `REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED` event this event corresponds
@@ -1763,8 +1817,11 @@ class ExternalWorkflowExecutionCancelRequestedEventAttributes(
     """
 
     namespace: typing.Text
-    """namespace of the to-be-cancelled workflow"""
+    """Namespace of the to-be-cancelled workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -1774,6 +1831,7 @@ class ExternalWorkflowExecutionCancelRequestedEventAttributes(
         *,
         initiated_event_id: builtins.int = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -1791,6 +1849,8 @@ class ExternalWorkflowExecutionCancelRequestedEventAttributes(
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "workflow_execution",
             b"workflow_execution",
         ],
@@ -1806,6 +1866,7 @@ class SignalExternalWorkflowExecutionInitiatedEventAttributes(
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     SIGNAL_NAME_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -1816,8 +1877,11 @@ class SignalExternalWorkflowExecutionInitiatedEventAttributes(
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
 
     namespace: typing.Text
-    """namespace of the to-be-signalled workflow"""
+    """Namespace of the to-be-signalled workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -1844,6 +1908,7 @@ class SignalExternalWorkflowExecutionInitiatedEventAttributes(
         *,
         workflow_task_completed_event_id: builtins.int = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -1877,6 +1942,8 @@ class SignalExternalWorkflowExecutionInitiatedEventAttributes(
             b"input",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "signal_name",
             b"signal_name",
             "workflow_execution",
@@ -1897,6 +1964,7 @@ class SignalExternalWorkflowExecutionFailedEventAttributes(
     CAUSE_FIELD_NUMBER: builtins.int
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     CONTROL_FIELD_NUMBER: builtins.int
@@ -1905,6 +1973,11 @@ class SignalExternalWorkflowExecutionFailedEventAttributes(
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
 
     namespace: typing.Text
+    """Namespace of the workflow which failed the signal.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
+
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -1919,6 +1992,7 @@ class SignalExternalWorkflowExecutionFailedEventAttributes(
         cause: temporalio.api.enums.v1.failed_cause_pb2.SignalExternalWorkflowExecutionFailedCause.ValueType = ...,
         workflow_task_completed_event_id: builtins.int = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -1942,6 +2016,8 @@ class SignalExternalWorkflowExecutionFailedEventAttributes(
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "workflow_execution",
             b"workflow_execution",
             "workflow_task_completed_event_id",
@@ -1957,14 +2033,18 @@ class ExternalWorkflowExecutionSignaledEventAttributes(google.protobuf.message.M
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     CONTROL_FIELD_NUMBER: builtins.int
     initiated_event_id: builtins.int
     """id of the `SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED` event this event corresponds to"""
 
     namespace: typing.Text
-    """namespace of the workflow which was signaled"""
+    """Namespace of the workflow which was signaled.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -1977,6 +2057,7 @@ class ExternalWorkflowExecutionSignaledEventAttributes(google.protobuf.message.M
         *,
         initiated_event_id: builtins.int = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -1997,6 +2078,8 @@ class ExternalWorkflowExecutionSignaledEventAttributes(google.protobuf.message.M
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "workflow_execution",
             b"workflow_execution",
         ],
@@ -2050,6 +2133,7 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
 ):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
@@ -2067,8 +2151,11 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     workflow_id: typing.Text
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
@@ -2117,6 +2204,7 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
         self,
         *,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_id: typing.Text = ...,
         workflow_type: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowType
@@ -2188,6 +2276,8 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
             b"memo",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "parent_close_policy",
             b"parent_close_policy",
             "retry_policy",
@@ -2220,6 +2310,7 @@ global___StartChildWorkflowExecutionInitiatedEventAttributes = (
 class StartChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     CAUSE_FIELD_NUMBER: builtins.int
@@ -2227,8 +2318,11 @@ class StartChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.M
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     workflow_id: typing.Text
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
@@ -2246,6 +2340,7 @@ class StartChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.M
         self,
         *,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_id: typing.Text = ...,
         workflow_type: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowType
@@ -2269,6 +2364,8 @@ class StartChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.M
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "workflow_id",
             b"workflow_id",
             "workflow_task_completed_event_id",
@@ -2285,13 +2382,17 @@ global___StartChildWorkflowExecutionFailedEventAttributes = (
 class ChildWorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     initiated_event_id: builtins.int
     """Id of the `START_CHILD_WORKFLOW_EXECUTION_INITIATED` event which this event corresponds to"""
 
@@ -2307,6 +2408,7 @@ class ChildWorkflowExecutionStartedEventAttributes(google.protobuf.message.Messa
         self,
         *,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         initiated_event_id: builtins.int = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
@@ -2336,6 +2438,8 @@ class ChildWorkflowExecutionStartedEventAttributes(google.protobuf.message.Messa
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "workflow_execution",
             b"workflow_execution",
             "workflow_type",
@@ -2351,6 +2455,7 @@ class ChildWorkflowExecutionCompletedEventAttributes(google.protobuf.message.Mes
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     RESULT_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
@@ -2358,8 +2463,11 @@ class ChildWorkflowExecutionCompletedEventAttributes(google.protobuf.message.Mes
     @property
     def result(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -2377,6 +2485,7 @@ class ChildWorkflowExecutionCompletedEventAttributes(google.protobuf.message.Mes
         *,
         result: typing.Optional[temporalio.api.common.v1.message_pb2.Payloads] = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -2404,6 +2513,8 @@ class ChildWorkflowExecutionCompletedEventAttributes(google.protobuf.message.Mes
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "result",
             b"result",
             "started_event_id",
@@ -2423,6 +2534,7 @@ class ChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.Messag
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     FAILURE_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
@@ -2431,8 +2543,11 @@ class ChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.Messag
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -2451,6 +2566,7 @@ class ChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.Messag
         *,
         failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -2481,6 +2597,8 @@ class ChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.Messag
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "retry_state",
             b"retry_state",
             "started_event_id",
@@ -2500,6 +2618,7 @@ class ChildWorkflowExecutionCanceledEventAttributes(google.protobuf.message.Mess
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     DETAILS_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
@@ -2507,8 +2626,11 @@ class ChildWorkflowExecutionCanceledEventAttributes(google.protobuf.message.Mess
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -2526,6 +2648,7 @@ class ChildWorkflowExecutionCanceledEventAttributes(google.protobuf.message.Mess
         *,
         details: typing.Optional[temporalio.api.common.v1.message_pb2.Payloads] = ...,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -2555,6 +2678,8 @@ class ChildWorkflowExecutionCanceledEventAttributes(google.protobuf.message.Mess
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "started_event_id",
             b"started_event_id",
             "workflow_execution",
@@ -2571,14 +2696,18 @@ global___ChildWorkflowExecutionCanceledEventAttributes = (
 class ChildWorkflowExecutionTimedOutEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
     RETRY_STATE_FIELD_NUMBER: builtins.int
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -2596,6 +2725,7 @@ class ChildWorkflowExecutionTimedOutEventAttributes(google.protobuf.message.Mess
         self,
         *,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -2622,6 +2752,8 @@ class ChildWorkflowExecutionTimedOutEventAttributes(google.protobuf.message.Mess
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "retry_state",
             b"retry_state",
             "started_event_id",
@@ -2640,13 +2772,17 @@ global___ChildWorkflowExecutionTimedOutEventAttributes = (
 class ChildWorkflowExecutionTerminatedEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
     STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
     namespace: typing.Text
-    """Namespace of the child workflow"""
+    """Namespace of the child workflow.
+    SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
+    """
 
+    namespace_id: typing.Text
     @property
     def workflow_execution(
         self,
@@ -2663,6 +2799,7 @@ class ChildWorkflowExecutionTerminatedEventAttributes(google.protobuf.message.Me
         self,
         *,
         namespace: typing.Text = ...,
+        namespace_id: typing.Text = ...,
         workflow_execution: typing.Optional[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ] = ...,
@@ -2688,6 +2825,8 @@ class ChildWorkflowExecutionTerminatedEventAttributes(google.protobuf.message.Me
             b"initiated_event_id",
             "namespace",
             b"namespace",
+            "namespace_id",
+            b"namespace_id",
             "started_event_id",
             b"started_event_id",
             "workflow_execution",

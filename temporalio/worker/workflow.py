@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 import os
 from datetime import timezone
-from typing import Callable, Dict, Iterable, List, Optional, Type
+from typing import Callable, Dict, Iterable, List, MutableMapping, Optional, Type
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -27,7 +27,11 @@ import temporalio.exceptions
 import temporalio.workflow
 import temporalio.workflow_service
 
-from .interceptor import Interceptor, WorkflowInboundInterceptor
+from .interceptor import (
+    Interceptor,
+    WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
+)
 from .workflow_instance import WorkflowInstance, WorkflowInstanceDetails, WorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -48,7 +52,6 @@ class _WorkflowWorker:
         workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Iterable[Interceptor],
-        type_hint_eval_str: bool,
         debug_mode: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
@@ -64,12 +67,16 @@ class _WorkflowWorker:
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
         self._workflow_runner = workflow_runner
         self._data_converter = data_converter
+        # Build the interceptor classes and collect extern functions
+        self._extern_functions: MutableMapping[str, Callable] = {}
         self._interceptor_classes: List[Type[WorkflowInboundInterceptor]] = []
+        interceptor_class_input = WorkflowInterceptorClassInput(
+            unsafe_extern_functions=self._extern_functions
+        )
         for i in interceptors:
-            interceptor_class = i.workflow_interceptor_class()
+            interceptor_class = i.workflow_interceptor_class(interceptor_class_input)
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
-        self._type_hint_eval_str = type_hint_eval_str
         self._running_workflows: Dict[str, WorkflowInstance] = {}
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
@@ -135,19 +142,18 @@ class _WorkflowWorker:
                 )
 
             if LOG_PROTOS:
-                logger.debug("Received workflow activation: %s", act)
-
-            # If the workflow is not running yet, create it
-            workflow = self._running_workflows.get(act.run_id)
-            if not workflow:
-                workflow = await self._create_workflow_instance(act)
-                self._running_workflows[act.run_id] = workflow
+                logger.debug("Received workflow activation:\n%s", act)
 
             # We only have to run if there are any non-remove-from-cache jobs
             remove_job = next(
                 (j for j in act.jobs if j.HasField("remove_from_cache")), None
             )
             if len(act.jobs) > 1 or not remove_job:
+                # If the workflow is not running yet, create it
+                workflow = self._running_workflows.get(act.run_id)
+                if not workflow:
+                    workflow = await self._create_workflow_instance(act)
+                    self._running_workflows[act.run_id] = workflow
                 # Run activation in separate thread so we can check if it's
                 # deadlocked
                 activate_task = asyncio.get_running_loop().run_in_executor(
@@ -167,7 +173,7 @@ class _WorkflowWorker:
                     )
         except Exception as err:
             logger.exception(
-                f"Failed handling activation on workflow with run ID {act.run_id}"
+                "Failed handling activation on workflow with run ID %s", act.run_id
             )
             # Set completion failure
             completion.failed.failure.SetInParent()
@@ -179,7 +185,8 @@ class _WorkflowWorker:
                 )
             except Exception as inner_err:
                 logger.exception(
-                    f"Failed converting activation exception on workflow with run ID {act.run_id}"
+                    "Failed converting activation exception on workflow with run ID %s",
+                    act.run_id,
                 )
                 completion.failed.failure.message = (
                     f"Failed converting activation exception: {inner_err}"
@@ -196,28 +203,37 @@ class _WorkflowWorker:
                 )
             except Exception as err:
                 logger.exception(
-                    f"Failed encoding completion on workflow with run ID {act.run_id}"
+                    "Failed encoding completion on workflow with run ID %s", act.run_id
                 )
                 completion.failed.Clear()
                 completion.failed.failure.message = f"Failed encoding completion: {err}"
 
         # Send off completion
         if LOG_PROTOS:
-            logger.debug("Sending workflow completion: %s", completion)
+            logger.debug("Sending workflow completion:\n%s", completion)
         try:
             await self._bridge_worker().complete_workflow_activation(completion)
         except Exception:
             # TODO(cretz): Per others, this is supposed to crash the worker
             logger.exception(
-                f"Failed completing activation on workflow with run ID {act.run_id}"
+                "Failed completing activation on workflow with run ID %s", act.run_id
             )
 
         # If there is a remove-from-cache job, do so
         if remove_job:
-            logger.debug(
-                f"Evicting workflow with run ID {act.run_id}, message: {remove_job.remove_from_cache.message}"
-            )
-            del self._running_workflows[act.run_id]
+            if act.run_id in self._running_workflows:
+                logger.debug(
+                    "Evicting workflow with run ID %s, message: %s",
+                    act.run_id,
+                    remove_job.remove_from_cache.message,
+                )
+                del self._running_workflows[act.run_id]
+            else:
+                logger.debug(
+                    "Eviction request on unknown workflow with run ID %s, message: %s",
+                    act.run_id,
+                    remove_job.remove_from_cache.message,
+                )
 
     async def _create_workflow_instance(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
@@ -254,6 +270,7 @@ class _WorkflowWorker:
             execution_timeout=start.workflow_execution_timeout.ToTimedelta()
             if start.HasField("workflow_execution_timeout")
             else None,
+            headers=dict(start.headers),
             namespace=self._namespace,
             parent=parent,
             retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
@@ -280,7 +297,7 @@ class _WorkflowWorker:
                 interceptor_classes=self._interceptor_classes,
                 defn=defn,
                 info=info,
-                type_hint_eval_str=self._type_hint_eval_str,
                 randomness_seed=start.randomness_seed,
+                extern_functions=self._extern_functions,
             )
         )
