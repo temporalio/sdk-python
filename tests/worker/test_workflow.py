@@ -1591,16 +1591,12 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
                 start_to_close_timeout=timedelta(seconds=30),
             )
             param.assert_expected()
-            # TODO(cretz): There is a rare issue in Core where doing this LA
-            # then starting child immediately after (maybe along with query
-            # being received) is causing workflow hang. Leaving this commented
-            # until we can dig further.
-            # param = await workflow.execute_local_activity(
-            #     data_class_typed_activity,
-            #     param,
-            #     start_to_close_timeout=timedelta(seconds=30),
-            # )
-            # param.assert_expected()
+            param = await workflow.execute_local_activity(
+                data_class_typed_activity,
+                param,
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+            param.assert_expected()
             child_handle = await workflow.start_child_workflow(
                 DataClassTypedWorkflow.run,
                 param,

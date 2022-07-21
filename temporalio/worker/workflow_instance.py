@@ -657,7 +657,7 @@ class _WorkflowInstanceImpl(
                 task_timeout=task_timeout,
                 memo=memo,
                 search_attributes=search_attributes,
-                headers=None,
+                headers={},
                 arg_types=arg_types,
             )
         )
@@ -803,7 +803,7 @@ class _WorkflowInstanceImpl(
                 heartbeat_timeout=heartbeat_timeout,
                 retry_policy=retry_policy,
                 cancellation_type=cancellation_type,
-                headers=None,
+                headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
             )
@@ -857,7 +857,7 @@ class _WorkflowInstanceImpl(
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
-                headers=None,
+                headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
             )
@@ -899,7 +899,7 @@ class _WorkflowInstanceImpl(
                 retry_policy=retry_policy,
                 local_retry_threshold=local_retry_threshold,
                 cancellation_type=cancellation_type,
-                headers=None,
+                headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
             )
@@ -1671,7 +1671,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 ),
                 args=temporalio.common._arg_or_args(arg, args),
                 child_workflow_id=self._input.id,
-                headers=None,
+                headers={},
             )
         )
 
@@ -1791,7 +1791,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
                 namespace=self._instance._info.namespace,
                 workflow_id=self._id,
                 workflow_run_id=self._run_id,
-                headers=None,
+                headers={},
             )
         )
 

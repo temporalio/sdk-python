@@ -117,20 +117,21 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         return TracingWorkflowInboundInterceptor
 
     def _context_to_headers(
-        self, headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
-    ) -> Optional[Mapping[str, temporalio.api.common.v1.Payload]]:
+        self, headers: Mapping[str, temporalio.api.common.v1.Payload]
+    ) -> Mapping[str, temporalio.api.common.v1.Payload]:
         carrier: _CarrierDict = {}
         self.text_map_propagator.inject(carrier)
-        if not carrier:
-            return None
-        new_headers = dict(headers) if headers is not None else {}
-        new_headers[self.header_key] = self.payload_converter.to_payloads([carrier])[0]
-        return new_headers
+        if carrier:
+            headers = {
+                **headers,
+                self.header_key: self.payload_converter.to_payloads([carrier])[0],
+            }
+        return headers
 
     def _context_from_headers(
-        self, headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+        self, headers: Mapping[str, temporalio.api.common.v1.Payload]
     ) -> Optional[opentelemetry.context.context.Context]:
-        if not headers or self.header_key not in headers:
+        if self.header_key not in headers:
             return None
         header_payload = headers.get(self.header_key)
         if not header_payload:
@@ -148,7 +149,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         name: str,
         *,
         attributes: opentelemetry.util.types.Attributes,
-        input: Optional[_InputWithMutableHeaders] = None,
+        input: Optional[_InputWithHeaders] = None,
     ) -> Iterator[None]:
         with self.tracer.start_as_current_span(name, attributes=attributes):
             if input:
@@ -256,8 +257,8 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
             return await super().execute_activity(input)
 
 
-class _InputWithMutableHeaders(Protocol):
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+class _InputWithHeaders(Protocol):
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 class _WorkflowExternFunctions(TypedDict):
@@ -432,8 +433,8 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             opentelemetry.context.detach(token)
 
     def _context_to_headers(
-        self, headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
-    ) -> Optional[Mapping[str, temporalio.api.common.v1.Payload]]:
+        self, headers: Mapping[str, temporalio.api.common.v1.Payload]
+    ) -> Mapping[str, temporalio.api.common.v1.Payload]:
         carrier: _CarrierDict = {}
         self.text_map_propagator.inject(carrier)
         return self._context_carrier_to_headers(carrier, headers)
@@ -441,20 +442,21 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
     def _context_carrier_to_headers(
         self,
         carrier: _CarrierDict,
-        headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
-    ) -> Optional[Mapping[str, temporalio.api.common.v1.Payload]]:
-        if not carrier:
-            return None
-        new_headers = dict(headers) if headers is not None else {}
-        new_headers[self.header_key] = self.payload_converter.to_payloads([carrier])[0]
-        return new_headers
+        headers: Mapping[str, temporalio.api.common.v1.Payload],
+    ) -> Mapping[str, temporalio.api.common.v1.Payload]:
+        if carrier:
+            headers = {
+                **headers,
+                self.header_key: self.payload_converter.to_payloads([carrier])[0],
+            }
+        return headers
 
     def _completed_span(
         self,
         span_name: str,
         *,
         link_context_carrier: Optional[_CarrierDict] = None,
-        add_to_outbound: Optional[_InputWithMutableHeaders] = None,
+        add_to_outbound: Optional[_InputWithHeaders] = None,
         new_span_even_on_replay: bool = False,
         additional_attributes: opentelemetry.util.types.Attributes = None,
         exception: Optional[Exception] = None,

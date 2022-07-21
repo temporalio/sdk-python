@@ -351,7 +351,7 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
-                headers=None,
+                headers={},
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
                 ret_type=ret_type,
@@ -968,7 +968,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 args=temporalio.common._arg_or_args(arg, args),
                 reject_condition=reject_condition
                 or self._client._config["default_workflow_query_reject_condition"],
-                headers=None,
+                headers={},
                 ret_type=ret_type,
             )
         )
@@ -1047,7 +1047,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                     signal
                 ),
                 args=temporalio.common._arg_or_args(arg, args),
-                headers=None,
+                headers={},
             )
         )
 
@@ -1337,7 +1337,7 @@ class StartWorkflowInput:
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
     start_signal_args: Iterable[Any]
     # Type may be absent
@@ -1370,7 +1370,7 @@ class QueryWorkflowInput:
     query: str
     args: Iterable[Any]
     reject_condition: Optional[temporalio.common.QueryRejectCondition]
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # Type may be absent
     ret_type: Optional[Type]
 
@@ -1383,7 +1383,7 @@ class SignalWorkflowInput:
     run_id: Optional[str]
     signal: str
     args: Iterable[Any]
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass

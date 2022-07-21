@@ -153,7 +153,7 @@ class ContinueAsNewInput:
     task_timeout: Optional[timedelta]
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
 
@@ -195,7 +195,7 @@ class SignalChildWorkflowInput:
     signal: str
     args: Iterable[Any]
     child_workflow_id: str
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass
@@ -207,7 +207,7 @@ class SignalExternalWorkflowInput:
     namespace: str
     workflow_id: str
     workflow_run_id: Optional[str]
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass
@@ -224,7 +224,7 @@ class StartActivityInput:
     heartbeat_timeout: Optional[timedelta]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cancellation_type: temporalio.workflow.ActivityCancellationType
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
@@ -249,7 +249,7 @@ class StartChildWorkflowInput:
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
@@ -268,7 +268,7 @@ class StartLocalActivityInput:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     local_retry_threshold: Optional[timedelta]
     cancellation_type: temporalio.workflow.ActivityCancellationType
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]

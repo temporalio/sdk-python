@@ -173,7 +173,7 @@ class _WorkflowWorker:
                     )
         except Exception as err:
             logger.exception(
-                f"Failed handling activation on workflow with run ID {act.run_id}"
+                "Failed handling activation on workflow with run ID %s", act.run_id
             )
             # Set completion failure
             completion.failed.failure.SetInParent()
@@ -185,7 +185,8 @@ class _WorkflowWorker:
                 )
             except Exception as inner_err:
                 logger.exception(
-                    f"Failed converting activation exception on workflow with run ID {act.run_id}"
+                    "Failed converting activation exception on workflow with run ID %s",
+                    act.run_id,
                 )
                 completion.failed.failure.message = (
                     f"Failed converting activation exception: {inner_err}"
@@ -202,7 +203,7 @@ class _WorkflowWorker:
                 )
             except Exception as err:
                 logger.exception(
-                    f"Failed encoding completion on workflow with run ID {act.run_id}"
+                    "Failed encoding completion on workflow with run ID %s", act.run_id
                 )
                 completion.failed.Clear()
                 completion.failed.failure.message = f"Failed encoding completion: {err}"
@@ -215,19 +216,23 @@ class _WorkflowWorker:
         except Exception:
             # TODO(cretz): Per others, this is supposed to crash the worker
             logger.exception(
-                f"Failed completing activation on workflow with run ID {act.run_id}"
+                "Failed completing activation on workflow with run ID %s", act.run_id
             )
 
         # If there is a remove-from-cache job, do so
         if remove_job:
             if act.run_id in self._running_workflows:
                 logger.debug(
-                    f"Evicting workflow with run ID {act.run_id}, message: {remove_job.remove_from_cache.message}"
+                    "Evicting workflow with run ID %s, message: %s",
+                    act.run_id,
+                    remove_job.remove_from_cache.message,
                 )
                 del self._running_workflows[act.run_id]
             else:
                 logger.debug(
-                    f"Eviction request on unknown workflow with run ID {act.run_id}, message: {remove_job.remove_from_cache.message}"
+                    "Eviction request on unknown workflow with run ID %s, message: %s",
+                    act.run_id,
+                    remove_job.remove_from_cache.message,
                 )
 
     async def _create_workflow_instance(
