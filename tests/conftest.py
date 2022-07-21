@@ -1,4 +1,5 @@
 import asyncio
+import multiprocessing
 import os
 import sys
 from typing import AsyncGenerator, Optional
@@ -23,6 +24,12 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
 from temporalio.client import Client
 from tests.helpers.server import ExternalGolangServer, ExternalServer
 from tests.helpers.worker import ExternalGolangWorker, ExternalWorker
+
+# Due to https://github.com/python/cpython/issues/77906, multiprocessing on
+# macOS starting with Python 3.8 has changed from "fork" to "spawn". For
+# pre-3.8, we are changing it for them.
+if sys.version_info < (3, 8) and sys.platform.startswith("darwin"):
+    multiprocessing.set_start_method("spawn", True)
 
 
 @pytest.fixture(scope="session")
