@@ -6,8 +6,6 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 
-import pytest
-
 from temporalio.client import Client, TLSConfig
 from tests.helpers.golang import start_external_go_process
 
@@ -17,10 +15,6 @@ class ExternalServer(ABC):
     @abstractmethod
     def host_port(self) -> str:
         raise NotImplementedError
-
-    @property
-    def target_url(self) -> str:
-        return f"http://{self.host_port}"
 
     @property
     @abstractmethod
@@ -37,7 +31,7 @@ class ExternalServer(ABC):
         raise NotImplementedError
 
     async def new_client(self) -> Client:
-        return await Client.connect(self.target_url, namespace=self.namespace)
+        return await Client.connect(self.host_port, namespace=self.namespace)
 
     async def new_tls_client(self) -> Optional[Client]:
         return None
@@ -120,9 +114,6 @@ class ExternalGolangServer(ExternalServer):
         await self._process.wait()
 
     async def new_tls_client(self) -> Optional[Client]:
-        # TODO(cretz): No longer works in newer Temporalite versions, waiting on
-        # https://github.com/DataDog/temporalite/pull/75
-        pytest.skip("Temporalite does not currently support TLS")
         # Read certs
         certs_dir = os.path.join(os.path.dirname(__file__), "golangserver", "certs")
         with open(os.path.join(certs_dir, "server-ca-cert.pem"), "rb") as f:
@@ -132,9 +123,9 @@ class ExternalGolangServer(ExternalServer):
         with open(os.path.join(certs_dir, "client-key.pem"), "rb") as f:
             client_private_key = f.read()
         return await Client.connect(
-            target_url=f"https://{self._tls_host_port}",
+            target_host=self._tls_host_port,
             namespace=self._namespace,
-            tls_config=TLSConfig(
+            tls=TLSConfig(
                 server_root_ca_cert=server_root_ca_cert,
                 client_cert=client_cert,
                 client_private_key=client_private_key,

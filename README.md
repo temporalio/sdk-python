@@ -13,6 +13,7 @@ Also see:
 
 * [Code Samples](https://github.com/temporalio/samples-python)
 * [API Documentation](https://python.temporal.io)
+* [Application Development Guide](https://docs.temporal.io/application-development?lang=python)
 
 In addition to features common across all Temporal SDKs, the Python SDK also has the following interesting features:
 
@@ -89,7 +90,7 @@ class SayHello:
 
 async def main():
     # Create client connected to server at the given address
-    client = await Client.connect("http://localhost:7233")
+    client = await Client.connect("localhost:7233")
 
     # Run the worker
     worker = Worker(client, task_queue="my-task-queue", workflows=[SayHello], activities=[say_hello])
@@ -117,7 +118,7 @@ from my_worker_package import SayHello
 
 async def main():
     # Create client connected to server at the given address
-    client = await Client.connect("http://localhost:7233")
+    client = await Client.connect("localhost:7233")
 
     # Execute a workflow
     result = await client.execute_workflow(SayHello.run, "my name", id="my-workflow-id", task_queue="my-task-queue")
@@ -147,7 +148,7 @@ from temporalio.client import Client
 
 async def main():
     # Create client connected to server at the given address and namespace
-    client = await Client.connect("http://localhost:7233", namespace="my-namespace")
+    client = await Client.connect("localhost:7233", namespace="my-namespace")
 
     # Start a workflow
     handle = await client.start_workflow(MyWorkflow.run, "some arg", id="my-workflow-id", task_queue="my-task-queue")
@@ -160,6 +161,7 @@ async def main():
 Some things to note about the above code:
 
 * A `Client` does not have an explicit "close"
+* To enable TLS, the `tls` argument to `connect` can be set to `True` or a `TLSConfig` object
 * A single positional argument can be passed to `start_workflow`. If there are multiple arguments, only the
   non-type-safe form of `start_workflow` can be used (i.e. the one accepting a string workflow name) and it must be in
   the `args` keyword argument.
@@ -213,7 +215,7 @@ from my_workflow_package import MyWorkflow, my_activity
 
 async def run_worker(stop_event: asyncio.Event):
     # Create client connected to server at the given address
-    client = await Client.connect("http://localhost:7233", namespace="my-namespace")
+    client = await Client.connect("localhost:7233", namespace="my-namespace")
 
     # Run the worker until the event is set
     worker = Worker(client, task_queue="my-task-queue", workflows=[MyWorkflow], activities=[my_activity])
@@ -677,7 +679,7 @@ class SayHello:
         return f"Hello, {name}!"
 
 async def main():
-    client = await Client.connect("http://localhost:7233")
+    client = await Client.connect("localhost:7233")
     async with Worker(client, task_queue="my-task-queue", workflows=[SayHello]):
         result = await client.execute_workflow(SayHello.run, "Temporal",
             id="my-workflow-id", task_queue="my-task-queue")
