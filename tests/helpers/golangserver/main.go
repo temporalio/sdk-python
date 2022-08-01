@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/DataDog/temporalite"
+	"github.com/temporalio/temporalite"
 	"go.temporal.io/server/common/config"
 	"go.temporal.io/server/common/dynamicconfig"
 	serverlog "go.temporal.io/server/common/log"

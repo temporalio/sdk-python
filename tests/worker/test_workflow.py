@@ -825,8 +825,12 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
                         LongSleepWorkflow.started
                     )
                 except RPCError as err:
-                    # Ignore not-found because child may not have started yet
-                    if err.status == RPCStatusCode.NOT_FOUND:
+                    # Ignore not-found or failed precondition because child may
+                    # not have started yet
+                    if (
+                        err.status == RPCStatusCode.NOT_FOUND
+                        or err.status == RPCStatusCode.FAILED_PRECONDITION
+                    ):
                         return False
                     raise
 
