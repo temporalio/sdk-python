@@ -1149,9 +1149,13 @@ class _WorkflowInstanceImpl(
                     if self._current_activation_error:
                         raise self._current_activation_error
 
-                # Check conditions which may add to the ready list
+                # Check conditions which may add to the ready list. Also remove
+                # conditions whose futures have already cancelled (e.g. when
+                # timed out).
                 self._conditions[:] = [
-                    t for t in self._conditions if not self._check_condition(*t)
+                    t
+                    for t in self._conditions
+                    if not t[1].done() and not self._check_condition(*t)
                 ]
         finally:
             asyncio._set_running_loop(None)

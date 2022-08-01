@@ -2118,6 +2118,52 @@ async def test_workflow_activity_method(client: Client):
         assert result == MyDataClass(field1="in worker, workflow param, in workflow")
 
 
+@workflow.defn
+class WaitConditionTimeoutWorkflow:
+    def __init__(self) -> None:
+        self._done = False
+        self._waiting = False
+
+    @workflow.run
+    async def run(self) -> None:
+        # Force timeout, ignore, wait again
+        try:
+            await workflow.wait_condition(lambda: self._done, timeout=0.01)
+            raise RuntimeError("Expected timeout")
+        except asyncio.TimeoutError:
+            pass
+        self._waiting = True
+        await workflow.wait_condition(lambda: self._done)
+
+    @workflow.signal
+    def done(self) -> None:
+        self._done = True
+
+    @workflow.query
+    def waiting(self) -> bool:
+        return self._waiting
+
+
+async def test_workflow_wait_condition_timeout(client: Client):
+    async with new_worker(
+        client,
+        WaitConditionTimeoutWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            WaitConditionTimeoutWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait until it's waiting, then send the signal
+        async def waiting() -> bool:
+            return await handle.query(WaitConditionTimeoutWorkflow.waiting)
+
+        await assert_eq_eventually(True, waiting)
+        await handle.signal(WaitConditionTimeoutWorkflow.done)
+        # Wait for result which should succeed
+        await handle.result()
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
