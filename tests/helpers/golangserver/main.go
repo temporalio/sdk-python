@@ -10,11 +10,10 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/DataDog/temporalite"
+	"github.com/temporalio/temporalite"
 	"go.temporal.io/server/common/config"
 	"go.temporal.io/server/common/dynamicconfig"
 	serverlog "go.temporal.io/server/common/log"
-	"go.temporal.io/server/common/rpc/encryption"
 	"go.temporal.io/server/temporal"
 )
 
@@ -27,9 +26,7 @@ func main() {
 	}
 }
 
-// TODO(cretz): No longer works in newer Temporalite versions, waiting on
-// https://github.com/DataDog/temporalite/pull/75
-const supportsTLS = false
+const supportsTLS = true
 
 func run(portStr, namespace string) error {
 	port, err := strconv.Atoi(portStr)
@@ -62,21 +59,24 @@ func run(portStr, namespace string) error {
 		// Start TLS server
 		_, thisFile, _, _ := runtime.Caller(0)
 		certsDir := filepath.Join(thisFile, "..", "certs")
-		var rootTLS config.RootTLS
-		rootTLS.Frontend.Server.CertFile = filepath.Join(certsDir, "server-cert.pem")
-		rootTLS.Frontend.Server.KeyFile = filepath.Join(certsDir, "server-key.pem")
-		rootTLS.Frontend.Server.ClientCAFiles = []string{filepath.Join(certsDir, "client-ca-cert.pem")}
-		rootTLS.Frontend.Server.RequireClientAuth = true
-		tlsConfigProvider, err := encryption.NewTLSConfigProviderFromConfig(rootTLS, nil, serverlog.NewNoopLogger(), nil)
-		if err != nil {
-			return err
+		var tlsServerConfig config.Config
+		tlsServerConfig.Global.TLS.Frontend.Server = config.ServerTLS{
+			CertFile:      filepath.Join(certsDir, "server-cert.pem"),
+			KeyFile:       filepath.Join(certsDir, "server-key.pem"),
+			ClientCAFiles: []string{filepath.Join(certsDir, "client-ca-cert.pem")},
+			// Cannot require client auth because the frontend client cannot connect
+			// to itself
+			// RequireClientAuth: true,
+		}
+		tlsServerConfig.Global.TLS.Frontend.Client = config.ClientTLS{
+			RootCAFiles: []string{filepath.Join(certsDir, "server-ca-cert.pem")},
 		}
 		tlsServer, err := temporalite.NewServer(
 			temporalite.WithNamespaces(namespace),
 			temporalite.WithPersistenceDisabled(),
 			temporalite.WithFrontendPort(port+1000),
 			temporalite.WithLogger(serverlog.NewNoopLogger()),
-			temporalite.WithUpstreamOptions(temporal.WithTLSConfigFactory(tlsConfigProvider)),
+			temporalite.WithBaseConfig(&tlsServerConfig),
 		)
 		if err != nil {
 			return err

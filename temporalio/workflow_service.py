@@ -5,10 +5,11 @@ from __future__ import annotations
 import logging
 import os
 import socket
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Generic, Mapping, Optional, Type, TypeVar
+from typing import Generic, Mapping, Optional, Type, TypeVar, Union
 
 import google.protobuf.message
 import grpc
@@ -94,8 +95,8 @@ class RetryConfig:
 class ConnectConfig:
     """Config for connecting to the server."""
 
-    target_url: str
-    tls_config: Optional[TLSConfig] = None
+    target_host: str
+    tls: Union[bool, TLSConfig] = False
     retry_config: Optional[RetryConfig] = None
     static_headers: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
@@ -106,9 +107,34 @@ class ConnectConfig:
             self.identity = f"{os.getpid()}@{socket.gethostname()}"
 
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientConfig:
+        # Need to create the URL from the host:port. We allowed scheme in the
+        # past so we'll leave it for only one more version with a warning.
+        # Otherwise we'll prepend the scheme.
+        target_url: str
+        tls_config: Optional[temporalio.bridge.client.ClientTlsConfig]
+        if "://" in self.target_host:
+            warnings.warn(
+                "Target host as URL with scheme no longer supported. This will be an error in future versions."
+            )
+            target_url = self.target_host
+            tls_config = (
+                self.tls._to_bridge_config()
+                if isinstance(self.tls, TLSConfig)
+                else None
+            )
+        elif isinstance(self.tls, TLSConfig):
+            target_url = f"https://{self.target_host}"
+            tls_config = self.tls._to_bridge_config()
+        elif self.tls:
+            target_url = f"https://{self.target_host}"
+            tls_config = TLSConfig()._to_bridge_config()
+        else:
+            target_url = f"http://{self.target_host}"
+            tls_config = None
+
         return temporalio.bridge.client.ClientConfig(
-            target_url=self.target_url,
-            tls_config=self.tls_config._to_bridge_config() if self.tls_config else None,
+            target_url=target_url,
+            tls_config=tls_config,
             retry_config=self.retry_config._to_bridge_config()
             if self.retry_config
             else None,

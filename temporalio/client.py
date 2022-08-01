@@ -22,7 +22,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Concatenate, ParamSpec, TypedDict
+from typing_extensions import Concatenate, TypedDict
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -61,7 +61,7 @@ class Client:
 
     @staticmethod
     async def connect(
-        target_url: str,
+        target_host: str,
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
@@ -71,7 +71,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
-        tls_config: Optional[TLSConfig] = None,
+        tls: Union[bool, TLSConfig] = False,
         retry_config: Optional[RetryConfig] = None,
         static_headers: Mapping[str, str] = {},
         identity: Optional[str] = None,
@@ -79,8 +79,8 @@ class Client:
         """Connect to a Temporal server.
 
         Args:
-            target_url: URL for the Temporal server. For local development, this
-                is often "http://localhost:7233".
+            target_host: `host:port` for the Temporal server. For local
+                development, this is often "localhost:7233".
             namespace: Namespace to use for client calls.
             data_converter: Data converter to use for all data conversions
                 to/from payloads.
@@ -96,8 +96,9 @@ class Client:
                 condition for workflow queries if not set during query. See
                 :py:meth:`WorkflowHandle.query` for details on the rejection
                 condition.
-            tls_config: TLS configuration for connecting to the server. If unset
-                no TLS connection will be used.
+            tls: If false, the default, do not use TLS. If true, use system
+                default TLS configuration. If TLS configuration present, that
+                TLS configuration will be used.
             retry_config: Retry configuration for direct service calls (when
                 opted in) or all high-level calls made by this client (which all
                 opt-in to retries by default). If unset, a default retry
@@ -107,8 +108,8 @@ class Client:
                 based on the version of the SDK.
         """
         connect_config = temporalio.workflow_service.ConnectConfig(
-            target_url=target_url,
-            tls_config=tls_config,
+            target_host=target_host,
+            tls=tls,
             retry_config=retry_config,
             static_headers=static_headers,
             identity=identity or "",
