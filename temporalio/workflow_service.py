@@ -19,7 +19,7 @@ import temporalio.bridge.client
 import temporalio.bridge.telemetry
 import temporalio.exceptions
 
-__version__ = "0.1a2"
+__version__ = "0.1b1"
 
 WorkflowServiceRequest = TypeVar(
     "WorkflowServiceRequest", bound=google.protobuf.message.Message

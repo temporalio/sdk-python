@@ -199,7 +199,8 @@ automatically [converted to dictionaries](https://docs.python.org/3/library/data
 encoding as JSON. Since Python is a dynamic language, when decoding via
 [`json.load`](https://docs.python.org/3/library/json.html#json.load), the type is not known at runtime so, for example,
 a JSON object will be a `dict`. As a special case, if the parameter type hint is a data class for a JSON payload, it is
-decoded into an instance of that data class (properly recursing into child data classes).
+decoded into an instance of that data class (properly recursing into child data classes). Currently this capability does
+not extend to any other type hints that may wrap a data class like `Optional`, `List`, etc. This support is planned.
 
 ### Workers
 
