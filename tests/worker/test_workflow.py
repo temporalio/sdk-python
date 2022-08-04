@@ -722,6 +722,31 @@ async def test_workflow_simple_cancel(client: Client):
         assert isinstance(err.value.cause, CancelledError)
 
 
+@workflow.defn
+class TrapCancelWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            await asyncio.Future()
+            raise RuntimeError("should not get here")
+        except asyncio.CancelledError:
+            return "cancelled"
+
+
+async def test_workflow_cancel_before_run(client: Client):
+    # Start the workflow _and_ send cancel before even starting the workflow
+    task_queue = str(uuid.uuid4())
+    handle = await client.start_workflow(
+        TrapCancelWorkflow.run,
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+    await handle.cancel()
+    # Start worker and wait for result
+    async with new_worker(client, TrapCancelWorkflow, task_queue=task_queue):
+        assert "cancelled" == await handle.result()
+
+
 @activity.defn
 async def wait_forever() -> NoReturn:
     await asyncio.Future()
