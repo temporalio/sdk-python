@@ -352,7 +352,10 @@ class _WorkflowInstanceImpl(
         self._cancel_requested = True
         # TODO(cretz): Details or cancel message or whatever?
         if self._primary_task:
-            self._primary_task.cancel()
+            # The primary task may not have started yet and we want to give the
+            # workflow the ability to receive the cancellation, so we must defer
+            # this cancellation to the next iteration of the event loop.
+            self.call_soon(self._primary_task.cancel)
 
     def _apply_fire_timer(
         self, job: temporalio.bridge.proto.workflow_activation.FireTimer
