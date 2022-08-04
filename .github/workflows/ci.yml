@@ -116,7 +116,7 @@ jobs:
           working-directory: temporalio/bridge
 
       # Prepare
-      - run: python -m pip install --upgrade wheel poetry poethepoet
+      - run: python -m pip install --upgrade setuptools wheel cibuildwheel poetry poethepoet
       - run: poetry install --no-root -E opentelemetry
 
       # Add the source dist only for Linux x64 for now
@@ -124,7 +124,7 @@ jobs:
         run: poetry build --format sdist
 
       # Build and fix the wheel
-      - run: poetry run cibuildwheel --output-dir dist --arch ${{ matrix.ci-arch }}
+      - run: cibuildwheel --output-dir dist --arch ${{ matrix.ci-arch }}
       - run: poe fix-wheel
 
       # Do test only for ci-arch auto (i.e. local machine)
@@ -163,11 +163,11 @@ jobs:
           platforms: arm64
 
       # Prepare
-      - run: python -m pip install --upgrade wheel poetry poethepoet
+      - run: python -m pip install --upgrade setuptools wheel cibuildwheel poetry poethepoet
       - run: poetry install --no-root -E opentelemetry
 
       # Build and fix the wheel
-      - run: poetry run cibuildwheel --output-dir dist --arch aarch64
+      - run: cibuildwheel --output-dir dist --arch aarch64
       - run: poe fix-wheel
 
       # Upload dist
