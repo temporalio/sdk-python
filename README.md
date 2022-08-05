@@ -36,12 +36,7 @@ event loop. This means task management, sleep, cancellation, etc have all been d
 
 **⚠️ UNDER DEVELOPMENT**
 
-The Python SDK is under development. There are no compatibility guarantees nor proper documentation pages at this time.
-
-Currently missing features:
-
-* Support for Windows arm, Linux arm, and Linux x64 glibc < 2.31.
-* Full documentation
+The Python SDK is under development. There are no compatibility guarantees at this time.
 
 ## Quick Start
 
