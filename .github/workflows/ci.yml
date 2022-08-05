@@ -86,9 +86,11 @@ jobs:
           - os: macos-latest
             package-suffix: macos-amd64
             ci-arch: auto
-          - os: macos-latest
-            package-suffix: macos-arm64
-            ci-arch: arm64
+          # TODO(cretz): Disabling macOS arm because cibuildwheel is still
+          # generating an x64 wheel name even for arm64
+          #- os: macos-latest
+          #  package-suffix: macos-arm64
+          #  ci-arch: arm64
             rust-add-target: aarch64-apple-darwin
           - os: windows-latest
             package-suffix: windows-amd64
