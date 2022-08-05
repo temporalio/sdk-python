@@ -41,7 +41,6 @@ if __name__ == "__main__":
                 pieces[0] = "cp37"
             wheel_lines[i] = "Tag: " + "-".join(pieces)
             found_wheel_tag = True
-            break
     if not found_wheel_tag:
         raise RuntimeError("Could not find WHEEL tag")
 
