@@ -25,7 +25,6 @@ script = "build.py"
 "Bug Tracker" = "https://github.com/temporalio/sdk-python/issues"
 
 [tool.poetry.dependencies]
-dacite = "^1.6.0"
 grpcio = "^1.47.0"
 opentelemetry-api = { version = "^1.11.1", optional = true }
 opentelemetry-sdk = { version = "^1.11.1", optional = true }
@@ -41,6 +40,7 @@ grpcio-tools = "^1.47.0"
 isort = "^5.10.1"
 mypy = "^0.961"
 mypy-protobuf = "^3.2.0"
+pydantic = "^1.9.1"
 pydocstyle = "^6.1.1"
 # TODO(cretz): Update when https://github.com/twisted/pydoctor/pull/595 released
 # pydoctor = "^22.5.1"
