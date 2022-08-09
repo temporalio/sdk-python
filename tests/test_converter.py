@@ -12,7 +12,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     NewType,
@@ -27,7 +26,7 @@ from typing import (
 
 import pydantic
 import pytest
-from typing_extensions import TypedDict
+from typing_extensions import Literal, TypedDict
 
 import temporalio.api.common.v1
 import temporalio.common
@@ -305,8 +304,10 @@ def test_json_type_hints():
 
     # Dict-like
     ok(Dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
+    ok(Dict, {"foo": 123})
     ok(Dict[str, Any], {"foo": 123})
     ok(Dict[Any, int], {"foo": 123})
+    ok(Mapping, {"foo": 123})
     ok(Mapping[str, int], {"foo": 123})
     ok(MutableMapping[str, int], {"foo": 123})
     ok(

@@ -19,12 +19,11 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Literal,
     Mapping,
-    NewType,
     Optional,
     Tuple,
     Type,
+    TypeVar,
     Union,
     get_type_hints,
 )
@@ -32,6 +31,7 @@ from typing import (
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
+from typing_extensions import Literal
 
 import temporalio.api.common.v1
 import temporalio.common
@@ -845,9 +845,12 @@ def value_to_type(hint: Type, value: Any) -> Any:
             raise TypeError(f"Expected None, got value of type {type(value)}")
         return None
 
-    # NewType
-    if isinstance(hint, NewType):
-        return value_to_type(hint.__supertype__, value)
+    # NewType. Note we cannot simply check isinstance NewType here because it's
+    # only been a class since 3.10. Instead we'll just check for the presence
+    # of a supertype.
+    supertype = getattr(hint, "__supertype__", None)
+    if supertype:
+        return value_to_type(supertype, value)
 
     # Load origin for other checks
     origin = getattr(hint, "__origin__", hint)
@@ -882,10 +885,18 @@ def value_to_type(hint: Type, value: Any) -> Any:
         ):
             per_key_types = get_type_hints(origin)
         key_type = (
-            type_args[0] if len(type_args) > 0 and type_args[0] is not Any else None
+            type_args[0]
+            if len(type_args) > 0
+            and type_args[0] is not Any
+            and not isinstance(type_args[0], TypeVar)
+            else None
         )
         value_type = (
-            type_args[1] if len(type_args) > 1 and type_args[1] is not Any else None
+            type_args[1]
+            if len(type_args) > 1
+            and type_args[1] is not Any
+            and not isinstance(type_args[1], TypeVar)
+            else None
         )
         # Convert each key/value
         for key, value in value.items():
@@ -970,7 +981,10 @@ def value_to_type(hint: Type, value: Any) -> Any:
             raise TypeError(f"Expected {hint}, value was {type(value)}")
         ret_list = []
         # If there is no type arg, just return value as is
-        if not type_args or (len(type_args) == 1 and type_args[0] is Ellipsis):
+        if not type_args or (
+            len(type_args) == 1
+            and (isinstance(type_args[0], TypeVar) or type_args[0] is Ellipsis)
+        ):
             ret_list = list(value)
         else:
             # Otherwise convert
