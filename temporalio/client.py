@@ -16,7 +16,6 @@ from typing import (
     Mapping,
     Optional,
     Type,
-    TypeVar,
     Union,
     cast,
     overload,
@@ -33,9 +32,9 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.service
 import temporalio.workflow
-import temporalio.workflow_service
-from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
+from temporalio.service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 from .types import (
     LocalReturnType,
@@ -107,7 +106,7 @@ class Client:
             identity: Identity for this client. If unset, a default is created
                 based on the version of the SDK.
         """
-        connect_config = temporalio.workflow_service.ConnectConfig(
+        connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
             tls=tls,
             retry_config=retry_config,
@@ -115,7 +114,7 @@ class Client:
             identity=identity or "",
         )
         return Client(
-            await temporalio.workflow_service.WorkflowService.connect(connect_config),
+            await temporalio.service.ServiceClient.connect(connect_config),
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
@@ -124,7 +123,7 @@ class Client:
 
     def __init__(
         self,
-        service: temporalio.workflow_service.WorkflowService,
+        service_client: temporalio.service.ServiceClient,
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
@@ -135,7 +134,7 @@ class Client:
             temporalio.common.QueryRejectCondition
         ] = None,
     ):
-        """Create a Temporal client from a workflow service.
+        """Create a Temporal client from a service client.
 
         See :py:meth:`connect` for details on the parameters.
         """
@@ -152,7 +151,7 @@ class Client:
 
         # Store the config for tracking
         self._config = ClientConfig(
-            service=service,
+            service_client=service_client,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
@@ -169,9 +168,24 @@ class Client:
         return config
 
     @property
-    def service(self) -> temporalio.workflow_service.WorkflowService:
-        """Raw gRPC service for this client."""
-        return self._config["service"]
+    def service_client(self) -> temporalio.service.ServiceClient:
+        """Raw gRPC service client."""
+        return self._config["service_client"]
+
+    @property
+    def workflow_service(self) -> temporalio.service.WorkflowService:
+        """Raw gRPC workflow service client."""
+        return self._config["service_client"].workflow_service
+
+    @property
+    def operator_service(self) -> temporalio.service.OperatorService:
+        """Raw gRPC operator service client."""
+        return self._config["service_client"].operator_service
+
+    @property
+    def test_service(self) -> temporalio.service.TestService:
+        """Raw gRPC test service client."""
+        return self._config["service_client"].test_service
 
     @property
     def namespace(self) -> str:
@@ -181,7 +195,7 @@ class Client:
     @property
     def identity(self) -> str:
         """Identity used in calls by this client."""
-        return self.service.config.identity
+        return self._config["service_client"].config.identity
 
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
@@ -607,7 +621,7 @@ class Client:
 class ClientConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
-    service: temporalio.workflow_service.WorkflowService
+    service_client: temporalio.service.ServiceClient
     namespace: str
     data_converter: temporalio.converter.DataConverter
     interceptors: Iterable[
@@ -723,7 +737,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             skip_archival=True,
         )
         while True:
-            resp = await self._client.service.get_workflow_execution_history(
+            resp = await self._client.workflow_service.get_workflow_execution_history(
                 req, retry=True
             )
             # Continually ask for pages until we get close
@@ -1588,11 +1602,13 @@ class _ClientImpl(OutboundInterceptor):
             req,
             temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
         ):
-            resp = await self._client.service.signal_with_start_workflow_execution(
+            resp = await self._client.workflow_service.signal_with_start_workflow_execution(
                 req, retry=True
             )
         else:
-            resp = await self._client.service.start_workflow_execution(req, retry=True)
+            resp = await self._client.workflow_service.start_workflow_execution(
+                req, retry=True
+            )
             first_execution_run_id = resp.run_id
         return WorkflowHandle(
             self._client,
@@ -1603,7 +1619,7 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
-        await self._client.service.request_cancel_workflow_execution(
+        await self._client.workflow_service.request_cancel_workflow_execution(
             temporalio.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest(
                 namespace=self._client.namespace,
                 workflow_execution=temporalio.api.common.v1.WorkflowExecution(
@@ -1621,7 +1637,7 @@ class _ClientImpl(OutboundInterceptor):
         self, input: DescribeWorkflowInput
     ) -> WorkflowExecutionDescription:
         return await WorkflowExecutionDescription.from_raw(
-            await self._client.service.describe_workflow_execution(
+            await self._client.workflow_service.describe_workflow_execution(
                 temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
                     namespace=self._client.namespace,
                     execution=temporalio.api.common.v1.WorkflowExecution(
@@ -1654,7 +1670,7 @@ class _ClientImpl(OutboundInterceptor):
             )
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.query.header.fields)
-        resp = await self._client.service.query_workflow(req, retry=True)
+        resp = await self._client.workflow_service.query_workflow(req, retry=True)
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
                 WorkflowExecutionStatus(resp.query_rejected.status)
@@ -1690,7 +1706,7 @@ class _ClientImpl(OutboundInterceptor):
             )
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.header.fields)
-        await self._client.service.signal_workflow_execution(req, retry=True)
+        await self._client.workflow_service.signal_workflow_execution(req, retry=True)
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
         req = temporalio.api.workflowservice.v1.TerminateWorkflowExecutionRequest(
@@ -1707,7 +1723,9 @@ class _ClientImpl(OutboundInterceptor):
             req.details.payloads.extend(
                 await self._client.data_converter.encode(input.args)
             )
-        await self._client.service.terminate_workflow_execution(req, retry=True)
+        await self._client.workflow_service.terminate_workflow_execution(
+            req, retry=True
+        )
 
     ### Async activity calls
 
@@ -1720,7 +1738,7 @@ class _ClientImpl(OutboundInterceptor):
             else await self._client.data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            resp_by_id = await self._client.service.record_activity_task_heartbeat_by_id(
+            resp_by_id = await self._client.workflow_service.record_activity_task_heartbeat_by_id(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1734,7 +1752,7 @@ class _ClientImpl(OutboundInterceptor):
             if resp_by_id.cancel_requested:
                 raise AsyncActivityCancelledError()
         else:
-            resp = await self._client.service.record_activity_task_heartbeat(
+            resp = await self._client.workflow_service.record_activity_task_heartbeat(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,
@@ -1753,7 +1771,7 @@ class _ClientImpl(OutboundInterceptor):
             else await self._client.data_converter.encode_wrapper([input.result])
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            await self._client.service.respond_activity_task_completed_by_id(
+            await self._client.workflow_service.respond_activity_task_completed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1765,7 +1783,7 @@ class _ClientImpl(OutboundInterceptor):
                 retry=True,
             )
         else:
-            await self._client.service.respond_activity_task_completed(
+            await self._client.workflow_service.respond_activity_task_completed(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCompletedRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,
@@ -1788,7 +1806,7 @@ class _ClientImpl(OutboundInterceptor):
             )
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            await self._client.service.respond_activity_task_failed_by_id(
+            await self._client.workflow_service.respond_activity_task_failed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1801,7 +1819,7 @@ class _ClientImpl(OutboundInterceptor):
                 retry=True,
             )
         else:
-            await self._client.service.respond_activity_task_failed(
+            await self._client.workflow_service.respond_activity_task_failed(
                 temporalio.api.workflowservice.v1.RespondActivityTaskFailedRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,
@@ -1821,7 +1839,7 @@ class _ClientImpl(OutboundInterceptor):
             else await self._client.data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            await self._client.service.respond_activity_task_canceled_by_id(
+            await self._client.workflow_service.respond_activity_task_canceled_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1833,7 +1851,7 @@ class _ClientImpl(OutboundInterceptor):
                 retry=True,
             )
         else:
-            await self._client.service.respond_activity_task_canceled(
+            await self._client.workflow_service.respond_activity_task_canceled(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCanceledRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,

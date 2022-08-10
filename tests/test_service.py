@@ -7,16 +7,16 @@ import grpc
 
 import temporalio
 import temporalio.api.workflowservice.v1
-import temporalio.workflow_service
+import temporalio.service
 from temporalio.client import Client
 
 
 def test_all_grpc_calls_present(client: Client):
     # Collect workflow service calls
     workflow_service_calls: Dict[str, Tuple[Type, Type]] = {}
-    for member in inspect.getmembers(client.service):
+    for member in inspect.getmembers(client.workflow_service):
         _, call = member
-        if isinstance(call, temporalio.workflow_service.WorkflowServiceCall):
+        if isinstance(call, temporalio.service.ServiceCall):
             workflow_service_calls[call.name] = (call.req_type, call.resp_type)
 
     # Collect gRPC service calls with a fake channel
@@ -52,5 +52,5 @@ def test_version():
         pyproject = f.read()
     version = pyproject[pyproject.find('version = "') + 11 :]
     version = version[: version.find('"')]
-    assert temporalio.workflow_service.__version__ == version
+    assert temporalio.service.__version__ == version
     assert temporalio.__version__ == version

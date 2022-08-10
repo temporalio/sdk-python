@@ -14,6 +14,7 @@ import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
+import temporalio.api.update.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import typing
 import typing_extensions
@@ -2840,6 +2841,252 @@ global___ChildWorkflowExecutionTerminatedEventAttributes = (
     ChildWorkflowExecutionTerminatedEventAttributes
 )
 
+class WorkflowUpdateRequestedEventAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    HEADER_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    UPDATE_ID_FIELD_NUMBER: builtins.int
+    UPDATE_FIELD_NUMBER: builtins.int
+    @property
+    def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    request_id: typing.Text
+    update_id: typing.Text
+    @property
+    def update(self) -> temporalio.api.update.v1.message_pb2.WorkflowUpdate: ...
+    def __init__(
+        self,
+        *,
+        header: typing.Optional[temporalio.api.common.v1.message_pb2.Header] = ...,
+        request_id: typing.Text = ...,
+        update_id: typing.Text = ...,
+        update: typing.Optional[
+            temporalio.api.update.v1.message_pb2.WorkflowUpdate
+        ] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["header", b"header", "update", b"update"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "header",
+            b"header",
+            "request_id",
+            b"request_id",
+            "update",
+            b"update",
+            "update_id",
+            b"update_id",
+        ],
+    ) -> None: ...
+
+global___WorkflowUpdateRequestedEventAttributes = WorkflowUpdateRequestedEventAttributes
+
+class WorkflowUpdateAcceptedEventAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    HEADER_FIELD_NUMBER: builtins.int
+    UPDATE_ID_FIELD_NUMBER: builtins.int
+    @property
+    def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    update_id: typing.Text
+    def __init__(
+        self,
+        *,
+        header: typing.Optional[temporalio.api.common.v1.message_pb2.Header] = ...,
+        update_id: typing.Text = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["header", b"header"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "header", b"header", "update_id", b"update_id"
+        ],
+    ) -> None: ...
+
+global___WorkflowUpdateAcceptedEventAttributes = WorkflowUpdateAcceptedEventAttributes
+
+class WorkflowUpdateCompletedEventAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    SYSTEM_HEADER_FIELD_NUMBER: builtins.int
+    UPDATE_ID_FIELD_NUMBER: builtins.int
+    SUCCESS_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
+    @property
+    def system_header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    update_id: typing.Text
+    @property
+    def success(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
+    def __init__(
+        self,
+        *,
+        system_header: typing.Optional[
+            temporalio.api.common.v1.message_pb2.Header
+        ] = ...,
+        update_id: typing.Text = ...,
+        success: typing.Optional[temporalio.api.common.v1.message_pb2.Payloads] = ...,
+        failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failure",
+            b"failure",
+            "result",
+            b"result",
+            "success",
+            b"success",
+            "system_header",
+            b"system_header",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failure",
+            b"failure",
+            "result",
+            b"result",
+            "success",
+            b"success",
+            "system_header",
+            b"system_header",
+            "update_id",
+            b"update_id",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["result", b"result"]
+    ) -> typing.Optional[typing_extensions.Literal["success", "failure"]]: ...
+
+global___WorkflowUpdateCompletedEventAttributes = WorkflowUpdateCompletedEventAttributes
+
+class WorkflowPropertiesModifiedExternallyEventAttributes(
+    google.protobuf.message.Message
+):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NEW_TASK_QUEUE_FIELD_NUMBER: builtins.int
+    NEW_WORKFLOW_TASK_TIMEOUT_FIELD_NUMBER: builtins.int
+    NEW_WORKFLOW_RUN_TIMEOUT_FIELD_NUMBER: builtins.int
+    NEW_WORKFLOW_EXECUTION_TIMEOUT_FIELD_NUMBER: builtins.int
+    UPSERTED_MEMO_FIELD_NUMBER: builtins.int
+    new_task_queue: typing.Text
+    """If set to a nonempty string, future workflow tasks for this workflow shall be dispatched on
+    the provided queue.
+    """
+
+    @property
+    def new_workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """If set, update the workflow task timeout to this value."""
+        pass
+    @property
+    def new_workflow_run_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """If set, update the workflow run timeout to this value. May be set to 0 for no timeout."""
+        pass
+    @property
+    def new_workflow_execution_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """If set, update the workflow execution timeout to this value. May be set to 0 for no timeout."""
+        pass
+    @property
+    def upserted_memo(self) -> temporalio.api.common.v1.message_pb2.Memo:
+        """If set, update the workflow memo with the provided values. The values will be merged with
+        the existing memo. If the user wants to delete values, a default/empty Payload should be
+        used as the value for the key being deleted.
+        """
+        pass
+    def __init__(
+        self,
+        *,
+        new_task_queue: typing.Text = ...,
+        new_workflow_task_timeout: typing.Optional[
+            google.protobuf.duration_pb2.Duration
+        ] = ...,
+        new_workflow_run_timeout: typing.Optional[
+            google.protobuf.duration_pb2.Duration
+        ] = ...,
+        new_workflow_execution_timeout: typing.Optional[
+            google.protobuf.duration_pb2.Duration
+        ] = ...,
+        upserted_memo: typing.Optional[temporalio.api.common.v1.message_pb2.Memo] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "new_workflow_execution_timeout",
+            b"new_workflow_execution_timeout",
+            "new_workflow_run_timeout",
+            b"new_workflow_run_timeout",
+            "new_workflow_task_timeout",
+            b"new_workflow_task_timeout",
+            "upserted_memo",
+            b"upserted_memo",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "new_task_queue",
+            b"new_task_queue",
+            "new_workflow_execution_timeout",
+            b"new_workflow_execution_timeout",
+            "new_workflow_run_timeout",
+            b"new_workflow_run_timeout",
+            "new_workflow_task_timeout",
+            b"new_workflow_task_timeout",
+            "upserted_memo",
+            b"upserted_memo",
+        ],
+    ) -> None: ...
+
+global___WorkflowPropertiesModifiedExternallyEventAttributes = (
+    WorkflowPropertiesModifiedExternallyEventAttributes
+)
+
+class ActivityPropertiesModifiedExternallyEventAttributes(
+    google.protobuf.message.Message
+):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
+    NEW_RETRY_POLICY_FIELD_NUMBER: builtins.int
+    scheduled_event_id: builtins.int
+    """The id of the `ACTIVITY_TASK_SCHEDULED` event this modification corresponds to."""
+
+    @property
+    def new_retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
+        """If set, update the retry policy of the activity, replacing it with the specified one.
+        The number of attempts at the activity is preserved.
+        """
+        pass
+    def __init__(
+        self,
+        *,
+        scheduled_event_id: builtins.int = ...,
+        new_retry_policy: typing.Optional[
+            temporalio.api.common.v1.message_pb2.RetryPolicy
+        ] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["new_retry_policy", b"new_retry_policy"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "new_retry_policy",
+            b"new_retry_policy",
+            "scheduled_event_id",
+            b"scheduled_event_id",
+        ],
+    ) -> None: ...
+
+global___ActivityPropertiesModifiedExternallyEventAttributes = (
+    ActivityPropertiesModifiedExternallyEventAttributes
+)
+
 class HistoryEvent(google.protobuf.message.Message):
     """History events are the method by which Temporal SDKs advance (or recreate) workflow state.
     See the `EventType` enum for more info about what each event is for.
@@ -2851,6 +3098,7 @@ class HistoryEvent(google.protobuf.message.Message):
     EVENT_TYPE_FIELD_NUMBER: builtins.int
     VERSION_FIELD_NUMBER: builtins.int
     TASK_ID_FIELD_NUMBER: builtins.int
+    WORKER_MAY_IGNORE_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_STARTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -2891,6 +3139,11 @@ class HistoryEvent(google.protobuf.message.Message):
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     EXTERNAL_WORKFLOW_EXECUTION_SIGNALED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_UPDATE_REQUESTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_UPDATE_ACCEPTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_UPDATE_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
 
@@ -2902,6 +3155,13 @@ class HistoryEvent(google.protobuf.message.Message):
 
     task_id: builtins.int
     """TODO: What is this? Appears unused by SDKs"""
+
+    worker_may_ignore: builtins.bool
+    """Set to true when the SDK may ignore the event as it does not impact workflow state or
+    information in any way that the SDK need be concerned with. If an SDK encounters an event
+    type which it does not understand, it must error unless this is true. If it is true, it's
+    acceptable for the event type and/or attributes to be uninterpretable.
+    """
 
     @property
     def workflow_execution_started_event_attributes(
@@ -3061,6 +3321,26 @@ class HistoryEvent(google.protobuf.message.Message):
     def upsert_workflow_search_attributes_event_attributes(
         self,
     ) -> global___UpsertWorkflowSearchAttributesEventAttributes: ...
+    @property
+    def workflow_update_requested_event_attributes(
+        self,
+    ) -> global___WorkflowUpdateRequestedEventAttributes: ...
+    @property
+    def workflow_update_accepted_event_attributes(
+        self,
+    ) -> global___WorkflowUpdateAcceptedEventAttributes: ...
+    @property
+    def workflow_update_completed_event_attributes(
+        self,
+    ) -> global___WorkflowUpdateCompletedEventAttributes: ...
+    @property
+    def workflow_properties_modified_externally_event_attributes(
+        self,
+    ) -> global___WorkflowPropertiesModifiedExternallyEventAttributes: ...
+    @property
+    def activity_properties_modified_externally_event_attributes(
+        self,
+    ) -> global___ActivityPropertiesModifiedExternallyEventAttributes: ...
     def __init__(
         self,
         *,
@@ -3069,6 +3349,7 @@ class HistoryEvent(google.protobuf.message.Message):
         event_type: temporalio.api.enums.v1.event_type_pb2.EventType.ValueType = ...,
         version: builtins.int = ...,
         task_id: builtins.int = ...,
+        worker_may_ignore: builtins.bool = ...,
         workflow_execution_started_event_attributes: typing.Optional[
             global___WorkflowExecutionStartedEventAttributes
         ] = ...,
@@ -3189,10 +3470,27 @@ class HistoryEvent(google.protobuf.message.Message):
         upsert_workflow_search_attributes_event_attributes: typing.Optional[
             global___UpsertWorkflowSearchAttributesEventAttributes
         ] = ...,
+        workflow_update_requested_event_attributes: typing.Optional[
+            global___WorkflowUpdateRequestedEventAttributes
+        ] = ...,
+        workflow_update_accepted_event_attributes: typing.Optional[
+            global___WorkflowUpdateAcceptedEventAttributes
+        ] = ...,
+        workflow_update_completed_event_attributes: typing.Optional[
+            global___WorkflowUpdateCompletedEventAttributes
+        ] = ...,
+        workflow_properties_modified_externally_event_attributes: typing.Optional[
+            global___WorkflowPropertiesModifiedExternallyEventAttributes
+        ] = ...,
+        activity_properties_modified_externally_event_attributes: typing.Optional[
+            global___ActivityPropertiesModifiedExternallyEventAttributes
+        ] = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "activity_properties_modified_externally_event_attributes",
+            b"activity_properties_modified_externally_event_attributes",
             "activity_task_cancel_requested_event_attributes",
             b"activity_task_cancel_requested_event_attributes",
             "activity_task_canceled_event_attributes",
@@ -3267,6 +3565,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_terminated_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
+            "workflow_properties_modified_externally_event_attributes",
+            b"workflow_properties_modified_externally_event_attributes",
             "workflow_task_completed_event_attributes",
             b"workflow_task_completed_event_attributes",
             "workflow_task_failed_event_attributes",
@@ -3277,11 +3577,19 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_task_started_event_attributes",
             "workflow_task_timed_out_event_attributes",
             b"workflow_task_timed_out_event_attributes",
+            "workflow_update_accepted_event_attributes",
+            b"workflow_update_accepted_event_attributes",
+            "workflow_update_completed_event_attributes",
+            b"workflow_update_completed_event_attributes",
+            "workflow_update_requested_event_attributes",
+            b"workflow_update_requested_event_attributes",
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "activity_properties_modified_externally_event_attributes",
+            b"activity_properties_modified_externally_event_attributes",
             "activity_task_cancel_requested_event_attributes",
             b"activity_task_cancel_requested_event_attributes",
             "activity_task_canceled_event_attributes",
@@ -3346,6 +3654,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"upsert_workflow_search_attributes_event_attributes",
             "version",
             b"version",
+            "worker_may_ignore",
+            b"worker_may_ignore",
             "workflow_execution_cancel_requested_event_attributes",
             b"workflow_execution_cancel_requested_event_attributes",
             "workflow_execution_canceled_event_attributes",
@@ -3364,6 +3674,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_terminated_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
+            "workflow_properties_modified_externally_event_attributes",
+            b"workflow_properties_modified_externally_event_attributes",
             "workflow_task_completed_event_attributes",
             b"workflow_task_completed_event_attributes",
             "workflow_task_failed_event_attributes",
@@ -3374,6 +3686,12 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_task_started_event_attributes",
             "workflow_task_timed_out_event_attributes",
             b"workflow_task_timed_out_event_attributes",
+            "workflow_update_accepted_event_attributes",
+            b"workflow_update_accepted_event_attributes",
+            "workflow_update_completed_event_attributes",
+            b"workflow_update_completed_event_attributes",
+            "workflow_update_requested_event_attributes",
+            b"workflow_update_requested_event_attributes",
         ],
     ) -> None: ...
     def WhichOneof(
@@ -3420,6 +3738,11 @@ class HistoryEvent(google.protobuf.message.Message):
             "signal_external_workflow_execution_failed_event_attributes",
             "external_workflow_execution_signaled_event_attributes",
             "upsert_workflow_search_attributes_event_attributes",
+            "workflow_update_requested_event_attributes",
+            "workflow_update_accepted_event_attributes",
+            "workflow_update_completed_event_attributes",
+            "workflow_properties_modified_externally_event_attributes",
+            "activity_properties_modified_externally_event_attributes",
         ]
     ]: ...
 

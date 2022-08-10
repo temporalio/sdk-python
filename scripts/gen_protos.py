@@ -12,7 +12,14 @@ base_dir = Path(__file__).parent.parent
 proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
 api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
-proto_paths = proto_dir.glob("**/*.proto")
+testsrv_proto_dir = proto_dir / "testsrv_upstream"
+
+# Exclude testsrv dependencies
+proto_paths = (
+    v
+    for v in proto_dir.glob("**/*.proto")
+    if not str(v).startswith(str(testsrv_proto_dir / "dependencies"))
+)
 
 api_out_dir = base_dir / "temporalio" / "api"
 sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
@@ -102,6 +109,7 @@ if __name__ == "__main__":
                 "-mgrpc_tools.protoc",
                 f"--proto_path={api_proto_dir}",
                 f"--proto_path={core_proto_dir}",
+                f"--proto_path={testsrv_proto_dir}",
                 f"--python_out={temp_dir}",
                 f"--grpc_python_out={temp_dir}",
                 f"--mypy_out={temp_dir}",

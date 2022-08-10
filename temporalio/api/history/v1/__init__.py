@@ -1,4 +1,5 @@
 from .message_pb2 import (
+    ActivityPropertiesModifiedExternallyEventAttributes,
     ActivityTaskCanceledEventAttributes,
     ActivityTaskCancelRequestedEventAttributes,
     ActivityTaskCompletedEventAttributes,
@@ -36,14 +37,19 @@ from .message_pb2 import (
     WorkflowExecutionStartedEventAttributes,
     WorkflowExecutionTerminatedEventAttributes,
     WorkflowExecutionTimedOutEventAttributes,
+    WorkflowPropertiesModifiedExternallyEventAttributes,
     WorkflowTaskCompletedEventAttributes,
     WorkflowTaskFailedEventAttributes,
     WorkflowTaskScheduledEventAttributes,
     WorkflowTaskStartedEventAttributes,
     WorkflowTaskTimedOutEventAttributes,
+    WorkflowUpdateAcceptedEventAttributes,
+    WorkflowUpdateCompletedEventAttributes,
+    WorkflowUpdateRequestedEventAttributes,
 )
 
 __all__ = [
+    "ActivityPropertiesModifiedExternallyEventAttributes",
     "ActivityTaskCancelRequestedEventAttributes",
     "ActivityTaskCanceledEventAttributes",
     "ActivityTaskCompletedEventAttributes",
@@ -81,9 +87,13 @@ __all__ = [
     "WorkflowExecutionStartedEventAttributes",
     "WorkflowExecutionTerminatedEventAttributes",
     "WorkflowExecutionTimedOutEventAttributes",
+    "WorkflowPropertiesModifiedExternallyEventAttributes",
     "WorkflowTaskCompletedEventAttributes",
     "WorkflowTaskFailedEventAttributes",
     "WorkflowTaskScheduledEventAttributes",
     "WorkflowTaskStartedEventAttributes",
     "WorkflowTaskTimedOutEventAttributes",
+    "WorkflowUpdateAcceptedEventAttributes",
+    "WorkflowUpdateCompletedEventAttributes",
+    "WorkflowUpdateRequestedEventAttributes",
 ]

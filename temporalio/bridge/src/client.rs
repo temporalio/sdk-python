@@ -6,15 +6,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_client::{
-    ClientOptions, ClientOptionsBuilder, ConfiguredClient, RetryClient, RetryConfig, TlsConfig,
-    WorkflowService, WorkflowServiceClientWithMetrics,
+    ClientOptions, ClientOptionsBuilder, ConfiguredClient, OperatorService, RetryClient,
+    RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
 };
 use tonic;
 use url::Url;
 
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = RetryClient<ConfiguredClient<WorkflowServiceClientWithMetrics>>;
+type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
 
 #[pyclass]
 pub struct ClientRef {
@@ -82,7 +82,7 @@ macro_rules! rpc_call {
 
 #[pymethods]
 impl ClientRef {
-    fn call<'p>(
+    fn call_workflow_service<'p>(
         &self,
         py: Python<'p>,
         rpc: String,
@@ -113,6 +113,9 @@ impl ClientRef {
                     rpc_call!(retry_client, retry, get_search_attributes, req)
                 }
                 "get_system_info" => rpc_call!(retry_client, retry, get_system_info, req),
+                "get_worker_build_id_ordering" => {
+                    rpc_call!(retry_client, retry, get_worker_build_id_ordering, req)
+                },
                 "get_workflow_execution_history" => {
                     rpc_call!(retry_client, retry, get_workflow_execution_history, req)
                 }
@@ -228,6 +231,74 @@ impl ClientRef {
                 }
                 "update_namespace" => rpc_call!(retry_client, retry, update_namespace, req),
                 "update_schedule" => rpc_call!(retry_client, retry, update_schedule, req),
+                "update_workflow" => rpc_call!(retry_client, retry, update_workflow, req),
+                "update_worker_build_id_ordering" => {
+                    rpc_call!(retry_client, retry, update_worker_build_id_ordering, req)
+                },
+                _ => return Err(PyValueError::new_err(format!("Unknown RPC call {}", rpc))),
+            }?;
+            let bytes: &[u8] = &bytes;
+            Ok(Python::with_gil(|py| bytes.into_py(py)))
+        })
+    }
+
+    fn call_operator_service<'p>(
+        &self,
+        py: Python<'p>,
+        rpc: String,
+        retry: bool,
+        req: Vec<u8>,
+    ) -> PyResult<&'p PyAny> {
+        let mut retry_client = self.retry_client.clone();
+        future_into_py(py, async move {
+            let bytes = match rpc.as_str() {
+                "add_or_update_remote_cluster" => {
+                    rpc_call!(retry_client, retry, add_or_update_remote_cluster, req)
+                }
+                "add_search_attributes" => {
+                    rpc_call!(retry_client, retry, add_search_attributes, req)
+                }
+                "delete_namespace" => rpc_call!(retry_client, retry, delete_namespace, req),
+                "delete_workflow_execution" => {
+                    rpc_call!(retry_client, retry, delete_workflow_execution, req)
+                }
+                "describe_cluster" => rpc_call!(retry_client, retry, describe_cluster, req),
+                "list_cluster_members" => rpc_call!(retry_client, retry, list_cluster_members, req),
+                "list_clusters" => rpc_call!(retry_client, retry, list_clusters, req),
+                "list_search_attributes" => {
+                    rpc_call!(retry_client, retry, list_search_attributes, req)
+                }
+                "remove_remote_cluster" => {
+                    rpc_call!(retry_client, retry, remove_remote_cluster, req)
+                }
+                "remove_search_attributes" => {
+                    rpc_call!(retry_client, retry, remove_search_attributes, req)
+                }
+                _ => return Err(PyValueError::new_err(format!("Unknown RPC call {}", rpc))),
+            }?;
+            let bytes: &[u8] = &bytes;
+            Ok(Python::with_gil(|py| bytes.into_py(py)))
+        })
+    }
+
+    fn call_test_service<'p>(
+        &self,
+        py: Python<'p>,
+        rpc: String,
+        retry: bool,
+        req: Vec<u8>,
+    ) -> PyResult<&'p PyAny> {
+        let mut retry_client = self.retry_client.clone();
+        future_into_py(py, async move {
+            let bytes = match rpc.as_str() {
+                "get_current_time" => rpc_call!(retry_client, retry, get_current_time, req),
+                "lock_time_skipping" => rpc_call!(retry_client, retry, lock_time_skipping, req),
+                "sleep_until" => rpc_call!(retry_client, retry, sleep_until, req),
+                "sleep" => rpc_call!(retry_client, retry, sleep, req),
+                "unlock_time_skipping_with_sleep" => {
+                    rpc_call!(retry_client, retry, unlock_time_skipping_with_sleep, req)
+                }
+                "unlock_time_skipping" => rpc_call!(retry_client, retry, unlock_time_skipping, req),
                 _ => return Err(PyValueError::new_err(format!("Unknown RPC call {}", rpc))),
             }?;
             let bytes: &[u8] = &bytes;

@@ -4,7 +4,6 @@ import logging
 import logging.handlers
 import multiprocessing
 import queue
-import sys
 import time
 import uuid
 from dataclasses import dataclass

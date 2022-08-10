@@ -27,7 +27,6 @@ from typing import (
     cast,
 )
 
-import grpc
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Protocol, runtime_checkable
@@ -38,7 +37,6 @@ from temporalio.api.enums.v1 import EventType, IndexedValueType
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
-    OperatorServiceStub,
 )
 from temporalio.api.workflowservice.v1 import (
     GetSearchAttributesRequest,
@@ -54,7 +52,7 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import RetryPolicy, SearchAttributes
-from temporalio.converter import DataConverter, PayloadCodec, decode_search_attributes
+from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -63,6 +61,7 @@ from temporalio.exceptions import (
     TimeoutError,
     WorkflowAlreadyStartedError,
 )
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
     Worker,
@@ -70,7 +69,6 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from temporalio.workflow_service import RPCError, RPCStatusCode
 from tests.helpers.server import ExternalServer
 
 
@@ -441,7 +439,7 @@ async def test_workflow_async_utils(client: Client):
         assert "done" == await status()
 
         # Get the actual start time out of history
-        resp = await client.service.get_workflow_execution_history(
+        resp = await client.workflow_service.get_workflow_execution_history(
             GetWorkflowExecutionHistoryRequest(
                 namespace=client.namespace,
                 execution=WorkflowExecution(workflow_id=handle.id),
@@ -1131,7 +1129,7 @@ async def test_workflow_cancel_unsent(client: Client):
             task_queue=worker.task_queue,
         )
     # Check history
-    resp = await client.service.get_workflow_execution_history(
+    resp = await client.workflow_service.get_workflow_execution_history(
         GetWorkflowExecutionHistoryRequest(
             namespace=client.namespace,
             execution=WorkflowExecution(workflow_id=workflow_id),
@@ -1332,28 +1330,30 @@ async def test_workflow_search_attributes(server: ExternalServer, client: Client
         pytest.skip("Custom search attributes not supported")
 
     async def search_attributes_present() -> bool:
-        resp = await client.service.get_search_attributes(GetSearchAttributesRequest())
+        resp = await client.workflow_service.get_search_attributes(
+            GetSearchAttributesRequest()
+        )
         return any(k for k in resp.keys.keys() if k.startswith(sa_prefix))
 
     # Add search attributes if not already present
     if not await search_attributes_present():
-        async with grpc.aio.insecure_channel(server.host_port) as channel:
-            stub = OperatorServiceStub(channel)
-            await stub.AddSearchAttributes(
-                AddSearchAttributesRequest(
-                    search_attributes={
-                        f"{sa_prefix}text": IndexedValueType.INDEXED_VALUE_TYPE_TEXT,
-                        f"{sa_prefix}keyword": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
-                        f"{sa_prefix}int": IndexedValueType.INDEXED_VALUE_TYPE_INT,
-                        f"{sa_prefix}double": IndexedValueType.INDEXED_VALUE_TYPE_DOUBLE,
-                        f"{sa_prefix}bool": IndexedValueType.INDEXED_VALUE_TYPE_BOOL,
-                        f"{sa_prefix}datetime": IndexedValueType.INDEXED_VALUE_TYPE_DATETIME,
-                    },
-                )
-            )
-            # TODO(cretz): Why is it required to issue this list call before it
-            # will appear in the other RPC list call?
-            await stub.ListSearchAttributes(ListSearchAttributesRequest())
+        await client.operator_service.add_search_attributes(
+            AddSearchAttributesRequest(
+                search_attributes={
+                    f"{sa_prefix}text": IndexedValueType.INDEXED_VALUE_TYPE_TEXT,
+                    f"{sa_prefix}keyword": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+                    f"{sa_prefix}int": IndexedValueType.INDEXED_VALUE_TYPE_INT,
+                    f"{sa_prefix}double": IndexedValueType.INDEXED_VALUE_TYPE_DOUBLE,
+                    f"{sa_prefix}bool": IndexedValueType.INDEXED_VALUE_TYPE_BOOL,
+                    f"{sa_prefix}datetime": IndexedValueType.INDEXED_VALUE_TYPE_DATETIME,
+                },
+            ),
+        )
+        # TODO(cretz): Why is it required to issue this list call before it will
+        # appear in the other RPC list call?
+        await client.operator_service.list_search_attributes(
+            ListSearchAttributesRequest()
+        )
     # Confirm now present
     assert await search_attributes_present()
 
@@ -1878,7 +1878,7 @@ async def test_workflow_local_activity_backoff(client: Client):
             task_timeout=timedelta(seconds=3),
         )
     # Check history
-    resp = await client.service.get_workflow_execution_history(
+    resp = await client.workflow_service.get_workflow_execution_history(
         GetWorkflowExecutionHistoryRequest(
             namespace=client.namespace,
             execution=WorkflowExecution(workflow_id=workflow_id),
@@ -1917,7 +1917,7 @@ async def test_workflow_deadlock(client: Client):
         )
 
         async def last_history_task_failure() -> str:
-            resp = await client.service.get_workflow_execution_history(
+            resp = await client.workflow_service.get_workflow_execution_history(
                 GetWorkflowExecutionHistoryRequest(
                     namespace=client.namespace,
                     execution=WorkflowExecution(workflow_id=handle.id),

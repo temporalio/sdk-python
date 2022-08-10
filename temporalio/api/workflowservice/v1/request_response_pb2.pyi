@@ -16,6 +16,7 @@ import temporalio.api.enums.v1.namespace_pb2
 import temporalio.api.enums.v1.query_pb2
 import temporalio.api.enums.v1.reset_pb2
 import temporalio.api.enums.v1.task_queue_pb2
+import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.filter.v1.message_pb2
@@ -25,6 +26,7 @@ import temporalio.api.query.v1.message_pb2
 import temporalio.api.replication.v1.message_pb2
 import temporalio.api.schedule.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
+import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import typing
@@ -3678,6 +3680,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         INTERNAL_ERROR_DIFFERENTIATION_FIELD_NUMBER: builtins.int
         ACTIVITY_FAILURE_INCLUDE_HEARTBEAT_FIELD_NUMBER: builtins.int
         SUPPORTS_SCHEDULES_FIELD_NUMBER: builtins.int
+        ENCODED_FAILURE_ATTRIBUTES_FIELD_NUMBER: builtins.int
         signal_and_query_header: builtins.bool
         """True if signal and query headers are supported."""
 
@@ -3695,6 +3698,9 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         supports_schedules: builtins.bool
         """Supports scheduled workflow features."""
 
+        encoded_failure_attributes: builtins.bool
+        """True if server uses protos that include temporalio.api.failure.v1.Failure.encoded_attributes"""
+
         def __init__(
             self,
             *,
@@ -3702,12 +3708,15 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
             internal_error_differentiation: builtins.bool = ...,
             activity_failure_include_heartbeat: builtins.bool = ...,
             supports_schedules: builtins.bool = ...,
+            encoded_failure_attributes: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
             field_name: typing_extensions.Literal[
                 "activity_failure_include_heartbeat",
                 b"activity_failure_include_heartbeat",
+                "encoded_failure_attributes",
+                b"encoded_failure_attributes",
                 "internal_error_differentiation",
                 b"internal_error_differentiation",
                 "signal_and_query_header",
@@ -4359,3 +4368,302 @@ class ListSchedulesResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ListSchedulesResponse = ListSchedulesResponse
+
+class UpdateWorkerBuildIdOrderingRequest(google.protobuf.message.Message):
+    """(-- api-linter: core::0134::request-mask-required=disabled
+        aip.dev/not-precedent: UpdateWorkerBuildIdOrderingRequest doesn't follow Google API format --)
+    (-- api-linter: core::0134::request-resource-required=disabled
+        aip.dev/not-precedent: UpdateWorkerBuildIdOrderingRequest RPC doesn't follow Google API format. --)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    VERSION_ID_FIELD_NUMBER: builtins.int
+    PREVIOUS_COMPATIBLE_FIELD_NUMBER: builtins.int
+    BECOME_DEFAULT_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    task_queue: typing.Text
+    """Must be set, the task queue to apply changes to. Because all workers on
+    a given task queue must have the same set of workflow & activity
+    implementations, there is no reason to specify a task queue type here.
+    """
+
+    @property
+    def version_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
+        """The version id we are targeting."""
+        pass
+    @property
+    def previous_compatible(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
+        """When set, indicates that the `version_id` in this message is compatible
+        with the one specified in this field. Because compatability should form
+        a DAG, any build id can only be the "next compatible" version for one
+        other ID of a certain type at a time, and any setting which would create a cycle is invalid.
+        """
+        pass
+    become_default: builtins.bool
+    """When set, establishes the specified `version_id` as the default of it's type
+    for the queue. Workers matching it will begin processing new workflow executions.
+    The existing default will be marked as a previous incompatible version
+    to this one, assuming it is not also in `is_compatible_with`.
+    """
+
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        task_queue: typing.Text = ...,
+        version_id: typing.Optional[
+            temporalio.api.taskqueue.v1.message_pb2.VersionId
+        ] = ...,
+        previous_compatible: typing.Optional[
+            temporalio.api.taskqueue.v1.message_pb2.VersionId
+        ] = ...,
+        become_default: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "previous_compatible", b"previous_compatible", "version_id", b"version_id"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "become_default",
+            b"become_default",
+            "namespace",
+            b"namespace",
+            "previous_compatible",
+            b"previous_compatible",
+            "task_queue",
+            b"task_queue",
+            "version_id",
+            b"version_id",
+        ],
+    ) -> None: ...
+
+global___UpdateWorkerBuildIdOrderingRequest = UpdateWorkerBuildIdOrderingRequest
+
+class UpdateWorkerBuildIdOrderingResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___UpdateWorkerBuildIdOrderingResponse = UpdateWorkerBuildIdOrderingResponse
+
+class GetWorkerBuildIdOrderingRequest(google.protobuf.message.Message):
+    """(-- api-linter: core::0134::request-resource-required=disabled
+    aip.dev/not-precedent: GetWorkerBuildIdOrderingRequest RPC doesn't follow Google API format. --)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    MAX_DEPTH_FIELD_NUMBER: builtins.int
+    namespace: typing.Text
+    task_queue: typing.Text
+    """Must be set, the task queue to interrogate about worker id ordering"""
+
+    max_depth: builtins.int
+    """Limits how deep the returned DAG will go. 1 will return only the
+    default build id. A default/0 value will return the entire graph.
+    """
+
+    def __init__(
+        self,
+        *,
+        namespace: typing.Text = ...,
+        task_queue: typing.Text = ...,
+        max_depth: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "max_depth",
+            b"max_depth",
+            "namespace",
+            b"namespace",
+            "task_queue",
+            b"task_queue",
+        ],
+    ) -> None: ...
+
+global___GetWorkerBuildIdOrderingRequest = GetWorkerBuildIdOrderingRequest
+
+class GetWorkerBuildIdOrderingResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    CURRENT_DEFAULT_FIELD_NUMBER: builtins.int
+    COMPATIBLE_LEAVES_FIELD_NUMBER: builtins.int
+    @property
+    def current_default(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionIdNode:
+        """The currently established default version"""
+        pass
+    @property
+    def compatible_leaves(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.taskqueue.v1.message_pb2.VersionIdNode
+    ]:
+        """Other current latest-compatible versions who are not the overall default. These are the
+        versions that will be used when generating new tasks by following the graph from the
+        version of the last task out to a leaf.
+        """
+        pass
+    def __init__(
+        self,
+        *,
+        current_default: typing.Optional[
+            temporalio.api.taskqueue.v1.message_pb2.VersionIdNode
+        ] = ...,
+        compatible_leaves: typing.Optional[
+            typing.Iterable[temporalio.api.taskqueue.v1.message_pb2.VersionIdNode]
+        ] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["current_default", b"current_default"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "compatible_leaves",
+            b"compatible_leaves",
+            "current_default",
+            b"current_default",
+        ],
+    ) -> None: ...
+
+global___GetWorkerBuildIdOrderingResponse = GetWorkerBuildIdOrderingResponse
+
+class UpdateWorkflowRequest(google.protobuf.message.Message):
+    """(-- api-linter: core::0134=disabled
+    aip.dev/not-precedent: Update RPCs don't follow Google API format. --)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    RESULT_ACCESS_STYLE_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
+    FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
+    UPDATE_FIELD_NUMBER: builtins.int
+    request_id: typing.Text
+    """A unique ID for this logical request"""
+
+    result_access_style: temporalio.api.enums.v1.update_pb2.WorkflowUpdateResultAccessStyle.ValueType
+    """The manner in which the update result will be accessed.
+    This field requires a non-default value; the default value of the enum
+    will result in an error.
+    """
+
+    namespace: typing.Text
+    """The namespace name of the target workflow"""
+
+    @property
+    def workflow_execution(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """The target workflow id and (optionally) a specific run thereof
+        (-- api-linter: core::0203::optional=disabled
+            aip.dev/not-precedent: false positive triggered by the word "optional" --)
+        """
+        pass
+    first_execution_run_id: typing.Text
+    """If set, this call will error if the most recent (if no run id is set on
+    `workflow_execution`), or specified (if it is) workflow execution is not
+    part of the same execution chain as this id.
+    """
+
+    @property
+    def update(self) -> temporalio.api.update.v1.message_pb2.WorkflowUpdate:
+        """The name under which the workflow update function is registered and the
+        arguments to pass to said function.
+        """
+        pass
+    def __init__(
+        self,
+        *,
+        request_id: typing.Text = ...,
+        result_access_style: temporalio.api.enums.v1.update_pb2.WorkflowUpdateResultAccessStyle.ValueType = ...,
+        namespace: typing.Text = ...,
+        workflow_execution: typing.Optional[
+            temporalio.api.common.v1.message_pb2.WorkflowExecution
+        ] = ...,
+        first_execution_run_id: typing.Text = ...,
+        update: typing.Optional[
+            temporalio.api.update.v1.message_pb2.WorkflowUpdate
+        ] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "update", b"update", "workflow_execution", b"workflow_execution"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "first_execution_run_id",
+            b"first_execution_run_id",
+            "namespace",
+            b"namespace",
+            "request_id",
+            b"request_id",
+            "result_access_style",
+            b"result_access_style",
+            "update",
+            b"update",
+            "workflow_execution",
+            b"workflow_execution",
+        ],
+    ) -> None: ...
+
+global___UpdateWorkflowRequest = UpdateWorkflowRequest
+
+class UpdateWorkflowResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    UPDATE_TOKEN_FIELD_NUMBER: builtins.int
+    SUCCESS_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
+    update_token: builtins.bytes
+    """An opaque token that can be used to retrieve the update result via
+    polling if it is not returned as part of the gRPC response
+    """
+
+    @property
+    def success(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
+    def __init__(
+        self,
+        *,
+        update_token: builtins.bytes = ...,
+        success: typing.Optional[temporalio.api.common.v1.message_pb2.Payloads] = ...,
+        failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failure", b"failure", "result", b"result", "success", b"success"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failure",
+            b"failure",
+            "result",
+            b"result",
+            "success",
+            b"success",
+            "update_token",
+            b"update_token",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["result", b"result"]
+    ) -> typing.Optional[typing_extensions.Literal["success", "failure"]]: ...
+
+global___UpdateWorkflowResponse = UpdateWorkflowResponse

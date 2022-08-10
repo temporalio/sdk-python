@@ -63,7 +63,7 @@ class Client:
         """Initialize client with underlying SDK Core reference."""
         self._ref = ref
 
-    async def rpc_call(
+    async def call_workflow_service(
         self,
         rpc: str,
         req: google.protobuf.message.Message,
@@ -73,5 +73,37 @@ class Client:
     ) -> ProtoMessage:
         """Make RPC call using SDK Core."""
         resp = resp_type()
-        resp.ParseFromString(await self._ref.call(rpc, retry, req.SerializeToString()))
+        resp.ParseFromString(
+            await self._ref.call_workflow_service(rpc, retry, req.SerializeToString())
+        )
+        return resp
+
+    async def call_operator_service(
+        self,
+        rpc: str,
+        req: google.protobuf.message.Message,
+        resp_type: Type[ProtoMessage],
+        *,
+        retry: bool = False,
+    ) -> ProtoMessage:
+        """Make RPC call using SDK Core."""
+        resp = resp_type()
+        resp.ParseFromString(
+            await self._ref.call_operator_service(rpc, retry, req.SerializeToString())
+        )
+        return resp
+
+    async def call_test_service(
+        self,
+        rpc: str,
+        req: google.protobuf.message.Message,
+        resp_type: Type[ProtoMessage],
+        *,
+        retry: bool = False,
+    ) -> ProtoMessage:
+        """Make RPC call using SDK Core."""
+        resp = resp_type()
+        resp.ParseFromString(
+            await self._ref.call_test_service(rpc, retry, req.SerializeToString())
+        )
         return resp

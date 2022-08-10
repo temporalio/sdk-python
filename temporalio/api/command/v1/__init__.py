@@ -1,8 +1,10 @@
 from .message_pb2 import (
+    AcceptWorkflowUpdateCommandAttributes,
     CancelTimerCommandAttributes,
     CancelWorkflowExecutionCommandAttributes,
     Command,
     CompleteWorkflowExecutionCommandAttributes,
+    CompleteWorkflowUpdateCommandAttributes,
     ContinueAsNewWorkflowExecutionCommandAttributes,
     FailWorkflowExecutionCommandAttributes,
     RecordMarkerCommandAttributes,
@@ -16,10 +18,12 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "AcceptWorkflowUpdateCommandAttributes",
     "CancelTimerCommandAttributes",
     "CancelWorkflowExecutionCommandAttributes",
     "Command",
     "CompleteWorkflowExecutionCommandAttributes",
+    "CompleteWorkflowUpdateCommandAttributes",
     "ContinueAsNewWorkflowExecutionCommandAttributes",
     "FailWorkflowExecutionCommandAttributes",
     "RecordMarkerCommandAttributes",
