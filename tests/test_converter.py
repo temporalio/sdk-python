@@ -172,5 +172,6 @@ def test_type_hints_from_func():
     assert_hints(some_hinted_func)
     assert_hints(some_hinted_func_async)
     assert_hints(MyCallableClass())
+    assert_hints(MyCallableClass)
     assert_hints(MyCallableClass.some_method)
     assert_hints(MyCallableClass().some_method)
