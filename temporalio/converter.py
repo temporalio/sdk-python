@@ -757,16 +757,17 @@ def _type_hints_from_func(
     # the func. This mimics inspect logic inside Python.
     if (
         not inspect.isfunction(func)
-        and not isinstance(func, type)
         and not isinstance(func, _non_user_defined_callables)
         and not isinstance(func, types.MethodType)
     ):
-        # Callable instance
-        call_func = getattr(type(func), "__call__", None)
+        # Class type or Callable instance
+        tmp_func = func if isinstance(func, type) else type(func)
+        call_func = getattr(tmp_func, "__call__", None)
         if call_func is not None and not isinstance(
-            type(func), _non_user_defined_callables
+            tmp_func, _non_user_defined_callables
         ):
             func = call_func
+
     # We use inspect.signature for the parameter names and kinds, but we cannot
     # use it for annotations because those that are using deferred hinting (i.e.
     # from __future__ import annotations) only work with the eval_str parameter
