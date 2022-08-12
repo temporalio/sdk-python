@@ -587,6 +587,14 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+name = "protoc-wheel-0"
+version = "21.1"
+description = "Google Protocol buffers compiler"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "py"
 version = "1.11.0"
 description = "library with cross-python path, ini-parsing, io, code, log facilities"
@@ -814,7 +822,7 @@ jupyter = ["ipywidgets (>=7.5.1,<8.0.0)"]
 
 [[package]]
 name = "secretstorage"
-version = "3.3.2"
+version = "3.3.3"
 description = "Python bindings to FreeDesktop.org Secret Service API"
 category = "dev"
 optional = false
@@ -838,7 +846,7 @@ doc = ["sphinx", "sphinx-rtd-theme"]
 
 [[package]]
 name = "setuptools-rust"
-version = "1.5.0"
+version = "1.5.1"
 description = "Setuptools Rust extension plugin"
 category = "dev"
 optional = false
@@ -1026,7 +1034,7 @@ opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "a0101e48b4102c55e4233080aaa7af886c0d96fe60047edb7e58af2deeb7dc47"
+content-hash = "4f4a89e17f3aef7a1bb81815c7163a77a860d6376067fb4f19857d2d87741b67"
 
 [metadata.files]
 appdirs = []
@@ -1078,6 +1086,7 @@ pkginfo = []
 platformdirs = []
 pluggy = []
 protobuf = []
+protoc-wheel-0 = []
 py = []
 pycparser = []
 pydantic = []

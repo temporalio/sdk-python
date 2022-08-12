@@ -2222,8 +2222,10 @@ async def test_workflow_query_rpc_timeout(client: Client):
         await handle.query(
             HelloWorkflowWithQuery.some_query, rpc_timeout=timedelta(seconds=1)
         )
-    assert err.value.status == RPCStatusCode.CANCELLED
-    assert "timeout" in str(err.value).lower()
+    assert (
+        err.value.status == RPCStatusCode.CANCELLED
+        and "timeout" in str(err.value).lower()
+    ) or err.value.status == RPCStatusCode.DEADLINE_EXCEEDED
 
 
 def new_worker(

@@ -51,7 +51,7 @@ jobs:
         run: |
           poe gen-protos
           poe format
-          [[ -z $(git status --porcelain) ]] || (git status; echo "Protos changed"; exit 1)
+          [[ -z $(git status --porcelain) ]] || (git diff; echo "Protos changed"; exit 1)
 
       # Do docs stuff (only on one host)
       - name: Build API docs

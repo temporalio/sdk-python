@@ -105,7 +105,7 @@ def fix_generated_output(base_path: Path):
                     or message == "TestService"
                 ):
                     import_suffix = " # type: ignore"
-                f.write(f"    from .{stem} import {message}{import_suffix}\n")
+                f.write(f"    from .service_pb2_grpc import {message}{import_suffix}\n")
                 message_names.append(message)
             # __all__
             message_names = sorted(message_names)
