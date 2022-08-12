@@ -8,6 +8,7 @@ import socket
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import IntEnum
 from typing import Generic, Mapping, Optional, Type, TypeVar, Union
 
@@ -96,7 +97,7 @@ class ConnectConfig:
     target_host: str
     tls: Union[bool, TLSConfig] = False
     retry_config: Optional[RetryConfig] = None
-    static_headers: Mapping[str, str] = field(default_factory=dict)
+    rpc_metadata: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
 
     def __post_init__(self) -> None:
@@ -136,7 +137,7 @@ class ConnectConfig:
             retry_config=self.retry_config._to_bridge_config()
             if self.retry_config
             else None,
-            static_headers=self.static_headers,
+            metadata=self.rpc_metadata,
             identity=self.identity,
             client_name="temporal-python",
             client_version=__version__,
@@ -172,8 +173,10 @@ class ServiceClient(ABC):
         req: google.protobuf.message.Message,
         resp_type: Type[ServiceResponse],
         *,
-        retry: bool = False,
-        service: str = "workflow",
+        service: str,
+        retry: bool,
+        metadata: Mapping[str, str],
+        timeout: Optional[timedelta],
     ) -> ServiceResponse:
         raise NotImplementedError
 
@@ -577,13 +580,21 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
         self.service = service
 
     async def __call__(
-        self, req: ServiceRequest, *, retry: bool = False
+        self,
+        req: ServiceRequest,
+        *,
+        retry: bool = False,
+        metadata: Mapping[str, str] = {},
+        timeout: Optional[timedelta] = None,
     ) -> ServiceResponse:
         """Invoke underlying client with the given request.
 
         Args:
             req: Request for the call.
             retry: If true, will use retry config to retry failed calls.
+            metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
             RPC response.
@@ -592,7 +603,13 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
             RPCError: Any RPC error that occurs during the call.
         """
         return await self.service_client._rpc_call(
-            self.name, req, self.resp_type, retry=retry, service=self.service
+            self.name,
+            req,
+            self.resp_type,
+            service=self.service,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
         )
 
 
@@ -627,27 +644,24 @@ class _BridgeServiceClient(ServiceClient):
         req: google.protobuf.message.Message,
         resp_type: Type[ServiceResponse],
         *,
-        retry: bool = False,
-        service: str = "workflow",
+        service: str,
+        retry: bool,
+        metadata: Mapping[str, str],
+        timeout: Optional[timedelta],
     ) -> ServiceResponse:
         global LOG_PROTOS
         if LOG_PROTOS:
             logger.debug("Service %s request to %s: %s", service, rpc, req)
         try:
-            if service == "workflow":
-                resp = await self._bridge_client.call_workflow_service(
-                    rpc, req, resp_type, retry=retry
-                )
-            elif service == "operator":
-                resp = await self._bridge_client.call_operator_service(
-                    rpc, req, resp_type, retry=retry
-                )
-            elif service == "test":
-                resp = await self._bridge_client.call_test_service(
-                    rpc, req, resp_type, retry=retry
-                )
-            else:
-                raise ValueError(f"Unrecognized service {service}")
+            resp = await self._bridge_client.call(
+                service=service,
+                rpc=rpc,
+                req=req,
+                resp_type=resp_type,
+                retry=retry,
+                metadata=metadata,
+                timeout=timeout,
+            )
             if LOG_PROTOS:
                 logger.debug("Service %s response from %s: %s", service, rpc, resp)
             return resp

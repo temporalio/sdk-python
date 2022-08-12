@@ -1,86 +1,118 @@
-import google.protobuf.empty_pb2
-import google.protobuf.timestamp_pb2
-import grpc
+from datetime import timedelta
 
-import temporalio
-import temporalio.api.operatorservice.v1
-import temporalio.api.testservice.v1
-import temporalio.api.workflowservice.v1
+from google.protobuf.empty_pb2 import Empty
+from google.protobuf.timestamp_pb2 import Timestamp
+from grpc.aio import ServicerContext
+from grpc.aio import server as grpc_server
+
+from temporalio.api.operatorservice.v1 import (
+    DeleteNamespaceRequest,
+    DeleteNamespaceResponse,
+    OperatorServiceServicer,
+    add_OperatorServiceServicer_to_server,
+)
+from temporalio.api.testservice.v1 import (
+    GetCurrentTimeResponse,
+    TestServiceServicer,
+    add_TestServiceServicer_to_server,
+)
+from temporalio.api.workflowservice.v1 import (
+    CountWorkflowExecutionsRequest,
+    CountWorkflowExecutionsResponse,
+    GetSystemInfoRequest,
+    GetSystemInfoResponse,
+    WorkflowServiceServicer,
+    add_WorkflowServiceServicer_to_server,
+)
+from temporalio.client import Client
 
 
-class SimpleWorkflowServer(temporalio.api.workflowservice.v1.WorkflowServiceServicer):
+def assert_metadata(context: ServicerContext, **kwargs) -> None:
+    metadata = dict(context.invocation_metadata())
+    for k, v in kwargs.items():
+        assert metadata.get(k) == v
+
+
+def assert_time_remaining(context: ServicerContext, expected: int) -> None:
+    # Give or take 5 seconds
+    assert expected - 5 <= context.time_remaining() <= expected + 5
+
+
+class SimpleWorkflowServer(WorkflowServiceServicer):
+    async def GetSystemInfo(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
+        self,
+        request: GetSystemInfoRequest,
+        context: ServicerContext,
+    ) -> GetSystemInfoResponse:
+        assert_metadata(context, client_key="client_value")
+        return GetSystemInfoResponse()
+
     async def CountWorkflowExecutions(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
         self,
-        request: temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest,
-        context: grpc.aio.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.CountWorkflowExecutionsResponse:
+        request: CountWorkflowExecutionsRequest,
+        context: ServicerContext,
+    ) -> CountWorkflowExecutionsResponse:
+        assert_metadata(context, client_key="client_value", rpc_key="rpc_value")
+        assert_time_remaining(context, 123)
         assert request.namespace == "my namespace"
         assert request.query == "my query"
-        return temporalio.api.workflowservice.v1.CountWorkflowExecutionsResponse(
-            count=123
-        )
+        return CountWorkflowExecutionsResponse(count=123)
 
 
-class SimpleOperatorServer(temporalio.api.operatorservice.v1.OperatorServiceServicer):
+class SimpleOperatorServer(OperatorServiceServicer):
     async def DeleteNamespace(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
         self,
-        request: temporalio.api.operatorservice.v1.DeleteNamespaceRequest,
-        context: grpc.aio.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.DeleteNamespaceResponse:
+        request: DeleteNamespaceRequest,
+        context: ServicerContext,
+    ) -> DeleteNamespaceResponse:
+        assert_metadata(context, client_key="client_value", rpc_key="rpc_value")
+        assert_time_remaining(context, 123)
         assert request.namespace == "my namespace"
-        return temporalio.api.operatorservice.v1.DeleteNamespaceResponse(
-            deleted_namespace="my namespace response"
-        )
+        return DeleteNamespaceResponse(deleted_namespace="my namespace response")
 
 
-class SimpleTestServer(temporalio.api.testservice.v1.TestServiceServicer):
+class SimpleTestServer(TestServiceServicer):
     async def GetCurrentTime(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
         self,
-        request: google.protobuf.empty_pb2.Empty,
-        context: grpc.aio.ServicerContext,
-    ) -> temporalio.api.testservice.v1.GetCurrentTimeResponse:
-        return temporalio.api.testservice.v1.GetCurrentTimeResponse(
-            time=google.protobuf.timestamp_pb2.Timestamp(seconds=123)
-        )
+        request: Empty,
+        context: ServicerContext,
+    ) -> GetCurrentTimeResponse:
+        assert_metadata(context, client_key="client_value", rpc_key="rpc_value")
+        assert_time_remaining(context, 123)
+        return GetCurrentTimeResponse(time=Timestamp(seconds=123))
 
 
 async def test_python_grpc_stub():
     """Make sure pure Python gRPC client works."""
 
     # Start server
-    server = grpc.aio.server()
-    temporalio.api.workflowservice.v1.add_WorkflowServiceServicer_to_server(
-        SimpleWorkflowServer(), server
-    )
-    temporalio.api.operatorservice.v1.add_OperatorServiceServicer_to_server(
-        SimpleOperatorServer(), server
-    )
-    temporalio.api.testservice.v1.add_TestServiceServicer_to_server(
-        SimpleTestServer(), server
-    )
+    server = grpc_server()
+    add_WorkflowServiceServicer_to_server(SimpleWorkflowServer(), server)
+    add_OperatorServiceServicer_to_server(SimpleOperatorServer(), server)
+    add_TestServiceServicer_to_server(SimpleTestServer(), server)
     port = server.add_insecure_port("[::]:0")
     await server.start()
 
-    async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
-        response = await temporalio.api.workflowservice.v1.WorkflowServiceStub(
-            channel
-        ).CountWorkflowExecutions(
-            temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest(
-                namespace="my namespace", query="my query"
-            )
-        )
-        assert response.count == 123
-        response = await temporalio.api.operatorservice.v1.OperatorServiceStub(
-            channel
-        ).DeleteNamespace(
-            temporalio.api.operatorservice.v1.DeleteNamespaceRequest(
-                namespace="my namespace"
-            )
-        )
-        assert response.deleted_namespace == "my namespace response"
-        response = await temporalio.api.testservice.v1.TestServiceStub(
-            channel
-        ).GetCurrentTime(google.protobuf.empty_pb2.Empty())
-        assert response.time.seconds == 123
-
+    # Use our client to make a call to each service
+    client = await Client.connect(
+        f"localhost:{port}", rpc_metadata={"client_key": "client_value"}
+    )
+    metadata = {"rpc_key": "rpc_value"}
+    timeout = timedelta(seconds=123)
+    count_resp = await client.workflow_service.count_workflow_executions(
+        CountWorkflowExecutionsRequest(namespace="my namespace", query="my query"),
+        metadata=metadata,
+        timeout=timeout,
+    )
+    assert count_resp.count == 123
+    del_resp = await client.operator_service.delete_namespace(
+        DeleteNamespaceRequest(namespace="my namespace"),
+        metadata=metadata,
+        timeout=timeout,
+    )
+    assert del_resp.deleted_namespace == "my namespace response"
+    time_resp = await client.test_service.get_current_time(
+        Empty(), metadata=metadata, timeout=timeout
+    )
+    assert time_resp.time.seconds == 123
     await server.stop(grace=None)

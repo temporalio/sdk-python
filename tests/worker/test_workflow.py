@@ -2189,6 +2189,41 @@ async def test_workflow_wait_condition_timeout(client: Client):
         await handle.result()
 
 
+@workflow.defn
+class HelloWorkflowWithQuery:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return f"Hello, {name}!"
+
+    @workflow.query
+    def some_query(self) -> str:
+        return "some value"
+
+
+async def test_workflow_query_rpc_timeout(client: Client):
+    # Run workflow under worker and confirm query works
+    async with new_worker(
+        client,
+        HelloWorkflowWithQuery,
+    ) as worker:
+        handle = await client.start_workflow(
+            HelloWorkflowWithQuery.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert "Hello, Temporal!" == await handle.result()
+        assert "some value" == await handle.query(HelloWorkflowWithQuery.some_query)
+
+    # Now with the worker stopped, issue a query with a one second timeout
+    with pytest.raises(RPCError) as err:
+        await handle.query(
+            HelloWorkflowWithQuery.some_query, rpc_timeout=timedelta(seconds=1)
+        )
+    assert err.value.status == RPCStatusCode.CANCELLED
+    assert "timeout" in str(err.value).lower()
+
+
 def new_worker(
     client: Client,
     *workflows: Type,

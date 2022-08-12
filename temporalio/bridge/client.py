@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional, Type, TypeVar
+from datetime import timedelta
+from typing import Callable, Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
 
@@ -38,12 +39,23 @@ class ClientConfig:
     """Python representation of the Rust struct for configuring the client."""
 
     target_url: str
-    static_headers: Mapping[str, str]
+    metadata: Mapping[str, str]
     identity: str
     tls_config: Optional[ClientTlsConfig]
     retry_config: Optional[ClientRetryConfig]
     client_name: str
     client_version: str
+
+
+@dataclass
+class RpcCall:
+    """Python representation of the Rust struct for an RPC call."""
+
+    rpc: str
+    req: bytes
+    retry: bool
+    metadata: Mapping[str, str]
+    timeout_millis: Optional[int]
 
 
 ProtoMessage = TypeVar("ProtoMessage", bound=google.protobuf.message.Message)
@@ -63,47 +75,33 @@ class Client:
         """Initialize client with underlying SDK Core reference."""
         self._ref = ref
 
-    async def call_workflow_service(
+    async def call(
         self,
+        *,
+        service: str,
         rpc: str,
         req: google.protobuf.message.Message,
         resp_type: Type[ProtoMessage],
-        *,
-        retry: bool = False,
+        retry: bool,
+        metadata: Mapping[str, str],
+        timeout: Optional[timedelta],
     ) -> ProtoMessage:
         """Make RPC call using SDK Core."""
-        resp = resp_type()
-        resp.ParseFromString(
-            await self._ref.call_workflow_service(rpc, retry, req.SerializeToString())
-        )
-        return resp
+        # Prepare call
+        timeout_millis = round(timeout.total_seconds() * 1000) if timeout else None
+        call = RpcCall(rpc, req.SerializeToString(), retry, metadata, timeout_millis)
 
-    async def call_operator_service(
-        self,
-        rpc: str,
-        req: google.protobuf.message.Message,
-        resp_type: Type[ProtoMessage],
-        *,
-        retry: bool = False,
-    ) -> ProtoMessage:
-        """Make RPC call using SDK Core."""
-        resp = resp_type()
-        resp.ParseFromString(
-            await self._ref.call_operator_service(rpc, retry, req.SerializeToString())
-        )
-        return resp
+        # Do call (this throws an RPCError on failure)
+        if service == "workflow":
+            resp_fut = self._ref.call_workflow_service(call)
+        elif service == "operator":
+            resp_fut = self._ref.call_operator_service(call)
+        elif service == "test":
+            resp_fut = self._ref.call_test_service(call)
+        else:
+            raise ValueError(f"Unrecognized service {service}")
 
-    async def call_test_service(
-        self,
-        rpc: str,
-        req: google.protobuf.message.Message,
-        resp_type: Type[ProtoMessage],
-        *,
-        retry: bool = False,
-    ) -> ProtoMessage:
-        """Make RPC call using SDK Core."""
+        # Convert response
         resp = resp_type()
-        resp.ParseFromString(
-            await self._ref.call_test_service(rpc, retry, req.SerializeToString())
-        )
+        resp.ParseFromString(await resp_fut)
         return resp

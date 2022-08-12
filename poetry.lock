@@ -1022,7 +1022,7 @@ opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "aac2b3c826b3010884b663558b6c57cf0a2c11228c379277daf8086bb4192e65"
+content-hash = "d202854370c90885cbb8d798dde132454cb7a02b29f087c5744b0e094fe7d71c"
 
 [metadata.files]
 appdirs = []
