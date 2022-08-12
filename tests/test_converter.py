@@ -1,13 +1,35 @@
 from __future__ import annotations
 
+import dataclasses
+import sys
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, IntEnum
-from typing import Any
+from typing import (
+    Any,
+    Deque,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    NewType,
+    Optional,
+    Sequence,
+    Set,
+    Text,
+    Tuple,
+    Type,
+    Union,
+)
 
+import pydantic
 import pytest
+from typing_extensions import Literal, TypedDict
 
 import temporalio.api.common.v1
+import temporalio.common
 import temporalio.converter
 from temporalio.api.common.v1 import Payload as AnotherNameForPayload
 
@@ -172,5 +194,152 @@ def test_type_hints_from_func():
     assert_hints(some_hinted_func)
     assert_hints(some_hinted_func_async)
     assert_hints(MyCallableClass())
+    assert_hints(MyCallableClass)
     assert_hints(MyCallableClass.some_method)
     assert_hints(MyCallableClass().some_method)
+
+
+NewIntType = NewType("NewIntType", int)
+MyDataClassAlias = MyDataClass
+
+
+@dataclass
+class NestedDataClass:
+    foo: str
+    bar: List[NestedDataClass] = dataclasses.field(default_factory=list)
+    baz: Optional[NestedDataClass] = None
+
+
+class MyTypedDict(TypedDict):
+    foo: str
+    bar: MyDataClass
+
+
+class MyTypedDictNotTotal(TypedDict, total=False):
+    foo: str
+    bar: MyDataClass
+
+
+class MyPydanticClass(pydantic.BaseModel):
+    foo: str
+    bar: List[MyPydanticClass]
+
+
+def test_json_type_hints():
+    converter = temporalio.converter.JSONPlainPayloadConverter()
+
+    def ok(
+        hint: Type, value: Any, expected_result: Any = temporalio.common._arg_unset
+    ) -> None:
+        payload = converter.to_payload(value)
+        converted_value = converter.from_payload(payload, hint)
+        if expected_result is not temporalio.common._arg_unset:
+            assert expected_result == converted_value
+        else:
+            assert converted_value == value
+
+    def fail(hint: Type, value: Any) -> None:
+        with pytest.raises(Exception):
+            payload = converter.to_payload(value)
+            converter.from_payload(payload, hint)
+
+    # Primitives
+    ok(int, 5)
+    ok(int, 5.5, 5)
+    ok(float, 5, 5.0)
+    ok(float, 5.5)
+    ok(bool, True)
+    ok(str, "foo")
+    ok(Text, "foo")
+    ok(bytes, b"foo")
+    fail(int, "1")
+    fail(float, "1")
+    fail(bool, "1")
+    fail(str, 1)
+
+    # Any
+    ok(Any, 5)
+    ok(Any, None)
+
+    # Literal
+    ok(Literal["foo"], "foo")
+    ok(Literal["foo", False], False)
+    fail(Literal["foo", "bar"], "baz")
+
+    # Dataclass
+    ok(MyDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(NestedDataClass, NestedDataClass("foo"))
+    ok(NestedDataClass, NestedDataClass("foo", baz=NestedDataClass("bar")))
+    ok(NestedDataClass, NestedDataClass("foo", bar=[NestedDataClass("bar")]))
+    # Missing required dataclass fields causes failure
+    ok(NestedDataClass, {"foo": "bar"}, NestedDataClass("bar"))
+    fail(NestedDataClass, {})
+    # Additional dataclass fields is ok
+    ok(NestedDataClass, {"foo": "bar", "unknownfield": "baz"}, NestedDataClass("bar"))
+
+    # Optional/Union
+    ok(Optional[int], 5)
+    ok(Optional[int], None)
+    ok(Optional[MyDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(Union[int, str], 5)
+    ok(Union[int, str], "foo")
+    ok(Union[MyDataClass, NestedDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(Union[MyDataClass, NestedDataClass], NestedDataClass("foo"))
+
+    # NewType
+    ok(NewIntType, 5)
+
+    # List-like
+    ok(List, [5])
+    ok(List[int], [5])
+    ok(List[MyDataClass], [MyDataClass("foo", 5, SerializableEnum.FOO)])
+    ok(Iterable[int], [5, 6])
+    ok(Tuple[int, str], (5, "6"))
+    ok(Tuple[int, ...], (5, 6, 7))
+    ok(Set[int], set([5, 6]))
+    ok(Set, set([5, 6]))
+    ok(List, ["foo"])
+    ok(Deque[int], deque([5, 6]))
+    ok(Sequence[int], [5, 6])
+    fail(List[int], [1, 2, "3"])
+
+    # Dict-like
+    ok(Dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
+    ok(Dict, {"foo": 123})
+    ok(Dict[str, Any], {"foo": 123})
+    ok(Dict[Any, int], {"foo": 123})
+    ok(Mapping, {"foo": 123})
+    ok(Mapping[str, int], {"foo": 123})
+    ok(MutableMapping[str, int], {"foo": 123})
+    ok(
+        MyTypedDict,
+        MyTypedDict(foo="somestr", bar=MyDataClass("foo", 5, SerializableEnum.FOO)),
+    )
+    # TypedDict allows all sorts of dicts, even if they are missing required
+    # fields or have unknown fields. This matches Python runtime behavior of
+    # just accepting any dict.
+    ok(MyTypedDictNotTotal, {"foo": "bar"})
+    ok(MyTypedDict, {"foo": "bar", "blah": "meh"})
+    # Note, dicts can't have int key in JSON
+    fail(Dict[int, str], {1: "2"})
+
+    # Alias
+    ok(MyDataClassAlias, MyDataClass("foo", 5, SerializableEnum.FOO))
+
+    # IntEnum
+    ok(SerializableEnum, SerializableEnum.FOO)
+    ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
+
+    # 3.10+ checks
+    if sys.version_info >= (3, 10):
+        ok(list[int], [1, 2])
+        ok(dict[str, int], {"1": 2})
+        ok(tuple[int, str], (1, "2"))
+
+    # Pydantic
+    ok(
+        MyPydanticClass,
+        MyPydanticClass(foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])]),
+    )
+    ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
+    fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])

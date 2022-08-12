@@ -383,13 +383,11 @@ async def test_activity_type_hints(client: Client, worker: ExternalWorker):
         worker,
         some_activity,
         SomeClass2(foo="str1", bar=SomeClass1(foo=123)),
-        123,
+        "123",
     )
-    # We called with the wrong non-dataclass type, but since we don't strictly
-    # check non-data-types, we don't perform any validation there
     assert (
         result.result
-        == "param1: <class 'tests.worker.test_activity.SomeClass2'>, param2: <class 'int'>"
+        == "param1: <class 'tests.worker.test_activity.SomeClass2'>, param2: <class 'str'>"
     )
     assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
 

@@ -182,15 +182,20 @@ The default data converter supports converting multiple types including:
 * `None`
 * `bytes`
 * `google.protobuf.message.Message` - As JSON when encoding, but has ability to decode binary proto from other languages
-* Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports
+* Anything that can be converted to JSON including:
+  * Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports natively
+  * [dataclasses](https://docs.python.org/3/library/dataclasses.html)
+  * Iterables including ones JSON dump may not support by default, e.g. `set`
+  * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
+    [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
+  * [IntEnum](https://docs.python.org/3/library/enum.html) based enumerates
 
-As a special case in the default converter, [data classes](https://docs.python.org/3/library/dataclasses.html) are
-automatically [converted to dictionaries](https://docs.python.org/3/library/dataclasses.html#dataclasses.asdict) before
-encoding as JSON. Since Python is a dynamic language, when decoding via
-[`json.load`](https://docs.python.org/3/library/json.html#json.load), the type is not known at runtime so, for example,
-a JSON object will be a `dict`. As a special case, if the parameter type hint is a data class for a JSON payload, it is
-decoded into an instance of that data class (properly recursing into child data classes). Currently this capability does
-not extend to any other type hints that may wrap a data class like `Optional`, `List`, etc. This support is planned.
+For converting from JSON, the workflow/activity type hint is taken into account to convert to the proper type. Care has
+been taken to support all common typings including `Optional`, `Union`, all forms of iterables and mappings, `NewType`,
+etc in addition to the regular JSON values mentioned before.
+
+Users are strongly encouraged to use a single `dataclass` for parameter and return types so fields with defaults can be
+easily added without breaking compatibility.
 
 ### Workers
 

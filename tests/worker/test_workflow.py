@@ -2081,9 +2081,11 @@ class CallableClassActivity:
 class ActivityCallableClassWorkflow:
     @workflow.run
     async def run(self, to_add: MyDataClass) -> MyDataClass:
-        return await workflow.execute_activity_class(
+        result = await workflow.execute_activity_class(
             CallableClassActivity, to_add, start_to_close_timeout=timedelta(seconds=30)
         )
+        assert isinstance(result, MyDataClass)
+        return result
 
 
 async def test_workflow_activity_callable_class(client: Client):

@@ -250,17 +250,6 @@ ssh = ["bcrypt (>=3.1.5)"]
 test = ["pytest (>=6.2.0)", "pytest-benchmark", "pytest-cov", "pytest-subtests", "pytest-xdist", "pretend", "iso8601", "pytz", "hypothesis (>=1.11.4,!=3.79.2)"]
 
 [[package]]
-name = "dacite"
-version = "1.6.0"
-description = "Simple creation of data classes from dictionaries."
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[package.extras]
-dev = ["pylint", "mypy", "black", "coveralls", "pytest-cov", "pytest (>=5)"]
-
-[[package]]
 name = "deprecated"
 version = "1.2.13"
 description = "Python @deprecated decorator to deprecate old python classes, functions or methods."
@@ -612,6 +601,21 @@ description = "C parser in Python"
 category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+
+[[package]]
+name = "pydantic"
+version = "1.9.2"
+description = "Data validation and settings management using python type hints"
+category = "dev"
+optional = false
+python-versions = ">=3.6.1"
+
+[package.dependencies]
+typing-extensions = ">=3.7.4.3"
+
+[package.extras]
+email = ["email-validator (>=1.0.3)"]
+dotenv = ["python-dotenv (>=0.10.4)"]
 
 [[package]]
 name = "pydocstyle"
@@ -1022,7 +1026,7 @@ opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "d202854370c90885cbb8d798dde132454cb7a02b29f087c5744b0e094fe7d71c"
+content-hash = "a0101e48b4102c55e4233080aaa7af886c0d96fe60047edb7e58af2deeb7dc47"
 
 [metadata.files]
 appdirs = []
@@ -1045,7 +1049,6 @@ commonmark = []
 configargparse = []
 constantly = []
 cryptography = []
-dacite = []
 deprecated = []
 docutils = []
 filelock = []
@@ -1077,6 +1080,7 @@ pluggy = []
 protobuf = []
 py = []
 pycparser = []
+pydantic = []
 pydocstyle = []
 pydoctor = []
 pygments = []
