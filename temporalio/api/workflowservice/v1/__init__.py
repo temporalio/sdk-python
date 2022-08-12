@@ -100,12 +100,6 @@ from .request_response_pb2 import (
     UpdateWorkflowRequest,
     UpdateWorkflowResponse,
 )
-from .service_pb2_grpc import WorkflowService  # type: ignore
-from .service_pb2_grpc import (
-    WorkflowServiceServicer,
-    WorkflowServiceStub,
-    add_WorkflowServiceServicer_to_server,
-)
 
 __all__ = [
     "CountWorkflowExecutionsRequest",
@@ -208,8 +202,26 @@ __all__ = [
     "UpdateWorkerBuildIdOrderingResponse",
     "UpdateWorkflowRequest",
     "UpdateWorkflowResponse",
-    "WorkflowService",
-    "WorkflowServiceServicer",
-    "WorkflowServiceStub",
-    "add_WorkflowServiceServicer_to_server",
 ]
+
+# gRPC is optional
+try:
+    import grpc
+
+    from .service_pb2_grpc import WorkflowService  # type: ignore
+    from .service_pb2_grpc import (
+        WorkflowServiceServicer,
+        WorkflowServiceStub,
+        add_WorkflowServiceServicer_to_server,
+    )
+
+    __all__.extend(
+        [
+            "WorkflowService",
+            "WorkflowServiceServicer",
+            "WorkflowServiceStub",
+            "add_WorkflowServiceServicer_to_server",
+        ]
+    )
+except ImportError:
+    pass

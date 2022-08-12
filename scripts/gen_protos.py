@@ -78,25 +78,39 @@ def fix_generated_output(base_path: Path):
         # Add docstring to API's init
         if str(base_path.as_posix()).endswith("/temporal/api"):
             f.write('"""gRPC API."""\n')
-        # Imports
+        # Non-gRPC imports
         message_names = []
         for stem, messages in imports.items():
-            for message in messages:
-                # MyPy protobuf does not document this experimental class, see
-                # https://github.com/nipunn1313/mypy-protobuf/issues/212#issuecomment-885300106
-                import_suffix = ""
-                if stem == "service_pb2_grpc" and (
-                    message == "WorkflowService" or message == "OperatorService"
-                ):
-                    import_suffix = " # type: ignore"
-                f.write(f"from .{stem} import {message}{import_suffix}\n")
-                message_names.append(message)
+            if stem != "service_pb2_grpc":
+                for message in messages:
+                    f.write(f"from .{stem} import {message}\n")
+                    message_names.append(message)
         # __all__
         message_names = sorted(message_names)
         if message_names:
             f.write(
                 f'\n__all__ = [\n    "' + '",\n    "'.join(message_names) + '",\n]\n'
             )
+        # gRPC imports
+        if "service_pb2_grpc" in imports:
+            message_names = []
+            f.write("\n# gRPC is optional\ntry:\n    import grpc\n")
+            for message in imports["service_pb2_grpc"]:
+                # MyPy protobuf does not document this experimental class, see
+                # https://github.com/nipunn1313/mypy-protobuf/issues/212#issuecomment-885300106
+                import_suffix = ""
+                if (
+                    message == "WorkflowService"
+                    or message == "OperatorService"
+                    or message == "TestService"
+                ):
+                    import_suffix = " # type: ignore"
+                f.write(f"    from .{stem} import {message}{import_suffix}\n")
+                message_names.append(message)
+            # __all__
+            message_names = sorted(message_names)
+            f.write(f'    __all__.extend(["' + '", "'.join(message_names) + '"])\n')
+            f.write("except ImportError:\n    pass")
 
 
 if __name__ == "__main__":

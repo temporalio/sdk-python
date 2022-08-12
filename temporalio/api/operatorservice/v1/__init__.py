@@ -20,12 +20,6 @@ from .request_response_pb2 import (
     RemoveSearchAttributesRequest,
     RemoveSearchAttributesResponse,
 )
-from .service_pb2_grpc import OperatorService  # type: ignore
-from .service_pb2_grpc import (
-    OperatorServiceServicer,
-    OperatorServiceStub,
-    add_OperatorServiceServicer_to_server,
-)
 
 __all__ = [
     "AddOrUpdateRemoteClusterRequest",
@@ -44,12 +38,30 @@ __all__ = [
     "ListClustersResponse",
     "ListSearchAttributesRequest",
     "ListSearchAttributesResponse",
-    "OperatorService",
-    "OperatorServiceServicer",
-    "OperatorServiceStub",
     "RemoveRemoteClusterRequest",
     "RemoveRemoteClusterResponse",
     "RemoveSearchAttributesRequest",
     "RemoveSearchAttributesResponse",
-    "add_OperatorServiceServicer_to_server",
 ]
+
+# gRPC is optional
+try:
+    import grpc
+
+    from .service_pb2_grpc import OperatorService  # type: ignore
+    from .service_pb2_grpc import (
+        OperatorServiceServicer,
+        OperatorServiceStub,
+        add_OperatorServiceServicer_to_server,
+    )
+
+    __all__.extend(
+        [
+            "OperatorService",
+            "OperatorServiceServicer",
+            "OperatorServiceStub",
+            "add_OperatorServiceServicer_to_server",
+        ]
+    )
+except ImportError:
+    pass

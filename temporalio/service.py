@@ -13,7 +13,6 @@ from typing import Generic, Mapping, Optional, Type, TypeVar, Union
 
 import google.protobuf.empty_pb2
 import google.protobuf.message
-import grpc
 
 import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
@@ -661,23 +660,23 @@ class _BridgeServiceClient(ServiceClient):
 class RPCStatusCode(IntEnum):
     """Status code for :py:class:`RPCError`."""
 
-    OK = grpc.StatusCode.OK.value[0]
-    CANCELLED = grpc.StatusCode.CANCELLED.value[0]
-    UNKNOWN = grpc.StatusCode.UNKNOWN.value[0]
-    INVALID_ARGUMENT = grpc.StatusCode.INVALID_ARGUMENT.value[0]
-    DEADLINE_EXCEEDED = grpc.StatusCode.DEADLINE_EXCEEDED.value[0]
-    NOT_FOUND = grpc.StatusCode.NOT_FOUND.value[0]
-    ALREADY_EXISTS = grpc.StatusCode.ALREADY_EXISTS.value[0]
-    PERMISSION_DENIED = grpc.StatusCode.PERMISSION_DENIED.value[0]
-    RESOURCE_EXHAUSTED = grpc.StatusCode.RESOURCE_EXHAUSTED.value[0]
-    FAILED_PRECONDITION = grpc.StatusCode.FAILED_PRECONDITION.value[0]
-    ABORTED = grpc.StatusCode.ABORTED.value[0]
-    OUT_OF_RANGE = grpc.StatusCode.OUT_OF_RANGE.value[0]
-    UNIMPLEMENTED = grpc.StatusCode.UNIMPLEMENTED.value[0]
-    INTERNAL = grpc.StatusCode.INTERNAL.value[0]
-    UNAVAILABLE = grpc.StatusCode.UNAVAILABLE.value[0]
-    DATA_LOSS = grpc.StatusCode.DATA_LOSS.value[0]
-    UNAUTHENTICATED = grpc.StatusCode.UNAUTHENTICATED.value[0]
+    OK = 0
+    CANCELLED = 1
+    UNKNOWN = 2
+    INVALID_ARGUMENT = 3
+    DEADLINE_EXCEEDED = 4
+    NOT_FOUND = 5
+    ALREADY_EXISTS = 6
+    PERMISSION_DENIED = 7
+    RESOURCE_EXHAUSTED = 8
+    FAILED_PRECONDITION = 9
+    ABORTED = 10
+    OUT_OF_RANGE = 11
+    UNIMPLEMENTED = 12
+    INTERNAL = 13
+    UNAVAILABLE = 14
+    DATA_LOSS = 15
+    UNAUTHENTICATED = 16
 
 
 class RPCError(temporalio.exceptions.TemporalError):

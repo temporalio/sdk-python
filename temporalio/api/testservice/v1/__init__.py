@@ -8,12 +8,6 @@ from .request_response_pb2 import (
     UnlockTimeSkippingRequest,
     UnlockTimeSkippingResponse,
 )
-from .service_pb2_grpc import (
-    TestService,
-    TestServiceServicer,
-    TestServiceStub,
-    add_TestServiceServicer_to_server,
-)
 
 __all__ = [
     "GetCurrentTimeResponse",
@@ -22,10 +16,28 @@ __all__ = [
     "SleepRequest",
     "SleepResponse",
     "SleepUntilRequest",
-    "TestService",
-    "TestServiceServicer",
-    "TestServiceStub",
     "UnlockTimeSkippingRequest",
     "UnlockTimeSkippingResponse",
-    "add_TestServiceServicer_to_server",
 ]
+
+# gRPC is optional
+try:
+    import grpc
+
+    from .service_pb2_grpc import TestService  # type: ignore
+    from .service_pb2_grpc import (
+        TestServiceServicer,
+        TestServiceStub,
+        add_TestServiceServicer_to_server,
+    )
+
+    __all__.extend(
+        [
+            "TestService",
+            "TestServiceServicer",
+            "TestServiceStub",
+            "add_TestServiceServicer_to_server",
+        ]
+    )
+except ImportError:
+    pass
