@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import collections
+import collections.abc
 import dataclasses
 import inspect
 import json
@@ -11,12 +13,25 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Type
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    get_type_hints,
+)
 
-import dacite
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
+from typing_extensions import Literal
 
 import temporalio.api.common.v1
 import temporalio.common
@@ -376,24 +391,50 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
+class AdvancedJSONEncoder(json.JSONEncoder):
+    """Advanced JSON encoder.
+
+    This encoder supports dataclasses, classes with dict() functions, and
+    all iterables as lists.
+    """
+
+    def default(self, o: Any) -> Any:
+        """Override JSON encoding default.
+
+        See :py:meth:`json.JSONEncoder.default`.
+        """
+        # Dataclass support
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        # Support for models with "dict" function like Pydantic
+        dict_fn = getattr(o, "dict", None)
+        if callable(dict_fn):
+            return dict_fn()
+        # Support for non-list iterables like set
+        if not isinstance(o, list) and isinstance(o, collections.abc.Iterable):
+            return list(o)
+        return super().default(o)
+
+
 class JSONPlainPayloadConverter(EncodingPayloadConverter):
     """Converter for 'json/plain' payloads supporting common Python values.
 
-    This supports all values that :py:func:`json.dump` supports and also adds
-    encoding support for :py:mod:`dataclasses` by converting them using
-    :py:mod:`dataclasses.asdict`. Note that on decode, if there is a type hint,
-    it will be used to construct the data class.
+    For encoding, this supports all values that :py:func:`json.dump` supports
+    and by default adds extra encoding support for dataclasses, classes with
+    ``dict()`` methods, and all iterables.
+
+    For decoding, this uses type hints to attempt to rebuild the type from the
+    type hint.
     """
 
     _encoder: Optional[Type[json.JSONEncoder]]
     _decoder: Optional[Type[json.JSONDecoder]]
     _encoding: str
-    _dacite_config: dacite.Config
 
     def __init__(
         self,
         *,
-        encoder: Optional[Type[json.JSONEncoder]] = None,
+        encoder: Optional[Type[json.JSONEncoder]] = AdvancedJSONEncoder,
         decoder: Optional[Type[json.JSONDecoder]] = None,
         encoding: str = "json/plain",
     ) -> None:
@@ -408,7 +449,6 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         self._encoder = encoder
         self._decoder = decoder
         self._encoding = encoding
-        self._dacite_config = dacite.Config(cast=[IntEnum])
 
     @property
     def encoding(self) -> str:
@@ -417,8 +457,6 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        if dataclasses.is_dataclass(value):
-            value = dataclasses.asdict(value)
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self._encoding.encode()},
@@ -435,21 +473,8 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         try:
             obj = json.loads(payload.data, cls=self._decoder)
-
-            # If the object is an int and the type hint is an IntEnum, convert
-            if isinstance(obj, int) and type_hint and issubclass(type_hint, IntEnum):
-                obj = type_hint(obj)
-
-            # If the object is a dict and the type hint is present for a data
-            # class, we instantiate the data class with the value
-            if (
-                isinstance(obj, dict)
-                and inspect.isclass(type_hint)
-                and dataclasses.is_dataclass(type_hint)
-            ):
-                # We have to use dacite here to handle nested dataclasses
-                obj = dacite.from_dict(type_hint, obj, self._dacite_config)
-
+            if type_hint:
+                obj = value_to_type(type_hint, obj)
             return obj
         except json.JSONDecodeError as err:
             raise RuntimeError("Failed parsing") from err
@@ -777,3 +802,218 @@ def _type_hints_from_func(
             return (None, ret)
         args.append(arg_hint)
     return args, ret
+
+
+def value_to_type(hint: Type, value: Any) -> Any:
+    """Convert a given value to the given type hint.
+
+    This is used internally to convert a raw JSON loaded value to a specific
+    type hint.
+
+    Args:
+        hint: Type hint to convert the value to.
+        value: Raw value (e.g. primitive, dict, or list) to convert from.
+
+    Returns:
+        Converted value.
+
+    Raises:
+        TypeError: Unable to convert to the given hint.
+    """
+    # Any or primitives
+    if hint is Any:
+        return value
+    elif hint is int or hint is float:
+        if not isinstance(value, (int, float)):
+            raise TypeError(f"Expected value to be int|float, was {type(value)}")
+        return hint(value)
+    elif hint is bool:
+        if not isinstance(value, bool):
+            raise TypeError(f"Expected value to be bool, was {type(value)}")
+        return bool(value)
+    elif hint is str:
+        if not isinstance(value, str):
+            raise TypeError(f"Expected value to be str, was {type(value)}")
+        return str(value)
+    elif hint is bytes:
+        if not isinstance(value, (str, bytes, list)):
+            raise TypeError(f"Expected value to be bytes, was {type(value)}")
+        # In some other SDKs, this is serialized as a base64 string, but in
+        # Python this is a numeric array.
+        return bytes(value)  # type: ignore
+    elif hint is type(None):
+        if value is not None:
+            raise TypeError(f"Expected None, got value of type {type(value)}")
+        return None
+
+    # NewType. Note we cannot simply check isinstance NewType here because it's
+    # only been a class since 3.10. Instead we'll just check for the presence
+    # of a supertype.
+    supertype = getattr(hint, "__supertype__", None)
+    if supertype:
+        return value_to_type(supertype, value)
+
+    # Load origin for other checks
+    origin = getattr(hint, "__origin__", hint)
+    type_args: Tuple = getattr(hint, "__args__", ())
+
+    # Literal
+    if origin is Literal:
+        if value not in type_args:
+            raise TypeError(f"Value {value} not in literal values {type_args}")
+        return value
+
+    # Union
+    if origin is Union:
+        # Try each one. Note, Optional is just a union w/ none.
+        for arg in type_args:
+            try:
+                return value_to_type(arg, value)
+            except Exception:
+                pass
+        raise TypeError(f"Failed converting to {hint} from {value}")
+
+    # Mapping
+    if inspect.isclass(origin) and issubclass(origin, collections.abc.Mapping):
+        if not isinstance(value, collections.abc.Mapping):
+            raise TypeError(f"Expected {hint}, value was {type(value)}")
+        ret_dict = {}
+        # If there are required or optional keys that means we are a TypedDict
+        # and therefore can extract per-key types
+        per_key_types: Optional[Dict[str, Type]] = None
+        if getattr(origin, "__required_keys__", None) or getattr(
+            origin, "__optional_keys__", None
+        ):
+            per_key_types = get_type_hints(origin)
+        key_type = (
+            type_args[0]
+            if len(type_args) > 0
+            and type_args[0] is not Any
+            and not isinstance(type_args[0], TypeVar)
+            else None
+        )
+        value_type = (
+            type_args[1]
+            if len(type_args) > 1
+            and type_args[1] is not Any
+            and not isinstance(type_args[1], TypeVar)
+            else None
+        )
+        # Convert each key/value
+        for key, value in value.items():
+            if key_type:
+                try:
+                    key = value_to_type(key_type, key)
+                except Exception as err:
+                    raise TypeError(f"Failed converting key {key} on {hint}") from err
+            # If there are per-key types, use it instead of single type
+            this_value_type = value_type
+            if per_key_types:
+                # TODO(cretz): Strict mode would fail an unknown key
+                this_value_type = per_key_types.get(key)
+            if this_value_type:
+                try:
+                    value = value_to_type(this_value_type, value)
+                except Exception as err:
+                    raise TypeError(
+                        f"Failed converting value for key {key} on {hint}"
+                    ) from err
+            ret_dict[key] = value
+        # If there are per-key types, it's a typed dict and we want to attempt
+        # instantiation to get its validation
+        if per_key_types:
+            ret_dict = hint(**ret_dict)
+        return ret_dict
+
+    # Dataclass
+    if dataclasses.is_dataclass(hint):
+        if not isinstance(value, dict):
+            raise TypeError(
+                f"Cannot convert to dataclass {hint}, value is {type(value)} not dict"
+            )
+        # Obtain dataclass fields and check that all dict fields are there and
+        # that no required fields are missing. Unknown fields are silently
+        # ignored.
+        fields = dataclasses.fields(hint)
+        field_hints = get_type_hints(hint)
+        field_values = {}
+        for field in fields:
+            field_value = value.get(field.name, dataclasses.MISSING)
+            # We do not check whether field is required here. Rather, we let the
+            # attempted instantiation of the dataclass raise if a field is
+            # missing
+            if field_value is not dataclasses.MISSING:
+                try:
+                    field_values[field.name] = value_to_type(
+                        field_hints[field.name], field_value
+                    )
+                except Exception as err:
+                    raise TypeError(
+                        f"Failed converting field {field.name} on dataclass {hint}"
+                    ) from err
+        # Simply instantiate the dataclass. This will fail as expected when
+        # missing required fields.
+        # TODO(cretz): Want way to convert snake case to camel case?
+        return hint(**field_values)
+
+    # If there is a @staticmethod or @classmethod parse_obj, we will use it.
+    # This covers Pydantic models.
+    parse_obj_attr = inspect.getattr_static(hint, "parse_obj", None)
+    if isinstance(parse_obj_attr, classmethod) or isinstance(
+        parse_obj_attr, staticmethod
+    ):
+        if not isinstance(value, dict):
+            raise TypeError(
+                f"Cannot convert to {hint}, value is {type(value)} not dict"
+            )
+        return getattr(hint, "parse_obj")(value)
+
+    # IntEnum
+    if inspect.isclass(hint) and issubclass(hint, IntEnum):
+        if not isinstance(value, int):
+            raise TypeError(
+                f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
+            )
+        return hint(value)
+
+    # Iterable. We intentionally put this last as it catches several others.
+    if inspect.isclass(origin) and issubclass(origin, collections.abc.Iterable):
+        if not isinstance(value, collections.abc.Iterable):
+            raise TypeError(f"Expected {hint}, value was {type(value)}")
+        ret_list = []
+        # If there is no type arg, just return value as is
+        if not type_args or (
+            len(type_args) == 1
+            and (isinstance(type_args[0], TypeVar) or type_args[0] is Ellipsis)
+        ):
+            ret_list = list(value)
+        else:
+            # Otherwise convert
+            for i, item in enumerate(value):
+                # Non-tuples use first type arg, tuples use arg set or one
+                # before ellipsis if that's set
+                if origin is not tuple:
+                    arg_type = type_args[0]
+                elif len(type_args) > i and type_args[i] is not Ellipsis:
+                    arg_type = type_args[i]
+                elif type_args[-1] is Ellipsis:
+                    # Ellipsis means use the second to last one
+                    arg_type = type_args[-2]
+                else:
+                    raise TypeError(
+                        f"Type {hint} only expecting {len(type_args)} values, got at least {i + 1}"
+                    )
+                try:
+                    ret_list.append(value_to_type(arg_type, item))
+                except Exception as err:
+                    raise TypeError(f"Failed converting {hint} index {i}") from err
+        # If tuple, set, or deque convert back to that type
+        if origin is tuple:
+            return tuple(ret_list)
+        elif origin is set:
+            return set(ret_list)
+        elif origin is collections.deque:
+            return collections.deque(ret_list)
+        return ret_list
+
+    raise TypeError(f"Unserializable type during conversion: {hint}")
