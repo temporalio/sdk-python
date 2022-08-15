@@ -585,6 +585,22 @@ cancellation of all outstanding activities.
 The `shutdown()` invocation will wait on all activities to complete, so if a long-running activity does not at least
 respect cancellation, the shutdown may never complete.
 
+### Workflow Replay
+
+Given a workflow's history, it can be replayed locally to check for things like non-determinism errors. For example,
+assuming `history_json_str` is populated with a JSON string history either exported from the web UI or from `tctl`, the
+following function will replay it:
+
+```python
+from temporalio.worker import Replayer
+
+async def run_replayer(history_json_str: str):
+  replayer = Replayer(workflows=[SayHello])
+  await replayer.replay_workflow(history_json_str)
+```
+
+This will throw an error if any non-determinism is detected.
+
 ### OpenTelemetry Support
 
 OpenTelemetry support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra.

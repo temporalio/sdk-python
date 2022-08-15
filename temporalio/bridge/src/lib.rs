@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 
 mod client;
 mod telemetry;
@@ -22,6 +23,7 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     )?;
     m.add_class::<worker::WorkerRef>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
+    m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;
     Ok(())
 }
 
@@ -41,4 +43,12 @@ fn new_worker(
     config: worker::WorkerConfig,
 ) -> PyResult<worker::WorkerRef> {
     worker::new_worker(&client, config)
+}
+
+#[pyfunction]
+fn new_replay_worker(
+    history_proto: &PyBytes,
+    config: worker::WorkerConfig,
+) -> PyResult<worker::WorkerRef> {
+    worker::new_replay_worker(&history_proto, config)
 }

@@ -9,6 +9,7 @@ use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
+use temporal_sdk_core_protos::temporal::api::history::v1::History;
 
 use crate::client;
 
@@ -47,6 +48,21 @@ pub fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> PyResult<
             config,
             client.retry_client.clone().into_inner(),
         ))),
+    })
+}
+
+pub fn new_replay_worker(history_proto: &PyBytes, config: WorkerConfig) -> PyResult<WorkerRef> {
+    // This must be run with the Tokio context available
+    let _guard = pyo3_asyncio::tokio::get_runtime().enter();
+    let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
+    let history = History::decode(history_proto.as_bytes())
+        .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+    Ok(WorkerRef {
+        worker: Some(Arc::new(
+            temporal_sdk_core::init_replay_worker(config, &history).map_err(|err| {
+                PyValueError::new_err(format!("Failed creating replay worker: {}", err))
+            })?,
+        )),
     })
 }
 
