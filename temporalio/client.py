@@ -16,7 +16,6 @@ from typing import (
     Mapping,
     Optional,
     Type,
-    TypeVar,
     Union,
     cast,
     overload,
@@ -33,9 +32,9 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.service
 import temporalio.workflow
-import temporalio.workflow_service
-from temporalio.workflow_service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
+from temporalio.service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 from .types import (
     LocalReturnType,
@@ -73,7 +72,7 @@ class Client:
         ] = None,
         tls: Union[bool, TLSConfig] = False,
         retry_config: Optional[RetryConfig] = None,
-        static_headers: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
     ) -> Client:
         """Connect to a Temporal server.
@@ -103,19 +102,20 @@ class Client:
                 opted in) or all high-level calls made by this client (which all
                 opt-in to retries by default). If unset, a default retry
                 configuration is used.
-            static_headers: Static headers to use for all calls to the server.
+            rpc_metadata: Headers to use for all calls to the server. Keys here
+                always override per-call RPC metadata keys.
             identity: Identity for this client. If unset, a default is created
                 based on the version of the SDK.
         """
-        connect_config = temporalio.workflow_service.ConnectConfig(
+        connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
             tls=tls,
             retry_config=retry_config,
-            static_headers=static_headers,
+            rpc_metadata=rpc_metadata,
             identity=identity or "",
         )
         return Client(
-            await temporalio.workflow_service.WorkflowService.connect(connect_config),
+            await temporalio.service.ServiceClient.connect(connect_config),
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
@@ -124,7 +124,7 @@ class Client:
 
     def __init__(
         self,
-        service: temporalio.workflow_service.WorkflowService,
+        service_client: temporalio.service.ServiceClient,
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
@@ -135,7 +135,7 @@ class Client:
             temporalio.common.QueryRejectCondition
         ] = None,
     ):
-        """Create a Temporal client from a workflow service.
+        """Create a Temporal client from a service client.
 
         See :py:meth:`connect` for details on the parameters.
         """
@@ -152,7 +152,7 @@ class Client:
 
         # Store the config for tracking
         self._config = ClientConfig(
-            service=service,
+            service_client=service_client,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
@@ -169,9 +169,24 @@ class Client:
         return config
 
     @property
-    def service(self) -> temporalio.workflow_service.WorkflowService:
-        """Raw gRPC service for this client."""
-        return self._config["service"]
+    def service_client(self) -> temporalio.service.ServiceClient:
+        """Raw gRPC service client."""
+        return self._config["service_client"]
+
+    @property
+    def workflow_service(self) -> temporalio.service.WorkflowService:
+        """Raw gRPC workflow service client."""
+        return self._config["service_client"].workflow_service
+
+    @property
+    def operator_service(self) -> temporalio.service.OperatorService:
+        """Raw gRPC operator service client."""
+        return self._config["service_client"].operator_service
+
+    @property
+    def test_service(self) -> temporalio.service.TestService:
+        """Raw gRPC test service client."""
+        return self._config["service_client"].test_service
 
     @property
     def namespace(self) -> str:
@@ -181,7 +196,7 @@ class Client:
     @property
     def identity(self) -> str:
         """Identity used in calls by this client."""
-        return self.service.config.identity
+        return self._config["service_client"].config.identity
 
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
@@ -206,6 +221,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
@@ -228,6 +245,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
@@ -252,6 +271,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
@@ -275,6 +296,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[Any, Any]:
         ...
 
@@ -296,6 +319,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -319,6 +344,9 @@ class Client:
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
                 present.
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
             A workflow handle to the started/existing workflow.
@@ -356,6 +384,8 @@ class Client:
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
                 ret_type=ret_type,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             )
         )
 
@@ -377,6 +407,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
         ...
 
@@ -399,6 +431,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
         ...
 
@@ -423,6 +457,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
         ...
 
@@ -446,6 +482,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         ...
 
@@ -467,6 +505,8 @@ class Client:
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         """Start a workflow and wait for completion.
 
@@ -492,6 +532,8 @@ class Client:
                 search_attributes=search_attributes,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             )
         ).result()
 
@@ -607,7 +649,7 @@ class Client:
 class ClientConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
-    service: temporalio.workflow_service.WorkflowService
+    service_client: temporalio.service.ServiceClient
     namespace: str
     data_converter: temporalio.converter.DataConverter
     interceptors: Iterable[
@@ -691,7 +733,13 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         """
         return self._first_execution_run_id
 
-    async def result(self, *, follow_runs: bool = True) -> ReturnType:
+    async def result(
+        self,
+        *,
+        follow_runs: bool = True,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> ReturnType:
         """Wait for result of the workflow.
 
         This will use :py:attr:`result_run_id` if present to base the result on.
@@ -702,6 +750,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             follow_runs: If true (default), workflow runs will be continually
                 fetched, until the most recent one is found. If false, the first
                 result is used.
+            rpc_metadata: Headers used on each RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call. Note,
+                this is the timeout for each history RPC call not this overall
+                function.
 
         Returns:
             Result of the workflow after being converted by the data converter.
@@ -723,8 +776,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             skip_archival=True,
         )
         while True:
-            resp = await self._client.service.get_workflow_execution_history(
-                req, retry=True
+            resp = await self._client.workflow_service.get_workflow_execution_history(
+                req,
+                retry=True,
+                metadata=rpc_metadata,
+                timeout=rpc_timeout,
             )
             # Continually ask for pages until we get close
             if len(resp.history.events) == 0:
@@ -816,7 +872,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                     continue
                 raise WorkflowContinuedAsNewError(cont_attr.new_execution_run_id)
 
-    async def cancel(self) -> None:
+    async def cancel(
+        self,
+        *,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
         """Cancel the workflow.
 
         This will issue a cancellation for :py:attr:`run_id` if present. This
@@ -829,6 +890,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             a start signal will cancel the latest workflow with the same
             workflow ID even if it is unrelated to the started workflow.
 
+        Args:
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
         Raises:
             RPCError: Workflow could not be cancelled.
         """
@@ -837,11 +903,16 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 id=self._id,
                 run_id=self._run_id,
                 first_execution_run_id=self._first_execution_run_id,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             )
         )
 
     async def describe(
         self,
+        *,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowExecutionDescription:
         """Get workflow details.
 
@@ -854,6 +925,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             describe the latest workflow with the same workflow ID even if it is
             unrelated to the started workflow.
 
+        Args:
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
         Returns:
             Workflow details.
 
@@ -861,7 +937,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             RPCError: Workflow details could not be fetched.
         """
         return await self._client._impl.describe_workflow(
-            DescribeWorkflowInput(id=self._id, run_id=self._run_id)
+            DescribeWorkflowInput(
+                id=self._id,
+                run_id=self._run_id,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
         )
 
     # Overload for no-param query
@@ -871,6 +952,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         query: MethodSyncOrAsyncNoParam[SelfType, LocalReturnType],
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
         ...
 
@@ -882,6 +965,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: ParamType,
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
         ...
 
@@ -896,6 +981,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: Iterable[Any],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
         ...
 
@@ -908,6 +995,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: Iterable[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         ...
 
@@ -918,6 +1007,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: Iterable[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         """Query the workflow.
 
@@ -936,6 +1027,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             args: Multiple arguments to the query. Cannot be set if arg is.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
             Result of the query.
@@ -971,6 +1065,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 or self._client._config["default_workflow_query_reject_condition"],
                 headers={},
                 ret_type=ret_type,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             )
         )
 
@@ -979,6 +1075,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     async def signal(
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
+        *,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         ...
 
@@ -988,6 +1087,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
+        *,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         ...
 
@@ -1000,6 +1102,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         *,
         args: Iterable[Any],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         ...
 
@@ -1011,6 +1115,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         ...
 
@@ -1020,6 +1126,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Send a signal to the workflow.
 
@@ -1036,6 +1144,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             signal: Signal function or name on the workflow.
             arg: Single argument to the signal.
             args: Multiple arguments to the signal. Cannot be set if arg is.
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
             RPCError: Workflow could not be signalled.
@@ -1049,6 +1160,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 ),
                 args=temporalio.common._arg_or_args(arg, args),
                 headers={},
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             )
         )
 
@@ -1056,6 +1169,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         *args: Any,
         reason: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Terminate the workflow.
 
@@ -1072,6 +1187,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Args:
             args: Details to store on the termination.
             reason: Reason for the termination.
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
             RPCError: Workflow could not be terminated.
@@ -1083,6 +1201,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 args=args,
                 reason=reason,
                 first_execution_run_id=self._first_execution_run_id,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             )
         )
 
@@ -1106,35 +1226,100 @@ class AsyncActivityHandle:
         self._client = client
         self._id_or_token = id_or_token
 
-    async def heartbeat(self, *details: Any) -> None:
-        """Record a heartbeat for the activity."""
+    async def heartbeat(
+        self,
+        *details: Any,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        """Record a heartbeat for the activity.
+
+        Args:
+            details: Details of the heartbeat.
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
         await self._client._impl.heartbeat_async_activity(
-            HeartbeatAsyncActivityInput(id_or_token=self._id_or_token, details=details),
+            HeartbeatAsyncActivityInput(
+                id_or_token=self._id_or_token,
+                details=details,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            ),
         )
 
-    async def complete(self, result: Optional[Any] = None) -> None:
-        """Complete the activity."""
+    async def complete(
+        self,
+        result: Optional[Any] = None,
+        *,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        """Complete the activity.
+
+        Args:
+            result: Result of the activity.
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
         await self._client._impl.complete_async_activity(
-            CompleteAsyncActivityInput(id_or_token=self._id_or_token, result=result),
+            CompleteAsyncActivityInput(
+                id_or_token=self._id_or_token,
+                result=result,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            ),
         )
 
     async def fail(
-        self, error: Exception, *, last_heartbeat_details: Iterable[Any] = []
+        self,
+        error: Exception,
+        *,
+        last_heartbeat_details: Iterable[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
     ) -> None:
-        """Fail the activity."""
+        """Fail the activity.
+
+        Args:
+            error: Error for the activity.
+            last_heartbeat_details: Last heartbeat details for the activity.
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
         await self._client._impl.fail_async_activity(
             FailAsyncActivityInput(
                 id_or_token=self._id_or_token,
                 error=error,
                 last_heartbeat_details=last_heartbeat_details,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             ),
         )
 
-    async def report_cancellation(self, *details: Any) -> None:
-        """Report the activity as cancelled."""
+    async def report_cancellation(
+        self,
+        *details: Any,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        """Report the activity as cancelled.
+
+        Args:
+            details: Cancellation details.
+            rpc_metadata: Headers used on the RPC call. Keys here are always
+                overridden by client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
         await self._client._impl.report_cancellation_async_activity(
             ReportCancellationAsyncActivityInput(
-                id_or_token=self._id_or_token, details=details
+                id_or_token=self._id_or_token,
+                details=details,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             ),
         )
 
@@ -1343,6 +1528,8 @@ class StartWorkflowInput:
     start_signal_args: Iterable[Any]
     # Type may be absent
     ret_type: Optional[Type]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1352,6 +1539,8 @@ class CancelWorkflowInput:
     id: str
     run_id: Optional[str]
     first_execution_run_id: Optional[str]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1360,6 +1549,8 @@ class DescribeWorkflowInput:
 
     id: str
     run_id: Optional[str]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1374,6 +1565,8 @@ class QueryWorkflowInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     # Type may be absent
     ret_type: Optional[Type]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1385,6 +1578,8 @@ class SignalWorkflowInput:
     signal: str
     args: Iterable[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1396,6 +1591,8 @@ class TerminateWorkflowInput:
     first_execution_run_id: Optional[str]
     args: Iterable[Any]
     reason: Optional[str]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1404,6 +1601,8 @@ class HeartbeatAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     details: Iterable[Any]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1412,6 +1611,8 @@ class CompleteAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     result: Optional[Any]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1421,6 +1622,8 @@ class FailAsyncActivityInput:
     id_or_token: Union[AsyncActivityIDReference, bytes]
     error: Exception
     last_heartbeat_details: Iterable[Any]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 @dataclass
@@ -1429,6 +1632,8 @@ class ReportCancellationAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     details: Iterable[Any]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
 
 
 class Interceptor:
@@ -1588,11 +1793,19 @@ class _ClientImpl(OutboundInterceptor):
             req,
             temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
         ):
-            resp = await self._client.service.signal_with_start_workflow_execution(
-                req, retry=True
+            resp = await self._client.workflow_service.signal_with_start_workflow_execution(
+                req,
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
         else:
-            resp = await self._client.service.start_workflow_execution(req, retry=True)
+            resp = await self._client.workflow_service.start_workflow_execution(
+                req,
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
             first_execution_run_id = resp.run_id
         return WorkflowHandle(
             self._client,
@@ -1603,7 +1816,7 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
-        await self._client.service.request_cancel_workflow_execution(
+        await self._client.workflow_service.request_cancel_workflow_execution(
             temporalio.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest(
                 namespace=self._client.namespace,
                 workflow_execution=temporalio.api.common.v1.WorkflowExecution(
@@ -1615,13 +1828,15 @@ class _ClientImpl(OutboundInterceptor):
                 first_execution_run_id=input.first_execution_run_id or "",
             ),
             retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
         )
 
     async def describe_workflow(
         self, input: DescribeWorkflowInput
     ) -> WorkflowExecutionDescription:
         return await WorkflowExecutionDescription.from_raw(
-            await self._client.service.describe_workflow_execution(
+            await self._client.workflow_service.describe_workflow_execution(
                 temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
                     namespace=self._client.namespace,
                     execution=temporalio.api.common.v1.WorkflowExecution(
@@ -1630,6 +1845,8 @@ class _ClientImpl(OutboundInterceptor):
                     ),
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             ),
             self._client.data_converter,
         )
@@ -1654,7 +1871,9 @@ class _ClientImpl(OutboundInterceptor):
             )
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.query.header.fields)
-        resp = await self._client.service.query_workflow(req, retry=True)
+        resp = await self._client.workflow_service.query_workflow(
+            req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+        )
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
                 WorkflowExecutionStatus(resp.query_rejected.status)
@@ -1690,7 +1909,9 @@ class _ClientImpl(OutboundInterceptor):
             )
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.header.fields)
-        await self._client.service.signal_workflow_execution(req, retry=True)
+        await self._client.workflow_service.signal_workflow_execution(
+            req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+        )
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
         req = temporalio.api.workflowservice.v1.TerminateWorkflowExecutionRequest(
@@ -1707,7 +1928,9 @@ class _ClientImpl(OutboundInterceptor):
             req.details.payloads.extend(
                 await self._client.data_converter.encode(input.args)
             )
-        await self._client.service.terminate_workflow_execution(req, retry=True)
+        await self._client.workflow_service.terminate_workflow_execution(
+            req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+        )
 
     ### Async activity calls
 
@@ -1720,7 +1943,7 @@ class _ClientImpl(OutboundInterceptor):
             else await self._client.data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            resp_by_id = await self._client.service.record_activity_task_heartbeat_by_id(
+            resp_by_id = await self._client.workflow_service.record_activity_task_heartbeat_by_id(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1730,11 +1953,13 @@ class _ClientImpl(OutboundInterceptor):
                     details=details,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
             if resp_by_id.cancel_requested:
                 raise AsyncActivityCancelledError()
         else:
-            resp = await self._client.service.record_activity_task_heartbeat(
+            resp = await self._client.workflow_service.record_activity_task_heartbeat(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,
@@ -1742,6 +1967,8 @@ class _ClientImpl(OutboundInterceptor):
                     details=details,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
             if resp.cancel_requested:
                 raise AsyncActivityCancelledError()
@@ -1753,7 +1980,7 @@ class _ClientImpl(OutboundInterceptor):
             else await self._client.data_converter.encode_wrapper([input.result])
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            await self._client.service.respond_activity_task_completed_by_id(
+            await self._client.workflow_service.respond_activity_task_completed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1763,9 +1990,11 @@ class _ClientImpl(OutboundInterceptor):
                     result=result,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
         else:
-            await self._client.service.respond_activity_task_completed(
+            await self._client.workflow_service.respond_activity_task_completed(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCompletedRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,
@@ -1773,6 +2002,8 @@ class _ClientImpl(OutboundInterceptor):
                     result=result,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
@@ -1788,7 +2019,7 @@ class _ClientImpl(OutboundInterceptor):
             )
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            await self._client.service.respond_activity_task_failed_by_id(
+            await self._client.workflow_service.respond_activity_task_failed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1799,9 +2030,11 @@ class _ClientImpl(OutboundInterceptor):
                     last_heartbeat_details=last_heartbeat_details,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
         else:
-            await self._client.service.respond_activity_task_failed(
+            await self._client.workflow_service.respond_activity_task_failed(
                 temporalio.api.workflowservice.v1.RespondActivityTaskFailedRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,
@@ -1810,6 +2043,8 @@ class _ClientImpl(OutboundInterceptor):
                     last_heartbeat_details=last_heartbeat_details,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
 
     async def report_cancellation_async_activity(
@@ -1821,7 +2056,7 @@ class _ClientImpl(OutboundInterceptor):
             else await self._client.data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
-            await self._client.service.respond_activity_task_canceled_by_id(
+            await self._client.workflow_service.respond_activity_task_canceled_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest(
                     workflow_id=input.id_or_token.workflow_id,
                     run_id=input.id_or_token.run_id or "",
@@ -1831,9 +2066,11 @@ class _ClientImpl(OutboundInterceptor):
                     details=details,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
         else:
-            await self._client.service.respond_activity_task_canceled(
+            await self._client.workflow_service.respond_activity_task_canceled(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCanceledRequest(
                     task_token=input.id_or_token,
                     namespace=self._client.namespace,
@@ -1841,4 +2078,6 @@ class _ClientImpl(OutboundInterceptor):
                     details=details,
                 ),
                 retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )

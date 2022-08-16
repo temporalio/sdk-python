@@ -23,7 +23,7 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.workflow_service
+import temporalio.service
 
 from .activity import SharedStateManager, _ActivityWorker
 from .interceptor import Interceptor
@@ -73,8 +73,8 @@ class Worker:
         Args:
             client: Client to use for this worker. This is required and must be
                 the :py:class:`temporalio.client.Client` instance or have a
-                worker_workflow_service attribute with reference to the original
-                client's underlying service.
+                worker_service_client attribute with reference to the original
+                client's underlying service client.
             task_queue: Required task queue for this worker.
             activities: Set of activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
@@ -162,26 +162,22 @@ class Worker:
         # one here so we can continue to only use the public API of the client
         type_lookup = temporalio.converter._FunctionTypeLookup()
 
-        # Extract the bridge workflow service. We try the service on the client
-        # first, then we support a worker_workflow_service on the client's
-        # service to return underlying service we can use.
-        bridge_service: temporalio.workflow_service._BridgeWorkflowService
-        if isinstance(
-            client.service, temporalio.workflow_service._BridgeWorkflowService
-        ):
-            bridge_service = client.service
-        elif hasattr(client.service, "worker_workflow_service"):
-            bridge_service = client.service.worker_workflow_service
-            if not isinstance(
-                bridge_service, temporalio.workflow_service._BridgeWorkflowService
-            ):
+        # Extract the bridge service client. We try the service on the client
+        # first, then we support a worker_service_client on the client's service
+        # to return underlying service client we can use.
+        bridge_client: temporalio.service._BridgeServiceClient
+        if isinstance(client.service_client, temporalio.service._BridgeServiceClient):
+            bridge_client = client.service_client
+        elif hasattr(client.service_client, "worker_service_client"):
+            bridge_client = client.service_client.worker_service_client
+            if not isinstance(bridge_client, temporalio.service._BridgeServiceClient):
                 raise TypeError(
-                    "Client service's worker_workflow_service cannot be used for a worker"
+                    "Client's worker_service_client cannot be used for a worker"
                 )
         else:
             raise TypeError(
-                "Client service cannot be used for a worker. "
-                + "Use the original client's service or set worker_workflow_service on the wrapped service with the original service."
+                "Client cannot be used for a worker. "
+                + "Use the original client's service or set worker_service_client on the wrapped service with the original service client."
             )
 
         # Store the config for tracking
@@ -247,7 +243,7 @@ class Worker:
         # TODO(cretz): Why does this cause a test hang when an exception is
         # thrown after it?
         self._bridge_worker = temporalio.bridge.worker.Worker(
-            bridge_service._bridge_client,
+            bridge_client._bridge_client,
             temporalio.bridge.worker.WorkerConfig(
                 namespace=client.namespace,
                 task_queue=task_queue,

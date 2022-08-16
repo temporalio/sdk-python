@@ -10,8 +10,8 @@ crate-type = ["cdylib"]
 [dependencies]
 log = "0.4"
 parking_lot = "0.12"
-prost = "0.9"
-prost-types = "0.9"
+prost = "0.11"
+prost-types = "0.11"
 pyo3 = { version = "0.16", features = ["extension-module", "abi3-py37"] }
 pyo3-asyncio = { version = "0.16", features = ["tokio-runtime"] }
 temporal-client = { version = "0.1.0", path = "./sdk-core/client" }
@@ -19,7 +19,7 @@ temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core" }
 temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api" }
 temporal-sdk-core-protos = { version = "0.1.0", path = "./sdk-core/sdk-core-protos" }
 tokio = "1.15"
-tonic = "0.6"
+tonic = "0.8"
 url = "2.2"
 
 [profile.release]

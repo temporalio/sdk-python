@@ -466,6 +466,31 @@ class WorkflowServiceStub:
     ]
     """List all schedules in a namespace."""
 
+    UpdateWorkerBuildIdOrdering: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse,
+    ]
+    """(-- api-linter: core::0134::response-message-name=disabled
+        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+    (-- api-linter: core::0134::method-signature=disabled
+        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+    """
+
+    GetWorkerBuildIdOrdering: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse,
+    ]
+    """This could / maybe should just be part of `DescribeTaskQueue`, but is broken out here to show easily."""
+
+    UpdateWorkflow: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowResponse,
+    ]
+    """Invokes the specified update function on user workflow code.
+    (-- api-linter: core::0134=disabled
+        aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
+    """
+
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
     to create and interact with workflows and activities.
@@ -1017,6 +1042,37 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse:
         """List all schedules in a namespace."""
+        pass
+    @abc.abstractmethod
+    def UpdateWorkerBuildIdOrdering(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse:
+        """(-- api-linter: core::0134::response-message-name=disabled
+            aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0134::method-signature=disabled
+            aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        """
+        pass
+    @abc.abstractmethod
+    def GetWorkerBuildIdOrdering(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse:
+        """This could / maybe should just be part of `DescribeTaskQueue`, but is broken out here to show easily."""
+        pass
+    @abc.abstractmethod
+    def UpdateWorkflow(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowResponse:
+        """Invokes the specified update function on user workflow code.
+        (-- api-linter: core::0134=disabled
+            aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
+        """
         pass
 
 def add_WorkflowServiceServicer_to_server(

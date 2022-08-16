@@ -400,7 +400,7 @@ async def test_interceptor_callable(client: Client, worker: ExternalWorker):
 async def test_tls_config(tls_client: Optional[Client]):
     if not tls_client:
         pytest.skip("No TLS client")
-    resp = await tls_client.service.describe_namespace(
+    resp = await tls_client.workflow_service.describe_namespace(
         temporalio.api.workflowservice.v1.DescribeNamespaceRequest(
             namespace=tls_client.namespace
         )

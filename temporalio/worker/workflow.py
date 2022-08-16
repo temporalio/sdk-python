@@ -25,7 +25,6 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
-import temporalio.workflow_service
 
 from .interceptor import (
     Interceptor,

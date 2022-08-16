@@ -51,11 +51,6 @@ These steps can be followed to use with a virtual environment and `pip`:
   * Needed because older versions of `pip` may not pick the right wheel
 * Install Temporal SDK - `python -m pip install temporalio`
 
-For macOS M1 users on Python 3.10+, due to an
-[improperly named wheel in PyPI for gRPC](https://github.com/grpc/grpc/issues/28387), you may have to run
-`pip install --no-binary :all: grpcio --ignore-installed` in your environment before use. (this is fixed in the next
-version of `temporalio` and in the `main` branch)
-
 The SDK is now ready for use. To build from source, see "Building" near the end of this documentation.
 
 **NOTE: This README is for the current branch and not necessarily what's released on `PyPI`.**
