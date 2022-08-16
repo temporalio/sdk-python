@@ -67,6 +67,7 @@ class Worker:
         graceful_shutdown_timeout: timedelta = timedelta(),
         shared_state_manager: Optional[SharedStateManager] = None,
         debug_mode: bool = False,
+        use_worker_versioning: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -146,6 +147,8 @@ class Worker:
                 sandboxing in order to make using a debugger easier. If false
                 but the environment variable ``TEMPORAL_DEBUG`` is truthy, this
                 will be set to true.
+            use_worker_versioning: If true, this worker opts into worker build id
+                based versioning. See the documentation at TODO for more.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
@@ -206,6 +209,7 @@ class Worker:
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
+            use_worker_versioning=use_worker_versioning,
         )
         self._task: Optional[asyncio.Task] = None
 
@@ -366,6 +370,7 @@ class WorkerConfig(TypedDict, total=False):
     graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
     debug_mode: bool
+    use_worker_versioning: bool
 
 
 _default_build_id: Optional[str] = None

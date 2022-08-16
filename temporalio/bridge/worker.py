@@ -37,6 +37,7 @@ class WorkerConfig:
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int
     default_heartbeat_throttle_interval_millis: int
+    use_worker_versioning: bool
 
 
 class Worker:

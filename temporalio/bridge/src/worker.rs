@@ -36,6 +36,7 @@ pub struct WorkerConfig {
     sticky_queue_schedule_to_start_timeout_millis: u64,
     max_heartbeat_throttle_interval_millis: u64,
     default_heartbeat_throttle_interval_millis: u64,
+    use_worker_versioning: bool,
 }
 
 pub fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> PyResult<WorkerRef> {
@@ -180,6 +181,7 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             .default_heartbeat_throttle_interval(Duration::from_millis(
                 conf.default_heartbeat_throttle_interval_millis,
             ))
+            .use_worker_versioning(conf.use_worker_versioning)
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
     }
