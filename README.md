@@ -517,6 +517,11 @@ Cancellation for synchronous activities is done in the background and the activi
 react appropriately. An activity must heartbeat to receive cancellation and there are other ways to be notified about
 cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
 
+Note, all calls from an activity to functions in the `temporalio.activity` package are powered by
+[contextvars](https://docs.python.org/3/library/contextvars.html). Therefore, new threads starting _inside_ of
+activities must `copy_context()` and then `.run()` manually to ensure `temporalio.activity` calls like `heartbeat` still
+function in the new threads.
+
 ###### Synchronous Multithreaded Activities
 
 If `activity_executor` is set to an instance of `concurrent.futures.ThreadPoolExecutor` then the synchronous activities
