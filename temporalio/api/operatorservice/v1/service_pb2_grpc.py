@@ -118,8 +118,10 @@ class OperatorServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def DeleteWorkflowExecution(self, request, context):
-        """DeleteWorkflowExecution deletes a closed workflow execution asynchronously (workflow must be completed or terminated before).
-        This method is EXPERIMENTAL and may be changed or removed in a later release.
+        """DeleteWorkflowExecution asynchronously deletes a specific Workflow Execution (when
+        WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
+        WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
+        terminated before deletion.
         (-- api-linter: core::0135::method-signature=disabled
         aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
         (-- api-linter: core::0135::response-message-name=disabled

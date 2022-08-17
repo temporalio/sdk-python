@@ -21,6 +21,8 @@ from .request_response_pb2 import (
     GetSearchAttributesResponse,
     GetSystemInfoRequest,
     GetSystemInfoResponse,
+    GetWorkerBuildIdOrderingRequest,
+    GetWorkerBuildIdOrderingResponse,
     GetWorkflowExecutionHistoryRequest,
     GetWorkflowExecutionHistoryResponse,
     GetWorkflowExecutionHistoryReverseRequest,
@@ -93,12 +95,10 @@ from .request_response_pb2 import (
     UpdateNamespaceResponse,
     UpdateScheduleRequest,
     UpdateScheduleResponse,
-)
-from .service_pb2_grpc import WorkflowService  # type: ignore
-from .service_pb2_grpc import (
-    WorkflowServiceServicer,
-    WorkflowServiceStub,
-    add_WorkflowServiceServicer_to_server,
+    UpdateWorkerBuildIdOrderingRequest,
+    UpdateWorkerBuildIdOrderingResponse,
+    UpdateWorkflowRequest,
+    UpdateWorkflowResponse,
 )
 
 __all__ = [
@@ -124,6 +124,8 @@ __all__ = [
     "GetSearchAttributesResponse",
     "GetSystemInfoRequest",
     "GetSystemInfoResponse",
+    "GetWorkerBuildIdOrderingRequest",
+    "GetWorkerBuildIdOrderingResponse",
     "GetWorkflowExecutionHistoryRequest",
     "GetWorkflowExecutionHistoryResponse",
     "GetWorkflowExecutionHistoryReverseRequest",
@@ -196,8 +198,30 @@ __all__ = [
     "UpdateNamespaceResponse",
     "UpdateScheduleRequest",
     "UpdateScheduleResponse",
-    "WorkflowService",
-    "WorkflowServiceServicer",
-    "WorkflowServiceStub",
-    "add_WorkflowServiceServicer_to_server",
+    "UpdateWorkerBuildIdOrderingRequest",
+    "UpdateWorkerBuildIdOrderingResponse",
+    "UpdateWorkflowRequest",
+    "UpdateWorkflowResponse",
 ]
+
+# gRPC is optional
+try:
+    import grpc
+
+    from .service_pb2_grpc import WorkflowService  # type: ignore
+    from .service_pb2_grpc import (
+        WorkflowServiceServicer,
+        WorkflowServiceStub,
+        add_WorkflowServiceServicer_to_server,
+    )
+
+    __all__.extend(
+        [
+            "WorkflowService",
+            "WorkflowServiceServicer",
+            "WorkflowServiceStub",
+            "add_WorkflowServiceServicer_to_server",
+        ]
+    )
+except ImportError:
+    pass

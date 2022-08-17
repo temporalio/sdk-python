@@ -262,6 +262,7 @@ class Failure(google.protobuf.message.Message):
     MESSAGE_FIELD_NUMBER: builtins.int
     SOURCE_FIELD_NUMBER: builtins.int
     STACK_TRACE_FIELD_NUMBER: builtins.int
+    ENCODED_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CAUSE_FIELD_NUMBER: builtins.int
     APPLICATION_FAILURE_INFO_FIELD_NUMBER: builtins.int
     TIMEOUT_FAILURE_INFO_FIELD_NUMBER: builtins.int
@@ -273,7 +274,30 @@ class Failure(google.protobuf.message.Message):
     CHILD_WORKFLOW_EXECUTION_FAILURE_INFO_FIELD_NUMBER: builtins.int
     message: typing.Text
     source: typing.Text
+    """The source this Failure originated in, e.g. TypeScriptSDK / JavaSDK
+    In some SDKs this is used to rehydrate the stack trace into an exception object.
+    """
+
     stack_trace: typing.Text
+    @property
+    def encoded_attributes(self) -> temporalio.api.common.v1.message_pb2.Payload:
+        """Alternative way to supply `message` and `stack_trace` and possibly other attributes, used for encryption of
+        errors originating in user code which might contain sensitive information.
+        The `encoded_attributes` Payload could represent any serializable object, e.g. JSON object or a `Failure` proto
+        message.
+
+        SDK authors:
+        - The SDK should provide a default `encodeFailureAttributes` and `decodeFailureAttributes` implementation that:
+          - Uses a JSON object to represent `{ message, stack_trace }`.
+          - Overwrites the original message with "Encoded failure" to indicate that more information could be extracted.
+          - Overwrites the original stack_trace with an empty string.
+          - The resulting JSON object is converted to Payload using the default PayloadConverter and should be processed
+            by the user-provided PayloadCodec
+
+        - If there's demand, we could allow overriding the default SDK implementation to encode other opaque Failure attributes.
+        (-- api-linter: core::0203::optional=disabled --)
+        """
+        pass
     @property
     def cause(self) -> global___Failure: ...
     @property
@@ -300,6 +324,9 @@ class Failure(google.protobuf.message.Message):
         message: typing.Text = ...,
         source: typing.Text = ...,
         stack_trace: typing.Text = ...,
+        encoded_attributes: typing.Optional[
+            temporalio.api.common.v1.message_pb2.Payload
+        ] = ...,
         cause: typing.Optional[global___Failure] = ...,
         application_failure_info: typing.Optional[
             global___ApplicationFailureInfo
@@ -329,6 +356,8 @@ class Failure(google.protobuf.message.Message):
             b"cause",
             "child_workflow_execution_failure_info",
             b"child_workflow_execution_failure_info",
+            "encoded_attributes",
+            b"encoded_attributes",
             "failure_info",
             b"failure_info",
             "reset_workflow_failure_info",
@@ -354,6 +383,8 @@ class Failure(google.protobuf.message.Message):
             b"cause",
             "child_workflow_execution_failure_info",
             b"child_workflow_execution_failure_info",
+            "encoded_attributes",
+            b"encoded_attributes",
             "failure_info",
             b"failure_info",
             "message",

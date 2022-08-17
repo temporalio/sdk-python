@@ -197,6 +197,27 @@ class _EventTypeEnumTypeWrapper(
     EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: _EventType.ValueType  # 40
     """Workflow search attributes should be updated and synchronized with the visibility store"""
 
+    EVENT_TYPE_WORKFLOW_UPDATE_REQUESTED: _EventType.ValueType  # 41
+    """Workflow update request has been received"""
+
+    EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED: _EventType.ValueType  # 42
+    """Workflow update request has been accepted by user workflow code"""
+
+    EVENT_TYPE_WORKFLOW_UPDATE_COMPLETED: _EventType.ValueType  # 43
+    """Workflow update has been completed"""
+
+    EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY: _EventType.ValueType  # 44
+    """Some property or properties of the workflow as a whole have changed by non-workflow code.
+    The distinction of external vs. command-based modification is important so the SDK can
+    maintain determinism when using the command-based approach.
+    """
+
+    EVENT_TYPE_ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY: _EventType.ValueType  # 45
+    """Some property or properties of an already-scheduled activity have changed by non-workflow code.
+    The distinction of external vs. command-based modification is important so the SDK can
+    maintain determinism when using the command-based approach.
+    """
+
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
 
@@ -379,5 +400,26 @@ EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED: EventType.ValueType  # 39
 
 EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: EventType.ValueType  # 40
 """Workflow search attributes should be updated and synchronized with the visibility store"""
+
+EVENT_TYPE_WORKFLOW_UPDATE_REQUESTED: EventType.ValueType  # 41
+"""Workflow update request has been received"""
+
+EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED: EventType.ValueType  # 42
+"""Workflow update request has been accepted by user workflow code"""
+
+EVENT_TYPE_WORKFLOW_UPDATE_COMPLETED: EventType.ValueType  # 43
+"""Workflow update has been completed"""
+
+EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY: EventType.ValueType  # 44
+"""Some property or properties of the workflow as a whole have changed by non-workflow code.
+The distinction of external vs. command-based modification is important so the SDK can
+maintain determinism when using the command-based approach.
+"""
+
+EVENT_TYPE_ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY: EventType.ValueType  # 45
+"""Some property or properties of an already-scheduled activity have changed by non-workflow code.
+The distinction of external vs. command-based modification is important so the SDK can
+maintain determinism when using the command-based approach.
+"""
 
 global___EventType = EventType

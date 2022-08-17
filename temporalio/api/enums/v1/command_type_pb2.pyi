@@ -33,6 +33,13 @@ class _CommandTypeEnumTypeWrapper(
     COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION: _CommandType.ValueType  # 11
     COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION: _CommandType.ValueType  # 12
     COMMAND_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: _CommandType.ValueType  # 13
+    COMMAND_TYPE_ACCEPT_WORKFLOW_UPDATE: _CommandType.ValueType  # 14
+    """Indicates that an update has been accepted for processing workflow code"""
+
+    COMMAND_TYPE_COMPLETE_WORKFLOW_UPDATE: _CommandType.ValueType  # 15
+    """Indicates that an update has completed and carries either the success or
+    failure outcome of said update.
+    """
 
 class CommandType(_CommandType, metaclass=_CommandTypeEnumTypeWrapper):
     """Whenever this list of command types is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering."""
@@ -53,4 +60,12 @@ COMMAND_TYPE_CONTINUE_AS_NEW_WORKFLOW_EXECUTION: CommandType.ValueType  # 10
 COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION: CommandType.ValueType  # 11
 COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION: CommandType.ValueType  # 12
 COMMAND_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: CommandType.ValueType  # 13
+COMMAND_TYPE_ACCEPT_WORKFLOW_UPDATE: CommandType.ValueType  # 14
+"""Indicates that an update has been accepted for processing workflow code"""
+
+COMMAND_TYPE_COMPLETE_WORKFLOW_UPDATE: CommandType.ValueType  # 15
+"""Indicates that an update has completed and carries either the success or
+failure outcome of said update.
+"""
+
 global___CommandType = CommandType

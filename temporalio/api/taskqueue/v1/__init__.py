@@ -6,6 +6,8 @@ from .message_pb2 import (
     TaskQueueMetadata,
     TaskQueuePartitionMetadata,
     TaskQueueStatus,
+    VersionId,
+    VersionIdNode,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "TaskQueueMetadata",
     "TaskQueuePartitionMetadata",
     "TaskQueueStatus",
+    "VersionId",
+    "VersionIdNode",
 ]

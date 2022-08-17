@@ -3,18 +3,19 @@ use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3_asyncio::tokio::future_into_py;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_client::{
-    ClientOptions, ClientOptionsBuilder, ConfiguredClient, RetryClient, RetryConfig, TlsConfig,
-    WorkflowService, WorkflowServiceClientWithMetrics,
+    ClientOptions, ClientOptionsBuilder, ConfiguredClient, OperatorService, RetryClient,
+    RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
 };
-use tonic;
+use tonic::metadata::MetadataKey;
 use url::Url;
 
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = RetryClient<ConfiguredClient<WorkflowServiceClientWithMetrics>>;
+type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
 
 #[pyclass]
 pub struct ClientRef {
@@ -26,7 +27,7 @@ pub struct ClientConfig {
     target_url: String,
     client_name: String,
     client_version: String,
-    static_headers: HashMap<String, String>,
+    metadata: HashMap<String, String>,
     identity: String,
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
@@ -50,12 +51,21 @@ struct ClientRetryConfig {
     pub max_retries: usize,
 }
 
+#[derive(FromPyObject)]
+struct RpcCall {
+    rpc: String,
+    req: Vec<u8>,
+    retry: bool,
+    metadata: HashMap<String, String>,
+    timeout_millis: Option<u64>,
+}
+
 pub fn connect_client(py: Python, config: ClientConfig) -> PyResult<&PyAny> {
     // TODO(cretz): Add metrics_meter?
-    let headers = if config.static_headers.is_empty() {
+    let headers = if config.metadata.is_empty() {
         None
     } else {
-        Some(Arc::new(RwLock::new(config.static_headers.clone())))
+        Some(Arc::new(RwLock::new(config.metadata.clone())))
     };
     let opts: ClientOptions = config.try_into()?;
     future_into_py(py, async move {
@@ -71,164 +81,215 @@ pub fn connect_client(py: Python, config: ClientConfig) -> PyResult<&PyAny> {
 }
 
 macro_rules! rpc_call {
-    ($retry_client:ident, $retry:ident, $call_name:ident, $req:ident) => {
-        if $retry {
-            rpc_resp($retry_client.$call_name(rpc_req($req)?).await)
+    ($retry_client:ident, $call:ident, $call_name:ident) => {
+        if $call.retry {
+            rpc_resp($retry_client.$call_name(rpc_req($call)?).await)
         } else {
-            rpc_resp($retry_client.into_inner().$call_name(rpc_req($req)?).await)
+            rpc_resp($retry_client.into_inner().$call_name(rpc_req($call)?).await)
         }
     };
 }
 
 #[pymethods]
 impl ClientRef {
-    fn call<'p>(
-        &self,
-        py: Python<'p>,
-        rpc: String,
-        retry: bool,
-        req: Vec<u8>,
-    ) -> PyResult<&'p PyAny> {
+    fn call_workflow_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
         let mut retry_client = self.retry_client.clone();
         future_into_py(py, async move {
-            let bytes = match rpc.as_str() {
+            let bytes = match call.rpc.as_str() {
                 "count_workflow_executions" => {
-                    rpc_call!(retry_client, retry, count_workflow_executions, req)
+                    rpc_call!(retry_client, call, count_workflow_executions)
                 }
                 "create_schedule" => {
-                    rpc_call!(retry_client, retry, create_schedule, req)
+                    rpc_call!(retry_client, call, create_schedule)
                 }
                 "delete_schedule" => {
-                    rpc_call!(retry_client, retry, delete_schedule, req)
+                    rpc_call!(retry_client, call, delete_schedule)
                 }
-                "deprecate_namespace" => rpc_call!(retry_client, retry, deprecate_namespace, req),
-                "describe_namespace" => rpc_call!(retry_client, retry, describe_namespace, req),
-                "describe_schedule" => rpc_call!(retry_client, retry, describe_schedule, req),
-                "describe_task_queue" => rpc_call!(retry_client, retry, describe_task_queue, req),
+                "deprecate_namespace" => rpc_call!(retry_client, call, deprecate_namespace),
+                "describe_namespace" => rpc_call!(retry_client, call, describe_namespace),
+                "describe_schedule" => rpc_call!(retry_client, call, describe_schedule),
+                "describe_task_queue" => rpc_call!(retry_client, call, describe_task_queue),
                 "describe_workflow_execution" => {
-                    rpc_call!(retry_client, retry, describe_workflow_execution, req)
+                    rpc_call!(retry_client, call, describe_workflow_execution)
                 }
-                "get_cluster_info" => rpc_call!(retry_client, retry, get_cluster_info, req),
+                "get_cluster_info" => rpc_call!(retry_client, call, get_cluster_info),
                 "get_search_attributes" => {
-                    rpc_call!(retry_client, retry, get_search_attributes, req)
+                    rpc_call!(retry_client, call, get_search_attributes)
                 }
-                "get_system_info" => rpc_call!(retry_client, retry, get_system_info, req),
+                "get_system_info" => rpc_call!(retry_client, call, get_system_info),
+                "get_worker_build_id_ordering" => {
+                    rpc_call!(retry_client, call, get_worker_build_id_ordering)
+                }
                 "get_workflow_execution_history" => {
-                    rpc_call!(retry_client, retry, get_workflow_execution_history, req)
+                    rpc_call!(retry_client, call, get_workflow_execution_history)
                 }
                 "get_workflow_execution_history_reverse" => {
-                    rpc_call!(
-                        retry_client,
-                        retry,
-                        get_workflow_execution_history_reverse,
-                        req
-                    )
+                    rpc_call!(retry_client, call, get_workflow_execution_history_reverse)
                 }
                 "list_archived_workflow_executions" => {
-                    rpc_call!(retry_client, retry, list_archived_workflow_executions, req)
+                    rpc_call!(retry_client, call, list_archived_workflow_executions)
                 }
                 "list_closed_workflow_executions" => {
-                    rpc_call!(retry_client, retry, list_closed_workflow_executions, req)
+                    rpc_call!(retry_client, call, list_closed_workflow_executions)
                 }
-                "list_namespaces" => rpc_call!(retry_client, retry, list_namespaces, req),
+                "list_namespaces" => rpc_call!(retry_client, call, list_namespaces),
                 "list_open_workflow_executions" => {
-                    rpc_call!(retry_client, retry, list_open_workflow_executions, req)
+                    rpc_call!(retry_client, call, list_open_workflow_executions)
                 }
                 "list_schedule_matching_times" => {
-                    rpc_call!(retry_client, retry, list_schedule_matching_times, req)
+                    rpc_call!(retry_client, call, list_schedule_matching_times)
                 }
                 "list_schedules" => {
-                    rpc_call!(retry_client, retry, list_schedules, req)
+                    rpc_call!(retry_client, call, list_schedules)
                 }
                 "list_task_queue_partitions" => {
-                    rpc_call!(retry_client, retry, list_task_queue_partitions, req)
+                    rpc_call!(retry_client, call, list_task_queue_partitions)
                 }
                 "list_workflow_executions" => {
-                    rpc_call!(retry_client, retry, list_workflow_executions, req)
+                    rpc_call!(retry_client, call, list_workflow_executions)
                 }
                 "patch_schedule" => {
-                    rpc_call!(retry_client, retry, patch_schedule, req)
+                    rpc_call!(retry_client, call, patch_schedule)
                 }
                 "poll_activity_task_queue" => {
-                    rpc_call!(retry_client, retry, poll_activity_task_queue, req)
+                    rpc_call!(retry_client, call, poll_activity_task_queue)
                 }
                 "poll_workflow_task_queue" => {
-                    rpc_call!(retry_client, retry, poll_workflow_task_queue, req)
+                    rpc_call!(retry_client, call, poll_workflow_task_queue)
                 }
-                "query_workflow" => rpc_call!(retry_client, retry, query_workflow, req),
+                "query_workflow" => rpc_call!(retry_client, call, query_workflow),
                 "record_activity_task_heartbeat" => {
-                    rpc_call!(retry_client, retry, record_activity_task_heartbeat, req)
+                    rpc_call!(retry_client, call, record_activity_task_heartbeat)
                 }
-                "record_activity_task_heartbeat_by_id" => rpc_call!(
-                    retry_client,
-                    retry,
-                    record_activity_task_heartbeat_by_id,
-                    req
-                ),
-                "register_namespace" => rpc_call!(retry_client, retry, register_namespace, req),
+                "record_activity_task_heartbeat_by_id" => {
+                    rpc_call!(retry_client, call, record_activity_task_heartbeat_by_id)
+                }
+                "register_namespace" => rpc_call!(retry_client, call, register_namespace),
                 "request_cancel_workflow_execution" => {
-                    rpc_call!(retry_client, retry, request_cancel_workflow_execution, req)
+                    rpc_call!(retry_client, call, request_cancel_workflow_execution)
                 }
                 "reset_sticky_task_queue" => {
-                    rpc_call!(retry_client, retry, reset_sticky_task_queue, req)
+                    rpc_call!(retry_client, call, reset_sticky_task_queue)
                 }
                 "reset_workflow_execution" => {
-                    rpc_call!(retry_client, retry, reset_workflow_execution, req)
+                    rpc_call!(retry_client, call, reset_workflow_execution)
                 }
                 "respond_activity_task_canceled" => {
-                    rpc_call!(retry_client, retry, respond_activity_task_canceled, req)
+                    rpc_call!(retry_client, call, respond_activity_task_canceled)
                 }
-                "respond_activity_task_canceled_by_id" => rpc_call!(
-                    retry_client,
-                    retry,
-                    respond_activity_task_canceled_by_id,
-                    req
-                ),
+                "respond_activity_task_canceled_by_id" => {
+                    rpc_call!(retry_client, call, respond_activity_task_canceled_by_id)
+                }
                 "respond_activity_task_completed" => {
-                    rpc_call!(retry_client, retry, respond_activity_task_completed, req)
+                    rpc_call!(retry_client, call, respond_activity_task_completed)
                 }
-                "respond_activity_task_completed_by_id" => rpc_call!(
-                    retry_client,
-                    retry,
-                    respond_activity_task_completed_by_id,
-                    req
-                ),
+                "respond_activity_task_completed_by_id" => {
+                    rpc_call!(retry_client, call, respond_activity_task_completed_by_id)
+                }
                 "respond_activity_task_failed" => {
-                    rpc_call!(retry_client, retry, respond_activity_task_failed, req)
+                    rpc_call!(retry_client, call, respond_activity_task_failed)
                 }
                 "respond_activity_task_failed_by_id" => {
-                    rpc_call!(retry_client, retry, respond_activity_task_failed_by_id, req)
+                    rpc_call!(retry_client, call, respond_activity_task_failed_by_id)
                 }
                 "respond_query_task_completed" => {
-                    rpc_call!(retry_client, retry, respond_query_task_completed, req)
+                    rpc_call!(retry_client, call, respond_query_task_completed)
                 }
                 "respond_workflow_task_completed" => {
-                    rpc_call!(retry_client, retry, respond_workflow_task_completed, req)
+                    rpc_call!(retry_client, call, respond_workflow_task_completed)
                 }
                 "respond_workflow_task_failed" => {
-                    rpc_call!(retry_client, retry, respond_workflow_task_failed, req)
+                    rpc_call!(retry_client, call, respond_workflow_task_failed)
                 }
                 "scan_workflow_executions" => {
-                    rpc_call!(retry_client, retry, scan_workflow_executions, req)
+                    rpc_call!(retry_client, call, scan_workflow_executions)
                 }
-                "signal_with_start_workflow_execution" => rpc_call!(
-                    retry_client,
-                    retry,
-                    signal_with_start_workflow_execution,
-                    req
-                ),
+                "signal_with_start_workflow_execution" => {
+                    rpc_call!(retry_client, call, signal_with_start_workflow_execution)
+                }
                 "signal_workflow_execution" => {
-                    rpc_call!(retry_client, retry, signal_workflow_execution, req)
+                    rpc_call!(retry_client, call, signal_workflow_execution)
                 }
                 "start_workflow_execution" => {
-                    rpc_call!(retry_client, retry, start_workflow_execution, req)
+                    rpc_call!(retry_client, call, start_workflow_execution)
                 }
                 "terminate_workflow_execution" => {
-                    rpc_call!(retry_client, retry, terminate_workflow_execution, req)
+                    rpc_call!(retry_client, call, terminate_workflow_execution)
                 }
-                "update_namespace" => rpc_call!(retry_client, retry, update_namespace, req),
-                "update_schedule" => rpc_call!(retry_client, retry, update_schedule, req),
-                _ => return Err(PyValueError::new_err(format!("Unknown RPC call {}", rpc))),
+                "update_namespace" => rpc_call!(retry_client, call, update_namespace),
+                "update_schedule" => rpc_call!(retry_client, call, update_schedule),
+                "update_workflow" => rpc_call!(retry_client, call, update_workflow),
+                "update_worker_build_id_ordering" => {
+                    rpc_call!(retry_client, call, update_worker_build_id_ordering)
+                }
+                _ => {
+                    return Err(PyValueError::new_err(format!(
+                        "Unknown RPC call {}",
+                        call.rpc
+                    )))
+                }
+            }?;
+            let bytes: &[u8] = &bytes;
+            Ok(Python::with_gil(|py| bytes.into_py(py)))
+        })
+    }
+
+    fn call_operator_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+        let mut retry_client = self.retry_client.clone();
+        future_into_py(py, async move {
+            let bytes = match call.rpc.as_str() {
+                "add_or_update_remote_cluster" => {
+                    rpc_call!(retry_client, call, add_or_update_remote_cluster)
+                }
+                "add_search_attributes" => {
+                    rpc_call!(retry_client, call, add_search_attributes)
+                }
+                "delete_namespace" => rpc_call!(retry_client, call, delete_namespace),
+                "delete_workflow_execution" => {
+                    rpc_call!(retry_client, call, delete_workflow_execution)
+                }
+                "describe_cluster" => rpc_call!(retry_client, call, describe_cluster),
+                "list_cluster_members" => rpc_call!(retry_client, call, list_cluster_members),
+                "list_clusters" => rpc_call!(retry_client, call, list_clusters),
+                "list_search_attributes" => {
+                    rpc_call!(retry_client, call, list_search_attributes)
+                }
+                "remove_remote_cluster" => {
+                    rpc_call!(retry_client, call, remove_remote_cluster)
+                }
+                "remove_search_attributes" => {
+                    rpc_call!(retry_client, call, remove_search_attributes)
+                }
+                _ => {
+                    return Err(PyValueError::new_err(format!(
+                        "Unknown RPC call {}",
+                        call.rpc
+                    )))
+                }
+            }?;
+            let bytes: &[u8] = &bytes;
+            Ok(Python::with_gil(|py| bytes.into_py(py)))
+        })
+    }
+
+    fn call_test_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+        let mut retry_client = self.retry_client.clone();
+        future_into_py(py, async move {
+            let bytes = match call.rpc.as_str() {
+                "get_current_time" => rpc_call!(retry_client, call, get_current_time),
+                "lock_time_skipping" => rpc_call!(retry_client, call, lock_time_skipping),
+                "sleep_until" => rpc_call!(retry_client, call, sleep_until),
+                "sleep" => rpc_call!(retry_client, call, sleep),
+                "unlock_time_skipping_with_sleep" => {
+                    rpc_call!(retry_client, call, unlock_time_skipping_with_sleep)
+                }
+                "unlock_time_skipping" => rpc_call!(retry_client, call, unlock_time_skipping),
+                _ => {
+                    return Err(PyValueError::new_err(format!(
+                        "Unknown RPC call {}",
+                        call.rpc
+                    )))
+                }
             }?;
             let bytes: &[u8] = &bytes;
             Ok(Python::with_gil(|py| bytes.into_py(py)))
@@ -236,10 +297,22 @@ impl ClientRef {
     }
 }
 
-fn rpc_req<P: prost::Message + Default>(bytes: Vec<u8>) -> PyResult<tonic::Request<P>> {
-    let proto = P::decode(&*bytes)
+fn rpc_req<P: prost::Message + Default>(call: RpcCall) -> PyResult<tonic::Request<P>> {
+    let proto = P::decode(&*call.req)
         .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
-    Ok(tonic::Request::new(proto))
+    let mut req = tonic::Request::new(proto);
+    for (k, v) in call.metadata {
+        req.metadata_mut().insert(
+            MetadataKey::from_str(k.as_str())
+                .map_err(|err| PyValueError::new_err(format!("Invalid metadata key: {}", err)))?,
+            v.parse()
+                .map_err(|err| PyValueError::new_err(format!("Invalid metadata value: {}", err)))?,
+        );
+    }
+    if let Some(timeout_millis) = call.timeout_millis {
+        req.set_timeout(Duration::from_millis(timeout_millis));
+    }
+    Ok(req)
 }
 
 fn rpc_resp<P>(res: Result<tonic::Response<P>, tonic::Status>) -> PyResult<Vec<u8>>

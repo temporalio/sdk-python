@@ -9,6 +9,7 @@ import google.protobuf.internal.containers
 import google.protobuf.message
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.command_type_pb2
+import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
@@ -863,6 +864,81 @@ global___StartChildWorkflowExecutionCommandAttributes = (
     StartChildWorkflowExecutionCommandAttributes
 )
 
+class AcceptWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    UPDATE_ID_FIELD_NUMBER: builtins.int
+    update_id: typing.Text
+    """A unique identifier for an update within a given workflow context"""
+
+    def __init__(
+        self,
+        *,
+        update_id: typing.Text = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["update_id", b"update_id"]
+    ) -> None: ...
+
+global___AcceptWorkflowUpdateCommandAttributes = AcceptWorkflowUpdateCommandAttributes
+
+class CompleteWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    UPDATE_ID_FIELD_NUMBER: builtins.int
+    DURABILITY_PREFERENCE_FIELD_NUMBER: builtins.int
+    SUCCESS_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
+    update_id: typing.Text
+    """A unique identifier for an update within a given workflow context"""
+
+    durability_preference: temporalio.api.enums.v1.update_pb2.WorkflowUpdateDurabilityPreference.ValueType
+    """Whether the server should attempt to bypass making this update rejection
+    durable in history. This field is only consulted when the result field
+    indicates failure. Leaving this field in its default state (i.e.
+    UPDATE_WORKFLOW_REJECTION_DURABILITY_PREFERENCE_UNSPECIFIED) will result
+    in making the rejection durable.
+    """
+
+    @property
+    def success(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
+    def __init__(
+        self,
+        *,
+        update_id: typing.Text = ...,
+        durability_preference: temporalio.api.enums.v1.update_pb2.WorkflowUpdateDurabilityPreference.ValueType = ...,
+        success: typing.Optional[temporalio.api.common.v1.message_pb2.Payloads] = ...,
+        failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failure", b"failure", "result", b"result", "success", b"success"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "durability_preference",
+            b"durability_preference",
+            "failure",
+            b"failure",
+            "result",
+            b"result",
+            "success",
+            b"success",
+            "update_id",
+            b"update_id",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["result", b"result"]
+    ) -> typing.Optional[typing_extensions.Literal["success", "failure"]]: ...
+
+global___CompleteWorkflowUpdateCommandAttributes = (
+    CompleteWorkflowUpdateCommandAttributes
+)
+
 class Command(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     COMMAND_TYPE_FIELD_NUMBER: builtins.int
@@ -879,6 +955,8 @@ class Command(google.protobuf.message.Message):
     START_CHILD_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    ACCEPT_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    COMPLETE_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType
     @property
     def schedule_activity_task_command_attributes(
@@ -932,6 +1010,14 @@ class Command(google.protobuf.message.Message):
     def upsert_workflow_search_attributes_command_attributes(
         self,
     ) -> global___UpsertWorkflowSearchAttributesCommandAttributes: ...
+    @property
+    def accept_workflow_update_command_attributes(
+        self,
+    ) -> global___AcceptWorkflowUpdateCommandAttributes: ...
+    @property
+    def complete_workflow_update_command_attributes(
+        self,
+    ) -> global___CompleteWorkflowUpdateCommandAttributes: ...
     def __init__(
         self,
         *,
@@ -975,10 +1061,18 @@ class Command(google.protobuf.message.Message):
         upsert_workflow_search_attributes_command_attributes: typing.Optional[
             global___UpsertWorkflowSearchAttributesCommandAttributes
         ] = ...,
+        accept_workflow_update_command_attributes: typing.Optional[
+            global___AcceptWorkflowUpdateCommandAttributes
+        ] = ...,
+        complete_workflow_update_command_attributes: typing.Optional[
+            global___CompleteWorkflowUpdateCommandAttributes
+        ] = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "accept_workflow_update_command_attributes",
+            b"accept_workflow_update_command_attributes",
             "attributes",
             b"attributes",
             "cancel_timer_command_attributes",
@@ -987,6 +1081,8 @@ class Command(google.protobuf.message.Message):
             b"cancel_workflow_execution_command_attributes",
             "complete_workflow_execution_command_attributes",
             b"complete_workflow_execution_command_attributes",
+            "complete_workflow_update_command_attributes",
+            b"complete_workflow_update_command_attributes",
             "continue_as_new_workflow_execution_command_attributes",
             b"continue_as_new_workflow_execution_command_attributes",
             "fail_workflow_execution_command_attributes",
@@ -1012,6 +1108,8 @@ class Command(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "accept_workflow_update_command_attributes",
+            b"accept_workflow_update_command_attributes",
             "attributes",
             b"attributes",
             "cancel_timer_command_attributes",
@@ -1022,6 +1120,8 @@ class Command(google.protobuf.message.Message):
             b"command_type",
             "complete_workflow_execution_command_attributes",
             b"complete_workflow_execution_command_attributes",
+            "complete_workflow_update_command_attributes",
+            b"complete_workflow_update_command_attributes",
             "continue_as_new_workflow_execution_command_attributes",
             b"continue_as_new_workflow_execution_command_attributes",
             "fail_workflow_execution_command_attributes",
@@ -1061,6 +1161,8 @@ class Command(google.protobuf.message.Message):
             "start_child_workflow_execution_command_attributes",
             "signal_external_workflow_execution_command_attributes",
             "upsert_workflow_search_attributes_command_attributes",
+            "accept_workflow_update_command_attributes",
+            "complete_workflow_update_command_attributes",
         ]
     ]: ...
 

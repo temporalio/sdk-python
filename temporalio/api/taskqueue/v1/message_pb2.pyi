@@ -230,3 +230,78 @@ class StickyExecutionAttributes(google.protobuf.message.Message):
     ) -> None: ...
 
 global___StickyExecutionAttributes = StickyExecutionAttributes
+
+class VersionIdNode(google.protobuf.message.Message):
+    """Used by the worker versioning APIs, represents a node in the version graph for a particular
+    task queue
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    VERSION_FIELD_NUMBER: builtins.int
+    PREVIOUS_COMPATIBLE_FIELD_NUMBER: builtins.int
+    PREVIOUS_INCOMPATIBLE_FIELD_NUMBER: builtins.int
+    @property
+    def version(self) -> global___VersionId: ...
+    @property
+    def previous_compatible(self) -> global___VersionIdNode:
+        """A pointer to the previous version this version is considered to be compatible with"""
+        pass
+    @property
+    def previous_incompatible(self) -> global___VersionIdNode:
+        """A pointer to the last incompatible version (previous major version)"""
+        pass
+    def __init__(
+        self,
+        *,
+        version: typing.Optional[global___VersionId] = ...,
+        previous_compatible: typing.Optional[global___VersionIdNode] = ...,
+        previous_incompatible: typing.Optional[global___VersionIdNode] = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "previous_compatible",
+            b"previous_compatible",
+            "previous_incompatible",
+            b"previous_incompatible",
+            "version",
+            b"version",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "previous_compatible",
+            b"previous_compatible",
+            "previous_incompatible",
+            b"previous_incompatible",
+            "version",
+            b"version",
+        ],
+    ) -> None: ...
+
+global___VersionIdNode = VersionIdNode
+
+class VersionId(google.protobuf.message.Message):
+    """Used by the worker versioning APIs, represents a specific version of something
+    Currently, that's just a whole-worker id. In the future, if we support
+    WASM workflow bundle based versioning, for example, then the inside of this
+    message may become a oneof of different version types.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    WORKER_BUILD_ID_FIELD_NUMBER: builtins.int
+    worker_build_id: typing.Text
+    """An opaque whole-worker identifier"""
+
+    def __init__(
+        self,
+        *,
+        worker_build_id: typing.Text = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["worker_build_id", b"worker_build_id"],
+    ) -> None: ...
+
+global___VersionId = VersionId

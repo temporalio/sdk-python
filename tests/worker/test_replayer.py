@@ -212,7 +212,7 @@ async def get_history(client: Client, workflow_id: str) -> History:
         namespace=client.namespace, execution=WorkflowExecution(workflow_id=workflow_id)
     )
     while True:
-        resp = await client.service.get_workflow_execution_history(req)
+        resp = await client.workflow_service.get_workflow_execution_history(req)
         history.events.extend(resp.history.events)
         if not resp.next_page_token:
             return history

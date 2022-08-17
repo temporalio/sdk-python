@@ -6,6 +6,7 @@ import builtins
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
+import google.protobuf.timestamp_pb2
 import temporalio.api.enums.v1.namespace_pb2
 import typing
 import typing_extensions
@@ -32,6 +33,7 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
     ACTIVE_CLUSTER_NAME_FIELD_NUMBER: builtins.int
     CLUSTERS_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
+    FAILOVER_HISTORY_FIELD_NUMBER: builtins.int
     active_cluster_name: typing.Text
     @property
     def clusters(
@@ -40,6 +42,16 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
         global___ClusterReplicationConfig
     ]: ...
     state: temporalio.api.enums.v1.namespace_pb2.ReplicationState.ValueType
+    @property
+    def failover_history(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___FailoverStatus
+    ]:
+        """Contains the historical state of failover_versions for the cluster, truncated to contain only the last N
+        states to ensure that the list does not grow unbounded.
+        """
+        pass
     def __init__(
         self,
         *,
@@ -48,6 +60,9 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
             typing.Iterable[global___ClusterReplicationConfig]
         ] = ...,
         state: temporalio.api.enums.v1.namespace_pb2.ReplicationState.ValueType = ...,
+        failover_history: typing.Optional[
+            typing.Iterable[global___FailoverStatus]
+        ] = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -56,9 +71,40 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
             b"active_cluster_name",
             "clusters",
             b"clusters",
+            "failover_history",
+            b"failover_history",
             "state",
             b"state",
         ],
     ) -> None: ...
 
 global___NamespaceReplicationConfig = NamespaceReplicationConfig
+
+class FailoverStatus(google.protobuf.message.Message):
+    """Represents a historical replication status of a Namespace"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+    FAILOVER_TIME_FIELD_NUMBER: builtins.int
+    FAILOVER_VERSION_FIELD_NUMBER: builtins.int
+    @property
+    def failover_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Timestamp when the Cluster switched to the following failover_version"""
+        pass
+    failover_version: builtins.int
+    def __init__(
+        self,
+        *,
+        failover_time: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
+        failover_version: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["failover_time", b"failover_time"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failover_time", b"failover_time", "failover_version", b"failover_version"
+        ],
+    ) -> None: ...
+
+global___FailoverStatus = FailoverStatus

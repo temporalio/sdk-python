@@ -262,6 +262,21 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.FromString,
         )
+        self.UpdateWorkerBuildIdOrdering = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerBuildIdOrdering",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingResponse.FromString,
+        )
+        self.GetWorkerBuildIdOrdering = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerBuildIdOrdering",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.FromString,
+        )
+        self.UpdateWorkflow = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflow",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.FromString,
+        )
 
 
 class WorkflowServiceServicer(object):
@@ -724,6 +739,31 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def UpdateWorkerBuildIdOrdering(self, request, context):
+        """(-- api-linter: core::0134::response-message-name=disabled
+        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0134::method-signature=disabled
+        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetWorkerBuildIdOrdering(self, request, context):
+        """This could / maybe should just be part of `DescribeTaskQueue`, but is broken out here to show easily."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateWorkflow(self, request, context):
+        """Invokes the specified update function on user workflow code.
+        (-- api-linter: core::0134=disabled
+        aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_WorkflowServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -961,6 +1001,21 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.ListSchedules,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.SerializeToString,
+        ),
+        "UpdateWorkerBuildIdOrdering": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkerBuildIdOrdering,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingResponse.SerializeToString,
+        ),
+        "GetWorkerBuildIdOrdering": grpc.unary_unary_rpc_method_handler(
+            servicer.GetWorkerBuildIdOrdering,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.SerializeToString,
+        ),
+        "UpdateWorkflow": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkflow,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2337,6 +2392,93 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/ListSchedules",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateWorkerBuildIdOrdering(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerBuildIdOrdering",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetWorkerBuildIdOrdering(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerBuildIdOrdering",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateWorkflow(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflow",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.FromString,
             options,
             channel_credentials,
             insecure,
