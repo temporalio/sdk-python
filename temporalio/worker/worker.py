@@ -147,8 +147,8 @@ class Worker:
                 sandboxing in order to make using a debugger easier. If false
                 but the environment variable ``TEMPORAL_DEBUG`` is truthy, this
                 will be set to true.
-            use_worker_versioning: If true, this worker opts into worker build id
-                based versioning. See the documentation at TODO for more.
+            use_worker_versioning: IN DEVELOPMENT, don't use.
+                If true, this worker opts into worker build id based versioning.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
@@ -270,6 +270,7 @@ class Worker:
                 default_heartbeat_throttle_interval_millis=int(
                     1000 * default_heartbeat_throttle_interval.total_seconds()
                 ),
+                use_worker_versioning=use_worker_versioning,
             ),
         )
 
