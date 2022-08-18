@@ -1,6 +1,6 @@
 import asyncio
-from contextvars import copy_context
 import threading
+from contextvars import copy_context
 
 from temporalio import activity
 from temporalio.testing import ActivityEnvironment
@@ -39,6 +39,7 @@ async def test_activity_env_async():
     assert "done" == await task
     assert heartbeats == ["param: param1", "task, type: unknown", "cancelled"]
 
+
 def test_activity_env_sync():
     waiting = threading.Event()
 
@@ -47,8 +48,10 @@ def test_activity_env_sync():
 
         # Ensure it works across thread
         context = copy_context()
+
         def via_thread():
             activity.heartbeat(f"task, type: {activity.info().activity_type}")
+
         thread = threading.Thread(target=context.run, args=[via_thread])
         thread.start()
         thread.join()
