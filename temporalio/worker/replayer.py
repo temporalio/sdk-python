@@ -43,12 +43,13 @@ class Replayer:
         """Create a replayer to replay workflows from history.
 
         See :py:meth:`temporalio.worker.Worker.__init__` for a description of
-        arguments.
+        arguments. The same arguments need to be passed to the replayer that
+        were passed to the worker when the workflow originally ran.
         """
         if not workflows:
             raise ValueError("At least one workflow must be specified")
         self._config = ReplayerConfig(
-            workflows=workflows,
+            workflows=list(workflows),
             workflow_task_executor=workflow_task_executor,
             workflow_runner=workflow_runner,
             namespace=namespace,
@@ -76,9 +77,10 @@ class Replayer:
         """Replay a workflow for the given history.
 
         Args:
-            history: The history to replay. Can be a proto history object, a
-                JSON string of the history as exported via web/tctl, or a
-                dictionary of the JSON history.
+            history: The history to replay. Can be a proto history object or
+                JSON history as exported via web/tctl. If JSON history, can be a
+                JSON string or a JSON dictionary as returned by
+                :py:func:`json.load`.
         """
         # Convert history if JSON or dict
         if not isinstance(history, temporalio.api.history.v1.History):

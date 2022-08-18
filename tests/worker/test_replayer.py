@@ -29,7 +29,6 @@ from temporalio.client import Client, WorkflowFailureError
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Replayer, Worker
 from temporalio.worker.replayer import _history_from_json
-from temporalio.worker.workflow import _NondeterminismError, _UnexpectedEvictionError
 from tests.worker.test_workflow import assert_eq_eventually
 
 
@@ -157,9 +156,8 @@ async def test_replayer_workflow_nondeterministic(client: Client) -> None:
 
     # Collect history and replay it expecting error
     history = await get_history(client, handle.id)
-    with pytest.raises(_NondeterminismError) as err:
+    with pytest.raises(workflow.NondeterminismError) as err:
         await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history)
-    assert err.value.reason == "NONDETERMINISM"
 
 
 async def test_replayer_workflow_nondeterministic_json() -> None:
@@ -167,9 +165,8 @@ async def test_replayer_workflow_nondeterministic_json() -> None:
         "r"
     ) as f:
         history_json = f.read()
-    with pytest.raises(_NondeterminismError) as err:
+    with pytest.raises(workflow.NondeterminismError) as err:
         await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history_json)
-    assert err.value.reason == "NONDETERMINISM"
 
 
 @workflow.defn
@@ -192,9 +189,9 @@ async def test_replayer_workflow_not_registered(client: Client) -> None:
 
     # Collect history and replay it expecting error
     history = await get_history(client, handle.id)
-    with pytest.raises(_UnexpectedEvictionError) as err:
+    with pytest.raises(RuntimeError) as err:
         await Replayer(workflows=[SayHelloWorkflowDifferent]).replay_workflow(history)
-    assert "SayHelloWorkflow is not registered" in err.value.message
+    assert "SayHelloWorkflow is not registered" in str(err.value)
 
 
 def new_say_hello_worker(client: Client) -> Worker:

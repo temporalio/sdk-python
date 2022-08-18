@@ -79,7 +79,7 @@ class _WorkflowWorker:
                 self._interceptor_classes.append(interceptor_class)
         self._running_workflows: Dict[str, WorkflowInstance] = {}
         self._fail_on_eviction = fail_on_eviction
-        self._failure_due_to_eviction: Optional[_UnexpectedEvictionError] = None
+        self._failure_due_to_eviction: Optional[Exception] = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
         # deadlock detection, otherwise set to 2 seconds
@@ -261,14 +261,14 @@ class _WorkflowWorker:
                     remove_job.remove_from_cache.reason
                     == temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.NONDETERMINISM
                 ):
-                    self._failure_due_to_eviction = _NondeterminismError(
-                        remove_job.remove_from_cache.reason,
-                        remove_job.remove_from_cache.message,
+                    self._failure_due_to_eviction = (
+                        temporalio.workflow.NondeterminismError(
+                            remove_job.remove_from_cache.message
+                        )
                     )
                 else:
-                    self._failure_due_to_eviction = _UnexpectedEvictionError(
-                        remove_job.remove_from_cache.reason,
-                        remove_job.remove_from_cache.message,
+                    self._failure_due_to_eviction = RuntimeError(
+                        f"{remove_job.remove_from_cache.reason}: {remove_job.remove_from_cache.message}"
                     )
                 asyncio.create_task(self._bridge_worker().shutdown())
 
@@ -338,22 +338,3 @@ class _WorkflowWorker:
                 extern_functions=self._extern_functions,
             )
         )
-
-
-class _UnexpectedEvictionError(temporalio.exceptions.TemporalError):
-    def __init__(
-        self,
-        reason: temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.ValueType,
-        message: str,
-    ) -> None:
-        self.reason = temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.Name(
-            reason
-        )
-        self.message = message
-        super().__init__(f"{self.reason}: {message}")
-
-
-# TODO(cretz): Make this public and move to a more centralized place whenever a
-# sandbox is around that could justify its reuse
-class _NondeterminismError(_UnexpectedEvictionError):
-    pass
