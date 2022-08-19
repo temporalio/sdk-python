@@ -3475,3 +3475,25 @@ def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:
         and inspect.getmodule(fn) is inspect.getmodule(cls)
         and fn.__qualname__.rsplit(".", 1)[0] == cls.__name__
     )
+
+
+class _UnexpectedEvictionError(temporalio.exceptions.TemporalError):
+    def __init__(
+        self,
+        reason: temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.ValueType,
+        message: str,
+    ) -> None:
+        self.reason = temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.Name(
+            reason
+        )
+        self.message = message
+        super().__init__(f"{self.reason}: {message}")
+
+
+class NondeterminismError(temporalio.exceptions.TemporalError):
+    """Error that can be thrown during replay for non-deterministic workflow."""
+
+    def __init__(self, message: str) -> None:
+        """Initialize a nondeterminism error."""
+        super().__init__(message)
+        self.message = message

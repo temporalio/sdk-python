@@ -1,5 +1,7 @@
 """Worker using SDK Core."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List, Mapping, Optional
 
@@ -7,6 +9,7 @@ import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
+import temporalio.api.history.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
@@ -42,13 +45,27 @@ class WorkerConfig:
 class Worker:
     """SDK Core worker."""
 
-    def __init__(
-        self, client: temporalio.bridge.client.Client, config: WorkerConfig
-    ) -> None:
-        """Create SDK core worker with a client and config."""
-        self._ref = temporalio.bridge.temporal_sdk_bridge.new_worker(
-            client._ref, config
+    @staticmethod
+    def create(client: temporalio.bridge.client.Client, config: WorkerConfig) -> Worker:
+        """Create a bridge worker from a bridge client."""
+        return Worker(
+            temporalio.bridge.temporal_sdk_bridge.new_worker(client._ref, config)
         )
+
+    @staticmethod
+    def for_replay(
+        history: temporalio.api.history.v1.History, config: WorkerConfig
+    ) -> Worker:
+        """Create a bridge replay worker from history."""
+        return Worker(
+            temporalio.bridge.temporal_sdk_bridge.new_replay_worker(
+                history.SerializeToString(), config
+            )
+        )
+
+    def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.WorkerRef) -> None:
+        """Create SDK core worker from a bridge worker."""
+        self._ref = ref
 
     async def poll_workflow_activation(
         self,
