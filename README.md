@@ -104,7 +104,7 @@ import asyncio
 from temporalio.client import Client
 
 # Import the workflow from the previous code
-from my_worker_package import SayHello
+from run_worker import SayHello
 
 async def main():
     # Create client connected to server at the given address
