@@ -39,7 +39,21 @@ _default_info = temporalio.activity.Info(
 
 
 class ActivityEnvironment:
+    """Activity environment for testing activities.
+
+    This environment is used for running activity code that can access the
+    functions in the :py:mod:`temporalio.activity` module. Use :py:meth:`run` to
+    run an activity function or any function within an activity context.
+
+    Attributes:
+        info: The info that is returned from :py:func:`temporalio.activity.info`
+            function.
+        on_heartbeat: Function called on each heartbeat invocation by the
+            activity.
+    """
+
     def __init__(self) -> None:
+        """Create an ActivityEnvironment for running activity code."""
         self.info = _default_info
         self.on_heartbeat: Callable[..., None] = lambda *args: None
         self._cancelled = False
@@ -47,6 +61,10 @@ class ActivityEnvironment:
         self._activities: Set[_Activity] = set()
 
     def cancel(self) -> None:
+        """Cancel the activity.
+
+        This only has an effect on the first call.
+        """
         if self._cancelled:
             return
         self._cancelled = True
@@ -54,6 +72,10 @@ class ActivityEnvironment:
             act.cancel()
 
     def worker_shutdown(self) -> None:
+        """Notify the activity that the worker is shutting down.
+
+        This only has an effect on the first call.
+        """
         if self._worker_shutdown:
             return
         self._worker_shutdown = True
@@ -66,6 +88,16 @@ class ActivityEnvironment:
         *args: _Params.args,
         **kwargs: _Params.kwargs,
     ) -> _Return:
+        """Run the given callable in an activity context.
+
+        Args:
+            fn: The function/callable to run.
+            args: All positional arguments to the callable.
+            kwargs: All keyword arguments to the callable.
+
+        Returns:
+            The callable's result.
+        """
         # Create an activity and run it
         return _Activity(self, fn).run(*args, **kwargs)
 

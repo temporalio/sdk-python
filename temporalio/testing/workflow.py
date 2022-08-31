@@ -1,3 +1,5 @@
+"""Workflow test environment."""
+
 from __future__ import annotations
 
 import asyncio
@@ -12,11 +14,22 @@ import tarfile
 import tempfile
 import urllib.request
 import zipfile
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Iterable, Mapping, Optional, Union
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Optional,
+    Type,
+    Union,
+    cast,
+)
 
 import google.protobuf.empty_pb2
 
@@ -24,19 +37,51 @@ import temporalio.api.testservice.v1
 import temporalio.client
 import temporalio.common
 import temporalio.converter
+import temporalio.exceptions
+import temporalio.types
+import temporalio.worker
 
 logger = logging.getLogger(__name__)
 
 
 class WorkflowEnvironment:
+    """Workflow environment for testing workflows.
+
+    Most developers will want to use the static :py:meth:`start_time_skipping`
+    to start a test server process that automatically skips time as needed.
+
+    This environment is an async context manager, so it can be used with
+    ``async with`` to make sure it shuts down properly. Otherwise,
+    :py:meth:`shutdown` can be manually called.
+
+    To use the environment, simply use the :py:attr:`client` on it.
+
+    Workflows invoked on the workflow environment are automatically configured
+    to have ``assert`` failures fail the workflow with the assertion error.
+    """
+
     @staticmethod
     def from_client(client: temporalio.client.Client) -> WorkflowEnvironment:
-        return WorkflowEnvironment(client)
+        """Create a workflow environment from the given client.
+
+        :py:attr:`supports_time_skipping` will always return ``False`` for this
+        environment. :py:meth:`sleep` will sleep the actual amount of time and
+        :py:meth:`get_current_time` will return the current time.
+
+        Args:
+            client: The client to use for the environment.
+
+        Returns:
+            The workflow environment that runs against the given client.
+        """
+        # Add the assertion interceptor
+        return WorkflowEnvironment(
+            _client_with_interceptors(client, _AssertionErrorInterceptor())
+        )
 
     @staticmethod
     async def start_time_skipping(
         *,
-        auto_time_skipping: bool = True,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
         interceptors: Iterable[
             Union[
@@ -55,17 +100,71 @@ class WorkflowEnvironment:
         identity: Optional[str] = None,
         test_server_stdout: Optional[Any] = subprocess.PIPE,
         test_server_stderr: Optional[Any] = subprocess.PIPE,
-    ) -> TimeSkippingWorkflowEnvironment:
+        test_server_exe_path: Optional[str] = None,
+        test_server_version: str = "1.15.1",
+    ) -> WorkflowEnvironment:
+        """Start a time skipping workflow environment.
+
+        By default, this environment will automatically skip to the next events
+        in time when a workflow's
+        :py:meth:`temporalio.client.WorkflowHandle.result` is awaited on (which
+        includes :py:meth:`temporalio.client.Client.execute_workflow`). Before
+        the result is awaited on, time can be manually skipped forward using
+        :py:meth:`sleep`. The currently known time can be obtained via
+        :py:meth:`get_current_time`.
+
+        Internally, this environment lazily downloads a test-server binary for
+        the current OS/arch into the temp directory if it is not already there.
+        Then the executable is started and will be killed when
+        :py:meth:`shutdown` is called (which is implicitly done if this is
+        started via
+        ``async with await WorkflowEnvironment.start_time_skipping()``).
+
+        Users can reuse this environment for testing multiple independent
+        workflows, but not concurrently. Time skipping, which is automatically
+        done when awaiting a workflow result and manually done on
+        :py:meth:`sleep`, is global to the environment, not to the workflow
+        under test.
+
+        Args:
+            data_converter: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            interceptors: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            default_workflow_query_reject_condition: See parameter of the same
+                name on :py:meth:`temporalio.client.Client.connect`.
+            retry_config: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            rpc_metadata: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            identity: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            test_server_stdout: See ``stdout`` parameter on
+                :py:func:`asyncio.loop.subprocess_exec`.
+            test_server_stderr: See ``stderr`` parameter on
+                :py:func:`asyncio.loop.subprocess_exec`.
+            test_server_exe_path: Executable path for the test server. Defaults
+                to a version-specific path in the temp directory, lazily
+                downloaded at version ``test_server_version`` if not there.
+            test_server_version: Test server version to lazily download when not
+                found. This is only used if ``test_server_exe_path`` is not set.
+
+        Returns:
+            The started workflow environment with time skipping.
+        """
         # Download server binary. We accept this is not async.
-        exe_path = _ensure_test_server_downloaded("1.15.1", Path(tempfile.gettempdir()))
+        exe_path = (
+            Path(test_server_exe_path)
+            if test_server_exe_path
+            else _ensure_test_server_downloaded(
+                test_server_version, Path(tempfile.gettempdir())
+            )
+        )
 
         # Get a free port and start the server
         port = _get_free_port()
-        args = [port]
-        if auto_time_skipping:
-            args.append("--enable-time-skipping")
         test_server_process = await asyncio.create_subprocess_exec(
-            exe_path, *args, stdout=test_server_stdout, stderr=test_server_stderr
+            exe_path, port, stdout=test_server_stdout, stderr=test_server_stderr
         )
 
         # We must terminate the process if we can't connect
@@ -74,7 +173,7 @@ class WorkflowEnvironment:
             err_count = 0
             while True:
                 try:
-                    return TimeSkippingWorkflowEnvironment(
+                    return _TimeSkippingWorkflowEnvironment(
                         await temporalio.client.Client.connect(
                             f"localhost:{port}",
                             data_converter=data_converter,
@@ -85,7 +184,6 @@ class WorkflowEnvironment:
                             identity=identity,
                         ),
                         test_server_process=test_server_process,
-                        auto_time_skipping=auto_time_skipping,
                     )
                 except RuntimeError as err:
                     err_count += 1
@@ -106,79 +204,134 @@ class WorkflowEnvironment:
             raise
 
     def __init__(self, client: temporalio.client.Client) -> None:
+        """Create a workflow environment from a client.
+
+        Most users would use a static method instead.
+        """
         self._client = client
 
     async def __aenter__(self) -> WorkflowEnvironment:
+        """Noop for ``async with`` support."""
         return self
 
     async def __aexit__(self, *args) -> None:
+        """For ``async with`` support to just call :py:meth:`shutdown`."""
         await self.shutdown()
 
     @property
     def client(self) -> temporalio.client.Client:
+        """Client to this environment."""
         return self._client
 
     async def shutdown(self) -> None:
+        """Shut down this environment."""
         pass
 
     async def sleep(self, duration: Union[timedelta, float]) -> None:
+        """Sleep in this environment.
+
+        This awaits a regular :py:func:`asyncio.sleep` in regular environments,
+        or manually skips time in time-skipping environments.
+
+        Args:
+            duration: Amount of time to sleep.
+        """
         await asyncio.sleep(
             duration.total_seconds() if isinstance(duration, timedelta) else duration
         )
 
     async def get_current_time(self) -> datetime:
+        """Get the current time known to this environment.
+
+        For non-time-skipping environments this is simply the system time. For
+        time-skipping environments this is whatever time has been skipped to.
+        """
         return datetime.now(timezone.utc)
 
     @property
-    def has_time_skipping(self) -> bool:
+    def supports_time_skipping(self) -> bool:
+        """Whether this environment supports time skipping."""
         return False
 
-    @property
-    def auto_time_skipping(self) -> bool:
-        return False
+    @contextmanager
+    def auto_time_skipping_disabled(self) -> Iterator[None]:
+        """Disable any automatic time skipping if this is a time-skipping
+        environment.
 
-    async def set_auto_time_skipping(self, auto_time_skipping: bool) -> bool:
-        raise NotImplementedError
+        This is a context manager for use via ``with``. Usually in time-skipping
+        environments, waiting on a workflow result causes time to automatically
+        skip until the next event. This can disable that. However, this only
+        applies to results awaited inside this context. This will not disable
+        automatic time skipping on previous results.
 
-    @asynccontextmanager
-    async def auto_time_skipping_disabled(self) -> AsyncIterator[None]:
-        was_set = await self.set_auto_time_skipping(True)
+        This has no effect on non-time-skipping environments.
+        """
+        # It's always disabled for this base class
+        yield None
+
+
+class _AssertionErrorInterceptor(
+    temporalio.client.Interceptor, temporalio.worker.Interceptor
+):
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> Optional[Type[temporalio.worker.WorkflowInboundInterceptor]]:
+        return _AssertionErrorWorkflowInboundInterceptor
+
+
+class _AssertionErrorWorkflowInboundInterceptor(
+    temporalio.worker.WorkflowInboundInterceptor
+):
+    async def execute_workflow(
+        self, input: temporalio.worker.ExecuteWorkflowInput
+    ) -> Any:
+        with self.assert_error_as_app_error():
+            return await super().execute_workflow(input)
+
+    async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
+        with self.assert_error_as_app_error():
+            return await super().handle_signal(input)
+
+    @contextmanager
+    def assert_error_as_app_error(self) -> Iterator[None]:
         try:
             yield None
-        finally:
-            if was_set:
-                await self.set_auto_time_skipping(False)
+        except AssertionError as err:
+            app_err = temporalio.exceptions.ApplicationError(
+                str(err), type="AssertionError", non_retryable=True
+            )
+            app_err.__traceback__ = err.__traceback__
+            raise app_err from None
 
 
-class TimeSkippingWorkflowEnvironment(WorkflowEnvironment):
+class _TimeSkippingWorkflowEnvironment(WorkflowEnvironment):
     def __init__(
         self,
         client: temporalio.client.Client,
         *,
         test_server_process: asyncio.subprocess.Process,
-        auto_time_skipping: bool,
     ) -> None:
-        super().__init__(client)
-        self._test_server_process = test_server_process
-        self._auto_time_skipping = auto_time_skipping
-
-    @property
-    def test_server_process(self) -> asyncio.subprocess.Process:
-        return self._test_server_process
+        # Add the assertion interceptor and time skipping interceptor
+        super().__init__(
+            _client_with_interceptors(
+                client,
+                _AssertionErrorInterceptor(),
+                _TimeSkippingClientInterceptor(self),
+            )
+        )
+        self.test_server_process = test_server_process
+        self.auto_time_skipping = True
 
     async def shutdown(self) -> None:
-        self._test_server_process.terminate()
-        await self._test_server_process.wait()
+        self.test_server_process.terminate()
+        await self.test_server_process.wait()
 
     async def sleep(self, duration: Union[timedelta, float]) -> None:
         req = temporalio.api.testservice.v1.SleepRequest()
         req.duration.FromTimedelta(
             duration if isinstance(duration, timedelta) else timedelta(seconds=duration)
         )
-        if self._auto_time_skipping:
-            await self._client.test_service.sleep(req)
-        else:
-            await self._client.test_service.unlock_time_skipping_with_sleep(req)
+        await self._client.test_service.unlock_time_skipping_with_sleep(req)
 
     async def get_current_time(self) -> datetime:
         resp = await self._client.test_service.get_current_time(
@@ -187,27 +340,102 @@ class TimeSkippingWorkflowEnvironment(WorkflowEnvironment):
         return resp.time.ToDatetime().replace(tzinfo=timezone.utc)
 
     @property
-    def has_time_skipping(self) -> bool:
+    def supports_time_skipping(self) -> bool:
         return True
 
-    @property
-    def auto_time_skipping(self) -> bool:
-        return self._auto_time_skipping
+    @contextmanager
+    def auto_time_skipping_disabled(self) -> Iterator[None]:
+        already_disabled = not self.auto_time_skipping
+        self.auto_time_skipping = False
+        try:
+            yield None
+        finally:
+            if not already_disabled:
+                self.auto_time_skipping = True
 
-    async def set_auto_time_skipping(self, auto_time_skipping: bool) -> bool:
-        if self._auto_time_skipping and not auto_time_skipping:
-            await self._client.test_service.lock_time_skipping(
+    @asynccontextmanager
+    async def time_skipping_unlocked(self) -> AsyncIterator[None]:
+        # If it's disabled, no locking/unlocking, just yield and return
+        if not self.auto_time_skipping:
+            yield None
+            return
+        # Unlock to start time skipping, lock again to stop it
+        await self.client.test_service.unlock_time_skipping(
+            temporalio.api.testservice.v1.UnlockTimeSkippingRequest()
+        )
+        try:
+            yield None
+            # Lock it back, throwing on error
+            await self.client.test_service.lock_time_skipping(
                 temporalio.api.testservice.v1.LockTimeSkippingRequest()
             )
-            self._auto_time_skipping = False
-            return True
-        if not self._auto_time_skipping and auto_time_skipping:
-            await self._client.test_service.unlock_time_skipping(
-                temporalio.api.testservice.v1.UnlockTimeSkippingRequest()
+        except:
+            # Lock it back, swallowing error
+            try:
+                await self.client.test_service.lock_time_skipping(
+                    temporalio.api.testservice.v1.LockTimeSkippingRequest()
+                )
+            except:
+                logger.exception("Failed locking time skipping after error")
+            raise
+
+
+class _TimeSkippingClientInterceptor(temporalio.client.Interceptor):
+    def __init__(self, env: _TimeSkippingWorkflowEnvironment) -> None:
+        self.env = env
+
+    def intercept_client(
+        self, next: temporalio.client.OutboundInterceptor
+    ) -> temporalio.client.OutboundInterceptor:
+        return _TimeSkippingClientOutboundInterceptor(next, self.env)
+
+
+class _TimeSkippingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
+    def __init__(
+        self,
+        next: temporalio.client.OutboundInterceptor,
+        env: _TimeSkippingWorkflowEnvironment,
+    ) -> None:
+        super().__init__(next)
+        self.env = env
+
+    async def start_workflow(
+        self, input: temporalio.client.StartWorkflowInput
+    ) -> temporalio.client.WorkflowHandle[Any, Any]:
+        # We need to change the class of the handle so we can override result
+        handle = cast(_TimeSkippingWorkflowHandle, await super().start_workflow(input))
+        handle.__class__ = _TimeSkippingWorkflowHandle
+        handle.env = self.env
+        return handle
+
+
+class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
+    env: _TimeSkippingWorkflowEnvironment
+
+    async def result(
+        self,
+        *,
+        follow_runs: bool = True,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> Any:
+        async with self.env.time_skipping_unlocked():
+            return await super().result(
+                follow_runs=follow_runs,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
             )
-            self._auto_time_skipping = True
-            return True
-        return False
+
+
+def _client_with_interceptors(
+    client: temporalio.client.Client, *interceptors: temporalio.client.Interceptor
+) -> temporalio.client.Client:
+    # Shallow clone client and add interceptors
+    config = client.config()
+    config_interceptors = list(config["interceptors"])
+    config_interceptors.extend(interceptors)
+    config["interceptors"] = interceptors
+    return temporalio.client.Client(**config)
 
 
 def _ensure_test_server_downloaded(version: str, dest_dir: Path) -> Path:

@@ -73,3 +73,25 @@ def test_activity_env_sync():
     env.cancel()
     thread.join()
     assert heartbeats == ["param: param1", "task, type: unknown", "cancelled"]
+
+
+async def test_activity_env_assert():
+    async def assert_equals(a: str, b: str) -> None:
+        assert a == b
+
+    # Get out-of-env expected err
+    try:
+        await assert_equals("foo", "bar")
+        assert False
+    except Exception as err:
+        expected_err = err
+
+    # Get in-env actual err
+    try:
+        await ActivityEnvironment().run(assert_equals, "foo", "bar")
+        assert False
+    except Exception as err:
+        actual_err = err
+
+    assert type(expected_err) == type(actual_err)
+    assert str(expected_err) == str(actual_err)

@@ -149,6 +149,8 @@ intersphinx = [
 privacy = [
   "PRIVATE:temporalio.bridge",
   "PRIVATE:temporalio.types",
+  "HIDDEN:temporalio.testing.activity",
+  "HIDDEN:temporalio.testing.workflow",
   "HIDDEN:temporalio.worker.activity",
   "HIDDEN:temporalio.worker.interceptor",
   "HIDDEN:temporalio.worker.worker",
