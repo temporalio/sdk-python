@@ -242,7 +242,7 @@ class Worker:
         # free it.
         # TODO(cretz): Why does this cause a test hang when an exception is
         # thrown after it?
-        self._bridge_worker = temporalio.bridge.worker.Worker(
+        self._bridge_worker = temporalio.bridge.worker.Worker.create(
             bridge_client._bridge_client,
             temporalio.bridge.worker.WorkerConfig(
                 namespace=client.namespace,
@@ -277,6 +277,7 @@ class Worker:
         """
         config = self._config.copy()
         config["activities"] = list(config["activities"])
+        config["workflows"] = list(config["workflows"])
         return config
 
     @property

@@ -104,7 +104,7 @@ import asyncio
 from temporalio.client import Client
 
 # Import the workflow from the previous code
-from my_worker_package import SayHello
+from run_worker import SayHello
 
 async def main():
     # Create client connected to server at the given address
@@ -712,6 +712,22 @@ affect calls activity code might make to functions on the `temporalio.activity` 
 * `on_heartbeat` property can be set to handle `activity.heartbeat()` calls
 * `cancel()` can be invoked to simulate a cancellation of the activity
 * `worker_shutdown()` can be invoked to simulate a worker shutdown during execution of the activity
+
+### Workflow Replay
+
+Given a workflow's history, it can be replayed locally to check for things like non-determinism errors. For example,
+assuming `history_json_str` is populated with a JSON string history either exported from the web UI or from `tctl`, the
+following function will replay it:
+
+```python
+from temporalio.worker import Replayer
+
+async def run_replayer(history_json_str: str):
+  replayer = Replayer(workflows=[SayHello])
+  await replayer.replay_workflow(history_json_str)
+```
+
+This will throw an error if any non-determinism is detected.
 
 ### OpenTelemetry Support
 
