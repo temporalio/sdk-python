@@ -3,6 +3,7 @@
 isort:skip_file
 """
 import builtins
+import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
@@ -10,12 +11,17 @@ import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import google.protobuf.wrappers_pb2
+import sys
 import temporalio.bridge.proto.activity_task.activity_task_pb2
 import temporalio.bridge.proto.core_interface_pb2
 import temporalio.bridge.proto.workflow_activation.workflow_activation_pb2
 import temporalio.bridge.proto.workflow_completion.workflow_completion_pb2
 import typing
-import typing_extensions
+
+if sys.version_info >= (3, 10):
+    import typing as typing_extensions
+else:
+    import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -26,7 +32,7 @@ class _LogLevel:
 class _LogLevelEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_LogLevel.ValueType],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     LOG_LEVEL_UNSPECIFIED: _LogLevel.ValueType  # 0
     OFF: _LogLevel.ValueType  # 1
@@ -36,8 +42,7 @@ class _LogLevelEnumTypeWrapper(
     DEBUG: _LogLevel.ValueType  # 5
     TRACE: _LogLevel.ValueType  # 6
 
-class LogLevel(_LogLevel, metaclass=_LogLevelEnumTypeWrapper):
-    pass
+class LogLevel(_LogLevel, metaclass=_LogLevelEnumTypeWrapper): ...
 
 LOG_LEVEL_UNSPECIFIED: LogLevel.ValueType  # 0
 OFF: LogLevel.ValueType  # 1
@@ -53,12 +58,14 @@ class InitTelemetryRequest(google.protobuf.message.Message):
 
     class ConsoleLoggerOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         def __init__(
             self,
         ) -> None: ...
 
     class ForwardLoggerOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         LEVEL_FIELD_NUMBER: builtins.int
         level: global___LogLevel.ValueType
         def __init__(
@@ -75,15 +82,16 @@ class InitTelemetryRequest(google.protobuf.message.Message):
 
         class HeadersEntry(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
             KEY_FIELD_NUMBER: builtins.int
             VALUE_FIELD_NUMBER: builtins.int
-            key: typing.Text
-            value: typing.Text
+            key: builtins.str
+            value: builtins.str
             def __init__(
                 self,
                 *,
-                key: typing.Text = ...,
-                value: typing.Text = ...,
+                key: builtins.str = ...,
+                value: builtins.str = ...,
             ) -> None: ...
             def ClearField(
                 self,
@@ -92,18 +100,18 @@ class InitTelemetryRequest(google.protobuf.message.Message):
 
         URL_FIELD_NUMBER: builtins.int
         HEADERS_FIELD_NUMBER: builtins.int
-        url: typing.Text
+        url: builtins.str
         @property
         def headers(
             self,
         ) -> google.protobuf.internal.containers.ScalarMap[
-            typing.Text, typing.Text
+            builtins.str, builtins.str
         ]: ...
         def __init__(
             self,
             *,
-            url: typing.Text = ...,
-            headers: typing.Optional[typing.Mapping[typing.Text, typing.Text]] = ...,
+            url: builtins.str = ...,
+            headers: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -112,12 +120,13 @@ class InitTelemetryRequest(google.protobuf.message.Message):
 
     class PrometheusOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         EXPORT_BIND_ADDRESS_FIELD_NUMBER: builtins.int
-        export_bind_address: typing.Text
+        export_bind_address: builtins.str
         def __init__(
             self,
             *,
-            export_bind_address: typing.Text = ...,
+            export_bind_address: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -132,7 +141,7 @@ class InitTelemetryRequest(google.protobuf.message.Message):
     OTEL_TRACING_FIELD_NUMBER: builtins.int
     OTEL_METRICS_FIELD_NUMBER: builtins.int
     PROMETHEUS_FIELD_NUMBER: builtins.int
-    tracing_filter: typing.Text
+    tracing_filter: builtins.str
     @property
     def console(self) -> global___InitTelemetryRequest.ConsoleLoggerOptions: ...
     @property
@@ -146,22 +155,12 @@ class InitTelemetryRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        tracing_filter: typing.Text = ...,
-        console: typing.Optional[
-            global___InitTelemetryRequest.ConsoleLoggerOptions
-        ] = ...,
-        forward: typing.Optional[
-            global___InitTelemetryRequest.ForwardLoggerOptions
-        ] = ...,
-        otel_tracing: typing.Optional[
-            global___InitTelemetryRequest.OtelCollectorOptions
-        ] = ...,
-        otel_metrics: typing.Optional[
-            global___InitTelemetryRequest.OtelCollectorOptions
-        ] = ...,
-        prometheus: typing.Optional[
-            global___InitTelemetryRequest.PrometheusOptions
-        ] = ...,
+        tracing_filter: builtins.str = ...,
+        console: global___InitTelemetryRequest.ConsoleLoggerOptions | None = ...,
+        forward: global___InitTelemetryRequest.ForwardLoggerOptions | None = ...,
+        otel_tracing: global___InitTelemetryRequest.OtelCollectorOptions | None = ...,
+        otel_metrics: global___InitTelemetryRequest.OtelCollectorOptions | None = ...,
+        prometheus: global___InitTelemetryRequest.PrometheusOptions | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -210,15 +209,15 @@ class InitTelemetryRequest(google.protobuf.message.Message):
     @typing.overload
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["logging", b"logging"]
-    ) -> typing.Optional[typing_extensions.Literal["console", "forward"]]: ...
+    ) -> typing_extensions.Literal["console", "forward"] | None: ...
     @typing.overload
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["metrics", b"metrics"]
-    ) -> typing.Optional[typing_extensions.Literal["otel_metrics", "prometheus"]]: ...
+    ) -> typing_extensions.Literal["otel_metrics", "prometheus"] | None: ...
     @typing.overload
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["tracing", b"tracing"]
-    ) -> typing.Optional[typing_extensions.Literal["otel_tracing"]]: ...
+    ) -> typing_extensions.Literal["otel_tracing"] | None: ...
 
 global___InitTelemetryRequest = InitTelemetryRequest
 
@@ -227,19 +226,20 @@ class CreateClientRequest(google.protobuf.message.Message):
 
     class TlsConfig(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         SERVER_ROOT_CA_CERT_FIELD_NUMBER: builtins.int
         DOMAIN_FIELD_NUMBER: builtins.int
         CLIENT_CERT_FIELD_NUMBER: builtins.int
         CLIENT_PRIVATE_KEY_FIELD_NUMBER: builtins.int
         server_root_ca_cert: builtins.bytes
-        domain: typing.Text
+        domain: builtins.str
         client_cert: builtins.bytes
         client_private_key: builtins.bytes
         def __init__(
             self,
             *,
             server_root_ca_cert: builtins.bytes = ...,
-            domain: typing.Text = ...,
+            domain: builtins.str = ...,
             client_cert: builtins.bytes = ...,
             client_private_key: builtins.bytes = ...,
         ) -> None: ...
@@ -259,6 +259,7 @@ class CreateClientRequest(google.protobuf.message.Message):
 
     class RetryConfig(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         INITIAL_INTERVAL_FIELD_NUMBER: builtins.int
         RANDOMIZATION_FACTOR_FIELD_NUMBER: builtins.int
         MULTIPLIER_FIELD_NUMBER: builtins.int
@@ -280,20 +281,12 @@ class CreateClientRequest(google.protobuf.message.Message):
         def __init__(
             self,
             *,
-            initial_interval: typing.Optional[
-                google.protobuf.duration_pb2.Duration
-            ] = ...,
-            randomization_factor: typing.Optional[
-                google.protobuf.wrappers_pb2.DoubleValue
-            ] = ...,
-            multiplier: typing.Optional[google.protobuf.wrappers_pb2.DoubleValue] = ...,
-            max_interval: typing.Optional[google.protobuf.duration_pb2.Duration] = ...,
-            max_elapsed_time: typing.Optional[
-                google.protobuf.duration_pb2.Duration
-            ] = ...,
-            max_retries: typing.Optional[
-                google.protobuf.wrappers_pb2.UInt32Value
-            ] = ...,
+            initial_interval: google.protobuf.duration_pb2.Duration | None = ...,
+            randomization_factor: google.protobuf.wrappers_pb2.DoubleValue | None = ...,
+            multiplier: google.protobuf.wrappers_pb2.DoubleValue | None = ...,
+            max_interval: google.protobuf.duration_pb2.Duration | None = ...,
+            max_elapsed_time: google.protobuf.duration_pb2.Duration | None = ...,
+            max_retries: google.protobuf.wrappers_pb2.UInt32Value | None = ...,
         ) -> None: ...
         def HasField(
             self,
@@ -337,11 +330,11 @@ class CreateClientRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     TLS_CONFIG_FIELD_NUMBER: builtins.int
     RETRY_CONFIG_FIELD_NUMBER: builtins.int
-    target_url: typing.Text
-    namespace: typing.Text
-    client_name: typing.Text
-    client_version: typing.Text
-    identity: typing.Text
+    target_url: builtins.str
+    namespace: builtins.str
+    client_name: builtins.str
+    client_version: builtins.str
+    identity: builtins.str
     @property
     def tls_config(self) -> global___CreateClientRequest.TlsConfig: ...
     @property
@@ -349,13 +342,13 @@ class CreateClientRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        target_url: typing.Text = ...,
-        namespace: typing.Text = ...,
-        client_name: typing.Text = ...,
-        client_version: typing.Text = ...,
-        identity: typing.Text = ...,
-        tls_config: typing.Optional[global___CreateClientRequest.TlsConfig] = ...,
-        retry_config: typing.Optional[global___CreateClientRequest.RetryConfig] = ...,
+        target_url: builtins.str = ...,
+        namespace: builtins.str = ...,
+        client_name: builtins.str = ...,
+        client_version: builtins.str = ...,
+        identity: builtins.str = ...,
+        tls_config: global___CreateClientRequest.TlsConfig | None = ...,
+        retry_config: global___CreateClientRequest.RetryConfig | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -390,12 +383,13 @@ class InitResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
@@ -407,7 +401,7 @@ class InitResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        error: typing.Optional[global___InitResponse.Error] = ...,
+        error: global___InitResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["error", b"error"]
@@ -420,6 +414,7 @@ global___InitResponse = InitResponse
 
 class CreateWorkerRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     MAX_CACHED_WORKFLOWS_FIELD_NUMBER: builtins.int
     MAX_OUTSTANDING_WORKFLOW_TASKS_FIELD_NUMBER: builtins.int
@@ -432,7 +427,7 @@ class CreateWorkerRequest(google.protobuf.message.Message):
     STICKY_QUEUE_SCHEDULE_TO_START_TIMEOUT_FIELD_NUMBER: builtins.int
     MAX_HEARTBEAT_THROTTLE_INTERVAL_FIELD_NUMBER: builtins.int
     DEFAULT_HEARTBEAT_THROTTLE_INTERVAL_FIELD_NUMBER: builtins.int
-    task_queue: typing.Text
+    task_queue: builtins.str
     @property
     def max_cached_workflows(self) -> google.protobuf.wrappers_pb2.UInt32Value: ...
     @property
@@ -471,38 +466,25 @@ class CreateWorkerRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        task_queue: typing.Text = ...,
-        max_cached_workflows: typing.Optional[
-            google.protobuf.wrappers_pb2.UInt32Value
-        ] = ...,
-        max_outstanding_workflow_tasks: typing.Optional[
-            google.protobuf.wrappers_pb2.UInt32Value
-        ] = ...,
-        max_outstanding_activities: typing.Optional[
-            google.protobuf.wrappers_pb2.UInt32Value
-        ] = ...,
-        max_outstanding_local_activities: typing.Optional[
-            google.protobuf.wrappers_pb2.UInt32Value
-        ] = ...,
-        max_concurrent_wft_polls: typing.Optional[
-            google.protobuf.wrappers_pb2.UInt32Value
-        ] = ...,
-        nonsticky_to_sticky_poll_ratio: typing.Optional[
-            google.protobuf.wrappers_pb2.FloatValue
-        ] = ...,
-        max_concurrent_at_polls: typing.Optional[
-            google.protobuf.wrappers_pb2.UInt32Value
-        ] = ...,
+        task_queue: builtins.str = ...,
+        max_cached_workflows: google.protobuf.wrappers_pb2.UInt32Value | None = ...,
+        max_outstanding_workflow_tasks: google.protobuf.wrappers_pb2.UInt32Value
+        | None = ...,
+        max_outstanding_activities: google.protobuf.wrappers_pb2.UInt32Value
+        | None = ...,
+        max_outstanding_local_activities: google.protobuf.wrappers_pb2.UInt32Value
+        | None = ...,
+        max_concurrent_wft_polls: google.protobuf.wrappers_pb2.UInt32Value | None = ...,
+        nonsticky_to_sticky_poll_ratio: google.protobuf.wrappers_pb2.FloatValue
+        | None = ...,
+        max_concurrent_at_polls: google.protobuf.wrappers_pb2.UInt32Value | None = ...,
         no_remote_activities: builtins.bool = ...,
-        sticky_queue_schedule_to_start_timeout: typing.Optional[
-            google.protobuf.duration_pb2.Duration
-        ] = ...,
-        max_heartbeat_throttle_interval: typing.Optional[
-            google.protobuf.duration_pb2.Duration
-        ] = ...,
-        default_heartbeat_throttle_interval: typing.Optional[
-            google.protobuf.duration_pb2.Duration
-        ] = ...,
+        sticky_queue_schedule_to_start_timeout: google.protobuf.duration_pb2.Duration
+        | None = ...,
+        max_heartbeat_throttle_interval: google.protobuf.duration_pb2.Duration
+        | None = ...,
+        default_heartbeat_throttle_interval: google.protobuf.duration_pb2.Duration
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -566,12 +548,13 @@ class RegisterWorkerResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
@@ -583,7 +566,7 @@ class RegisterWorkerResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        error: typing.Optional[global___RegisterWorkerResponse.Error] = ...,
+        error: global___RegisterWorkerResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["error", b"error"]
@@ -596,6 +579,7 @@ global___RegisterWorkerResponse = RegisterWorkerResponse
 
 class PollWorkflowActivationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     def __init__(
         self,
     ) -> None: ...
@@ -607,14 +591,15 @@ class PollWorkflowActivationResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
         SHUTDOWN_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         shutdown: builtins.bool
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
             shutdown: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
@@ -635,10 +620,9 @@ class PollWorkflowActivationResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        activation: typing.Optional[
-            temporalio.bridge.proto.workflow_activation.workflow_activation_pb2.WorkflowActivation
-        ] = ...,
-        error: typing.Optional[global___PollWorkflowActivationResponse.Error] = ...,
+        activation: temporalio.bridge.proto.workflow_activation.workflow_activation_pb2.WorkflowActivation
+        | None = ...,
+        error: global___PollWorkflowActivationResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -654,12 +638,13 @@ class PollWorkflowActivationResponse(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["response", b"response"]
-    ) -> typing.Optional[typing_extensions.Literal["activation", "error"]]: ...
+    ) -> typing_extensions.Literal["activation", "error"] | None: ...
 
 global___PollWorkflowActivationResponse = PollWorkflowActivationResponse
 
 class PollActivityTaskRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     def __init__(
         self,
     ) -> None: ...
@@ -671,14 +656,15 @@ class PollActivityTaskResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
         SHUTDOWN_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         shutdown: builtins.bool
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
             shutdown: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
@@ -699,10 +685,9 @@ class PollActivityTaskResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        task: typing.Optional[
-            temporalio.bridge.proto.activity_task.activity_task_pb2.ActivityTask
-        ] = ...,
-        error: typing.Optional[global___PollActivityTaskResponse.Error] = ...,
+        task: temporalio.bridge.proto.activity_task.activity_task_pb2.ActivityTask
+        | None = ...,
+        error: global___PollActivityTaskResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -718,12 +703,13 @@ class PollActivityTaskResponse(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["response", b"response"]
-    ) -> typing.Optional[typing_extensions.Literal["task", "error"]]: ...
+    ) -> typing_extensions.Literal["task", "error"] | None: ...
 
 global___PollActivityTaskResponse = PollActivityTaskResponse
 
 class CompleteWorkflowActivationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     COMPLETION_FIELD_NUMBER: builtins.int
     @property
     def completion(
@@ -732,9 +718,8 @@ class CompleteWorkflowActivationRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        completion: typing.Optional[
-            temporalio.bridge.proto.workflow_completion.workflow_completion_pb2.WorkflowActivationCompletion
-        ] = ...,
+        completion: temporalio.bridge.proto.workflow_completion.workflow_completion_pb2.WorkflowActivationCompletion
+        | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["completion", b"completion"]
@@ -750,12 +735,13 @@ class CompleteWorkflowActivationResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
@@ -767,7 +753,7 @@ class CompleteWorkflowActivationResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        error: typing.Optional[global___CompleteWorkflowActivationResponse.Error] = ...,
+        error: global___CompleteWorkflowActivationResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["error", b"error"]
@@ -780,6 +766,7 @@ global___CompleteWorkflowActivationResponse = CompleteWorkflowActivationResponse
 
 class CompleteActivityTaskRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     COMPLETION_FIELD_NUMBER: builtins.int
     @property
     def completion(
@@ -788,9 +775,8 @@ class CompleteActivityTaskRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        completion: typing.Optional[
-            temporalio.bridge.proto.core_interface_pb2.ActivityTaskCompletion
-        ] = ...,
+        completion: temporalio.bridge.proto.core_interface_pb2.ActivityTaskCompletion
+        | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["completion", b"completion"]
@@ -806,12 +792,13 @@ class CompleteActivityTaskResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
@@ -823,7 +810,7 @@ class CompleteActivityTaskResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        error: typing.Optional[global___CompleteActivityTaskResponse.Error] = ...,
+        error: global___CompleteActivityTaskResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["error", b"error"]
@@ -836,6 +823,7 @@ global___CompleteActivityTaskResponse = CompleteActivityTaskResponse
 
 class RecordActivityHeartbeatRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     HEARTBEAT_FIELD_NUMBER: builtins.int
     @property
     def heartbeat(
@@ -844,9 +832,8 @@ class RecordActivityHeartbeatRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        heartbeat: typing.Optional[
-            temporalio.bridge.proto.core_interface_pb2.ActivityHeartbeat
-        ] = ...,
+        heartbeat: temporalio.bridge.proto.core_interface_pb2.ActivityHeartbeat
+        | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["heartbeat", b"heartbeat"]
@@ -862,12 +849,13 @@ class RecordActivityHeartbeatResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
@@ -879,7 +867,7 @@ class RecordActivityHeartbeatResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        error: typing.Optional[global___RecordActivityHeartbeatResponse.Error] = ...,
+        error: global___RecordActivityHeartbeatResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["error", b"error"]
@@ -892,12 +880,13 @@ global___RecordActivityHeartbeatResponse = RecordActivityHeartbeatResponse
 
 class RequestWorkflowEvictionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     RUN_ID_FIELD_NUMBER: builtins.int
-    run_id: typing.Text
+    run_id: builtins.str
     def __init__(
         self,
         *,
-        run_id: typing.Text = ...,
+        run_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self, field_name: typing_extensions.Literal["run_id", b"run_id"]
@@ -910,12 +899,13 @@ class RequestWorkflowEvictionResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
@@ -927,7 +917,7 @@ class RequestWorkflowEvictionResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        error: typing.Optional[global___RequestWorkflowEvictionResponse.Error] = ...,
+        error: global___RequestWorkflowEvictionResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["error", b"error"]
@@ -940,6 +930,7 @@ global___RequestWorkflowEvictionResponse = RequestWorkflowEvictionResponse
 
 class ShutdownWorkerRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     def __init__(
         self,
     ) -> None: ...
@@ -951,12 +942,13 @@ class ShutdownWorkerResponse(google.protobuf.message.Message):
 
     class Error(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
+            message: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self, field_name: typing_extensions.Literal["message", b"message"]
@@ -968,7 +960,7 @@ class ShutdownWorkerResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        error: typing.Optional[global___ShutdownWorkerResponse.Error] = ...,
+        error: global___ShutdownWorkerResponse.Error | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["error", b"error"]
@@ -981,6 +973,7 @@ global___ShutdownWorkerResponse = ShutdownWorkerResponse
 
 class FetchBufferedLogsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     def __init__(
         self,
     ) -> None: ...
@@ -992,18 +985,19 @@ class FetchBufferedLogsResponse(google.protobuf.message.Message):
 
     class LogEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
         MESSAGE_FIELD_NUMBER: builtins.int
         TIMESTAMP_FIELD_NUMBER: builtins.int
         LEVEL_FIELD_NUMBER: builtins.int
-        message: typing.Text
+        message: builtins.str
         @property
         def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
         level: global___LogLevel.ValueType
         def __init__(
             self,
             *,
-            message: typing.Text = ...,
-            timestamp: typing.Optional[google.protobuf.timestamp_pb2.Timestamp] = ...,
+            message: builtins.str = ...,
+            timestamp: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             level: global___LogLevel.ValueType = ...,
         ) -> None: ...
         def HasField(
@@ -1026,9 +1020,8 @@ class FetchBufferedLogsResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        entries: typing.Optional[
-            typing.Iterable[global___FetchBufferedLogsResponse.LogEntry]
-        ] = ...,
+        entries: collections.abc.Iterable[global___FetchBufferedLogsResponse.LogEntry]
+        | None = ...,
     ) -> None: ...
     def ClearField(
         self, field_name: typing_extensions.Literal["entries", b"entries"]

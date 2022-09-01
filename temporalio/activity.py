@@ -30,7 +30,6 @@ from typing import (
     overload,
 )
 
-import temporalio.api.common.v1
 import temporalio.common
 import temporalio.exceptions
 
@@ -130,8 +129,12 @@ class _Context:
         return context
 
     @staticmethod
-    def set(context: _Context) -> None:
-        _current_context.set(context)
+    def set(context: _Context) -> contextvars.Token:
+        return _current_context.set(context)
+
+    @staticmethod
+    def reset(token: contextvars.Token) -> None:
+        _current_context.reset(token)
 
     @property
     def logger_details(self) -> Mapping[str, Any]:

@@ -3,13 +3,18 @@
 isort:skip_file
 """
 import builtins
+import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
+import sys
 import temporalio.api.common.v1.message_pb2
 import temporalio.bridge.proto.activity_result.activity_result_pb2
-import typing
-import typing_extensions
+
+if sys.version_info >= (3, 8):
+    import typing as typing_extensions
+else:
+    import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -17,6 +22,7 @@ class ActivityHeartbeat(google.protobuf.message.Message):
     """A request as given to `record_activity_heartbeat`"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
@@ -30,9 +36,8 @@ class ActivityHeartbeat(google.protobuf.message.Message):
         self,
         *,
         task_token: builtins.bytes = ...,
-        details: typing.Optional[
-            typing.Iterable[temporalio.api.common.v1.message_pb2.Payload]
-        ] = ...,
+        details: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
+        | None = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -47,6 +52,7 @@ class ActivityTaskCompletion(google.protobuf.message.Message):
     """A request as given to `complete_activity_task`"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     RESULT_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
@@ -58,9 +64,8 @@ class ActivityTaskCompletion(google.protobuf.message.Message):
         self,
         *,
         task_token: builtins.bytes = ...,
-        result: typing.Optional[
-            temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityExecutionResult
-        ] = ...,
+        result: temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityExecutionResult
+        | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["result", b"result"]

@@ -465,6 +465,122 @@ While running in a workflow, in addition to features documented elsewhere, the f
 * `await handle.signal()` can be called on the handle to signal the external workflow
 * `await handle.cancel()` can be called on the handle to send a cancel to the external workflow
 
+#### Testing
+
+Workflow testing can be done in an integration-test fashion against a real server, however it is hard to simulate
+timeouts and other long time-based code. Using the time-skipping workflow test environment can help there.
+
+The time-skipping `temporalio.testing.WorkflowEnvironment` can be created via the static async `start_time_skipping()`.
+This internally downloads the Temporal time-skipping test server to a temporary directory if it doesn't already exist,
+then starts the test server which has special APIs for skipping time.
+
+##### Automatic Time Skipping
+
+Anytime a workflow result is waited on, the time-skipping server automatically advances to the next event it can. To
+manually advance time before waiting on the result of a workflow, the `WorkflowEnvironment.sleep` method can be used.
+
+Here's a simple example of a workflow that sleeps for 24 hours:
+
+```python
+import asyncio
+from temporalio import workflow
+
+@workflow.defn
+class WaitADayWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        await asyncio.sleep(24 * 60 * 60)
+        return "all done"
+```
+
+An integration test of this workflow would be way too slow. However the time-skipping server automatically skips to the
+next event when we wait on the result. Here's a test for that workflow:
+
+```python
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
+
+async def test_wait_a_day_workflow():
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with Worker(env.client, task_queue="tq1", workflows=[WaitADayWorkflow]):
+            assert "all done" == await env.client.execute_workflow(WaitADayWorkflow.run, id="wf1", task_queue="tq1")
+```
+
+That test will run almost instantly. This is because by calling `execute_workflow` on our client, we have asked the
+environment to automatically skip time as much as it can (basically until the end of the workflow or until an activity
+is run).
+
+To disable automatic time-skipping while waiting for a workflow result, run code inside a
+`with env.auto_time_skipping_disabled():` block.
+
+##### Manual Time Skipping
+
+Until a workflow is waited on, all time skipping in the time-skipping environment is done manually via
+`WorkflowEnvironment.sleep`.
+
+Here's workflow that waits for a signal or times out:
+
+```python
+import asyncio
+from temporalio import workflow
+
+@workflow.defn
+class SignalWorkflow:
+    def __init__(self) -> None:
+        self.signal_received = False
+
+    @workflow.run
+    async def run(self) -> str:
+        # Wait for signal or timeout in 45 seconds
+        try:
+            await workflow.wait_condition(lambda: self.signal_received, timeout=45)
+            return "got signal"
+        except asyncio.TimeoutError:
+            return "got timeout"
+
+    @workflow.signal
+    def some_signal(self) -> None:
+        self.signal_received = True
+```
+
+To test a normal signal, you might:
+
+```python
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
+
+async def test_signal_workflow():
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with Worker(env.client, task_queue="tq1", workflows=[SignalWorkflow]):
+            # Start workflow, send signal, check result
+            handle = await env.client.start_workflow(SignalWorkflow.run, id="wf1", task_queue="tq1")
+            await handle.signal(SignalWorkflow.some_signal)
+            assert "got signal" == await handle.result()
+```
+
+But how would you test the timeout part? Like so:
+
+```python
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
+
+async def test_signal_workflow_timeout():
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with Worker(env.client, task_queue="tq1", workflows=[SignalWorkflow]):
+            # Start workflow, advance time past timeout, check result
+            handle = await env.client.start_workflow(SignalWorkflow.run, id="wf1", task_queue="tq1")
+            await env.sleep(50)
+            assert "got timeout" == await handle.result()
+```
+
+Also, the current time of the workflow environment can be obtained via the async `WorkflowEnvironment.get_current_time`
+method.
+
+##### Mocking Activities
+
+Activities are just functions decorated with `@activity.defn`. Simply write different ones and pass those to the worker
+to have different activities called during the test.
+
 ### Activities
 
 #### Definition
@@ -516,6 +632,11 @@ activities.
 Cancellation for synchronous activities is done in the background and the activity must choose to listen for it and
 react appropriately. An activity must heartbeat to receive cancellation and there are other ways to be notified about
 cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
+
+Note, all calls from an activity to functions in the `temporalio.activity` package are powered by
+[contextvars](https://docs.python.org/3/library/contextvars.html). Therefore, new threads starting _inside_ of
+activities must `copy_context()` and then `.run()` manually to ensure `temporalio.activity` calls like `heartbeat` still
+function in the new threads.
 
 ###### Synchronous Multithreaded Activities
 
@@ -579,6 +700,18 @@ cancellation of all outstanding activities.
 
 The `shutdown()` invocation will wait on all activities to complete, so if a long-running activity does not at least
 respect cancellation, the shutdown may never complete.
+
+#### Testing
+
+Unit testing an activity or any code that could run in an activity is done via the
+`temporalio.testing.ActivityEnvironment` class. Simply instantiate this and any callable + params passed to `run` will
+be invoked inside the activity context. The following are attributes/methods on the environment that can be used to
+affect calls activity code might make to functions on the `temporalio.activity` package.
+
+* `info` property can be set to customize what is returned from `activity.info()`
+* `on_heartbeat` property can be set to handle `activity.heartbeat()` calls
+* `cancel()` can be invoked to simulate a cancellation of the activity
+* `worker_shutdown()` can be invoked to simulate a worker shutdown during execution of the activity
 
 ### Workflow Replay
 

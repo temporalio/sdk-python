@@ -6,10 +6,15 @@ import builtins
 import google.protobuf.descriptor
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import sys
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.failure.v1.message_pb2
 import typing
-import typing_extensions
+
+if sys.version_info >= (3, 10):
+    import typing as typing_extensions
+else:
+    import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -22,17 +27,14 @@ class _ParentClosePolicyEnumTypeWrapper(
         _ParentClosePolicy.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PARENT_CLOSE_POLICY_UNSPECIFIED: _ParentClosePolicy.ValueType  # 0
     """* Let's the server set the default."""
-
     PARENT_CLOSE_POLICY_TERMINATE: _ParentClosePolicy.ValueType  # 1
     """* Terminate means terminating the child workflow."""
-
     PARENT_CLOSE_POLICY_ABANDON: _ParentClosePolicy.ValueType  # 2
     """* Abandon means not doing anything on the child workflow."""
-
     PARENT_CLOSE_POLICY_REQUEST_CANCEL: _ParentClosePolicy.ValueType  # 3
     """* Cancel means requesting cancellation on the child workflow."""
 
@@ -44,20 +46,14 @@ class ParentClosePolicy(
     in case its parent is closed.
     """
 
-    pass
-
 PARENT_CLOSE_POLICY_UNSPECIFIED: ParentClosePolicy.ValueType  # 0
 """* Let's the server set the default."""
-
 PARENT_CLOSE_POLICY_TERMINATE: ParentClosePolicy.ValueType  # 1
 """* Terminate means terminating the child workflow."""
-
 PARENT_CLOSE_POLICY_ABANDON: ParentClosePolicy.ValueType  # 2
 """* Abandon means not doing anything on the child workflow."""
-
 PARENT_CLOSE_POLICY_REQUEST_CANCEL: ParentClosePolicy.ValueType  # 3
 """* Cancel means requesting cancellation on the child workflow."""
-
 global___ParentClosePolicy = ParentClosePolicy
 
 class _StartChildWorkflowExecutionFailedCause:
@@ -69,7 +65,7 @@ class _StartChildWorkflowExecutionFailedCauseEnumTypeWrapper(
         _StartChildWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: _StartChildWorkflowExecutionFailedCause.ValueType  # 0
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: _StartChildWorkflowExecutionFailedCause.ValueType  # 1
@@ -79,8 +75,6 @@ class StartChildWorkflowExecutionFailedCause(
     metaclass=_StartChildWorkflowExecutionFailedCauseEnumTypeWrapper,
 ):
     """* Possible causes of failure to start a child workflow"""
-
-    pass
 
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: StartChildWorkflowExecutionFailedCause.ValueType  # 0
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: StartChildWorkflowExecutionFailedCause.ValueType  # 1
@@ -95,17 +89,14 @@ class _ChildWorkflowCancellationTypeEnumTypeWrapper(
         _ChildWorkflowCancellationType.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ABANDON: _ChildWorkflowCancellationType.ValueType  # 0
     """* Do not request cancellation of the child workflow if already scheduled"""
-
     TRY_CANCEL: _ChildWorkflowCancellationType.ValueType  # 1
     """* Initiate a cancellation request and immediately report cancellation to the parent."""
-
     WAIT_CANCELLATION_COMPLETED: _ChildWorkflowCancellationType.ValueType  # 2
     """* Wait for child cancellation completion."""
-
     WAIT_CANCELLATION_REQUESTED: _ChildWorkflowCancellationType.ValueType  # 3
     """* Request cancellation of the child and wait for confirmation that the request was received."""
 
@@ -117,20 +108,14 @@ class ChildWorkflowCancellationType(
     Controls at which point to report back to lang when a child workflow is cancelled
     """
 
-    pass
-
 ABANDON: ChildWorkflowCancellationType.ValueType  # 0
 """* Do not request cancellation of the child workflow if already scheduled"""
-
 TRY_CANCEL: ChildWorkflowCancellationType.ValueType  # 1
 """* Initiate a cancellation request and immediately report cancellation to the parent."""
-
 WAIT_CANCELLATION_COMPLETED: ChildWorkflowCancellationType.ValueType  # 2
 """* Wait for child cancellation completion."""
-
 WAIT_CANCELLATION_REQUESTED: ChildWorkflowCancellationType.ValueType  # 3
 """* Request cancellation of the child and wait for confirmation that the request was received."""
-
 global___ChildWorkflowCancellationType = ChildWorkflowCancellationType
 
 class ChildWorkflowResult(google.protobuf.message.Message):
@@ -139,6 +124,7 @@ class ChildWorkflowResult(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     COMPLETED_FIELD_NUMBER: builtins.int
     FAILED_FIELD_NUMBER: builtins.int
     CANCELLED_FIELD_NUMBER: builtins.int
@@ -151,9 +137,9 @@ class ChildWorkflowResult(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        completed: typing.Optional[global___Success] = ...,
-        failed: typing.Optional[global___Failure] = ...,
-        cancelled: typing.Optional[global___Cancellation] = ...,
+        completed: global___Success | None = ...,
+        failed: global___Failure | None = ...,
+        cancelled: global___Cancellation | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -183,9 +169,7 @@ class ChildWorkflowResult(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> typing.Optional[
-        typing_extensions.Literal["completed", "failed", "cancelled"]
-    ]: ...
+    ) -> typing_extensions.Literal["completed", "failed", "cancelled"] | None: ...
 
 global___ChildWorkflowResult = ChildWorkflowResult
 
@@ -195,13 +179,14 @@ class Success(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     RESULT_FIELD_NUMBER: builtins.int
     @property
     def result(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
     def __init__(
         self,
         *,
-        result: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
+        result: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["result", b"result"]
@@ -219,13 +204,14 @@ class Failure(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     FAILURE_FIELD_NUMBER: builtins.int
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     def __init__(
         self,
         *,
-        failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
@@ -243,13 +229,14 @@ class Cancellation(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     FAILURE_FIELD_NUMBER: builtins.int
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     def __init__(
         self,
         *,
-        failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
