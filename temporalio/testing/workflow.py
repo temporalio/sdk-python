@@ -164,7 +164,7 @@ class WorkflowEnvironment:
         # Get a free port and start the server
         port = _get_free_port()
         test_server_process = await asyncio.create_subprocess_exec(
-            exe_path, port, stdout=test_server_stdout, stderr=test_server_stderr
+            str(exe_path), port, stdout=test_server_stdout, stderr=test_server_stderr
         )
 
         # We must terminate the process if we can't connect
@@ -469,15 +469,18 @@ def _ensure_test_server_downloaded(version: str, dest_dir: Path) -> Path:
     name = f"temporal-test-server_{version}_{plat}_amd64"
     url = f"https://github.com/temporalio/sdk-java/releases/download/v{version}/{name}{ext}"
 
-    # Download to memory then extract single file to dest
-    # TODO(cretz): Too expensive? Tests show it's quite cheap
+    # Download to memory then extract single file to dest. Tests show this is
+    # a cheap operation and no real need to put compressed file on disk first.
     logger.info("Downloading %s to extract test server to %s", url, dest)
     with urllib.request.urlopen(url) as url_file:
         with BytesIO(url_file.read()) as comp_content:
             with (zipfile.ZipFile(comp_content) if ext == ".zip" else tarfile.open(fileobj=comp_content)) as comp_file:  # type: ignore
                 with open(dest, "wb") as out_file:
+                    in_file = f"{name}/temporal-test-server{out_ext}"
                     shutil.copyfileobj(
-                        comp_file.open(f"{name}/temporal-test-server{out_ext}"),
+                        comp_file.open(in_file)
+                        if ext == ".zip"
+                        else comp_file.extractfile(in_file),
                         out_file,
                     )
     # If not an exe, we need make it executable
