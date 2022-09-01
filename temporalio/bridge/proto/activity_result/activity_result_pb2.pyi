@@ -7,10 +7,14 @@ import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
+import sys
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.failure.v1.message_pb2
-import typing
-import typing_extensions
+
+if sys.version_info >= (3, 8):
+    import typing as typing_extensions
+else:
+    import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -20,6 +24,7 @@ class ActivityExecutionResult(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     COMPLETED_FIELD_NUMBER: builtins.int
     FAILED_FIELD_NUMBER: builtins.int
     CANCELLED_FIELD_NUMBER: builtins.int
@@ -35,10 +40,10 @@ class ActivityExecutionResult(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        completed: typing.Optional[global___Success] = ...,
-        failed: typing.Optional[global___Failure] = ...,
-        cancelled: typing.Optional[global___Cancellation] = ...,
-        will_complete_async: typing.Optional[global___WillCompleteAsync] = ...,
+        completed: global___Success | None = ...,
+        failed: global___Failure | None = ...,
+        cancelled: global___Cancellation | None = ...,
+        will_complete_async: global___WillCompleteAsync | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -72,11 +77,9 @@ class ActivityExecutionResult(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> typing.Optional[
-        typing_extensions.Literal[
-            "completed", "failed", "cancelled", "will_complete_async"
-        ]
-    ]: ...
+    ) -> typing_extensions.Literal[
+        "completed", "failed", "cancelled", "will_complete_async"
+    ] | None: ...
 
 global___ActivityExecutionResult = ActivityExecutionResult
 
@@ -86,6 +89,7 @@ class ActivityResolution(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     COMPLETED_FIELD_NUMBER: builtins.int
     FAILED_FIELD_NUMBER: builtins.int
     CANCELLED_FIELD_NUMBER: builtins.int
@@ -101,10 +105,10 @@ class ActivityResolution(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        completed: typing.Optional[global___Success] = ...,
-        failed: typing.Optional[global___Failure] = ...,
-        cancelled: typing.Optional[global___Cancellation] = ...,
-        backoff: typing.Optional[global___DoBackoff] = ...,
+        completed: global___Success | None = ...,
+        failed: global___Failure | None = ...,
+        cancelled: global___Cancellation | None = ...,
+        backoff: global___DoBackoff | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -138,9 +142,9 @@ class ActivityResolution(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> typing.Optional[
-        typing_extensions.Literal["completed", "failed", "cancelled", "backoff"]
-    ]: ...
+    ) -> typing_extensions.Literal[
+        "completed", "failed", "cancelled", "backoff"
+    ] | None: ...
 
 global___ActivityResolution = ActivityResolution
 
@@ -148,13 +152,14 @@ class Success(google.protobuf.message.Message):
     """* Used to report successful completion either when executing or resolving"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     RESULT_FIELD_NUMBER: builtins.int
     @property
     def result(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
     def __init__(
         self,
         *,
-        result: typing.Optional[temporalio.api.common.v1.message_pb2.Payload] = ...,
+        result: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["result", b"result"]
@@ -169,13 +174,14 @@ class Failure(google.protobuf.message.Message):
     """* Used to report activity failure either when executing or resolving"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     FAILURE_FIELD_NUMBER: builtins.int
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     def __init__(
         self,
         *,
-        failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
@@ -195,13 +201,14 @@ class Cancellation(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     FAILURE_FIELD_NUMBER: builtins.int
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     def __init__(
         self,
         *,
-        failure: typing.Optional[temporalio.api.failure.v1.message_pb2.Failure] = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
@@ -219,6 +226,7 @@ class WillCompleteAsync(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     def __init__(
         self,
     ) -> None: ...
@@ -237,6 +245,7 @@ class DoBackoff(google.protobuf.message.Message):
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
     ATTEMPT_FIELD_NUMBER: builtins.int
     BACKOFF_DURATION_FIELD_NUMBER: builtins.int
     ORIGINAL_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
@@ -244,7 +253,6 @@ class DoBackoff(google.protobuf.message.Message):
     """The attempt number that lang should provide when scheduling the retry. If the LA failed
     on attempt 4 and we told lang to back off with a timer, this number will be 5.
     """
-
     @property
     def backoff_duration(self) -> google.protobuf.duration_pb2.Duration: ...
     @property
@@ -252,15 +260,12 @@ class DoBackoff(google.protobuf.message.Message):
         """The time the first attempt of this local activity was scheduled. Must be passed with attempt
         to the retry LA.
         """
-        pass
     def __init__(
         self,
         *,
         attempt: builtins.int = ...,
-        backoff_duration: typing.Optional[google.protobuf.duration_pb2.Duration] = ...,
-        original_schedule_time: typing.Optional[
-            google.protobuf.timestamp_pb2.Timestamp
-        ] = ...,
+        backoff_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        original_schedule_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
