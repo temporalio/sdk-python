@@ -30,9 +30,9 @@ pub struct WorkerConfig {
     max_outstanding_workflow_tasks: usize,
     max_outstanding_activities: usize,
     max_outstanding_local_activities: usize,
-    max_concurrent_wft_polls: usize,
+    max_concurrent_workflow_task_polls: usize,
     nonsticky_to_sticky_poll_ratio: f32,
-    max_concurrent_at_polls: usize,
+    max_concurrent_activity_task_polls: usize,
     no_remote_activities: bool,
     sticky_queue_schedule_to_start_timeout_millis: u64,
     max_heartbeat_throttle_interval_millis: u64,
@@ -183,9 +183,9 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             .max_outstanding_workflow_tasks(conf.max_outstanding_workflow_tasks)
             .max_outstanding_activities(conf.max_outstanding_activities)
             .max_outstanding_local_activities(conf.max_outstanding_local_activities)
-            .max_concurrent_wft_polls(conf.max_concurrent_wft_polls)
+            .max_concurrent_wft_polls(conf.max_concurrent_workflow_task_polls)
             .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-            .max_concurrent_at_polls(conf.max_concurrent_at_polls)
+            .max_concurrent_at_polls(conf.max_concurrent_activity_task_polls)
             .no_remote_activities(conf.no_remote_activities)
             .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
                 conf.sticky_queue_schedule_to_start_timeout_millis,

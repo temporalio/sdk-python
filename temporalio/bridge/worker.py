@@ -33,9 +33,9 @@ class WorkerConfig:
     max_outstanding_workflow_tasks: int
     max_outstanding_activities: int
     max_outstanding_local_activities: int
-    max_concurrent_wft_polls: int
+    max_concurrent_workflow_task_polls: int
     nonsticky_to_sticky_poll_ratio: float
-    max_concurrent_at_polls: int
+    max_concurrent_activity_task_polls: int
     no_remote_activities: bool
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int

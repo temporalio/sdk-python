@@ -57,9 +57,9 @@ class Worker:
         max_concurrent_workflow_tasks: int = 100,
         max_concurrent_activities: int = 100,
         max_concurrent_local_activities: int = 100,
-        max_concurrent_wft_polls: int = 5,
+        max_concurrent_workflow_task_polls: int = 5,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
-        max_concurrent_at_polls: int = 5,
+        max_concurrent_activity_task_polls: int = 5,
         no_remote_activities: bool = False,
         sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
@@ -110,19 +110,19 @@ class Worker:
                 will ever be given to this worker concurrently.
             max_concurrent_local_activities: Maximum number of local activity
                 tasks that will ever be given to this worker concurrently.
-            max_concurrent_wft_polls: Maximum number of concurrent poll workflow
-                task requests we will perform at a time on this worker's task
-                queue.
-            nonsticky_to_sticky_poll_ratio: max_concurrent_wft_polls * this
-                number = the number of max pollers that will be allowed for the
-                nonsticky queue when sticky tasks are enabled. If both defaults
-                are used, the sticky queue will allow 4 max pollers while the
-                nonsticky queue will allow one. The minimum for either poller is
-                1, so if ``max_concurrent_wft_polls`` is 1 and sticky queues are
-                enabled, there will be 2 concurrent polls.
-            max_concurrent_at_polls: Maximum number of concurrent poll activity
-                task requests we will perform at a time on this worker's task
-                queue.
+            max_concurrent_workflow_task_polls: Maximum number of concurrent
+                poll workflow task requests we will perform at a time on this
+                worker's task queue.
+            nonsticky_to_sticky_poll_ratio: max_concurrent_workflow_task_polls *
+                this number = the number of max pollers that will be allowed for
+                the nonsticky queue when sticky tasks are enabled. If both
+                defaults are used, the sticky queue will allow 4 max pollers
+                while the nonsticky queue will allow one. The minimum for either
+                poller is 1, so if ``max_concurrent_workflow_task_polls`` is 1
+                and sticky queues are enabled, there will be 2 concurrent polls.
+            max_concurrent_activity_task_polls: Maximum number of concurrent
+                poll activity task requests we will perform at a time on this
+                worker's task queue.
             no_remote_activities: If true, this worker will only handle workflow
                 tasks and local activities, it will not poll for activity tasks.
             sticky_queue_schedule_to_start_timeout: How long a workflow task is
@@ -196,9 +196,9 @@ class Worker:
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             max_concurrent_activities=max_concurrent_activities,
             max_concurrent_local_activities=max_concurrent_local_activities,
-            max_concurrent_wft_polls=max_concurrent_wft_polls,
+            max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
             nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
-            max_concurrent_at_polls=max_concurrent_at_polls,
+            max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
             no_remote_activities=no_remote_activities,
             sticky_queue_schedule_to_start_timeout=sticky_queue_schedule_to_start_timeout,
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
@@ -253,9 +253,9 @@ class Worker:
                 max_outstanding_workflow_tasks=max_concurrent_workflow_tasks,
                 max_outstanding_activities=max_concurrent_activities,
                 max_outstanding_local_activities=max_concurrent_local_activities,
-                max_concurrent_wft_polls=max_concurrent_wft_polls,
+                max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
                 nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
-                max_concurrent_at_polls=max_concurrent_at_polls,
+                max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
                 no_remote_activities=no_remote_activities,
                 sticky_queue_schedule_to_start_timeout_millis=int(
                     1000 * sticky_queue_schedule_to_start_timeout.total_seconds()
@@ -357,9 +357,9 @@ class WorkerConfig(TypedDict, total=False):
     max_concurrent_workflow_tasks: int
     max_concurrent_activities: int
     max_concurrent_local_activities: int
-    max_concurrent_wft_polls: int
+    max_concurrent_workflow_task_polls: int
     nonsticky_to_sticky_poll_ratio: float
-    max_concurrent_at_polls: int
+    max_concurrent_activity_task_polls: int
     no_remote_activities: bool
     sticky_queue_schedule_to_start_timeout: timedelta
     max_heartbeat_throttle_interval: timedelta
