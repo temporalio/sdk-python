@@ -2802,7 +2802,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
     and :py:func:`execute_child_workflow`.
     """
 
-    id: str
+    id: Optional[str]
     task_queue: Optional[str]
     namespace: Optional[str]
     cancellation_type: ChildWorkflowCancellationType
@@ -2822,7 +2822,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
 async def start_child_workflow(
     workflow: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2845,7 +2845,7 @@ async def start_child_workflow(
     workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2868,7 +2868,7 @@ async def start_child_workflow(
     workflow: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
     args: Iterable[Any],
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2892,7 +2892,7 @@ async def start_child_workflow(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Iterable[Any] = [],
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2914,7 +2914,7 @@ async def start_child_workflow(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Iterable[Any] = [],
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2935,7 +2935,8 @@ async def start_child_workflow(
             for the workflow to start.
         arg: Single argument to the child workflow.
         args: Multiple arguments to the child workflow. Cannot be set if arg is.
-        id: Unique identifier for the workflow execution.
+        id: Optional unique identifier for the workflow execution. If not set,
+            defaults to :py:func:`uuid4`.
         task_queue: Task queue to run the workflow on. Defaults to the current
             workflow's task queue.
         namespace: Namespace to run the child workflow on. Defaults to the
@@ -2959,7 +2960,7 @@ async def start_child_workflow(
     return await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *temporalio.common._arg_or_args(arg, args),
-        id=id,
+        id=id or str(uuid4()),
         task_queue=task_queue,
         namespace=namespace,
         cancellation_type=cancellation_type,
@@ -2980,7 +2981,7 @@ async def start_child_workflow(
 async def execute_child_workflow(
     workflow: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3003,7 +3004,7 @@ async def execute_child_workflow(
     workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3026,7 +3027,7 @@ async def execute_child_workflow(
     workflow: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
     args: Iterable[Any],
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3050,7 +3051,7 @@ async def execute_child_workflow(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Iterable[Any] = [],
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3072,7 +3073,7 @@ async def execute_child_workflow(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Iterable[Any] = [],
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3095,7 +3096,7 @@ async def execute_child_workflow(
     handle = await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *temporalio.common._arg_or_args(arg, args),
-        id=id,
+        id=id or str(uuid4()),
         task_queue=task_queue,
         namespace=namespace,
         cancellation_type=cancellation_type,

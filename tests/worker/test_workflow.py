@@ -661,29 +661,18 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await handle.cancel()
         await wait_cancel_complete.wait()
 
-
-@dataclass
-class SimpleChildWorkflowParams:
-    name: str
-    child_id: str
-
-
 @workflow.defn
 class SimpleChildWorkflow:
     @workflow.run
-    async def run(self, params: SimpleChildWorkflowParams) -> str:
-        return await workflow.execute_child_workflow(
-            HelloWorkflow.run, params.name, id=params.child_id
-        )
+    async def run(self, name: str) -> str:
+        return await workflow.execute_child_workflow(HelloWorkflow.run, name)
 
 
 async def test_workflow_simple_child(client: Client):
     async with new_worker(client, SimpleChildWorkflow, HelloWorkflow) as worker:
         result = await client.execute_workflow(
             SimpleChildWorkflow.run,
-            SimpleChildWorkflowParams(
-                name="Temporal", child_id=f"workflow-{uuid.uuid4()}"
-            ),
+            "Temporal",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
