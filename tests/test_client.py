@@ -377,26 +377,6 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
     assert interceptor.traces[4][1].id == handle.id
 
 
-async def test_interceptor_callable(client: Client, worker: ExternalWorker):
-    # Create new client from existing client but with a tracing interceptor
-    # callable and only check a simple call
-    interceptor = TracingClientInterceptor()
-    config = client.config()
-    config["interceptors"] = [interceptor.intercept_client]
-    client = Client(**config)
-    handle = await client.start_workflow(
-        "kitchen_sink",
-        KSWorkflowParams(),
-        id=str(uuid.uuid4()),
-        task_queue=worker.task_queue,
-    )
-    await handle.result()
-
-    # Check trace
-    assert interceptor.traces[0][0] == "start_workflow"
-    assert interceptor.traces[0][1].workflow == "kitchen_sink"
-
-
 async def test_tls_config(tls_client: Optional[Client]):
     if not tls_client:
         pytest.skip("No TLS client")

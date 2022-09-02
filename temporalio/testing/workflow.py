@@ -83,15 +83,7 @@ class WorkflowEnvironment:
     async def start_time_skipping(
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[
-            Union[
-                temporalio.client.Interceptor,
-                Callable[
-                    [temporalio.client.OutboundInterceptor],
-                    temporalio.client.OutboundInterceptor,
-                ],
-            ]
-        ] = [],
+        interceptors: Iterable[temporalio.client.Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,

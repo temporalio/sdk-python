@@ -64,9 +64,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[
-            Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
-        ] = [],
+        interceptors: Iterable[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -128,9 +126,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[
-            Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
-        ] = [],
+        interceptors: Iterable[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -143,12 +139,7 @@ class Client:
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
         for interceptor in reversed(list(interceptors)):
-            if isinstance(interceptor, Interceptor):
-                self._impl = interceptor.intercept_client(self._impl)
-            elif callable(interceptor):
-                self._impl = interceptor(self._impl)
-            else:
-                raise TypeError("interceptor neither OutboundInterceptor nor callable")
+            self._impl = interceptor.intercept_client(self._impl)
 
         # Store the config for tracking
         self._config = ClientConfig(
@@ -652,9 +643,7 @@ class ClientConfig(TypedDict, total=False):
     service_client: temporalio.service.ServiceClient
     namespace: str
     data_converter: temporalio.converter.DataConverter
-    interceptors: Iterable[
-        Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
-    ]
+    interceptors: Iterable[Interceptor]
     default_workflow_query_reject_condition: Optional[
         temporalio.common.QueryRejectCondition
     ]
