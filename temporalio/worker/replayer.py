@@ -265,7 +265,11 @@ def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
     else:
         child = parent.get(attrs[0])
         if isinstance(child, str) and len(attrs) == 1:
-            parent[attrs[0]] = prefix + _pascal_case_match.sub(r"_\1", child).upper()
+            # We only fix it if it doesn't already have the prefix
+            if not parent[attrs[0]].startswith(prefix):
+                parent[attrs[0]] = (
+                    prefix + _pascal_case_match.sub(r"_\1", child).upper()
+                )
         elif isinstance(child, dict) and len(attrs) > 1:
             _fix_history_enum(prefix, child, *attrs[1:])
         elif isinstance(child, list) and len(attrs) > 1:

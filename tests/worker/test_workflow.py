@@ -661,6 +661,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await handle.cancel()
         await wait_cancel_complete.wait()
 
+
 @workflow.defn
 class SimpleChildWorkflow:
     @workflow.run
