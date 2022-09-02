@@ -37,6 +37,7 @@ import temporalio.workflow
 from temporalio.service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 from .types import (
+    AnyType,
     LocalReturnType,
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
@@ -1327,6 +1328,9 @@ class WorkflowExecutionDescription:
     close_time: Optional[datetime]
     """When the workflow was closed if closed."""
 
+    data_converter: temporalio.converter.DataConverter
+    """Data converter from when this description was created."""
+
     execution_time: Optional[datetime]
     """When this workflow run started or should start."""
 
@@ -1335,9 +1339,6 @@ class WorkflowExecutionDescription:
 
     id: str
     """ID for the workflow."""
-
-    memo: Mapping[str, Any]
-    """Memo values on the workflow if any."""
 
     parent_id: Optional[str]
     """ID for the parent workflow if this was started as a child."""
@@ -1378,6 +1379,7 @@ class WorkflowExecutionDescription:
             )
             if raw.workflow_execution_info.HasField("close_time")
             else None,
+            data_converter=converter,
             execution_time=raw.workflow_execution_info.execution_time.ToDatetime().replace(
                 tzinfo=timezone.utc
             )
@@ -1385,10 +1387,6 @@ class WorkflowExecutionDescription:
             else None,
             history_length=raw.workflow_execution_info.history_length,
             id=raw.workflow_execution_info.execution.workflow_id,
-            memo={
-                k: (await converter.decode([v]))[0]
-                for k, v in raw.workflow_execution_info.memo.fields.items()
-            },
             parent_id=raw.workflow_execution_info.parent_execution.workflow_id
             if raw.workflow_execution_info.HasField("parent_execution")
             else None,
@@ -1409,6 +1407,71 @@ class WorkflowExecutionDescription:
             task_queue=raw.workflow_execution_info.task_queue,
             workflow_type=raw.workflow_execution_info.type.name,
         )
+
+    async def memo(self) -> Mapping[str, Any]:
+        """Workflow's memo values, converted without type hints.
+
+        Since type hints are not used, the default converted values will come
+        back. For example, if the memo was originally created with a dataclass,
+        the value will be a dict. To convert using proper type hints, use
+        :py:meth:`memo_value`.
+
+        Returns:
+            Mapping of all memo keys and they values without type hints.
+        """
+        return {
+            k: (await self.data_converter.decode([v]))[0]
+            for k, v in self.raw.workflow_execution_info.memo.fields.items()
+        }
+
+    @overload
+    async def memo_value(
+        self, key: str, default: Any = temporalio.common._arg_unset
+    ) -> Any:
+        ...
+
+    @overload
+    async def memo_value(self, key: str, *, type_hint: Type[ParamType]) -> ParamType:
+        ...
+
+    @overload
+    async def memo_value(
+        self, key: str, default: AnyType, *, type_hint: Type[ParamType]
+    ) -> Union[AnyType, ParamType]:
+        ...
+
+    async def memo_value(
+        self,
+        key: str,
+        default: Any = temporalio.common._arg_unset,
+        *,
+        type_hint: Optional[Type] = None,
+    ) -> Any:
+        """Memo value for the given key, optional default, and optional type
+        hint.
+
+        Args:
+            key: Key to get memo value for.
+            default: Default to use if key is not present. If unset, a
+                :py:class:`KeyError` is raised when the key does not exist.
+            type_hint: Type hint to use when converting.
+
+        Returns:
+            Memo value, converted with the type hint if present.
+
+        Raises:
+            KeyError: Key not present and default not set.
+        """
+        payload = self.raw.workflow_execution_info.memo.fields.get(key)
+        if not payload:
+            if default is temporalio.common._arg_unset:
+                raise KeyError(f"Memo does not have a value for key {key}")
+            return default
+        return (
+            await self.data_converter.decode(
+                [payload], [type_hint] if type_hint else None
+            )
+        )[0]
 
 
 class WorkflowExecutionStatus(IntEnum):

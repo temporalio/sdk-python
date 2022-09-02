@@ -310,6 +310,7 @@ class _WorkflowWorker:
             headers=dict(start.headers),
             namespace=self._namespace,
             parent=parent,
+            raw_memo=dict(start.memo.fields),
             retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
             if start.HasField("retry_policy")
             else None,

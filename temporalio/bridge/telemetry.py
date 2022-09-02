@@ -51,6 +51,7 @@ def init_telemetry(
         This API is not stable and may change in a future release.
 
     Args:
+        config: Telemetry config.
         warn_if_already_inited: If True and telemetry is already initialized,
             this will emit a warning.
     """

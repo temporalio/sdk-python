@@ -2244,6 +2244,64 @@ async def test_workflow_typed_handle(client: Client):
         assert isinstance(handle_result, TypedHandleResponse)
 
 
+@dataclass
+class MemoValue:
+    field1: str
+
+
+@workflow.defn
+class MemoWorkflow:
+    @workflow.run
+    async def run(self, run_child: bool) -> None:
+        # Check untyped memo
+        assert workflow.memo()["my_memo"] == {"field1": "foo"}
+        # Check typed memo
+        assert workflow.memo_value("my_memo", type_hint=MemoValue) == MemoValue(
+            field1="foo"
+        )
+        # Check default
+        assert workflow.memo_value("absent_memo", "blah") == "blah"
+        # Check key error
+        try:
+            workflow.memo_value("absent_memo")
+            assert False
+        except KeyError:
+            pass
+        # Run child if requested
+        if run_child:
+            await workflow.execute_child_workflow(
+                MemoWorkflow.run, False, memo=workflow.memo()
+            )
+
+
+async def test_workflow_memo(client: Client):
+    async with new_worker(client, MemoWorkflow) as worker:
+        # Run workflow
+        handle = await client.start_workflow(
+            MemoWorkflow.run,
+            True,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            memo={"my_memo": MemoValue(field1="foo")},
+        )
+        await handle.result()
+        desc = await handle.describe()
+        # Check untyped memo
+        assert (await desc.memo())["my_memo"] == {"field1": "foo"}
+        # Check typed memo
+        assert (await desc.memo_value("my_memo", type_hint=MemoValue)) == MemoValue(
+            field1="foo"
+        )
+        # Check default
+        assert (await desc.memo_value("absent_memo", "blah")) == "blah"
+        # Check key error
+        try:
+            await desc.memo_value("absent_memo")
+            assert False
+        except KeyError:
+            pass
+
+
 def new_worker(
     client: Client,
     *workflows: Type,

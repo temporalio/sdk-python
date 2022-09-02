@@ -276,6 +276,7 @@ class Info:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
+    raw_memo: Mapping[str, temporalio.api.common.v1.Payload]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     run_id: str
     run_timeout: Optional[timedelta]
@@ -285,8 +286,6 @@ class Info:
     task_timeout: timedelta
     workflow_id: str
     workflow_type: str
-
-    # TODO(cretz): memo
 
     def _logger_details(self) -> Mapping[str, Any]:
         return {
@@ -389,6 +388,16 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_replaying(self) -> bool:
+        ...
+
+    @abstractmethod
+    def workflow_memo(self) -> Mapping[str, Any]:
+        ...
+
+    @abstractmethod
+    def workflow_memo_value(
+        self, key: str, default: Any, *, type_hint: Optional[Type]
+    ) -> Any:
         ...
 
     @abstractmethod
@@ -511,6 +520,61 @@ def info() -> Info:
         Info for the currently running workflow.
     """
     return _Runtime.current().workflow_info()
+
+
+def memo() -> Mapping[str, Any]:
+    """Current workflow's memo values, converted without type hints.
+
+    Since type hints are not used, the default converted values will come back.
+    For example, if the memo was originally created with a dataclass, the value
+    will be a dict. To convert using proper type hints, use
+    :py:func:`memo_value`.
+
+    Returns:
+        Mapping of all memo keys and they values without type hints.
+    """
+    return _Runtime.current().workflow_memo()
+
+
+@overload
+def memo_value(key: str, default: Any = temporalio.common._arg_unset) -> Any:
+    ...
+
+
+@overload
+def memo_value(key: str, *, type_hint: Type[ParamType]) -> ParamType:
+    ...
+
+
+@overload
+def memo_value(
+    key: str, default: AnyType, *, type_hint: Type[ParamType]
+) -> Union[AnyType, ParamType]:
+    ...
+
+
+def memo_value(
+    key: str,
+    default: Any = temporalio.common._arg_unset,
+    *,
+    type_hint: Optional[Type] = None,
+) -> Any:
+    """Memo value for the given key, optional default, and optional type
+    hint.
+
+    Args:
+        key: Key to get memo value for.
+        default: Default to use if key is not present. If unset, a
+            :py:class:`KeyError` is raised when the key does not exist.
+        type_hint: Type hint to use when converting.
+
+    Returns:
+        Memo value, converted with the type hint if present.
+
+    Raises:
+        KeyError: Key not present and default not set.
+    """
+    return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
 
 
 def now() -> datetime:
