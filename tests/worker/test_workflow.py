@@ -2218,6 +2218,32 @@ async def test_workflow_query_rpc_timeout(client: Client):
     ) or err.value.status == RPCStatusCode.DEADLINE_EXCEEDED
 
 
+@dataclass
+class TypedHandleResponse:
+    field1: str
+
+
+@workflow.defn
+class TypedHandleWorkflow:
+    @workflow.run
+    async def run(self) -> TypedHandleResponse:
+        return TypedHandleResponse(field1="foo")
+
+
+async def test_workflow_typed_handle(client: Client):
+    async with new_worker(client, TypedHandleWorkflow) as worker:
+        # Run the workflow then get a typed handle for it and confirm response
+        # type is as expected
+        id = f"workflow-{uuid.uuid4()}"
+        await client.execute_workflow(
+            TypedHandleWorkflow.run, id=id, task_queue=worker.task_queue
+        )
+        handle_result = await client.get_workflow_handle_for(
+            TypedHandleWorkflow.run, id
+        ).result()
+        assert isinstance(handle_result, TypedHandleResponse)
+
+
 def new_worker(
     client: Client,
     *workflows: Type,

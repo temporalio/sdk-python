@@ -534,6 +534,7 @@ class Client:
         *,
         run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
+        result_type: Optional[Type] = None,
     ) -> WorkflowHandle[Any, Any]:
         """Get a workflow handle to an existing workflow by its ID.
 
@@ -542,6 +543,7 @@ class Client:
             run_id: Run ID that will be used for all calls.
             first_execution_run_id: First execution run ID used for cancellation
                 and termination.
+            result_type: The result type to deserialize into if known.
 
         Returns:
             The workflow handle.
@@ -552,6 +554,7 @@ class Client:
             run_id=run_id,
             result_run_id=run_id,
             first_execution_run_id=first_execution_run_id,
+            result_type=result_type,
         )
 
     def get_workflow_handle_for(
@@ -567,8 +570,7 @@ class Client:
     ) -> WorkflowHandle[SelfType, ReturnType]:
         """Get a typed workflow handle to an existing workflow by its ID.
 
-        This is the same as :py:meth:`get_workflow_handle` but typed. Note, the
-        workflow type given is not validated, it is only for typing.
+        This is the same as :py:meth:`get_workflow_handle` but typed.
 
         Args:
             workflow: The workflow run method to use for typing the handle.
@@ -580,8 +582,13 @@ class Client:
         Returns:
             The workflow handle.
         """
+        defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
+        _, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
         return self.get_workflow_handle(
-            workflow_id, run_id=run_id, first_execution_run_id=first_execution_run_id
+            workflow_id,
+            run_id=run_id,
+            first_execution_run_id=first_execution_run_id,
+            result_type=ret_type,
         )
 
     @overload
