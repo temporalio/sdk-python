@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum
-from typing import Any, Iterable, List, Mapping, Optional, Text, Union
+from typing import Any, List, Mapping, Optional, Sequence, Text, Union
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
@@ -37,7 +37,7 @@ class RetryPolicy:
     If 0, the default, there is no maximum.
     """
 
-    non_retryable_error_types: Optional[Iterable[str]] = None
+    non_retryable_error_types: Optional[Sequence[str]] = None
     """List of error types that are not retryable."""
 
     @staticmethod
@@ -131,9 +131,9 @@ class QueryRejectCondition(IntEnum):
     """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY`."""
 
 
-# We choose to make this a list instead of an iterable so we can catch if people
+# We choose to make this a list instead of an sequence so we can catch if people
 # are not sending lists each time but maybe accidentally sending a string (which
-# is iterable)
+# is a sequence)
 SearchAttributeValues: TypeAlias = Union[
     List[str], List[int], List[float], List[bool], List[datetime]
 ]
@@ -146,7 +146,7 @@ SearchAttributes: TypeAlias = Mapping[str, SearchAttributeValues]
 _arg_unset = object()
 
 
-def _arg_or_args(arg: Any, args: Iterable[Any]) -> Iterable[Any]:
+def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:
     if arg is not _arg_unset:
         if args:
             raise ValueError("Cannot have arg and args")

@@ -15,7 +15,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
@@ -49,11 +49,11 @@ class _ActivityWorker:
         *,
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         task_queue: str,
-        activities: Iterable[Callable],
+        activities: Sequence[Callable],
         activity_executor: Optional[concurrent.futures.Executor],
         shared_state_manager: Optional[SharedStateManager],
         data_converter: temporalio.converter.DataConverter,
-        interceptors: Iterable[Interceptor],
+        interceptors: Sequence[Interceptor],
         type_lookup: temporalio.converter._FunctionTypeLookup,
     ) -> None:
         self._bridge_worker = bridge_worker
@@ -209,7 +209,7 @@ class _ActivityWorker:
         task_token: bytes,
     ) -> None:
         # Drain the queue, only taking the last value to actually heartbeat
-        details: Optional[Iterable[Any]] = None
+        details: Optional[Sequence[Any]] = None
         while not activity.pending_heartbeats.empty():
             details = activity.pending_heartbeats.get_nowait()
         if details is None:
@@ -476,7 +476,7 @@ class _ActivityWorker:
 
 @dataclass
 class _RunningActivity:
-    pending_heartbeats: asyncio.Queue[Iterable[Any]]
+    pending_heartbeats: asyncio.Queue[Sequence[Any]]
     # Most of these optional values are set before use
     info: Optional[temporalio.activity.Info] = None
     task: Optional[asyncio.Task] = None
@@ -714,7 +714,7 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
         self._mgr = mgr
         self._queue_poller_executor = queue_poller_executor
         # 1000 in-flight heartbeats should be plenty
-        self._heartbeat_queue: queue.Queue[Tuple[bytes, Iterable[Any]]] = mgr.Queue(
+        self._heartbeat_queue: queue.Queue[Tuple[bytes, Sequence[Any]]] = mgr.Queue(
             1000
         )
         self._heartbeats: Dict[bytes, Callable[..., None]] = {}
@@ -776,7 +776,7 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
 
 class _MultiprocessingSharedHeartbeatSender(SharedHeartbeatSender):
     def __init__(
-        self, heartbeat_queue: queue.Queue[Tuple[bytes, Iterable[Any]]]
+        self, heartbeat_queue: queue.Queue[Tuple[bytes, Sequence[Any]]]
     ) -> None:
         super().__init__()
         self._heartbeat_queue = heartbeat_queue

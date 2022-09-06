@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, Iterable, List, Mapping, Optional
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Sequence
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
@@ -141,7 +141,7 @@ else:
 async def _apply_to_payloads(
     payloads: PayloadContainer,
     cb: Callable[
-        [Iterable[temporalio.api.common.v1.Payload]],
+        [Sequence[temporalio.api.common.v1.Payload]],
         Awaitable[List[temporalio.api.common.v1.Payload]],
     ],
 ) -> None:
@@ -157,7 +157,7 @@ async def _apply_to_payloads(
 async def _apply_to_payload(
     payload: temporalio.api.common.v1.Payload,
     cb: Callable[
-        [Iterable[temporalio.api.common.v1.Payload]],
+        [Sequence[temporalio.api.common.v1.Payload]],
         Awaitable[List[temporalio.api.common.v1.Payload]],
     ],
 ) -> None:

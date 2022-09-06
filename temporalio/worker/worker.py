@@ -8,7 +8,7 @@ import hashlib
 import logging
 import sys
 from datetime import timedelta
-from typing import Any, Callable, Iterable, List, Optional, Type, cast
+from typing import Any, Callable, List, Optional, Sequence, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -45,12 +45,12 @@ class Worker:
         client: temporalio.client.Client,
         *,
         task_queue: str,
-        activities: Iterable[Callable] = [],
-        workflows: Iterable[Type] = [],
+        activities: Sequence[Callable] = [],
+        workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
-        interceptors: Iterable[Interceptor] = [],
+        interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         max_cached_workflows: int = 1000,
@@ -361,12 +361,12 @@ class WorkerConfig(TypedDict, total=False):
 
     client: temporalio.client.Client
     task_queue: str
-    activities: Iterable[Callable]
-    workflows: Iterable[Type]
+    activities: Sequence[Callable]
+    workflows: Sequence[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
-    interceptors: Iterable[Interceptor]
+    interceptors: Sequence[Interceptor]
     build_id: Optional[str]
     identity: Optional[str]
     max_cached_workflows: int

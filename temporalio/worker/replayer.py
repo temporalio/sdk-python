@@ -7,7 +7,7 @@ import copy
 import json
 import logging
 import re
-from typing import Any, Dict, Iterable, Optional, Type, Union
+from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
 
 import google.protobuf.json_format
 from typing_extensions import TypedDict
@@ -30,12 +30,12 @@ class Replayer:
     def __init__(
         self,
         *,
-        workflows: Iterable[Type],
+        workflows: Sequence[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[Interceptor] = [],
+        interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         debug_mode: bool = False,
@@ -149,12 +149,12 @@ class Replayer:
 class ReplayerConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:class:`Replayer`."""
 
-    workflows: Iterable[Type]
+    workflows: Sequence[Type]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
     namespace: str
     data_converter: temporalio.converter.DataConverter
-    interceptors: Iterable[Interceptor]
+    interceptors: Sequence[Interceptor]
     build_id: Optional[str]
     identity: Optional[str]
     debug_mode: bool

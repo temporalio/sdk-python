@@ -16,11 +16,11 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
     NoReturn,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -1170,7 +1170,7 @@ async def test_workflow_activity_timeout(client: Client):
 
 # Just serializes in a "payloads" wrapper
 class SimpleCodec(PayloadCodec):
-    async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
         wrapper = Payloads(payloads=payloads)
         return [
             Payload(
@@ -1178,7 +1178,7 @@ class SimpleCodec(PayloadCodec):
             )
         ]
 
-    async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
         payloads = list(payloads)
         if len(payloads) != 1:
             raise RuntimeError("Expected only a single payload")
@@ -2305,7 +2305,7 @@ async def test_workflow_memo(client: Client):
 def new_worker(
     client: Client,
     *workflows: Type,
-    activities: Iterable[Callable] = [],
+    activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
     workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
 ) -> Worker:

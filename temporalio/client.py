@@ -12,9 +12,9 @@ from typing import (
     Awaitable,
     Callable,
     Generic,
-    Iterable,
     Mapping,
     Optional,
+    Sequence,
     Type,
     Union,
     cast,
@@ -65,7 +65,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[Interceptor] = [],
+        interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -127,7 +127,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[Interceptor] = [],
+        interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -212,7 +212,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -236,7 +236,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -250,7 +250,7 @@ class Client:
             Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -262,7 +262,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -275,7 +275,7 @@ class Client:
         workflow: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -287,7 +287,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[Any, Any]:
@@ -298,7 +298,7 @@ class Client:
         workflow: Union[str, Callable[..., Awaitable[Any]]],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -310,7 +310,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[Any, Any]:
@@ -398,7 +398,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
@@ -422,7 +422,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
@@ -436,7 +436,7 @@ class Client:
             Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -448,7 +448,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
@@ -461,7 +461,7 @@ class Client:
         workflow: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -473,7 +473,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
@@ -484,7 +484,7 @@ class Client:
         workflow: Union[str, Callable[..., Awaitable[Any]]],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -496,7 +496,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
@@ -651,7 +651,7 @@ class ClientConfig(TypedDict, total=False):
     service_client: temporalio.service.ServiceClient
     namespace: str
     data_converter: temporalio.converter.DataConverter
-    interceptors: Iterable[Interceptor]
+    interceptors: Sequence[Interceptor]
     default_workflow_query_reject_condition: Optional[
         temporalio.common.QueryRejectCondition
     ]
@@ -976,7 +976,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             Union[Awaitable[LocalReturnType], LocalReturnType],
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -990,7 +990,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         query: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1002,7 +1002,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         query: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1098,7 +1098,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             Concatenate[SelfType, MultiParamSpec], Union[Awaitable[None], None]
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1111,7 +1111,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         signal: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1122,7 +1122,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1274,7 +1274,7 @@ class AsyncActivityHandle:
         self,
         error: Exception,
         *,
-        last_heartbeat_details: Iterable[Any] = [],
+        last_heartbeat_details: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1571,7 +1571,7 @@ class StartWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow`."""
 
     workflow: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     id: str
     task_queue: str
     execution_timeout: Optional[timedelta]
@@ -1584,7 +1584,7 @@ class StartWorkflowInput:
     search_attributes: Optional[temporalio.common.SearchAttributes]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
-    start_signal_args: Iterable[Any]
+    start_signal_args: Sequence[Any]
     # Type may be absent
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
@@ -1619,7 +1619,7 @@ class QueryWorkflowInput:
     id: str
     run_id: Optional[str]
     query: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     reject_condition: Optional[temporalio.common.QueryRejectCondition]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     # Type may be absent
@@ -1635,7 +1635,7 @@ class SignalWorkflowInput:
     id: str
     run_id: Optional[str]
     signal: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
@@ -1648,7 +1648,7 @@ class TerminateWorkflowInput:
     id: str
     run_id: Optional[str]
     first_execution_run_id: Optional[str]
-    args: Iterable[Any]
+    args: Sequence[Any]
     reason: Optional[str]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
@@ -1659,7 +1659,7 @@ class HeartbeatAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.heartbeat_async_activity`."""
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
-    details: Iterable[Any]
+    details: Sequence[Any]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -1680,7 +1680,7 @@ class FailAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     error: Exception
-    last_heartbeat_details: Iterable[Any]
+    last_heartbeat_details: Sequence[Any]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -1690,7 +1690,7 @@ class ReportCancellationAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.report_cancellation_async_activity`."""
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
-    details: Iterable[Any]
+    details: Sequence[Any]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 

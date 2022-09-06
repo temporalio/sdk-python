@@ -9,12 +9,12 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Iterable,
     List,
     Mapping,
     MutableMapping,
     NoReturn,
     Optional,
+    Sequence,
     Type,
 )
 
@@ -84,7 +84,7 @@ class ExecuteActivityInput:
     """Input for :py:meth:`ActivityInboundInterceptor.execute_activity`."""
 
     fn: Callable[..., Any]
-    args: Iterable[Any]
+    args: Sequence[Any]
     executor: Optional[concurrent.futures.Executor]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     _cancelled_event: temporalio.activity._CompositeEvent
@@ -147,7 +147,7 @@ class ContinueAsNewInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.continue_as_new`."""
 
     workflow: Optional[str]
-    args: Iterable[Any]
+    args: Sequence[Any]
     task_queue: Optional[str]
     run_timeout: Optional[timedelta]
     task_timeout: Optional[timedelta]
@@ -165,7 +165,7 @@ class ExecuteWorkflowInput:
     type: Type
     # Note, this is an unbound method
     run_fn: Callable[..., Awaitable[Any]]
-    args: Iterable[Any]
+    args: Sequence[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
@@ -174,7 +174,7 @@ class HandleSignalInput:
     """Input for :py:meth:`WorkflowInboundInterceptor.handle_signal`."""
 
     signal: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
@@ -184,7 +184,7 @@ class HandleQueryInput:
 
     id: str
     query: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
@@ -193,7 +193,7 @@ class SignalChildWorkflowInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.signal_child_workflow`."""
 
     signal: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     child_workflow_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
 
@@ -203,7 +203,7 @@ class SignalExternalWorkflowInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.signal_external_workflow`."""
 
     signal: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     namespace: str
     workflow_id: str
     workflow_run_id: Optional[str]
@@ -215,7 +215,7 @@ class StartActivityInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_activity`."""
 
     activity: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     activity_id: Optional[str]
     task_queue: Optional[str]
     schedule_to_close_timeout: Optional[timedelta]
@@ -235,7 +235,7 @@ class StartChildWorkflowInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_child_workflow`."""
 
     workflow: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     id: str
     task_queue: Optional[str]
     namespace: Optional[str]
@@ -260,7 +260,7 @@ class StartLocalActivityInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_local_activity`."""
 
     activity: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     activity_id: Optional[str]
     schedule_to_close_timeout: Optional[timedelta]
     schedule_to_start_timeout: Optional[timedelta]

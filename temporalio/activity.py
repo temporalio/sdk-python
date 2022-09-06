@@ -21,11 +21,11 @@ from functools import partial
 from typing import (
     Any,
     Callable,
-    Iterable,
     Mapping,
     MutableMapping,
     NoReturn,
     Optional,
+    Sequence,
     Tuple,
     overload,
 )
@@ -81,7 +81,7 @@ class Info:
     activity_type: str
     attempt: int
     current_attempt_scheduled_time: datetime
-    heartbeat_details: Iterable[Any]
+    heartbeat_details: Sequence[Any]
     heartbeat_timeout: Optional[timedelta]
     is_local: bool
     schedule_to_close_timeout: Optional[timedelta]

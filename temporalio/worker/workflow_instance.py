@@ -21,7 +21,6 @@ from typing import (
     Deque,
     Dict,
     Generator,
-    Iterable,
     List,
     Mapping,
     MutableMapping,
@@ -93,7 +92,7 @@ class WorkflowInstanceDetails:
     """Immutable, serializable details for creating a workflow instance."""
 
     payload_converter_class: Type[temporalio.converter.PayloadConverter]
-    interceptor_classes: Iterable[Type[WorkflowInboundInterceptor]]
+    interceptor_classes: Sequence[Type[WorkflowInboundInterceptor]]
     defn: temporalio.workflow._Definition
     info: temporalio.workflow.Info
     randomness_seed: int
@@ -1691,7 +1690,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         await self._instance._outbound.signal_child_workflow(
             SignalChildWorkflowInput(
@@ -1811,7 +1810,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         await self._instance._outbound.signal_external_workflow(
             SignalExternalWorkflowInput(
