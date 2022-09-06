@@ -184,17 +184,23 @@ class PollerInfo(google.protobuf.message.Message):
     LAST_ACCESS_TIME_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     RATE_PER_SECOND_FIELD_NUMBER: builtins.int
+    WORKER_VERSIONING_BUILD_ID_FIELD_NUMBER: builtins.int
     @property
     def last_access_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Unix Nano"""
     identity: builtins.str
     rate_per_second: builtins.float
+    worker_versioning_build_id: builtins.str
+    """If a worker has specified an ID for use with the worker versioning feature while polling,
+    that id must appear here.
+    """
     def __init__(
         self,
         *,
         last_access_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         identity: builtins.str = ...,
         rate_per_second: builtins.float = ...,
+        worker_versioning_build_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -209,6 +215,8 @@ class PollerInfo(google.protobuf.message.Message):
             b"last_access_time",
             "rate_per_second",
             b"rate_per_second",
+            "worker_versioning_build_id",
+            b"worker_versioning_build_id",
         ],
     ) -> None: ...
 

@@ -23,7 +23,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n)temporal/api/replication/v1/message.proto\x12\x1btemporal.api.replication.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto\x1a%temporal/api/enums/v1/namespace.proto"0\n\x18\x43lusterReplicationConfig\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\x81\x02\n\x1aNamespaceReplicationConfig\x12\x1b\n\x13\x61\x63tive_cluster_name\x18\x01 \x01(\t\x12G\n\x08\x63lusters\x18\x02 \x03(\x0b\x32\x35.temporal.api.replication.v1.ClusterReplicationConfig\x12\x36\n\x05state\x18\x03 \x01(\x0e\x32\'.temporal.api.enums.v1.ReplicationState\x12\x45\n\x10\x66\x61ilover_history\x18\x04 \x03(\x0b\x32+.temporal.api.replication.v1.FailoverStatus"c\n\x0e\x46\x61iloverStatus\x12\x37\n\rfailover_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x18\n\x10\x66\x61ilover_version\x18\x02 \x01(\x03\x42\x9e\x01\n\x1eio.temporal.api.replication.v1B\x0cMessageProtoP\x01Z-go.temporal.io/api/replication/v1;replication\xaa\x02\x1bTemporal.Api.Replication.V1\xea\x02\x1eTemporal::Api::Replication::V1b\x06proto3'
+    b'\n)temporal/api/replication/v1/message.proto\x12\x1btemporal.api.replication.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto\x1a%temporal/api/enums/v1/namespace.proto"0\n\x18\x43lusterReplicationConfig\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\xba\x01\n\x1aNamespaceReplicationConfig\x12\x1b\n\x13\x61\x63tive_cluster_name\x18\x01 \x01(\t\x12G\n\x08\x63lusters\x18\x02 \x03(\x0b\x32\x35.temporal.api.replication.v1.ClusterReplicationConfig\x12\x36\n\x05state\x18\x03 \x01(\x0e\x32\'.temporal.api.enums.v1.ReplicationState"c\n\x0e\x46\x61iloverStatus\x12\x37\n\rfailover_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x18\n\x10\x66\x61ilover_version\x18\x02 \x01(\x03\x42\x9e\x01\n\x1eio.temporal.api.replication.v1B\x0cMessageProtoP\x01Z-go.temporal.io/api/replication/v1;replication\xaa\x02\x1bTemporal.Api.Replication.V1\xea\x02\x1eTemporal::Api::Replication::V1b\x06proto3'
 )
 
 
@@ -76,7 +76,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _CLUSTERREPLICATIONCONFIG._serialized_start = 181
     _CLUSTERREPLICATIONCONFIG._serialized_end = 229
     _NAMESPACEREPLICATIONCONFIG._serialized_start = 232
-    _NAMESPACEREPLICATIONCONFIG._serialized_end = 489
-    _FAILOVERSTATUS._serialized_start = 491
-    _FAILOVERSTATUS._serialized_end = 590
+    _NAMESPACEREPLICATIONCONFIG._serialized_end = 418
+    _FAILOVERSTATUS._serialized_start = 420
+    _FAILOVERSTATUS._serialized_end = 519
 # @@protoc_insertion_point(module_scope)

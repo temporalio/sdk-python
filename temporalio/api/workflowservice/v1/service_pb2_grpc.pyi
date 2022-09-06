@@ -462,6 +462,26 @@ class WorkflowServiceStub:
     (-- api-linter: core::0134=disabled
         aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
     """
+    StartBatchOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
+    ]
+    """StartBatchOperation starts a new batch operation"""
+    StopBatchOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
+    ]
+    """StopBatchOperation stops a batch operation"""
+    DescribeBatchOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
+    ]
+    """DescribeBatchOperation returns the information about a batch operation"""
+    ListBatchOperations: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
+    ]
+    """ListBatchOperations returns a list of batch operations"""
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -997,6 +1017,34 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0134=disabled
             aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
         """
+    @abc.abstractmethod
+    def StartBatchOperation(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse:
+        """StartBatchOperation starts a new batch operation"""
+    @abc.abstractmethod
+    def StopBatchOperation(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse:
+        """StopBatchOperation stops a batch operation"""
+    @abc.abstractmethod
+    def DescribeBatchOperation(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse:
+        """DescribeBatchOperation returns the information about a batch operation"""
+    @abc.abstractmethod
+    def ListBatchOperations(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse:
+        """ListBatchOperations returns a list of batch operations"""
 
 def add_WorkflowServiceServicer_to_server(
     servicer: WorkflowServiceServicer, server: grpc.Server

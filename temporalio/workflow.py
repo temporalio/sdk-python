@@ -355,6 +355,7 @@ class _Runtime(ABC):
         task_queue: Optional[str],
         run_timeout: Optional[timedelta],
         task_timeout: Optional[timedelta],
+        retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> NoReturn:
@@ -3315,6 +3316,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3329,6 +3331,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3344,6 +3347,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3359,6 +3363,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3374,6 +3379,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3388,6 +3394,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3422,6 +3429,7 @@ def continue_as_new(
         task_queue=task_queue,
         run_timeout=run_timeout,
         task_timeout=task_timeout,
+        retry_policy=retry_policy,
         memo=memo,
         search_attributes=search_attributes,
     )

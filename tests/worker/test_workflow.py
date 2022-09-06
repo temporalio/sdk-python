@@ -1252,12 +1252,24 @@ async def test_workflow_with_custom_runner(client: Client):
 class ContinueAsNewWorkflow:
     @workflow.run
     async def run(self, past_run_ids: List[str]) -> List[str]:
+        # Check memo and retry policy
+        assert workflow.memo_value("past_run_id_count") == len(past_run_ids)
+        retry_policy = workflow.info().retry_policy
+        assert retry_policy and retry_policy.maximum_attempts == 1000 + len(
+            past_run_ids
+        )
+
         if len(past_run_ids) == 5:
             return past_run_ids
         info = workflow.info()
         if info.continued_run_id:
             past_run_ids.append(info.continued_run_id)
-        workflow.continue_as_new(past_run_ids)
+        workflow.continue_as_new(
+            past_run_ids,
+            # Add memo and retry policy to check
+            memo={"past_run_id_count": len(past_run_ids)},
+            retry_policy=RetryPolicy(maximum_attempts=1000 + len(past_run_ids)),
+        )
 
 
 async def test_workflow_continue_as_new(client: Client):
@@ -1267,6 +1279,8 @@ async def test_workflow_continue_as_new(client: Client):
             cast(List[str], []),
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            memo={"past_run_id_count": 0},
+            retry_policy=RetryPolicy(maximum_attempts=1000),
         )
         result = await handle.result()
         assert len(result) == 5

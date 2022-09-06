@@ -810,10 +810,7 @@ class FailWorkflowExecution(google.protobuf.message.Message):
 global___FailWorkflowExecution = FailWorkflowExecution
 
 class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
-    """TODO: Maybe combine all execution resolves into one message
-    / Continue the workflow as a new execution. Unless noted otherwise, unset or default field values
-    / will re-use the issuing workflow's values.
-    """
+    """Continue the workflow as a new execution"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -891,46 +888,56 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
     MEMO_FIELD_NUMBER: builtins.int
     HEADERS_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    RETRY_POLICY_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
-    """/ The identifier the lang-specific sdk uses to execute workflow code"""
+    """The identifier the lang-specific sdk uses to execute workflow code"""
     task_queue: builtins.str
-    """/ Task queue for the new workflow execution"""
+    """Task queue for the new workflow execution"""
     @property
     def arguments(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.common.v1.message_pb2.Payload
     ]:
-        """/ Inputs to the workflow code. Should be specified. Will not re-use old arguments, as that
-        / typically wouldn't make any sense.
+        """Inputs to the workflow code. Should be specified. Will not re-use old arguments, as that
+        typically wouldn't make any sense.
         """
     @property
     def workflow_run_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """/ Timeout for a single run of the new workflow."""
+        """Timeout for a single run of the new workflow. Will not re-use current workflow's value."""
     @property
     def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """/ Timeout of a single workflow task."""
+        """Timeout of a single workflow task. Will not re-use current workflow's value."""
     @property
     def memo(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
         builtins.str, temporalio.api.common.v1.message_pb2.Payload
     ]:
-        """/ Memo fields"""
+        """If set, the new workflow will have this memo. If unset, re-uses the current workflow's memo"""
     @property
     def headers(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
         builtins.str, temporalio.api.common.v1.message_pb2.Payload
     ]:
-        """/ Header fields"""
+        """If set, the new workflow will have these headers. Will *not* re-use current workflow's
+        headers otherwise.
+        """
     @property
     def search_attributes(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
         builtins.str, temporalio.api.common.v1.message_pb2.Payload
     ]:
-        """/ Search attributes"""
+        """If set, the new workflow will have these search attributes. If unset, re-uses the current
+        workflow's search attributes.
+        """
+    @property
+    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
+        """If set, the new workflow will have this retry policy. If unset, re-uses the current
+        workflow's retry policy.
+        """
     def __init__(
         self,
         *,
@@ -954,10 +961,13 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
             builtins.str, temporalio.api.common.v1.message_pb2.Payload
         ]
         | None = ...,
+        retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "retry_policy",
+            b"retry_policy",
             "workflow_run_timeout",
             b"workflow_run_timeout",
             "workflow_task_timeout",
@@ -973,6 +983,8 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
             b"headers",
             "memo",
             b"memo",
+            "retry_policy",
+            b"retry_policy",
             "search_attributes",
             b"search_attributes",
             "task_queue",

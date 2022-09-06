@@ -151,6 +151,7 @@ class ContinueAsNewInput:
     task_queue: Optional[str]
     run_timeout: Optional[timedelta]
     task_timeout: Optional[timedelta]
+    retry_policy: Optional[temporalio.common.RetryPolicy]
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
     headers: Mapping[str, temporalio.api.common.v1.Payload]

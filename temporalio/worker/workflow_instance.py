@@ -637,6 +637,7 @@ class _WorkflowInstanceImpl(
         task_queue: Optional[str],
         run_timeout: Optional[timedelta],
         task_timeout: Optional[timedelta],
+        retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> NoReturn:
@@ -659,6 +660,7 @@ class _WorkflowInstanceImpl(
                 task_queue=task_queue,
                 run_timeout=run_timeout,
                 task_timeout=task_timeout,
+                retry_policy=retry_policy,
                 memo=memo,
                 search_attributes=search_attributes,
                 headers={},
@@ -1862,6 +1864,8 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
         if self._input.headers:
             temporalio.common._apply_headers(self._input.headers, v.headers)
+        if self._input.retry_policy:
+            self._input.retry_policy.apply_to_proto(v.retry_policy)
         if self._input.memo:
             for k, val in self._input.memo.items():
                 v.memo[k].CopyFrom(

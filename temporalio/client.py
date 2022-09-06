@@ -102,7 +102,7 @@ class Client:
                 opt-in to retries by default). If unset, a default retry
                 configuration is used.
             rpc_metadata: Headers to use for all calls to the server. Keys here
-                always override per-call RPC metadata keys.
+                can be overriden by per-call RPC metadata keys.
             identity: Identity for this client. If unset, a default is created
                 based on the version of the SDK.
         """
@@ -336,8 +336,8 @@ class Client:
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
                 present.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
@@ -747,8 +747,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             follow_runs: If true (default), workflow runs will be continually
                 fetched, until the most recent one is found. If false, the first
                 result is used.
-            rpc_metadata: Headers used on each RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call. Note,
                 this is the timeout for each history RPC call not this overall
                 function.
@@ -888,8 +888,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             workflow ID even if it is unrelated to the started workflow.
 
         Args:
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
@@ -923,8 +923,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             unrelated to the started workflow.
 
         Args:
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
@@ -1024,8 +1024,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             args: Multiple arguments to the query. Cannot be set if arg is.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
@@ -1141,8 +1141,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             signal: Signal function or name on the workflow.
             arg: Single argument to the signal.
             args: Multiple arguments to the signal. Cannot be set if arg is.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
@@ -1184,8 +1184,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Args:
             args: Details to store on the termination.
             reason: Reason for the termination.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
@@ -1233,8 +1233,8 @@ class AsyncActivityHandle:
 
         Args:
             details: Details of the heartbeat.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.heartbeat_async_activity(
@@ -1257,8 +1257,8 @@ class AsyncActivityHandle:
 
         Args:
             result: Result of the activity.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.complete_async_activity(
@@ -1283,8 +1283,8 @@ class AsyncActivityHandle:
         Args:
             error: Error for the activity.
             last_heartbeat_details: Last heartbeat details for the activity.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.fail_async_activity(
@@ -1307,8 +1307,8 @@ class AsyncActivityHandle:
 
         Args:
             details: Cancellation details.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.report_cancellation_async_activity(

@@ -12,13 +12,15 @@ base_dir = Path(__file__).parent.parent
 proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
 api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
+health_proto_dir = proto_dir / "grpc"
 testsrv_proto_dir = proto_dir / "testsrv_upstream"
 
-# Exclude testsrv dependencies
+# Exclude testsrv dependencies and health protos
 proto_paths = (
     v
     for v in proto_dir.glob("**/*.proto")
     if not str(v).startswith(str(testsrv_proto_dir / "dependencies"))
+    and not str(v).startswith(str(health_proto_dir))
 )
 
 api_out_dir = base_dir / "temporalio" / "api"

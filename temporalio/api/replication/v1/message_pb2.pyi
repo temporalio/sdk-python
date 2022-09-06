@@ -61,7 +61,6 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
     ACTIVE_CLUSTER_NAME_FIELD_NUMBER: builtins.int
     CLUSTERS_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
-    FAILOVER_HISTORY_FIELD_NUMBER: builtins.int
     active_cluster_name: builtins.str
     @property
     def clusters(
@@ -70,15 +69,6 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
         global___ClusterReplicationConfig
     ]: ...
     state: temporalio.api.enums.v1.namespace_pb2.ReplicationState.ValueType
-    @property
-    def failover_history(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___FailoverStatus
-    ]:
-        """Contains the historical state of failover_versions for the cluster, truncated to contain only the last N
-        states to ensure that the list does not grow unbounded.
-        """
     def __init__(
         self,
         *,
@@ -86,8 +76,6 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
         clusters: collections.abc.Iterable[global___ClusterReplicationConfig]
         | None = ...,
         state: temporalio.api.enums.v1.namespace_pb2.ReplicationState.ValueType = ...,
-        failover_history: collections.abc.Iterable[global___FailoverStatus]
-        | None = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -96,8 +84,6 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
             b"active_cluster_name",
             "clusters",
             b"clusters",
-            "failover_history",
-            b"failover_history",
             "state",
             b"state",
         ],

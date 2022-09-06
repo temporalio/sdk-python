@@ -212,6 +212,11 @@ class WorkflowService:
             wsv1.DeleteScheduleRequest,
             wsv1.DeleteScheduleResponse,
         )
+        self.describe_batch_operation = client._new_call(
+            "describe_batch_operation",
+            wsv1.DescribeBatchOperationRequest,
+            wsv1.DescribeBatchOperationResponse,
+        )
         self.deprecate_namespace = client._new_call(
             "deprecate_namespace",
             wsv1.DeprecateNamespaceRequest,
@@ -271,6 +276,11 @@ class WorkflowService:
             "list_archived_workflow_executions",
             wsv1.ListArchivedWorkflowExecutionsRequest,
             wsv1.ListArchivedWorkflowExecutionsResponse,
+        )
+        self.list_batch_operations = client._new_call(
+            "list_batch_operations",
+            wsv1.ListBatchOperationsRequest,
+            wsv1.ListBatchOperationsResponse,
         )
         self.list_closed_workflow_executions = client._new_call(
             "list_closed_workflow_executions",
@@ -417,10 +427,20 @@ class WorkflowService:
             wsv1.SignalWorkflowExecutionRequest,
             wsv1.SignalWorkflowExecutionResponse,
         )
+        self.start_batch_operation = client._new_call(
+            "start_batch_operation",
+            wsv1.StartBatchOperationRequest,
+            wsv1.StartBatchOperationResponse,
+        )
         self.start_workflow_execution = client._new_call(
             "start_workflow_execution",
             wsv1.StartWorkflowExecutionRequest,
             wsv1.StartWorkflowExecutionResponse,
+        )
+        self.stop_batch_operation = client._new_call(
+            "stop_batch_operation",
+            wsv1.StopBatchOperationRequest,
+            wsv1.StopBatchOperationResponse,
         )
         self.terminate_workflow_execution = client._new_call(
             "terminate_workflow_execution",
@@ -592,8 +612,8 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
         Args:
             req: Request for the call.
             retry: If true, will use retry config to retry failed calls.
-            metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
