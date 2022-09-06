@@ -98,6 +98,8 @@ class Client:
             resp_fut = self._ref.call_operator_service(call)
         elif service == "test":
             resp_fut = self._ref.call_test_service(call)
+        elif service == "health":
+            resp_fut = self._ref.call_health_service(call)
         else:
             raise ValueError(f"Unrecognized service {service}")
 

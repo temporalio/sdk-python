@@ -5,9 +5,12 @@ from typing import Any, List, Optional, Tuple
 import pytest
 
 import temporalio.api.enums.v1
-import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
+from temporalio.api.workflowservice.v1 import (
+    DescribeNamespaceRequest,
+    GetSystemInfoRequest,
+)
 from temporalio.client import (
     CancelWorkflowInput,
     Client,
@@ -25,6 +28,7 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowQueryRejectedError,
 )
+from tests.helpers.server import ExternalServer
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -381,8 +385,17 @@ async def test_tls_config(tls_client: Optional[Client]):
     if not tls_client:
         pytest.skip("No TLS client")
     resp = await tls_client.workflow_service.describe_namespace(
-        temporalio.api.workflowservice.v1.DescribeNamespaceRequest(
-            namespace=tls_client.namespace
-        )
+        DescribeNamespaceRequest(namespace=tls_client.namespace)
     )
     assert resp.namespace_info.name == tls_client.namespace
+
+
+async def test_lazy_client(server: ExternalServer):
+    # Create another client that is lazy. This test just makes sure the
+    # functionality continues to work.
+    lazy_client = await Client.connect(
+        server.host_port, namespace=server.namespace, lazy=True
+    )
+    assert not lazy_client.service_client.worker_service_client._bridge_client
+    await lazy_client.workflow_service.get_system_info(GetSystemInfoRequest())
+    assert lazy_client.service_client.worker_service_client._bridge_client

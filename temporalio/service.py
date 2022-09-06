@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import socket
@@ -19,6 +20,7 @@ import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
+import temporalio.bridge.proto.health.v1
 import temporalio.bridge.telemetry
 import temporalio.exceptions
 
@@ -99,6 +101,7 @@ class ConnectConfig:
     retry_config: Optional[RetryConfig] = None
     rpc_metadata: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
+    lazy: bool = False
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -159,6 +162,42 @@ class ServiceClient(ABC):
         self.workflow_service = WorkflowService(self)
         self.operator_service = OperatorService(self)
         self.test_service = TestService(self)
+        self._check_health_call = self._new_call(
+            "check",
+            temporalio.bridge.proto.health.v1.HealthCheckRequest,
+            temporalio.bridge.proto.health.v1.HealthCheckResponse,
+            service="health",
+        )
+
+    async def check_health(
+        self,
+        *,
+        service: str = "temporal.api.workflowservice.v1.WorkflowService",
+        retry: bool = False,
+        metadata: Mapping[str, str] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> bool:
+        """Check whether the WorkflowService is up.
+
+        In addition to accepting which service to check health on, this accepts
+        some of the same parameters as other RPC calls. See
+        :py:meth:`ServiceCall.__call__`.
+
+        Returns:
+            True when available, false if the server is running but the service
+            is unavailable (rare), or raises an error if server/service cannot
+            be reached.
+        """
+        resp = await self._check_health_call(
+            temporalio.bridge.proto.health.v1.HealthCheckRequest(service=service),
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+        return (
+            resp.status
+            == temporalio.bridge.proto.health.v1.HealthCheckResponse.ServingStatus.SERVING
+        )
 
     @property
     @abstractmethod
@@ -641,17 +680,25 @@ class _BridgeServiceClient(ServiceClient):
             temporalio.bridge.telemetry.TelemetryConfig(),
             warn_if_already_inited=False,
         )
+        client = _BridgeServiceClient(config)
+        # If not lazy, try to connect
+        if not config.lazy:
+            await client._connected_client()
+        return client
 
-        return _BridgeServiceClient(
-            config,
-            await temporalio.bridge.client.Client.connect(config._to_bridge_config()),
-        )
-
-    def __init__(
-        self, config: ConnectConfig, bridge_client: temporalio.bridge.client.Client
-    ) -> None:
+    def __init__(self, config: ConnectConfig) -> None:
         super().__init__(config)
-        self._bridge_client = bridge_client
+        self._bridge_config = config._to_bridge_config()
+        self._bridge_client: Optional[temporalio.bridge.client.Client] = None
+        self._bridge_client_connect_lock = asyncio.Lock()
+
+    async def _connected_client(self) -> temporalio.bridge.client.Client:
+        async with self._bridge_client_connect_lock:
+            if not self._bridge_client:
+                self._bridge_client = await temporalio.bridge.client.Client.connect(
+                    self._bridge_config
+                )
+            return self._bridge_client
 
     @property
     def worker_service_client(self) -> _BridgeServiceClient:
@@ -673,7 +720,8 @@ class _BridgeServiceClient(ServiceClient):
         if LOG_PROTOS:
             logger.debug("Service %s request to %s: %s", service, rpc, req)
         try:
-            resp = await self._bridge_client.call(
+            client = await self._connected_client()
+            resp = await client.call(
                 service=service,
                 rpc=rpc,
                 req=req,

@@ -76,7 +76,8 @@ class Worker:
             client: Client to use for this worker. This is required and must be
                 the :py:class:`temporalio.client.Client` instance or have a
                 worker_service_client attribute with reference to the original
-                client's underlying service client.
+                client's underlying service client. This client cannot be
+                "lazy".
             task_queue: Required task queue for this worker.
             activities: Set of activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
@@ -250,6 +251,17 @@ class Worker:
                 debug_mode=debug_mode,
             )
 
+        # We need an already connected client
+        # TODO(cretz): How to connect to client inside constructor here? In the
+        # meantime, we disallow lazy clients from being used for workers. We
+        # could check whether the connected client is present which means
+        # lazy-but-already-connected clients would work, but that is confusing
+        # to users that the client only works if they already made a call on it.
+        if bridge_client.config.lazy:
+            raise RuntimeError("Lazy clients cannot be used for workers")
+        raw_bridge_client = bridge_client._bridge_client
+        assert raw_bridge_client
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -257,7 +269,7 @@ class Worker:
         # TODO(cretz): Why does this cause a test hang when an exception is
         # thrown after it?
         self._bridge_worker = temporalio.bridge.worker.Worker.create(
-            bridge_client._bridge_client,
+            raw_bridge_client,
             temporalio.bridge.worker.WorkerConfig(
                 namespace=client.namespace,
                 task_queue=task_queue,

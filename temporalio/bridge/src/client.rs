@@ -7,8 +7,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_client::{
-    ClientOptions, ClientOptionsBuilder, ConfiguredClient, OperatorService, RetryClient,
-    RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
+    ClientOptions, ClientOptionsBuilder, ConfiguredClient, HealthService, OperatorService,
+    RetryClient, RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig,
+    WorkflowService,
 };
 use tonic::metadata::MetadataKey;
 use url::Url;
@@ -284,6 +285,23 @@ impl ClientRef {
                     rpc_call!(retry_client, call, unlock_time_skipping_with_sleep)
                 }
                 "unlock_time_skipping" => rpc_call!(retry_client, call, unlock_time_skipping),
+                _ => {
+                    return Err(PyValueError::new_err(format!(
+                        "Unknown RPC call {}",
+                        call.rpc
+                    )))
+                }
+            }?;
+            let bytes: &[u8] = &bytes;
+            Ok(Python::with_gil(|py| bytes.into_py(py)))
+        })
+    }
+
+    fn call_health_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+        let mut retry_client = self.retry_client.clone();
+        future_into_py(py, async move {
+            let bytes = match call.rpc.as_str() {
+                "check" => rpc_call!(retry_client, call, check),
                 _ => {
                     return Err(PyValueError::new_err(format!(
                         "Unknown RPC call {}",

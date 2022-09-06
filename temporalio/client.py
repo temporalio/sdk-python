@@ -73,6 +73,7 @@ class Client:
         retry_config: Optional[RetryConfig] = None,
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
+        lazy: bool = False,
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -105,6 +106,9 @@ class Client:
                 can be overriden by per-call RPC metadata keys.
             identity: Identity for this client. If unset, a default is created
                 based on the version of the SDK.
+            lazy: If true, the client will not connect until the first call is
+                attempted or a worker is created with it. Lazy clients cannot be
+                used for workers.
         """
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
@@ -112,6 +116,7 @@ class Client:
             retry_config=retry_config,
             rpc_metadata=rpc_metadata,
             identity=identity or "",
+            lazy=lazy,
         )
         return Client(
             await temporalio.service.ServiceClient.connect(connect_config),
