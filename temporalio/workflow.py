@@ -675,7 +675,7 @@ def uuid4() -> uuid.UUID:
 
 
 async def wait_condition(
-    fn: Callable[[], bool], *, timeout: Optional[float] = None
+    fn: Callable[[], bool], *, timeout: Optional[Union[timedelta, float]] = None
 ) -> None:
     """Wait on a callback to become true.
 
@@ -687,7 +687,10 @@ async def wait_condition(
         timeout: Optional number of seconds to wait until throwing
             :py:class:`asyncio.TimeoutError`.
     """
-    await _Runtime.current().workflow_wait_condition(fn, timeout=timeout)
+    await _Runtime.current().workflow_wait_condition(
+        fn,
+        timeout=timeout.total_seconds() if isinstance(timeout, timedelta) else timeout,
+    )
 
 
 class unsafe:
