@@ -64,6 +64,8 @@ class Worker:
         sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
+        max_activities_per_second: Optional[float] = None,
+        max_task_queue_activities_per_second: Optional[float] = None,
         graceful_shutdown_timeout: timedelta = timedelta(),
         shared_state_manager: Optional[SharedStateManager] = None,
         debug_mode: bool = False,
@@ -134,6 +136,16 @@ class Worker:
             default_heartbeat_throttle_interval: Default interval for throttling
                 activity heartbeats in case per-activity heartbeat timeout is
                 unset. Otherwise, it's the per-activity heartbeat timeout * 0.8.
+            max_activities_per_second: Limits the number of activities per
+                second that this worker will process. The worker will not poll
+                for new activities if by doing so it might receive and execute
+                an activity which would cause it to exceed this limit.
+            max_task_queue_activities_per_second: Sets the maximum number of
+                activities per second the task queue will dispatch, controlled
+                server-side. Note that this only takes effect upon an activity
+                poll request. If multiple workers on the same queue have
+                different values set, they will thrash with the last poller
+                winning.
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
@@ -203,6 +215,8 @@ class Worker:
             sticky_queue_schedule_to_start_timeout=sticky_queue_schedule_to_start_timeout,
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
+            max_activities_per_second=max_activities_per_second,
+            max_task_queue_activities_per_second=max_task_queue_activities_per_second,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
@@ -266,6 +280,8 @@ class Worker:
                 default_heartbeat_throttle_interval_millis=int(
                     1000 * default_heartbeat_throttle_interval.total_seconds()
                 ),
+                max_activities_per_second=max_activities_per_second,
+                max_task_queue_activities_per_second=max_task_queue_activities_per_second,
             ),
         )
 
@@ -364,6 +380,8 @@ class WorkerConfig(TypedDict, total=False):
     sticky_queue_schedule_to_start_timeout: timedelta
     max_heartbeat_throttle_interval: timedelta
     default_heartbeat_throttle_interval: timedelta
+    max_activities_per_second: Optional[float]
+    max_task_queue_activities_per_second: Optional[float]
     graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
     debug_mode: bool

@@ -118,6 +118,8 @@ class Replayer:
                 sticky_queue_schedule_to_start_timeout_millis=1000,
                 max_heartbeat_throttle_interval_millis=1000,
                 default_heartbeat_throttle_interval_millis=1000,
+                max_activities_per_second=None,
+                max_task_queue_activities_per_second=None,
             ),
         )
         workflow_worker = _WorkflowWorker(

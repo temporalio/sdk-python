@@ -183,7 +183,7 @@ async def test_describe(client: Client, worker: ExternalWorker):
         desc.execution_time - datetime.now(timezone.utc)
     ) < timedelta(seconds=20)
     assert desc.id == handle.id
-    assert desc.memo == {"foo": "bar"}
+    assert (await desc.memo()) == {"foo": "bar"}
     assert not desc.parent_id
     assert not desc.parent_run_id
     assert desc.run_id == handle.first_execution_run_id

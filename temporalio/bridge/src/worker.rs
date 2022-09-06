@@ -37,6 +37,8 @@ pub struct WorkerConfig {
     sticky_queue_schedule_to_start_timeout_millis: u64,
     max_heartbeat_throttle_interval_millis: u64,
     default_heartbeat_throttle_interval_millis: u64,
+    max_activities_per_second: Option<f64>,
+    max_task_queue_activities_per_second: Option<f64>,
 }
 
 pub fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> PyResult<WorkerRef> {
@@ -196,6 +198,8 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             .default_heartbeat_throttle_interval(Duration::from_millis(
                 conf.default_heartbeat_throttle_interval_millis,
             ))
+            .max_worker_activities_per_second(conf.max_activities_per_second)
+            .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
     }
