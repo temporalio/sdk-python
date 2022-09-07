@@ -1,1 +1,1 @@
-"""gRPC API."""
+"""Temporal API protobuf models."""

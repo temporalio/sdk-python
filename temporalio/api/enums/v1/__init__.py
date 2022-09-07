@@ -1,3 +1,4 @@
+from .batch_operation_pb2 import BatchOperationState, BatchOperationType
 from .cluster_pb2 import ClusterMemberRole
 from .command_type_pb2 import CommandType
 from .common_pb2 import EncodingType, IndexedValueType, Severity
@@ -32,6 +33,8 @@ from .workflow_pb2 import (
 
 __all__ = [
     "ArchivalState",
+    "BatchOperationState",
+    "BatchOperationType",
     "CancelExternalWorkflowExecutionFailedCause",
     "ClusterMemberRole",
     "CommandType",

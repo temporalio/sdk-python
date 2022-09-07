@@ -277,6 +277,26 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.FromString,
         )
+        self.StartBatchOperation = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/StartBatchOperation",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartBatchOperationRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartBatchOperationResponse.FromString,
+        )
+        self.StopBatchOperation = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/StopBatchOperation",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StopBatchOperationRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StopBatchOperationResponse.FromString,
+        )
+        self.DescribeBatchOperation = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeBatchOperation",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeBatchOperationRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeBatchOperationResponse.FromString,
+        )
+        self.ListBatchOperations = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListBatchOperations",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListBatchOperationsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListBatchOperationsResponse.FromString,
+        )
 
 
 class WorkflowServiceServicer(object):
@@ -764,6 +784,30 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def StartBatchOperation(self, request, context):
+        """StartBatchOperation starts a new batch operation"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def StopBatchOperation(self, request, context):
+        """StopBatchOperation stops a batch operation"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeBatchOperation(self, request, context):
+        """DescribeBatchOperation returns the information about a batch operation"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListBatchOperations(self, request, context):
+        """ListBatchOperations returns a list of batch operations"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_WorkflowServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1016,6 +1060,26 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.UpdateWorkflow,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.SerializeToString,
+        ),
+        "StartBatchOperation": grpc.unary_unary_rpc_method_handler(
+            servicer.StartBatchOperation,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartBatchOperationRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartBatchOperationResponse.SerializeToString,
+        ),
+        "StopBatchOperation": grpc.unary_unary_rpc_method_handler(
+            servicer.StopBatchOperation,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StopBatchOperationRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StopBatchOperationResponse.SerializeToString,
+        ),
+        "DescribeBatchOperation": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeBatchOperation,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeBatchOperationRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeBatchOperationResponse.SerializeToString,
+        ),
+        "ListBatchOperations": grpc.unary_unary_rpc_method_handler(
+            servicer.ListBatchOperations,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListBatchOperationsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListBatchOperationsResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2479,6 +2543,122 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflow",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def StartBatchOperation(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/StartBatchOperation",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartBatchOperationRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartBatchOperationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def StopBatchOperation(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/StopBatchOperation",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StopBatchOperationRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StopBatchOperationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeBatchOperation(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeBatchOperation",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeBatchOperationRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeBatchOperationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListBatchOperations(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListBatchOperations",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListBatchOperationsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListBatchOperationsResponse.FromString,
             options,
             channel_credentials,
             insecure,

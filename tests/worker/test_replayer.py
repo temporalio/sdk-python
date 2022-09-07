@@ -310,3 +310,8 @@ def test_history_from_json():
     assert json_format.MessageToDict(history) == json_format.MessageToDict(
         history_from_json
     )
+
+    # Confirm double-encode does not cause issues
+    assert json_format.MessageToDict(history) == json_format.MessageToDict(
+        _history_from_json(json_format.MessageToDict(history_from_dict))
+    )

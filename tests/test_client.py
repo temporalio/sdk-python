@@ -5,9 +5,12 @@ from typing import Any, List, Optional, Tuple
 import pytest
 
 import temporalio.api.enums.v1
-import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
+from temporalio.api.workflowservice.v1 import (
+    DescribeNamespaceRequest,
+    GetSystemInfoRequest,
+)
 from temporalio.client import (
     CancelWorkflowInput,
     Client,
@@ -25,6 +28,7 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowQueryRejectedError,
 )
+from tests.helpers.server import ExternalServer
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -183,7 +187,7 @@ async def test_describe(client: Client, worker: ExternalWorker):
         desc.execution_time - datetime.now(timezone.utc)
     ) < timedelta(seconds=20)
     assert desc.id == handle.id
-    assert desc.memo == {"foo": "bar"}
+    assert (await desc.memo()) == {"foo": "bar"}
     assert not desc.parent_id
     assert not desc.parent_run_id
     assert desc.run_id == handle.first_execution_run_id
@@ -377,32 +381,21 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
     assert interceptor.traces[4][1].id == handle.id
 
 
-async def test_interceptor_callable(client: Client, worker: ExternalWorker):
-    # Create new client from existing client but with a tracing interceptor
-    # callable and only check a simple call
-    interceptor = TracingClientInterceptor()
-    config = client.config()
-    config["interceptors"] = [interceptor.intercept_client]
-    client = Client(**config)
-    handle = await client.start_workflow(
-        "kitchen_sink",
-        KSWorkflowParams(),
-        id=str(uuid.uuid4()),
-        task_queue=worker.task_queue,
-    )
-    await handle.result()
-
-    # Check trace
-    assert interceptor.traces[0][0] == "start_workflow"
-    assert interceptor.traces[0][1].workflow == "kitchen_sink"
-
-
 async def test_tls_config(tls_client: Optional[Client]):
     if not tls_client:
         pytest.skip("No TLS client")
     resp = await tls_client.workflow_service.describe_namespace(
-        temporalio.api.workflowservice.v1.DescribeNamespaceRequest(
-            namespace=tls_client.namespace
-        )
+        DescribeNamespaceRequest(namespace=tls_client.namespace)
     )
     assert resp.namespace_info.name == tls_client.namespace
+
+
+async def test_lazy_client(server: ExternalServer):
+    # Create another client that is lazy. This test just makes sure the
+    # functionality continues to work.
+    lazy_client = await Client.connect(
+        server.host_port, namespace=server.namespace, lazy=True
+    )
+    assert not lazy_client.service_client.worker_service_client._bridge_client
+    await lazy_client.workflow_service.get_system_info(GetSystemInfoRequest())
+    assert lazy_client.service_client.worker_service_client._bridge_client

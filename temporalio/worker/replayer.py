@@ -7,7 +7,7 @@ import copy
 import json
 import logging
 import re
-from typing import Any, Dict, Iterable, Optional, Type, Union
+from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
 
 import google.protobuf.json_format
 from typing_extensions import TypedDict
@@ -30,12 +30,12 @@ class Replayer:
     def __init__(
         self,
         *,
-        workflows: Iterable[Type],
+        workflows: Sequence[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[Interceptor] = [],
+        interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         debug_mode: bool = False,
@@ -111,13 +111,15 @@ class Replayer:
                 max_outstanding_workflow_tasks=1,
                 max_outstanding_activities=1,
                 max_outstanding_local_activities=1,
-                max_concurrent_wft_polls=1,
+                max_concurrent_workflow_task_polls=1,
                 nonsticky_to_sticky_poll_ratio=1,
-                max_concurrent_at_polls=1,
+                max_concurrent_activity_task_polls=1,
                 no_remote_activities=True,
                 sticky_queue_schedule_to_start_timeout_millis=1000,
                 max_heartbeat_throttle_interval_millis=1000,
                 default_heartbeat_throttle_interval_millis=1000,
+                max_activities_per_second=None,
+                max_task_queue_activities_per_second=None,
             ),
         )
         workflow_worker = _WorkflowWorker(
@@ -147,12 +149,12 @@ class Replayer:
 class ReplayerConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:class:`Replayer`."""
 
-    workflows: Iterable[Type]
+    workflows: Sequence[Type]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
     namespace: str
     data_converter: temporalio.converter.DataConverter
-    interceptors: Iterable[Interceptor]
+    interceptors: Sequence[Interceptor]
     build_id: Optional[str]
     identity: Optional[str]
     debug_mode: bool
@@ -265,7 +267,11 @@ def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
     else:
         child = parent.get(attrs[0])
         if isinstance(child, str) and len(attrs) == 1:
-            parent[attrs[0]] = prefix + _pascal_case_match.sub(r"_\1", child).upper()
+            # We only fix it if it doesn't already have the prefix
+            if not parent[attrs[0]].startswith(prefix):
+                parent[attrs[0]] = (
+                    prefix + _pascal_case_match.sub(r"_\1", child).upper()
+                )
         elif isinstance(child, dict) and len(attrs) > 1:
             _fix_history_enum(prefix, child, *attrs[1:])
         elif isinstance(child, list) and len(attrs) > 1:

@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, Mapping, Tuple, Type
 import google.protobuf.empty_pb2
 import google.protobuf.message
 import grpc
+import pytest
 
 import temporalio
 import temporalio.api.operatorservice.v1
@@ -115,3 +116,11 @@ def test_version():
     version = version[: version.find('"')]
     assert temporalio.service.__version__ == version
     assert temporalio.__version__ == version
+
+
+async def test_check_health(client: Client):
+    assert await client.service_client.check_health()
+    # Unknown service
+    with pytest.raises(temporalio.service.RPCError) as err:
+        assert await client.service_client.check_health(service="whatever")
+    assert err.value.status == temporalio.service.RPCStatusCode.NOT_FOUND

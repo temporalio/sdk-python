@@ -21,7 +21,6 @@ from typing import (
     Deque,
     Dict,
     Generator,
-    Iterable,
     List,
     Mapping,
     MutableMapping,
@@ -93,7 +92,7 @@ class WorkflowInstanceDetails:
     """Immutable, serializable details for creating a workflow instance."""
 
     payload_converter_class: Type[temporalio.converter.PayloadConverter]
-    interceptor_classes: Iterable[Type[WorkflowInboundInterceptor]]
+    interceptor_classes: Sequence[Type[WorkflowInboundInterceptor]]
     defn: temporalio.workflow._Definition
     info: temporalio.workflow.Info
     randomness_seed: int
@@ -153,6 +152,8 @@ class _WorkflowInstanceImpl(
         self._time_ns = 0
         self._cancel_requested = False
         self._current_history_length = 0
+        # Lazily loaded
+        self._memo: Optional[Mapping[str, Any]] = None
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
@@ -636,6 +637,7 @@ class _WorkflowInstanceImpl(
         task_queue: Optional[str],
         run_timeout: Optional[timedelta],
         task_timeout: Optional[timedelta],
+        retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> NoReturn:
@@ -658,6 +660,7 @@ class _WorkflowInstanceImpl(
                 task_queue=task_queue,
                 run_timeout=run_timeout,
                 task_timeout=task_timeout,
+                retry_policy=retry_policy,
                 memo=memo,
                 search_attributes=search_attributes,
                 headers={},
@@ -719,6 +722,26 @@ class _WorkflowInstanceImpl(
 
     def workflow_is_replaying(self) -> bool:
         return self._is_replaying
+
+    def workflow_memo(self) -> Mapping[str, Any]:
+        if self._memo is None:
+            self._memo = {
+                k: self._payload_converter.from_payloads([v])[0]
+                for k, v in self._info.raw_memo.items()
+            }
+        return self._memo
+
+    def workflow_memo_value(
+        self, key: str, default: Any, *, type_hint: Optional[Type]
+    ) -> Any:
+        payload = self._info.raw_memo.get(key)
+        if not payload:
+            if default is temporalio.common._arg_unset:
+                raise KeyError(f"Memo does not have a value for key {key}")
+            return default
+        return self._payload_converter.from_payloads(
+            [payload], [type_hint] if type_hint else None
+        )[0]
 
     def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
         use_patch = not self._is_replaying or id in self._patches_notified
@@ -1669,7 +1692,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         await self._instance._outbound.signal_child_workflow(
             SignalChildWorkflowInput(
@@ -1736,7 +1759,9 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             temporalio.common._apply_headers(self._input.headers, v.headers)
         if self._input.memo:
             for k, val in self._input.memo.items():
-                v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]
+                v.memo[k].CopyFrom(
+                    self._instance._payload_converter.to_payloads([val])[0]
+                )
         if self._input.search_attributes:
             _encode_search_attributes(
                 self._input.search_attributes, v.search_attributes
@@ -1787,7 +1812,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         await self._instance._outbound.signal_external_workflow(
             SignalExternalWorkflowInput(
@@ -1839,9 +1864,13 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
         if self._input.headers:
             temporalio.common._apply_headers(self._input.headers, v.headers)
+        if self._input.retry_policy:
+            self._input.retry_policy.apply_to_proto(v.retry_policy)
         if self._input.memo:
             for k, val in self._input.memo.items():
-                v.memo[k] = self._instance._payload_converter.to_payloads([val])[0]
+                v.memo[k].CopyFrom(
+                    self._instance._payload_converter.to_payloads([val])[0]
+                )
         if self._input.search_attributes:
             _encode_search_attributes(
                 self._input.search_attributes, v.search_attributes

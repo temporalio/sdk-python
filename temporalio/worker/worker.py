@@ -8,7 +8,7 @@ import hashlib
 import logging
 import sys
 from datetime import timedelta
-from typing import Any, Callable, Iterable, List, Optional, Type, cast
+from typing import Any, Callable, List, Optional, Sequence, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -45,25 +45,27 @@ class Worker:
         client: temporalio.client.Client,
         *,
         task_queue: str,
-        activities: Iterable[Callable] = [],
-        workflows: Iterable[Type] = [],
+        activities: Sequence[Callable] = [],
+        workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
-        interceptors: Iterable[Interceptor] = [],
+        interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         max_cached_workflows: int = 1000,
         max_concurrent_workflow_tasks: int = 100,
         max_concurrent_activities: int = 100,
         max_concurrent_local_activities: int = 100,
-        max_concurrent_wft_polls: int = 5,
+        max_concurrent_workflow_task_polls: int = 5,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
-        max_concurrent_at_polls: int = 5,
+        max_concurrent_activity_task_polls: int = 5,
         no_remote_activities: bool = False,
         sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
+        max_activities_per_second: Optional[float] = None,
+        max_task_queue_activities_per_second: Optional[float] = None,
         graceful_shutdown_timeout: timedelta = timedelta(),
         shared_state_manager: Optional[SharedStateManager] = None,
         debug_mode: bool = False,
@@ -74,7 +76,8 @@ class Worker:
             client: Client to use for this worker. This is required and must be
                 the :py:class:`temporalio.client.Client` instance or have a
                 worker_service_client attribute with reference to the original
-                client's underlying service client.
+                client's underlying service client. This client cannot be
+                "lazy".
             task_queue: Required task queue for this worker.
             activities: Set of activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
@@ -110,19 +113,19 @@ class Worker:
                 will ever be given to this worker concurrently.
             max_concurrent_local_activities: Maximum number of local activity
                 tasks that will ever be given to this worker concurrently.
-            max_concurrent_wft_polls: Maximum number of concurrent poll workflow
-                task requests we will perform at a time on this worker's task
-                queue.
-            nonsticky_to_sticky_poll_ratio: max_concurrent_wft_polls * this
-                number = the number of max pollers that will be allowed for the
-                nonsticky queue when sticky tasks are enabled. If both defaults
-                are used, the sticky queue will allow 4 max pollers while the
-                nonsticky queue will allow one. The minimum for either poller is
-                1, so if ``max_concurrent_wft_polls`` is 1 and sticky queues are
-                enabled, there will be 2 concurrent polls.
-            max_concurrent_at_polls: Maximum number of concurrent poll activity
-                task requests we will perform at a time on this worker's task
-                queue.
+            max_concurrent_workflow_task_polls: Maximum number of concurrent
+                poll workflow task requests we will perform at a time on this
+                worker's task queue.
+            nonsticky_to_sticky_poll_ratio: max_concurrent_workflow_task_polls *
+                this number = the number of max pollers that will be allowed for
+                the nonsticky queue when sticky tasks are enabled. If both
+                defaults are used, the sticky queue will allow 4 max pollers
+                while the nonsticky queue will allow one. The minimum for either
+                poller is 1, so if ``max_concurrent_workflow_task_polls`` is 1
+                and sticky queues are enabled, there will be 2 concurrent polls.
+            max_concurrent_activity_task_polls: Maximum number of concurrent
+                poll activity task requests we will perform at a time on this
+                worker's task queue.
             no_remote_activities: If true, this worker will only handle workflow
                 tasks and local activities, it will not poll for activity tasks.
             sticky_queue_schedule_to_start_timeout: How long a workflow task is
@@ -134,6 +137,16 @@ class Worker:
             default_heartbeat_throttle_interval: Default interval for throttling
                 activity heartbeats in case per-activity heartbeat timeout is
                 unset. Otherwise, it's the per-activity heartbeat timeout * 0.8.
+            max_activities_per_second: Limits the number of activities per
+                second that this worker will process. The worker will not poll
+                for new activities if by doing so it might receive and execute
+                an activity which would cause it to exceed this limit.
+            max_task_queue_activities_per_second: Sets the maximum number of
+                activities per second the task queue will dispatch, controlled
+                server-side. Note that this only takes effect upon an activity
+                poll request. If multiple workers on the same queue have
+                different values set, they will thrash with the last poller
+                winning.
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
@@ -196,13 +209,15 @@ class Worker:
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             max_concurrent_activities=max_concurrent_activities,
             max_concurrent_local_activities=max_concurrent_local_activities,
-            max_concurrent_wft_polls=max_concurrent_wft_polls,
+            max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
             nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
-            max_concurrent_at_polls=max_concurrent_at_polls,
+            max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
             no_remote_activities=no_remote_activities,
             sticky_queue_schedule_to_start_timeout=sticky_queue_schedule_to_start_timeout,
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
+            max_activities_per_second=max_activities_per_second,
+            max_task_queue_activities_per_second=max_task_queue_activities_per_second,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
@@ -236,6 +251,17 @@ class Worker:
                 debug_mode=debug_mode,
             )
 
+        # We need an already connected client
+        # TODO(cretz): How to connect to client inside constructor here? In the
+        # meantime, we disallow lazy clients from being used for workers. We
+        # could check whether the connected client is present which means
+        # lazy-but-already-connected clients would work, but that is confusing
+        # to users that the client only works if they already made a call on it.
+        if bridge_client.config.lazy:
+            raise RuntimeError("Lazy clients cannot be used for workers")
+        raw_bridge_client = bridge_client._bridge_client
+        assert raw_bridge_client
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -243,7 +269,7 @@ class Worker:
         # TODO(cretz): Why does this cause a test hang when an exception is
         # thrown after it?
         self._bridge_worker = temporalio.bridge.worker.Worker.create(
-            bridge_client._bridge_client,
+            raw_bridge_client,
             temporalio.bridge.worker.WorkerConfig(
                 namespace=client.namespace,
                 task_queue=task_queue,
@@ -253,9 +279,9 @@ class Worker:
                 max_outstanding_workflow_tasks=max_concurrent_workflow_tasks,
                 max_outstanding_activities=max_concurrent_activities,
                 max_outstanding_local_activities=max_concurrent_local_activities,
-                max_concurrent_wft_polls=max_concurrent_wft_polls,
+                max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
                 nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
-                max_concurrent_at_polls=max_concurrent_at_polls,
+                max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
                 no_remote_activities=no_remote_activities,
                 sticky_queue_schedule_to_start_timeout_millis=int(
                     1000 * sticky_queue_schedule_to_start_timeout.total_seconds()
@@ -266,6 +292,8 @@ class Worker:
                 default_heartbeat_throttle_interval_millis=int(
                     1000 * default_heartbeat_throttle_interval.total_seconds()
                 ),
+                max_activities_per_second=max_activities_per_second,
+                max_task_queue_activities_per_second=max_task_queue_activities_per_second,
             ),
         )
 
@@ -345,25 +373,27 @@ class WorkerConfig(TypedDict, total=False):
 
     client: temporalio.client.Client
     task_queue: str
-    activities: Iterable[Callable]
-    workflows: Iterable[Type]
+    activities: Sequence[Callable]
+    workflows: Sequence[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
-    interceptors: Iterable[Interceptor]
+    interceptors: Sequence[Interceptor]
     build_id: Optional[str]
     identity: Optional[str]
     max_cached_workflows: int
     max_concurrent_workflow_tasks: int
     max_concurrent_activities: int
     max_concurrent_local_activities: int
-    max_concurrent_wft_polls: int
+    max_concurrent_workflow_task_polls: int
     nonsticky_to_sticky_poll_ratio: float
-    max_concurrent_at_polls: int
+    max_concurrent_activity_task_polls: int
     no_remote_activities: bool
     sticky_queue_schedule_to_start_timeout: timedelta
     max_heartbeat_throttle_interval: timedelta
     default_heartbeat_throttle_interval: timedelta
+    max_activities_per_second: Optional[float]
+    max_task_queue_activities_per_second: Optional[float]
     graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
     debug_mode: bool

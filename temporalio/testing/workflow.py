@@ -21,11 +21,10 @@ from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
-    Callable,
-    Iterable,
     Iterator,
     Mapping,
     Optional,
+    Sequence,
     Type,
     Union,
     cast,
@@ -83,15 +82,7 @@ class WorkflowEnvironment:
     async def start_time_skipping(
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[
-            Union[
-                temporalio.client.Interceptor,
-                Callable[
-                    [temporalio.client.OutboundInterceptor],
-                    temporalio.client.OutboundInterceptor,
-                ],
-            ]
-        ] = [],
+        interceptors: Sequence[temporalio.client.Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,

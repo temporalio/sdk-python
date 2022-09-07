@@ -19,12 +19,12 @@ from typing import (
     Callable,
     Dict,
     Generic,
-    Iterable,
     List,
     Mapping,
     MutableMapping,
     NoReturn,
     Optional,
+    Sequence,
     Tuple,
     Type,
     Union,
@@ -276,6 +276,7 @@ class Info:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
+    raw_memo: Mapping[str, temporalio.api.common.v1.Payload]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     run_id: str
     run_timeout: Optional[timedelta]
@@ -285,8 +286,6 @@ class Info:
     task_timeout: timedelta
     workflow_id: str
     workflow_type: str
-
-    # TODO(cretz): memo
 
     def _logger_details(self) -> Mapping[str, Any]:
         return {
@@ -356,6 +355,7 @@ class _Runtime(ABC):
         task_queue: Optional[str],
         run_timeout: Optional[timedelta],
         task_timeout: Optional[timedelta],
+        retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
     ) -> NoReturn:
@@ -389,6 +389,16 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_replaying(self) -> bool:
+        ...
+
+    @abstractmethod
+    def workflow_memo(self) -> Mapping[str, Any]:
+        ...
+
+    @abstractmethod
+    def workflow_memo_value(
+        self, key: str, default: Any, *, type_hint: Optional[Type]
+    ) -> Any:
         ...
 
     @abstractmethod
@@ -513,6 +523,61 @@ def info() -> Info:
     return _Runtime.current().workflow_info()
 
 
+def memo() -> Mapping[str, Any]:
+    """Current workflow's memo values, converted without type hints.
+
+    Since type hints are not used, the default converted values will come back.
+    For example, if the memo was originally created with a dataclass, the value
+    will be a dict. To convert using proper type hints, use
+    :py:func:`memo_value`.
+
+    Returns:
+        Mapping of all memo keys and they values without type hints.
+    """
+    return _Runtime.current().workflow_memo()
+
+
+@overload
+def memo_value(key: str, default: Any = temporalio.common._arg_unset) -> Any:
+    ...
+
+
+@overload
+def memo_value(key: str, *, type_hint: Type[ParamType]) -> ParamType:
+    ...
+
+
+@overload
+def memo_value(
+    key: str, default: AnyType, *, type_hint: Type[ParamType]
+) -> Union[AnyType, ParamType]:
+    ...
+
+
+def memo_value(
+    key: str,
+    default: Any = temporalio.common._arg_unset,
+    *,
+    type_hint: Optional[Type] = None,
+) -> Any:
+    """Memo value for the given key, optional default, and optional type
+    hint.
+
+    Args:
+        key: Key to get memo value for.
+        default: Default to use if key is not present. If unset, a
+            :py:class:`KeyError` is raised when the key does not exist.
+        type_hint: Type hint to use when converting.
+
+    Returns:
+        Memo value, converted with the type hint if present.
+
+    Raises:
+        KeyError: Key not present and default not set.
+    """
+    return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
+
+
 def now() -> datetime:
     """Current time from the workflow perspective.
 
@@ -611,7 +676,7 @@ def uuid4() -> uuid.UUID:
 
 
 async def wait_condition(
-    fn: Callable[[], bool], *, timeout: Optional[float] = None
+    fn: Callable[[], bool], *, timeout: Optional[Union[timedelta, float]] = None
 ) -> None:
     """Wait on a callback to become true.
 
@@ -623,7 +688,10 @@ async def wait_condition(
         timeout: Optional number of seconds to wait until throwing
             :py:class:`asyncio.TimeoutError`.
     """
-    await _Runtime.current().workflow_wait_condition(fn, timeout=timeout)
+    await _Runtime.current().workflow_wait_condition(
+        fn,
+        timeout=timeout.total_seconds() if isinstance(timeout, timedelta) else timeout,
+    )
 
 
 class unsafe:
@@ -1012,7 +1080,7 @@ def start_activity(
 def start_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1030,7 +1098,7 @@ def start_activity(
 def start_activity(
     activity: Callable[..., ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1049,7 +1117,7 @@ def start_activity(
     activity: str,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1066,7 +1134,7 @@ def start_activity(
     activity: Any,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1195,7 +1263,7 @@ async def execute_activity(
 async def execute_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1213,7 +1281,7 @@ async def execute_activity(
 async def execute_activity(
     activity: Callable[..., ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1232,7 +1300,7 @@ async def execute_activity(
     activity: str,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1249,7 +1317,7 @@ async def execute_activity(
     activity: Any,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1354,7 +1422,7 @@ def start_activity_class(
 def start_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1372,7 +1440,7 @@ def start_activity_class(
 def start_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1389,7 +1457,7 @@ def start_activity_class(
     activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1492,7 +1560,7 @@ async def execute_activity_class(
 async def execute_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1510,7 +1578,7 @@ async def execute_activity_class(
 async def execute_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1527,7 +1595,7 @@ async def execute_activity_class(
     activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1630,7 +1698,7 @@ def start_activity_method(
 def start_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1648,7 +1716,7 @@ def start_activity_method(
 def start_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1665,7 +1733,7 @@ def start_activity_method(
     activity: Callable,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1768,7 +1836,7 @@ async def execute_activity_method(
 async def execute_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1786,7 +1854,7 @@ async def execute_activity_method(
 async def execute_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1803,7 +1871,7 @@ async def execute_activity_method(
     activity: Callable,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -1918,7 +1986,7 @@ def start_local_activity(
 def start_local_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1935,7 +2003,7 @@ def start_local_activity(
 def start_local_activity(
     activity: Callable[..., ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1953,7 +2021,7 @@ def start_local_activity(
     activity: str,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1969,7 +2037,7 @@ def start_local_activity(
     activity: Any,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2088,7 +2156,7 @@ async def execute_local_activity(
 async def execute_local_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2105,7 +2173,7 @@ async def execute_local_activity(
 async def execute_local_activity(
     activity: Callable[..., ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2123,7 +2191,7 @@ async def execute_local_activity(
     activity: str,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2139,7 +2207,7 @@ async def execute_local_activity(
     activity: Any,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2238,7 +2306,7 @@ def start_local_activity_class(
 def start_local_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2255,7 +2323,7 @@ def start_local_activity_class(
 def start_local_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2271,7 +2339,7 @@ def start_local_activity_class(
     activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2368,7 +2436,7 @@ async def execute_local_activity_class(
 async def execute_local_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2385,7 +2453,7 @@ async def execute_local_activity_class(
 async def execute_local_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2401,7 +2469,7 @@ async def execute_local_activity_class(
     activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2500,7 +2568,7 @@ def start_local_activity_method(
 def start_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2517,7 +2585,7 @@ def start_local_activity_method(
 def start_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2533,7 +2601,7 @@ def start_local_activity_method(
     activity: Callable,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2630,7 +2698,7 @@ async def execute_local_activity_method(
 async def execute_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2647,7 +2715,7 @@ async def execute_local_activity_method(
 async def execute_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
-    args: Iterable[Any],
+    args: Sequence[Any],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2663,7 +2731,7 @@ async def execute_local_activity_method(
     activity: Callable,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2731,7 +2799,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
             Concatenate[SelfType, MultiParamSpec], Union[Awaitable[None], None]
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
     ) -> None:
         ...
 
@@ -2741,7 +2809,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         signal: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         ...
 
@@ -2750,7 +2818,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         """Signal this child workflow.
 
@@ -2802,7 +2870,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
     and :py:func:`execute_child_workflow`.
     """
 
-    id: str
+    id: Optional[str]
     task_queue: Optional[str]
     namespace: Optional[str]
     cancellation_type: ChildWorkflowCancellationType
@@ -2822,7 +2890,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
 async def start_child_workflow(
     workflow: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2845,7 +2913,7 @@ async def start_child_workflow(
     workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2867,8 +2935,8 @@ async def start_child_workflow(
 async def start_child_workflow(
     workflow: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
-    id: str,
+    args: Sequence[Any],
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2891,8 +2959,8 @@ async def start_child_workflow(
     workflow: str,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
-    id: str,
+    args: Sequence[Any] = [],
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2913,8 +2981,8 @@ async def start_child_workflow(
     workflow: Any,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
-    id: str,
+    args: Sequence[Any] = [],
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -2935,7 +3003,8 @@ async def start_child_workflow(
             for the workflow to start.
         arg: Single argument to the child workflow.
         args: Multiple arguments to the child workflow. Cannot be set if arg is.
-        id: Unique identifier for the workflow execution.
+        id: Optional unique identifier for the workflow execution. If not set,
+            defaults to :py:func:`uuid4`.
         task_queue: Task queue to run the workflow on. Defaults to the current
             workflow's task queue.
         namespace: Namespace to run the child workflow on. Defaults to the
@@ -2959,7 +3028,7 @@ async def start_child_workflow(
     return await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *temporalio.common._arg_or_args(arg, args),
-        id=id,
+        id=id or str(uuid4()),
         task_queue=task_queue,
         namespace=namespace,
         cancellation_type=cancellation_type,
@@ -2980,7 +3049,7 @@ async def start_child_workflow(
 async def execute_child_workflow(
     workflow: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3003,7 +3072,7 @@ async def execute_child_workflow(
     workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    id: str,
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3025,8 +3094,8 @@ async def execute_child_workflow(
 async def execute_child_workflow(
     workflow: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
-    args: Iterable[Any],
-    id: str,
+    args: Sequence[Any],
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3049,8 +3118,8 @@ async def execute_child_workflow(
     workflow: str,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
-    id: str,
+    args: Sequence[Any] = [],
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3071,8 +3140,8 @@ async def execute_child_workflow(
     workflow: Any,
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
-    id: str,
+    args: Sequence[Any] = [],
+    id: Optional[str] = None,
     task_queue: Optional[str] = None,
     namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
@@ -3095,7 +3164,7 @@ async def execute_child_workflow(
     handle = await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *temporalio.common._arg_or_args(arg, args),
-        id=id,
+        id=id or str(uuid4()),
         task_queue=task_queue,
         namespace=namespace,
         cancellation_type=cancellation_type,
@@ -3150,7 +3219,7 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         signal: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         ...
 
@@ -3159,7 +3228,7 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
     ) -> None:
         """Signal this external workflow.
 
@@ -3243,10 +3312,11 @@ class ContinueAsNewError(BaseException):
 def continue_as_new(
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3261,6 +3331,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3276,6 +3347,7 @@ def continue_as_new(
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3287,10 +3359,11 @@ def continue_as_new(
 def continue_as_new(
     *,
     workflow: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[Any]],
-    args: Iterable[Any],
+    args: Sequence[Any],
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3302,10 +3375,11 @@ def continue_as_new(
 def continue_as_new(
     *,
     workflow: str,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3315,11 +3389,12 @@ def continue_as_new(
 def continue_as_new(
     arg: Any = temporalio.common._arg_unset,
     *,
-    args: Iterable[Any] = [],
+    args: Sequence[Any] = [],
     workflow: Union[None, Callable, str] = None,
     task_queue: Optional[str] = None,
     run_timeout: Optional[timedelta] = None,
     task_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
 ) -> NoReturn:
@@ -3354,6 +3429,7 @@ def continue_as_new(
         task_queue=task_queue,
         run_timeout=run_timeout,
         task_timeout=task_timeout,
+        retry_policy=retry_policy,
         memo=memo,
         search_attributes=search_attributes,
     )

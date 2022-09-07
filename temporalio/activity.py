@@ -21,12 +21,13 @@ from functools import partial
 from typing import (
     Any,
     Callable,
-    Iterable,
     Mapping,
     MutableMapping,
     NoReturn,
     Optional,
+    Sequence,
     Tuple,
+    Union,
     overload,
 )
 
@@ -81,7 +82,7 @@ class Info:
     activity_type: str
     attempt: int
     current_attempt_scheduled_time: datetime
-    heartbeat_details: Iterable[Any]
+    heartbeat_details: Sequence[Any]
     heartbeat_timeout: Optional[timedelta]
     is_local: bool
     schedule_to_close_timeout: Optional[timedelta]
@@ -227,7 +228,7 @@ async def wait_for_cancelled() -> None:
     await _Context.current().cancelled_event.wait()
 
 
-def wait_for_cancelled_sync(timeout: Optional[float] = None) -> None:
+def wait_for_cancelled_sync(timeout: Optional[Union[timedelta, float]] = None) -> None:
     """Synchronously block while waiting for a cancellation request on this
     activity.
 
@@ -239,7 +240,9 @@ def wait_for_cancelled_sync(timeout: Optional[float] = None) -> None:
     Raises:
         RuntimeError: When not in an activity.
     """
-    _Context.current().cancelled_event.wait_sync(timeout)
+    _Context.current().cancelled_event.wait_sync(
+        timeout.total_seconds() if isinstance(timeout, timedelta) else timeout
+    )
 
 
 def is_worker_shutdown() -> bool:
@@ -263,7 +266,9 @@ async def wait_for_worker_shutdown() -> None:
     await _Context.current().worker_shutdown_event.wait()
 
 
-def wait_for_worker_shutdown_sync(timeout: Optional[float] = None) -> None:
+def wait_for_worker_shutdown_sync(
+    timeout: Optional[Union[timedelta, float]] = None
+) -> None:
     """Synchronously block while waiting for shutdown to be called on the
     worker.
 
@@ -276,7 +281,9 @@ def wait_for_worker_shutdown_sync(timeout: Optional[float] = None) -> None:
     Raises:
         RuntimeError: When not in an activity.
     """
-    _Context.current().worker_shutdown_event.wait_sync(timeout)
+    _Context.current().worker_shutdown_event.wait_sync(
+        timeout.total_seconds() if isinstance(timeout, timedelta) else timeout
+    )
 
 
 def raise_complete_async() -> NoReturn:

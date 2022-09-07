@@ -44,7 +44,16 @@ def init_telemetry(
 ) -> bool:
     """Initialize telemetry with the given configuration.
 
-    Does nothing if already called.
+    This must be called before any Temporal client is created. Does nothing if
+    already called.
+
+    .. warning::
+        This API is not stable and may change in a future release.
+
+    Args:
+        config: Telemetry config.
+        warn_if_already_inited: If True and telemetry is already initialized,
+            this will emit a warning.
     """
     global _inited
     if _inited:

@@ -12,9 +12,10 @@ base_dir = Path(__file__).parent.parent
 proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
 api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
+health_proto_dir = proto_dir / "grpc"
 testsrv_proto_dir = proto_dir / "testsrv_upstream"
 
-# Exclude testsrv dependencies
+# Exclude testsrv dependencies protos
 proto_paths = (
     v
     for v in proto_dir.glob("**/*.proto")
@@ -77,7 +78,7 @@ def fix_generated_output(base_path: Path):
     with (base_path / "__init__.py").open("w") as f:
         # Add docstring to API's init
         if str(base_path.as_posix()).endswith("/temporal/api"):
-            f.write('"""gRPC API."""\n')
+            f.write('"""Temporal API protobuf models."""\n')
         # Non-gRPC imports
         message_names = []
         for stem, messages in imports.items():
@@ -124,6 +125,7 @@ if __name__ == "__main__":
                 f"--proto_path={api_proto_dir}",
                 f"--proto_path={core_proto_dir}",
                 f"--proto_path={testsrv_proto_dir}",
+                f"--proto_path={health_proto_dir}",
                 f"--python_out={temp_dir}",
                 f"--grpc_python_out={temp_dir}",
                 f"--mypy_out={temp_dir}",
@@ -131,6 +133,9 @@ if __name__ == "__main__":
                 *map(str, proto_paths),
             ]
         )
+        # Remove health gRPC parts
+        (temp_dir / "health" / "v1" / "health_pb2_grpc.py").unlink()
+        (temp_dir / "health" / "v1" / "health_pb2_grpc.pyi").unlink()
         # Apply fixes before moving code
         fix_generated_output(temp_dir)
         # Move protos
@@ -142,4 +147,6 @@ if __name__ == "__main__":
         for p in (temp_dir / "temporal" / "sdk" / "core").iterdir():
             shutil.rmtree(sdk_out_dir / p.name, ignore_errors=True)
             p.replace(sdk_out_dir / p.name)
+        shutil.rmtree(sdk_out_dir / "health", ignore_errors=True)
+        (temp_dir / "health").replace(sdk_out_dir / "health")
     print("Done", file=sys.stderr)

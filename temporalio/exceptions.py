@@ -2,7 +2,7 @@
 
 import traceback
 from enum import IntEnum
-from typing import Any, Awaitable, Callable, Iterable, Optional, Tuple
+from typing import Any, Awaitable, Callable, Optional, Sequence, Tuple
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -17,7 +17,7 @@ class TemporalError(Exception):
     def cause(self) -> Optional[BaseException]:
         """Cause of the exception.
 
-        This is the same as :py:attr:`__cause__`.
+        This is the same as ``Exception.__cause__``.
         """
         return self.__cause__
 
@@ -81,7 +81,7 @@ class ApplicationError(FailureError):
         self._non_retryable = non_retryable
 
     @property
-    def details(self) -> Iterable[Any]:
+    def details(self) -> Sequence[Any]:
         """User-defined details on the error."""
         return self._details
 
@@ -105,7 +105,7 @@ class CancelledError(FailureError):
         self._details = details
 
     @property
-    def details(self) -> Iterable[Any]:
+    def details(self) -> Sequence[Any]:
         """User-defined details on the error."""
         return self._details
 
@@ -119,7 +119,7 @@ class TerminatedError(FailureError):
         self._details = details
 
     @property
-    def details(self) -> Iterable[Any]:
+    def details(self) -> Sequence[Any]:
         """User-defined details on the error."""
         return self._details
 
@@ -147,7 +147,7 @@ class TimeoutError(FailureError):
         message: str,
         *,
         type: Optional[TimeoutType],
-        last_heartbeat_details: Iterable[Any],
+        last_heartbeat_details: Sequence[Any],
     ) -> None:
         """Initialize a timeout error."""
         super().__init__(message)
@@ -160,7 +160,7 @@ class TimeoutError(FailureError):
         return self._type
 
     @property
-    def last_heartbeat_details(self) -> Iterable[Any]:
+    def last_heartbeat_details(self) -> Sequence[Any]:
         """Last heartbeat details if this is for an activity heartbeat."""
         return self._last_heartbeat_details
 

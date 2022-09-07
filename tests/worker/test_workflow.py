@@ -16,11 +16,11 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
     NoReturn,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -662,28 +662,18 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await wait_cancel_complete.wait()
 
 
-@dataclass
-class SimpleChildWorkflowParams:
-    name: str
-    child_id: str
-
-
 @workflow.defn
 class SimpleChildWorkflow:
     @workflow.run
-    async def run(self, params: SimpleChildWorkflowParams) -> str:
-        return await workflow.execute_child_workflow(
-            HelloWorkflow.run, params.name, id=params.child_id
-        )
+    async def run(self, name: str) -> str:
+        return await workflow.execute_child_workflow(HelloWorkflow.run, name)
 
 
 async def test_workflow_simple_child(client: Client):
     async with new_worker(client, SimpleChildWorkflow, HelloWorkflow) as worker:
         result = await client.execute_workflow(
             SimpleChildWorkflow.run,
-            SimpleChildWorkflowParams(
-                name="Temporal", child_id=f"workflow-{uuid.uuid4()}"
-            ),
+            "Temporal",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -1180,7 +1170,7 @@ async def test_workflow_activity_timeout(client: Client):
 
 # Just serializes in a "payloads" wrapper
 class SimpleCodec(PayloadCodec):
-    async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
         wrapper = Payloads(payloads=payloads)
         return [
             Payload(
@@ -1188,7 +1178,7 @@ class SimpleCodec(PayloadCodec):
             )
         ]
 
-    async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
         payloads = list(payloads)
         if len(payloads) != 1:
             raise RuntimeError("Expected only a single payload")
@@ -1262,12 +1252,24 @@ async def test_workflow_with_custom_runner(client: Client):
 class ContinueAsNewWorkflow:
     @workflow.run
     async def run(self, past_run_ids: List[str]) -> List[str]:
+        # Check memo and retry policy
+        assert workflow.memo_value("past_run_id_count") == len(past_run_ids)
+        retry_policy = workflow.info().retry_policy
+        assert retry_policy and retry_policy.maximum_attempts == 1000 + len(
+            past_run_ids
+        )
+
         if len(past_run_ids) == 5:
             return past_run_ids
         info = workflow.info()
         if info.continued_run_id:
             past_run_ids.append(info.continued_run_id)
-        workflow.continue_as_new(past_run_ids)
+        workflow.continue_as_new(
+            past_run_ids,
+            # Add memo and retry policy to check
+            memo={"past_run_id_count": len(past_run_ids)},
+            retry_policy=RetryPolicy(maximum_attempts=1000 + len(past_run_ids)),
+        )
 
 
 async def test_workflow_continue_as_new(client: Client):
@@ -1277,6 +1279,8 @@ async def test_workflow_continue_as_new(client: Client):
             cast(List[str], []),
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            memo={"past_run_id_count": 0},
+            retry_policy=RetryPolicy(maximum_attempts=1000),
         )
         result = await handle.result()
         assert len(result) == 5
@@ -2228,10 +2232,94 @@ async def test_workflow_query_rpc_timeout(client: Client):
     ) or err.value.status == RPCStatusCode.DEADLINE_EXCEEDED
 
 
+@dataclass
+class TypedHandleResponse:
+    field1: str
+
+
+@workflow.defn
+class TypedHandleWorkflow:
+    @workflow.run
+    async def run(self) -> TypedHandleResponse:
+        return TypedHandleResponse(field1="foo")
+
+
+async def test_workflow_typed_handle(client: Client):
+    async with new_worker(client, TypedHandleWorkflow) as worker:
+        # Run the workflow then get a typed handle for it and confirm response
+        # type is as expected
+        id = f"workflow-{uuid.uuid4()}"
+        await client.execute_workflow(
+            TypedHandleWorkflow.run, id=id, task_queue=worker.task_queue
+        )
+        handle_result = await client.get_workflow_handle_for(
+            TypedHandleWorkflow.run, id
+        ).result()
+        assert isinstance(handle_result, TypedHandleResponse)
+
+
+@dataclass
+class MemoValue:
+    field1: str
+
+
+@workflow.defn
+class MemoWorkflow:
+    @workflow.run
+    async def run(self, run_child: bool) -> None:
+        # Check untyped memo
+        assert workflow.memo()["my_memo"] == {"field1": "foo"}
+        # Check typed memo
+        assert workflow.memo_value("my_memo", type_hint=MemoValue) == MemoValue(
+            field1="foo"
+        )
+        # Check default
+        assert workflow.memo_value("absent_memo", "blah") == "blah"
+        # Check key error
+        try:
+            workflow.memo_value("absent_memo")
+            assert False
+        except KeyError:
+            pass
+        # Run child if requested
+        if run_child:
+            await workflow.execute_child_workflow(
+                MemoWorkflow.run, False, memo=workflow.memo()
+            )
+
+
+async def test_workflow_memo(client: Client):
+    async with new_worker(client, MemoWorkflow) as worker:
+        # Run workflow
+        handle = await client.start_workflow(
+            MemoWorkflow.run,
+            True,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            memo={"my_memo": MemoValue(field1="foo")},
+        )
+        await handle.result()
+        desc = await handle.describe()
+        # Check untyped memo
+        assert (await desc.memo())["my_memo"] == {"field1": "foo"}
+        # Check typed memo
+        assert (await desc.memo_value("my_memo", type_hint=MemoValue)) == MemoValue(
+            field1="foo"
+        )
+        # Check default
+        assert (await desc.memo_value("absent_memo", "blah")) == "blah"
+        # Check key error
+        try:
+            await desc.memo_value("absent_memo")
+            assert False
+        except KeyError:
+            pass
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
-    activities: Iterable[Callable] = [],
+    activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
     workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
 ) -> Worker:

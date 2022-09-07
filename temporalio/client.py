@@ -12,9 +12,9 @@ from typing import (
     Awaitable,
     Callable,
     Generic,
-    Iterable,
     Mapping,
     Optional,
+    Sequence,
     Type,
     Union,
     cast,
@@ -37,6 +37,7 @@ import temporalio.workflow
 from temporalio.service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
 
 from .types import (
+    AnyType,
     LocalReturnType,
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
@@ -64,9 +65,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[
-            Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
-        ] = [],
+        interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -74,11 +73,12 @@ class Client:
         retry_config: Optional[RetryConfig] = None,
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
+        lazy: bool = False,
     ) -> Client:
         """Connect to a Temporal server.
 
         Args:
-            target_host: `host:port` for the Temporal server. For local
+            target_host: ``host:port`` for the Temporal server. For local
                 development, this is often "localhost:7233".
             namespace: Namespace to use for client calls.
             data_converter: Data converter to use for all data conversions
@@ -103,9 +103,12 @@ class Client:
                 opt-in to retries by default). If unset, a default retry
                 configuration is used.
             rpc_metadata: Headers to use for all calls to the server. Keys here
-                always override per-call RPC metadata keys.
+                can be overriden by per-call RPC metadata keys.
             identity: Identity for this client. If unset, a default is created
                 based on the version of the SDK.
+            lazy: If true, the client will not connect until the first call is
+                attempted or a worker is created with it. Lazy clients cannot be
+                used for workers.
         """
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
@@ -113,6 +116,7 @@ class Client:
             retry_config=retry_config,
             rpc_metadata=rpc_metadata,
             identity=identity or "",
+            lazy=lazy,
         )
         return Client(
             await temporalio.service.ServiceClient.connect(connect_config),
@@ -128,9 +132,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
-        interceptors: Iterable[
-            Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
-        ] = [],
+        interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -143,12 +145,7 @@ class Client:
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
         for interceptor in reversed(list(interceptors)):
-            if isinstance(interceptor, Interceptor):
-                self._impl = interceptor.intercept_client(self._impl)
-            elif callable(interceptor):
-                self._impl = interceptor(self._impl)
-            else:
-                raise TypeError("interceptor neither OutboundInterceptor nor callable")
+            self._impl = interceptor.intercept_client(self._impl)
 
         # Store the config for tracking
         self._config = ClientConfig(
@@ -220,7 +217,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -244,7 +241,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -258,7 +255,7 @@ class Client:
             Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -270,7 +267,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
@@ -283,7 +280,7 @@ class Client:
         workflow: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -295,7 +292,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[Any, Any]:
@@ -306,7 +303,7 @@ class Client:
         workflow: Union[str, Callable[..., Awaitable[Any]]],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -318,7 +315,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHandle[Any, Any]:
@@ -344,8 +341,8 @@ class Client:
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
                 present.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
@@ -406,7 +403,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
@@ -430,7 +427,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
@@ -444,7 +441,7 @@ class Client:
             Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -456,7 +453,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
@@ -469,7 +466,7 @@ class Client:
         workflow: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -481,7 +478,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
@@ -492,7 +489,7 @@ class Client:
         workflow: Union[str, Callable[..., Awaitable[Any]]],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         execution_timeout: Optional[timedelta] = None,
@@ -504,7 +501,7 @@ class Client:
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
         start_signal: Optional[str] = None,
-        start_signal_args: Iterable[Any] = [],
+        start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
@@ -543,6 +540,7 @@ class Client:
         *,
         run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
+        result_type: Optional[Type] = None,
     ) -> WorkflowHandle[Any, Any]:
         """Get a workflow handle to an existing workflow by its ID.
 
@@ -551,6 +549,7 @@ class Client:
             run_id: Run ID that will be used for all calls.
             first_execution_run_id: First execution run ID used for cancellation
                 and termination.
+            result_type: The result type to deserialize into if known.
 
         Returns:
             The workflow handle.
@@ -561,6 +560,7 @@ class Client:
             run_id=run_id,
             result_run_id=run_id,
             first_execution_run_id=first_execution_run_id,
+            result_type=result_type,
         )
 
     def get_workflow_handle_for(
@@ -576,8 +576,7 @@ class Client:
     ) -> WorkflowHandle[SelfType, ReturnType]:
         """Get a typed workflow handle to an existing workflow by its ID.
 
-        This is the same as :py:meth:`get_workflow_handle` but typed. Note, the
-        workflow type given is not validated, it is only for typing.
+        This is the same as :py:meth:`get_workflow_handle` but typed.
 
         Args:
             workflow: The workflow run method to use for typing the handle.
@@ -589,8 +588,13 @@ class Client:
         Returns:
             The workflow handle.
         """
+        defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
+        _, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
         return self.get_workflow_handle(
-            workflow_id, run_id=run_id, first_execution_run_id=first_execution_run_id
+            workflow_id,
+            run_id=run_id,
+            first_execution_run_id=first_execution_run_id,
+            result_type=ret_type,
         )
 
     @overload
@@ -652,9 +656,7 @@ class ClientConfig(TypedDict, total=False):
     service_client: temporalio.service.ServiceClient
     namespace: str
     data_converter: temporalio.converter.DataConverter
-    interceptors: Iterable[
-        Union[Interceptor, Callable[[OutboundInterceptor], OutboundInterceptor]]
-    ]
+    interceptors: Sequence[Interceptor]
     default_workflow_query_reject_condition: Optional[
         temporalio.common.QueryRejectCondition
     ]
@@ -750,8 +752,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             follow_runs: If true (default), workflow runs will be continually
                 fetched, until the most recent one is found. If false, the first
                 result is used.
-            rpc_metadata: Headers used on each RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call. Note,
                 this is the timeout for each history RPC call not this overall
                 function.
@@ -891,8 +893,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             workflow ID even if it is unrelated to the started workflow.
 
         Args:
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
@@ -926,8 +928,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             unrelated to the started workflow.
 
         Args:
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
@@ -979,7 +981,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             Union[Awaitable[LocalReturnType], LocalReturnType],
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -993,7 +995,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         query: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1005,7 +1007,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         query: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1027,8 +1029,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             args: Multiple arguments to the query. Cannot be set if arg is.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
@@ -1101,7 +1103,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             Concatenate[SelfType, MultiParamSpec], Union[Awaitable[None], None]
         ],
         *,
-        args: Iterable[Any],
+        args: Sequence[Any],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1114,7 +1116,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         signal: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1125,7 +1127,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         signal: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        args: Iterable[Any] = [],
+        args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1144,8 +1146,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             signal: Signal function or name on the workflow.
             arg: Single argument to the signal.
             args: Multiple arguments to the signal. Cannot be set if arg is.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
@@ -1187,8 +1189,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Args:
             args: Details to store on the termination.
             reason: Reason for the termination.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
@@ -1236,8 +1238,8 @@ class AsyncActivityHandle:
 
         Args:
             details: Details of the heartbeat.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.heartbeat_async_activity(
@@ -1260,8 +1262,8 @@ class AsyncActivityHandle:
 
         Args:
             result: Result of the activity.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.complete_async_activity(
@@ -1277,7 +1279,7 @@ class AsyncActivityHandle:
         self,
         error: Exception,
         *,
-        last_heartbeat_details: Iterable[Any] = [],
+        last_heartbeat_details: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -1286,8 +1288,8 @@ class AsyncActivityHandle:
         Args:
             error: Error for the activity.
             last_heartbeat_details: Last heartbeat details for the activity.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.fail_async_activity(
@@ -1310,8 +1312,8 @@ class AsyncActivityHandle:
 
         Args:
             details: Cancellation details.
-            rpc_metadata: Headers used on the RPC call. Keys here are always
-                overridden by client-level RPC metadata keys.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.report_cancellation_async_activity(
@@ -1331,6 +1333,9 @@ class WorkflowExecutionDescription:
     close_time: Optional[datetime]
     """When the workflow was closed if closed."""
 
+    data_converter: temporalio.converter.DataConverter
+    """Data converter from when this description was created."""
+
     execution_time: Optional[datetime]
     """When this workflow run started or should start."""
 
@@ -1339,9 +1344,6 @@ class WorkflowExecutionDescription:
 
     id: str
     """ID for the workflow."""
-
-    memo: Mapping[str, Any]
-    """Memo values on the workflow if any."""
 
     parent_id: Optional[str]
     """ID for the parent workflow if this was started as a child."""
@@ -1382,6 +1384,7 @@ class WorkflowExecutionDescription:
             )
             if raw.workflow_execution_info.HasField("close_time")
             else None,
+            data_converter=converter,
             execution_time=raw.workflow_execution_info.execution_time.ToDatetime().replace(
                 tzinfo=timezone.utc
             )
@@ -1389,10 +1392,6 @@ class WorkflowExecutionDescription:
             else None,
             history_length=raw.workflow_execution_info.history_length,
             id=raw.workflow_execution_info.execution.workflow_id,
-            memo={
-                k: (await converter.decode([v]))[0]
-                for k, v in raw.workflow_execution_info.memo.fields.items()
-            },
             parent_id=raw.workflow_execution_info.parent_execution.workflow_id
             if raw.workflow_execution_info.HasField("parent_execution")
             else None,
@@ -1414,6 +1413,71 @@ class WorkflowExecutionDescription:
             workflow_type=raw.workflow_execution_info.type.name,
         )
 
+    async def memo(self) -> Mapping[str, Any]:
+        """Workflow's memo values, converted without type hints.
+
+        Since type hints are not used, the default converted values will come
+        back. For example, if the memo was originally created with a dataclass,
+        the value will be a dict. To convert using proper type hints, use
+        :py:meth:`memo_value`.
+
+        Returns:
+            Mapping of all memo keys and they values without type hints.
+        """
+        return {
+            k: (await self.data_converter.decode([v]))[0]
+            for k, v in self.raw.workflow_execution_info.memo.fields.items()
+        }
+
+    @overload
+    async def memo_value(
+        self, key: str, default: Any = temporalio.common._arg_unset
+    ) -> Any:
+        ...
+
+    @overload
+    async def memo_value(self, key: str, *, type_hint: Type[ParamType]) -> ParamType:
+        ...
+
+    @overload
+    async def memo_value(
+        self, key: str, default: AnyType, *, type_hint: Type[ParamType]
+    ) -> Union[AnyType, ParamType]:
+        ...
+
+    async def memo_value(
+        self,
+        key: str,
+        default: Any = temporalio.common._arg_unset,
+        *,
+        type_hint: Optional[Type] = None,
+    ) -> Any:
+        """Memo value for the given key, optional default, and optional type
+        hint.
+
+        Args:
+            key: Key to get memo value for.
+            default: Default to use if key is not present. If unset, a
+                :py:class:`KeyError` is raised when the key does not exist.
+            type_hint: Type hint to use when converting.
+
+        Returns:
+            Memo value, converted with the type hint if present.
+
+        Raises:
+            KeyError: Key not present and default not set.
+        """
+        payload = self.raw.workflow_execution_info.memo.fields.get(key)
+        if not payload:
+            if default is temporalio.common._arg_unset:
+                raise KeyError(f"Memo does not have a value for key {key}")
+            return default
+        return (
+            await self.data_converter.decode(
+                [payload], [type_hint] if type_hint else None
+            )
+        )[0]
+
 
 class WorkflowExecutionStatus(IntEnum):
     """Status of a workflow execution.
@@ -1424,37 +1488,24 @@ class WorkflowExecutionStatus(IntEnum):
     RUNNING = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING`."""
-
     COMPLETED = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_COMPLETED`."""
-
     FAILED = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_FAILED
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_FAILED`."""
-
     CANCELED = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CANCELED
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CANCELED`."""
-
     TERMINATED = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TERMINATED
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TERMINATED`."""
-
     CONTINUED_AS_NEW = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW`."""
-
     TIMED_OUT = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT`."""
 
 
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
@@ -1512,7 +1563,7 @@ class StartWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow`."""
 
     workflow: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     id: str
     task_queue: str
     execution_timeout: Optional[timedelta]
@@ -1525,7 +1576,7 @@ class StartWorkflowInput:
     search_attributes: Optional[temporalio.common.SearchAttributes]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
-    start_signal_args: Iterable[Any]
+    start_signal_args: Sequence[Any]
     # Type may be absent
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
@@ -1560,7 +1611,7 @@ class QueryWorkflowInput:
     id: str
     run_id: Optional[str]
     query: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     reject_condition: Optional[temporalio.common.QueryRejectCondition]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     # Type may be absent
@@ -1576,7 +1627,7 @@ class SignalWorkflowInput:
     id: str
     run_id: Optional[str]
     signal: str
-    args: Iterable[Any]
+    args: Sequence[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
@@ -1589,7 +1640,7 @@ class TerminateWorkflowInput:
     id: str
     run_id: Optional[str]
     first_execution_run_id: Optional[str]
-    args: Iterable[Any]
+    args: Sequence[Any]
     reason: Optional[str]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
@@ -1600,7 +1651,7 @@ class HeartbeatAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.heartbeat_async_activity`."""
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
-    details: Iterable[Any]
+    details: Sequence[Any]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -1621,7 +1672,7 @@ class FailAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     error: Exception
-    last_heartbeat_details: Iterable[Any]
+    last_heartbeat_details: Sequence[Any]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -1631,7 +1682,7 @@ class ReportCancellationAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.report_cancellation_async_activity`."""
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
-    details: Iterable[Any]
+    details: Sequence[Any]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 

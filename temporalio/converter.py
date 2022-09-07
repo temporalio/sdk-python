@@ -17,10 +17,10 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -42,7 +42,7 @@ class PayloadConverter(ABC):
 
     @abstractmethod
     def to_payloads(
-        self, values: Iterable[Any]
+        self, values: Sequence[Any]
     ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
@@ -62,7 +62,7 @@ class PayloadConverter(ABC):
     @abstractmethod
     def from_payloads(
         self,
-        payloads: Iterable[temporalio.api.common.v1.Payload],
+        payloads: Sequence[temporalio.api.common.v1.Payload],
         type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode payloads into values.
@@ -84,7 +84,7 @@ class PayloadConverter(ABC):
         raise NotImplementedError
 
     def to_payloads_wrapper(
-        self, values: Iterable[Any]
+        self, values: Sequence[Any]
     ) -> temporalio.api.common.v1.Payloads:
         """:py:meth:`to_payloads` for the
         :py:class:`temporalio.api.common.v1.Payloads` wrapper.
@@ -138,8 +138,8 @@ class EncodingPayloadConverter(ABC):
 
         Args:
             payload: Payload to convert to Python value.
-            type_hints: Type that is expected if any. This may not have a type
-                if there are no annotations on the target.
+            type_hint: Type that is expected if any. This may not have a type if
+                there are no annotations on the target.
 
         Return:
             The decoded value from the payload. Since the encoding is checked by
@@ -174,7 +174,7 @@ class CompositePayloadConverter(PayloadConverter):
         self.converters = {c.encoding.encode(): c for c in converters}
 
     def to_payloads(
-        self, values: Iterable[Any]
+        self, values: Sequence[Any]
     ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values trying each converter.
 
@@ -201,7 +201,7 @@ class CompositePayloadConverter(PayloadConverter):
 
     def from_payloads(
         self,
-        payloads: Iterable[temporalio.api.common.v1.Payload],
+        payloads: Sequence[temporalio.api.common.v1.Payload],
         type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode values trying each converter.
@@ -488,7 +488,7 @@ class PayloadCodec(ABC):
 
     @abstractmethod
     async def encode(
-        self, payloads: Iterable[temporalio.api.common.v1.Payload]
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> List[temporalio.api.common.v1.Payload]:
         """Encode the given payloads.
 
@@ -504,7 +504,7 @@ class PayloadCodec(ABC):
 
     @abstractmethod
     async def decode(
-        self, payloads: Iterable[temporalio.api.common.v1.Payload]
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> List[temporalio.api.common.v1.Payload]:
         """Decode the given payloads.
 
@@ -561,7 +561,7 @@ class DataConverter:
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
 
     async def encode(
-        self, values: Iterable[Any]
+        self, values: Sequence[Any]
     ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
@@ -582,7 +582,7 @@ class DataConverter:
 
     async def decode(
         self,
-        payloads: Iterable[temporalio.api.common.v1.Payload],
+        payloads: Sequence[temporalio.api.common.v1.Payload],
         type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode payloads into values.
@@ -600,7 +600,7 @@ class DataConverter:
         return self.payload_converter.from_payloads(payloads, type_hints)
 
     async def encode_wrapper(
-        self, values: Iterable[Any]
+        self, values: Sequence[Any]
     ) -> temporalio.api.common.v1.Payloads:
         """:py:meth:`encode` for the
         :py:class:`temporalio.api.common.v1.Payloads` wrapper.

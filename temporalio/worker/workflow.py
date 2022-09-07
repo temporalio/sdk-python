@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 import os
 from datetime import timezone
-from typing import Callable, Dict, Iterable, List, MutableMapping, Optional, Type
+from typing import Callable, Dict, List, MutableMapping, Optional, Sequence, Type
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -46,11 +46,11 @@ class _WorkflowWorker:
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         namespace: str,
         task_queue: str,
-        workflows: Iterable[Type],
+        workflows: Sequence[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor],
         workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
-        interceptors: Iterable[Interceptor],
+        interceptors: Sequence[Interceptor],
         debug_mode: bool,
         fail_on_eviction: bool = False,
     ) -> None:
@@ -310,6 +310,7 @@ class _WorkflowWorker:
             headers=dict(start.headers),
             namespace=self._namespace,
             parent=parent,
+            raw_memo=dict(start.memo.fields),
             retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
             if start.HasField("retry_policy")
             else None,

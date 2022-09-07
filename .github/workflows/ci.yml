@@ -59,17 +59,8 @@ jobs:
         run: poe gen-docs
       - name: Deploy prod API docs
         if: ${{ github.ref == 'refs/heads/main' && matrix.docsTarget }}
-        uses: netlify/actions/cli@master
-        with:
-          args: deploy --dir=build/apidocs --prod
-        env:
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-      - name: Deploy draft API docs
-        if: ${{ github.ref != 'refs/heads/main' && matrix.docsTarget }}
-        uses: netlify/actions/cli@master
-        with:
-          args: deploy --dir=build/apidocs
+        # Using NPX instead of action due to https://github.com/netlify/actions/issues/60
+        run: npx netlify-cli deploy --build --dir=build/apidocs --prod
         env:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
