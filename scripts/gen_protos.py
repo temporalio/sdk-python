@@ -78,7 +78,7 @@ def fix_generated_output(base_path: Path):
     with (base_path / "__init__.py").open("w") as f:
         # Add docstring to API's init
         if str(base_path.as_posix()).endswith("/temporal/api"):
-            f.write('"""gRPC API."""\n')
+            f.write('"""Temporal API protobuf models."""\n')
         # Non-gRPC imports
         message_names = []
         for stem, messages in imports.items():
