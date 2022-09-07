@@ -98,17 +98,12 @@ class WorkflowIDReusePolicy(IntEnum):
     ALLOW_DUPLICATE = int(
         temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE`."""
-
     ALLOW_DUPLICATE_FAILED_ONLY = int(
         temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY`."""
-
     REJECT_DUPLICATE = int(
         temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE
     )
-    """See :py:attr:`temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE`."""
 
 
 class QueryRejectCondition(IntEnum):
@@ -118,17 +113,12 @@ class QueryRejectCondition(IntEnum):
     """
 
     NONE = int(temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NONE)
-    """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NONE`."""
-
     NOT_OPEN = int(
         temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_OPEN
     )
-    """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_OPEN`."""
-
     NOT_COMPLETED_CLEANLY = int(
         temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY
     )
-    """See :py:attr:`temporalio.api.enums.v1.QueryRejectCondition.QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY`."""
 
 
 # We choose to make this a list instead of an sequence so we can catch if people

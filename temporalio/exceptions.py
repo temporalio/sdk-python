@@ -17,7 +17,7 @@ class TemporalError(Exception):
     def cause(self) -> Optional[BaseException]:
         """Cause of the exception.
 
-        This is the same as :py:attr:`__cause__`.
+        This is the same as ``Exception.__cause__``.
         """
         return self.__cause__
 

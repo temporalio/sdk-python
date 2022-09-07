@@ -138,8 +138,8 @@ class EncodingPayloadConverter(ABC):
 
         Args:
             payload: Payload to convert to Python value.
-            type_hints: Type that is expected if any. This may not have a type
-                if there are no annotations on the target.
+            type_hint: Type that is expected if any. This may not have a type if
+                there are no annotations on the target.
 
         Return:
             The decoded value from the payload. Since the encoding is checked by

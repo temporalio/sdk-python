@@ -651,7 +651,7 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
         Args:
             req: Request for the call.
             retry: If true, will use retry config to retry failed calls.
-            rpc_metadata: Headers used on the RPC call. Keys here override
+            metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             timeout: Optional RPC deadline to set for the RPC call.
 
