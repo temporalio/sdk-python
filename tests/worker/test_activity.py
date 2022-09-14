@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Iterable, List, Optional
+from typing import Any, Callable, List, Optional, Sequence
 
 import pytest
 
@@ -26,6 +26,7 @@ from temporalio.exceptions import (
     TimeoutError,
     TimeoutType,
 )
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import SharedStateManager, Worker, WorkerConfig
 from tests.helpers.worker import (
     ExternalWorker,
@@ -74,7 +75,14 @@ async def test_activity_custom_name(client: Client, worker: ExternalWorker):
     assert result.result == "Name: my custom activity name!"
 
 
-async def test_activity_info(client: Client, worker: ExternalWorker):
+async def test_activity_info(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1426"
+        )
     # Make sure info call outside of activity context fails
     assert not activity.in_activity()
     with pytest.raises(RuntimeError) as err:
@@ -218,7 +226,7 @@ async def test_activity_cancel_catch(client: Client, worker: ExternalWorker):
     async def wait_cancel() -> str:
         try:
             while True:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.3)
                 activity.heartbeat()
         except asyncio.CancelledError:
             return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
@@ -238,7 +246,7 @@ async def test_activity_cancel_throw(client: Client, worker: ExternalWorker):
     @activity.defn
     async def wait_cancel() -> str:
         while True:
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.3)
             activity.heartbeat()
 
     with pytest.raises(WorkflowFailureError) as err:
@@ -250,10 +258,8 @@ async def test_activity_cancel_throw(client: Client, worker: ExternalWorker):
             wait_for_cancellation=True,
             heartbeat_timeout_ms=1000,
         )
-    # TODO(cretz): This is a side effect of Go where returning the activity
-    # cancel looks like a workflow cancel. Change assertion if/when on another
-    # lang.
-    assert isinstance(err.value.cause, CancelledError)
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, CancelledError)
 
 
 async def test_sync_activity_thread_cancel(client: Client, worker: ExternalWorker):
@@ -354,7 +360,6 @@ async def test_max_concurrent_activities(client: Client, worker: ExternalWorker)
         )
     timeout = assert_activity_error(err.value)
     assert isinstance(timeout, TimeoutError)
-    assert str(timeout) == "activity ScheduleToStart timeout"
     assert timeout.type == TimeoutType.SCHEDULE_TO_START
 
 
@@ -437,8 +442,14 @@ async def test_activity_heartbeat_details_converter_fail(
 
 
 async def test_activity_heartbeat_details_timeout(
-    client: Client, worker: ExternalWorker
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1427"
+        )
+
     @activity.defn
     async def some_activity() -> str:
         activity.heartbeat("some details!")
@@ -599,7 +610,7 @@ async def test_activity_worker_shutdown(client: Client, worker: ExternalWorker):
         activity_started.set()
         try:
             while True:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.3)
                 activity.heartbeat()
         except asyncio.CancelledError:
             return "Properly cancelled"
@@ -822,8 +833,9 @@ async def test_activity_async_cancel(
     )
     with pytest.raises(WorkflowFailureError) as err:
         await task
-    assert isinstance(err.value.cause, CancelledError)
-    assert list(err.value.cause.details) == ["cancel details"]
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, CancelledError)
+    assert list(err.value.cause.cause.details) == ["cancel details"]
 
 
 @dataclass
@@ -847,7 +859,7 @@ async def _execute_workflow_with_activity(
     wait_for_cancellation: Optional[bool] = None,
     heartbeat_timeout_ms: Optional[int] = None,
     retry_max_attempts: Optional[int] = None,
-    non_retryable_error_types: Optional[Iterable[str]] = None,
+    non_retryable_error_types: Optional[Sequence[str]] = None,
     worker_config: WorkerConfig = {},
     on_complete: Optional[Callable[[], None]] = None,
     activity_name_override: Optional[str] = None,

@@ -2,7 +2,7 @@ import asyncio
 import multiprocessing
 import os
 import sys
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -22,14 +22,23 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
     ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
 
 from temporalio.client import Client
-from tests.helpers.server import ExternalGolangServer, ExternalServer
-from tests.helpers.worker import ExternalGolangWorker, ExternalWorker
+from temporalio.testing import WorkflowEnvironment
+from tests.helpers.golang import ExternalGolangServer
+from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 # Due to https://github.com/python/cpython/issues/77906, multiprocessing on
 # macOS starting with Python 3.8 has changed from "fork" to "spawn". For
 # pre-3.8, we are changing it for them.
 if sys.version_info < (3, 8) and sys.platform.startswith("darwin"):
     multiprocessing.set_start_method("spawn", True)
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--workflow-environment",
+        default="local",
+        help="Which workflow environment to use ('local', 'time-skipping', or target to existing server)",
+    )
 
 
 @pytest.fixture(scope="session")
@@ -47,29 +56,34 @@ def event_loop():
 
 
 @pytest_asyncio.fixture(scope="session")
-async def server() -> AsyncGenerator[ExternalServer, None]:
-    # TODO(cretz): More options such as our test server
+async def golang_server() -> AsyncGenerator[ExternalGolangServer, None]:
     server = await ExternalGolangServer.start()
     yield server
     await server.close()
 
 
-@pytest_asyncio.fixture
-async def client(server: ExternalServer) -> Client:
-    return await server.new_client()
+@pytest_asyncio.fixture(scope="session")
+async def env(request) -> AsyncGenerator[WorkflowEnvironment, None]:
+    env_type = request.config.getoption("--workflow-environment")
+    if env_type == "local":
+        env = await WorkflowEnvironment.start_local()
+    elif env_type == "time-skipping":
+        env = await WorkflowEnvironment.start_time_skipping()
+    else:
+        env = WorkflowEnvironment.from_client(await Client.connect(env_type))
+    yield env
+    await env.shutdown()
 
 
 @pytest_asyncio.fixture
-async def tls_client(
-    server: ExternalServer,
-) -> Optional[Client]:
-    return await server.new_tls_client()
+async def client(env: WorkflowEnvironment) -> Client:
+    return env.client
 
 
 @pytest_asyncio.fixture(scope="session")
 async def worker(
-    server: ExternalServer,
+    env: WorkflowEnvironment,
 ) -> AsyncGenerator[ExternalWorker, None]:
-    worker = await ExternalGolangWorker.start(server.host_port, server.namespace)
+    worker = ExternalPythonWorker(env)
     yield worker
     await worker.close()
