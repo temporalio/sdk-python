@@ -91,7 +91,6 @@ class WorkflowEnvironment:
         temporalite_existing_path: Optional[str] = None,
         temporalite_database_filename: Optional[str] = None,
         temporalite_log_format: str = "pretty",
-        # TODO(cretz): Document that you can set to None to translate from Python level
         temporalite_log_level: Optional[str] = "warn",
         temporalite_download_version: str = "default",
         temporalite_extra_args: Sequence[str] = [],
