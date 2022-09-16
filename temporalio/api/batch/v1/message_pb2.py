@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -29,59 +28,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n#temporal/api/batch/v1/message.proto\x12\x15temporal.api.batch.v1\x1a!dependencies/gogoproto/gogo.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a+temporal/api/enums/v1/batch_operation.proto"\xcb\x01\n\x12\x42\x61tchOperationInfo\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x39\n\x05state\x18\x02 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12\x34\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x34\n\nclose_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01"p\n\x19\x42\x61tchOperationTermination\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t"\x99\x01\n\x14\x42\x61tchOperationSignal\x12\x0e\n\x06signal\x18\x01 \x01(\t\x12/\n\x05input\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x10\n\x08identity\x18\x04 \x01(\t">\n\x1a\x42\x61tchOperationCancellation\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\tB\x80\x01\n\x18io.temporal.api.batch.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/batch/v1;batch\xaa\x02\x15Temporal.Api.Batch.V1\xea\x02\x18Temporal::Api::Batch::V1b\x06proto3'
 )
 
-
-_BATCHOPERATIONINFO = DESCRIPTOR.message_types_by_name["BatchOperationInfo"]
-_BATCHOPERATIONTERMINATION = DESCRIPTOR.message_types_by_name[
-    "BatchOperationTermination"
-]
-_BATCHOPERATIONSIGNAL = DESCRIPTOR.message_types_by_name["BatchOperationSignal"]
-_BATCHOPERATIONCANCELLATION = DESCRIPTOR.message_types_by_name[
-    "BatchOperationCancellation"
-]
-BatchOperationInfo = _reflection.GeneratedProtocolMessageType(
-    "BatchOperationInfo",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _BATCHOPERATIONINFO,
-        "__module__": "temporal.api.batch.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationInfo)
-    },
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "temporal.api.batch.v1.message_pb2", globals()
 )
-_sym_db.RegisterMessage(BatchOperationInfo)
-
-BatchOperationTermination = _reflection.GeneratedProtocolMessageType(
-    "BatchOperationTermination",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _BATCHOPERATIONTERMINATION,
-        "__module__": "temporal.api.batch.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationTermination)
-    },
-)
-_sym_db.RegisterMessage(BatchOperationTermination)
-
-BatchOperationSignal = _reflection.GeneratedProtocolMessageType(
-    "BatchOperationSignal",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _BATCHOPERATIONSIGNAL,
-        "__module__": "temporal.api.batch.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationSignal)
-    },
-)
-_sym_db.RegisterMessage(BatchOperationSignal)
-
-BatchOperationCancellation = _reflection.GeneratedProtocolMessageType(
-    "BatchOperationCancellation",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _BATCHOPERATIONCANCELLATION,
-        "__module__": "temporal.api.batch.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationCancellation)
-    },
-)
-_sym_db.RegisterMessage(BatchOperationCancellation)
-
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None

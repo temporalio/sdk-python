@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -46,31 +45,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n&temporal/sdk/core/core_interface.proto\x12\x07\x63oresdk\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a\x37temporal/sdk/core/activity_result/activity_result.proto\x1a\x33temporal/sdk/core/activity_task/activity_task.proto\x1a%temporal/sdk/core/common/common.proto\x1a\x33temporal/sdk/core/external_data/external_data.proto\x1a?temporal/sdk/core/workflow_activation/workflow_activation.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto\x1a?temporal/sdk/core/workflow_completion/workflow_completion.proto"Y\n\x11\x41\x63tivityHeartbeat\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload"n\n\x16\x41\x63tivityTaskCompletion\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12@\n\x06result\x18\x02 \x01(\x0b\x32\x30.coresdk.activity_result.ActivityExecutionResultb\x06proto3'
 )
 
-
-_ACTIVITYHEARTBEAT = DESCRIPTOR.message_types_by_name["ActivityHeartbeat"]
-_ACTIVITYTASKCOMPLETION = DESCRIPTOR.message_types_by_name["ActivityTaskCompletion"]
-ActivityHeartbeat = _reflection.GeneratedProtocolMessageType(
-    "ActivityHeartbeat",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _ACTIVITYHEARTBEAT,
-        "__module__": "temporal.sdk.core.core_interface_pb2"
-        # @@protoc_insertion_point(class_scope:coresdk.ActivityHeartbeat)
-    },
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "temporal.sdk.core.core_interface_pb2", globals()
 )
-_sym_db.RegisterMessage(ActivityHeartbeat)
-
-ActivityTaskCompletion = _reflection.GeneratedProtocolMessageType(
-    "ActivityTaskCompletion",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _ACTIVITYTASKCOMPLETION,
-        "__module__": "temporal.sdk.core.core_interface_pb2"
-        # @@protoc_insertion_point(class_scope:coresdk.ActivityTaskCompletion)
-    },
-)
-_sym_db.RegisterMessage(ActivityTaskCompletion)
-
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None

@@ -24,7 +24,6 @@ __all__ = [
 try:
     import grpc
 
-    from .service_pb2_grpc import TestService  # type: ignore
     from .service_pb2_grpc import (
         TestServiceServicer,
         TestServiceStub,
@@ -32,12 +31,7 @@ try:
     )
 
     __all__.extend(
-        [
-            "TestService",
-            "TestServiceServicer",
-            "TestServiceStub",
-            "add_TestServiceServicer_to_server",
-        ]
+        ["TestServiceServicer", "TestServiceStub", "add_TestServiceServicer_to_server"]
     )
 except ImportError:
     pass

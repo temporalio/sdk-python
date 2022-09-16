@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -27,45 +26,12 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n?temporal/sdk/core/workflow_completion/workflow_completion.proto\x12\x1b\x63oresdk.workflow_completion\x1a%temporal/api/failure/v1/message.proto\x1a%temporal/sdk/core/common/common.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto"\xac\x01\n\x1cWorkflowActivationCompletion\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12:\n\nsuccessful\x18\x02 \x01(\x0b\x32$.coresdk.workflow_completion.SuccessH\x00\x12\x36\n\x06\x66\x61iled\x18\x03 \x01(\x0b\x32$.coresdk.workflow_completion.FailureH\x00\x42\x08\n\x06status"G\n\x07Success\x12<\n\x08\x63ommands\x18\x01 \x03(\x0b\x32*.coresdk.workflow_commands.WorkflowCommand"<\n\x07\x46\x61ilure\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failureb\x06proto3'
 )
 
-
-_WORKFLOWACTIVATIONCOMPLETION = DESCRIPTOR.message_types_by_name[
-    "WorkflowActivationCompletion"
-]
-_SUCCESS = DESCRIPTOR.message_types_by_name["Success"]
-_FAILURE = DESCRIPTOR.message_types_by_name["Failure"]
-WorkflowActivationCompletion = _reflection.GeneratedProtocolMessageType(
-    "WorkflowActivationCompletion",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWACTIVATIONCOMPLETION,
-        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2"
-        # @@protoc_insertion_point(class_scope:coresdk.workflow_completion.WorkflowActivationCompletion)
-    },
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR,
+    "temporal.sdk.core.workflow_completion.workflow_completion_pb2",
+    globals(),
 )
-_sym_db.RegisterMessage(WorkflowActivationCompletion)
-
-Success = _reflection.GeneratedProtocolMessageType(
-    "Success",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SUCCESS,
-        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2"
-        # @@protoc_insertion_point(class_scope:coresdk.workflow_completion.Success)
-    },
-)
-_sym_db.RegisterMessage(Success)
-
-Failure = _reflection.GeneratedProtocolMessageType(
-    "Failure",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _FAILURE,
-        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2"
-        # @@protoc_insertion_point(class_scope:coresdk.workflow_completion.Failure)
-    },
-)
-_sym_db.RegisterMessage(Failure)
-
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None

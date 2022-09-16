@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -23,8 +22,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n)temporal/api/testservice/v1/service.proto\x12\x1btemporal.api.testservice.v1\x1a\x32temporal/api/testservice/v1/request_response.proto\x1a\x1bgoogle/protobuf/empty.proto2\xc2\x05\n\x0bTestService\x12\x81\x01\n\x10LockTimeSkipping\x12\x34.temporal.api.testservice.v1.LockTimeSkippingRequest\x1a\x35.temporal.api.testservice.v1.LockTimeSkippingResponse"\x00\x12\x87\x01\n\x12UnlockTimeSkipping\x12\x36.temporal.api.testservice.v1.UnlockTimeSkippingRequest\x1a\x37.temporal.api.testservice.v1.UnlockTimeSkippingResponse"\x00\x12`\n\x05Sleep\x12).temporal.api.testservice.v1.SleepRequest\x1a*.temporal.api.testservice.v1.SleepResponse"\x00\x12j\n\nSleepUntil\x12..temporal.api.testservice.v1.SleepUntilRequest\x1a*.temporal.api.testservice.v1.SleepResponse"\x00\x12v\n\x1bUnlockTimeSkippingWithSleep\x12).temporal.api.testservice.v1.SleepRequest\x1a*.temporal.api.testservice.v1.SleepResponse"\x00\x12_\n\x0eGetCurrentTime\x12\x16.google.protobuf.Empty\x1a\x33.temporal.api.testservice.v1.GetCurrentTimeResponse"\x00\x42\x9e\x01\n\x1eio.temporal.api.testservice.v1B\x0cServiceProtoP\x01Z-go.temporal.io/api/testservice/v1;testservice\xaa\x02\x1bTemporal.Api.TestService.V1\xea\x02\x1eTemporal::Api::TestService::V1b\x06proto3'
 )
 
-
-_TESTSERVICE = DESCRIPTOR.services_by_name["TestService"]
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "temporal.api.testservice.v1.service_pb2", globals()
+)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None

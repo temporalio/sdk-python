@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -21,19 +20,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n$temporal/api/update/v1/message.proto\x12\x16temporal.api.update.v1\x1a$temporal/api/common/v1/message.proto"~\n\x0eWorkflowUpdate\x12.\n\x06header\x18\x01 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x0c\n\x04name\x18\x02 \x01(\t\x12.\n\x04\x61rgs\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.PayloadsB\x85\x01\n\x19io.temporal.api.update.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/update/v1;update\xaa\x02\x16Temporal.Api.Update.V1\xea\x02\x19Temporal::Api::Update::V1b\x06proto3'
 )
 
-
-_WORKFLOWUPDATE = DESCRIPTOR.message_types_by_name["WorkflowUpdate"]
-WorkflowUpdate = _reflection.GeneratedProtocolMessageType(
-    "WorkflowUpdate",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWUPDATE,
-        "__module__": "temporal.api.update.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.update.v1.WorkflowUpdate)
-    },
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "temporal.api.update.v1.message_pb2", globals()
 )
-_sym_db.RegisterMessage(WorkflowUpdate)
-
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None

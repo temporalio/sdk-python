@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -24,107 +23,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n2temporal/api/testservice/v1/request_response.proto\x12\x1btemporal.api.testservice.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto"\x19\n\x17LockTimeSkippingRequest"\x1a\n\x18LockTimeSkippingResponse"\x1b\n\x19UnlockTimeSkippingRequest"\x1c\n\x1aUnlockTimeSkippingResponse"H\n\x11SleepUntilRequest\x12\x33\n\ttimestamp\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01"A\n\x0cSleepRequest\x12\x31\n\x08\x64uration\x18\x01 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01"\x0f\n\rSleepResponse"H\n\x16GetCurrentTimeResponse\x12.\n\x04time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x42\xa6\x01\n\x1eio.temporal.api.testservice.v1B\x14RequestResponseProtoP\x01Z-go.temporal.io/api/testservice/v1;testservice\xaa\x02\x1bTemporal.Api.TestService.V1\xea\x02\x1eTemporal::Api::TestService::V1b\x06proto3'
 )
 
-
-_LOCKTIMESKIPPINGREQUEST = DESCRIPTOR.message_types_by_name["LockTimeSkippingRequest"]
-_LOCKTIMESKIPPINGRESPONSE = DESCRIPTOR.message_types_by_name["LockTimeSkippingResponse"]
-_UNLOCKTIMESKIPPINGREQUEST = DESCRIPTOR.message_types_by_name[
-    "UnlockTimeSkippingRequest"
-]
-_UNLOCKTIMESKIPPINGRESPONSE = DESCRIPTOR.message_types_by_name[
-    "UnlockTimeSkippingResponse"
-]
-_SLEEPUNTILREQUEST = DESCRIPTOR.message_types_by_name["SleepUntilRequest"]
-_SLEEPREQUEST = DESCRIPTOR.message_types_by_name["SleepRequest"]
-_SLEEPRESPONSE = DESCRIPTOR.message_types_by_name["SleepResponse"]
-_GETCURRENTTIMERESPONSE = DESCRIPTOR.message_types_by_name["GetCurrentTimeResponse"]
-LockTimeSkippingRequest = _reflection.GeneratedProtocolMessageType(
-    "LockTimeSkippingRequest",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _LOCKTIMESKIPPINGREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.LockTimeSkippingRequest)
-    },
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "temporal.api.testservice.v1.request_response_pb2", globals()
 )
-_sym_db.RegisterMessage(LockTimeSkippingRequest)
-
-LockTimeSkippingResponse = _reflection.GeneratedProtocolMessageType(
-    "LockTimeSkippingResponse",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _LOCKTIMESKIPPINGRESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.LockTimeSkippingResponse)
-    },
-)
-_sym_db.RegisterMessage(LockTimeSkippingResponse)
-
-UnlockTimeSkippingRequest = _reflection.GeneratedProtocolMessageType(
-    "UnlockTimeSkippingRequest",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _UNLOCKTIMESKIPPINGREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.UnlockTimeSkippingRequest)
-    },
-)
-_sym_db.RegisterMessage(UnlockTimeSkippingRequest)
-
-UnlockTimeSkippingResponse = _reflection.GeneratedProtocolMessageType(
-    "UnlockTimeSkippingResponse",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _UNLOCKTIMESKIPPINGRESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.UnlockTimeSkippingResponse)
-    },
-)
-_sym_db.RegisterMessage(UnlockTimeSkippingResponse)
-
-SleepUntilRequest = _reflection.GeneratedProtocolMessageType(
-    "SleepUntilRequest",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SLEEPUNTILREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.SleepUntilRequest)
-    },
-)
-_sym_db.RegisterMessage(SleepUntilRequest)
-
-SleepRequest = _reflection.GeneratedProtocolMessageType(
-    "SleepRequest",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SLEEPREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.SleepRequest)
-    },
-)
-_sym_db.RegisterMessage(SleepRequest)
-
-SleepResponse = _reflection.GeneratedProtocolMessageType(
-    "SleepResponse",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SLEEPRESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.SleepResponse)
-    },
-)
-_sym_db.RegisterMessage(SleepResponse)
-
-GetCurrentTimeResponse = _reflection.GeneratedProtocolMessageType(
-    "GetCurrentTimeResponse",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _GETCURRENTTIMERESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.GetCurrentTimeResponse)
-    },
-)
-_sym_db.RegisterMessage(GetCurrentTimeResponse)
-
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
