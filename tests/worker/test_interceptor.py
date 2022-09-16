@@ -3,8 +3,11 @@ import uuid
 from datetime import timedelta
 from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
 
+import pytest
+
 from temporalio import activity, workflow
 from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
@@ -165,7 +168,12 @@ class InterceptedWorkflow:
         self.finish.set()
 
 
-async def test_worker_interceptor(client: Client):
+async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
         client,

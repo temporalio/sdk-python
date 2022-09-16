@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
+import pytest
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -17,6 +18,7 @@ from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 
@@ -140,7 +142,12 @@ class TracingWorkflow:
         self._signal_count += 1
 
 
-async def test_opentelemetry_tracing(client: Client):
+async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
     provider = TracerProvider()

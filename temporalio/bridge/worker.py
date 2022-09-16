@@ -1,4 +1,7 @@
-"""Worker using SDK Core."""
+"""Worker using SDK Core. (unstable)
+
+Nothing in this module should be considered stable. The API may change.
+"""
 
 from __future__ import annotations
 

@@ -4,24 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import platform
-import shutil
-import socket
-import stat
-import subprocess
-import tarfile
-import tempfile
-import urllib.request
-import zipfile
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
-from io import BytesIO
-from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
     Iterator,
+    List,
     Mapping,
     Optional,
     Sequence,
@@ -33,10 +22,12 @@ from typing import (
 import google.protobuf.empty_pb2
 
 import temporalio.api.testservice.v1
+import temporalio.bridge.testing
 import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.service
 import temporalio.types
 import temporalio.worker
 
@@ -48,6 +39,9 @@ class WorkflowEnvironment:
 
     Most developers will want to use the static :py:meth:`start_time_skipping`
     to start a test server process that automatically skips time as needed.
+    Alternatively, :py:meth:`start_local` may be used for a full, local Temporal
+    server with more features. To use an existing server, use
+    :py:meth:`from_client`.
 
     This environment is an async context manager, so it can be used with
     ``async with`` to make sure it shuts down properly. Otherwise,
@@ -79,6 +73,139 @@ class WorkflowEnvironment:
         )
 
     @staticmethod
+    async def start_local(
+        *,
+        namespace: str = "default",
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        interceptors: Sequence[temporalio.client.Interceptor] = [],
+        default_workflow_query_reject_condition: Optional[
+            temporalio.common.QueryRejectCondition
+        ] = None,
+        retry_config: Optional[temporalio.client.RetryConfig] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        identity: Optional[str] = None,
+        ip: str = "127.0.0.1",
+        port: Optional[int] = None,
+        download_dest_dir: Optional[str] = None,
+        ui: bool = False,
+        temporalite_existing_path: Optional[str] = None,
+        temporalite_database_filename: Optional[str] = None,
+        temporalite_log_format: str = "pretty",
+        temporalite_log_level: Optional[str] = "warn",
+        temporalite_download_version: str = "default",
+        temporalite_extra_args: Sequence[str] = [],
+    ) -> WorkflowEnvironment:
+        """Start a full Temporal server locally, downloading if necessary.
+
+        This environment is good for testing full server capabilities, but does
+        not support time skipping like :py:meth:`start_time_skipping` does.
+        :py:attr:`supports_time_skipping` will always return ``False`` for this
+        environment. :py:meth:`sleep` will sleep the actual amount of time and
+        :py:meth:`get_current_time` will return the current time.
+
+        Internally, this uses
+        `Temporalite <https://github.com/temporalio/temporalite>`_. Which is a
+        self-contained binary for Temporal using Sqlite persistence. This will
+        download Temporalite to a temporary directory by default if it has not
+        already been downloaded before and ``temporalite_existing_path`` is not
+        set.
+
+        In the future, the Temporalite implementation may be changed to another
+        implementation. Therefore, all ``temporalite_`` prefixed parameters are
+        Temporalite specific and may not apply to newer versions.
+
+        Args:
+            namespace: Namespace name to use for this environment.
+            data_converter: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            interceptors: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            default_workflow_query_reject_condition: See parameter of the same
+                name on :py:meth:`temporalio.client.Client.connect`.
+            retry_config: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            rpc_metadata: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            identity: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            ip: IP address to bind to, or 127.0.0.1 by default.
+            port: Port number to bind to, or an OS-provided port by default.
+            download_dest_dir: Directory to download binary to if a download is
+                needed. If unset, this is the system's temporary directory.
+            ui: If ``True``, will start a UI in Temporalite.
+            temporalite_existing_path: Existing path to the Temporalite binary.
+                If present, no download will be attempted to fetch the binary.
+            temporalite_database_filename: Path to the Sqlite database to use
+                for Temporalite. Unset default means only in-memory Sqlite will
+                be used.
+            temporalite_log_format: Log format for Temporalite.
+            temporalite_log_level: Log level to use for Temporalite. Default is
+                ``warn``, but if set to ``None`` this will translate the Python
+                logger's level to a Temporalite level.
+            temporalite_download_version: Specific Temporalite version to
+                download. Defaults to ``default`` which downloads the version
+                known to work best with this SDK.
+            temporalite_extra_args: Extra arguments for the Temporalite binary.
+
+        Returns:
+            The started Temporalite workflow environment.
+        """
+        # Use the logger's configured level if none given
+        if not temporalite_log_level:
+            if logger.isEnabledFor(logging.DEBUG):
+                temporalite_log_level = "debug"
+            elif logger.isEnabledFor(logging.INFO):
+                temporalite_log_level = "info"
+            elif logger.isEnabledFor(logging.WARNING):
+                temporalite_log_level = "warn"
+            elif logger.isEnabledFor(logging.ERROR):
+                temporalite_log_level = "error"
+            else:
+                temporalite_log_level = "fatal"
+        # Start Temporalite
+        server = await temporalio.bridge.testing.EphemeralServer.start_temporalite(
+            temporalio.bridge.testing.TemporaliteConfig(
+                existing_path=temporalite_existing_path,
+                sdk_name="sdk-python",
+                sdk_version=temporalio.service.__version__,
+                download_version=temporalite_download_version,
+                download_dest_dir=download_dest_dir,
+                namespace=namespace,
+                ip=ip,
+                port=port,
+                database_filename=temporalite_database_filename,
+                ui=ui,
+                log_format=temporalite_log_format,
+                log_level=temporalite_log_level,
+                extra_args=temporalite_extra_args,
+            )
+        )
+        # If we can't connect to the server, we should shut it down
+        try:
+            return _EphemeralServerWorkflowEnvironment(
+                await temporalio.client.Client.connect(
+                    server.target,
+                    namespace=namespace,
+                    data_converter=data_converter,
+                    interceptors=interceptors,
+                    default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+                    retry_config=retry_config,
+                    rpc_metadata=rpc_metadata,
+                    identity=identity,
+                ),
+                server,
+            )
+        except:
+            try:
+                await server.shutdown()
+            except:
+                logger.warn(
+                    "Failed stopping local server on client connection failure",
+                    exc_info=True,
+                )
+            raise
+
+    @staticmethod
     async def start_time_skipping(
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
@@ -89,10 +216,11 @@ class WorkflowEnvironment:
         retry_config: Optional[temporalio.client.RetryConfig] = None,
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
-        test_server_stdout: Optional[Any] = subprocess.PIPE,
-        test_server_stderr: Optional[Any] = subprocess.PIPE,
-        test_server_exe_path: Optional[str] = None,
-        test_server_version: str = "1.15.1",
+        port: Optional[int] = None,
+        download_dest_dir: Optional[str] = None,
+        test_server_existing_path: Optional[str] = None,
+        test_server_download_version: str = "default",
+        test_server_extra_args: Sequence[str] = [],
     ) -> WorkflowEnvironment:
         """Start a time skipping workflow environment.
 
@@ -117,6 +245,10 @@ class WorkflowEnvironment:
         :py:meth:`sleep`, is global to the environment, not to the workflow
         under test.
 
+        In the future, the test server implementation may be changed to another
+        implementation. Therefore, all ``test_server_`` prefixed parameters are
+        test server specific and may not apply to newer versions.
+
         Args:
             data_converter: See parameter of the same name on
                 :py:meth:`temporalio.client.Client.connect`.
@@ -130,68 +262,53 @@ class WorkflowEnvironment:
                 :py:meth:`temporalio.client.Client.connect`.
             identity: See parameter of the same name on
                 :py:meth:`temporalio.client.Client.connect`.
-            test_server_stdout: See ``stdout`` parameter on
-                :py:func:`asyncio.loop.subprocess_exec`.
-            test_server_stderr: See ``stderr`` parameter on
-                :py:func:`asyncio.loop.subprocess_exec`.
-            test_server_exe_path: Executable path for the test server. Defaults
-                to a version-specific path in the temp directory, lazily
-                downloaded at version ``test_server_version`` if not there.
-            test_server_version: Test server version to lazily download when not
-                found. This is only used if ``test_server_exe_path`` is not set.
+            port: Port number to bind to, or an OS-provided port by default.
+            download_dest_dir: Directory to download binary to if a download is
+                needed. If unset, this is the system's temporary directory.
+            test_server_existing_path: Existing path to the test server binary.
+                If present, no download will be attempted to fetch the binary.
+            test_server_download_version: Specific test server version to
+                download. Defaults to ``default`` which downloads the version
+                known to work best with this SDK.
+            test_server_extra_args: Extra arguments for the test server binary.
 
         Returns:
             The started workflow environment with time skipping.
         """
-        # Download server binary. We accept this is not async.
-        exe_path = (
-            Path(test_server_exe_path)
-            if test_server_exe_path
-            else _ensure_test_server_downloaded(
-                test_server_version, Path(tempfile.gettempdir())
+        # Start test server
+        server = await temporalio.bridge.testing.EphemeralServer.start_test_server(
+            temporalio.bridge.testing.TestServerConfig(
+                existing_path=test_server_existing_path,
+                sdk_name="sdk-python",
+                sdk_version=temporalio.service.__version__,
+                download_version=test_server_download_version,
+                download_dest_dir=download_dest_dir,
+                port=port,
+                extra_args=test_server_extra_args,
             )
         )
-
-        # Get a free port and start the server
-        port = _get_free_port()
-        test_server_process = await asyncio.create_subprocess_exec(
-            str(exe_path), port, stdout=test_server_stdout, stderr=test_server_stderr
-        )
-
-        # We must terminate the process if we can't connect
+        # If we can't connect to the server, we should shut it down
         try:
-            # Continually attempt to connect every 100ms for 5 seconds
-            err_count = 0
-            while True:
-                try:
-                    return _TimeSkippingWorkflowEnvironment(
-                        await temporalio.client.Client.connect(
-                            f"localhost:{port}",
-                            data_converter=data_converter,
-                            interceptors=interceptors,
-                            default_workflow_query_reject_condition=default_workflow_query_reject_condition,
-                            retry_config=retry_config,
-                            rpc_metadata=rpc_metadata,
-                            identity=identity,
-                        ),
-                        test_server_process=test_server_process,
-                    )
-                except RuntimeError as err:
-                    err_count += 1
-                    if err_count >= 50:
-                        raise RuntimeError(
-                            "Test server could not connect after 5 seconds"
-                        ) from err
-                    await asyncio.sleep(0.1)
-        except Exception:
-            if test_server_process.returncode is not None:
-                try:
-                    test_server_process.terminate()
-                    await asyncio.wait_for(test_server_process.wait(), 5)
-                except Exception:
-                    logger.warning(
-                        "Failed stopping test server on failure", exc_info=True
-                    )
+            return _EphemeralServerWorkflowEnvironment(
+                await temporalio.client.Client.connect(
+                    server.target,
+                    data_converter=data_converter,
+                    interceptors=interceptors,
+                    default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+                    retry_config=retry_config,
+                    rpc_metadata=rpc_metadata,
+                    identity=identity,
+                ),
+                server,
+            )
+        except:
+            try:
+                await server.shutdown()
+            except:
+                logger.warn(
+                    "Failed stopping test server on client connection failure",
+                    exc_info=True,
+                )
             raise
 
     def __init__(self, client: temporalio.client.Client) -> None:
@@ -261,6 +378,88 @@ class WorkflowEnvironment:
         yield None
 
 
+class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
+    def __init__(
+        self,
+        client: temporalio.client.Client,
+        server: temporalio.bridge.testing.EphemeralServer,
+    ) -> None:
+        # Add assertion interceptor to client and if time skipping is supported,
+        # add time skipping interceptor
+        self._supports_time_skipping = server.has_test_service
+        interceptors: List[temporalio.client.Interceptor] = [
+            _AssertionErrorInterceptor()
+        ]
+        if self._supports_time_skipping:
+            interceptors.append(_TimeSkippingClientInterceptor(self))
+        super().__init__(_client_with_interceptors(client, *interceptors))
+        self._server = server
+        self._auto_time_skipping = True
+
+    async def shutdown(self) -> None:
+        await self._server.shutdown()
+
+    async def sleep(self, duration: Union[timedelta, float]) -> None:
+        # Use regular sleep if no time skipping
+        if not self._supports_time_skipping:
+            return await super().sleep(duration)
+        req = temporalio.api.testservice.v1.SleepRequest()
+        req.duration.FromTimedelta(
+            duration if isinstance(duration, timedelta) else timedelta(seconds=duration)
+        )
+        await self._client.test_service.unlock_time_skipping_with_sleep(req)
+
+    async def get_current_time(self) -> datetime:
+        # Use regular time if no time skipping
+        if not self._supports_time_skipping:
+            return await super().get_current_time()
+        resp = await self._client.test_service.get_current_time(
+            google.protobuf.empty_pb2.Empty()
+        )
+        return resp.time.ToDatetime().replace(tzinfo=timezone.utc)
+
+    @property
+    def supports_time_skipping(self) -> bool:
+        return self._supports_time_skipping
+
+    @contextmanager
+    def auto_time_skipping_disabled(self) -> Iterator[None]:
+        already_disabled = not self._auto_time_skipping
+        self._auto_time_skipping = False
+        try:
+            yield None
+        finally:
+            if not already_disabled:
+                self._auto_time_skipping = True
+
+    @asynccontextmanager
+    async def time_skipping_unlocked(self) -> AsyncIterator[None]:
+        # If it's disabled or not supported, no locking/unlocking, just yield
+        # and return
+        if not self._supports_time_skipping or not self._auto_time_skipping:
+            yield None
+            return
+        # Unlock to start time skipping, lock again to stop it
+        await self.client.test_service.unlock_time_skipping(
+            temporalio.api.testservice.v1.UnlockTimeSkippingRequest()
+        )
+        try:
+            yield None
+            # Lock it back, throwing on error
+            await self.client.test_service.lock_time_skipping(
+                temporalio.api.testservice.v1.LockTimeSkippingRequest()
+            )
+        except:
+            # Lock it back, swallowing error
+            try:
+                await self.client.test_service.lock_time_skipping(
+                    temporalio.api.testservice.v1.LockTimeSkippingRequest()
+                )
+            except:
+                logger.exception("Failed locking time skipping after error")
+            raise
+
+
 class _AssertionErrorInterceptor(
     temporalio.client.Interceptor, temporalio.worker.Interceptor
 ):
@@ -295,84 +494,8 @@ class _AssertionErrorWorkflowInboundInterceptor(
             raise app_err from None
 
 
-class _TimeSkippingWorkflowEnvironment(WorkflowEnvironment):
-    def __init__(
-        self,
-        client: temporalio.client.Client,
-        *,
-        test_server_process: asyncio.subprocess.Process,
-    ) -> None:
-        # Add the assertion interceptor and time skipping interceptor
-        super().__init__(
-            _client_with_interceptors(
-                client,
-                _AssertionErrorInterceptor(),
-                _TimeSkippingClientInterceptor(self),
-            )
-        )
-        self.test_server_process = test_server_process
-        self.auto_time_skipping = True
-
-    async def shutdown(self) -> None:
-        self.test_server_process.terminate()
-        await self.test_server_process.wait()
-
-    async def sleep(self, duration: Union[timedelta, float]) -> None:
-        req = temporalio.api.testservice.v1.SleepRequest()
-        req.duration.FromTimedelta(
-            duration if isinstance(duration, timedelta) else timedelta(seconds=duration)
-        )
-        await self._client.test_service.unlock_time_skipping_with_sleep(req)
-
-    async def get_current_time(self) -> datetime:
-        resp = await self._client.test_service.get_current_time(
-            google.protobuf.empty_pb2.Empty()
-        )
-        return resp.time.ToDatetime().replace(tzinfo=timezone.utc)
-
-    @property
-    def supports_time_skipping(self) -> bool:
-        return True
-
-    @contextmanager
-    def auto_time_skipping_disabled(self) -> Iterator[None]:
-        already_disabled = not self.auto_time_skipping
-        self.auto_time_skipping = False
-        try:
-            yield None
-        finally:
-            if not already_disabled:
-                self.auto_time_skipping = True
-
-    @asynccontextmanager
-    async def time_skipping_unlocked(self) -> AsyncIterator[None]:
-        # If it's disabled, no locking/unlocking, just yield and return
-        if not self.auto_time_skipping:
-            yield None
-            return
-        # Unlock to start time skipping, lock again to stop it
-        await self.client.test_service.unlock_time_skipping(
-            temporalio.api.testservice.v1.UnlockTimeSkippingRequest()
-        )
-        try:
-            yield None
-            # Lock it back, throwing on error
-            await self.client.test_service.lock_time_skipping(
-                temporalio.api.testservice.v1.LockTimeSkippingRequest()
-            )
-        except:
-            # Lock it back, swallowing error
-            try:
-                await self.client.test_service.lock_time_skipping(
-                    temporalio.api.testservice.v1.LockTimeSkippingRequest()
-                )
-            except:
-                logger.exception("Failed locking time skipping after error")
-            raise
-
-
 class _TimeSkippingClientInterceptor(temporalio.client.Interceptor):
-    def __init__(self, env: _TimeSkippingWorkflowEnvironment) -> None:
+    def __init__(self, env: _EphemeralServerWorkflowEnvironment) -> None:
         self.env = env
 
     def intercept_client(
@@ -385,7 +508,7 @@ class _TimeSkippingClientOutboundInterceptor(temporalio.client.OutboundIntercept
     def __init__(
         self,
         next: temporalio.client.OutboundInterceptor,
-        env: _TimeSkippingWorkflowEnvironment,
+        env: _EphemeralServerWorkflowEnvironment,
     ) -> None:
         super().__init__(next)
         self.env = env
@@ -401,7 +524,7 @@ class _TimeSkippingClientOutboundInterceptor(temporalio.client.OutboundIntercept
 
 
 class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
-    env: _TimeSkippingWorkflowEnvironment
+    env: _EphemeralServerWorkflowEnvironment
 
     async def result(
         self,
@@ -427,68 +550,3 @@ def _client_with_interceptors(
     config_interceptors.extend(interceptors)
     config["interceptors"] = interceptors
     return temporalio.client.Client(**config)
-
-
-def _ensure_test_server_downloaded(version: str, dest_dir: Path) -> Path:
-    # If already present, skip download
-    if not dest_dir.is_dir():
-        raise RuntimeError(f"Directory for test server, {dest_dir}, not present")
-
-    # Build the URL
-    plat = platform.system()
-    ext = ".tar.gz"
-    out_ext = ""
-    if plat == "Windows":
-        plat = "windows"
-        ext = ".zip"
-        out_ext = ".exe"
-    elif plat == "Darwin":
-        plat = "macOS"
-    elif plat == "Linux":
-        plat = "linux"
-    else:
-        raise RuntimeError(f"Unrecognized platform {plat}")
-
-    # Ignore if already present
-    dest = dest_dir / f"temporal-test-server-{version}{out_ext}"
-    if dest.exists():
-        return dest
-
-    # We intentionally always choose amd64 even in cases of ARM processors
-    # because we don't have native ARM binaries yet and some systems like M1 can
-    # run the amd64 one.
-    name = f"temporal-test-server_{version}_{plat}_amd64"
-    url = f"https://github.com/temporalio/sdk-java/releases/download/v{version}/{name}{ext}"
-
-    # Download to memory then extract single file to dest. Tests show this is
-    # a cheap operation and no real need to put compressed file on disk first.
-    logger.info("Downloading %s to extract test server to %s", url, dest)
-    with urllib.request.urlopen(url) as url_file:
-        with BytesIO(url_file.read()) as comp_content:
-            with (zipfile.ZipFile(comp_content) if ext == ".zip" else tarfile.open(fileobj=comp_content)) as comp_file:  # type: ignore
-                with open(dest, "wb") as out_file:
-                    in_file = f"{name}/temporal-test-server{out_ext}"
-                    shutil.copyfileobj(
-                        comp_file.open(in_file)
-                        if ext == ".zip"
-                        else comp_file.extractfile(in_file),
-                        out_file,
-                    )
-    # If not an exe, we need make it executable
-    if out_ext != ".exe":
-        os.chmod(
-            dest, os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-        )
-    return dest
-
-
-def _get_free_port() -> str:
-    # Binds a port from the OS then closes the socket. Most OS's won't give the
-    # same port back to the next socket right away even after this one is
-    # closed.
-    sock = socket.socket()
-    try:
-        sock.bind(("", 0))
-        return str(sock.getsockname()[1])
-    finally:
-        sock.close()

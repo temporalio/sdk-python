@@ -1,4 +1,7 @@
-"""Telemetry for SDK Core."""
+"""Telemetry for SDK Core. (unstable)
+
+Nothing in this module should be considered stable. The API may change.
+"""
 
 from __future__ import annotations
 

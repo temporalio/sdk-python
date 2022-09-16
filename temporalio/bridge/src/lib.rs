@@ -3,6 +3,7 @@ use pyo3::types::PyBytes;
 
 mod client;
 mod telemetry;
+mod testing;
 mod worker;
 
 #[pymodule]
@@ -15,6 +16,11 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     // Telemetry stuff
     m.add_class::<telemetry::TelemetryRef>()?;
     m.add_function(wrap_pyfunction!(init_telemetry, m)?)?;
+
+    // Testing stuff
+    m.add_class::<testing::EphemeralServerRef>()?;
+    m.add_function(wrap_pyfunction!(start_temporalite, m)?)?;
+    m.add_function(wrap_pyfunction!(start_test_server, m)?)?;
 
     // Worker stuff
     m.add(
@@ -35,6 +41,16 @@ fn connect_client(py: Python, config: client::ClientConfig) -> PyResult<&PyAny> 
 #[pyfunction]
 fn init_telemetry(config: telemetry::TelemetryConfig) -> PyResult<telemetry::TelemetryRef> {
     telemetry::init_telemetry(config)
+}
+
+#[pyfunction]
+fn start_temporalite(py: Python, config: testing::TemporaliteConfig) -> PyResult<&PyAny> {
+    testing::start_temporalite(py, config)
+}
+
+#[pyfunction]
+fn start_test_server(py: Python, config: testing::TestServerConfig) -> PyResult<&PyAny> {
+    testing::start_test_server(py, config)
 }
 
 #[pyfunction]

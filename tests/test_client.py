@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 
 import pytest
 
@@ -28,7 +28,8 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowQueryRejectedError,
 )
-from tests.helpers.server import ExternalServer
+from temporalio.testing import WorkflowEnvironment
+from tests.helpers.golang import ExternalGolangServer
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -42,7 +43,14 @@ from tests.helpers.worker import (
 )
 
 
-async def test_start_id_reuse(client: Client, worker: ExternalWorker):
+async def test_start_id_reuse(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
+        )
     # Run to return "some result"
     id = str(uuid.uuid4())
     handle = await client.start_workflow(
@@ -92,7 +100,14 @@ async def test_start_with_signal(client: Client, worker: ExternalWorker):
     assert "some signal arg" == await handle.result()
 
 
-async def test_result_follow_continue_as_new(client: Client, worker: ExternalWorker):
+async def test_result_follow_continue_as_new(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
     handle = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
@@ -170,7 +185,14 @@ async def test_cancel_not_found(client: Client):
     assert err.value.status == RPCStatusCode.NOT_FOUND
 
 
-async def test_describe(client: Client, worker: ExternalWorker):
+async def test_describe(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1425"
+        )
     handle = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(actions=[KSAction(result=KSResultAction(value="some value"))]),
@@ -381,20 +403,27 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
     assert interceptor.traces[4][1].id == handle.id
 
 
-async def test_tls_config(tls_client: Optional[Client]):
-    if not tls_client:
-        pytest.skip("No TLS client")
+# TODO(cretz): Support TLS on Temporalite test server
+async def test_tls_config(golang_server: ExternalGolangServer):
+    tls_client = await golang_server.new_tls_client()
     resp = await tls_client.workflow_service.describe_namespace(
         DescribeNamespaceRequest(namespace=tls_client.namespace)
     )
     assert resp.namespace_info.name == tls_client.namespace
 
 
-async def test_lazy_client(server: ExternalServer):
+async def test_lazy_client(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1094"
+        )
     # Create another client that is lazy. This test just makes sure the
     # functionality continues to work.
     lazy_client = await Client.connect(
-        server.host_port, namespace=server.namespace, lazy=True
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        lazy=True,
     )
     assert not lazy_client.service_client.worker_service_client._bridge_client
     await lazy_client.workflow_service.get_system_info(GetSystemInfoRequest())

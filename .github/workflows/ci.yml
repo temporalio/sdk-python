@@ -44,6 +44,7 @@ jobs:
       - run: poe lint
       - run: poe build-develop
       - run: poe test -s -o log_cli_level=DEBUG
+      - run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
 
       # Confirm protos are already generated properly
       - name: Check generated protos

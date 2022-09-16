@@ -62,6 +62,7 @@ from temporalio.exceptions import (
     WorkflowAlreadyStartedError,
 )
 from temporalio.service import RPCError, RPCStatusCode
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
     Worker,
@@ -69,7 +70,7 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from tests.helpers.server import ExternalServer
+from tests.helpers.golang import ExternalGolangServer
 
 
 @workflow.defn
@@ -131,7 +132,12 @@ class InfoWorkflow:
         return json.loads(json.dumps(ret, default=str))
 
 
-async def test_workflow_info(client: Client):
+async def test_workflow_info(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1426"
+        )
     async with new_worker(client, InfoWorkflow) as worker:
         workflow_id = f"workflow-{uuid.uuid4()}"
         retry_policy = RetryPolicy(
@@ -520,14 +526,8 @@ async def test_workflow_simple_local_activity(client: Client):
         assert result == "Hello, Temporal!"
 
 
-# Cannot create until later so it's in the proper event loop in older Python
-# version (newer Python versions don't put the loop on the event eagerly)
-wait_cancel_complete: asyncio.Event
-
-
 @activity.defn
 async def wait_cancel() -> str:
-    wait_cancel_complete.clear()
     try:
         if activity.info().is_local:
             await asyncio.sleep(1000)
@@ -538,8 +538,27 @@ async def wait_cancel() -> str:
         return "Manually stopped"
     except asyncio.CancelledError:
         return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
-    finally:
-        wait_cancel_complete.set()
+
+
+class ActivityWaitCancelNotify:
+    def __init__(self) -> None:
+        self.wait_cancel_complete = asyncio.Event()
+
+    @activity.defn
+    async def wait_cancel(self) -> str:
+        self.wait_cancel_complete.clear()
+        try:
+            if activity.info().is_local:
+                await asyncio.sleep(1000)
+            else:
+                while True:
+                    await asyncio.sleep(0.3)
+                    activity.heartbeat()
+            return "Manually stopped"
+        except asyncio.CancelledError:
+            return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
+        finally:
+            self.wait_cancel_complete.set()
 
 
 @dataclass
@@ -556,16 +575,16 @@ class CancelActivityWorkflow:
     @workflow.run
     async def run(self, params: CancelActivityWorkflowParams) -> None:
         if params.local:
-            handle = workflow.start_local_activity(
-                wait_cancel,
+            handle = workflow.start_local_activity_method(
+                ActivityWaitCancelNotify.wait_cancel,
                 schedule_to_close_timeout=timedelta(seconds=5),
                 cancellation_type=workflow.ActivityCancellationType[
                     params.cancellation_type
                 ],
             )
         else:
-            handle = workflow.start_activity(
-                wait_cancel,
+            handle = workflow.start_activity_method(
+                ActivityWaitCancelNotify.wait_cancel,
                 schedule_to_close_timeout=timedelta(seconds=5),
                 heartbeat_timeout=timedelta(seconds=1),
                 cancellation_type=workflow.ActivityCancellationType[
@@ -591,16 +610,14 @@ class CancelActivityWorkflow:
 
 @pytest.mark.parametrize("local", [True, False])
 async def test_workflow_cancel_activity(client: Client, local: bool):
-    global wait_cancel_complete
-    wait_cancel_complete = asyncio.Event()
-    wait_cancel_complete.clear()
     # Need short task timeout to timeout LA task and longer assert timeout
     # so the task can timeout
     task_timeout = timedelta(seconds=1)
     assert_timeout = timedelta(seconds=10)
+    activity_inst = ActivityWaitCancelNotify()
 
     async with new_worker(
-        client, CancelActivityWorkflow, activities=[wait_cancel]
+        client, CancelActivityWorkflow, activities=[activity_inst.wait_cancel]
     ) as worker:
         # Try cancel - confirm error and activity was sent the cancel
         handle = await client.start_workflow(
@@ -620,7 +637,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await assert_eq_eventually(
             "Error: CancelledError", activity_result, timeout=assert_timeout
         )
-        await wait_cancel_complete.wait()
+        await activity_inst.wait_cancel_complete.wait()
         await handle.cancel()
 
         # Wait cancel - confirm no error due to graceful cancel handling
@@ -639,7 +656,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
             activity_result,
             timeout=assert_timeout,
         )
-        await wait_cancel_complete.wait()
+        await activity_inst.wait_cancel_complete.wait()
         await handle.cancel()
 
         # Abandon - confirm error and that activity stays running
@@ -657,9 +674,9 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
             "Error: CancelledError", activity_result, timeout=assert_timeout
         )
         await asyncio.sleep(0.5)
-        assert not wait_cancel_complete.is_set()
+        assert not activity_inst.wait_cancel_complete.is_set()
         await handle.cancel()
-        await wait_cancel_complete.wait()
+        await activity_inst.wait_cancel_complete.wait()
 
 
 @workflow.defn
@@ -1272,7 +1289,12 @@ class ContinueAsNewWorkflow:
         )
 
 
-async def test_workflow_continue_as_new(client: Client):
+async def test_workflow_continue_as_new(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
     async with new_worker(client, ContinueAsNewWorkflow) as worker:
         handle = await client.start_workflow(
             ContinueAsNewWorkflow.run,
@@ -1329,9 +1351,8 @@ class SearchAttributeWorkflow:
         )
 
 
-async def test_workflow_search_attributes(server: ExternalServer, client: Client):
-    if not server.supports_custom_search_attributes:
-        pytest.skip("Custom search attributes not supported")
+async def test_workflow_search_attributes(golang_server: ExternalGolangServer):
+    client = await golang_server.new_client()
 
     async def search_attributes_present() -> bool:
         resp = await client.workflow_service.get_search_attributes(
@@ -1665,7 +1686,12 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
         self._should_complete.set()
 
 
-async def test_workflow_dataclass_typed(client: Client):
+async def test_workflow_dataclass_typed(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-core/issues/390"
+        )
     async with new_worker(
         client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
     ) as worker:
@@ -1743,7 +1769,12 @@ async def test_workflow_separate_abstract(client: Client):
         (await handle.result()).assert_expected()
 
 
-async def test_workflow_already_started(client: Client):
+async def test_workflow_already_started(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
+        )
     async with new_worker(client, LongSleepWorkflow) as worker:
         id = f"workflow-{uuid.uuid4()}"
         # Try to start it twice
@@ -1768,16 +1799,18 @@ class ChildAlreadyStartedWorkflow:
         # Try to start it twice
         id = f"{workflow.info().workflow_id}_child"
         await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
-        # TODO(cretz): If we just let this throw, it is a WFT failure and not a
-        # workflow failure since WorkflowAlreadyStartedError isn't a "failure
-        # error". Is this ok?
         try:
             await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
         except WorkflowAlreadyStartedError:
             raise ApplicationError("Already started")
 
 
-async def test_workflow_child_already_started(client: Client):
+async def test_workflow_child_already_started(client: Client, env: WorkflowEnvironment):
+    # TODO(cretz): Fix
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
+        )
     async with new_worker(
         client, ChildAlreadyStartedWorkflow, LongSleepWorkflow
     ) as worker:

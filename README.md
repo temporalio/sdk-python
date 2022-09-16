@@ -884,6 +884,10 @@ With `Go` installed, run the following to execute tests:
 poe test
 ```
 
+This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
+server, pass `--workflow-environment time-skipping`. To run against the `default` namespace of an already-running
+server, pass the `host:port` to `--workflow-environment`.
+
 ### Style
 
 * Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
