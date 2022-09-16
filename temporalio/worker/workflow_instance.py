@@ -256,15 +256,17 @@ class _WorkflowInstanceImpl(
                     job_sets[3].append(job)
 
             # Apply every job set, running after each set
-            for job_set in job_sets:
+            for index, job_set in enumerate(job_sets):
                 if not job_set:
                     continue
                 for job in job_set:
                     # Let errors bubble out of these to the caller to fail the task
                     self._apply(job)
 
-                # Run one iteration of the loop
-                self._run_once()
+                # Run one iteration of the loop. We do not allow conditions to
+                # be checked in patch jobs (first index) or query jobs (last
+                # index).
+                self._run_once(check_conditions=index == 1 or index == 2)
         except Exception as err:
             logger.warning(
                 f"Failed activation on workflow {self._info.workflow_type} with ID {self._info.workflow_id} and run ID {self._info.run_id}",
@@ -1153,7 +1155,7 @@ class _WorkflowInstanceImpl(
         if hasattr(task, "_log_destroy_pending"):
             setattr(task, "_log_destroy_pending", False)
 
-    def _run_once(self) -> None:
+    def _run_once(self, *, check_conditions: bool) -> None:
         try:
             asyncio._set_running_loop(self)
 
@@ -1178,11 +1180,12 @@ class _WorkflowInstanceImpl(
                 # Check conditions which may add to the ready list. Also remove
                 # conditions whose futures have already cancelled (e.g. when
                 # timed out).
-                self._conditions[:] = [
-                    t
-                    for t in self._conditions
-                    if not t[1].done() and not self._check_condition(*t)
-                ]
+                if check_conditions:
+                    self._conditions[:] = [
+                        t
+                        for t in self._conditions
+                        if not t[1].done() and not self._check_condition(*t)
+                    ]
         finally:
             asyncio._set_running_loop(None)
 
