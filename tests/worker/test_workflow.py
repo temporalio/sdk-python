@@ -2349,6 +2349,38 @@ async def test_workflow_memo(client: Client):
             pass
 
 
+@workflow.defn
+class QueryAffectConditionWorkflow:
+    def __init__(self) -> None:
+        self.seen_query = False
+
+    @workflow.run
+    async def run(self) -> None:
+        def condition_never_after_query():
+            assert not self.seen_query
+            return False
+
+        while True:
+            await workflow.wait_condition(condition_never_after_query)
+
+    @workflow.query
+    def check_condition(self) -> bool:
+        # This is a bad thing, to mutate a workflow during a query, this is just
+        # for this test
+        self.seen_query = True
+        return True
+
+
+async def test_workflow_query_does_not_run_condition(client: Client):
+    async with new_worker(client, QueryAffectConditionWorkflow) as worker:
+        handle = await client.start_workflow(
+            QueryAffectConditionWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.query(QueryAffectConditionWorkflow.check_condition)
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
