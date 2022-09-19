@@ -147,7 +147,7 @@ unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "cibuildwheel"
-version = "2.10.0"
+version = "2.10.1"
 description = "Build Python wheels on CI with minimal configuration."
 category = "dev"
 optional = false
@@ -161,7 +161,7 @@ filelock = "*"
 packaging = ">=20.9"
 platformdirs = "*"
 tomli = {version = "*", markers = "python_version < \"3.11\""}
-typing-extensions = {version = ">=3.10.0.0", markers = "python_version < \"3.8\""}
+typing-extensions = {version = ">=4.1.0", markers = "python_version < \"3.11\""}
 
 [package.extras]
 all = ["build", "click", "ghapi", "jinja2", "jinja2 (>=3.1.2)", "mkdocs (==1.3.1)", "mkdocs-include-markdown-plugin (==2.8.0)", "mkdocs-macros-plugin", "mypy (>=0.901)", "packaging (>=21.0)", "pip-tools", "pygithub", "pymdown-extensions", "pytest (>=6)", "pytest-timeout", "pytest-xdist", "pyyaml", "requests", "rich (>=9.6)", "tomli-w", "types-certifi", "types-click", "types-jinja2", "types-pyyaml", "types-requests", "types-toml"]
@@ -1207,8 +1207,8 @@ charset-normalizer = [
     {file = "charset_normalizer-2.1.1-py3-none-any.whl", hash = "sha256:83e9a75d1911279afd89352c68b45348559d1fc0506b054b346651b5e7fee29f"},
 ]
 cibuildwheel = [
-    {file = "cibuildwheel-2.10.0-py3-none-any.whl", hash = "sha256:8946086aaac43b7885ebbf11166acdafb5275612f20428e99488fef594b0ed6e"},
-    {file = "cibuildwheel-2.10.0.tar.gz", hash = "sha256:3375f1f0cfb24a5b20941fc46059a7bdc983c28d725f7e0a255746544a8a4e44"},
+    {file = "cibuildwheel-2.10.1-py3-none-any.whl", hash = "sha256:78a4c4d207fd3f271ddbba7364b961cfafc1fcbc52725a5253310d2c2a7ad67c"},
+    {file = "cibuildwheel-2.10.1.tar.gz", hash = "sha256:c10fb19081cab3983bfb5d2ef62ef1521776d6e2dc9be350d697e3123239a1be"},
 ]
 click = [
     {file = "click-8.1.3-py3-none-any.whl", hash = "sha256:bb4d8133cb15a609f44e8213d9b391b0809795062913b383c62be0ee95b1db48"},
