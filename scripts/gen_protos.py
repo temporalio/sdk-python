@@ -14,6 +14,9 @@ api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
 health_proto_dir = proto_dir / "grpc"
 testsrv_proto_dir = proto_dir / "testsrv_upstream"
+# Needed for descriptor.proto which was removed as part of
+# https://github.com/grpc/grpc/pull/30377
+additional_well_known_proto_dir = base_dir / "scripts" / "_proto"
 
 # Exclude testsrv dependencies protos
 proto_paths = (
@@ -40,9 +43,7 @@ pyi_fixes = [
     partial(re.compile(r"temporal\.sdk\.core\.").sub, r"temporalio.bridge.proto."),
 ]
 
-find_message_re = re.compile(r"_sym_db\.RegisterMessage\(([^\)\.]+)\)")
-find_enum_re = re.compile(r"DESCRIPTOR\.enum_types_by_name\['([^']+)'\]")
-find_class_re = re.compile(r"\nclass ([^\(\:]+)")
+find_class_re = re.compile(r"\nclass ([^_\(\:]+)")
 find_def_re = re.compile(r"\ndef ([^\(\:]+)")
 
 
@@ -62,14 +63,12 @@ def fix_generated_output(base_path: Path):
             with p.open(encoding="utf8") as f:
                 content = f.read()
                 if p.suffix == ".py":
+                    # Defs in .py, classes in .pyi
+                    imports[p.stem] += find_def_re.findall(content)
                     for fix in py_fixes:
                         content = fix(content)
-                    # Only use .py files to determine imports, not pyi ones
-                    imports[p.stem] += find_message_re.findall(content)
-                    imports[p.stem] += find_enum_re.findall(content)
-                    imports[p.stem] += find_class_re.findall(content)
-                    imports[p.stem] += find_def_re.findall(content)
                 else:
+                    imports[p.stem] += find_class_re.findall(content)
                     for fix in pyi_fixes:
                         content = fix(content)
             with p.open("w") as f:
@@ -126,6 +125,7 @@ if __name__ == "__main__":
                 f"--proto_path={core_proto_dir}",
                 f"--proto_path={testsrv_proto_dir}",
                 f"--proto_path={health_proto_dir}",
+                f"--proto_path={additional_well_known_proto_dir}",
                 f"--python_out={temp_dir}",
                 f"--grpc_python_out={temp_dir}",
                 f"--mypy_out={temp_dir}",

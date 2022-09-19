@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -32,105 +31,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n%temporal/api/cluster/v1/message.proto\x12\x17temporal.api.cluster.v1\x1a!dependencies/gogoproto/gogo.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#temporal/api/enums/v1/cluster.proto\x1a"temporal/api/enums/v1/common.proto\x1a%temporal/api/version/v1/message.proto"\x86\x04\n\x0f\x43lusterMetadata\x12\x0f\n\x07\x63luster\x18\x01 \x01(\t\x12\x1b\n\x13history_shard_count\x18\x02 \x01(\x05\x12\x12\n\ncluster_id\x18\x03 \x01(\t\x12:\n\x0cversion_info\x18\x04 \x01(\x0b\x32$.temporal.api.version.v1.VersionInfo\x12\x64\n\x17index_search_attributes\x18\x05 \x03(\x0b\x32\x43.temporal.api.cluster.v1.ClusterMetadata.IndexSearchAttributesEntry\x12\x17\n\x0f\x63luster_address\x18\x06 \x01(\t\x12"\n\x1a\x66\x61ilover_version_increment\x18\x07 \x01(\x03\x12 \n\x18initial_failover_version\x18\x08 \x01(\x03\x12#\n\x1bis_global_namespace_enabled\x18\t \x01(\x08\x12\x1d\n\x15is_connection_enabled\x18\n \x01(\x08\x1al\n\x1aIndexSearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12=\n\x05value\x18\x02 \x01(\x0b\x32..temporal.api.cluster.v1.IndexSearchAttributes:\x02\x38\x01"\xed\x01\n\x15IndexSearchAttributes\x12l\n\x18\x63ustom_search_attributes\x18\x01 \x03(\x0b\x32J.temporal.api.cluster.v1.IndexSearchAttributes.CustomSearchAttributesEntry\x1a\x66\n\x1b\x43ustomSearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1c\n\x08HostInfo\x12\x10\n\x08identity\x18\x01 \x01(\t"b\n\x08RingInfo\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x14\n\x0cmember_count\x18\x02 \x01(\x05\x12\x32\n\x07members\x18\x03 \x03(\x0b\x32!.temporal.api.cluster.v1.HostInfo"\x96\x01\n\x0eMembershipInfo\x12\x37\n\x0c\x63urrent_host\x18\x01 \x01(\x0b\x32!.temporal.api.cluster.v1.HostInfo\x12\x19\n\x11reachable_members\x18\x02 \x03(\t\x12\x30\n\x05rings\x18\x03 \x03(\x0b\x32!.temporal.api.cluster.v1.RingInfo"\xb9\x02\n\rClusterMember\x12\x36\n\x04role\x18\x01 \x01(\x0e\x32(.temporal.api.enums.v1.ClusterMemberRole\x12\x0f\n\x07host_id\x18\x02 \x01(\t\x12\x13\n\x0brpc_address\x18\x03 \x01(\t\x12\x10\n\x08rpc_port\x18\x04 \x01(\x05\x12<\n\x12session_start_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12<\n\x12last_heartbit_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12<\n\x12record_expiry_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x42\x8a\x01\n\x1aio.temporal.api.cluster.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/cluster/v1;cluster\xaa\x02\x17Temporal.Api.Cluster.V1\xea\x02\x1aTemporal::Api::Cluster::V1b\x06proto3'
 )
 
-
-_CLUSTERMETADATA = DESCRIPTOR.message_types_by_name["ClusterMetadata"]
-_CLUSTERMETADATA_INDEXSEARCHATTRIBUTESENTRY = _CLUSTERMETADATA.nested_types_by_name[
-    "IndexSearchAttributesEntry"
-]
-_INDEXSEARCHATTRIBUTES = DESCRIPTOR.message_types_by_name["IndexSearchAttributes"]
-_INDEXSEARCHATTRIBUTES_CUSTOMSEARCHATTRIBUTESENTRY = (
-    _INDEXSEARCHATTRIBUTES.nested_types_by_name["CustomSearchAttributesEntry"]
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "temporal.api.cluster.v1.message_pb2", globals()
 )
-_HOSTINFO = DESCRIPTOR.message_types_by_name["HostInfo"]
-_RINGINFO = DESCRIPTOR.message_types_by_name["RingInfo"]
-_MEMBERSHIPINFO = DESCRIPTOR.message_types_by_name["MembershipInfo"]
-_CLUSTERMEMBER = DESCRIPTOR.message_types_by_name["ClusterMember"]
-ClusterMetadata = _reflection.GeneratedProtocolMessageType(
-    "ClusterMetadata",
-    (_message.Message,),
-    {
-        "IndexSearchAttributesEntry": _reflection.GeneratedProtocolMessageType(
-            "IndexSearchAttributesEntry",
-            (_message.Message,),
-            {
-                "DESCRIPTOR": _CLUSTERMETADATA_INDEXSEARCHATTRIBUTESENTRY,
-                "__module__": "temporal.api.cluster.v1.message_pb2"
-                # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.ClusterMetadata.IndexSearchAttributesEntry)
-            },
-        ),
-        "DESCRIPTOR": _CLUSTERMETADATA,
-        "__module__": "temporal.api.cluster.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.ClusterMetadata)
-    },
-)
-_sym_db.RegisterMessage(ClusterMetadata)
-_sym_db.RegisterMessage(ClusterMetadata.IndexSearchAttributesEntry)
-
-IndexSearchAttributes = _reflection.GeneratedProtocolMessageType(
-    "IndexSearchAttributes",
-    (_message.Message,),
-    {
-        "CustomSearchAttributesEntry": _reflection.GeneratedProtocolMessageType(
-            "CustomSearchAttributesEntry",
-            (_message.Message,),
-            {
-                "DESCRIPTOR": _INDEXSEARCHATTRIBUTES_CUSTOMSEARCHATTRIBUTESENTRY,
-                "__module__": "temporal.api.cluster.v1.message_pb2"
-                # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.IndexSearchAttributes.CustomSearchAttributesEntry)
-            },
-        ),
-        "DESCRIPTOR": _INDEXSEARCHATTRIBUTES,
-        "__module__": "temporal.api.cluster.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.IndexSearchAttributes)
-    },
-)
-_sym_db.RegisterMessage(IndexSearchAttributes)
-_sym_db.RegisterMessage(IndexSearchAttributes.CustomSearchAttributesEntry)
-
-HostInfo = _reflection.GeneratedProtocolMessageType(
-    "HostInfo",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _HOSTINFO,
-        "__module__": "temporal.api.cluster.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.HostInfo)
-    },
-)
-_sym_db.RegisterMessage(HostInfo)
-
-RingInfo = _reflection.GeneratedProtocolMessageType(
-    "RingInfo",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _RINGINFO,
-        "__module__": "temporal.api.cluster.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.RingInfo)
-    },
-)
-_sym_db.RegisterMessage(RingInfo)
-
-MembershipInfo = _reflection.GeneratedProtocolMessageType(
-    "MembershipInfo",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _MEMBERSHIPINFO,
-        "__module__": "temporal.api.cluster.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.MembershipInfo)
-    },
-)
-_sym_db.RegisterMessage(MembershipInfo)
-
-ClusterMember = _reflection.GeneratedProtocolMessageType(
-    "ClusterMember",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _CLUSTERMEMBER,
-        "__module__": "temporal.api.cluster.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.cluster.v1.ClusterMember)
-    },
-)
-_sym_db.RegisterMessage(ClusterMember)
-
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None

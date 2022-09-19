@@ -4,9 +4,8 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -19,21 +18,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n%temporal/sdk/core/common/common.proto\x12\x0e\x63oresdk.common\x1a\x1egoogle/protobuf/duration.proto"U\n\x1bNamespacedWorkflowExecution\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\tb\x06proto3'
 )
 
-
-_NAMESPACEDWORKFLOWEXECUTION = DESCRIPTOR.message_types_by_name[
-    "NamespacedWorkflowExecution"
-]
-NamespacedWorkflowExecution = _reflection.GeneratedProtocolMessageType(
-    "NamespacedWorkflowExecution",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _NAMESPACEDWORKFLOWEXECUTION,
-        "__module__": "temporal.sdk.core.common.common_pb2"
-        # @@protoc_insertion_point(class_scope:coresdk.common.NamespacedWorkflowExecution)
-    },
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(
+    DESCRIPTOR, "temporal.sdk.core.common.common_pb2", globals()
 )
-_sym_db.RegisterMessage(NamespacedWorkflowExecution)
-
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
