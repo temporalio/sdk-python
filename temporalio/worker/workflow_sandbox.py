@@ -7,12 +7,22 @@ import importlib.abc
 import importlib.machinery
 import importlib.util
 import logging
-import re
 import sys
 import types
 from copy import copy
 from dataclasses import dataclass
-from typing import ClassVar, Dict, List, Mapping, Optional, Sequence, Type, Union
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+    Union,
+)
 
 from typing_extensions import TypeAlias
 
@@ -46,6 +56,17 @@ from .workflow_instance import (
 # * Using sys.setprofile
 #   * Problem: Only affects calls, not variable access
 # * Using custom importer to proxy out bad things - Investigating
+#   * Existing solutions/ideas:
+#     * https://www.attrs.org/en/stable/how-does-it-work.html#immutability
+#     * https://github.com/diegojromerolopez/gelidum
+#     * https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch
+#     * https://wrapt.readthedocs.io
+#     * https://github.com/zopefoundation/RestrictedPython
+#     * Immutable proxies
+#       * https://codereview.stackexchange.com/questions/27468/creating-proxy-classes-for-immutable-objects
+#       * https://stackoverflow.com/a/29986462
+#       * https://ruddra.com/python-proxy-object/
+
 #
 # Discussion of extension module reloading:
 #
@@ -83,58 +104,116 @@ from .workflow_instance import (
 #     that we can use our own builtins (namely so we get transitive imports)
 # * For import/call restrictions, we TODO(cretz): describe
 
-# String patterns are fixed values.  Regex is from the beginning of the string,
-# not anywhere in the string (i.e. using match, see
-# https://docs.python.org/3/library/re.html#search-vs-match).
-Patterns: TypeAlias = List[Union[str, re.Pattern]]
-
 
 @dataclass(frozen=True)
 class SandboxRestrictions:
     # Modules which pass through because we know they are side-effect free.
     # These modules will not be reloaded and will share with the host. Compares
     # against the fully qualified module name.
-    passthrough_modules: Patterns
+    passthrough_modules: SandboxPattern
 
     # Modules which cannot even be imported. If possible, use
     # invalid_module_members instead so modules that are unused by running code
     # can still be imported for other non-running code. Compares against the
     # fully qualified module name.
-    invalid_modules: Patterns
+    invalid_modules: SandboxPattern
 
     # Module members which cannot be accessed. This includes variables,
     # functions, class methods (including __init__, etc). Compares the key
     # against the fully qualified module name then the value against the
     # qualified member name not including the module itself.
-    invalid_module_members: Dict[str, Patterns]
+    invalid_module_members: SandboxPattern
 
     default: ClassVar[SandboxRestrictions]
-
-    # These are set at the end of the file
-    passthrough_modules_minimum: ClassVar[Patterns]
-    passthrough_modules_with_temporal: ClassVar[Patterns]
-    passthrough_modules_maximum: ClassVar[Patterns]
-    passthrough_modules_default: ClassVar[Patterns]
+    passthrough_modules_minimum: ClassVar[SandboxPattern]
+    passthrough_modules_with_temporal: ClassVar[SandboxPattern]
+    passthrough_modules_maximum: ClassVar[SandboxPattern]
+    passthrough_modules_default: ClassVar[SandboxPattern]
 
 
-def self_and_children_pattern(parent: str) -> re.Pattern:
-    return re.compile(re.escape(parent) + r"(?:$|\..*)")
+# TODO(cretz): Make recursive when recursive types no longer experimental, see
+# https://github.com/python/mypy/issues/731#issuecomment-1213482527
+SandboxPatternNestedDict: TypeAlias = Dict[str, Any]
 
 
-SandboxRestrictions.passthrough_modules_minimum = [
-    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
-    self_and_children_pattern("google.protobuf"),
-    self_and_children_pattern("grpc"),
-]
+@dataclass(frozen=True)
+class SandboxPattern:
+    match_self: bool = False
+    children: Optional[Dict[str, SandboxPattern]] = None
 
-SandboxRestrictions.passthrough_modules_with_temporal = (
-    SandboxRestrictions.passthrough_modules_minimum
-    # Due to Python checks on ABC class extension, we have to include all
-    # modules of classes we might extend
-    + [
-        self_and_children_pattern("asyncio"),
-        self_and_children_pattern("abc"),
-        self_and_children_pattern("temporalio"),
+    all: ClassVar[SandboxPattern]
+    none: ClassVar[SandboxPattern]
+
+    @staticmethod
+    def from_nested_dict(d: SandboxPatternNestedDict) -> SandboxPattern:
+        return SandboxPattern(
+            children={
+                k: SandboxPattern.from_nested_dict(v) if v else SandboxPattern.all
+                for k, v in d.items()
+            }
+            or None,
+        )
+
+    @staticmethod
+    def from_dotted_strs(v: List[str]) -> SandboxPattern:
+        # TODO(cretz): Document that if entire module is included _and_ a child,
+        # the entire-module restriction won't apply
+        root: SandboxPatternNestedDict = {}
+        for s in v:
+            curr = root
+            for piece in s.split("."):
+                curr = curr.setdefault(piece, {})
+        return SandboxPattern.from_nested_dict(root)
+
+    def __or__(self, other: SandboxPattern) -> SandboxPattern:
+        if self.match_self or other.match_self:
+            return SandboxPattern.all
+        if not self.children and not other.children:
+            return SandboxPattern.none
+        return SandboxPattern(children=(self.children or {}) | (other.children or {}))
+
+    def matches_dotted_str(self, s: str) -> bool:
+        return self.matches_path(s.split("."))
+
+    def matches_path(self, pieces: List[str]) -> bool:
+        if self.match_self or not self.children or len(pieces) == 0:
+            return self.match_self
+        child = self.children.get(pieces[0])
+        return child is not None and child.matches_path(pieces[1:])
+
+    def child_from_dotted_str(self, s: str) -> Optional[SandboxPattern]:
+        return self.child_from_path(s.split("."))
+
+    def child_from_path(self, v: List[str]) -> Optional[SandboxPattern]:
+        if self.match_self:
+            return SandboxPattern.all
+        if len(v) == 0 or not self.children:
+            return None
+        child = self.children.get(v[0])
+        if not child or len(v) == 1:
+            return child
+        return child.child_from_path(v[1:])
+
+
+SandboxPattern.none = SandboxPattern()
+SandboxPattern.all = SandboxPattern(match_self=True)
+
+
+SandboxRestrictions.passthrough_modules_minimum = SandboxPattern.from_dotted_strs(
+    [
+        # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
+        "google.protobuf",
+        "grpc",
+    ]
+)
+
+SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | SandboxPattern.from_dotted_strs(
+    [
+        # Due to Python checks on ABC class extension, we have to include all
+        # modules of classes we might extend
+        "asyncio",
+        "abc",
+        "temporalio",
     ]
 )
 
@@ -178,15 +257,17 @@ _stdlib_module_names = (
 
 SandboxRestrictions.passthrough_modules_maximum = (
     SandboxRestrictions.passthrough_modules_with_temporal
-    # All stdlib modules except "sys" and their children. Children are not
-    # listed in stdlib names but we need them because in some cases (e.g. os
-    # manually setting sys.modules["os.path"]) they have certain child
-    # expectations.
-    + [
-        self_and_children_pattern(m)
-        for m in _stdlib_module_names.split(",")
-        if m != "sys"
-    ]
+    | SandboxPattern.from_dotted_strs(
+        [
+            # All stdlib modules except "sys" and their children. Children are not
+            # listed in stdlib names but we need them because in some cases (e.g. os
+            # manually setting sys.modules["os.path"]) they have certain child
+            # expectations.
+            v
+            for v in _stdlib_module_names.split(",")
+            if v != "sys"
+        ]
+    )
 )
 
 SandboxRestrictions.passthrough_modules_default = (
@@ -195,8 +276,8 @@ SandboxRestrictions.passthrough_modules_default = (
 
 SandboxRestrictions.default = SandboxRestrictions(
     passthrough_modules=SandboxRestrictions.passthrough_modules_default,
-    invalid_modules=[],
-    invalid_module_members={},
+    invalid_modules=SandboxPattern.none,
+    invalid_module_members=SandboxPattern.none,
 )
 
 logger = logging.getLogger(__name__)
@@ -221,26 +302,9 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         super().__init__()
         self._runner_class = runner_class
         self._restrictions = restrictions
-        self._cached_module_passthrough: Dict[str, bool] = {}
 
     async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         return await _WorkflowInstanceImpl.create(self, det)
-
-    def _check_module_passthrough(self, name: str) -> bool:
-        res = self._cached_module_passthrough.get(name)
-        if res is None:
-            res = self._check_patterns(name, self._restrictions.passthrough_modules)
-            self._cached_module_passthrough[name] = res
-        return res
-
-    def _check_patterns(self, str: str, patterns: Patterns) -> bool:
-        for p in patterns:
-            if isinstance(p, re.Pattern):
-                if p.match(str):
-                    return True
-            elif p == str:
-                return True
-        return False
 
 
 class _WorkflowInstanceImpl(WorkflowInstance):
@@ -293,6 +357,9 @@ class _WorkflowInstanceImpl(WorkflowInstance):
         # Make a new set of sys.modules cache and new meta path
         self._new_modules: Dict[str, types.ModuleType] = {}
         self._new_meta_path: List = [_SandboxedImporter(self, sys.meta_path)]  # type: ignore
+        # # We need to know which modules we've checked for restrictions so we
+        # # save the effort of re-checking on successive imports
+        self._restriction_checked_modules: Set[str] = set()
 
     def _run_code(self, code: str) -> None:
         _trace("Running sandboxed code:\n%s", code)
@@ -354,12 +421,16 @@ class _WorkflowInstanceImpl(WorkflowInstance):
         level: int = 0,
     ) -> types.ModuleType:
         new_sys = False
+        # Passthrough modules
         if name not in sys.modules:
             new_sys = name == "sys"
+            # Make sure the entire module isn't set as invalid
+            if self._runner._restrictions.invalid_modules.matches_dotted_str(name):
+                raise RestrictedWorkflowAccessError(name)
             # If it's a passthrough module, just put it in sys.modules from old
             # sys.modules
             if (
-                self._runner._check_module_passthrough(name)
+                self._runner._restrictions.passthrough_modules.matches_dotted_str(name)
                 and name in self._old_modules
             ):
                 # Internally, Python loads the parents before the children, but
@@ -382,10 +453,23 @@ class _WorkflowInstanceImpl(WorkflowInstance):
                 if parent:
                     setattr(sys.modules[parent], child, sys.modules[name])
         mod = importlib.__import__(name, globals, locals, fromlist, level)
+        # If this is not already checked and there is a pattern, restrict
+        if name not in self._restriction_checked_modules:
+            self._restriction_checked_modules.add(name)
+            pattern = (
+                self._runner._restrictions.invalid_module_members.child_from_dotted_str(
+                    name
+                )
+            )
+            if pattern:
+                _trace("Restricting module %s during import", name)
+                mod = _RestrictedModule(mod, pattern)
+                sys.modules[name] = mod
+
         if new_sys:
-            _trace("Replacing modules and meta path in sys")
             # We have to change the modules and meta path back to the known
             # ones
+            _trace("Replacing modules and meta path in sys")
             self._new_modules["sys"] = mod
             setattr(mod, "modules", self._new_modules)
             setattr(mod, "meta_path", self._new_meta_path)
@@ -414,12 +498,21 @@ class _SandboxedImporter(importlib.abc.MetaPathFinder):
             if not spec:
                 continue
             _trace("  Found spec: %s in finder %s", spec, finder)
-            # Python's default exec_module does not use our builtins (which has
-            # our custom importer), so we must inject out builtins.
+            # There are two things the default Python loaders do that we must
+            # override here.
             #
-            # We do this by shallow-copying the spec and its loader, then
-            # replacing the loader's exec_module with our own that delegates to
-            # the original after we have set the builtins.
+            # First, when resolving "from lists"  where the child is a module
+            # (e.g. "from foo import bar" where foo.bar is a module), Python
+            # internally uses an importer we can't override. Therefore we must
+            # perform our restrictions on create_module of the loader.
+            #
+            # Second, Python's default exec_module does not use our builtins
+            # which has our custom importer, so we must inject our builtins at
+            # module execution time.
+            #
+            # We override these two loader methods by shallow-copying the spec
+            # and its loader, then replacing the loader's create_module and
+            # exec_module with our own that delegates to the original.
             #
             # We choose shallow copy for the spec and loader instead of a
             # wrapper class because the internal Python code has a lot of hidden
@@ -428,9 +521,35 @@ class _SandboxedImporter(importlib.abc.MetaPathFinder):
             if spec.loader:
                 spec = copy(spec)
                 spec.loader = copy(spec.loader)
-                # MyPy needs help
+                # There's always a loader in our experience but Typeshed is
+                # saying it's optional
                 assert spec.loader
+                orig_create_module = spec.loader.create_module
                 orig_exec_module = spec.loader.exec_module
+                spec.loader.load_module
+
+                def custom_create_module(
+                    spec: importlib.machinery.ModuleSpec,
+                ) -> Optional[types.ModuleType]:
+                    _trace("Applying custom create for module %s", spec.name)
+                    mod = orig_create_module(spec)
+
+                    # If this is not already checked and there is a pattern,
+                    # restrict
+                    if spec.name not in self._instance._restriction_checked_modules:
+                        self._instance._restriction_checked_modules.add(spec.name)
+                        pattern = self._instance._runner._restrictions.invalid_module_members.child_from_dotted_str(
+                            spec.name
+                        )
+                        if pattern:
+                            _trace("Restricting module %s during create", spec.name)
+                            # mod might be None which means "defer to default"
+                            # loading in Python, so we manually instantiate if
+                            # that's the case
+                            if not mod:
+                                mod = types.ModuleType(spec.name)
+                            mod = _RestrictedModule(mod, pattern)
+                    return mod
 
                 def custom_exec_module(module: types.ModuleType) -> None:
                     # MyPy needs help
@@ -449,6 +568,79 @@ class _SandboxedImporter(importlib.abc.MetaPathFinder):
                     ] = self._instance._globals_and_locals["__builtins__"]
                     orig_exec_module(module)
 
+                # Replace the methods
+                spec.loader.create_module = custom_create_module  # type: ignore
                 spec.loader.exec_module = custom_exec_module  # type: ignore
             return spec
         return None
+
+
+@dataclass
+class _RestrictionState:
+    name: str
+    obj: object
+    pattern: SandboxPattern
+
+
+class _RestrictedObject:
+    def __init__(self, state: _RestrictionState) -> None:
+        _trace("Init restricted object for %s", state.name)
+        object.__setattr__(self, "__temporal_state", state)
+
+    def __delattr__(self, __name: str) -> None:
+        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        _trace("__delattr__ %s on %s", __name, state.name)
+        delattr(state.obj, __name)
+
+    def __getattribute__(self, __name: str) -> Any:
+        # To prevent recursion, must use __getattribute__ on super to get the
+        # restriction state
+        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        _trace("__getattribute__ %s on %s", __name, state.name)
+        if state.pattern.matches_dotted_str(__name):
+            _trace("%s on %s restricted")
+            raise RestrictedWorkflowAccessError(f"{state.name}.{__name}")
+        # return types.ModuleType.__getattribute__(self, __name)
+        # TODO(cretz): Wrap result if necessary and do hierarchical restrictions
+        return getattr(state.obj, __name)
+
+    def __nonzero__(self):
+        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        _trace("__nonzero__ for %s", state.name)
+        return bool(state.obj)
+
+    def __repr__(self):
+        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        _trace("__repr__ for %s", state.name)
+        return repr(state.obj)
+
+    def __hash__(self):
+        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        _trace("__hash__ for %s", state.name)
+        return hash(state.obj)
+
+    def __setattr__(self, __name: str, __value: Any) -> None:
+        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        _trace("__setattr__ %s on %s", __name, state.name)
+        setattr(state.obj, __name, __value)
+
+    def __str__(self):
+        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        _trace("__str__ for %s", state.name)
+        return str(state.obj)
+
+    # TODO(cretz): More special calls
+
+
+class _RestrictedModule(_RestrictedObject, types.ModuleType):
+    def __init__(self, mod: types.ModuleType, pattern: SandboxPattern) -> None:
+        _RestrictedObject.__init__(
+            self, _RestrictionState(name=mod.__name__, obj=mod, pattern=pattern)
+        )
+        types.ModuleType.__init__(self, mod.__name__, mod.__doc__)
+
+
+class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
+    def __init__(self, qualified_name: str) -> None:
+        super().__init__(f"Cannot access {qualified_name} from inside a workflow.")
+        self.qualified_name = qualified_name

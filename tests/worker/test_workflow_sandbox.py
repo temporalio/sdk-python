@@ -8,10 +8,11 @@ import pytest
 
 import temporalio.worker.workflow_sandbox
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import (
     SandboxedWorkflowRunner,
+    SandboxPattern,
     SandboxRestrictions,
     UnsandboxedWorkflowRunner,
     Worker,
@@ -82,7 +83,7 @@ class GlobalStateWorkflow:
 )
 async def test_workflow_sandbox_global_state(
     client: Client,
-    sandboxed_passthrough_modules: temporalio.worker.workflow_sandbox.Patterns,
+    sandboxed_passthrough_modules: SandboxPattern,
 ):
     async with new_worker(
         client,
@@ -142,32 +143,47 @@ async def test_workflow_sandbox_global_state(
 # * Invalid modules
 # * Invalid module members (all forms of access/use)
 # * Different preconfigured passthroughs
+# * Import from with "as" that is restricted
+# * Restricted modules that are still passed through
 
-# bad_global_var = "some var"
 
-# @workflow.defn
-# class InvalidMemberWorkflow:
-#     @workflow.run
-#     async def run(self) -> None:
-#         # Wait forever
-#         await asyncio.Future()
+@workflow.defn
+class InvalidMemberWorkflow:
+    @workflow.run
+    async def run(self, action: str) -> None:
+        try:
+            if action == "get_bad_global_var":
+                workflow.logger.info(stateful_module.bad_global_var)
+        except temporalio.worker.workflow_sandbox.RestrictedWorkflowAccessError as err:
+            raise ApplicationError(
+                f"Got restriction", type="RestrictedWorkflowAccessError"
+            ) from err
 
-#     @workflow.signal
-#     def access_bad_global_var(self) -> None:
-#         workflow.logger.info(bad_global_var)
-#         workflow.logger.info(stateful_module.module_state)
 
-# async def test_workflow_sandbox_invalid_module_members(client: Client):
-#     # TODO(cretz): Var read, var write, class create, class static access, func calls, class methods, class creation
-#     async with new_worker(
-#         client,
-#         InvalidMemberWorkflow,
-#     ) as worker:
-#         handle = await client.start_workflow(InvalidMemberWorkflow.run,
-#             id=f"workflow-{uuid.uuid4()}",
-#             task_queue=worker.task_queue)
-#         await handle.signal(InvalidMemberWorkflow.access_bad_global_var)
-#         await asyncio.sleep(5)
+async def test_workflow_sandbox_restrictions(client: Client):
+    # TODO(cretz): Var read, var write, class create, class static access, func calls, class methods, class creation
+    async with new_worker(
+        client,
+        InvalidMemberWorkflow,
+        sandboxed_invalid_module_members=SandboxPattern.from_dotted_strs(
+            [
+                "tests.worker.stateful_module.bad_global_var",
+            ]
+        ),
+    ) as worker:
+
+        async def assert_restriction(action: str) -> None:
+            with pytest.raises(WorkflowFailureError) as err:
+                await client.execute_workflow(
+                    InvalidMemberWorkflow.run,
+                    action,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+            assert isinstance(err.value.cause, ApplicationError)
+            assert err.value.cause.type == "RestrictedWorkflowAccessError"
+
+        await assert_restriction("get_bad_global_var")
 
 
 def new_worker(
@@ -176,14 +192,17 @@ def new_worker(
     activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
     sandboxed: bool = True,
-    sandboxed_passthrough_modules: Optional[
-        temporalio.worker.workflow_sandbox.Patterns
-    ] = None,
+    sandboxed_passthrough_modules: Optional[SandboxPattern] = None,
+    sandboxed_invalid_module_members: Optional[SandboxPattern] = None,
 ) -> Worker:
     restrictions = SandboxRestrictions.default
     if sandboxed_passthrough_modules:
         restrictions = dataclasses.replace(
             restrictions, passthrough_modules=sandboxed_passthrough_modules
+        )
+    if sandboxed_invalid_module_members:
+        restrictions = dataclasses.replace(
+            restrictions, invalid_module_members=sandboxed_invalid_module_members
         )
     return Worker(
         client,
