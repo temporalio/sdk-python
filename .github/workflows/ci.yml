@@ -60,11 +60,7 @@ jobs:
         run: poe gen-docs
       - name: Deploy prod API docs
         if: ${{ github.ref == 'refs/heads/main' && matrix.docsTarget }}
-        # Using NPX instead of action due to https://github.com/netlify/actions/issues/60
-        run: npx netlify-cli deploy --build --dir=build/apidocs --prod
-        env:
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --name python --scope temporal --prod --yes
 
   # Compile the binaries and upload artifacts
   compile-binaries:
