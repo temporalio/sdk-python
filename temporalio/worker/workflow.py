@@ -94,6 +94,12 @@ class _WorkflowWorker:
             # Confirm name unique
             if defn.name in self._workflows:
                 raise ValueError(f"More than one workflow named {defn.name}")
+            # Prepare the workflow with the runner (this will error in the
+            # sandbox if an import fails somehow)
+            try:
+                workflow_runner.prepare_workflow(defn)
+            except Exception as err:
+                raise RuntimeError(f"Failed validating workflow {defn.name}") from err
             self._workflows[defn.name] = defn
 
     async def run(self) -> None:

@@ -75,6 +75,10 @@ class WorkflowRunner(ABC):
     """
 
     @abstractmethod
+    def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Create a workflow instance that can handle activations.
 
@@ -122,6 +126,10 @@ class WorkflowInstance(ABC):
 
 class UnsandboxedWorkflowRunner(WorkflowRunner):
     """Workflow runner that does not do any sandboxing."""
+
+    def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
+        # Do nothing by default
+        pass
 
     async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Create an unsandboxed workflow instance."""

@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import dataclasses
+import os
 import sys
 import uuid
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence, Type
+from typing import Callable, ClassVar, Dict, List, Optional, Sequence, Type
 
 import pytest
 
@@ -16,6 +19,10 @@ from temporalio.worker import (
     SandboxRestrictions,
     UnsandboxedWorkflowRunner,
     Worker,
+)
+from temporalio.worker.workflow_sandbox import (
+    RestrictedWorkflowAccessError,
+    _RestrictedProxy,
 )
 from tests.worker import stateful_module
 from tests.worker.test_workflow import assert_eq_eventually
@@ -38,6 +45,41 @@ def test_workflow_sandbox_stdlib_module_names():
     assert (
         actual_names == temporalio.worker.workflow_sandbox._stdlib_module_names
     ), f"Expecting names as {actual_names}. In code as:\n{code}"
+
+
+def test_workflow_sandbox_pattern_from_value():
+    actual = SandboxPattern.from_value(
+        [
+            "foo.bar",
+            "qux.foo.foo",
+            {
+                "bar": "baz",
+                "baz": True,
+                "foo": {"sub1": ["sub2.sub3"]},
+            },
+        ]
+    )
+    assert actual == SandboxPattern(
+        children={
+            "foo": SandboxPattern(
+                children={
+                    "bar": SandboxPattern.all,
+                    "sub1": SandboxPattern(
+                        children={
+                            "sub2": SandboxPattern(
+                                children={"sub3": SandboxPattern.all}
+                            ),
+                        }
+                    ),
+                }
+            ),
+            "bar": SandboxPattern(children={"baz": SandboxPattern.all}),
+            "baz": SandboxPattern.all,
+            "qux": SandboxPattern(
+                children={"foo": SandboxPattern(children={"foo": SandboxPattern.all})}
+            ),
+        }
+    )
 
 
 global_state = ["global orig"]
@@ -139,12 +181,72 @@ async def test_workflow_sandbox_global_state(
         assert stateful_module.module_state == ["module orig"]
 
 
+@dataclass
+class RestrictableObject:
+    foo: Optional[RestrictableObject] = None
+    bar: int = 42
+    baz: ClassVar[int] = 57
+    qux: ClassVar[RestrictableObject]
+
+    some_dict: Optional[Dict] = None
+
+
+RestrictableObject.qux = RestrictableObject(foo=RestrictableObject(bar=70), bar=80)
+
+
+def test_workflow_sandbox_restricted_proxy():
+    obj_class = _RestrictedProxy(
+        "RestrictableObject",
+        RestrictableObject,
+        SandboxPattern.from_value(
+            [
+                "foo.bar",
+                "qux.foo.foo",
+                "some_dict.key1.subkey2",
+                "some_dict.key.2.subkey1",
+                "some_dict.key\\.2.subkey2",
+            ]
+        ),
+    )
+    obj = obj_class(
+        foo=obj_class(),
+        some_dict={
+            "key1": {"subkey1": "val", "subkey2": "val"},
+            "key.2": {"subkey1": "val", "subkey2": "val"},
+        },
+    )
+    # Accessing these values is fine
+    _ = (
+        obj.bar,
+        obj.foo.foo,
+        obj_class.baz,
+        obj_class.qux.bar,
+        obj_class.qux.foo.bar,
+        obj.some_dict["key1"]["subkey1"],
+        obj.some_dict["key.2"]["subkey1"],
+    )
+    # But these aren't
+    with pytest.raises(RestrictedWorkflowAccessError) as err:
+        _ = obj.foo.bar
+    assert err.value.qualified_name == "RestrictableObject.foo.bar"
+    with pytest.raises(RestrictedWorkflowAccessError) as err:
+        _ = obj_class.qux.foo.foo.bar
+    assert err.value.qualified_name == "RestrictableObject.qux.foo.foo"
+    with pytest.raises(RestrictedWorkflowAccessError) as err:
+        _ = obj.some_dict["key1"]["subkey2"]
+    assert err.value.qualified_name == "RestrictableObject.some_dict.key1.subkey2"
+    with pytest.raises(RestrictedWorkflowAccessError) as err:
+        _ = obj.some_dict["key.2"]["subkey2"]
+    assert err.value.qualified_name == "RestrictableObject.some_dict.key.2.subkey2"
+
+
 # TODO(cretz): To test:
 # * Invalid modules
 # * Invalid module members (all forms of access/use)
 # * Different preconfigured passthroughs
 # * Import from with "as" that is restricted
 # * Restricted modules that are still passed through
+# * Import w/ bad top-level code
 
 
 @workflow.defn
@@ -152,25 +254,24 @@ class InvalidMemberWorkflow:
     @workflow.run
     async def run(self, action: str) -> None:
         try:
-            if action == "get_bad_global_var":
-                workflow.logger.info(stateful_module.bad_global_var)
-        except temporalio.worker.workflow_sandbox.RestrictedWorkflowAccessError as err:
+            if action == "get_bad_module_var":
+                workflow.logger.info(os.name)
+            elif action == "set_bad_module_var":
+                os.name = "bad"
+            elif action == "call_bad_module_func":
+                os.getcwd()
+            elif action == "call_bad_builtin_func":
+                open("does-not-exist.txt")
+        except RestrictedWorkflowAccessError as err:
             raise ApplicationError(
-                f"Got restriction", type="RestrictedWorkflowAccessError"
+                str(err), type="RestrictedWorkflowAccessError"
             ) from err
 
 
 async def test_workflow_sandbox_restrictions(client: Client):
-    # TODO(cretz): Var read, var write, class create, class static access, func calls, class methods, class creation
-    async with new_worker(
-        client,
-        InvalidMemberWorkflow,
-        sandboxed_invalid_module_members=SandboxPattern.from_dotted_strs(
-            [
-                "tests.worker.stateful_module.bad_global_var",
-            ]
-        ),
-    ) as worker:
+    # TODO(cretz): Things to Var read, var write, class create, class static access, func calls, class methods, class creation
+
+    async with new_worker(client, InvalidMemberWorkflow) as worker:
 
         async def assert_restriction(action: str) -> None:
             with pytest.raises(WorkflowFailureError) as err:
@@ -183,7 +284,21 @@ async def test_workflow_sandbox_restrictions(client: Client):
             assert isinstance(err.value.cause, ApplicationError)
             assert err.value.cause.type == "RestrictedWorkflowAccessError"
 
-        await assert_restriction("get_bad_global_var")
+        actions_to_check = [
+            "get_bad_module_var",
+            "set_bad_module_var",
+            "call_bad_module_func",
+            "call_bad_builtin_func",
+            # TODO(cretz): How can we prevent this while also letting the stdlib
+            # to its own setattr?
+            # "set_module_var_on_passthrough",
+            # "delete_module_var_on_passthrough",
+            # TODO(cretz):
+            # "mutate_bad_sequence"
+            # "create_bad_class"
+        ]
+        for action in actions_to_check:
+            await assert_restriction(action)
 
 
 def new_worker(

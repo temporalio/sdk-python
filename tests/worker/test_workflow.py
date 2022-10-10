@@ -1222,6 +1222,9 @@ class CustomWorkflowRunner(WorkflowRunner):
         self._unsandboxed = UnsandboxedWorkflowRunner()
         self._pairs: List[Tuple[WorkflowActivation, WorkflowActivationCompletion]] = []
 
+    def prepare_workflow(self, defn: workflow._Definition) -> None:
+        pass
+
     async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         # We need to assert details can be pickled for potential sandbox use
         det_pickled = pickle.loads(pickle.dumps(det))
