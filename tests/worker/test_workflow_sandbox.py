@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import random
 import sys
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable, ClassVar, Dict, List, Optional, Sequence, Type
 
 import pytest
@@ -255,13 +257,17 @@ class InvalidMemberWorkflow:
     async def run(self, action: str) -> None:
         try:
             if action == "get_bad_module_var":
-                workflow.logger.info(os.name)
+                workflow.logger.info(os.getcwd)
             elif action == "set_bad_module_var":
-                os.name = "bad"
+                os.getcwd = lambda: "bad"
             elif action == "call_bad_module_func":
                 os.getcwd()
             elif action == "call_bad_builtin_func":
                 open("does-not-exist.txt")
+            elif action == "call_datetime_now":
+                datetime.now()
+            elif action == "call_random_choice":
+                random.choice(["foo", "bar"])
         except RestrictedWorkflowAccessError as err:
             raise ApplicationError(
                 str(err), type="RestrictedWorkflowAccessError"
@@ -289,6 +295,8 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "set_bad_module_var",
             "call_bad_module_func",
             "call_bad_builtin_func",
+            "call_datetime_now",
+            "call_random_choice",
             # TODO(cretz): How can we prevent this while also letting the stdlib
             # to its own setattr?
             # "set_module_var_on_passthrough",

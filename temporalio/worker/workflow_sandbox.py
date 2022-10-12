@@ -235,6 +235,9 @@ SandboxRestrictions.passthrough_modules_minimum = SandboxPattern.from_value(
         # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
         "google.protobuf",
         "grpc",
+        # Due to some side-effecting calls made on import, these need to be
+        # allowed
+        "pathlib",
     ]
 )
 
@@ -306,18 +309,50 @@ SandboxRestrictions.invalid_module_members_default = SandboxPattern.from_value(
     {
         "__builtins__": [
             "breakpoint",
-            # TODO(cretz): Cannot restrict access to these, they are used by some
-            # imports like the "attrs" library
-            # "compile",
-            # "eval",
-            # "exec",
             "input",
             "open",
         ],
+        "datetime": {
+            "date": ["today"],
+            "datetime": ["now", "today", "utcnow"],
+        },
         "os": [
             "getcwd",
-            "name",
+            # Cannot easily restrict os.name, it's even used in Python's pathlib
+            # and shutil during import time
+            # "name",
+            # TODO(cretz): The rest
         ],
+        "random": [
+            "betavariate",
+            "choice",
+            "choices",
+            "expovariate",
+            "gammavariate",
+            "gauss",
+            "getrandbits" "getstate",
+            "lognormvariate",
+            "normalvariate",
+            "paretovariate",
+            "randbytes",
+            "randint",
+            "random",
+            "randrange",
+            "sample",
+            "seed",
+            "setstate",
+            "shuffle",
+            "triangular",
+            "uniform",
+            "vonmisesvariate",
+            "weibullvariate",
+            # TODO(cretz): Disallow Random() and SecureRandom() without seeds
+        ],
+        "readline": SandboxPattern.all,
+        "zoneinfo": {
+            "ZoneInfo": ["clear_cache", "from_file", "reset_tzpath"],
+        }
+        # TODO(cretz): The rest
     }
 )
 
