@@ -21,7 +21,6 @@ from typing import (
     ClassVar,
     Dict,
     List,
-    Literal,
     Mapping,
     NoReturn,
     Optional,
@@ -121,79 +120,82 @@ class SandboxRestrictions:
     # Modules which pass through because we know they are side-effect free.
     # These modules will not be reloaded and will share with the host. Compares
     # against the fully qualified module name.
-    passthrough_modules: SandboxPattern
+    passthrough_modules: SandboxMatcher
 
     # Modules which cannot even be imported. If possible, use
     # invalid_module_members instead so modules that are unused by running code
     # can still be imported for other non-running code. Compares against the
     # fully qualified module name.
-    invalid_modules: SandboxPattern
+    invalid_modules: SandboxMatcher
 
     # Module members which cannot be accessed. This includes variables,
     # functions, class methods (including __init__, etc). Compares the key
     # against the fully qualified module name then the value against the
     # qualified member name not including the module itself.
-    invalid_module_members: SandboxPattern
+    invalid_module_members: SandboxMatcher
 
-    passthrough_modules_minimum: ClassVar[SandboxPattern]
-    passthrough_modules_with_temporal: ClassVar[SandboxPattern]
-    passthrough_modules_maximum: ClassVar[SandboxPattern]
-    passthrough_modules_default: ClassVar[SandboxPattern]
+    passthrough_modules_minimum: ClassVar[SandboxMatcher]
+    passthrough_modules_with_temporal: ClassVar[SandboxMatcher]
+    passthrough_modules_maximum: ClassVar[SandboxMatcher]
+    passthrough_modules_default: ClassVar[SandboxMatcher]
 
-    invalid_module_members_default: ClassVar[SandboxPattern]
+    invalid_module_members_default: ClassVar[SandboxMatcher]
 
     default: ClassVar[SandboxRestrictions]
 
 
+# TODO(cretz): Document asterisk can be used
 @dataclass(frozen=True)
-class SandboxPattern:
+class SandboxMatcher:
+    # TODO(cretz): Document that we intentionally use this form instead of a
+    # more flexible/abstract matching tree form for optimization reasons
+    access: Set[str] = frozenset()  # type: ignore
+    use: Set[str] = frozenset()  # type: ignore
+    children: Mapping[str, SandboxMatcher] = types.MappingProxyType({})
     match_self: bool = False
-    children: Optional[Mapping[str, SandboxPattern]] = None
 
-    all: ClassVar[SandboxPattern]
-    none: ClassVar[SandboxPattern]
+    all: ClassVar[SandboxMatcher]
+    none: ClassVar[SandboxMatcher]
 
-    @staticmethod
-    def from_value(
-        v: Union[SandboxPattern, str, Dict[str, Any], List, Literal[True]]
-    ) -> SandboxPattern:
-        if v is True:
-            return SandboxPattern.all
-        if isinstance(v, SandboxPattern):
-            return v
-        if isinstance(v, str):
-            # Dotted string
-            pieces = v.split(".", maxsplit=1)
-            # Allow escaping dots
-            while pieces[0].endswith("\\") and len(pieces) > 1:
-                # TODO(cretz): Could stop being lazy and do full unescape here
-                if pieces[0].endswith("\\\\"):
-                    raise ValueError("Only simple dot escapes supported")
-                sub_pieces = pieces[1].split(".", maxsplit=1)
-                pieces[0] = pieces[0][:-1] + "." + sub_pieces[0]
-                pieces[1] = sub_pieces[1]
-            return SandboxPattern(
-                children={
-                    pieces[0]: SandboxPattern.all
-                    if len(pieces) == 1
-                    else SandboxPattern.from_value(pieces[1])
-                }
-            )
-        if isinstance(v, dict):
-            return SandboxPattern(
-                children={k: SandboxPattern.from_value(v) for k, v in v.items()}
-            )
-        if isinstance(v, list):
-            ret = SandboxPattern.none
-            for child in v:
-                ret = ret | SandboxPattern.from_value(child)
-            return ret
+    def match_access(self, *child_path: str) -> bool:
+        # We prefer to avoid recursion
+        matcher: Optional[SandboxMatcher] = self
+        for v in child_path:
+            # Considered matched if self matches or access matches Note, "use"
+            # does not match because we allow it to be accessed but not used.
+            assert matcher  # MyPy help
+            if matcher.match_self or v in matcher.access or "*" in matcher.access:
+                return True
+            matcher = self.children.get(v) or self.children.get("*")
+            if not matcher:
+                return False
+            elif matcher.match_self:
+                return True
+        return False
 
-    def __or__(self, other: SandboxPattern) -> SandboxPattern:
+    def child_matcher(self, *child_path: str) -> Optional[SandboxMatcher]:
+        # We prefer to avoid recursion
+        matcher: Optional[SandboxMatcher] = self
+        for v in child_path:
+            # Use all if it matches self, access, _or_ use. Use doesn't match
+            # self but matches all children.
+            assert matcher  # MyPy help
+            if (
+                matcher.match_self
+                or v in matcher.access
+                or v in matcher.use
+                or "*" in matcher.access
+                or "*" in matcher.use
+            ):
+                return SandboxMatcher.all
+            matcher = matcher.children.get(v) or matcher.children.get("*")
+            if not matcher:
+                return None
+        return matcher
+
+    def __or__(self, other: SandboxMatcher) -> SandboxMatcher:
         if self.match_self or other.match_self:
-            return SandboxPattern.all
-        if not self.children and not other.children:
-            return SandboxPattern.none
+            return SandboxMatcher.all
         new_children = dict(self.children) if self.children else {}
         if other.children:
             for other_k, other_v in other.children.items():
@@ -201,54 +203,35 @@ class SandboxPattern:
                     new_children[other_k] = new_children[other_k] | other_v
                 else:
                     new_children[other_k] = other_v
-        return SandboxPattern(children=new_children)
-
-    def matches_dotted_str(self, s: str) -> bool:
-        return self.matches_path(s.split("."))
-
-    def matches_path(self, pieces: List[str]) -> bool:
-        if self.match_self or not self.children or len(pieces) == 0:
-            return self.match_self
-        child = self.children.get(pieces[0])
-        return child is not None and child.matches_path(pieces[1:])
-
-    def child_from_dotted_str(self, s: str) -> Optional[SandboxPattern]:
-        return self.child_from_path(s.split("."))
-
-    def child_from_path(self, v: List[str]) -> Optional[SandboxPattern]:
-        if self.match_self:
-            return SandboxPattern.all
-        if len(v) == 0 or not self.children:
-            return None
-        child = self.children.get(v[0])
-        if not child or len(v) == 1:
-            return child
-        return child.child_from_path(v[1:])
+        return SandboxMatcher(
+            access=self.access | other.access,
+            use=self.use | other.use,
+            children=new_children,
+        )
 
 
-SandboxPattern.none = SandboxPattern()
-SandboxPattern.all = SandboxPattern(match_self=True)
+SandboxMatcher.all = SandboxMatcher(match_self=True)
+SandboxMatcher.none = SandboxMatcher()
 
-
-SandboxRestrictions.passthrough_modules_minimum = SandboxPattern.from_value(
-    [
-        # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
-        "google.protobuf",
+SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
+    access={
         "grpc",
         # Due to some side-effecting calls made on import, these need to be
         # allowed
         "pathlib",
-    ]
+    },
+    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
+    children={"google": SandboxMatcher(access={"protobuf"})},
 )
 
-SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | SandboxPattern.from_value(
-    [
+SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | SandboxMatcher(
+    access={
         # Due to Python checks on ABC class extension, we have to include all
         # modules of classes we might extend
         "asyncio",
         "abc",
         "temporalio",
-    ]
+    }
 )
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
@@ -289,8 +272,8 @@ _stdlib_module_names = (
     "zipfile,zipimport,zlib,zoneinfo"
 )
 
-SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | SandboxPattern.from_value(
-    [
+SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | SandboxMatcher(
+    access={
         # All stdlib modules except "sys" and their children. Children are not
         # listed in stdlib names but we need them because in some cases (e.g. os
         # manually setting sys.modules["os.path"]) they have certain child
@@ -298,67 +281,131 @@ SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthroug
         v
         for v in _stdlib_module_names.split(",")
         if v != "sys"
-    ]
+    }
 )
 
 SandboxRestrictions.passthrough_modules_default = (
     SandboxRestrictions.passthrough_modules_maximum
 )
 
-SandboxRestrictions.invalid_module_members_default = SandboxPattern.from_value(
-    {
-        "__builtins__": [
-            "breakpoint",
-            "input",
-            "open",
-        ],
-        "datetime": {
-            "date": ["today"],
-            "datetime": ["now", "today", "utcnow"],
-        },
-        "os": [
-            "getcwd",
-            # Cannot easily restrict os.name, it's even used in Python's pathlib
-            # and shutil during import time
-            # "name",
-            # TODO(cretz): The rest
-        ],
-        "random": [
-            "betavariate",
-            "choice",
-            "choices",
-            "expovariate",
-            "gammavariate",
-            "gauss",
-            "getrandbits" "getstate",
-            "lognormvariate",
-            "normalvariate",
-            "paretovariate",
-            "randbytes",
-            "randint",
-            "random",
-            "randrange",
-            "sample",
-            "seed",
-            "setstate",
-            "shuffle",
-            "triangular",
-            "uniform",
-            "vonmisesvariate",
-            "weibullvariate",
-            # TODO(cretz): Disallow Random() and SecureRandom() without seeds
-        ],
-        "readline": SandboxPattern.all,
-        "zoneinfo": {
-            "ZoneInfo": ["clear_cache", "from_file", "reset_tzpath"],
-        }
-        # TODO(cretz): The rest
+SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
+    children={
+        "__builtins__": SandboxMatcher(
+            use={
+                "breakpoint",
+                "input",
+                "open",
+            }
+        ),
+        "datetime": SandboxMatcher(
+            children={
+                "date": SandboxMatcher(use={"today"}),
+                "datetime": SandboxMatcher(use={"now", "today", "utcnow"}),
+            }
+        ),
+        "filecmp": SandboxMatcher(use={"*"}),
+        "fileinput": SandboxMatcher(use={"*"}),
+        "glob": SandboxMatcher(use={"*"}),
+        # We cannot restrict linecache because some packages like attrs' attr use it
+        # during dynamic code generation
+        # "linecache": SandboxMatcher(use={"*"}),
+        # We cannot restrict os.name because too many things use it during import
+        # side effects (including stdlib imports like pathlib and shutil)
+        "os": SandboxMatcher(
+            use={
+                "getcwd",
+            }
+        ),
+        # Not restricting platform-specific calls as that would be too strict. Just
+        # things that are specific to what's on disk.
+        "os.path": SandboxMatcher(
+            use={
+                "abspath",
+                "exists",
+                "lexists",
+                "expanduser",
+                "expandvars",
+                "getatime",
+                "getmtime",
+                "getctime",
+                "getsize",
+                "isabs",
+                "isfile",
+                "isdir",
+                "islink",
+                "ismount",
+                "realpath",
+                "relpath",
+                "samefile",
+                "sameopenfile",
+                "samestat",
+            }
+        ),
+        "pathlib": SandboxMatcher(
+            children={
+                # We allow instantiation and all PurePath calls on Path, so we have to
+                # list what we don't like explicitly here
+                "Path": SandboxMatcher(
+                    use={
+                        "chmod",
+                        "cwd",
+                        "exists",
+                        "expanduser",
+                        "glob",
+                        "group",
+                        "hardlink_to",
+                        "home",
+                        "is_block_device",
+                        "is_char_device",
+                        "is_dir",
+                        "is_fifo",
+                        "is_file",
+                        "is_mount",
+                        "is_socket",
+                        "is_symlink",
+                        "iterdir",
+                        "lchmod",
+                        "link_to",
+                        "lstat",
+                        "mkdir",
+                        "open",
+                        "owner",
+                        "read_bytes",
+                        "read_link",
+                        "read_text",
+                        "rename",
+                        "replace",
+                        "resolve",
+                        "rglob",
+                        "rmdir",
+                        "samefile",
+                        "stat",
+                        "symlink_to",
+                        "touch",
+                        "unlink",
+                        "write_bytes",
+                        "write_text",
+                    }
+                )
+            }
+        ),
+        # TODO(cretz): All "random" but Random and SecureRandom classes
+        "readline": SandboxMatcher(use={"*"}),
+        "shutil": SandboxMatcher(use={"*"}),
+        "tempfile": SandboxMatcher(use={"*"}),
+        "zoneinfo": SandboxMatcher(
+            children={
+                "ZoneInfo": SandboxMatcher(
+                    use={"clear_cache", "from_file", "reset_tzpath"}
+                )
+            }
+        ),
     }
 )
 
 SandboxRestrictions.default = SandboxRestrictions(
     passthrough_modules=SandboxRestrictions.passthrough_modules_default,
-    invalid_modules=SandboxPattern.none,
+    invalid_modules=SandboxMatcher.none,
     invalid_module_members=SandboxRestrictions.invalid_module_members_default,
 )
 
@@ -478,15 +525,14 @@ class _WorkflowInstanceImpl(WorkflowInstance):
         # Builtins not properly typed in typeshed
         assert isinstance(__builtins__, dict)
         # Restrict some builtins and replace import in builtins
-        # TODO(cretz): Restrict
         new_builtins = __builtins__.copy()
         # If there's a builtins restriction, we need to use it
-        builtins_pattern = (
-            self._runner._restrictions.invalid_module_members.child_from_path(
-                ["__builtins__"]
+        builtins_matcher = (
+            self._runner._restrictions.invalid_module_members.child_matcher(
+                "__builtins__"
             )
         )
-        if builtins_pattern:
+        if builtins_matcher:
             # Python doesn't allow us to wrap the builtins dictionary with our
             # own __getitem__ type (low-level C assertion is performed to
             # confirm it is a dict), so we instead choose to walk the builtins
@@ -495,7 +541,7 @@ class _WorkflowInstanceImpl(WorkflowInstance):
                 raise RestrictedWorkflowAccessError(f"__builtins__.{name}")
 
             for k in new_builtins.keys():
-                if builtins_pattern.matches_path([k]):
+                if builtins_matcher.match_access(k):
                     new_builtins[k] = functools.partial(restrict_built_in, k)
         new_builtins["__import__"] = self._sandboxed_import
         self._globals_and_locals = {
@@ -576,12 +622,16 @@ class _WorkflowInstanceImpl(WorkflowInstance):
         if name not in sys.modules:
             new_sys = name == "sys"
             # Make sure the entire module isn't set as invalid
-            if self._runner._restrictions.invalid_modules.matches_dotted_str(name):
+            if self._runner._restrictions.invalid_modules.match_access(
+                *name.split(".")
+            ):
                 raise RestrictedWorkflowAccessError(name)
             # If it's a passthrough module, just put it in sys.modules from old
             # sys.modules
             if (
-                self._runner._restrictions.passthrough_modules.matches_dotted_str(name)
+                self._runner._restrictions.passthrough_modules.match_access(
+                    *name.split(".")
+                )
                 and name in self._old_modules
             ):
                 # Internally, Python loads the parents before the children, but
@@ -604,17 +654,15 @@ class _WorkflowInstanceImpl(WorkflowInstance):
                 if parent:
                     setattr(sys.modules[parent], child, sys.modules[name])
         mod = importlib.__import__(name, globals, locals, fromlist, level)
-        # If this is not already checked and there is a pattern, restrict
+        # If this is not already checked and there is a matcher, restrict
         if name not in self._restriction_checked_modules:
             self._restriction_checked_modules.add(name)
-            pattern = (
-                self._runner._restrictions.invalid_module_members.child_from_dotted_str(
-                    name
-                )
+            matcher = self._runner._restrictions.invalid_module_members.child_matcher(
+                *name.split(".")
             )
-            if pattern:
+            if matcher:
                 _trace("Restricting module %s during import", name)
-                mod = _RestrictedModule(mod, pattern)
+                mod = _RestrictedModule(mod, matcher)
                 sys.modules[name] = mod
 
         if new_sys:
@@ -685,21 +733,21 @@ class _SandboxedImporter(importlib.abc.MetaPathFinder):
                     _trace("Applying custom create for module %s", spec.name)
                     mod = orig_create_module(spec)
 
-                    # If this is not already checked and there is a pattern,
+                    # If this is not already checked and there is a matcher,
                     # restrict
                     if spec.name not in self._instance._restriction_checked_modules:
                         self._instance._restriction_checked_modules.add(spec.name)
-                        pattern = self._instance._runner._restrictions.invalid_module_members.child_from_dotted_str(
-                            spec.name
+                        matcher = self._instance._runner._restrictions.invalid_module_members.child_matcher(
+                            *spec.name.split(".")
                         )
-                        if pattern:
+                        if matcher:
                             _trace("Restricting module %s during create", spec.name)
                             # mod might be None which means "defer to default"
                             # loading in Python, so we manually instantiate if
                             # that's the case
                             if not mod:
                                 mod = types.ModuleType(spec.name)
-                            mod = _RestrictedModule(mod, pattern)
+                            mod = _RestrictedModule(mod, matcher)
                     return mod
 
                 def custom_exec_module(module: types.ModuleType) -> None:
@@ -730,10 +778,10 @@ class _SandboxedImporter(importlib.abc.MetaPathFinder):
 class _RestrictionState:
     name: str
     obj: object
-    pattern: SandboxPattern
+    matcher: SandboxMatcher
 
     def assert_child_not_restricted(self, name: str) -> None:
-        if self.pattern.matches_path([name]):
+        if self.matcher.match_access(name):
             logger.warning("%s on %s restricted", name, self.name)
             raise RestrictedWorkflowAccessError(f"{self.name}.{name}")
 
@@ -856,12 +904,12 @@ class _RestrictedProxy:
 
     _get_state: Callable[[], _RestrictionState]
 
-    def __init__(self, name: str, obj: Any, pattern: SandboxPattern) -> None:
+    def __init__(self, name: str, obj: Any, matcher: SandboxMatcher) -> None:
         _trace("__init__ on %s", name)
         object.__setattr__(
             self,
             "__temporal_state",
-            _RestrictionState(name=name, obj=obj, pattern=pattern),
+            _RestrictionState(name=name, obj=obj, matcher=matcher),
         )
 
     def __getattribute__(self, __name: str) -> Any:
@@ -870,12 +918,11 @@ class _RestrictedProxy:
         state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
         _trace("__getattribute__ %s on %s", __name, state.name)
         state.assert_child_not_restricted(__name)
-        # return types.ModuleType.__getattribute__(self, __name)
         ret = object.__getattribute__(self, "__getattr__")(__name)
-        # If there is a child pattern, restrict if we can
-        child_pattern = state.pattern.child_from_dotted_str(__name)
-        if child_pattern and _is_restrictable(ret):
-            ret = _RestrictedProxy(f"{state.name}.{__name}", ret, child_pattern)
+        # If there is a child matcher, restrict if we can
+        child_matcher = state.matcher.child_matcher(__name)
+        if child_matcher and _is_restrictable(ret):
+            ret = _RestrictedProxy(f"{state.name}.{__name}", ret, child_matcher)
         return ret
 
     def __setattr__(self, __name: str, __value: Any) -> None:
@@ -887,11 +934,12 @@ class _RestrictedProxy:
     def __call__(self, *args, **kwargs) -> _RestrictedProxy:
         state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
         _trace("__call__ on %s", state.name)
+        state.assert_child_not_restricted("__call__")
         ret = state.obj(*args, **kwargs)  # type: ignore
         # Always wrap the result of a call to self with the same restrictions
         # (this is often instantiating a class)
         if _is_restrictable(ret):
-            ret = _RestrictedProxy(state.name, ret, state.pattern)
+            ret = _RestrictedProxy(state.name, ret, state.matcher)
         return ret
 
     def __getitem__(self, key: Any) -> Any:
@@ -900,11 +948,11 @@ class _RestrictedProxy:
             state.assert_child_not_restricted(key)
         _trace("__getitem__ %s on %s", key, state.name)
         ret = operator.getitem(state.obj, key)  # type: ignore
-        # If there is a child pattern, restrict if we can
-        if isinstance(key, str) and state.pattern.children:
-            child_pattern = state.pattern.children.get(key)
-            if child_pattern and _is_restrictable(ret):
-                ret = _RestrictedProxy(f"{state.name}.{key}", ret, child_pattern)
+        # If there is a child matcher, restrict if we can
+        if isinstance(key, str):
+            child_matcher = state.matcher.child_matcher(key)
+            if child_matcher and _is_restrictable(ret):
+                ret = _RestrictedProxy(f"{state.name}.{key}", ret, child_matcher)
         return ret
 
     __doc__ = _RestrictedProxyLookup(  # type: ignore
@@ -1026,8 +1074,8 @@ class _RestrictedProxy:
 
 
 class _RestrictedModule(_RestrictedProxy, types.ModuleType):  # type: ignore
-    def __init__(self, mod: types.ModuleType, pattern: SandboxPattern) -> None:
-        _RestrictedProxy.__init__(self, mod.__name__, mod, pattern)
+    def __init__(self, mod: types.ModuleType, matcher: SandboxMatcher) -> None:
+        _RestrictedProxy.__init__(self, mod.__name__, mod, matcher)
         types.ModuleType.__init__(self, mod.__name__, mod.__doc__)
 
 

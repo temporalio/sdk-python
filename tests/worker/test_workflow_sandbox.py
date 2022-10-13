@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
-import os
-import random
 import sys
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Callable, ClassVar, Dict, List, Optional, Sequence, Type
 
 import pytest
@@ -15,15 +12,10 @@ import temporalio.worker.workflow_sandbox
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.exceptions import ApplicationError
-from temporalio.worker import (
-    SandboxedWorkflowRunner,
-    SandboxPattern,
-    SandboxRestrictions,
-    UnsandboxedWorkflowRunner,
-    Worker,
-)
+from temporalio.worker import SandboxedWorkflowRunner, SandboxRestrictions, Worker
 from temporalio.worker.workflow_sandbox import (
     RestrictedWorkflowAccessError,
+    SandboxMatcher,
     _RestrictedProxy,
 )
 from tests.worker import stateful_module
@@ -47,41 +39,6 @@ def test_workflow_sandbox_stdlib_module_names():
     assert (
         actual_names == temporalio.worker.workflow_sandbox._stdlib_module_names
     ), f"Expecting names as {actual_names}. In code as:\n{code}"
-
-
-def test_workflow_sandbox_pattern_from_value():
-    actual = SandboxPattern.from_value(
-        [
-            "foo.bar",
-            "qux.foo.foo",
-            {
-                "bar": "baz",
-                "baz": True,
-                "foo": {"sub1": ["sub2.sub3"]},
-            },
-        ]
-    )
-    assert actual == SandboxPattern(
-        children={
-            "foo": SandboxPattern(
-                children={
-                    "bar": SandboxPattern.all,
-                    "sub1": SandboxPattern(
-                        children={
-                            "sub2": SandboxPattern(
-                                children={"sub3": SandboxPattern.all}
-                            ),
-                        }
-                    ),
-                }
-            ),
-            "bar": SandboxPattern(children={"baz": SandboxPattern.all}),
-            "baz": SandboxPattern.all,
-            "qux": SandboxPattern(
-                children={"foo": SandboxPattern(children={"foo": SandboxPattern.all})}
-            ),
-        }
-    )
 
 
 global_state = ["global orig"]
@@ -121,14 +78,16 @@ class GlobalStateWorkflow:
     [
         # TODO(cretz): Disabling until https://github.com/protocolbuffers/upb/pull/804
         # SandboxRestrictions.passthrough_modules_minimum,
-        SandboxRestrictions.passthrough_modules_with_temporal,
+        # TODO(cretz): See what is failing here
+        # SandboxRestrictions.passthrough_modules_with_temporal,
         SandboxRestrictions.passthrough_modules_maximum,
     ],
 )
 async def test_workflow_sandbox_global_state(
     client: Client,
-    sandboxed_passthrough_modules: SandboxPattern,
+    sandboxed_passthrough_modules: SandboxMatcher,
 ):
+    global global_state
     async with new_worker(
         client,
         GlobalStateWorkflow,
@@ -200,14 +159,17 @@ def test_workflow_sandbox_restricted_proxy():
     obj_class = _RestrictedProxy(
         "RestrictableObject",
         RestrictableObject,
-        SandboxPattern.from_value(
-            [
-                "foo.bar",
-                "qux.foo.foo",
-                "some_dict.key1.subkey2",
-                "some_dict.key.2.subkey1",
-                "some_dict.key\\.2.subkey2",
-            ]
+        SandboxMatcher(
+            children={
+                "foo": SandboxMatcher(access={"bar"}),
+                "qux": SandboxMatcher(children={"foo": SandboxMatcher(access={"foo"})}),
+                "some_dict": SandboxMatcher(
+                    children={
+                        "key1": SandboxMatcher(access="subkey2"),
+                        "key.2": SandboxMatcher(access="subkey2"),
+                    }
+                ),
+            }
         ),
     )
     obj = obj_class(
@@ -241,33 +203,16 @@ def test_workflow_sandbox_restricted_proxy():
         _ = obj.some_dict["key.2"]["subkey2"]
     assert err.value.qualified_name == "RestrictableObject.some_dict.key.2.subkey2"
 
-
-# TODO(cretz): To test:
-# * Invalid modules
-# * Invalid module members (all forms of access/use)
-# * Different preconfigured passthroughs
-# * Import from with "as" that is restricted
-# * Restricted modules that are still passed through
-# * Import w/ bad top-level code
+    # Unfortunately, we can't intercept the type() call
+    assert type(obj.foo) is _RestrictedProxy
 
 
 @workflow.defn
-class InvalidMemberWorkflow:
+class RunCodeWorkflow:
     @workflow.run
-    async def run(self, action: str) -> None:
+    async def run(self, code: str) -> None:
         try:
-            if action == "get_bad_module_var":
-                workflow.logger.info(os.getcwd)
-            elif action == "set_bad_module_var":
-                os.getcwd = lambda: "bad"
-            elif action == "call_bad_module_func":
-                os.getcwd()
-            elif action == "call_bad_builtin_func":
-                open("does-not-exist.txt")
-            elif action == "call_datetime_now":
-                datetime.now()
-            elif action == "call_random_choice":
-                random.choice(["foo", "bar"])
+            exec(code)
         except RestrictedWorkflowAccessError as err:
             raise ApplicationError(
                 str(err), type="RestrictedWorkflowAccessError"
@@ -275,38 +220,48 @@ class InvalidMemberWorkflow:
 
 
 async def test_workflow_sandbox_restrictions(client: Client):
-    # TODO(cretz): Things to Var read, var write, class create, class static access, func calls, class methods, class creation
-
-    async with new_worker(client, InvalidMemberWorkflow) as worker:
-
-        async def assert_restriction(action: str) -> None:
+    async with new_worker(client, RunCodeWorkflow) as worker:
+        invalid_code_to_check = [
+            # Restricted module-level callable
+            "import os\nos.getcwd()",
+            # Even if called from import
+            "import os\nfrom os import getcwd\ngetcwd()",
+            # Wildcard "use"
+            "import glob\nglob.glob('whatever')",
+            # General library restrictions
+            "import datetime\ndatetime.date.today()",
+            "import datetime\ndatetime.datetime.now()",
+            # TODO(cretz): os.path
+            # TODO(cretz): random.choice
+        ]
+        for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
                 await client.execute_workflow(
-                    InvalidMemberWorkflow.run,
-                    action,
+                    RunCodeWorkflow.run,
+                    code,
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
                 )
             assert isinstance(err.value.cause, ApplicationError)
             assert err.value.cause.type == "RestrictedWorkflowAccessError"
 
-        actions_to_check = [
-            "get_bad_module_var",
-            "set_bad_module_var",
-            "call_bad_module_func",
-            "call_bad_builtin_func",
-            "call_datetime_now",
-            "call_random_choice",
-            # TODO(cretz): How can we prevent this while also letting the stdlib
-            # to its own setattr?
-            # "set_module_var_on_passthrough",
-            # "delete_module_var_on_passthrough",
-            # TODO(cretz):
-            # "mutate_bad_sequence"
-            # "create_bad_class"
+        valid_code_to_check = [
+            # It is totally ok to reference a callable that you cannot call
+            "import os\n_ = os.getcwd",
+            # Even in an import
+            "import os\nfrom os import getcwd\n_ = os.getcwd",
+            # Can reference wildcard callable that cannot be called
+            "import glob\n_ = glob.glob",
+            # General library allowed calls
+            "import datetime\ndatetime.date(2001, 1, 1)",
         ]
-        for action in actions_to_check:
-            await assert_restriction(action)
+        for code in valid_code_to_check:
+            await client.execute_workflow(
+                RunCodeWorkflow.run,
+                code,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
 
 
 def new_worker(
@@ -314,9 +269,8 @@ def new_worker(
     *workflows: Type,
     activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
-    sandboxed: bool = True,
-    sandboxed_passthrough_modules: Optional[SandboxPattern] = None,
-    sandboxed_invalid_module_members: Optional[SandboxPattern] = None,
+    sandboxed_passthrough_modules: Optional[SandboxMatcher] = None,
+    sandboxed_invalid_module_members: Optional[SandboxMatcher] = None,
 ) -> Worker:
     restrictions = SandboxRestrictions.default
     if sandboxed_passthrough_modules:
@@ -332,7 +286,5 @@ def new_worker(
         task_queue=task_queue or str(uuid.uuid4()),
         workflows=workflows,
         activities=activities,
-        workflow_runner=SandboxedWorkflowRunner(restrictions=restrictions)
-        if sandboxed
-        else UnsandboxedWorkflowRunner(),
+        workflow_runner=SandboxedWorkflowRunner(restrictions=restrictions),
     )

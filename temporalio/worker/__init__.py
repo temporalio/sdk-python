@@ -29,7 +29,7 @@ from .workflow_instance import (
 )
 from .workflow_sandbox import (
     SandboxedWorkflowRunner,
-    SandboxPattern,
+    SandboxMatcher,
     SandboxRestrictions,
 )
 
@@ -62,7 +62,7 @@ __all__ = [
     "SharedHeartbeatSender",
     # Advanced workflow classes
     "SandboxedWorkflowRunner",
-    "SandboxPattern",
+    "SandboxMatcher",
     "SandboxRestrictions",
     "WorkflowRunner",
     "WorkflowInstance",

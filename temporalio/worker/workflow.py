@@ -49,6 +49,7 @@ class _WorkflowWorker:
         workflows: Sequence[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor],
         workflow_runner: WorkflowRunner,
+        unsandboxed_workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         debug_mode: bool,
@@ -66,6 +67,7 @@ class _WorkflowWorker:
         )
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
         self._workflow_runner = workflow_runner
+        self._unsandboxed_workflow_runner = unsandboxed_workflow_runner
         self._data_converter = data_converter
         # Build the interceptor classes and collect extern functions
         self._extern_functions: MutableMapping[str, Callable] = {}
@@ -97,7 +99,10 @@ class _WorkflowWorker:
             # Prepare the workflow with the runner (this will error in the
             # sandbox if an import fails somehow)
             try:
-                workflow_runner.prepare_workflow(defn)
+                if defn.sandboxed:
+                    workflow_runner.prepare_workflow(defn)
+                else:
+                    unsandboxed_workflow_runner.prepare_workflow(defn)
             except Exception as err:
                 raise RuntimeError(f"Failed validating workflow {defn.name}") from err
             self._workflows[defn.name] = defn
@@ -335,13 +340,15 @@ class _WorkflowWorker:
         )
 
         # Create instance from details
-        return await self._workflow_runner.create_instance(
-            WorkflowInstanceDetails(
-                payload_converter_class=self._data_converter.payload_converter_class,
-                interceptor_classes=self._interceptor_classes,
-                defn=defn,
-                info=info,
-                randomness_seed=start.randomness_seed,
-                extern_functions=self._extern_functions,
-            )
+        det = WorkflowInstanceDetails(
+            payload_converter_class=self._data_converter.payload_converter_class,
+            interceptor_classes=self._interceptor_classes,
+            defn=defn,
+            info=info,
+            randomness_seed=start.randomness_seed,
+            extern_functions=self._extern_functions,
         )
+        if defn.sandboxed:
+            return await self._workflow_runner.create_instance(det)
+        else:
+            return await self._unsandboxed_workflow_runner.create_instance(det)

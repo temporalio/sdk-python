@@ -64,6 +64,7 @@ from temporalio.exceptions import (
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
+    SandboxedWorkflowRunner,
     UnsandboxedWorkflowRunner,
     Worker,
     WorkflowInstance,
@@ -1318,7 +1319,7 @@ sa_prefix = "python_test_"
 def search_attrs_to_dict_with_type(attrs: SearchAttributes) -> Mapping[str, Any]:
     return {
         k: {
-            "type": type(vals[0]).__name__ if vals else "<unknown>",
+            "type": vals[0].__class__.__name__ if vals else "<unknown>",
             "values": [str(v) if isinstance(v, datetime) else v for v in vals],
         }
         for k, vals in attrs.items()
@@ -1939,7 +1940,9 @@ async def test_workflow_local_activity_backoff(client: Client):
 deadlock_thread_event = threading.Event()
 
 
-@workflow.defn
+# We cannot sandbox this because we are intentionally non-deterministic when we
+# set the global threading event
+@workflow.defn(sandboxed=False)
 class DeadlockedWorkflow:
     @workflow.run
     async def run(self) -> None:
@@ -2389,7 +2392,7 @@ def new_worker(
     *workflows: Type,
     activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
-    workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
+    workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
 ) -> Worker:
     return Worker(
         client,

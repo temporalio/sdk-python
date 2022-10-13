@@ -69,11 +69,18 @@ def defn(cls: ClassType) -> ClassType:
 
 
 @overload
-def defn(*, name: str) -> Callable[[ClassType], ClassType]:
+def defn(
+    *, name: Optional[str] = None, sandboxed: bool = True
+) -> Callable[[ClassType], ClassType]:
     ...
 
 
-def defn(cls: Optional[ClassType] = None, *, name: Optional[str] = None):
+def defn(
+    cls: Optional[ClassType] = None,
+    *,
+    name: Optional[str] = None,
+    sandboxed: bool = True,
+):
     """Decorator for workflow classes.
 
     This must be set on any registered workflow class (it is ignored if on a
@@ -82,20 +89,20 @@ def defn(cls: Optional[ClassType] = None, *, name: Optional[str] = None):
     Args:
         cls: The class to decorate.
         name: Name to use for the workflow. Defaults to class ``__name__``.
+        sandboxed: Whether the workflow should run in a sandbox. Default is
+            true.
     """
 
-    def with_name(name: str, cls: ClassType) -> ClassType:
+    def decorator(cls: ClassType) -> ClassType:
         # This performs validation
-        _Definition._apply_to_class(cls, name)
+        _Definition._apply_to_class(
+            cls, workflow_name=name or cls.__name__, sandboxed=sandboxed
+        )
         return cls
 
-    # If name option is available, return decorator function
-    if name is not None:
-        return partial(with_name, name)
-    if cls is None:
-        raise RuntimeError("Cannot create defn without class or name")
-    # Otherwise just run decorator function
-    return with_name(cls.__name__, cls)
+    if cls is not None:
+        return decorator(cls)
+    return decorator
 
 
 def run(fn: CallableAsyncType) -> CallableAsyncType:
@@ -779,6 +786,7 @@ class _Definition:
     run_fn: Callable[..., Awaitable]
     signals: Mapping[Optional[str], _SignalDefinition]
     queries: Mapping[Optional[str], _QueryDefinition]
+    sandboxed: bool
 
     @staticmethod
     def from_class(cls: Type) -> Optional[_Definition]:
@@ -813,7 +821,7 @@ class _Definition:
         )
 
     @staticmethod
-    def _apply_to_class(cls: Type, workflow_name: str) -> None:
+    def _apply_to_class(cls: Type, *, workflow_name: str, sandboxed: bool) -> None:
         # Check it's not being doubly applied
         if _Definition.from_class(cls):
             raise ValueError("Class already contains workflow definition")
@@ -911,7 +919,12 @@ class _Definition:
 
         assert run_fn
         defn = _Definition(
-            name=workflow_name, cls=cls, run_fn=run_fn, signals=signals, queries=queries
+            name=workflow_name,
+            cls=cls,
+            run_fn=run_fn,
+            signals=signals,
+            queries=queries,
+            sandboxed=sandboxed,
         )
         setattr(cls, "__temporal_workflow_definition", defn)
         setattr(run_fn, "__temporal_workflow_definition", defn)
