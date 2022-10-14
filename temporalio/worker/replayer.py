@@ -99,8 +99,7 @@ class Replayer:
             raise ValueError("Started event not found")
 
         # Create bridge worker and workflow worker
-        bridge_worker = temporalio.bridge.worker.Worker.for_replay(
-            history,
+        (bridge_worker, pusher) = temporalio.bridge.worker.Worker.for_replay(
             temporalio.bridge.worker.WorkerConfig(
                 namespace=self._config["namespace"],
                 task_queue=started_event.workflow_execution_started_event_attributes.task_queue.name,
@@ -134,6 +133,9 @@ class Replayer:
             debug_mode=self._config["debug_mode"],
             fail_on_eviction=True,
         )
+
+        await pusher.push_history("fake", history.SerializeToString())
+        pusher.close()
 
         # Run it
         try:

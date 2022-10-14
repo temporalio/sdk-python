@@ -59,14 +59,14 @@ class Worker:
 
     @staticmethod
     def for_replay(
-        history: temporalio.api.history.v1.History, config: WorkerConfig
-    ) -> Worker:
+        config: WorkerConfig,
+    ) -> (Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher):
         """Create a bridge replay worker from history."""
-        return Worker(
-            temporalio.bridge.temporal_sdk_bridge.new_replay_worker(
-                history.SerializeToString(), config
-            )
-        )
+        [
+            replay_worker,
+            pusher,
+        ] = temporalio.bridge.temporal_sdk_bridge.new_replay_worker(config)
+        return Worker(replay_worker), pusher
 
     def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.WorkerRef) -> None:
         """Create SDK core worker from a bridge worker."""
