@@ -79,7 +79,7 @@ class GlobalStateWorkflow:
         # TODO(cretz): Disabling until https://github.com/protocolbuffers/upb/pull/804
         # SandboxRestrictions.passthrough_modules_minimum,
         # TODO(cretz): See what is failing here
-        # SandboxRestrictions.passthrough_modules_with_temporal,
+        SandboxRestrictions.passthrough_modules_with_temporal,
         SandboxRestrictions.passthrough_modules_maximum,
     ],
 )
@@ -231,8 +231,9 @@ async def test_workflow_sandbox_restrictions(client: Client):
             # General library restrictions
             "import datetime\ndatetime.date.today()",
             "import datetime\ndatetime.datetime.now()",
+            "import random\nrandom.choice(['foo', 'bar'])",
+            "import secrets\nsecrets.choice(['foo', 'bar'])",
             # TODO(cretz): os.path
-            # TODO(cretz): random.choice
         ]
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:

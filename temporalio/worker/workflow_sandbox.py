@@ -156,6 +156,7 @@ class SandboxMatcher:
 
     all: ClassVar[SandboxMatcher]
     none: ClassVar[SandboxMatcher]
+    all_uses: ClassVar[SandboxMatcher]
 
     def match_access(self, *child_path: str) -> bool:
         # We prefer to avoid recursion
@@ -212,6 +213,7 @@ class SandboxMatcher:
 
 SandboxMatcher.all = SandboxMatcher(match_self=True)
 SandboxMatcher.none = SandboxMatcher()
+SandboxMatcher.all_uses = SandboxMatcher(use={"*"})
 
 SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
     access={
@@ -288,6 +290,7 @@ SandboxRestrictions.passthrough_modules_default = (
     SandboxRestrictions.passthrough_modules_maximum
 )
 
+# TODO(cretz): Should I make this more declarative in an external file?
 SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
     children={
         "__builtins__": SandboxMatcher(
@@ -297,20 +300,29 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                 "open",
             }
         ),
+        "bz2": SandboxMatcher(use={"open"}),
+        # Python's own re lib registers itself. This is mostly ok to not
+        # restrict since it's just global picklers that people may want to
+        # register globally.
+        # "copyreg": SandboxMatcher.all_uses,
         "datetime": SandboxMatcher(
             children={
                 "date": SandboxMatcher(use={"today"}),
                 "datetime": SandboxMatcher(use={"now", "today", "utcnow"}),
             }
         ),
-        "filecmp": SandboxMatcher(use={"*"}),
-        "fileinput": SandboxMatcher(use={"*"}),
-        "glob": SandboxMatcher(use={"*"}),
-        # We cannot restrict linecache because some packages like attrs' attr use it
-        # during dynamic code generation
-        # "linecache": SandboxMatcher(use={"*"}),
-        # We cannot restrict os.name because too many things use it during import
-        # side effects (including stdlib imports like pathlib and shutil)
+        "dbm": SandboxMatcher.all_uses,
+        "filecmp": SandboxMatcher.all_uses,
+        "fileinput": SandboxMatcher.all_uses,
+        "glob": SandboxMatcher.all_uses,
+        "gzip": SandboxMatcher(use={"open"}),
+        "lzma": SandboxMatcher(use={"open"}),
+        "marshal": SandboxMatcher(use={"dump", "load"}),
+        # We cannot restrict linecache because some packages like attrs' attr
+        # use it during dynamic code generation
+        # "linecache": SandboxMatcher.all_uses,
+        # We cannot restrict os.name because too many things use it during
+        # import side effects (including stdlib imports like pathlib and shutil)
         "os": SandboxMatcher(
             use={
                 "getcwd",
@@ -343,8 +355,8 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         ),
         "pathlib": SandboxMatcher(
             children={
-                # We allow instantiation and all PurePath calls on Path, so we have to
-                # list what we don't like explicitly here
+                # We allow instantiation and all PurePath calls on Path, so we
+                # have to list what we don't like explicitly here
                 "Path": SandboxMatcher(
                     use={
                         "chmod",
@@ -389,10 +401,67 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                 )
             }
         ),
-        # TODO(cretz): All "random" but Random and SecureRandom classes
-        "readline": SandboxMatcher(use={"*"}),
-        "shutil": SandboxMatcher(use={"*"}),
-        "tempfile": SandboxMatcher(use={"*"}),
+        # Everything but instantiating Random and SecureRandom
+        # TODO(cretz): Should I support negation in SandboxMatcher to make this
+        # list easier?
+        # TODO(cretz): Should I have integration tests for this module and
+        # others to ensure new things don't get added in newer Python versions
+        # without me being aware?
+        "random": SandboxMatcher(
+            use={
+                "betavariate",
+                "choice",
+                "choices",
+                "expovariate",
+                "gammavariate",
+                "gauss",
+                "getrandbits",
+                "getstate",
+                "lognormvariate",
+                "normalvariate",
+                "paretovariate",
+                "randbytes",
+                "randint",
+                "random",
+                "randrange",
+                "sample",
+                "seed",
+                "setstate",
+                "shuffle",
+                "triangular",
+                "uniform",
+                "vonmisesvariate",
+                "weibullvariate",
+            }
+        ),
+        "readline": SandboxMatcher.all_uses,
+        # Only time-safe comparison remains after these restrictions
+        "secrets": SandboxMatcher(
+            use={
+                "choice",
+                "randbelow",
+                "randbits",
+                "SystemRandom",
+                "token_bytes",
+                "token_hex",
+                "token_urlsafe",
+            }
+        ),
+        "shelve": SandboxMatcher.all_uses,
+        "shutil": SandboxMatcher.all_uses,
+        # There's a good use case for sqlite in memory, so we're not restricting
+        # it in any way. Technically we could restrict some of the global
+        # settings, but they are often import side effects usable in and out of
+        # the sandbox.
+        # "sqlite3": SandboxMatcher.all_uses,
+        "tarfile": SandboxMatcher(
+            use={"open"},
+            children={"TarFile": SandboxMatcher(use={"extract", "extractall"})},
+        ),
+        "tempfile": SandboxMatcher.all_uses,
+        "zipfile": SandboxMatcher(
+            children={"ZipFile": SandboxMatcher(use={"extract", "extractall"})}
+        ),
         "zoneinfo": SandboxMatcher(
             children={
                 "ZoneInfo": SandboxMatcher(
@@ -761,11 +830,28 @@ class _SandboxedImporter(importlib.abc.MetaPathFinder):
                     )
                     if isinstance(spec.loader, importlib.machinery.ExtensionFileLoader):
                         _trace("  Extension module: %s", module.__dict__)
-                    # Put our builtins on the module dict before executing
+
+                    # Put our builtins on the module dict before executing.
+                    #
+                    # Python uses this __dict__ as the "globals" when calling
+                    # exec on the module. The C layer of Python forces these
+                    # globals to be an actual dictionary. Therefore if this
+                    # module is a restricted module, its __dict__ will also be
+                    # proxied which fails load. We can't just overwrite __dict__
+                    # for the life of this run because it's a read only
+                    # property. So instead we set it to be bypassed.
                     module.__dict__[
                         "__builtins__"
                     ] = self._instance._globals_and_locals["__builtins__"]
-                    orig_exec_module(module)
+                    state: Optional[_RestrictionState] = None
+                    if type(module) is _RestrictedModule:
+                        state = _RestrictionState.from_proxy(module)
+                        state.wrap_dict = False
+                    try:
+                        orig_exec_module(module)
+                    finally:
+                        if state:
+                            state.wrap_dict = True
 
                 # Replace the methods
                 spec.loader.create_module = custom_create_module  # type: ignore
@@ -776,14 +862,26 @@ class _SandboxedImporter(importlib.abc.MetaPathFinder):
 
 @dataclass
 class _RestrictionState:
+    @staticmethod
+    def from_proxy(v: _RestrictedProxy) -> _RestrictionState:
+        # To prevent recursion, must use __getattribute__ on object to get the
+        # restriction state
+        return object.__getattribute__(v, "__temporal_state")
+
     name: str
     obj: object
     matcher: SandboxMatcher
+    wrap_dict: bool = True
 
     def assert_child_not_restricted(self, name: str) -> None:
         if self.matcher.match_access(name):
             logger.warning("%s on %s restricted", name, self.name)
             raise RestrictedWorkflowAccessError(f"{self.name}.{name}")
+
+    def set_on_proxy(self, v: _RestrictedProxy) -> None:
+        # To prevent recursion, must use __setattr__ on object to set the
+        # restriction state
+        object.__setattr__(v, "__temporal_state", self)
 
 
 class _RestrictedProxyLookup:
@@ -901,38 +999,32 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-
-    _get_state: Callable[[], _RestrictionState]
-
     def __init__(self, name: str, obj: Any, matcher: SandboxMatcher) -> None:
         _trace("__init__ on %s", name)
-        object.__setattr__(
-            self,
-            "__temporal_state",
-            _RestrictionState(name=name, obj=obj, matcher=matcher),
-        )
+        _RestrictionState(name=name, obj=obj, matcher=matcher).set_on_proxy(self)
 
     def __getattribute__(self, __name: str) -> Any:
-        # To prevent recursion, must use __getattribute__ on object to get the
-        # restriction state
-        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        state = _RestrictionState.from_proxy(self)
         _trace("__getattribute__ %s on %s", __name, state.name)
         state.assert_child_not_restricted(__name)
         ret = object.__getattribute__(self, "__getattr__")(__name)
-        # If there is a child matcher, restrict if we can
-        child_matcher = state.matcher.child_matcher(__name)
-        if child_matcher and _is_restrictable(ret):
-            ret = _RestrictedProxy(f"{state.name}.{__name}", ret, child_matcher)
+
+        # If there is a child matcher, restrict if we can. As a special case, we
+        # don't wrap __dict__ if we're asked not to.
+        if __name != "__dict__" or state.wrap_dict:
+            child_matcher = state.matcher.child_matcher(__name)
+            if child_matcher and _is_restrictable(ret):
+                ret = _RestrictedProxy(f"{state.name}.{__name}", ret, child_matcher)
         return ret
 
     def __setattr__(self, __name: str, __value: Any) -> None:
-        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        state = _RestrictionState.from_proxy(self)
         _trace("__setattr__ %s on %s", __name, state.name)
         state.assert_child_not_restricted(__name)
         setattr(state.obj, __name, __value)
 
     def __call__(self, *args, **kwargs) -> _RestrictedProxy:
-        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        state = _RestrictionState.from_proxy(self)
         _trace("__call__ on %s", state.name)
         state.assert_child_not_restricted("__call__")
         ret = state.obj(*args, **kwargs)  # type: ignore
@@ -943,7 +1035,7 @@ class _RestrictedProxy:
         return ret
 
     def __getitem__(self, key: Any) -> Any:
-        state: _RestrictionState = object.__getattribute__(self, "__temporal_state")
+        state = _RestrictionState.from_proxy(self)
         if isinstance(key, str):
             state.assert_child_not_restricted(key)
         _trace("__getitem__ %s on %s", key, state.name)
@@ -959,7 +1051,7 @@ class _RestrictedProxy:
         class_value=__doc__, fallback_func=lambda self: type(self).__doc__, is_attr=True
     )
     __wrapped__ = _RestrictedProxyLookup(
-        fallback_func=lambda self: self._get_state().obj, is_attr=True
+        fallback_func=lambda self: _RestrictionState.from_proxy(self).obj, is_attr=True
     )
     # __del__ should only delete the proxy
     __repr__ = _RestrictedProxyLookup(  # type: ignore
