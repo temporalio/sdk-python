@@ -6,7 +6,7 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Sequence, Tuple
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
@@ -60,8 +60,14 @@ class Worker:
     @staticmethod
     def for_replay(
         config: WorkerConfig,
-    ) -> (Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher):
+    ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
         """Create a bridge replay worker from history."""
+        cfg = temporalio.bridge.telemetry.TelemetryConfig()
+        cfg.tracing_filter = "info,temporal_sdk_core=DEBUG,temporal_sdk=DEBUG"
+        temporalio.bridge.telemetry.init_telemetry(
+            cfg,
+            warn_if_already_inited=False,
+        )
         [
             replay_worker,
             pusher,

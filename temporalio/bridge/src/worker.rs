@@ -25,9 +25,7 @@ pub struct WorkerRef {
 
 #[pyclass]
 pub struct ReplayWorker {
-    // #[pyo3(get)]
     pub worker: WorkerRef,
-    // #[pyo3(get)]
     pub history_pusher: HistoryPusher,
 }
 
