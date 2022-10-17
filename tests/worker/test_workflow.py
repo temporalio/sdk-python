@@ -64,13 +64,13 @@ from temporalio.exceptions import (
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
-    SandboxedWorkflowRunner,
     UnsandboxedWorkflowRunner,
     Worker,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from tests.helpers.golang import ExternalGolangServer
 
 
