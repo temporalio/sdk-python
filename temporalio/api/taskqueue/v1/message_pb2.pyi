@@ -184,27 +184,33 @@ class PollerInfo(google.protobuf.message.Message):
     LAST_ACCESS_TIME_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     RATE_PER_SECOND_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_BUILD_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
     @property
     def last_access_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Unix Nano"""
     identity: builtins.str
     rate_per_second: builtins.float
-    worker_versioning_build_id: builtins.str
-    """If a worker has specified an ID for use with the worker versioning feature while polling,
-    that id must appear here.
-    """
+    @property
+    def worker_versioning_id(self) -> global___VersionId:
+        """If a worker has specified an ID for use with the worker versioning feature while polling,
+        that id must appear here.
+        """
     def __init__(
         self,
         *,
         last_access_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         identity: builtins.str = ...,
         rate_per_second: builtins.float = ...,
-        worker_versioning_build_id: builtins.str = ...,
+        worker_versioning_id: global___VersionId | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal["last_access_time", b"last_access_time"],
+        field_name: typing_extensions.Literal[
+            "last_access_time",
+            b"last_access_time",
+            "worker_versioning_id",
+            b"worker_versioning_id",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -215,8 +221,8 @@ class PollerInfo(google.protobuf.message.Message):
             b"last_access_time",
             "rate_per_second",
             b"rate_per_second",
-            "worker_versioning_build_id",
-            b"worker_versioning_build_id",
+            "worker_versioning_id",
+            b"worker_versioning_id",
         ],
     ) -> None: ...
 

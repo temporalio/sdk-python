@@ -198,6 +198,8 @@ class _EventTypeEnumTypeWrapper(
     The distinction of external vs. command-based modification is important so the SDK can
     maintain determinism when using the command-based approach.
     """
+    EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: _EventType.ValueType  # 46
+    """Workflow properties modified by user workflow code"""
 
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
@@ -355,4 +357,6 @@ EVENT_TYPE_ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY: EventType.ValueType  # 45
 The distinction of external vs. command-based modification is important so the SDK can
 maintain determinism when using the command-based approach.
 """
+EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: EventType.ValueType  # 46
+"""Workflow properties modified by user workflow code"""
 global___EventType = EventType

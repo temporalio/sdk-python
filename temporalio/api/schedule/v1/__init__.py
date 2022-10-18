@@ -2,6 +2,7 @@ from .message_pb2 import (
     BackfillRequest,
     CalendarSpec,
     IntervalSpec,
+    Range,
     Schedule,
     ScheduleAction,
     ScheduleActionResult,
@@ -12,6 +13,7 @@ from .message_pb2 import (
     SchedulePolicies,
     ScheduleSpec,
     ScheduleState,
+    StructuredCalendarSpec,
     TriggerImmediatelyRequest,
 )
 
@@ -19,6 +21,7 @@ __all__ = [
     "BackfillRequest",
     "CalendarSpec",
     "IntervalSpec",
+    "Range",
     "Schedule",
     "ScheduleAction",
     "ScheduleActionResult",
@@ -29,5 +32,6 @@ __all__ = [
     "SchedulePolicies",
     "ScheduleSpec",
     "ScheduleState",
+    "StructuredCalendarSpec",
     "TriggerImmediatelyRequest",
 ]

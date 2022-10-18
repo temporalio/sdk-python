@@ -476,6 +476,32 @@ global___UpsertWorkflowSearchAttributesCommandAttributes = (
     UpsertWorkflowSearchAttributesCommandAttributes
 )
 
+class ModifyWorkflowPropertiesCommandAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UPSERTED_MEMO_FIELD_NUMBER: builtins.int
+    @property
+    def upserted_memo(self) -> temporalio.api.common.v1.message_pb2.Memo:
+        """If set, update the workflow memo with the provided values. The values will be merged with
+        the existing memo. If the user wants to delete values, a default/empty Payload should be
+        used as the value for the key being deleted.
+        """
+    def __init__(
+        self,
+        *,
+        upserted_memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["upserted_memo", b"upserted_memo"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["upserted_memo", b"upserted_memo"]
+    ) -> None: ...
+
+global___ModifyWorkflowPropertiesCommandAttributes = (
+    ModifyWorkflowPropertiesCommandAttributes
+)
+
 class RecordMarkerCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -922,6 +948,7 @@ class Command(google.protobuf.message.Message):
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     ACCEPT_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     COMPLETE_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    MODIFY_WORKFLOW_PROPERTIES_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType
     @property
     def schedule_activity_task_command_attributes(
@@ -983,6 +1010,10 @@ class Command(google.protobuf.message.Message):
     def complete_workflow_update_command_attributes(
         self,
     ) -> global___CompleteWorkflowUpdateCommandAttributes: ...
+    @property
+    def modify_workflow_properties_command_attributes(
+        self,
+    ) -> global___ModifyWorkflowPropertiesCommandAttributes: ...
     def __init__(
         self,
         *,
@@ -1017,6 +1048,8 @@ class Command(google.protobuf.message.Message):
         | None = ...,
         complete_workflow_update_command_attributes: global___CompleteWorkflowUpdateCommandAttributes
         | None = ...,
+        modify_workflow_properties_command_attributes: global___ModifyWorkflowPropertiesCommandAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1037,6 +1070,8 @@ class Command(google.protobuf.message.Message):
             b"continue_as_new_workflow_execution_command_attributes",
             "fail_workflow_execution_command_attributes",
             b"fail_workflow_execution_command_attributes",
+            "modify_workflow_properties_command_attributes",
+            b"modify_workflow_properties_command_attributes",
             "record_marker_command_attributes",
             b"record_marker_command_attributes",
             "request_cancel_activity_task_command_attributes",
@@ -1076,6 +1111,8 @@ class Command(google.protobuf.message.Message):
             b"continue_as_new_workflow_execution_command_attributes",
             "fail_workflow_execution_command_attributes",
             b"fail_workflow_execution_command_attributes",
+            "modify_workflow_properties_command_attributes",
+            b"modify_workflow_properties_command_attributes",
             "record_marker_command_attributes",
             b"record_marker_command_attributes",
             "request_cancel_activity_task_command_attributes",
@@ -1112,6 +1149,7 @@ class Command(google.protobuf.message.Message):
         "upsert_workflow_search_attributes_command_attributes",
         "accept_workflow_update_command_attributes",
         "complete_workflow_update_command_attributes",
+        "modify_workflow_properties_command_attributes",
     ] | None: ...
 
 global___Command = Command
