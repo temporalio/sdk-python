@@ -24,7 +24,6 @@ from typing import (
 )
 
 import google.protobuf.json_format
-from temporalio.bridge.temporal_sdk_bridge import HistoryPusher
 from typing_extensions import TypedDict
 
 import temporalio.api.history.v1
@@ -32,6 +31,7 @@ import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.worker
 import temporalio.converter
 import temporalio.workflow
+from temporalio.bridge.temporal_sdk_bridge import HistoryPusher
 
 from .interceptor import Interceptor
 from .worker import load_default_build_id
@@ -204,11 +204,12 @@ class Replayer:
     ]:
         def retfn(run_id, remove_job):
             ex = None
-            if (
-                remove_job.reason
-                == temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.CACHE_FULL
-            ):
-                # Cache being full doesn't count as a failure-inducing eviction
+            ok_reasons = [
+                temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.CACHE_FULL,
+                temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.LANG_REQUESTED,
+            ]
+            if remove_job.reason in ok_reasons:
+                # These reasons don't count as a failure-inducing eviction
                 pass
             elif (
                 remove_job.reason
@@ -254,8 +255,7 @@ class WorkflowHistory:
     def from_json(
         cls, workflow_id: str, history: Union[str, Dict[str, Any]]
     ) -> WorkflowHistory:
-        """
-        Construct a WorkflowHistory from an ID and a json dump of history.
+        """Construct a WorkflowHistory from an ID and a json dump of history.
 
         Args:
             workflow_id: The workflow's ID
