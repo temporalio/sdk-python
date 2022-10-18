@@ -54,7 +54,7 @@ class _WorkflowWorker:
         debug_mode: bool,
         on_eviction_hook: Optional[
             Callable[
-                [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], bool
+                [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
             ]
         ] = None,
     ) -> None:

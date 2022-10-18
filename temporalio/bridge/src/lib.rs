@@ -28,7 +28,6 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
         py.get_type::<worker::PollShutdownError>(),
     )?;
     m.add_class::<worker::WorkerRef>()?;
-    m.add_class::<worker::ReplayWorker>()?;
     m.add_class::<worker::HistoryPusher>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
     m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;

@@ -23,12 +23,6 @@ pub struct WorkerRef {
     worker: Option<Arc<temporal_sdk_core::Worker>>,
 }
 
-#[pyclass]
-pub struct ReplayWorker {
-    pub worker: WorkerRef,
-    pub history_pusher: HistoryPusher,
-}
-
 #[derive(FromPyObject)]
 pub struct WorkerConfig {
     namespace: String,

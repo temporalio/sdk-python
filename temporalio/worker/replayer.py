@@ -24,6 +24,7 @@ from typing import (
 )
 
 import google.protobuf.json_format
+from temporalio.bridge.temporal_sdk_bridge import HistoryPusher
 from typing_extensions import TypedDict
 
 import temporalio.api.history.v1
@@ -77,49 +78,6 @@ class Replayer:
             debug_mode=debug_mode,
             fail_fast=fail_fast,
         )
-        tq = f"replay-{build_id}"
-
-        # Create bridge worker and workflow worker
-        (
-            self._bridge_worker,
-            self._pusher,
-        ) = temporalio.bridge.worker.Worker.for_replay(
-            temporalio.bridge.worker.WorkerConfig(
-                namespace=self._config["namespace"],
-                task_queue=tq,
-                build_id=self._config["build_id"] or load_default_build_id(),
-                identity_override=self._config["identity"],
-                # All values below are ignored but required by Core
-                max_cached_workflows=1,
-                max_outstanding_workflow_tasks=1,
-                max_outstanding_activities=1,
-                max_outstanding_local_activities=1,
-                max_concurrent_workflow_task_polls=1,
-                nonsticky_to_sticky_poll_ratio=1,
-                max_concurrent_activity_task_polls=1,
-                no_remote_activities=True,
-                sticky_queue_schedule_to_start_timeout_millis=1000,
-                max_heartbeat_throttle_interval_millis=1000,
-                default_heartbeat_throttle_interval_millis=1000,
-                max_activities_per_second=None,
-                max_task_queue_activities_per_second=None,
-            ),
-        )
-        self._workflow_worker = _WorkflowWorker(
-            bridge_worker=lambda: self._bridge_worker,
-            namespace=self._config["namespace"],
-            task_queue=tq,
-            workflows=self._config["workflows"],
-            workflow_task_executor=self._config["workflow_task_executor"],
-            workflow_runner=self._config["workflow_runner"],
-            data_converter=self._config["data_converter"],
-            interceptors=self._config["interceptors"],
-            debug_mode=self._config["debug_mode"],
-            on_eviction_hook=self._replayer_eviction_hook(
-                fail_fast=self._config["fail_fast"]
-            ),
-        )
-        self._current_run_results = WorkflowReplayResults(False, dict())
 
     def config(self) -> ReplayerConfig:
         """Config, as a dictionary, used to create this replayer.
@@ -156,7 +114,47 @@ class Replayer:
         Args:
             histories: The histories to replay, from an async iterator.
         """
-        self._current_run_results = WorkflowReplayResults(False, dict())
+        current_run_results = WorkflowReplayResults(dict())
+        # Create bridge worker and workflow worker
+        tq = f"replay-{self._config['build_id']}"
+        (bridge_worker, pusher,) = temporalio.bridge.worker.Worker.for_replay(
+            temporalio.bridge.worker.WorkerConfig(
+                namespace=self._config["namespace"],
+                task_queue=tq,
+                build_id=self._config["build_id"] or load_default_build_id(),
+                identity_override=self._config["identity"],
+                # All values below are ignored but required by Core
+                max_cached_workflows=1,
+                max_outstanding_workflow_tasks=1,
+                max_outstanding_activities=1,
+                max_outstanding_local_activities=1,
+                max_concurrent_workflow_task_polls=1,
+                nonsticky_to_sticky_poll_ratio=1,
+                max_concurrent_activity_task_polls=1,
+                no_remote_activities=True,
+                sticky_queue_schedule_to_start_timeout_millis=1000,
+                max_heartbeat_throttle_interval_millis=1000,
+                default_heartbeat_throttle_interval_millis=1000,
+                max_activities_per_second=None,
+                max_task_queue_activities_per_second=None,
+            ),
+        )
+        workflow_worker = _WorkflowWorker(
+            bridge_worker=lambda: bridge_worker,
+            namespace=self._config["namespace"],
+            task_queue=tq,
+            workflows=self._config["workflows"],
+            workflow_task_executor=self._config["workflow_task_executor"],
+            workflow_runner=self._config["workflow_runner"],
+            data_converter=self._config["data_converter"],
+            interceptors=self._config["interceptors"],
+            debug_mode=self._config["debug_mode"],
+            on_eviction_hook=self._replayer_eviction_hook(
+                fail_fast=self._config["fail_fast"],
+                pusher=pusher,
+                current_results=current_run_results,
+            ),
+        )
 
         async def history_feeder():
             try:
@@ -176,30 +174,33 @@ class Replayer:
                     as_history_proto = temporalio.api.history.v1.History(
                         events=history.events
                     )
-                    await self._pusher.push_history(
+                    await pusher.push_history(
                         history.workflow_id, as_history_proto.SerializeToString()
                     )
             finally:
-                self._pusher.close()
+                pusher.close()
 
         async def runner():
             # Run it
             try:
-                await self._workflow_worker.run()
+                await workflow_worker.run()
             finally:
                 # We must finalize shutdown here
                 try:
-                    await self._bridge_worker.finalize_shutdown()
+                    await bridge_worker.finalize_shutdown()
                 except Exception:
                     logger.warning("Failed to finalize shutdown", exc_info=True)
 
         await asyncio.gather(history_feeder(), runner())
-        return self._current_run_results
+        return current_run_results
 
+    @staticmethod
     def _replayer_eviction_hook(
-        self, fail_fast: bool
+        fail_fast: bool,
+        pusher: HistoryPusher,
+        current_results: WorkflowReplayResults,
     ) -> Callable[
-        [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], bool
+        [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
     ]:
         def retfn(run_id, remove_job):
             ex = None
@@ -219,11 +220,10 @@ class Replayer:
 
             if ex is not None:
                 if fail_fast:
-                    self._pusher.close()
+                    pusher.close()
                     raise ex
                 else:
-                    self._current_run_results.had_any_failure = True
-                    self._current_run_results.failure_details[run_id] = ex
+                    current_results.failure_details[run_id] = ex
 
         return retfn
 
@@ -245,7 +245,7 @@ class ReplayerConfig(TypedDict, total=False):
 
 @dataclass
 class WorkflowHistory:
-    """A workflow's id and history"""
+    """A workflow's ID and history."""
 
     workflow_id: str
     events: Sequence[temporalio.api.history.v1.HistoryEvent]
@@ -254,17 +254,26 @@ class WorkflowHistory:
     def from_json(
         cls, workflow_id: str, history: Union[str, Dict[str, Any]]
     ) -> WorkflowHistory:
-        """Construct a WorkflowHistory from an id and a json dump of history"""
+        """
+        Construct a WorkflowHistory from an ID and a json dump of history.
+
+        Args:
+            workflow_id: The workflow's ID
+            history: A string or parsed-to-dict representation of workflow history.
+        """
         parsed = _history_from_json(history)
         return cls(workflow_id, parsed.events)
 
 
 @dataclass
 class WorkflowReplayResults:
-    """Results of replaying multiple workflows"""
+    """Results of replaying multiple workflows."""
 
-    had_any_failure: bool
     failure_details: MutableMapping[str, Exception]
+
+    def had_any_failure(self) -> bool:
+        """Returns True if any run experienced a failure."""
+        return len(self.failure_details) > 0
 
 
 def _history_from_json(

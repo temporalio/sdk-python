@@ -237,7 +237,7 @@ async def test_replayer_multiple_histories_fail_slow() -> None:
     ).replay_workflows(histories())
 
     assert callcount == 4
-    assert results.had_any_failure
+    assert results.had_any_failure()
     assert results.failure_details[bad_hist_run_id] is not None
 
 

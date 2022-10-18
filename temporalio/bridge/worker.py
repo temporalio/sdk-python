@@ -61,11 +61,9 @@ class Worker:
     def for_replay(
         config: WorkerConfig,
     ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
-        """Create a bridge replay worker from history."""
-        cfg = temporalio.bridge.telemetry.TelemetryConfig()
-        cfg.tracing_filter = "info,temporal_sdk_core=DEBUG,temporal_sdk=DEBUG"
+        """Create a bridge replay worker."""
         temporalio.bridge.telemetry.init_telemetry(
-            cfg,
+            temporalio.bridge.telemetry.TelemetryConfig(),
             warn_if_already_inited=False,
         )
         [
