@@ -79,7 +79,7 @@ class WorkflowRunner(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+    def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Create a workflow instance that can handle activations.
 
         Args:
@@ -131,7 +131,7 @@ class UnsandboxedWorkflowRunner(WorkflowRunner):
         # Do nothing by default
         pass
 
-    async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+    def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Create an unsandboxed workflow instance."""
         # We ignore MyPy failing to instantiate this because it's not _really_
         # abstract at runtime. All of the asyncio.AbstractEventLoop calls that

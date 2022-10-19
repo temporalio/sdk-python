@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 import dataclasses
 import sys
@@ -20,7 +21,7 @@ from temporalio.worker.workflow_sandbox import (
     SandboxRestrictions,
 )
 from tests.worker.test_workflow import assert_eq_eventually
-from tests.worker.workflow_sandbox import stateful_module
+from tests.worker.workflow_sandbox.testmodules import stateful_module
 
 
 def test_workflow_sandbox_stdlib_module_names():
@@ -41,9 +42,8 @@ def test_workflow_sandbox_stdlib_module_names():
         actual_names == temporalio.worker.workflow_sandbox._stdlib_module_names
     ), f"Expecting names as {actual_names}. In code as:\n{code}"
 
-
 global_state = ["global orig"]
-
+print("!!GLOBAL STATE!!", id(global_state))
 
 @dataclass
 class GlobalStateWorkflowParams:
@@ -53,10 +53,12 @@ class GlobalStateWorkflowParams:
 @workflow.defn
 class GlobalStateWorkflow:
     def __init__(self) -> None:
+        print("!!INIT GLOBAL STATE!!", id(global_state), __import__)
         self.append("inited")
 
     @workflow.run
     async def run(self, params: GlobalStateWorkflowParams) -> Dict[str, List[str]]:
+        print("!!RUN GLOBAL STATE!!", id(global_state))
         self.append("started")
         if params.fail_on_first_attempt:
             raise ApplicationError("Failing first attempt")
@@ -139,8 +141,10 @@ async def test_workflow_sandbox_global_state(
         } == await handle2.result()
 
         # But that _this_ global state wasn't even touched
+        # print("THIS GLOBAL STATE", global_state)
         assert global_state == ["global orig"]
         assert stateful_module.module_state == ["module orig"]
+        print("SUCCESS1!", __import__)
 
 
 # @dataclass

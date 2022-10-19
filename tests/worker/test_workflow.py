@@ -1226,12 +1226,12 @@ class CustomWorkflowRunner(WorkflowRunner):
     def prepare_workflow(self, defn: workflow._Definition) -> None:
         pass
 
-    async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+    def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         # We need to assert details can be pickled for potential sandbox use
         det_pickled = pickle.loads(pickle.dumps(det))
         assert det == det_pickled
         return CustomWorkflowInstance(
-            self, await self._unsandboxed.create_instance(det)
+            self, self._unsandboxed.create_instance(det)
         )
 
 

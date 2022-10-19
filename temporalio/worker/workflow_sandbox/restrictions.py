@@ -4,15 +4,16 @@ import logging
 import math
 import operator
 import types
+import functools
 from copy import copy, deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Mapping, Optional, Set, Type, TypeVar, cast
+from typing import Any, Callable, ClassVar, Mapping, Optional, Sequence, Set, Type, TypeVar, cast
 
 import temporalio.workflow
 
 logger = logging.getLogger(__name__)
 
-LOG_TRACE = True
+LOG_TRACE = False
 
 
 def _trace(message: object, *args: object) -> None:
@@ -58,6 +59,13 @@ class SandboxRestrictions:
 # TODO(cretz): Document asterisk can be used
 @dataclass(frozen=True)
 class SandboxMatcher:
+    @staticmethod
+    def nested_child(path: Sequence[str], child: SandboxMatcher) -> SandboxMatcher:
+        ret = child
+        for key in reversed(path):
+            ret = SandboxMatcher(children={key: ret})
+        return ret
+
     # TODO(cretz): Document that we intentionally use this form instead of a
     # more flexible/abstract matching tree form for optimization reasons
     access: Set[str] = frozenset()  # type: ignore
@@ -78,7 +86,7 @@ class SandboxMatcher:
             assert matcher  # MyPy help
             if matcher.match_self or v in matcher.access or "*" in matcher.access:
                 return True
-            matcher = self.children.get(v) or self.children.get("*")
+            matcher = matcher.children.get(v) or matcher.children.get("*")
             if not matcher:
                 return False
             elif matcher.match_self:
@@ -132,9 +140,15 @@ SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
         # Due to some side-effecting calls made on import, these need to be
         # allowed
         "pathlib",
+        "importlib",
     },
-    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
-    children={"google": SandboxMatcher(access={"protobuf"})},
+    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143.
+    # This unfortunately means that for now, everyone using Python protos has to
+    # pass their module through :-(
+    children={
+        "google": SandboxMatcher(access={"protobuf"}),
+        "temporalio": SandboxMatcher(access={"api"}, children={"bridge": SandboxMatcher(access={"proto"})}),
+    },
 )
 
 SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | SandboxMatcher(
@@ -695,7 +709,7 @@ class _RestrictedProxy:
     __deepcopy__ = _RestrictedProxyLookup(deepcopy)
 
 
-class _RestrictedModule(_RestrictedProxy, types.ModuleType):  # type: ignore
+class RestrictedModule(_RestrictedProxy, types.ModuleType):  # type: ignore
     def __init__(self, mod: types.ModuleType, matcher: SandboxMatcher) -> None:
         _RestrictedProxy.__init__(self, mod.__name__, mod, matcher)
         types.ModuleType.__init__(self, mod.__name__, mod.__doc__)

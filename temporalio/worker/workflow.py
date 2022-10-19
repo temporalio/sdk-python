@@ -182,7 +182,7 @@ class _WorkflowWorker:
                 # If the workflow is not running yet, create it
                 workflow = self._running_workflows.get(act.run_id)
                 if not workflow:
-                    workflow = await self._create_workflow_instance(act)
+                    workflow = self._create_workflow_instance(act)
                     self._running_workflows[act.run_id] = workflow
                 # Run activation in separate thread so we can check if it's
                 # deadlocked
@@ -283,7 +283,7 @@ class _WorkflowWorker:
                     )
                 asyncio.create_task(self._bridge_worker().shutdown())
 
-    async def _create_workflow_instance(
+    def _create_workflow_instance(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> WorkflowInstance:
         # First find the start workflow job
@@ -349,6 +349,6 @@ class _WorkflowWorker:
             extern_functions=self._extern_functions,
         )
         if defn.sandboxed:
-            return await self._workflow_runner.create_instance(det)
+            return self._workflow_runner.create_instance(det)
         else:
-            return await self._unsandboxed_workflow_runner.create_instance(det)
+            return self._unsandboxed_workflow_runner.create_instance(det)
