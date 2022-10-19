@@ -152,6 +152,11 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateWorkflowExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateWorkflowExecutionResponse.FromString,
         )
+        self.DeleteWorkflowExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkflowExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionResponse.FromString,
+        )
         self.ListOpenWorkflowExecutions = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/ListOpenWorkflowExecutions",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListOpenWorkflowExecutionsRequest.SerializeToString,
@@ -595,6 +600,20 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def DeleteWorkflowExecution(self, request, context):
+        """DeleteWorkflowExecution asynchronously deletes a specific Workflow Execution (when
+        WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
+        WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
+        terminated before deletion.
+        (-- api-linter: core::0135::method-signature=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0135::response-message-name=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def ListOpenWorkflowExecutions(self, request, context):
         """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -760,7 +779,10 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def UpdateWorkerBuildIdOrdering(self, request, context):
-        """(-- api-linter: core::0134::response-message-name=disabled
+        """Allows users to specify a graph of worker build id based versions on a
+        per task queue basis. Versions are ordered, and may be either compatible
+        with some extant version, or a new incompatible version.
+        (-- api-linter: core::0134::response-message-name=disabled
         aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
         (-- api-linter: core::0134::method-signature=disabled
         aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
@@ -770,7 +792,7 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def GetWorkerBuildIdOrdering(self, request, context):
-        """This could / maybe should just be part of `DescribeTaskQueue`, but is broken out here to show easily."""
+        """Fetches the worker build id versioning graph for some task queue."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -935,6 +957,11 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.TerminateWorkflowExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateWorkflowExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateWorkflowExecutionResponse.SerializeToString,
+        ),
+        "DeleteWorkflowExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteWorkflowExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionResponse.SerializeToString,
         ),
         "ListOpenWorkflowExecutions": grpc.unary_unary_rpc_method_handler(
             servicer.ListOpenWorkflowExecutions,
@@ -1818,6 +1845,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/TerminateWorkflowExecution",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateWorkflowExecutionRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateWorkflowExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteWorkflowExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkflowExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowExecutionResponse.FromString,
             options,
             channel_credentials,
             insecure,

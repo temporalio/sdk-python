@@ -19,7 +19,7 @@ from .interceptor import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
-from .replayer import Replayer, ReplayerConfig
+from .replayer import Replayer, ReplayerConfig, WorkflowHistory
 from .worker import Worker, WorkerConfig
 from .workflow_instance import (
     UnsandboxedWorkflowRunner,

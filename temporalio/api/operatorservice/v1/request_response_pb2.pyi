@@ -26,16 +26,10 @@ THE SOFTWARE.
 import builtins
 import collections.abc
 import google.protobuf.descriptor
-import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
-import google.protobuf.timestamp_pb2
 import sys
-import temporalio.api.cluster.v1.message_pb2
-import temporalio.api.common.v1.message_pb2
-import temporalio.api.enums.v1.cluster_pb2
 import temporalio.api.enums.v1.common_pb2
-import temporalio.api.version.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -291,61 +285,15 @@ class DeleteNamespaceResponse(google.protobuf.message.Message):
 
 global___DeleteNamespaceResponse = DeleteNamespaceResponse
 
-class DeleteWorkflowExecutionRequest(google.protobuf.message.Message):
-    """(-- api-linter: core::0135::request-unknown-fields=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-    (-- api-linter: core::0135::request-name-required=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-    """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    NAMESPACE_FIELD_NUMBER: builtins.int
-    WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
-    namespace: builtins.str
-    @property
-    def workflow_execution(
-        self,
-    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
-        """Workflow Execution to delete. If run_id is not specified, the latest one is used."""
-    def __init__(
-        self,
-        *,
-        namespace: builtins.str = ...,
-        workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
-        | None = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "workflow_execution", b"workflow_execution"
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "namespace", b"namespace", "workflow_execution", b"workflow_execution"
-        ],
-    ) -> None: ...
-
-global___DeleteWorkflowExecutionRequest = DeleteWorkflowExecutionRequest
-
-class DeleteWorkflowExecutionResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___DeleteWorkflowExecutionResponse = DeleteWorkflowExecutionResponse
-
 class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FRONTEND_ADDRESS_FIELD_NUMBER: builtins.int
     ENABLE_REMOTE_CLUSTER_CONNECTION_FIELD_NUMBER: builtins.int
     frontend_address: builtins.str
+    """Frontend Address is a cross cluster accessible address."""
     enable_remote_cluster_connection: builtins.bool
+    """Flag to enable / disable the cross cluster connection."""
     def __init__(
         self,
         *,
@@ -378,6 +326,7 @@ class RemoveRemoteClusterRequest(google.protobuf.message.Message):
 
     CLUSTER_NAME_FIELD_NUMBER: builtins.int
     cluster_name: builtins.str
+    """Remote cluster name to be removed."""
     def __init__(
         self,
         *,
@@ -397,130 +346,6 @@ class RemoveRemoteClusterResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___RemoveRemoteClusterResponse = RemoveRemoteClusterResponse
-
-class DescribeClusterRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    CLUSTER_NAME_FIELD_NUMBER: builtins.int
-    cluster_name: builtins.str
-    def __init__(
-        self,
-        *,
-        cluster_name: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["cluster_name", b"cluster_name"]
-    ) -> None: ...
-
-global___DescribeClusterRequest = DescribeClusterRequest
-
-class DescribeClusterResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    class SupportedClientsEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        value: builtins.str
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: builtins.str = ...,
-        ) -> None: ...
-        def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
-        ) -> None: ...
-
-    SUPPORTED_CLIENTS_FIELD_NUMBER: builtins.int
-    SERVER_VERSION_FIELD_NUMBER: builtins.int
-    MEMBERSHIP_INFO_FIELD_NUMBER: builtins.int
-    CLUSTER_ID_FIELD_NUMBER: builtins.int
-    CLUSTER_NAME_FIELD_NUMBER: builtins.int
-    HISTORY_SHARD_COUNT_FIELD_NUMBER: builtins.int
-    PERSISTENCE_STORE_FIELD_NUMBER: builtins.int
-    VISIBILITY_STORE_FIELD_NUMBER: builtins.int
-    VERSION_INFO_FIELD_NUMBER: builtins.int
-    FAILOVER_VERSION_INCREMENT_FIELD_NUMBER: builtins.int
-    INITIAL_FAILOVER_VERSION_FIELD_NUMBER: builtins.int
-    IS_GLOBAL_NAMESPACE_ENABLED_FIELD_NUMBER: builtins.int
-    @property
-    def supported_clients(
-        self,
-    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
-    server_version: builtins.str
-    @property
-    def membership_info(
-        self,
-    ) -> temporalio.api.cluster.v1.message_pb2.MembershipInfo: ...
-    cluster_id: builtins.str
-    cluster_name: builtins.str
-    history_shard_count: builtins.int
-    persistence_store: builtins.str
-    visibility_store: builtins.str
-    @property
-    def version_info(self) -> temporalio.api.version.v1.message_pb2.VersionInfo: ...
-    failover_version_increment: builtins.int
-    initial_failover_version: builtins.int
-    is_global_namespace_enabled: builtins.bool
-    def __init__(
-        self,
-        *,
-        supported_clients: collections.abc.Mapping[builtins.str, builtins.str]
-        | None = ...,
-        server_version: builtins.str = ...,
-        membership_info: temporalio.api.cluster.v1.message_pb2.MembershipInfo
-        | None = ...,
-        cluster_id: builtins.str = ...,
-        cluster_name: builtins.str = ...,
-        history_shard_count: builtins.int = ...,
-        persistence_store: builtins.str = ...,
-        visibility_store: builtins.str = ...,
-        version_info: temporalio.api.version.v1.message_pb2.VersionInfo | None = ...,
-        failover_version_increment: builtins.int = ...,
-        initial_failover_version: builtins.int = ...,
-        is_global_namespace_enabled: builtins.bool = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "membership_info", b"membership_info", "version_info", b"version_info"
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "cluster_id",
-            b"cluster_id",
-            "cluster_name",
-            b"cluster_name",
-            "failover_version_increment",
-            b"failover_version_increment",
-            "history_shard_count",
-            b"history_shard_count",
-            "initial_failover_version",
-            b"initial_failover_version",
-            "is_global_namespace_enabled",
-            b"is_global_namespace_enabled",
-            "membership_info",
-            b"membership_info",
-            "persistence_store",
-            b"persistence_store",
-            "server_version",
-            b"server_version",
-            "supported_clients",
-            b"supported_clients",
-            "version_info",
-            b"version_info",
-            "visibility_store",
-            b"visibility_store",
-        ],
-    ) -> None: ...
-
-global___DescribeClusterResponse = DescribeClusterResponse
 
 class ListClustersRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -553,16 +378,14 @@ class ListClustersResponse(google.protobuf.message.Message):
     def clusters(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.cluster.v1.message_pb2.ClusterMetadata
-    ]: ...
+        global___ClusterMetadata
+    ]:
+        """List of all cluster information"""
     next_page_token: builtins.bytes
     def __init__(
         self,
         *,
-        clusters: collections.abc.Iterable[
-            temporalio.api.cluster.v1.message_pb2.ClusterMetadata
-        ]
-        | None = ...,
+        clusters: collections.abc.Iterable[global___ClusterMetadata] | None = ...,
         next_page_token: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
@@ -574,100 +397,53 @@ class ListClustersResponse(google.protobuf.message.Message):
 
 global___ListClustersResponse = ListClustersResponse
 
-class ListClusterMembersRequest(google.protobuf.message.Message):
+class ClusterMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    LAST_HEARTBEAT_WITHIN_FIELD_NUMBER: builtins.int
-    RPC_ADDRESS_FIELD_NUMBER: builtins.int
-    HOST_ID_FIELD_NUMBER: builtins.int
-    ROLE_FIELD_NUMBER: builtins.int
-    SESSION_STARTED_AFTER_TIME_FIELD_NUMBER: builtins.int
-    PAGE_SIZE_FIELD_NUMBER: builtins.int
-    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
-    @property
-    def last_heartbeat_within(self) -> google.protobuf.duration_pb2.Duration:
-        """(-- api-linter: core::0140::prepositions=disabled
-        aip.dev/not-precedent: "within" is used to indicate a time range. --)
-        """
-    rpc_address: builtins.str
-    host_id: builtins.str
-    role: temporalio.api.enums.v1.cluster_pb2.ClusterMemberRole.ValueType
-    @property
-    def session_started_after_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """(-- api-linter: core::0140::prepositions=disabled
-        aip.dev/not-precedent: "after" is used to indicate a time range. --)
-        """
-    page_size: builtins.int
-    next_page_token: builtins.bytes
+    CLUSTER_NAME_FIELD_NUMBER: builtins.int
+    CLUSTER_ID_FIELD_NUMBER: builtins.int
+    ADDRESS_FIELD_NUMBER: builtins.int
+    INITIAL_FAILOVER_VERSION_FIELD_NUMBER: builtins.int
+    HISTORY_SHARD_COUNT_FIELD_NUMBER: builtins.int
+    IS_CONNECTION_ENABLED_FIELD_NUMBER: builtins.int
+    cluster_name: builtins.str
+    """Name of the cluster name."""
+    cluster_id: builtins.str
+    """Id of the cluster."""
+    address: builtins.str
+    """Cluster accessible address."""
+    initial_failover_version: builtins.int
+    """A unique failover version across all connected clusters."""
+    history_shard_count: builtins.int
+    """History service shard number."""
+    is_connection_enabled: builtins.bool
+    """A flag to indicate if a connection is active."""
     def __init__(
         self,
         *,
-        last_heartbeat_within: google.protobuf.duration_pb2.Duration | None = ...,
-        rpc_address: builtins.str = ...,
-        host_id: builtins.str = ...,
-        role: temporalio.api.enums.v1.cluster_pb2.ClusterMemberRole.ValueType = ...,
-        session_started_after_time: google.protobuf.timestamp_pb2.Timestamp
-        | None = ...,
-        page_size: builtins.int = ...,
-        next_page_token: builtins.bytes = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "last_heartbeat_within",
-            b"last_heartbeat_within",
-            "session_started_after_time",
-            b"session_started_after_time",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "host_id",
-            b"host_id",
-            "last_heartbeat_within",
-            b"last_heartbeat_within",
-            "next_page_token",
-            b"next_page_token",
-            "page_size",
-            b"page_size",
-            "role",
-            b"role",
-            "rpc_address",
-            b"rpc_address",
-            "session_started_after_time",
-            b"session_started_after_time",
-        ],
-    ) -> None: ...
-
-global___ListClusterMembersRequest = ListClusterMembersRequest
-
-class ListClusterMembersResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    ACTIVE_MEMBERS_FIELD_NUMBER: builtins.int
-    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
-    @property
-    def active_members(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.cluster.v1.message_pb2.ClusterMember
-    ]: ...
-    next_page_token: builtins.bytes
-    def __init__(
-        self,
-        *,
-        active_members: collections.abc.Iterable[
-            temporalio.api.cluster.v1.message_pb2.ClusterMember
-        ]
-        | None = ...,
-        next_page_token: builtins.bytes = ...,
+        cluster_name: builtins.str = ...,
+        cluster_id: builtins.str = ...,
+        address: builtins.str = ...,
+        initial_failover_version: builtins.int = ...,
+        history_shard_count: builtins.int = ...,
+        is_connection_enabled: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "active_members", b"active_members", "next_page_token", b"next_page_token"
+            "address",
+            b"address",
+            "cluster_id",
+            b"cluster_id",
+            "cluster_name",
+            b"cluster_name",
+            "history_shard_count",
+            b"history_shard_count",
+            "initial_failover_version",
+            b"initial_failover_version",
+            "is_connection_enabled",
+            b"is_connection_enabled",
         ],
     ) -> None: ...
 
-global___ListClusterMembersResponse = ListClusterMembersResponse
+global___ClusterMetadata = ClusterMetadata

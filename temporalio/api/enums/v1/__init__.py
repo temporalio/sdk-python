@@ -1,5 +1,4 @@
 from .batch_operation_pb2 import BatchOperationState, BatchOperationType
-from .cluster_pb2 import ClusterMemberRole
 from .command_type_pb2 import CommandType
 from .common_pb2 import EncodingType, IndexedValueType, Severity
 from .event_type_pb2 import EventType
@@ -36,7 +35,6 @@ __all__ = [
     "BatchOperationState",
     "BatchOperationType",
     "CancelExternalWorkflowExecutionFailedCause",
-    "ClusterMemberRole",
     "CommandType",
     "ContinueAsNewInitiator",
     "EncodingType",

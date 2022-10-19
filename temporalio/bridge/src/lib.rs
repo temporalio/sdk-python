@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::PyTuple;
 
 mod client;
 mod telemetry;
@@ -28,6 +28,7 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
         py.get_type::<worker::PollShutdownError>(),
     )?;
     m.add_class::<worker::WorkerRef>()?;
+    m.add_class::<worker::HistoryPusher>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
     m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;
     Ok(())
@@ -62,9 +63,6 @@ fn new_worker(
 }
 
 #[pyfunction]
-fn new_replay_worker(
-    history_proto: &PyBytes,
-    config: worker::WorkerConfig,
-) -> PyResult<worker::WorkerRef> {
-    worker::new_replay_worker(&history_proto, config)
+fn new_replay_worker(py: Python, config: worker::WorkerConfig) -> PyResult<&PyTuple> {
+    worker::new_replay_worker(py, config)
 }

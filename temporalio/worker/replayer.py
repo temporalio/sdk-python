@@ -2,19 +2,36 @@
 
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import copy
 import json
 import logging
 import re
-from typing import Any, Dict, Iterable, Optional, Sequence, Type, Union
+from dataclasses import dataclass
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Type,
+    Union,
+)
 
 import google.protobuf.json_format
 from typing_extensions import TypedDict
 
 import temporalio.api.history.v1
+import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.worker
 import temporalio.converter
+import temporalio.workflow
+from temporalio.bridge.temporal_sdk_bridge import HistoryPusher
 
 from .interceptor import Interceptor
 from .worker import load_default_build_id
@@ -39,6 +56,7 @@ class Replayer:
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         debug_mode: bool = False,
+        fail_fast: bool = True,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -58,6 +76,7 @@ class Replayer:
             build_id=build_id,
             identity=identity,
             debug_mode=debug_mode,
+            fail_fast=fail_fast,
         )
 
     def config(self) -> ReplayerConfig:
@@ -72,38 +91,36 @@ class Replayer:
 
     async def replay_workflow(
         self,
-        history: Union[temporalio.api.history.v1.History, str, Dict[str, Any]],
+        history: WorkflowHistory,
     ) -> None:
         """Replay a workflow for the given history.
 
         Args:
-            history: The history to replay. Can be a proto history object or
-                JSON history as exported via web/tctl. If JSON history, can be a
-                JSON string or a JSON dictionary as returned by
-                :py:func:`json.load`.
+            history: The history to replay. Can be fetched directly, or use
+              :py:meth:`WorkflowHistory.from_json` to parse a history downloaded via `tctl` or the
+              web ui.
         """
-        # Convert history if JSON or dict
-        if not isinstance(history, temporalio.api.history.v1.History):
-            history = _history_from_json(history)
 
-        # Extract workflow started event
-        started_event = next(
-            (
-                e
-                for e in history.events
-                if e.HasField("workflow_execution_started_event_attributes")
-            ),
-            None,
-        )
-        if not started_event:
-            raise ValueError("Started event not found")
+        async def gen_hist():
+            yield history
 
+        await self.replay_workflows(gen_hist())
+
+    async def replay_workflows(
+        self, histories: AsyncIterator[WorkflowHistory]
+    ) -> WorkflowReplayResults:
+        """Replay a workflow for the given history.
+
+        Args:
+            histories: The histories to replay, from an async iterator.
+        """
+        current_run_results = WorkflowReplayResults(dict())
         # Create bridge worker and workflow worker
-        bridge_worker = temporalio.bridge.worker.Worker.for_replay(
-            history,
+        tq = f"replay-{self._config['build_id']}"
+        (bridge_worker, pusher,) = temporalio.bridge.worker.Worker.for_replay(
             temporalio.bridge.worker.WorkerConfig(
                 namespace=self._config["namespace"],
-                task_queue=started_event.workflow_execution_started_event_attributes.task_queue.name,
+                task_queue=tq,
                 build_id=self._config["build_id"] or load_default_build_id(),
                 identity_override=self._config["identity"],
                 # All values below are ignored but required by Core
@@ -125,25 +142,91 @@ class Replayer:
         workflow_worker = _WorkflowWorker(
             bridge_worker=lambda: bridge_worker,
             namespace=self._config["namespace"],
-            task_queue=started_event.workflow_execution_started_event_attributes.task_queue.name,
+            task_queue=tq,
             workflows=self._config["workflows"],
             workflow_task_executor=self._config["workflow_task_executor"],
             workflow_runner=self._config["workflow_runner"],
             data_converter=self._config["data_converter"],
             interceptors=self._config["interceptors"],
             debug_mode=self._config["debug_mode"],
-            fail_on_eviction=True,
+            on_eviction_hook=self._replayer_eviction_hook(
+                fail_fast=self._config["fail_fast"],
+                pusher=pusher,
+                current_results=current_run_results,
+            ),
         )
 
-        # Run it
-        try:
-            await workflow_worker.run()
-        finally:
-            # We must finalize shutdown here
+        async def history_feeder():
             try:
-                await bridge_worker.finalize_shutdown()
-            except Exception:
-                logger.warning("Failed to finalize shutdown", exc_info=True)
+                async for history in histories:
+                    # Extract workflow started event
+                    started_event = next(
+                        (
+                            e
+                            for e in history.events
+                            if e.HasField("workflow_execution_started_event_attributes")
+                        ),
+                        None,
+                    )
+                    if not started_event:
+                        raise ValueError("Started event not found")
+
+                    as_history_proto = temporalio.api.history.v1.History(
+                        events=history.events
+                    )
+                    await pusher.push_history(
+                        history.workflow_id, as_history_proto.SerializeToString()
+                    )
+            finally:
+                pusher.close()
+
+        async def runner():
+            # Run it
+            try:
+                await workflow_worker.run()
+            finally:
+                # We must finalize shutdown here
+                try:
+                    await bridge_worker.finalize_shutdown()
+                except Exception:
+                    logger.warning("Failed to finalize shutdown", exc_info=True)
+
+        await asyncio.gather(history_feeder(), runner())
+        return current_run_results
+
+    @staticmethod
+    def _replayer_eviction_hook(
+        fail_fast: bool,
+        pusher: HistoryPusher,
+        current_results: WorkflowReplayResults,
+    ) -> Callable[
+        [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
+    ]:
+        def retfn(run_id, remove_job):
+            ex = None
+            ok_reasons = [
+                temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.CACHE_FULL,
+                temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.LANG_REQUESTED,
+            ]
+            if remove_job.reason in ok_reasons:
+                # These reasons don't count as a failure-inducing eviction
+                pass
+            elif (
+                remove_job.reason
+                == temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.NONDETERMINISM
+            ):
+                ex = temporalio.workflow.NondeterminismError(remove_job.message)
+            else:
+                ex = RuntimeError(f"{remove_job.reason}: {remove_job.message}")
+
+            if ex is not None:
+                if fail_fast:
+                    pusher.close()
+                    raise ex
+                else:
+                    current_results.failure_details[run_id] = ex
+
+        return retfn
 
 
 class ReplayerConfig(TypedDict, total=False):
@@ -158,6 +241,39 @@ class ReplayerConfig(TypedDict, total=False):
     build_id: Optional[str]
     identity: Optional[str]
     debug_mode: bool
+    fail_fast: bool
+
+
+@dataclass
+class WorkflowHistory:
+    """A workflow's ID and history."""
+
+    workflow_id: str
+    events: Sequence[temporalio.api.history.v1.HistoryEvent]
+
+    @classmethod
+    def from_json(
+        cls, workflow_id: str, history: Union[str, Dict[str, Any]]
+    ) -> WorkflowHistory:
+        """Construct a WorkflowHistory from an ID and a json dump of history.
+
+        Args:
+            workflow_id: The workflow's ID
+            history: A string or parsed-to-dict representation of workflow history.
+        """
+        parsed = _history_from_json(history)
+        return cls(workflow_id, parsed.events)
+
+
+@dataclass
+class WorkflowReplayResults:
+    """Results of replaying multiple workflows."""
+
+    failure_details: MutableMapping[str, Exception]
+
+    def had_any_failure(self) -> bool:
+        """Returns True if any run experienced a failure."""
+        return len(self.failure_details) > 0
 
 
 def _history_from_json(
@@ -205,7 +321,10 @@ def _history_from_json(
         )
         _fix_history_enum("TASK_QUEUE_KIND", event, "*", "taskQueue", "kind")
         _fix_history_enum(
-            "TIMEOUT_TYPE", event, "workflowTaskTimedOutEventAttributes", "timeoutType"
+            "TIMEOUT_TYPE",
+            event,
+            "workflowTaskTimedOutEventAttributes",
+            "timeoutType",
         )
         _fix_history_enum(
             "WORKFLOW_ID_REUSE_POLICY",

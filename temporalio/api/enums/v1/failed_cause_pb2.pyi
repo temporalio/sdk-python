@@ -82,6 +82,7 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
     """The worker encountered a mismatch while replaying history between what was expected, and
     what the workflow code actually did.
     """
+    WORKFLOW_TASK_FAILED_CAUSE_BAD_MODIFY_WORKFLOW_PROPERTIES_ATTRIBUTES: _WorkflowTaskFailedCause.ValueType  # 25
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -125,6 +126,7 @@ WORKFLOW_TASK_FAILED_CAUSE_NON_DETERMINISTIC_ERROR: WorkflowTaskFailedCause.Valu
 """The worker encountered a mismatch while replaying history between what was expected, and
 what the workflow code actually did.
 """
+WORKFLOW_TASK_FAILED_CAUSE_BAD_MODIFY_WORKFLOW_PROPERTIES_ATTRIBUTES: WorkflowTaskFailedCause.ValueType  # 25
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:
@@ -224,6 +226,8 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
     """Caller exceeds max concurrent request limit."""
     RESOURCE_EXHAUSTED_CAUSE_SYSTEM_OVERLOADED: _ResourceExhaustedCause.ValueType  # 3
     """System overloaded."""
+    RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_LIMIT: _ResourceExhaustedCause.ValueType  # 4
+    """Namespace exceeds persistence rate limit."""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -236,4 +240,6 @@ RESOURCE_EXHAUSTED_CAUSE_CONCURRENT_LIMIT: ResourceExhaustedCause.ValueType  # 2
 """Caller exceeds max concurrent request limit."""
 RESOURCE_EXHAUSTED_CAUSE_SYSTEM_OVERLOADED: ResourceExhaustedCause.ValueType  # 3
 """System overloaded."""
+RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_LIMIT: ResourceExhaustedCause.ValueType  # 4
+"""Namespace exceeds persistence rate limit."""
 global___ResourceExhaustedCause = ResourceExhaustedCause

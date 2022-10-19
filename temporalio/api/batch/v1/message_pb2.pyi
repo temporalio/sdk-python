@@ -93,11 +93,8 @@ class BatchOperationTermination(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REASON_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
-    reason: builtins.str
-    """Reason of terminate workflows"""
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized value(s) to provide to the termination event"""
@@ -106,7 +103,6 @@ class BatchOperationTermination(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        reason: builtins.str = ...,
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
     ) -> None: ...
@@ -116,7 +112,7 @@ class BatchOperationTermination(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "details", b"details", "identity", b"identity", "reason", b"reason"
+            "details", b"details", "identity", b"identity"
         ],
     ) -> None: ...
 
@@ -181,23 +177,16 @@ class BatchOperationCancellation(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REASON_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
-    reason: builtins.str
-    """Reason of cancel workflows"""
     identity: builtins.str
     """The identity of the worker/client"""
     def __init__(
         self,
         *,
-        reason: builtins.str = ...,
         identity: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "identity", b"identity", "reason", b"reason"
-        ],
+        self, field_name: typing_extensions.Literal["identity", b"identity"]
     ) -> None: ...
 
 global___BatchOperationCancellation = BatchOperationCancellation

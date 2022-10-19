@@ -251,6 +251,11 @@ class WorkflowService:
             wsv1.DeleteScheduleRequest,
             wsv1.DeleteScheduleResponse,
         )
+        self.delete_workflow_execution = client._new_call(
+            "delete_workflow_execution",
+            wsv1.DeleteWorkflowExecutionRequest,
+            wsv1.DeleteWorkflowExecutionResponse,
+        )
         self.describe_batch_operation = client._new_call(
             "describe_batch_operation",
             wsv1.DescribeBatchOperationRequest,
@@ -530,24 +535,6 @@ class OperatorService:
             "delete_namespace",
             osv1.DeleteNamespaceRequest,
             osv1.DeleteNamespaceResponse,
-            service="operator",
-        )
-        self.delete_workflow_execution = client._new_call(
-            "delete_workflow_execution",
-            osv1.DeleteWorkflowExecutionRequest,
-            osv1.DeleteWorkflowExecutionResponse,
-            service="operator",
-        )
-        self.describe_cluster = client._new_call(
-            "describe_cluster",
-            osv1.DescribeClusterRequest,
-            osv1.DescribeClusterResponse,
-            service="operator",
-        )
-        self.list_cluster_members = client._new_call(
-            "list_cluster_members",
-            osv1.ListClusterMembersRequest,
-            osv1.ListClusterMembersResponse,
             service="operator",
         )
         self.list_clusters = client._new_call(

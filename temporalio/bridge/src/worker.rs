@@ -1,15 +1,18 @@
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyTuple};
 use pyo3_asyncio::tokio::future_into_py;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
+use temporal_sdk_core::replay::HistoryForReplay;
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
 use temporal_sdk_core_protos::temporal::api::history::v1::History;
+use tokio::sync::mpsc::{channel, Sender};
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::client;
 
@@ -53,19 +56,22 @@ pub fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> PyResult<
     })
 }
 
-pub fn new_replay_worker(history_proto: &PyBytes, config: WorkerConfig) -> PyResult<WorkerRef> {
+pub fn new_replay_worker(py: Python, config: WorkerConfig) -> PyResult<&PyTuple> {
     // This must be run with the Tokio context available
     let _guard = pyo3_asyncio::tokio::get_runtime().enter();
     let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
-    let history = History::decode(history_proto.as_bytes())
-        .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
-    Ok(WorkerRef {
+    let (history_pusher, stream) = HistoryPusher::new();
+    let worker = WorkerRef {
         worker: Some(Arc::new(
-            temporal_sdk_core::init_replay_worker(config, &history).map_err(|err| {
+            temporal_sdk_core::init_replay_worker(config, stream).map_err(|err| {
                 PyValueError::new_err(format!("Failed creating replay worker: {}", err))
             })?,
         )),
-    })
+    };
+    Ok(PyTuple::new(
+        py,
+        [worker.into_py(py), history_pusher.into_py(py)],
+    ))
 }
 
 #[pymethods]
@@ -130,7 +136,7 @@ impl WorkerRef {
         })
     }
 
-    fn record_activity_heartbeat(&self, proto: &pyo3::types::PyBytes) -> PyResult<()> {
+    fn record_activity_heartbeat(&self, proto: &PyBytes) -> PyResult<()> {
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
         self.worker
@@ -202,5 +208,53 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
+    }
+}
+
+/// For feeding histories into core during replay
+#[pyclass]
+pub struct HistoryPusher {
+    tx: Option<Sender<HistoryForReplay>>,
+}
+
+impl HistoryPusher {
+    fn new() -> (Self, ReceiverStream<HistoryForReplay>) {
+        let (tx, rx) = channel(1);
+        (Self { tx: Some(tx) }, ReceiverStream::new(rx))
+    }
+}
+
+#[pymethods]
+impl HistoryPusher {
+    fn push_history<'p>(
+        &self,
+        py: Python<'p>,
+        workflow_id: &str,
+        history_proto: &PyBytes,
+    ) -> PyResult<&'p PyAny> {
+        let history = History::decode(history_proto.as_bytes())
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+        let wfid = workflow_id.to_string();
+        let tx = if let Some(tx) = self.tx.as_ref() {
+            tx.clone()
+        } else {
+            return Err(PyRuntimeError::new_err(
+                "Replay worker is no longer accepting new histories",
+            ));
+        };
+        future_into_py(py, async move {
+            tx.send(HistoryForReplay::new(history, wfid))
+                .await
+                .map_err(|_| {
+                    PyRuntimeError::new_err(
+                        "Channel for history replay was dropped, this is an SDK bug.",
+                    )
+                })?;
+            Ok(())
+        })
+    }
+
+    fn close(&mut self) {
+        self.tx.take();
     }
 }

@@ -299,6 +299,19 @@ class WorkflowServiceStub:
     `WORKFLOW_EXECUTION_TERMINATED` event in the history and immediately terminating the
     execution instance.
     """
+    DeleteWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
+    ]
+    """DeleteWorkflowExecution asynchronously deletes a specific Workflow Execution (when
+    WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
+    WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
+    terminated before deletion.
+    (-- api-linter: core::0135::method-signature=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+    (-- api-linter: core::0135::response-message-name=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+    """
     ListOpenWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
@@ -444,7 +457,10 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse,
     ]
-    """(-- api-linter: core::0134::response-message-name=disabled
+    """Allows users to specify a graph of worker build id based versions on a
+    per task queue basis. Versions are ordered, and may be either compatible
+    with some extant version, or a new incompatible version.
+    (-- api-linter: core::0134::response-message-name=disabled
         aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
     (-- api-linter: core::0134::method-signature=disabled
         aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
@@ -453,7 +469,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse,
     ]
-    """This could / maybe should just be part of `DescribeTaskQueue`, but is broken out here to show easily."""
+    """Fetches the worker build id versioning graph for some task queue."""
     UpdateWorkflow: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowResponse,
@@ -805,6 +821,21 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         execution instance.
         """
     @abc.abstractmethod
+    def DeleteWorkflowExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse:
+        """DeleteWorkflowExecution asynchronously deletes a specific Workflow Execution (when
+        WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
+        WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
+        terminated before deletion.
+        (-- api-linter: core::0135::method-signature=disabled
+            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0135::response-message-name=disabled
+            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+        """
+    @abc.abstractmethod
     def ListOpenWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
@@ -995,7 +1026,10 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse:
-        """(-- api-linter: core::0134::response-message-name=disabled
+        """Allows users to specify a graph of worker build id based versions on a
+        per task queue basis. Versions are ordered, and may be either compatible
+        with some extant version, or a new incompatible version.
+        (-- api-linter: core::0134::response-message-name=disabled
             aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
         (-- api-linter: core::0134::method-signature=disabled
             aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
@@ -1006,7 +1040,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse:
-        """This could / maybe should just be part of `DescribeTaskQueue`, but is broken out here to show easily."""
+        """Fetches the worker build id versioning graph for some task queue."""
     @abc.abstractmethod
     def UpdateWorkflow(
         self,
