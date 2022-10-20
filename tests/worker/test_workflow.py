@@ -1230,9 +1230,7 @@ class CustomWorkflowRunner(WorkflowRunner):
         # We need to assert details can be pickled for potential sandbox use
         det_pickled = pickle.loads(pickle.dumps(det))
         assert det == det_pickled
-        return CustomWorkflowInstance(
-            self, self._unsandboxed.create_instance(det)
-        )
+        return CustomWorkflowInstance(self, self._unsandboxed.create_instance(det))
 
 
 class CustomWorkflowInstance(WorkflowInstance):

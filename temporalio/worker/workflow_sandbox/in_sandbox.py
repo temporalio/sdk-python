@@ -2,18 +2,20 @@ import dataclasses
 import logging
 from typing import Type
 
-import temporalio.worker.workflow_instance
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.worker.workflow_instance
 
 logger = logging.getLogger(__name__)
 
 # Set to true to log lots of sandbox details
 LOG_TRACE = False
 
+
 def _trace(message: object, *args: object) -> None:
     if LOG_TRACE:
         logger.debug(message, *args)
+
 
 class InSandbox:
     def __init__(

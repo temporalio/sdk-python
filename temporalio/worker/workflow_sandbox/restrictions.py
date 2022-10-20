@@ -1,13 +1,24 @@
 from __future__ import annotations
 
+import functools
 import logging
 import math
 import operator
 import types
-import functools
 from copy import copy, deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Mapping, Optional, Sequence, Set, Type, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+    TypeVar,
+    cast,
+)
 
 import temporalio.workflow
 
@@ -147,7 +158,9 @@ SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
     # pass their module through :-(
     children={
         "google": SandboxMatcher(access={"protobuf"}),
-        "temporalio": SandboxMatcher(access={"api"}, children={"bridge": SandboxMatcher(access={"proto"})}),
+        "temporalio": SandboxMatcher(
+            access={"api"}, children={"bridge": SandboxMatcher(access={"proto"})}
+        ),
     },
 )
 
@@ -551,7 +564,7 @@ class _RestrictedProxy:
         state = _RestrictionState.from_proxy(self)
         _trace("__getattribute__ %s on %s", __name, state.name)
         state.assert_child_not_restricted(__name)
-        ret = object.__getattribute__(state.obj, "__getattribute__")(__name)
+        ret = object.__getattribute__(self, "__getattr__")(__name)
 
         # If there is a child matcher, restrict if we can. As a special case, we
         # don't wrap __dict__ if we're asked not to.

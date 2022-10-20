@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Type
 
@@ -16,8 +17,8 @@ from ...worker.workflow_instance import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
+from .importer import RestrictedEnvironment
 from .restrictions import SandboxRestrictions
-from .importer import _RestrictedEnvironment
 
 
 class SandboxedWorkflowRunner(WorkflowRunner):
@@ -68,6 +69,22 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         return _Instance(det, self._runner_class, self._restrictions)
 
 
+# Due to the fact that we are altering the global sys.modules and builtins, we
+# have to apply a global lock.
+#
+# TODO(cretz): Can we get rid of this? It's unfortunate, but I have not
+# yet found a way around it. Technically the following code will create
+# a new sys:
+#
+#   new_sys = types.ModuleType("sys")
+#   importlib.util.find_spec("sys").loader.exec_module(new_sys)
+#   # Shallow copy everything over
+#   new_sys.__dict__.update(sys.__dict__.copy())
+#   globals()["sys"] = new_sys
+#
+# But this does not affect other imports. More testing is needed.
+_globals_lock = threading.Lock()
+
 # Implements in_sandbox._ExternEnvironment. Some of these calls are called from
 # within the sandbox.
 class _Instance(WorkflowInstance):
@@ -77,7 +94,6 @@ class _Instance(WorkflowInstance):
         runner_class: Type[WorkflowRunner],
         restrictions: SandboxRestrictions,
     ) -> None:
-        print("INIT INST", __import__)
         self.restrictions = restrictions
         self.runner_class = runner_class
         self.instance_details = instance_details
@@ -91,50 +107,45 @@ class _Instance(WorkflowInstance):
         self._create_instance()
 
     def _create_instance(self) -> None:
-        # First create the importer
-        print("CREATE", __import__)
-        self._run_code(
-            "from temporalio.worker.workflow_sandbox.importer import Importer\n"
-            "__temporal_importer = Importer(__temporal_importer_environment)\n",
-            __temporal_importer_environment=_RestrictedEnvironment(self.restrictions),
-        )
-        print("WUTUT", self.globals_and_locals.get("__temporal_importer"))
-        self.globals_and_locals["__builtins__"]["__import__"] = self.globals_and_locals.get("__temporal_importer")._import # type: ignore
-        self._run_code(
-            "with __temporal_importer.applied():\n"
-            f"  from {self.instance_details.defn.cls.__module__} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
-            f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n"
-            "  print('AA4', __builtins__.get('__import__'), __import__)\n"
-            "  from temporalio.worker.workflow_sandbox.in_sandbox import InSandbox\n"
-            "  __temporal_in_sandbox = InSandbox(__temporal_instance_details, __temporal_runner_class, __temporal_workflow_class)\n",
-            __temporal_instance_details=self.instance_details,
-            # __temporal_in_sandbox_environment=self,
-        )
-        print("POST CREATE", __import__)
+        _globals_lock.acquire(timeout=3)
+        try:
+            # First create the importer
+            self._run_code(
+                "from temporalio.worker.workflow_sandbox.importer import Importer\n"
+                "__temporal_importer = Importer(__temporal_importer_environment)\n",
+                __temporal_importer_environment=RestrictedEnvironment(
+                    self.restrictions
+                ),
+            )
 
-    # def validate(self) -> None:
-    #     self._run_code(
-    #         "with __temporal_importer.applied():\n"
-    #         "  __temporal_in_sandbox.validate()\n",
-    #     )
+            # Set the importer as the import
+            self.globals_and_locals["__builtins__"]["__import__"] = self.globals_and_locals.get("__temporal_importer")._import  # type: ignore
 
-    # def initialize(self) -> None:
-    #     self._run_code(
-    #         "with __temporal_importer.applied():\n"
-    #         "  import asyncio\n"
-    #         "  __temporal_in_sandbox.initialize()\n",
-    #     )
-    #     self.in_sandbox = await self.globals_and_locals.pop("__temporal_task")  # type: ignore
+            # Create the sandbox instance
+            self._run_code(
+                "with __temporal_importer.applied():\n"
+                f"  from {self.instance_details.defn.cls.__module__} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
+                f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n"
+                "  from temporalio.worker.workflow_sandbox.in_sandbox import InSandbox\n"
+                "  __temporal_in_sandbox = InSandbox(__temporal_instance_details, __temporal_runner_class, __temporal_workflow_class)\n",
+                __temporal_instance_details=self.instance_details,
+            )
+        finally:
+            _globals_lock.release()
 
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
-        self._run_code(
-            "with __temporal_importer.applied():\n"
-            "  __temporal_completion = __temporal_in_sandbox.activate(__temporal_activation)\n",
-            __temporal_activation=act,
-        )
-        return self.globals_and_locals.pop("__temporal_completion")  # type: ignore
+        _globals_lock.acquire(timeout=3)
+        try:
+            self._run_code(
+                "with __temporal_importer.applied():\n"
+                "  __temporal_completion = __temporal_in_sandbox.activate(__temporal_activation)\n",
+                __temporal_activation=act,
+            )
+            return self.globals_and_locals.pop("__temporal_completion")  # type: ignore
+        finally:
+            _globals_lock.release()
 
     def _run_code(self, code: str, **extra_globals: Any) -> None:
         for k, v in extra_globals.items():
