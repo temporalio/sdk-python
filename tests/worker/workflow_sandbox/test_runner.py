@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import os
 import sys
 import time
 import uuid
@@ -46,6 +47,9 @@ def test_workflow_sandbox_stdlib_module_names():
 
 
 global_state = ["global orig"]
+# We just access os.name in here to show we _can_. It's access-restricted at
+# runtime only
+_ = os.name
 
 
 @dataclass
@@ -163,6 +167,10 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import os\nfrom os import getcwd\ngetcwd()",
             # Wildcard "use"
             "import glob\nglob.glob('whatever')",
+            # Runtime-only access restriction on var
+            "import os\n_ = os.name",
+            # Builtin
+            "open('somefile')",
             # General library restrictions
             "import datetime\ndatetime.date.today()",
             "import datetime\ndatetime.datetime.now()",

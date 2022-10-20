@@ -7,6 +7,7 @@ import pytest
 
 from temporalio.worker.workflow_sandbox.restrictions import (
     RestrictedWorkflowAccessError,
+    RestrictionContext,
     SandboxMatcher,
     _RestrictedProxy,
 )
@@ -29,6 +30,7 @@ def test_workflow_sandbox_restricted_proxy():
     obj_class = _RestrictedProxy(
         "RestrictableObject",
         RestrictableObject,
+        RestrictionContext(),
         SandboxMatcher(
             children={
                 "foo": SandboxMatcher(access={"bar"}),

@@ -18,7 +18,7 @@ from ...worker.workflow_instance import (
     WorkflowRunner,
 )
 from .importer import RestrictedEnvironment
-from .restrictions import SandboxRestrictions
+from .restrictions import RestrictionContext, SandboxRestrictions
 
 
 class SandboxedWorkflowRunner(WorkflowRunner):
@@ -94,14 +94,16 @@ class _Instance(WorkflowInstance):
         runner_class: Type[WorkflowRunner],
         restrictions: SandboxRestrictions,
     ) -> None:
-        self.restrictions = restrictions
-        self.runner_class = runner_class
         self.instance_details = instance_details
-        # Builtins not properly typed in typeshed
-        assert isinstance(__builtins__, dict)
-        # Just copy the existing builtins and set ourselves as the env
+        self.runner_class = runner_class
+        self.restriction_context = RestrictionContext()
+        self.importer_environment = RestrictedEnvironment(
+            restrictions, self.restriction_context
+        )
+
+        # Create the instance
         self.globals_and_locals = {
-            "__builtins__": __builtins__.copy(),
+            "__builtins__": __builtins__.copy(),  # type: ignore
             "__file__": "workflow_sandbox.py",
         }
         self._create_instance()
@@ -113,30 +115,39 @@ class _Instance(WorkflowInstance):
             self._run_code(
                 "from temporalio.worker.workflow_sandbox.importer import Importer\n"
                 "__temporal_importer = Importer(__temporal_importer_environment)\n",
-                __temporal_importer_environment=RestrictedEnvironment(
-                    self.restrictions
-                ),
+                __temporal_importer_environment=self.importer_environment,
             )
 
             # Set the importer as the import
             self.globals_and_locals["__builtins__"]["__import__"] = self.globals_and_locals.get("__temporal_importer")._import  # type: ignore
 
+            # Import user code
+            self._run_code(
+                "with __temporal_importer.applied():\n"
+                # Import the workflow code
+                f"  from {self.instance_details.defn.cls.__module__} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
+                f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n"
+            )
+
+            # Set context as in runtime
+            self.restriction_context.is_runtime = True
+
             # Create the sandbox instance
             self._run_code(
                 "with __temporal_importer.applied():\n"
-                f"  from {self.instance_details.defn.cls.__module__} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
-                f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n"
                 "  from temporalio.worker.workflow_sandbox.in_sandbox import InSandbox\n"
                 "  __temporal_in_sandbox = InSandbox(__temporal_instance_details, __temporal_runner_class, __temporal_workflow_class)\n",
                 __temporal_instance_details=self.instance_details,
             )
         finally:
+            self.restriction_context.is_runtime = False
             _globals_lock.release()
 
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         _globals_lock.acquire(timeout=3)
+        self.restriction_context.is_runtime = True
         try:
             self._run_code(
                 "with __temporal_importer.applied():\n"
@@ -145,6 +156,7 @@ class _Instance(WorkflowInstance):
             )
             return self.globals_and_locals.pop("__temporal_completion")  # type: ignore
         finally:
+            self.restriction_context.is_runtime = False
             _globals_lock.release()
 
     def _run_code(self, code: str, **extra_globals: Any) -> None:

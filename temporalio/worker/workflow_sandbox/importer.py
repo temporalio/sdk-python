@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import builtins
+import functools
 import importlib
 import logging
 import sys
 import types
 from contextlib import contextmanager
-from typing import Dict, Iterator, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Set, Tuple
 
 from typing_extensions import Protocol
 
 from .restrictions import (
     RestrictedModule,
     RestrictedWorkflowAccessError,
+    RestrictionContext,
     SandboxRestrictions,
 )
 
@@ -38,7 +40,7 @@ class Importer:
         self.modules_checked_for_restrictions: Set[str] = set()
         self.import_func = self._import if not LOG_TRACE else self._traced_import
 
-    # TODO(cretz): Document that this has a global lock
+    # TODO(cretz): Document that this is expected to have a global lock
     @contextmanager
     def applied(self) -> Iterator[None]:
         # Error if already applied
@@ -57,16 +59,21 @@ class Importer:
                 # Import builtins and replace import
                 self.new_modules["builtins"] = importlib.__import__("builtins")
                 self.new_modules["builtins"].__import__ = self.import_func  # type: ignore
+
                 # Create a blank __main__ to help with anyone trying to
                 # "import __main__" to not accidentally get the real main
                 self.new_modules["__main__"] = types.ModuleType("__main__")
                 # Reset sys modules again
                 sys.modules = self.new_modules
+
+            # Restrict builtins
+            self.env.restrict_builtins()
+
             yield None
         finally:
-            # sys.meta_path.remove(self)
             sys.modules = self.orig_modules
             builtins.__import__ = self.orig_import
+            self.env.unrestrict_builtins()
 
     @contextmanager
     def _unapplied(self) -> Iterator[None]:
@@ -77,12 +84,13 @@ class Importer:
         # Set orig modules, then unset on complete
         sys.modules = self.orig_modules
         builtins.__import__ = self.orig_import
+        self.env.unrestrict_builtins()
         try:
             yield None
         finally:
-            # sys.meta_path.insert(0, self)
             sys.modules = self.new_modules
             builtins.__import__ = self.import_func
+            self.env.restrict_builtins()
 
     def _traced_import(
         self,
@@ -159,17 +167,65 @@ class _Environment(Protocol):
     ) -> Optional[types.ModuleType]:
         ...
 
+    def restrict_builtins(self) -> None:
+        ...
 
+    def unrestrict_builtins(self) -> None:
+        ...
+
+
+# TODO(cretz): Document that this is stateless
 class RestrictedEnvironment:
-    def __init__(self, restrictions: SandboxRestrictions) -> None:
+    def __init__(
+        self, restrictions: SandboxRestrictions, context: RestrictionContext
+    ) -> None:
         self.restrictions = restrictions
+        self.context = context
+
+        # Pre-build restricted builtins as tuple of applied and unapplied.
+        # Python doesn't allow us to wrap the builtins dictionary with our own
+        # __getitem__ type (low-level C assertion is performed to confirm it is
+        # a dict), so we instead choose to walk the builtins children and
+        # specifically set them as not callable.
+        self.restricted_builtins: Dict[str, Tuple[Any, Any]] = {}
+        builtin_matcher = restrictions.invalid_module_members.child_matcher(
+            "__builtins__"
+        )
+        if builtin_matcher:
+
+            def restrict_built_in(name: str, orig: Any, *args, **kwargs):
+                # Check if restricted against matcher
+                if builtin_matcher and builtin_matcher.match_access(
+                    context, name, include_use=True
+                ):
+                    raise RestrictedWorkflowAccessError(f"__builtins__.{name}")
+                return orig(*args, **kwargs)
+
+            assert isinstance(__builtins__, dict)
+            # Only apply to functions that are anywhere in access, use, or
+            # children
+            for k, v in __builtins__.items():
+                if (
+                    k in builtin_matcher.access
+                    or k in builtin_matcher.use
+                    or k in builtin_matcher.children
+                ):
+                    _trace("Restricting builtin %s", k)
+                    self.restricted_builtins[k] = (
+                        functools.partial(restrict_built_in, k, v),
+                        v,
+                    )
 
     def assert_valid_module(self, name: str) -> None:
-        if self.restrictions.invalid_modules.match_access(*name.split(".")):
+        if self.restrictions.invalid_modules.match_access(
+            self.context, *name.split(".")
+        ):
             raise RestrictedWorkflowAccessError(name)
 
     def maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
-        if not self.restrictions.passthrough_modules.match_access(*name.split(".")):
+        if not self.restrictions.passthrough_modules.match_access(
+            self.context, *name.split(".")
+        ):
             return None
         _trace("Passing module %s through from host", name)
         global _trace_depth
@@ -190,4 +246,12 @@ class RestrictedEnvironment:
             # No restrictions
             return None
         _trace("Restricting module %s during import", mod.__name__)
-        return RestrictedModule(mod, matcher)
+        return RestrictedModule(mod, self.context, matcher)
+
+    def restrict_builtins(self) -> None:
+        for k, v in self.restricted_builtins.items():
+            setattr(builtins, k, v[0])
+
+    def unrestrict_builtins(self) -> None:
+        for k, v in self.restricted_builtins.items():
+            setattr(builtins, k, v[1])

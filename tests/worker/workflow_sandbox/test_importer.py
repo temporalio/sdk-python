@@ -3,13 +3,14 @@ import pytest
 from temporalio.worker.workflow_sandbox.importer import Importer, RestrictedEnvironment
 from temporalio.worker.workflow_sandbox.restrictions import (
     RestrictedWorkflowAccessError,
+    RestrictionContext,
 )
 
 from .testmodules import restrictions
 
 
 def test_workflow_sandbox_importer_invalid_module():
-    importer = Importer(RestrictedEnvironment(restrictions))
+    importer = Importer(RestrictedEnvironment(restrictions, RestrictionContext()))
 
     with pytest.raises(RestrictedWorkflowAccessError) as err:
         with importer.applied():
@@ -29,7 +30,7 @@ def test_workflow_sandbox_importer_passthrough_module():
     assert outside2.module_state == ["module orig"]
 
     # Now import both via importer
-    importer = Importer(RestrictedEnvironment(restrictions))
+    importer = Importer(RestrictedEnvironment(restrictions, RestrictionContext()))
     with importer.applied():
         import tests.worker.workflow_sandbox.testmodules.passthrough_module as inside1
         import tests.worker.workflow_sandbox.testmodules.stateful_module as inside2
@@ -46,7 +47,7 @@ def test_workflow_sandbox_importer_passthrough_module():
 
 
 def test_workflow_sandbox_importer_invalid_module_members():
-    importer = Importer(RestrictedEnvironment(restrictions))
+    importer = Importer(RestrictedEnvironment(restrictions, RestrictionContext()))
     # Can access the function, no problem
     with importer.applied():
         import tests.worker.workflow_sandbox.testmodules.invalid_module_members

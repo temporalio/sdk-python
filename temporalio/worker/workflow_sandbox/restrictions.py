@@ -83,26 +83,43 @@ class SandboxMatcher:
     use: Set[str] = frozenset()  # type: ignore
     children: Mapping[str, SandboxMatcher] = types.MappingProxyType({})
     match_self: bool = False
+    only_runtime: bool = False
 
     all: ClassVar[SandboxMatcher]
     none: ClassVar[SandboxMatcher]
     all_uses: ClassVar[SandboxMatcher]
 
-    def match_access(self, *child_path: str) -> bool:
+    def match_access(
+        self, context: RestrictionContext, *child_path: str, include_use: bool = False
+    ) -> bool:
         # We prefer to avoid recursion
-        matcher: Optional[SandboxMatcher] = self
+        matcher = self
         for v in child_path:
-            # Considered matched if self matches or access matches Note, "use"
-            # does not match because we allow it to be accessed but not used.
-            assert matcher  # MyPy help
+            # Does not match if this is runtime only and we're not runtime, or
+            # if restrictions are disabled
+            if context.restrictions_disabled or (
+                not context.is_runtime and matcher.only_runtime
+            ):
+                return False
+
+            # Considered matched if self matches or access matches. Note, "use"
+            # does not match by default because we allow it to be accessed but
+            # not used.
             if matcher.match_self or v in matcher.access or "*" in matcher.access:
                 return True
-            matcher = matcher.children.get(v) or matcher.children.get("*")
-            if not matcher:
-                return False
-            elif matcher.match_self:
+            if include_use and (v in matcher.use or "*" in matcher.use):
                 return True
-        return False
+            child_matcher = matcher.children.get(v) or matcher.children.get("*")
+            if not child_matcher:
+                return False
+            matcher = child_matcher
+            # elif matcher.match_self and not context.restrictions_disabled:
+            #     return True
+        if context.restrictions_disabled or (
+            not context.is_runtime and matcher.only_runtime
+        ):
+            return False
+        return matcher.match_self
 
     def child_matcher(self, *child_path: str) -> Optional[SandboxMatcher]:
         # We prefer to avoid recursion
@@ -236,7 +253,10 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                 "breakpoint",
                 "input",
                 "open",
-            }
+            },
+            # Too many things use open() at import time, e.g. pytest's assertion
+            # rewriter
+            only_runtime=True,
         ),
         "bz2": SandboxMatcher(use={"open"}),
         # Python's own re lib registers itself. This is mostly ok to not
@@ -259,12 +279,62 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         # We cannot restrict linecache because some packages like attrs' attr
         # use it during dynamic code generation
         # "linecache": SandboxMatcher.all_uses,
-        # We cannot restrict os.name because too many things use it during
-        # import side effects (including stdlib imports like pathlib and shutil)
+        # TODO(cretz): Maybe I should make a limited whitelist instead?
         "os": SandboxMatcher(
             use={
+                "chdir",
+                "fchdir",
                 "getcwd",
-            }
+                "get_exec_path",
+                "getegid",
+                "geteuid",
+                "getgid",
+                "getgrouplist",
+                "getgroups",
+                "getlogin",
+                "getpgid",
+                "getpgrp",
+                "getpid",
+                "etppid",
+                "getpriority",
+                "getresuid",
+                "getresgid",
+                "getuid",
+                "initgroups",
+                "setegid",
+                "seteuid",
+                "setgid",
+                "setgroups",
+                "setpgrp",
+                "setpgid",
+                "setpriority",
+                "setregid",
+                "setresgid",
+                "setresuid",
+                "setreuid",
+                "getsid",
+                "setsid",
+                "setuid",
+                "umask",
+                "uname",
+                # Things below, while we would like to restrict them, we cannot
+                # due to how heavily they are used at import time.
+                #
+                # TODO(cretz): Should I differentiate between import-time
+                # restrictions and runtime restrictions?
+                #
+                # * Env - Used in lots of obvious places
+                #   "environ",
+                #   "environb",
+                #   "getenv",
+                #   "getenvb",
+                #   "putenv",
+                #   "unsetenv",
+                #
+                # * Misc
+                #   "name", - Used in pathlib, shutil, etc
+            },
+            children={"name": SandboxMatcher(match_self=True, only_runtime=True)},
         ),
         # Not restricting platform-specific calls as that would be too strict. Just
         # things that are specific to what's on disk.
@@ -417,6 +487,12 @@ SandboxRestrictions.default = SandboxRestrictions(
 )
 
 
+class RestrictionContext:
+    def __init__(self) -> None:
+        self.is_runtime = False
+        self.restrictions_disabled = False
+
+
 @dataclass
 class _RestrictionState:
     @staticmethod
@@ -427,11 +503,12 @@ class _RestrictionState:
 
     name: str
     obj: object
+    context: RestrictionContext
     matcher: SandboxMatcher
     wrap_dict: bool = True
 
     def assert_child_not_restricted(self, name: str) -> None:
-        if self.matcher.match_access(name):
+        if self.matcher.match_access(self.context, name):
             logger.warning("%s on %s restricted", name, self.name)
             raise RestrictedWorkflowAccessError(f"{self.name}.{name}")
 
@@ -556,9 +633,13 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    def __init__(self, name: str, obj: Any, matcher: SandboxMatcher) -> None:
+    def __init__(
+        self, name: str, obj: Any, context: RestrictionContext, matcher: SandboxMatcher
+    ) -> None:
         _trace("__init__ on %s", name)
-        _RestrictionState(name=name, obj=obj, matcher=matcher).set_on_proxy(self)
+        _RestrictionState(
+            name=name, obj=obj, context=context, matcher=matcher
+        ).set_on_proxy(self)
 
     def __getattribute__(self, __name: str) -> Any:
         state = _RestrictionState.from_proxy(self)
@@ -571,7 +652,9 @@ class _RestrictedProxy:
         if __name != "__dict__" or state.wrap_dict:
             child_matcher = state.matcher.child_matcher(__name)
             if child_matcher and _is_restrictable(ret):
-                ret = _RestrictedProxy(f"{state.name}.{__name}", ret, child_matcher)
+                ret = _RestrictedProxy(
+                    f"{state.name}.{__name}", ret, state.context, child_matcher
+                )
         return ret
 
     def __setattr__(self, __name: str, __value: Any) -> None:
@@ -588,7 +671,7 @@ class _RestrictedProxy:
         # Always wrap the result of a call to self with the same restrictions
         # (this is often instantiating a class)
         if _is_restrictable(ret):
-            ret = _RestrictedProxy(state.name, ret, state.matcher)
+            ret = _RestrictedProxy(state.name, ret, state.context, state.matcher)
         return ret
 
     def __getitem__(self, key: Any) -> Any:
@@ -601,7 +684,9 @@ class _RestrictedProxy:
         if isinstance(key, str):
             child_matcher = state.matcher.child_matcher(key)
             if child_matcher and _is_restrictable(ret):
-                ret = _RestrictedProxy(f"{state.name}.{key}", ret, child_matcher)
+                ret = _RestrictedProxy(
+                    f"{state.name}.{key}", ret, state.context, child_matcher
+                )
         return ret
 
     __doc__ = _RestrictedProxyLookup(  # type: ignore
@@ -723,6 +808,11 @@ class _RestrictedProxy:
 
 
 class RestrictedModule(_RestrictedProxy, types.ModuleType):  # type: ignore
-    def __init__(self, mod: types.ModuleType, matcher: SandboxMatcher) -> None:
-        _RestrictedProxy.__init__(self, mod.__name__, mod, matcher)
+    def __init__(
+        self,
+        mod: types.ModuleType,
+        context: RestrictionContext,
+        matcher: SandboxMatcher,
+    ) -> None:
+        _RestrictedProxy.__init__(self, mod.__name__, mod, context, matcher)
         types.ModuleType.__init__(self, mod.__name__, mod.__doc__)
