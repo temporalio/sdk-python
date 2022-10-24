@@ -76,6 +76,15 @@ class WorkflowRunner(ABC):
 
     @abstractmethod
     def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
+        """Prepare a workflow for future execution.
+
+        This is run once for each workflow definition when a worker starts. This
+        allows the runner to do anything necessarily to prepare for this
+        definition to be used multiple times in create_instance.
+
+        Args:
+            defn: The workflow definition.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -128,11 +137,11 @@ class UnsandboxedWorkflowRunner(WorkflowRunner):
     """Workflow runner that does not do any sandboxing."""
 
     def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
-        # Do nothing by default
+        """Implements :py:meth:`WorkflowRunner.prepare_workflow` as a no-op."""
         pass
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
-        """Create an unsandboxed workflow instance."""
+        """Implements :py:meth:`WorkflowRunner.create_instance`."""
         # We ignore MyPy failing to instantiate this because it's not _really_
         # abstract at runtime. All of the asyncio.AbstractEventLoop calls that
         # we are not implementing are not abstract, they just throw not-impl'd

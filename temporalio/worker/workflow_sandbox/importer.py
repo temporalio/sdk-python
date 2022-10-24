@@ -1,3 +1,9 @@
+"""Restrictive importer for workflow sandbox.
+
+.. warning::
+    This API for this module is considered unstable and may change in future.
+"""
+
 from __future__ import annotations
 
 import builtins
@@ -10,6 +16,8 @@ from contextlib import contextmanager
 from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Set, Tuple
 
 from typing_extensions import Protocol
+
+import temporalio.workflow
 
 from .restrictions import (
     RestrictedModule,
@@ -32,7 +40,10 @@ def _trace(message: object, *args: object) -> None:
 
 
 class Importer:
+    """Importer that restricts modules."""
+
     def __init__(self, env: _Environment) -> None:
+        """Create importer."""
         self.env = env
         self.orig_modules = sys.modules
         self.new_modules: Dict[str, types.ModuleType] = {}
@@ -43,6 +54,13 @@ class Importer:
     # TODO(cretz): Document that this is expected to have a global lock
     @contextmanager
     def applied(self) -> Iterator[None]:
+        """Context manager to apply this restrictive import.
+
+        .. warning::
+            This currently alters global sys.modules and builtins.__import__
+            while it is running and therefore should be locked against other
+            code running at the same time.
+        """
         # Error if already applied
         if sys.modules is self.new_modules:
             raise RuntimeError("Sandbox importer already applied")
@@ -174,11 +192,13 @@ class _Environment(Protocol):
         ...
 
 
-# TODO(cretz): Document that this is stateless
 class RestrictedEnvironment:
+    """Implementation of importer environment for restrictions."""
+
     def __init__(
         self, restrictions: SandboxRestrictions, context: RestrictionContext
     ) -> None:
+        """Create restricted environment."""
         self.restrictions = restrictions
         self.context = context
 
@@ -195,8 +215,10 @@ class RestrictedEnvironment:
 
             def restrict_built_in(name: str, orig: Any, *args, **kwargs):
                 # Check if restricted against matcher
-                if builtin_matcher and builtin_matcher.match_access(
-                    context, name, include_use=True
+                if (
+                    builtin_matcher
+                    and builtin_matcher.match_access(context, name, include_use=True)
+                    and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
                 ):
                     raise RestrictedWorkflowAccessError(f"__builtins__.{name}")
                 return orig(*args, **kwargs)
@@ -217,12 +239,17 @@ class RestrictedEnvironment:
                     )
 
     def assert_valid_module(self, name: str) -> None:
-        if self.restrictions.invalid_modules.match_access(
-            self.context, *name.split(".")
+        """Implements :py:meth:`_Environment.assert_valid_module`."""
+        if (
+            self.restrictions.invalid_modules.match_access(
+                self.context, *name.split(".")
+            )
+            and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
         ):
             raise RestrictedWorkflowAccessError(name)
 
     def maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
+        """Implements :py:meth:`_Environment.maybe_passthrough_module`."""
         if not self.restrictions.passthrough_modules.match_access(
             self.context, *name.split(".")
         ):
@@ -239,6 +266,7 @@ class RestrictedEnvironment:
     def maybe_restrict_module(
         self, mod: types.ModuleType
     ) -> Optional[types.ModuleType]:
+        """Implements :py:meth:`_Environment.maybe_restrict_module`."""
         matcher = self.restrictions.invalid_module_members.child_matcher(
             *mod.__name__.split(".")
         )
@@ -249,9 +277,11 @@ class RestrictedEnvironment:
         return RestrictedModule(mod, self.context, matcher)
 
     def restrict_builtins(self) -> None:
+        """Implements :py:meth:`_Environment.restrict_builtins`."""
         for k, v in self.restricted_builtins.items():
             setattr(builtins, k, v[0])
 
     def unrestrict_builtins(self) -> None:
+        """Implements :py:meth:`_Environment.unrestrict_builtins`."""
         for k, v in self.restricted_builtins.items():
             setattr(builtins, k, v[1])

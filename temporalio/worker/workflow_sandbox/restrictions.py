@@ -1,9 +1,18 @@
+"""Restrictions for workflow sandbox.
+
+.. warning::
+    This API for this module is considered unstable and may change in future.
+"""
+
 from __future__ import annotations
 
+import dataclasses
 import functools
+import inspect
 import logging
 import math
 import operator
+import random
 import types
 from copy import copy, deepcopy
 from dataclasses import dataclass
@@ -11,6 +20,7 @@ from typing import (
     Any,
     Callable,
     ClassVar,
+    Dict,
     Mapping,
     Optional,
     Sequence,
@@ -33,45 +43,96 @@ def _trace(message: object, *args: object) -> None:
 
 
 class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
+    """Error that occurs when a workflow accesses something non-deterministic.
+
+    Attributes:
+        qualified_name: Fully qualified name of what was accessed.
+    """
+
     def __init__(self, qualified_name: str) -> None:
+        """Create restricted workflow access error."""
         super().__init__(f"Cannot access {qualified_name} from inside a workflow.")
         self.qualified_name = qualified_name
 
 
 @dataclass(frozen=True)
 class SandboxRestrictions:
-    # Modules which pass through because we know they are side-effect free.
-    # These modules will not be reloaded and will share with the host. Compares
-    # against the fully qualified module name.
+    """Set of restrictions that can be applied to a sandbox."""
+
     passthrough_modules: SandboxMatcher
+    """
+    Modules which pass through because we know they are side-effect free (or the
+    side-effecting pieces are restricted). These modules will not be reloaded,
+    but instead will just be forwarded from outside of the sandbox. The check
+    whether a module matches here is an access match using the fully qualified
+    module name.
+    """
 
-    # Modules which cannot even be imported. If possible, use
-    # invalid_module_members instead so modules that are unused by running code
-    # can still be imported for other non-running code. Compares against the
-    # fully qualified module name.
     invalid_modules: SandboxMatcher
+    """
+    Modules which cannot even be imported. If possible, use
+    :py:attr:`invalid_module_members` instead so modules that are unused by
+    running code can still be imported for other non-running code. The check
+    whether a module matches here is an access match using the fully qualified
+    module name.
+    """
 
-    # Module members which cannot be accessed. This includes variables,
-    # functions, class methods (including __init__, etc). Compares the key
-    # against the fully qualified module name then the value against the
-    # qualified member name not including the module itself.
     invalid_module_members: SandboxMatcher
+    """
+    Module members which cannot be accessed. This includes variables, functions,
+    class methods (including __init__, etc). The check compares the against the
+    fully qualified path to the item.
+    """
 
     passthrough_modules_minimum: ClassVar[SandboxMatcher]
+    """Set of modules that must be passed through at the minimum."""
+
     passthrough_modules_with_temporal: ClassVar[SandboxMatcher]
+    """Minimum modules that must be passed through and the Temporal modules."""
+
     passthrough_modules_maximum: ClassVar[SandboxMatcher]
+    """
+    All modules that can be passed through. This includes all standard library
+    modules.
+    """
+
     passthrough_modules_default: ClassVar[SandboxMatcher]
+    """Same as :py:attr:`passthrough_modules_maximum`."""
 
     invalid_module_members_default: ClassVar[SandboxMatcher]
+    """
+    Default set of module members Temporal suggests be restricted for
+    non-determinism reasons.
+    """
 
     default: ClassVar[SandboxRestrictions]
+    """
+    Combination of :py:attr:`passthrough_modules_default`,
+    :py:attr:`invalid_module_members_default`, and no invalid modules."""
 
 
-# TODO(cretz): Document asterisk can be used
+# We intentionally use specific fields instead of generic "matcher" callbacks
+# for optimization reasons.
 @dataclass(frozen=True)
 class SandboxMatcher:
+    """Matcher that is used to match modules and members during restriction and
+    pass through checks.
+
+    This class is intentionally immutable. Changes need to be made as new
+    instances.
+    """
+
     @staticmethod
     def nested_child(path: Sequence[str], child: SandboxMatcher) -> SandboxMatcher:
+        """Create a matcher where the given child is put at the given path.
+
+        Args:
+            path: Path to the child.
+            child: Child matcher to set
+
+        Returns:
+            Created matcher.
+        """
         ret = child
         for key in reversed(path):
             ret = SandboxMatcher(children={key: ret})
@@ -79,27 +140,72 @@ class SandboxMatcher:
 
     # TODO(cretz): Document that we intentionally use this form instead of a
     # more flexible/abstract matching tree form for optimization reasons
+
     access: Set[str] = frozenset()  # type: ignore
+    """Immutable set of names to match access.
+    
+    This is often only used for pass through checks and not member restrictions.
+    If this is used for member restrictions, even importing/accessing the value
+    will fail as opposed to :py:attr:`use` which is for when it is used.
+
+    An string containing a single asterisk can be used to match all.
+    """
+
     use: Set[str] = frozenset()  # type: ignore
+    """Immutable set of names to match use.
+    
+    This is best used for member restrictions on functions/classes because the
+    restriction will not apply to referencing/importing the item, just when it
+    is used.
+
+    An string containing a single asterisk can be used to match all.
+    """
+
     children: Mapping[str, SandboxMatcher] = types.MappingProxyType({})
+    """Immutable mapping of child matchers."""
+
     match_self: bool = False
+    """If ``True``, this matcher matches."""
+
     only_runtime: bool = False
+    """
+    If ``True``, any matches on this matcher only apply at runtime, not import
+    time.
+    """
 
     all: ClassVar[SandboxMatcher]
+    """Shortcut for an always-matched matcher."""
+
+    all_runtime: ClassVar[SandboxMatcher]
+    """Shortcut for an always-runtime-matched matcher."""
+
     none: ClassVar[SandboxMatcher]
+    """Shortcut for a never-matched matcher."""
+
     all_uses: ClassVar[SandboxMatcher]
+    """Shortcut for a matcher that matches any :py:attr:`use`."""
+
+    all_uses_runtime: ClassVar[SandboxMatcher]
+    """Shortcut for a matcher that matches any :py:attr:`use` at runtime."""
 
     def match_access(
         self, context: RestrictionContext, *child_path: str, include_use: bool = False
     ) -> bool:
+        """Perform a match check.
+
+        Args:
+            context: Current restriction context.
+            child_path: Full path to the child being accessed.
+            include_use: Whether to include the :py:attr:`use` set in the check.
+
+        Returns:
+            ``True`` if matched.
+        """
         # We prefer to avoid recursion
         matcher = self
         for v in child_path:
-            # Does not match if this is runtime only and we're not runtime, or
-            # if restrictions are disabled
-            if context.restrictions_disabled or (
-                not context.is_runtime and matcher.only_runtime
-            ):
+            # Does not match if this is runtime only and we're not runtime
+            if not context.is_runtime and matcher.only_runtime:
                 return False
 
             # Considered matched if self matches or access matches. Note, "use"
@@ -113,15 +219,22 @@ class SandboxMatcher:
             if not child_matcher:
                 return False
             matcher = child_matcher
-            # elif matcher.match_self and not context.restrictions_disabled:
-            #     return True
-        if context.restrictions_disabled or (
-            not context.is_runtime and matcher.only_runtime
-        ):
+        if not context.is_runtime and matcher.only_runtime:
             return False
         return matcher.match_self
 
     def child_matcher(self, *child_path: str) -> Optional[SandboxMatcher]:
+        """Return a child matcher for the given path.
+
+        Unlike :py:meth:`match_access`, this will match if in py:attr:`use` in
+        addition to :py:attr:`access`. If in neither, it uses the child mapping.
+
+        Args:
+            child_path: Full path to the child to get matcher for.
+
+        Returns:
+            Matcher that can be used to check children.
+        """
         # We prefer to avoid recursion
         matcher: Optional[SandboxMatcher] = self
         for v in child_path:
@@ -135,6 +248,8 @@ class SandboxMatcher:
                 or "*" in matcher.access
                 or "*" in matcher.use
             ):
+                if self.only_runtime:
+                    return SandboxMatcher.all_runtime
                 return SandboxMatcher.all
             matcher = matcher.children.get(v) or matcher.children.get("*")
             if not matcher:
@@ -142,6 +257,7 @@ class SandboxMatcher:
         return matcher
 
     def __or__(self, other: SandboxMatcher) -> SandboxMatcher:
+        """Combine this matcher with another."""
         if self.match_self or other.match_self:
             return SandboxMatcher.all
         new_children = dict(self.children) if self.children else {}
@@ -157,10 +273,49 @@ class SandboxMatcher:
             children=new_children,
         )
 
+    def with_child_unrestricted(self, *child_path: str) -> SandboxMatcher:
+        """Create new matcher with the given child path removed.
+
+        Traverses the child mapping, if present, until on leaf of path where it
+        is removed from :py:attr:`access`, :py:attr:`use`, and
+        :py:attr:`children`.
+
+        Args:
+            child_path: Full path to the child to remove restrictions for.
+
+        Returns:
+            Copied matcher from this matcher without this child restricted.
+        """
+        assert child_path
+        # If there's only one item in path, make sure not in access, use, or
+        # children. Otherwise, just remove from child.
+        to_replace: Dict[str, Any] = {}
+        if len(child_path) == 1:
+            if child_path[0] in self.access:
+                to_replace["access"] = set(self.access)
+                to_replace["access"].remove(child_path[0])
+            if child_path[0] in self.use:
+                to_replace["use"] = set(self.use)
+                to_replace["use"].remove(child_path[0])
+            if child_path in self.children:
+                to_replace["children"] = dict(self.children)
+                del to_replace["children"][child_path[0]]
+        elif child_path[0] in self.children:
+            to_replace["children"] = dict(self.children)
+            to_replace["children"][child_path[0]] = self.children[
+                child_path[0]
+            ].with_child_unrestricted(*child_path[1:])
+        # Replace if needed
+        if not to_replace:
+            return self
+        return dataclasses.replace(self, **to_replace)
+
 
 SandboxMatcher.all = SandboxMatcher(match_self=True)
+SandboxMatcher.all_runtime = SandboxMatcher(match_self=True, only_runtime=True)
 SandboxMatcher.none = SandboxMatcher()
 SandboxMatcher.all_uses = SandboxMatcher(use={"*"})
+SandboxMatcher.all_uses_runtime = SandboxMatcher(use={"*"}, only_runtime=True)
 
 SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
     access={
@@ -183,11 +338,16 @@ SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
 
 SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | SandboxMatcher(
     access={
-        # Due to Python checks on ABC class extension, we have to include all
-        # modules of classes we might extend
+        # is_subclass is broken in sandbox due to Python bug on ABC C extension.
+        # So we have to include all things that might extend an ABC class and
+        # do a subclass check. See https://bugs.python.org/issue44847 and
+        # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
         "asyncio",
         "abc",
         "temporalio",
+        # Due to pkg_resources use of base classes caused by the ABC issue
+        # above, and Otel's use of pkg_resources, we pass it through
+        "pkg_resources",
     }
 )
 
@@ -245,6 +405,21 @@ SandboxRestrictions.passthrough_modules_default = (
     SandboxRestrictions.passthrough_modules_maximum
 )
 
+
+def _public_callables(parent: Any, *, exclude: Set[str] = set()) -> Set[str]:
+    ret: Set[str] = set()
+    for name, member in inspect.getmembers(parent):
+        # Name must be public and callable and not in exclude and not a class
+        if (
+            not name.startswith("_")
+            and name not in exclude
+            and callable(member)
+            and not inspect.isclass(member)
+        ):
+            ret.add(name)
+    return ret
+
+
 # TODO(cretz): Should I make this more declarative in an external file?
 SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
     children={
@@ -258,11 +433,15 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
             # rewriter
             only_runtime=True,
         ),
+        # TODO(cretz): Fix issues with class extensions on restricted proxy
+        # "argparse": SandboxMatcher.all_uses_runtime,
         "bz2": SandboxMatcher(use={"open"}),
+        "concurrent": SandboxMatcher.all_uses_runtime,
         # Python's own re lib registers itself. This is mostly ok to not
         # restrict since it's just global picklers that people may want to
         # register globally.
         # "copyreg": SandboxMatcher.all_uses,
+        "curses": SandboxMatcher.all_uses,
         "datetime": SandboxMatcher(
             children={
                 "date": SandboxMatcher(use={"today"}),
@@ -272,94 +451,37 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         "dbm": SandboxMatcher.all_uses,
         "filecmp": SandboxMatcher.all_uses,
         "fileinput": SandboxMatcher.all_uses,
+        "ftplib": SandboxMatcher.all_uses,
+        "getopt": SandboxMatcher.all_uses,
+        "getpass": SandboxMatcher.all_uses,
+        "gettext": SandboxMatcher.all_uses,
         "glob": SandboxMatcher.all_uses,
         "gzip": SandboxMatcher(use={"open"}),
+        "http": SandboxMatcher(
+            children={
+                "client": SandboxMatcher.all_uses,
+                "server": SandboxMatcher.all_uses,
+            },
+        ),
+        "imaplib": SandboxMatcher.all_uses,
+        # TODO(cretz): When restricting io, getting:
+        #   AttributeError: module 'io' has no attribute 'BufferedIOBase"
+        # From minimal imports in shutil/compression libs
+        # "io": SandboxMatcher(use={"open", "open_code"}, only_runtime=True),
+        "locale": SandboxMatcher.all_uses,
         "lzma": SandboxMatcher(use={"open"}),
         "marshal": SandboxMatcher(use={"dump", "load"}),
+        "mmap": SandboxMatcher.all_uses_runtime,
+        "multiprocessing": SandboxMatcher.all_uses,
         # We cannot restrict linecache because some packages like attrs' attr
         # use it during dynamic code generation
         # "linecache": SandboxMatcher.all_uses,
-        # TODO(cretz): Maybe I should make a limited whitelist instead?
+        # Restrict everything in OS at runtime
         "os": SandboxMatcher(
-            use={
-                "chdir",
-                "fchdir",
-                "getcwd",
-                "get_exec_path",
-                "getegid",
-                "geteuid",
-                "getgid",
-                "getgrouplist",
-                "getgroups",
-                "getlogin",
-                "getpgid",
-                "getpgrp",
-                "getpid",
-                "etppid",
-                "getpriority",
-                "getresuid",
-                "getresgid",
-                "getuid",
-                "initgroups",
-                "setegid",
-                "seteuid",
-                "setgid",
-                "setgroups",
-                "setpgrp",
-                "setpgid",
-                "setpriority",
-                "setregid",
-                "setresgid",
-                "setresuid",
-                "setreuid",
-                "getsid",
-                "setsid",
-                "setuid",
-                "umask",
-                "uname",
-                # Things below, while we would like to restrict them, we cannot
-                # due to how heavily they are used at import time.
-                #
-                # TODO(cretz): Should I differentiate between import-time
-                # restrictions and runtime restrictions?
-                #
-                # * Env - Used in lots of obvious places
-                #   "environ",
-                #   "environb",
-                #   "getenv",
-                #   "getenvb",
-                #   "putenv",
-                #   "unsetenv",
-                #
-                # * Misc
-                #   "name", - Used in pathlib, shutil, etc
-            },
-            children={"name": SandboxMatcher(match_self=True, only_runtime=True)},
-        ),
-        # Not restricting platform-specific calls as that would be too strict. Just
-        # things that are specific to what's on disk.
-        "os.path": SandboxMatcher(
-            use={
-                "abspath",
-                "exists",
-                "lexists",
-                "expanduser",
-                "expandvars",
-                "getatime",
-                "getmtime",
-                "getctime",
-                "getsize",
-                "isabs",
-                "isfile",
-                "isdir",
-                "islink",
-                "ismount",
-                "realpath",
-                "relpath",
-                "samefile",
-                "sameopenfile",
-                "samestat",
-            }
+            access={"name"},
+            use={"*"},
+            # Everything in OS restricted at runtime
+            only_runtime=True,
         ),
         "pathlib": SandboxMatcher(
             children={
@@ -409,40 +531,14 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                 )
             }
         ),
+        "platform": SandboxMatcher.all_uses_runtime,
+        "poplib": SandboxMatcher.all_uses,
         # Everything but instantiating Random and SecureRandom
-        # TODO(cretz): Should I support negation in SandboxMatcher to make this
-        # list easier?
-        # TODO(cretz): Should I have integration tests for this module and
-        # others to ensure new things don't get added in newer Python versions
-        # without me being aware?
         "random": SandboxMatcher(
-            use={
-                "betavariate",
-                "choice",
-                "choices",
-                "expovariate",
-                "gammavariate",
-                "gauss",
-                "getrandbits",
-                "getstate",
-                "lognormvariate",
-                "normalvariate",
-                "paretovariate",
-                "randbytes",
-                "randint",
-                "random",
-                "randrange",
-                "sample",
-                "seed",
-                "setstate",
-                "shuffle",
-                "triangular",
-                "uniform",
-                "vonmisesvariate",
-                "weibullvariate",
-            }
+            use=_public_callables(random, exclude={"Random", "SecureRandom"}),
         ),
         "readline": SandboxMatcher.all_uses,
+        "sched": SandboxMatcher.all_uses,
         # Only time-safe comparison remains after these restrictions
         "secrets": SandboxMatcher(
             use={
@@ -455,8 +551,40 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                 "token_urlsafe",
             }
         ),
+        "select": SandboxMatcher.all_uses_runtime,
+        "selectors": SandboxMatcher.all_uses_runtime,
         "shelve": SandboxMatcher.all_uses,
         "shutil": SandboxMatcher.all_uses,
+        "signal": SandboxMatcher.all_uses_runtime,
+        "smtplib": SandboxMatcher.all_uses,
+        "socket": SandboxMatcher.all_uses_runtime,
+        "socketserver": SandboxMatcher.all_uses,
+        "subprocess": SandboxMatcher.all_uses,
+        # TODO(cretz): Can't currently restrict anything on sys because of
+        # type(sys) being used as types.ModuleType among other things
+        # "sys": SandboxMatcher(access={"argv"}, only_runtime=True),
+        "time": SandboxMatcher(
+            # TODO(cretz): Some functions in this package are only
+            # non-deterministic when they lack a param (e.g. ctime)
+            use={
+                "pthread_getcpuclockid",
+                "get_clock_info",
+                "localtime",
+                "monotonic",
+                "monotonic_ns",
+                "perf_counter",
+                "perf_counter_ns" "process_time",
+                "process_time_ns",
+                "sleep",
+                "time",
+                "time_ns",
+                "thread_time",
+                "thread_time_ns",
+                "tzset",
+            },
+            # We allow time calls at import time
+            only_runtime=True,
+        ),
         # There's a good use case for sqlite in memory, so we're not restricting
         # it in any way. Technically we could restrict some of the global
         # settings, but they are often import side effects usable in and out of
@@ -467,6 +595,13 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
             children={"TarFile": SandboxMatcher(use={"extract", "extractall"})},
         ),
         "tempfile": SandboxMatcher.all_uses,
+        "threading": SandboxMatcher.all_uses_runtime,
+        "urllib": SandboxMatcher(
+            children={"request": SandboxMatcher.all_uses},
+        ),
+        "uuid": SandboxMatcher(use={"uuid1", "uuid4"}, only_runtime=True),
+        "webbrowser": SandboxMatcher.all_uses,
+        "xmlrpc": SandboxMatcher.all_uses,
         "zipfile": SandboxMatcher(
             children={"ZipFile": SandboxMatcher(use={"extract", "extractall"})}
         ),
@@ -488,9 +623,16 @@ SandboxRestrictions.default = SandboxRestrictions(
 
 
 class RestrictionContext:
+    """Context passed around restrictions.
+
+    Attributes:
+        is_runtime: ``True`` if we're currently running the workflow, ``False``
+            if we're just importing it.
+    """
+
     def __init__(self) -> None:
+        """Create a restriction context."""
         self.is_runtime = False
-        self.restrictions_disabled = False
 
 
 @dataclass
@@ -508,7 +650,10 @@ class _RestrictionState:
     wrap_dict: bool = True
 
     def assert_child_not_restricted(self, name: str) -> None:
-        if self.matcher.match_access(self.context, name):
+        if (
+            self.matcher.match_access(self.context, name)
+            and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
+        ):
             logger.warning("%s on %s restricted", name, self.name)
             raise RestrictedWorkflowAccessError(f"{self.name}.{name}")
 
@@ -808,11 +953,14 @@ class _RestrictedProxy:
 
 
 class RestrictedModule(_RestrictedProxy, types.ModuleType):  # type: ignore
+    """Module that is restricted."""
+
     def __init__(
         self,
         mod: types.ModuleType,
         context: RestrictionContext,
         matcher: SandboxMatcher,
     ) -> None:
+        """Create a restricted module."""
         _RestrictedProxy.__init__(self, mod.__name__, mod, context, matcher)
         types.ModuleType.__init__(self, mod.__name__, mod.__doc__)

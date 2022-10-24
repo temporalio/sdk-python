@@ -7,6 +7,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import date
 from typing import Callable, Dict, List, Optional, Sequence, Type
 
 import pytest
@@ -62,7 +63,8 @@ class GlobalStateWorkflow:
     def __init__(self) -> None:
         # We sleep here to defer to other threads so we can test the
         # thread-safety of global state isolation
-        time.sleep(0)
+        with workflow.unsafe.sandbox_unrestricted():
+            time.sleep(0)
         self.append("inited")
 
     @workflow.run
@@ -160,6 +162,7 @@ class RunCodeWorkflow:
 
 async def test_workflow_sandbox_restrictions(client: Client):
     async with new_worker(client, RunCodeWorkflow) as worker:
+        # Check restricted stuff
         invalid_code_to_check = [
             # Restricted module-level callable
             "import os\nos.getcwd()",
@@ -171,12 +174,22 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import os\n_ = os.name",
             # Builtin
             "open('somefile')",
+            # Importing module calling bad thing
+            "import tests.worker.workflow_sandbox.testmodules.module_calling_invalid",
             # General library restrictions
             "import datetime\ndatetime.date.today()",
             "import datetime\ndatetime.datetime.now()",
+            "import os\ngetattr(os.environ, 'foo')",
+            "import os\nos.getenv('foo')",
+            "import os.path\nos.path.abspath('foo')",
             "import random\nrandom.choice(['foo', 'bar'])",
             "import secrets\nsecrets.choice(['foo', 'bar'])",
-            # TODO(cretz): os.path
+            "import threading\nthreading.current_thread()",
+            "import time\ntime.sleep(1)",
+            "import concurrent.futures\nconcurrent.futures.ThreadPoolExecutor()",
+            "import urllib.request\nurllib.request.urlopen('example.com')",
+            "import http.client\nhttp.client.HTTPConnection('example.com')",
+            "import uuid\nuuid.uuid4()",
         ]
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
@@ -189,6 +202,7 @@ async def test_workflow_sandbox_restrictions(client: Client):
             assert isinstance(err.value.cause, ApplicationError)
             assert err.value.cause.type == "RestrictedWorkflowAccessError"
 
+        # Check unrestricted stuff
         valid_code_to_check = [
             # It is totally ok to reference a callable that you cannot call
             "import os\n_ = os.getcwd",
@@ -196,8 +210,18 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import os\nfrom os import getcwd\n_ = os.getcwd",
             # Can reference wildcard callable that cannot be called
             "import glob\n_ = glob.glob",
+            # Allowed to call random choice when restrictions are disabled
+            "import random\n"
+            "import temporalio.workflow\n"
+            "with temporalio.workflow.unsafe.sandbox_unrestricted():\n"
+            "    random.choice(['foo', 'bar'])",
+            # Allowed to import bad module when restrictions are disabled
+            "import temporalio.workflow\n"
+            "with temporalio.workflow.unsafe.sandbox_unrestricted():\n"
+            "    import tests.worker.workflow_sandbox.testmodules.module_calling_invalid",
             # General library allowed calls
             "import datetime\ndatetime.date(2001, 1, 1)",
+            "import uuid\nuuid.uuid5(uuid.NAMESPACE_DNS, 'example.com')",
         ]
         for code in valid_code_to_check:
             await client.execute_workflow(
@@ -206,6 +230,59 @@ async def test_workflow_sandbox_restrictions(client: Client):
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
+
+    # Confirm it's easy to unrestrict stuff
+    async with new_worker(
+        client,
+        RunCodeWorkflow,
+        sandboxed_invalid_module_members=SandboxRestrictions.invalid_module_members_default.with_child_unrestricted(
+            "datetime", "date", "today"
+        ),
+    ) as worker:
+        await client.execute_workflow(
+            RunCodeWorkflow.run,
+            "import datetime\ndatetime.date.today()",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Confirm it's easy to add restrictions
+    async with new_worker(
+        client,
+        RunCodeWorkflow,
+        sandboxed_invalid_module_members=SandboxRestrictions.invalid_module_members_default
+        | SandboxMatcher(children={"datetime": SandboxMatcher(use={"date"})}),
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                RunCodeWorkflow.run,
+                "import datetime\ndatetime.date(2001, 1, 1)",
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.type == "RestrictedWorkflowAccessError"
+
+
+@workflow.defn
+class DateOperatorWorkflow:
+    @workflow.run
+    async def run(self) -> int:
+        assert (
+            type(date(2010, 1, 20))
+            == temporalio.worker.workflow_sandbox.restrictions._RestrictedProxy
+        )
+        return (date(2010, 1, 20) - date(2010, 1, 1)).days
+
+
+async def test_workflow_sandbox_operator(client: Client):
+    # Just confirm a simpler operator works
+    async with new_worker(client, DateOperatorWorkflow) as worker:
+        assert 19 == await client.execute_workflow(
+            DateOperatorWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
 
 
 def new_worker(

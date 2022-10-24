@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import threading
 import uuid
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
@@ -19,6 +21,7 @@ from typing import (
     Callable,
     Dict,
     Generic,
+    Iterator,
     List,
     Mapping,
     MutableMapping,
@@ -701,6 +704,9 @@ async def wait_condition(
     )
 
 
+_sandbox_unrestricted = threading.local()
+
+
 class unsafe:
     """Contains static methods that should not normally be called during
     workflow execution except in advanced cases.
@@ -717,6 +723,33 @@ class unsafe:
             True if the workflow is currently replaying
         """
         return _Runtime.current().workflow_is_replaying()
+
+    @staticmethod
+    def is_sandbox_unrestricted() -> bool:
+        """Whether the current block of code is not restricted via sandbox.
+
+        Returns:
+            True if the current code is not restricted in the sandbox.
+        """
+        # Activations happen in different threads than init and possibly the
+        # local hasn't been initialized in _that_ thread, so we allow unset here
+        # instead of just setting value = False globally.
+        return getattr(_sandbox_unrestricted, "value", False)
+
+    @staticmethod
+    @contextmanager
+    def sandbox_unrestricted() -> Iterator[None]:
+        """A context manager to run code without sandbox restrictions."""
+        # Only apply if not already applied. Nested calls just continue
+        # unrestricted.
+        if unsafe.is_sandbox_unrestricted():
+            yield None
+            return
+        _sandbox_unrestricted.value = True
+        try:
+            yield None
+        finally:
+            _sandbox_unrestricted.value = False
 
 
 class LoggerAdapter(logging.LoggerAdapter):

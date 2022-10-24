@@ -1,3 +1,9 @@
+"""Code that runs inside the workflow sandbox.
+
+.. warning::
+    This API for this module is considered unstable and may change in future.
+"""
+
 import dataclasses
 import logging
 from typing import Type
@@ -18,12 +24,15 @@ def _trace(message: object, *args: object) -> None:
 
 
 class InSandbox:
+    """Instance that is expected to run inside a sandbox."""
+
     def __init__(
         self,
         instance_details: temporalio.worker.workflow_instance.WorkflowInstanceDetails,
         runner_class: Type[temporalio.worker.workflow_instance.WorkflowRunner],
         workflow_class: Type,
     ) -> None:
+        """Create in-sandbox instance."""
         _trace("Initializing workflow %s in sandbox", workflow_class)
         # We have to replace the given instance instance details with new one
         # replacing references to the workflow class
@@ -49,4 +58,5 @@ class InSandbox:
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        """Send activation to this instance."""
         return self.instance.activate(act)

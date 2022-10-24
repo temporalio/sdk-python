@@ -1,3 +1,9 @@
+"""Runner for workflow sandbox.
+
+.. warning::
+    This API for this module is considered unstable and may change in future.
+"""
+
 from __future__ import annotations
 
 import threading
@@ -22,18 +28,30 @@ from .restrictions import RestrictionContext, SandboxRestrictions
 
 
 class SandboxedWorkflowRunner(WorkflowRunner):
+    """Runner for workflows in a sandbox."""
+
     def __init__(
         self,
+        *,
+        restrictions: SandboxRestrictions = SandboxRestrictions.default,
         # TODO(cretz): Document that this is re-imported and instantiated for
         # _each_ workflow run.
         runner_class: Type[WorkflowRunner] = UnsandboxedWorkflowRunner,
-        restrictions: SandboxRestrictions = SandboxRestrictions.default,
     ) -> None:
+        """Create the sandboxed workflow runner.
+
+        Args:
+            restrictions: Set of restrictions to apply to this sandbox.
+            runner_class: The class for underlying runner the sandbox will
+                instantiate and  use to run workflows. Note, this class is
+                re-imported and instantiated for *each* workflow run.
+        """
         super().__init__()
         self._runner_class = runner_class
         self._restrictions = restrictions
 
     def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
+        """Implements :py:meth:`WorkflowRunner.prepare_workflow`."""
         # Just create with fake info which validates
         self.create_instance(
             WorkflowInstanceDetails(
@@ -66,6 +84,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         )
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+        """Implements :py:meth:`WorkflowRunner.create_instance`."""
         return _Instance(det, self._runner_class, self._restrictions)
 
 
@@ -109,7 +128,7 @@ class _Instance(WorkflowInstance):
         self._create_instance()
 
     def _create_instance(self) -> None:
-        _globals_lock.acquire(timeout=3)
+        _globals_lock.acquire(timeout=5)
         try:
             # First create the importer
             self._run_code(
@@ -146,7 +165,7 @@ class _Instance(WorkflowInstance):
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
-        _globals_lock.acquire(timeout=3)
+        _globals_lock.acquire(timeout=5)
         self.restriction_context.is_runtime = True
         try:
             self._run_code(

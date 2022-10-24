@@ -150,6 +150,8 @@ intersphinx = [
 privacy = [
   "PRIVATE:temporalio.bridge",
   "PRIVATE:temporalio.types",
+  "PRIVATE:temporalio.worker.workflow_sandbox.restrictions",
+  "PRIVATE:temporalio.worker.workflow_sandbox.runner",
   "HIDDEN:temporalio.testing.activity",
   "HIDDEN:temporalio.testing.workflow",
   "HIDDEN:temporalio.worker.activity",
@@ -157,6 +159,8 @@ privacy = [
   "HIDDEN:temporalio.worker.worker",
   "HIDDEN:temporalio.worker.workflow",
   "HIDDEN:temporalio.worker.workflow_instance",
+  "HIDDEN:temporalio.worker.workflow_sandbox.importer",
+  "HIDDEN:temporalio.worker.workflow_sandbox.in_sandbox",
   "HIDDEN:**.*_pb2*",
 ]
 project-name = "Temporal Python"
