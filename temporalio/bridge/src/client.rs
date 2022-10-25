@@ -249,8 +249,6 @@ impl ClientRef {
                 "delete_workflow_execution" => {
                     rpc_call!(retry_client, call, delete_workflow_execution)
                 }
-                "describe_cluster" => rpc_call!(retry_client, call, describe_cluster),
-                "list_cluster_members" => rpc_call!(retry_client, call, list_cluster_members),
                 "list_clusters" => rpc_call!(retry_client, call, list_clusters),
                 "list_search_attributes" => {
                     rpc_call!(retry_client, call, list_search_attributes)

@@ -656,6 +656,7 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
     STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
+    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
     scheduled_event_id: builtins.int
     """The id of the `WORKFLOW_TASK_SCHEDULED` event this task corresponds to"""
     started_event_id: builtins.int
@@ -664,6 +665,11 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
     """Identity of the worker who completed this task"""
     binary_checksum: builtins.str
     """Binary ID of the worker who completed this task"""
+    @property
+    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
+        """ID of the worker who picked up this workflow task, or missing if worker
+        is not using versioning.
+        """
     def __init__(
         self,
         *,
@@ -671,7 +677,15 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
         started_event_id: builtins.int = ...,
         identity: builtins.str = ...,
         binary_checksum: builtins.str = ...,
+        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "worker_versioning_id", b"worker_versioning_id"
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
@@ -683,6 +697,8 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
             b"scheduled_event_id",
             "started_event_id",
             b"started_event_id",
+            "worker_versioning_id",
+            b"worker_versioning_id",
         ],
     ) -> None: ...
 
@@ -1998,6 +2014,42 @@ global___UpsertWorkflowSearchAttributesEventAttributes = (
     UpsertWorkflowSearchAttributesEventAttributes
 )
 
+class WorkflowPropertiesModifiedEventAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
+    UPSERTED_MEMO_FIELD_NUMBER: builtins.int
+    workflow_task_completed_event_id: builtins.int
+    """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
+    @property
+    def upserted_memo(self) -> temporalio.api.common.v1.message_pb2.Memo:
+        """If set, update the workflow memo with the provided values. The values will be merged with
+        the existing memo. If the user wants to delete values, a default/empty Payload should be
+        used as the value for the key being deleted.
+        """
+    def __init__(
+        self,
+        *,
+        workflow_task_completed_event_id: builtins.int = ...,
+        upserted_memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["upserted_memo", b"upserted_memo"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "upserted_memo",
+            b"upserted_memo",
+            "workflow_task_completed_event_id",
+            b"workflow_task_completed_event_id",
+        ],
+    ) -> None: ...
+
+global___WorkflowPropertiesModifiedEventAttributes = (
+    WorkflowPropertiesModifiedEventAttributes
+)
+
 class StartChildWorkflowExecutionInitiatedEventAttributes(
     google.protobuf.message.Message
 ):
@@ -2946,6 +2998,7 @@ class HistoryEvent(google.protobuf.message.Message):
     WORKFLOW_UPDATE_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_PROPERTIES_MODIFIED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
     @property
@@ -3139,6 +3192,10 @@ class HistoryEvent(google.protobuf.message.Message):
     def activity_properties_modified_externally_event_attributes(
         self,
     ) -> global___ActivityPropertiesModifiedExternallyEventAttributes: ...
+    @property
+    def workflow_properties_modified_event_attributes(
+        self,
+    ) -> global___WorkflowPropertiesModifiedEventAttributes: ...
     def __init__(
         self,
         *,
@@ -3237,6 +3294,8 @@ class HistoryEvent(google.protobuf.message.Message):
         | None = ...,
         activity_properties_modified_externally_event_attributes: global___ActivityPropertiesModifiedExternallyEventAttributes
         | None = ...,
+        workflow_properties_modified_event_attributes: global___WorkflowPropertiesModifiedEventAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -3317,6 +3376,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_terminated_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
+            "workflow_properties_modified_event_attributes",
+            b"workflow_properties_modified_event_attributes",
             "workflow_properties_modified_externally_event_attributes",
             b"workflow_properties_modified_externally_event_attributes",
             "workflow_task_completed_event_attributes",
@@ -3426,6 +3487,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_terminated_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
+            "workflow_properties_modified_event_attributes",
+            b"workflow_properties_modified_event_attributes",
             "workflow_properties_modified_externally_event_attributes",
             b"workflow_properties_modified_externally_event_attributes",
             "workflow_task_completed_event_attributes",
@@ -3494,6 +3557,7 @@ class HistoryEvent(google.protobuf.message.Message):
         "workflow_update_completed_event_attributes",
         "workflow_properties_modified_externally_event_attributes",
         "activity_properties_modified_externally_event_attributes",
+        "workflow_properties_modified_event_attributes",
     ] | None: ...
 
 global___HistoryEvent = HistoryEvent

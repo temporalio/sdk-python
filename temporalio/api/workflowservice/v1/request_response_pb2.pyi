@@ -877,7 +877,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_BUILD_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -887,13 +887,14 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     """Each worker process should provide an ID unique to the specific set of code it is running
     "checksum" in this field name isn't very accurate, it should be though of as an id.
     """
-    worker_versioning_build_id: builtins.str
-    """If set, the worker is opting in to build-id based versioning and wishes to only
-    receive tasks that are considered compatible with the version provided in the string.
-    Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdOrdering` API.
-    When set, and `binary_checksum` is not, this value should also be considered as the
-    `binary_checksum`.
-    """
+    @property
+    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
+        """If set, the worker is opting in to build-id based versioning and wishes to only
+        receive tasks that are considered compatible with the version provided.
+        Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdOrdering` API.
+        When `worker_versioning_id` has a `worker_build_id`, and `binary_checksum` is not
+        set, that value should also be considered as the `binary_checksum`.
+        """
     def __init__(
         self,
         *,
@@ -901,10 +902,14 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
         identity: builtins.str = ...,
         binary_checksum: builtins.str = ...,
-        worker_versioning_build_id: builtins.str = ...,
+        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["task_queue", b"task_queue"]
+        self,
+        field_name: typing_extensions.Literal[
+            "task_queue", b"task_queue", "worker_versioning_id", b"worker_versioning_id"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -917,8 +922,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "task_queue",
             b"task_queue",
-            "worker_versioning_build_id",
-            b"worker_versioning_build_id",
+            "worker_versioning_id",
+            b"worker_versioning_id",
         ],
     ) -> None: ...
 
@@ -1136,6 +1141,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     QUERY_RESULTS_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollWorkflowTaskQueueResponse`"""
     @property
@@ -1174,6 +1180,13 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     ]:
         """Responses to the `queries` field in the task being responded to"""
     namespace: builtins.str
+    @property
+    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
+        """If using versioning, worker should send the same id here that it used to
+        poll for the workflow task.
+        When `worker_versioning_id` has a `worker_build_id`, and `binary_checksum` is not
+        set, that value should also be considered as the `binary_checksum`.
+        """
     def __init__(
         self,
         *,
@@ -1193,11 +1206,16 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         ]
         | None = ...,
         namespace: builtins.str = ...,
+        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "sticky_attributes", b"sticky_attributes"
+            "sticky_attributes",
+            b"sticky_attributes",
+            "worker_versioning_id",
+            b"worker_versioning_id",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -1221,6 +1239,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             b"sticky_attributes",
             "task_token",
             b"task_token",
+            "worker_versioning_id",
+            b"worker_versioning_id",
         ],
     ) -> None: ...
 
@@ -1332,7 +1352,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_BUILD_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -1342,11 +1362,12 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     def task_queue_metadata(
         self,
     ) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueMetadata: ...
-    worker_versioning_build_id: builtins.str
-    """If set, the worker is opting in to build-id based versioning and wishes to only
-    receive tasks that are considered compatible with the version provided in the string.
-    Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdOrdering` API.
-    """
+    @property
+    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
+        """If set, the worker is opting in to build-id based versioning and wishes to only
+        receive tasks that are considered compatible with the version provided.
+        Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdOrdering` API.
+        """
     def __init__(
         self,
         *,
@@ -1355,12 +1376,18 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         task_queue_metadata: temporalio.api.taskqueue.v1.message_pb2.TaskQueueMetadata
         | None = ...,
-        worker_versioning_build_id: builtins.str = ...,
+        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "task_queue", b"task_queue", "task_queue_metadata", b"task_queue_metadata"
+            "task_queue",
+            b"task_queue",
+            "task_queue_metadata",
+            b"task_queue_metadata",
+            "worker_versioning_id",
+            b"worker_versioning_id",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -1374,8 +1401,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
-            "worker_versioning_build_id",
-            b"worker_versioning_build_id",
+            "worker_versioning_id",
+            b"worker_versioning_id",
         ],
     ) -> None: ...
 
@@ -2601,6 +2628,54 @@ class TerminateWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___TerminateWorkflowExecutionResponse = TerminateWorkflowExecutionResponse
 
+class DeleteWorkflowExecutionRequest(google.protobuf.message.Message):
+    """(-- api-linter: core::0135::request-unknown-fields=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+    (-- api-linter: core::0135::request-name-required=disabled
+        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    @property
+    def workflow_execution(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """Workflow Execution to delete. If run_id is not specified, the latest one is used."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "workflow_execution", b"workflow_execution"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace", b"namespace", "workflow_execution", b"workflow_execution"
+        ],
+    ) -> None: ...
+
+global___DeleteWorkflowExecutionRequest = DeleteWorkflowExecutionRequest
+
+class DeleteWorkflowExecutionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteWorkflowExecutionResponse = DeleteWorkflowExecutionResponse
+
 class ListOpenWorkflowExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3570,6 +3645,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         ACTIVITY_FAILURE_INCLUDE_HEARTBEAT_FIELD_NUMBER: builtins.int
         SUPPORTS_SCHEDULES_FIELD_NUMBER: builtins.int
         ENCODED_FAILURE_ATTRIBUTES_FIELD_NUMBER: builtins.int
+        BUILD_ID_BASED_VERSIONING_FIELD_NUMBER: builtins.int
+        UPSERT_MEMO_FIELD_NUMBER: builtins.int
         signal_and_query_header: builtins.bool
         """True if signal and query headers are supported."""
         internal_error_differentiation: builtins.bool
@@ -3585,6 +3662,13 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         """Supports scheduled workflow features."""
         encoded_failure_attributes: builtins.bool
         """True if server uses protos that include temporalio.api.failure.v1.Failure.encoded_attributes"""
+        build_id_based_versioning: builtins.bool
+        """True if server supports dispatching Workflow and Activity tasks based on a worker's build_id
+        (see:
+        https://github.com/temporalio/proposals/blob/a123af3b559f43db16ea6dd31870bfb754c4dc5e/versioning/worker-versions.md)
+        """
+        upsert_memo: builtins.bool
+        """True if server supports upserting workflow memo"""
         def __init__(
             self,
             *,
@@ -3593,12 +3677,16 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
             activity_failure_include_heartbeat: builtins.bool = ...,
             supports_schedules: builtins.bool = ...,
             encoded_failure_attributes: builtins.bool = ...,
+            build_id_based_versioning: builtins.bool = ...,
+            upsert_memo: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
             field_name: typing_extensions.Literal[
                 "activity_failure_include_heartbeat",
                 b"activity_failure_include_heartbeat",
+                "build_id_based_versioning",
+                b"build_id_based_versioning",
                 "encoded_failure_attributes",
                 b"encoded_failure_attributes",
                 "internal_error_differentiation",
@@ -3607,6 +3695,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
                 b"signal_and_query_header",
                 "supports_schedules",
                 b"supports_schedules",
+                "upsert_memo",
+                b"upsert_memo",
             ],
         ) -> None: ...
 
@@ -3847,6 +3937,9 @@ class DescribeScheduleResponse(google.protobuf.message.Message):
     def schedule(self) -> temporalio.api.schedule.v1.message_pb2.Schedule:
         """The complete current schedule details. This may not match the schedule as
         created because:
+        - some types of schedule specs may get compiled into others (e.g.
+          CronString into StructuredCalendarSpec)
+        - some unspecified fields may be replaced by defaults
         - some fields in the state are modified automatically
         - the schedule may have been modified by UpdateSchedule or PatchSchedule
         """
@@ -4505,6 +4598,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     VISIBILITY_QUERY_FIELD_NUMBER: builtins.int
+    JOB_ID_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
     TERMINATION_OPERATION_FIELD_NUMBER: builtins.int
     SIGNAL_OPERATION_FIELD_NUMBER: builtins.int
     CANCELLATION_OPERATION_FIELD_NUMBER: builtins.int
@@ -4512,6 +4607,10 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     """Namespace that contains the batch operation"""
     visibility_query: builtins.str
     """Visibility query defines the the group of workflow to do batch operation"""
+    job_id: builtins.str
+    """Job ID defines the unique ID for the batch job"""
+    reason: builtins.str
+    """Reason to perform the batch operation"""
     @property
     def termination_operation(
         self,
@@ -4529,6 +4628,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         *,
         namespace: builtins.str = ...,
         visibility_query: builtins.str = ...,
+        job_id: builtins.str = ...,
+        reason: builtins.str = ...,
         termination_operation: temporalio.api.batch.v1.message_pb2.BatchOperationTermination
         | None = ...,
         signal_operation: temporalio.api.batch.v1.message_pb2.BatchOperationSignal
@@ -4554,10 +4655,14 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancellation_operation",
             b"cancellation_operation",
+            "job_id",
+            b"job_id",
             "namespace",
             b"namespace",
             "operation",
             b"operation",
+            "reason",
+            b"reason",
             "signal_operation",
             b"signal_operation",
             "termination_operation",
@@ -4577,16 +4682,8 @@ global___StartBatchOperationRequest = StartBatchOperationRequest
 class StartBatchOperationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    JOB_ID_FIELD_NUMBER: builtins.int
-    job_id: builtins.str
-    """Batch job id"""
     def __init__(
         self,
-        *,
-        job_id: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["job_id", b"job_id"]
     ) -> None: ...
 
 global___StartBatchOperationResponse = StartBatchOperationResponse
@@ -4596,20 +4693,35 @@ class StopBatchOperationRequest(google.protobuf.message.Message):
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     JOB_ID_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace that contains the batch operation"""
     job_id: builtins.str
     """Batch job id"""
+    reason: builtins.str
+    """Reason to stop a batch operation"""
+    identity: builtins.str
+    """Identity of the operator"""
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         job_id: builtins.str = ...,
+        reason: builtins.str = ...,
+        identity: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "job_id", b"job_id", "namespace", b"namespace"
+            "identity",
+            b"identity",
+            "job_id",
+            b"job_id",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
         ],
     ) -> None: ...
 
@@ -4659,6 +4771,8 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
     TOTAL_OPERATION_COUNT_FIELD_NUMBER: builtins.int
     COMPLETE_OPERATION_COUNT_FIELD_NUMBER: builtins.int
     FAILURE_OPERATION_COUNT_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
     operation_type: temporalio.api.enums.v1.batch_operation_pb2.BatchOperationType.ValueType
     """Batch operation type"""
     job_id: builtins.str
@@ -4677,6 +4791,10 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
     """Complete operation count"""
     failure_operation_count: builtins.int
     """Failure operation count"""
+    identity: builtins.str
+    """Identity indicates the operator identity"""
+    reason: builtins.str
+    """Reason indicates the reason to stop a operation"""
     def __init__(
         self,
         *,
@@ -4688,6 +4806,8 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
         total_operation_count: builtins.int = ...,
         complete_operation_count: builtins.int = ...,
         failure_operation_count: builtins.int = ...,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4704,10 +4824,14 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
             b"complete_operation_count",
             "failure_operation_count",
             b"failure_operation_count",
+            "identity",
+            b"identity",
             "job_id",
             b"job_id",
             "operation_type",
             b"operation_type",
+            "reason",
+            b"reason",
             "start_time",
             b"start_time",
             "state",

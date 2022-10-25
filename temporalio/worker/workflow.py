@@ -53,7 +53,11 @@ class _WorkflowWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         debug_mode: bool,
-        fail_on_eviction: bool = False,
+        on_eviction_hook: Optional[
+            Callable[
+                [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
+            ]
+        ] = None,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -80,8 +84,8 @@ class _WorkflowWorker:
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
         self._running_workflows: Dict[str, WorkflowInstance] = {}
-        self._fail_on_eviction = fail_on_eviction
-        self._failure_due_to_eviction: Optional[Exception] = None
+        self._on_eviction_hook = on_eviction_hook
+        self._throw_after_activation: Optional[Exception] = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
         # deadlock detection, otherwise set to 2 seconds
@@ -114,18 +118,6 @@ class _WorkflowWorker:
             while True:
                 act = await self._bridge_worker().poll_workflow_activation()
 
-                # If this activation is after we have received a failure due to
-                # eviction, we ignore it w/ a failed task every time
-                if self._failure_due_to_eviction:
-                    completion = temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
-                        run_id=act.run_id
-                    )
-                    completion.failed.failure.message = (
-                        "Ignoring post-eviction activation"
-                    )
-                    await self._bridge_worker().complete_workflow_activation(completion)
-                    continue
-
                 # Schedule this as a task, but we don't need to track it or
                 # await it. Rather we'll give it an attribute and wait for it
                 # when done.
@@ -149,9 +141,8 @@ class _WorkflowWorker:
             if not self._workflow_task_executor_user_provided:
                 self._workflow_task_executor.shutdown()
 
-        # If there was a failure due to eviction, raise it
-        if self._failure_due_to_eviction:
-            raise self._failure_due_to_eviction
+        if self._throw_after_activation:
+            raise self._throw_after_activation
 
     async def _handle_activation(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
@@ -266,22 +257,13 @@ class _WorkflowWorker:
                 )
             # If we are failing on eviction, set the error and shutdown the
             # entire worker
-            if self._fail_on_eviction and not self._failure_due_to_eviction:
-                logger.debug("Shutting down worker on eviction")
-                if (
-                    remove_job.remove_from_cache.reason
-                    == temporalio.bridge.proto.workflow_activation.RemoveFromCache.EvictionReason.NONDETERMINISM
-                ):
-                    self._failure_due_to_eviction = (
-                        temporalio.workflow.NondeterminismError(
-                            remove_job.remove_from_cache.message
-                        )
-                    )
-                else:
-                    self._failure_due_to_eviction = RuntimeError(
-                        f"{remove_job.remove_from_cache.reason}: {remove_job.remove_from_cache.message}"
-                    )
-                asyncio.create_task(self._bridge_worker().shutdown())
+            if self._on_eviction_hook is not None:
+                try:
+                    self._on_eviction_hook(act.run_id, remove_job.remove_from_cache)
+                except Exception as e:
+                    self._throw_after_activation = e
+                    logger.debug("Shutting down worker on eviction")
+                    asyncio.create_task(self._bridge_worker().shutdown())
 
     def _create_workflow_instance(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation

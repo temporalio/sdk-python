@@ -27,7 +27,7 @@ from temporalio.api.history.v1 import History
 from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.exceptions import ApplicationError
-from temporalio.worker import Replayer, Worker
+from temporalio.worker import Replayer, Worker, WorkflowHistory
 from temporalio.worker.replayer import _history_from_json
 from tests.worker.test_workflow import assert_eq_eventually
 
@@ -102,7 +102,9 @@ async def test_replayer_workflow_complete(client: Client) -> None:
 async def test_replayer_workflow_complete_json() -> None:
     with Path(__file__).with_name("test_replayer_complete_history.json").open("r") as f:
         history_json = f.read()
-    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history_json)
+    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
+        WorkflowHistory.from_json("fake", history_json)
+    )
 
 
 async def test_replayer_workflow_incomplete(client: Client) -> None:
@@ -114,6 +116,7 @@ async def test_replayer_workflow_incomplete(client: Client) -> None:
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
         # Wait until it's waiting
         async def waiting() -> bool:
             return await handle.query(SayHelloWorkflow.waiting)
@@ -166,7 +169,76 @@ async def test_replayer_workflow_nondeterministic_json() -> None:
     ) as f:
         history_json = f.read()
     with pytest.raises(workflow.NondeterminismError) as err:
-        await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history_json)
+        await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
+            WorkflowHistory.from_json("fake", history_json)
+        )
+
+
+async def test_replayer_multiple_histories_fail_fast() -> None:
+    with Path(__file__).with_name("test_replayer_complete_history.json").open("r") as f:
+        history_json = f.read()
+    with Path(__file__).with_name("test_replayer_nondeterministic_history.json").open(
+        "r"
+    ) as f:
+        history_json_bad = f.read()
+
+    callcount = 0
+
+    async def histories():
+        nonlocal callcount
+        callcount += 1
+        yield WorkflowHistory.from_json("fake_bad", history_json_bad)
+        # Must sleep so this coroutine can be interrupted by early exit
+        await asyncio.sleep(1)
+        callcount += 1
+        yield WorkflowHistory.from_json("fake", history_json)
+
+    with pytest.raises(workflow.NondeterminismError):
+        await Replayer(workflows=[SayHelloWorkflow]).replay_workflows(histories())
+
+    # We should only have replayed the fist history since we fail fast
+    assert callcount == 1
+
+
+async def test_replayer_multiple_histories_fail_slow() -> None:
+    with Path(__file__).with_name("test_replayer_complete_history.json").open("r") as f:
+        history_json = f.read()
+    with Path(__file__).with_name("test_replayer_nondeterministic_history.json").open(
+        "r"
+    ) as f:
+        history_json_bad = f.read()
+
+    callcount = 0
+    bad_hist = WorkflowHistory.from_json("fake_bad", history_json_bad)
+    bad_hist_run_id = bad_hist.events[
+        0
+    ].workflow_execution_started_event_attributes.original_execution_run_id
+
+    async def histories():
+        nonlocal callcount
+        callcount += 1
+        yield bad_hist
+        callcount += 1
+        yield WorkflowHistory.from_json("fake", history_json)
+        callcount += 1
+        h3 = WorkflowHistory.from_json("fake", history_json)
+        # Need to give a new run id to ensure playback continues
+        h3.events[
+            0
+        ].workflow_execution_started_event_attributes.original_execution_run_id = "r3"
+        h3.events[
+            0
+        ].workflow_execution_started_event_attributes.first_execution_run_id = "r3"
+        yield h3
+        callcount += 1
+
+    results = await Replayer(
+        workflows=[SayHelloWorkflow], fail_fast=False
+    ).replay_workflows(histories())
+
+    assert callcount == 4
+    assert results.had_any_failure()
+    assert results.failure_details[bad_hist_run_id] is not None
 
 
 @workflow.defn
@@ -203,7 +275,7 @@ def new_say_hello_worker(client: Client) -> Worker:
     )
 
 
-async def get_history(client: Client, workflow_id: str) -> History:
+async def get_history(client: Client, workflow_id: str) -> WorkflowHistory:
     history = History()
     req = GetWorkflowExecutionHistoryRequest(
         namespace=client.namespace, execution=WorkflowExecution(workflow_id=workflow_id)
@@ -212,7 +284,7 @@ async def get_history(client: Client, workflow_id: str) -> History:
         resp = await client.workflow_service.get_workflow_execution_history(req)
         history.events.extend(resp.history.events)
         if not resp.next_page_token:
-            return history
+            return WorkflowHistory(workflow_id, history.events)
         req.next_page_token = resp.next_page_token
 
 

@@ -1,8 +1,8 @@
 from .workflow_commands_pb2 import (
     ActivityCancellationType,
+    CancelChildWorkflowExecution,
     CancelSignalWorkflow,
     CancelTimer,
-    CancelUnstartedChildWorkflowExecution,
     CancelWorkflowExecution,
     CompleteWorkflowExecution,
     ContinueAsNewWorkflowExecution,
@@ -24,9 +24,9 @@ from .workflow_commands_pb2 import (
 
 __all__ = [
     "ActivityCancellationType",
+    "CancelChildWorkflowExecution",
     "CancelSignalWorkflow",
     "CancelTimer",
-    "CancelUnstartedChildWorkflowExecution",
     "CancelWorkflowExecution",
     "CompleteWorkflowExecution",
     "ContinueAsNewWorkflowExecution",

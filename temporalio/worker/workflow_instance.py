@@ -1796,15 +1796,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self,
         command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
     ) -> None:
-        if self._start_fut.done():
-            command.request_cancel_external_workflow_execution.seq = self._seq
-            command.request_cancel_external_workflow_execution.child_workflow_id = (
-                self._input.id
-            )
-        else:
-            command.cancel_unstarted_child_workflow_execution.child_workflow_seq = (
-                self._seq
-            )
+        command.cancel_child_workflow_execution.child_workflow_seq = self._seq
 
 
 class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):

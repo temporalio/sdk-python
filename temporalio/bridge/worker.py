@@ -6,7 +6,7 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Sequence, Tuple
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
@@ -59,14 +59,18 @@ class Worker:
 
     @staticmethod
     def for_replay(
-        history: temporalio.api.history.v1.History, config: WorkerConfig
-    ) -> Worker:
-        """Create a bridge replay worker from history."""
-        return Worker(
-            temporalio.bridge.temporal_sdk_bridge.new_replay_worker(
-                history.SerializeToString(), config
-            )
+        config: WorkerConfig,
+    ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
+        """Create a bridge replay worker."""
+        temporalio.bridge.telemetry.init_telemetry(
+            temporalio.bridge.telemetry.TelemetryConfig(),
+            warn_if_already_inited=False,
         )
+        [
+            replay_worker,
+            pusher,
+        ] = temporalio.bridge.temporal_sdk_bridge.new_replay_worker(config)
+        return Worker(replay_worker), pusher
 
     def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.WorkerRef) -> None:
         """Create SDK core worker from a bridge worker."""

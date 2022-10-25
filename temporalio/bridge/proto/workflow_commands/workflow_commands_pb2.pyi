@@ -83,7 +83,7 @@ class WorkflowCommand(google.protobuf.message.Message):
     CANCEL_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     SET_PATCH_MARKER_FIELD_NUMBER: builtins.int
     START_CHILD_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
-    CANCEL_UNSTARTED_CHILD_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
+    CANCEL_CHILD_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     CANCEL_SIGNAL_WORKFLOW_FIELD_NUMBER: builtins.int
@@ -117,9 +117,9 @@ class WorkflowCommand(google.protobuf.message.Message):
         self,
     ) -> global___StartChildWorkflowExecution: ...
     @property
-    def cancel_unstarted_child_workflow_execution(
+    def cancel_child_workflow_execution(
         self,
-    ) -> global___CancelUnstartedChildWorkflowExecution: ...
+    ) -> global___CancelChildWorkflowExecution: ...
     @property
     def request_cancel_external_workflow_execution(
         self,
@@ -154,7 +154,7 @@ class WorkflowCommand(google.protobuf.message.Message):
         set_patch_marker: global___SetPatchMarker | None = ...,
         start_child_workflow_execution: global___StartChildWorkflowExecution
         | None = ...,
-        cancel_unstarted_child_workflow_execution: global___CancelUnstartedChildWorkflowExecution
+        cancel_child_workflow_execution: global___CancelChildWorkflowExecution
         | None = ...,
         request_cancel_external_workflow_execution: global___RequestCancelExternalWorkflowExecution
         | None = ...,
@@ -169,12 +169,12 @@ class WorkflowCommand(google.protobuf.message.Message):
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "cancel_child_workflow_execution",
+            b"cancel_child_workflow_execution",
             "cancel_signal_workflow",
             b"cancel_signal_workflow",
             "cancel_timer",
             b"cancel_timer",
-            "cancel_unstarted_child_workflow_execution",
-            b"cancel_unstarted_child_workflow_execution",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
             "complete_workflow_execution",
@@ -212,12 +212,12 @@ class WorkflowCommand(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "cancel_child_workflow_execution",
+            b"cancel_child_workflow_execution",
             "cancel_signal_workflow",
             b"cancel_signal_workflow",
             "cancel_timer",
             b"cancel_timer",
-            "cancel_unstarted_child_workflow_execution",
-            b"cancel_unstarted_child_workflow_execution",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
             "complete_workflow_execution",
@@ -266,7 +266,7 @@ class WorkflowCommand(google.protobuf.message.Message):
         "cancel_workflow_execution",
         "set_patch_marker",
         "start_child_workflow_execution",
-        "cancel_unstarted_child_workflow_execution",
+        "cancel_child_workflow_execution",
         "request_cancel_external_workflow_execution",
         "signal_external_workflow_execution",
         "cancel_signal_workflow",
@@ -1271,8 +1271,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
 
 global___StartChildWorkflowExecution = StartChildWorkflowExecution
 
-class CancelUnstartedChildWorkflowExecution(google.protobuf.message.Message):
-    """/ Cancel a not-yet-started child workflow"""
+class CancelChildWorkflowExecution(google.protobuf.message.Message):
+    """/ Cancel a child workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1291,7 +1291,7 @@ class CancelUnstartedChildWorkflowExecution(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___CancelUnstartedChildWorkflowExecution = CancelUnstartedChildWorkflowExecution
+global___CancelChildWorkflowExecution = CancelChildWorkflowExecution
 
 class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
     """/ Request cancellation of an external workflow execution (which may be a started child)"""

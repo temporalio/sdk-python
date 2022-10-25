@@ -60,6 +60,7 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     AUTO_RESET_POINTS_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
+    HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     @property
     def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     @property
@@ -87,6 +88,7 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     def auto_reset_points(self) -> global___ResetPoints: ...
     task_queue: builtins.str
     state_transition_count: builtins.int
+    history_size_bytes: builtins.int
     def __init__(
         self,
         *,
@@ -106,6 +108,7 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
         auto_reset_points: global___ResetPoints | None = ...,
         task_queue: builtins.str = ...,
         state_transition_count: builtins.int = ...,
+        history_size_bytes: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -143,6 +146,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"execution_time",
             "history_length",
             b"history_length",
+            "history_size_bytes",
+            b"history_size_bytes",
             "memo",
             b"memo",
             "parent_execution",

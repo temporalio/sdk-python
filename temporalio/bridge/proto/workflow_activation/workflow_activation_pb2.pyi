@@ -318,6 +318,7 @@ class StartWorkflow(google.protobuf.message.Message):
     CRON_SCHEDULE_TO_SCHEDULE_INTERVAL_FIELD_NUMBER: builtins.int
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    START_TIME_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     workflow_id: builtins.str
@@ -399,6 +400,9 @@ class StartWorkflow(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
         """Search attributes created/updated when this workflow was started"""
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """When the workflow execution started event was first written"""
     def __init__(
         self,
         *,
@@ -435,6 +439,7 @@ class StartWorkflow(google.protobuf.message.Message):
         memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
+        start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -453,6 +458,8 @@ class StartWorkflow(google.protobuf.message.Message):
             b"retry_policy",
             "search_attributes",
             b"search_attributes",
+            "start_time",
+            b"start_time",
             "workflow_execution_expiration_time",
             b"workflow_execution_expiration_time",
             "workflow_execution_timeout",
@@ -498,6 +505,8 @@ class StartWorkflow(google.protobuf.message.Message):
             b"retry_policy",
             "search_attributes",
             b"search_attributes",
+            "start_time",
+            b"start_time",
             "workflow_execution_expiration_time",
             b"workflow_execution_expiration_time",
             "workflow_execution_timeout",

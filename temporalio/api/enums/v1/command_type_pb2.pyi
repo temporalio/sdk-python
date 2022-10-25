@@ -65,6 +65,7 @@ class _CommandTypeEnumTypeWrapper(
     """Indicates that an update has completed and carries either the success or
     failure outcome of said update.
     """
+    COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES: _CommandType.ValueType  # 16
 
 class CommandType(_CommandType, metaclass=_CommandTypeEnumTypeWrapper):
     """Whenever this list of command types is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering."""
@@ -89,4 +90,5 @@ COMMAND_TYPE_COMPLETE_WORKFLOW_UPDATE: CommandType.ValueType  # 15
 """Indicates that an update has completed and carries either the success or
 failure outcome of said update.
 """
+COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES: CommandType.ValueType  # 16
 global___CommandType = CommandType
