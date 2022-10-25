@@ -324,6 +324,11 @@ SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
         # allowed
         "pathlib",
         "importlib",
+        # Python 3.7 libs often import this to support things in older Python.
+        # This does not work natively due to an issue with extending
+        # zipfile.ZipFile. TODO(cretz): Fix when subclassing restricted classes
+        # is fixed.
+        "importlib_metadata",
     },
     # Required due to https://github.com/protocolbuffers/protobuf/issues/10143.
     # This unfortunately means that for now, everyone using Python protos has to
@@ -869,7 +874,7 @@ class _RestrictedProxy:
     # __weakref__ (__getattr__)
     # __init_subclass__ (proxying metaclass not supported)
     # __prepare__ (metaclass)
-    __class__ = _RestrictedProxyLookup(
+    __class__ = _RestrictedProxyLookup(  # type: ignore
         fallback_func=lambda self: type(self), is_attr=True
     )  # type: ignore
     __instancecheck__ = _RestrictedProxyLookup(

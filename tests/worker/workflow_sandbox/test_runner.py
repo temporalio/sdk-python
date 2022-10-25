@@ -52,6 +52,10 @@ global_state = ["global orig"]
 # runtime only
 _ = os.name
 
+# TODO(cretz): This fails because you can't subclass a restricted class
+# class MyZipFile(zipfile.ZipFile):
+#     pass
+
 
 @dataclass
 class GlobalStateWorkflowParams:

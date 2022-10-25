@@ -711,6 +711,12 @@ The sandbox is only a helper, it does not provide full protection.
 
 TODO: This is actively being measured; results to come soon
 
+###### Extending Restricted Classes
+
+Currently, extending classes marked as restricted causes an issue with their `__init__` parameters. This does not affect
+most users, but if there is a dependency that is, say, extending `zipfile.ZipFile` an error may occur and the module
+will have to be marked as pass through.
+
 ###### is_subclass of ABC-based Restricted Classes
 
 Due to [https://bugs.python.org/issue44847](https://bugs.python.org/issue44847), classes that are wrapped and then
