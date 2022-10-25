@@ -34,10 +34,7 @@ from typing_extensions import Protocol, runtime_checkable
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType, IndexedValueType
-from temporalio.api.operatorservice.v1 import (
-    AddSearchAttributesRequest,
-    ListSearchAttributesRequest,
-)
+from temporalio.api.operatorservice.v1 import AddSearchAttributesRequest
 from temporalio.api.workflowservice.v1 import (
     GetSearchAttributesRequest,
     GetWorkflowExecutionHistoryRequest,
@@ -70,7 +67,6 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from tests.helpers.golang import ExternalGolangServer
 
 
 @workflow.defn
@@ -1351,8 +1347,9 @@ class SearchAttributeWorkflow:
         )
 
 
-async def test_workflow_search_attributes(golang_server: ExternalGolangServer):
-    client = await golang_server.new_client()
+async def test_workflow_search_attributes(client: Client, env_type: str):
+    if env_type != "local":
+        pytest.skip("Only testing search attributes on local which disables cache")
 
     async def search_attributes_present() -> bool:
         resp = await client.workflow_service.get_search_attributes(
@@ -1373,11 +1370,6 @@ async def test_workflow_search_attributes(golang_server: ExternalGolangServer):
                     f"{sa_prefix}datetime": IndexedValueType.INDEXED_VALUE_TYPE_DATETIME,
                 },
             ),
-        )
-        # TODO(cretz): Why is it required to issue this list call before it will
-        # appear in the other RPC list call?
-        await client.operator_service.list_search_attributes(
-            ListSearchAttributesRequest()
         )
     # Confirm now present
     assert await search_attributes_present()
@@ -1440,6 +1432,9 @@ async def test_workflow_search_attributes(golang_server: ExternalGolangServer):
         attrs = {
             k: v for k, v in desc.search_attributes.items() if k.startswith(sa_prefix)
         }
+        # Check against expected, but remove double from expected since it is
+        # no longer present
+        del expected[f"{sa_prefix}double"]
         assert expected == search_attrs_to_dict_with_type(attrs)
 
 
