@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 import functools
 import os
-import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -25,27 +24,6 @@ from temporalio.worker.workflow_sandbox import (
 )
 from tests.worker.test_workflow import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
-
-
-def test_workflow_sandbox_stdlib_module_names():
-    if sys.version_info == (3, 10):
-        pytest.skip("Test only runs on 3.10")
-    actual_names = ",".join(sorted(sys.stdlib_module_names))
-    # Uncomment to print code for generating these
-    code_lines = [""]
-    for mod_name in sorted(sys.stdlib_module_names):
-        if code_lines[-1]:
-            code_lines[-1] += ","
-        if len(code_lines[-1]) > 80:
-            code_lines.append("")
-        code_lines[-1] += mod_name
-    code = f'_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
-    # TODO(cretz): Point releases may add modules :-(
-    assert (
-        actual_names
-        == temporalio.worker.workflow_sandbox.restrictions._stdlib_module_names
-    ), f"Expecting names as {actual_names}. In code as:\n{code}"
-
 
 global_state = ["global orig"]
 # We just access os.name in here to show we _can_. It's access-restricted at
