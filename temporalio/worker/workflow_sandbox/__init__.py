@@ -43,8 +43,6 @@ customize, and work around sandbox issues.
 # TODO(cretz): TODOs:
 #
 # * Try subinterpreter via Rust
-# * Currently we alter the global, shared sys.modules and builtins.__import__
-#   which is unacceptable
 # * Rework SandboxMatcher to be more robust and easier to build
 # * Protobuf issues w/ shared static state:
 #   * https://github.com/protocolbuffers/protobuf/issues/10143

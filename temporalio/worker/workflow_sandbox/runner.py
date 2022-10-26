@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Type
 
@@ -23,7 +22,7 @@ from ...worker.workflow_instance import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from .importer import RestrictedEnvironment
+from .importer import Importer
 from .restrictions import RestrictionContext, SandboxRestrictions
 
 
@@ -88,22 +87,6 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         return _Instance(det, self._runner_class, self._restrictions)
 
 
-# Due to the fact that we are altering the global sys.modules and builtins, we
-# have to apply a global lock.
-#
-# TODO(cretz): Can we get rid of this? It's unfortunate, but I have not
-# yet found a way around it. Technically the following code will create
-# a new sys:
-#
-#   new_sys = types.ModuleType("sys")
-#   importlib.util.find_spec("sys").loader.exec_module(new_sys)
-#   # Shallow copy everything over
-#   new_sys.__dict__.update(sys.__dict__.copy())
-#   globals()["sys"] = new_sys
-#
-# But this does not affect other imports. More testing is needed.
-_globals_lock = threading.Lock()
-
 # Implements in_sandbox._ExternEnvironment. Some of these calls are called from
 # within the sandbox.
 class _Instance(WorkflowInstance):
@@ -115,68 +98,54 @@ class _Instance(WorkflowInstance):
     ) -> None:
         self.instance_details = instance_details
         self.runner_class = runner_class
-        self.restriction_context = RestrictionContext()
-        self.importer_environment = RestrictedEnvironment(
-            restrictions, self.restriction_context
-        )
+        self.importer = Importer(restrictions, RestrictionContext())
 
         # Create the instance
         self.globals_and_locals = {
-            "__builtins__": __builtins__.copy(),  # type: ignore
+            # "__builtins__": __builtins__.copy(),  # type: ignore
             "__file__": "workflow_sandbox.py",
         }
         self._create_instance()
 
     def _create_instance(self) -> None:
-        _globals_lock.acquire(timeout=5)
         try:
-            # First create the importer
-            self._run_code(
-                "from temporalio.worker.workflow_sandbox.importer import Importer\n"
-                "__temporal_importer = Importer(__temporal_importer_environment)\n",
-                __temporal_importer_environment=self.importer_environment,
-            )
-
-            # Set the importer as the import
-            self.globals_and_locals["__builtins__"]["__import__"] = self.globals_and_locals.get("__temporal_importer")._import  # type: ignore
-
             # Import user code
             self._run_code(
                 "with __temporal_importer.applied():\n"
                 # Import the workflow code
                 f"  from {self.instance_details.defn.cls.__module__} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
-                f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n"
+                f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n",
+                __temporal_importer=self.importer,
             )
 
             # Set context as in runtime
-            self.restriction_context.is_runtime = True
+            self.importer.restriction_context.is_runtime = True
 
             # Create the sandbox instance
             self._run_code(
                 "with __temporal_importer.applied():\n"
                 "  from temporalio.worker.workflow_sandbox.in_sandbox import InSandbox\n"
                 "  __temporal_in_sandbox = InSandbox(__temporal_instance_details, __temporal_runner_class, __temporal_workflow_class)\n",
+                __temporal_importer=self.importer,
                 __temporal_instance_details=self.instance_details,
             )
         finally:
-            self.restriction_context.is_runtime = False
-            _globals_lock.release()
+            self.importer.restriction_context.is_runtime = False
 
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
-        _globals_lock.acquire(timeout=5)
-        self.restriction_context.is_runtime = True
+        self.importer.restriction_context.is_runtime = True
         try:
             self._run_code(
                 "with __temporal_importer.applied():\n"
                 "  __temporal_completion = __temporal_in_sandbox.activate(__temporal_activation)\n",
+                __temporal_importer=self.importer,
                 __temporal_activation=act,
             )
             return self.globals_and_locals.pop("__temporal_completion")  # type: ignore
         finally:
-            self.restriction_context.is_runtime = False
-            _globals_lock.release()
+            self.importer.restriction_context.is_runtime = False
 
     def _run_code(self, code: str, **extra_globals: Any) -> None:
         for k, v in extra_globals.items():

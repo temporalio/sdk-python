@@ -11,11 +11,26 @@ import functools
 import importlib
 import logging
 import sys
+import threading
 import types
-from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Set, Tuple
+from contextlib import ExitStack, contextmanager
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
-from typing_extensions import Protocol
+from typing_extensions import ParamSpec
 
 import temporalio.workflow
 
@@ -42,16 +57,53 @@ def _trace(message: object, *args: object) -> None:
 class Importer:
     """Importer that restricts modules."""
 
-    def __init__(self, env: _Environment) -> None:
+    def __init__(
+        self, restrictions: SandboxRestrictions, restriction_context: RestrictionContext
+    ) -> None:
         """Create importer."""
-        self.env = env
-        self.orig_modules = sys.modules
-        self.new_modules: Dict[str, types.ModuleType] = {}
-        self.orig_import = builtins.__import__
+        self.restrictions = restrictions
+        self.restriction_context = restriction_context
+        self.new_modules: Dict[str, types.ModuleType] = {
+            "sys": sys,
+            "builtins": builtins,
+        }
         self.modules_checked_for_restrictions: Set[str] = set()
         self.import_func = self._import if not LOG_TRACE else self._traced_import
+        # Pre-collect restricted builtins
+        self.restricted_builtins: List[Tuple[str, _ThreadLocalCallable, Callable]] = []
+        builtin_matcher = restrictions.invalid_module_members.child_matcher(
+            "__builtins__"
+        )
+        if builtin_matcher:
 
-    # TODO(cretz): Document that this is expected to have a global lock
+            def restrict_built_in(name: str, orig: Any, *args, **kwargs):
+                # Check if restricted against matcher
+                if (
+                    builtin_matcher
+                    and builtin_matcher.match_access(
+                        restriction_context, name, include_use=True
+                    )
+                    and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
+                ):
+                    raise RestrictedWorkflowAccessError(f"__builtins__.{name}")
+                return orig(*args, **kwargs)
+
+            for k in dir(builtins):
+                if not k.startswith("_") and (
+                    k in builtin_matcher.access
+                    or k in builtin_matcher.use
+                    or k in builtin_matcher.children
+                ):
+                    self.restricted_builtins.append(
+                        (
+                            k,
+                            _get_thread_local_builtin(k),
+                            functools.partial(
+                                restrict_built_in, k, getattr(builtins, k)
+                            ),
+                        )
+                    )
+
     @contextmanager
     def applied(self) -> Iterator[None]:
         """Context manager to apply this restrictive import.
@@ -61,54 +113,18 @@ class Importer:
             while it is running and therefore should be locked against other
             code running at the same time.
         """
-        # Error if already applied
-        if sys.modules is self.new_modules:
-            raise RuntimeError("Sandbox importer already applied")
-
-        # Set our modules, then unset on complete
-        sys.modules = self.new_modules
-        builtins.__import__ = self.import_func
-        try:
-            # The first time this is done, we need to manually import a few
-            # implied modules
-            if "sys" not in self.new_modules:
-                # Refresh sys
-                self.new_modules["sys"] = importlib.__import__("sys")
-                # Import builtins and replace import
-                self.new_modules["builtins"] = importlib.__import__("builtins")
-                self.new_modules["builtins"].__import__ = self.import_func  # type: ignore
-
-                # Create a blank __main__ to help with anyone trying to
-                # "import __main__" to not accidentally get the real main
-                self.new_modules["__main__"] = types.ModuleType("__main__")
-                # Reset sys modules again
-                sys.modules = self.new_modules
-
-            # Restrict builtins
-            self.env.restrict_builtins()
-
-            yield None
-        finally:
-            sys.modules = self.orig_modules
-            builtins.__import__ = self.orig_import
-            self.env.unrestrict_builtins()
+        with _thread_local_sys_modules.applied(sys, "modules", self.new_modules):
+            with _thread_local_import.applied(builtins, "__import__", self.import_func):
+                with self._builtins_restricted():
+                    yield None
 
     @contextmanager
     def _unapplied(self) -> Iterator[None]:
-        # Error if already unapplied
-        if sys.modules is not self.new_modules:
-            raise RuntimeError("Sandbox importer already unapplied")
-
         # Set orig modules, then unset on complete
-        sys.modules = self.orig_modules
-        builtins.__import__ = self.orig_import
-        self.env.unrestrict_builtins()
-        try:
-            yield None
-        finally:
-            sys.modules = self.new_modules
-            builtins.__import__ = self.import_func
-            self.env.restrict_builtins()
+        with _thread_local_sys_modules.unapplied():
+            with _thread_local_import.unapplied():
+                with self._builtins_unrestricted():
+                    yield None
 
     def _traced_import(
         self,
@@ -137,11 +153,10 @@ class Importer:
         # Check module restrictions and passthrough modules
         if name not in sys.modules:
             # Make sure not an entirely invalid module
-            self.env.assert_valid_module(name)
+            self._assert_valid_module(name)
 
             # Check if passthrough
-            with self._unapplied():
-                passthrough_mod = self.env.maybe_passthrough_module(name)
+            passthrough_mod = self._maybe_passthrough_module(name)
             if passthrough_mod:
                 # Load all parents. Usually Python does this for us, but not on
                 # passthrough.
@@ -165,105 +180,38 @@ class Importer:
         # Check for restrictions if necessary and apply
         if mod.__name__ not in self.modules_checked_for_restrictions:
             self.modules_checked_for_restrictions.add(mod.__name__)
-            restricted_mod = self.env.maybe_restrict_module(mod)
+            restricted_mod = self._maybe_restrict_module(mod)
             if restricted_mod:
                 sys.modules[mod.__name__] = restricted_mod
                 mod = restricted_mod
 
         return mod
 
-
-class _Environment(Protocol):
-    def assert_valid_module(self, name: str) -> None:
-        ...
-
-    def maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
-        ...
-
-    def maybe_restrict_module(
-        self, mod: types.ModuleType
-    ) -> Optional[types.ModuleType]:
-        ...
-
-    def restrict_builtins(self) -> None:
-        ...
-
-    def unrestrict_builtins(self) -> None:
-        ...
-
-
-class RestrictedEnvironment:
-    """Implementation of importer environment for restrictions."""
-
-    def __init__(
-        self, restrictions: SandboxRestrictions, context: RestrictionContext
-    ) -> None:
-        """Create restricted environment."""
-        self.restrictions = restrictions
-        self.context = context
-
-        # Pre-build restricted builtins as tuple of applied and unapplied.
-        # Python doesn't allow us to wrap the builtins dictionary with our own
-        # __getitem__ type (low-level C assertion is performed to confirm it is
-        # a dict), so we instead choose to walk the builtins children and
-        # specifically set them as not callable.
-        self.restricted_builtins: Dict[str, Tuple[Any, Any]] = {}
-        builtin_matcher = restrictions.invalid_module_members.child_matcher(
-            "__builtins__"
-        )
-        if builtin_matcher:
-
-            def restrict_built_in(name: str, orig: Any, *args, **kwargs):
-                # Check if restricted against matcher
-                if (
-                    builtin_matcher
-                    and builtin_matcher.match_access(context, name, include_use=True)
-                    and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
-                ):
-                    raise RestrictedWorkflowAccessError(f"__builtins__.{name}")
-                return orig(*args, **kwargs)
-
-            assert isinstance(__builtins__, dict)
-            # Only apply to functions that are anywhere in access, use, or
-            # children
-            for k, v in __builtins__.items():
-                if (
-                    k in builtin_matcher.access
-                    or k in builtin_matcher.use
-                    or k in builtin_matcher.children
-                ):
-                    _trace("Restricting builtin %s", k)
-                    self.restricted_builtins[k] = (
-                        functools.partial(restrict_built_in, k, v),
-                        v,
-                    )
-
-    def assert_valid_module(self, name: str) -> None:
-        """Implements :py:meth:`_Environment.assert_valid_module`."""
+    def _assert_valid_module(self, name: str) -> None:
         if (
             self.restrictions.invalid_modules.match_access(
-                self.context, *name.split(".")
+                self.restriction_context, *name.split(".")
             )
             and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
         ):
             raise RestrictedWorkflowAccessError(name)
 
-    def maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
-        """Implements :py:meth:`_Environment.maybe_passthrough_module`."""
+    def _maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
         if not self.restrictions.passthrough_modules.match_access(
-            self.context, *name.split(".")
+            self.restriction_context, *name.split(".")
         ):
             return None
-        _trace("Passing module %s through from host", name)
-        global _trace_depth
-        _trace_depth += 1
-        # Use our import outside of the sandbox
-        try:
-            return importlib.import_module(name)
-        finally:
-            _trace_depth -= 1
+        with self._unapplied():
+            _trace("Passing module %s through from host", name)
+            global _trace_depth
+            _trace_depth += 1
+            # Use our import outside of the sandbox
+            try:
+                return importlib.import_module(name)
+            finally:
+                _trace_depth -= 1
 
-    def maybe_restrict_module(
+    def _maybe_restrict_module(
         self, mod: types.ModuleType
     ) -> Optional[types.ModuleType]:
         """Implements :py:meth:`_Environment.maybe_restrict_module`."""
@@ -274,14 +222,126 @@ class RestrictedEnvironment:
             # No restrictions
             return None
         _trace("Restricting module %s during import", mod.__name__)
-        return RestrictedModule(mod, self.context, matcher)
+        return RestrictedModule(mod, self.restriction_context, matcher)
 
-    def restrict_builtins(self) -> None:
-        """Implements :py:meth:`_Environment.restrict_builtins`."""
-        for k, v in self.restricted_builtins.items():
-            setattr(builtins, k, v[0])
+    @contextmanager
+    def _builtins_restricted(self) -> Iterator[None]:
+        if not self.restricted_builtins:
+            yield None
+            return
+        with ExitStack() as stack:
+            for name, thread_local, restrict_fn in self.restricted_builtins:
+                _trace("Restricting builtin %s", name)
+                stack.enter_context(thread_local.applied(builtins, name, restrict_fn))
+            yield None
 
-    def unrestrict_builtins(self) -> None:
-        """Implements :py:meth:`_Environment.unrestrict_builtins`."""
-        for k, v in self.restricted_builtins.items():
-            setattr(builtins, k, v[1])
+    @contextmanager
+    def _builtins_unrestricted(self) -> Iterator[None]:
+        if not self.restricted_builtins:
+            yield None
+            return
+        with ExitStack() as stack:
+            for _, thread_local, _ in self.restricted_builtins:
+                stack.enter_context(thread_local.unapplied())
+            yield None
+
+
+_T = TypeVar("_T")
+
+
+class _ThreadLocalOverride(Generic[_T]):
+    def __init__(self, orig: _T) -> None:
+        self.orig = orig
+        self.thread_local = threading.local()
+
+    @property
+    def maybe_current(self) -> Optional[_T]:
+        return self.thread_local.__dict__.get("data")
+
+    @property
+    def current(self) -> _T:
+        return self.thread_local.__dict__.get("data", self.orig)
+
+    @current.setter
+    def current(self, v: _T) -> None:
+        self.thread_local.data = v
+
+    @current.deleter
+    def current(self) -> None:
+        self.thread_local.__dict__.pop("data", None)
+
+    @contextmanager
+    def applied(self, obj: Any, attr: str, current: _T) -> Iterator[None]:
+        # Function carefully crafted to support nesting and situations where
+        # other threads may have already set this on obj
+        orig_current = self.maybe_current
+        self.current = current
+        orig_value = getattr(obj, attr)
+        if orig_value is not self:
+            setattr(obj, attr, self)
+        try:
+            yield None
+        finally:
+            if orig_current is None:
+                del self.current
+            else:
+                self.current = orig_current
+            setattr(obj, attr, orig_value)
+
+    @contextmanager
+    def unapplied(self) -> Iterator[None]:
+        # Function carefully crafted to support nesting
+        orig_current = self.maybe_current
+        if orig_current is not None:
+            del self.current
+        try:
+            yield None
+        finally:
+            if orig_current is not None:
+                self.current = orig_current
+
+
+class _ThreadLocalSysModules(
+    _ThreadLocalOverride[MutableMapping[str, types.ModuleType]],
+    MutableMapping[str, types.ModuleType],
+):
+    def __contains__(self, key: object) -> bool:
+        return key in self.current
+
+    def __delitem__(self, key: str) -> None:
+        del self.current[key]
+
+    def __getitem__(self, key: str) -> types.ModuleType:
+        return self.current[key]
+
+    def __len__(self) -> int:
+        return len(self.current)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.current)
+
+    def __setitem__(self, key: str, value: types.ModuleType) -> None:
+        self.current[key] = value
+
+
+_thread_local_sys_modules = _ThreadLocalSysModules(sys.modules)
+
+_P = ParamSpec("_P")
+
+
+class _ThreadLocalCallable(_ThreadLocalOverride[Callable[_P, _T]]):  # type: ignore
+    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _T:
+        return self.current(*args, **kwargs)
+
+
+_thread_local_import = _ThreadLocalCallable(builtins.__import__)
+
+_thread_local_builtins: Dict[str, _ThreadLocalCallable] = {}
+
+
+def _get_thread_local_builtin(name: str) -> _ThreadLocalCallable:
+    ret = _thread_local_builtins.get(name)
+    if not ret:
+        ret = _ThreadLocalCallable(getattr(builtins, name))
+        _thread_local_builtins[name] = ret
+    return ret

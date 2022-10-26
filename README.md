@@ -589,7 +589,7 @@ By default workflows are run in a sandbox to help avoid non-deterministic code. 
 non-deterministic is performed, an exception will be thrown in the workflow which will "fail the task" which means the
 workflow will not progress until fixed.
 
-The sandbox is not foolproof and non-deterministic can still occur. It is simply a best-effort way to catch bad code
+The sandbox is not foolproof and non-determinism can still occur. It is simply a best-effort way to catch bad code
 early. Users are encouraged to define their workflows in files with no other side effects.
 
 ##### How the Sandbox Works
@@ -653,12 +653,12 @@ my_restrictions = dataclasses.replace(
 my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
 ```
 
-If an "access" match succeeds for an import, it will simpl;y be forwarded from outside of the sandbox. See the API for
+If an "access" match succeeds for an import, it will simply be forwarded from outside of the sandbox. See the API for
 more details on exact fields and their meaning.
 
 ###### Invalid Module Members
 
-`SandboxRestrictions.invalid_module_members` contains a root matcher that applies to all module members. This is already
+`SandboxRestrictions.invalid_module_members` contains a root matcher that applies to all module members. This already
 has a default set which includes things like `datetime.date.today()` which should never be called from a workflow. To
 remove this restriction:
 
@@ -693,17 +693,16 @@ Below are known sandbox issues. As the sandbox is developed and matures, some ma
 
 ###### Global Import/Builtins
 
-Currently the sandbox still references/alters the global `sys.modules` and `builtins.__import__` fields while running
-workflow code. In order to prevent affecting other sandboxed code a global lock is used to ensure other threads aren't
-yielded to during sandbox run. Effort is ongoing to remove this global side effect and make `sys` and `builtins` truly
-isolated, but in the meantime know that this can affect other imports occurring in the system. Users are encouraged to
-not define workflows in Python applications with many other moving parts if possible, and to always test.
+Currently the sandbox references/alters the global `sys.modules` and `builtins` fields while running workflow code. In
+order to prevent affecting other sandboxed code, thread locals are leveraged to only intercept these values during the
+workflow thread running. Therefore, technically if top-level import code starts a thread, it may lose sandbox
+protection.
 
 ###### Sandbox is not Secure
 
-The sandbox is built to catch many non-determinisms and state sharing issues, but it is not secure. Some known bad calls
-are intercepted, but for performance reasons, every single attribute get/set cannot be checked. Therefore a simple call
-like `setattr(temporalio.common, "__my_key", "my value")` will leak across sandbox runs.
+The sandbox is built to catch many non-deterministic and state sharing issues, but it is not secure. Some known bad
+calls are intercepted, but for performance reasons, every single attribute get/set cannot be checked. Therefore a simple
+call like `setattr(temporalio.common, "__my_key", "my value")` will leak across sandbox runs.
 
 The sandbox is only a helper, it does not provide full protection.
 

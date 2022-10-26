@@ -138,9 +138,6 @@ class SandboxMatcher:
             ret = SandboxMatcher(children={key: ret})
         return ret
 
-    # TODO(cretz): Document that we intentionally use this form instead of a
-    # more flexible/abstract matching tree form for optimization reasons
-
     access: Set[str] = frozenset()  # type: ignore
     """Immutable set of names to match access.
     
@@ -425,7 +422,6 @@ def _public_callables(parent: Any, *, exclude: Set[str] = set()) -> Set[str]:
     return ret
 
 
-# TODO(cretz): Should I make this more declarative in an external file?
 SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
     children={
         "__builtins__": SandboxMatcher(
