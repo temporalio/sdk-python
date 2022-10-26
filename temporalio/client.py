@@ -141,7 +141,6 @@ class Client:
 
         See :py:meth:`connect` for details on the parameters.
         """
-        self._type_lookup = temporalio.converter._FunctionTypeLookup()
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
         for interceptor in reversed(list(interceptors)):
@@ -359,7 +358,7 @@ class Client:
         elif callable(workflow):
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
             name = defn.name
-            _, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
+            ret_type = defn.ret_type
         else:
             raise TypeError("Workflow must be a string or callable")
 
@@ -589,12 +588,11 @@ class Client:
             The workflow handle.
         """
         defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
-        _, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
         return self.get_workflow_handle(
             workflow_id,
             run_id=run_id,
             first_execution_run_id=first_execution_run_id,
-            result_type=ret_type,
+            result_type=defn.ret_type,
         )
 
     @overload
@@ -1053,7 +1051,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 raise RuntimeError("Cannot invoke dynamic query definition")
             # TODO(cretz): Check count/type of args at runtime?
             query_name = defn.name
-            _, ret_type = self._client._type_lookup.get_type_hints(defn.fn)
+            ret_type = defn.ret_type
         else:
             query_name = str(query)
 

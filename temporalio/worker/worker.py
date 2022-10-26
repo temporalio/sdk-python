@@ -171,10 +171,6 @@ class Worker:
         )
         interceptors = interceptors_from_client + list(interceptors)
 
-        # Instead of using the _type_lookup on the client, we create a separate
-        # one here so we can continue to only use the public API of the client
-        type_lookup = temporalio.converter._FunctionTypeLookup()
-
         # Extract the bridge service client. We try the service on the client
         # first, then we support a worker_service_client on the client's service
         # to return underlying service client we can use.
@@ -235,7 +231,6 @@ class Worker:
                 shared_state_manager=shared_state_manager,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
-                type_lookup=type_lookup,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:

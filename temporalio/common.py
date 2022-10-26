@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
+import inspect
+import types
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum
-from typing import Any, List, Mapping, Optional, Sequence, Text, Union
+from typing import (
+    Any,
+    Callable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Text,
+    Tuple,
+    Type,
+    Union,
+    get_type_hints,
+)
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
@@ -160,3 +174,77 @@ def _apply_headers(
     for k, v in source.items():
         # This does not copy bytes, just messages
         dest[k].CopyFrom(v)
+
+
+# Same as inspect._NonUserDefinedCallables
+_non_user_defined_callables = (
+    type(type.__call__),
+    type(all.__call__),  # type: ignore
+    type(int.__dict__["from_bytes"]),
+    types.BuiltinFunctionType,
+)
+
+
+def _type_hints_from_func(
+    func: Callable,
+) -> Tuple[Optional[List[Type]], Optional[Type]]:
+    """Extracts the type hints from the function.
+
+    Args:
+        func: Function to extract hints from.
+
+    Returns:
+        Tuple containing parameter types and return type. The parameter types
+        will be None if there are any non-positional parameters or if any of the
+        parameters to not have an annotation that represents a class. If the
+        first parameter is "self" with no attribute, it is not included.
+    """
+    # If this is a class instance with user-defined __call__, then use that as
+    # the func. This mimics inspect logic inside Python.
+    if (
+        not inspect.isfunction(func)
+        and not isinstance(func, _non_user_defined_callables)
+        and not isinstance(func, types.MethodType)
+    ):
+        # Class type or Callable instance
+        tmp_func = func if isinstance(func, type) else type(func)
+        call_func = getattr(tmp_func, "__call__", None)
+        if call_func is not None and not isinstance(
+            tmp_func, _non_user_defined_callables
+        ):
+            func = call_func
+
+    # We use inspect.signature for the parameter names and kinds, but we cannot
+    # use it for annotations because those that are using deferred hinting (i.e.
+    # from __future__ import annotations) only work with the eval_str parameter
+    # which is only supported in >= 3.10. But typing.get_type_hints is supported
+    # in >= 3.7.
+    sig = inspect.signature(func)
+    hints = get_type_hints(func)
+    ret_hint = hints.get("return")
+    ret = (
+        ret_hint
+        if inspect.isclass(ret_hint) and ret_hint is not inspect.Signature.empty
+        else None
+    )
+    args: List[Type] = []
+    for index, value in enumerate(sig.parameters.values()):
+        # Ignore self on methods
+        if (
+            index == 0
+            and value.name == "self"
+            and value.annotation is inspect.Parameter.empty
+        ):
+            continue
+        # Stop if non-positional or not a class
+        if (
+            value.kind is not inspect.Parameter.POSITIONAL_ONLY
+            and value.kind is not inspect.Parameter.POSITIONAL_OR_KEYWORD
+        ):
+            return (None, ret)
+        # All params must have annotations or we consider none to have them
+        arg_hint = hints.get(value.name)
+        if not inspect.isclass(arg_hint) or arg_hint is inspect.Parameter.empty:
+            return (None, ret)
+        args.append(arg_hint)
+    return args, ret

@@ -59,23 +59,31 @@ def test_workflow_defn_good():
         cls=GoodDefn,
         run_fn=GoodDefn.run,
         signals={
-            "signal1": workflow._SignalDefinition(name="signal1", fn=GoodDefn.signal1),
-            "signal-custom": workflow._SignalDefinition(
-                name="signal-custom", fn=GoodDefn.signal2
+            "signal1": workflow._SignalDefinition(
+                name="signal1", fn=GoodDefn.signal1, is_method=True
             ),
-            None: workflow._SignalDefinition(name=None, fn=GoodDefn.signal3),
+            "signal-custom": workflow._SignalDefinition(
+                name="signal-custom", fn=GoodDefn.signal2, is_method=True
+            ),
+            None: workflow._SignalDefinition(
+                name=None, fn=GoodDefn.signal3, is_method=True
+            ),
             "base_signal": workflow._SignalDefinition(
-                name="base_signal", fn=GoodDefnBase.base_signal
+                name="base_signal", fn=GoodDefnBase.base_signal, is_method=True
             ),
         },
         queries={
-            "query1": workflow._QueryDefinition(name="query1", fn=GoodDefn.query1),
-            "query-custom": workflow._QueryDefinition(
-                name="query-custom", fn=GoodDefn.query2
+            "query1": workflow._QueryDefinition(
+                name="query1", fn=GoodDefn.query1, is_method=True
             ),
-            None: workflow._QueryDefinition(name=None, fn=GoodDefn.query3),
+            "query-custom": workflow._QueryDefinition(
+                name="query-custom", fn=GoodDefn.query2, is_method=True
+            ),
+            None: workflow._QueryDefinition(
+                name=None, fn=GoodDefn.query3, is_method=True
+            ),
             "base_query": workflow._QueryDefinition(
-                name="base_query", fn=GoodDefnBase.base_query
+                name="base_query", fn=GoodDefnBase.base_query, is_method=True
             ),
         },
     )

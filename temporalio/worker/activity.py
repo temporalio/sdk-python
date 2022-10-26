@@ -54,7 +54,6 @@ class _ActivityWorker:
         shared_state_manager: Optional[SharedStateManager],
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
-        type_lookup: temporalio.converter._FunctionTypeLookup,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
@@ -63,7 +62,6 @@ class _ActivityWorker:
         self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._data_converter = data_converter
         self._interceptors = interceptors
-        self._type_lookup = type_lookup
         # Lazily created on first activity
         self._worker_shutdown_event: Optional[
             temporalio.activity._CompositeEvent
@@ -303,7 +301,7 @@ class _ActivityWorker:
 
             # Convert arguments. We only use arg type hints if they match the
             # input count.
-            arg_types, _ = self._type_lookup.get_type_hints(activity_def.fn)
+            arg_types = activity_def.arg_types
             if arg_types is not None and len(arg_types) != len(start.input):
                 arg_types = None
             try:
