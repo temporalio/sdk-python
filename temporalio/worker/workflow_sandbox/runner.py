@@ -33,8 +33,6 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         self,
         *,
         restrictions: SandboxRestrictions = SandboxRestrictions.default,
-        # TODO(cretz): Document that this is re-imported and instantiated for
-        # _each_ workflow run.
         runner_class: Type[WorkflowRunner] = UnsandboxedWorkflowRunner,
     ) -> None:
         """Create the sandboxed workflow runner.
@@ -102,7 +100,6 @@ class _Instance(WorkflowInstance):
 
         # Create the instance
         self.globals_and_locals = {
-            # "__builtins__": __builtins__.copy(),  # type: ignore
             "__file__": "workflow_sandbox.py",
         }
         self._create_instance()

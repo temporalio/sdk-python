@@ -94,13 +94,12 @@ class Importer:
                     or k in builtin_matcher.use
                     or k in builtin_matcher.children
                 ):
+                    thread_local = _get_thread_local_builtin(k)
                     self.restricted_builtins.append(
                         (
                             k,
-                            _get_thread_local_builtin(k),
-                            functools.partial(
-                                restrict_built_in, k, getattr(builtins, k)
-                            ),
+                            thread_local,
+                            functools.partial(restrict_built_in, k, thread_local.orig),
                         )
                     )
 
@@ -275,18 +274,18 @@ class _ThreadLocalOverride(Generic[_T]):
         # Function carefully crafted to support nesting and situations where
         # other threads may have already set this on obj
         orig_current = self.maybe_current
-        self.current = current
         orig_value = getattr(obj, attr)
         if orig_value is not self:
             setattr(obj, attr, self)
+        self.current = current
         try:
             yield None
         finally:
+            setattr(obj, attr, orig_value)
             if orig_current is None:
                 del self.current
             else:
                 self.current = orig_current
-            setattr(obj, attr, orig_value)
 
     @contextmanager
     def unapplied(self) -> Iterator[None]:
