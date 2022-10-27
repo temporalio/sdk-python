@@ -2381,6 +2381,61 @@ async def test_workflow_query_does_not_run_condition(client: Client):
         assert await handle.query(QueryAffectConditionWorkflow.check_condition)
 
 
+@workflow.defn
+class CancelSignalAndTimerFiredInSameTaskWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Start a 1 hour timer
+        self.timer_task = asyncio.create_task(asyncio.sleep(60 * 60))
+        # Wait on it
+        try:
+            await self.timer_task
+            assert False
+        except asyncio.CancelledError:
+            pass
+
+    @workflow.signal
+    def cancel_timer(self) -> None:
+        self.timer_task.cancel()
+
+
+async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
+    client: Client, env: WorkflowEnvironment
+):
+    # This test only works when we support time skipping
+    if not env.supports_time_skipping:
+        pytest.skip("Need to skip time to validate this test")
+
+    # Start worker for 30 mins
+    async with new_worker(
+        client, CancelSignalAndTimerFiredInSameTaskWorkflow
+    ) as worker:
+        task_queue = worker.task_queue
+        handle = await client.start_workflow(
+            CancelSignalAndTimerFiredInSameTaskWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        # Wait 30 mins so the worker is waiting on timer
+        await env.sleep(30 * 60)
+
+    # Listen to handler result in background so the auto-skipping works
+    result_task = asyncio.create_task(handle.result())
+
+    # Now that worker is stopped, send a signal and wait another hour to pass
+    # the timer
+    await handle.signal(CancelSignalAndTimerFiredInSameTaskWorkflow.cancel_timer)
+    await env.sleep(60 * 60)
+
+    # Start worker again and wait for workflow completion
+    async with new_worker(
+        client, CancelSignalAndTimerFiredInSameTaskWorkflow, task_queue=task_queue
+    ):
+        # This used to not complete because a signal cancelling the timer was
+        # not respected by the timer fire
+        await result_task
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
