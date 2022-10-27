@@ -252,6 +252,8 @@ class _ThreadLocalOverride(Generic[_T]):
     def __init__(self, orig: _T) -> None:
         self.orig = orig
         self.thread_local = threading.local()
+        self.applied_counter = 0
+        self.applied_counter_lock = threading.Lock()
 
     @property
     def maybe_current(self) -> Optional[_T]:
@@ -274,18 +276,29 @@ class _ThreadLocalOverride(Generic[_T]):
         # Function carefully crafted to support nesting and situations where
         # other threads may have already set this on obj
         orig_current = self.maybe_current
-        orig_value = getattr(obj, attr)
-        if orig_value is not self:
-            setattr(obj, attr, self)
+
+        # Replace the attribute if it is not ourself. We have to do this
+        # atomically so we know it is only done once and can increment the
+        # counter for undoing it.
+        with self.applied_counter_lock:
+            self.applied_counter += 1
+            if getattr(obj, attr) is not self:
+                setattr(obj, attr, self)
+
         self.current = current
         try:
             yield None
         finally:
-            setattr(obj, attr, orig_value)
             if orig_current is None:
                 del self.current
             else:
                 self.current = orig_current
+            # Set back the original value once once when this counter reaches
+            # 0. This ensures that it is only unset when all are done.
+            with self.applied_counter_lock:
+                self.applied_counter -= 1
+                if self.applied_counter == 0:
+                    setattr(obj, attr, self.orig)
 
     @contextmanager
     def unapplied(self) -> Iterator[None]:
