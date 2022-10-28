@@ -27,9 +27,9 @@ from temporalio.api.history.v1 import History
 from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.exceptions import ApplicationError
-from temporalio.worker import Replayer, Worker, WorkflowHistory
-from temporalio.worker.replayer import _history_from_json
+from temporalio.worker import Replayer, Worker
 from tests.worker.test_workflow import assert_eq_eventually
+from temporalio.client import WorkflowHistory
 
 
 @activity.defn
