@@ -1018,8 +1018,7 @@ The environment is now ready to develop in.
 
 #### Testing
 
-Tests currently require [Go](https://go.dev/) to be installed since they use an embedded Temporal server as a library.
-With `Go` installed, run the following to execute tests:
+To execute tests:
 
 ```bash
 poe test
