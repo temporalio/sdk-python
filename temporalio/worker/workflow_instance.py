@@ -380,10 +380,11 @@ class _WorkflowInstanceImpl(
     def _apply_fire_timer(
         self, job: temporalio.bridge.proto.workflow_activation.FireTimer
     ) -> None:
+        # We ignore an absent handler because it may have been cancelled and
+        # removed earlier this activation by a signal
         handle = self._pending_timers.pop(job.seq, None)
-        if not handle:
-            raise RuntimeError(f"Failed finding timer handle for sequence {job.seq}")
-        self._ready.append(handle)
+        if handle:
+            self._ready.append(handle)
 
     def _apply_query_workflow(
         self, job: temporalio.bridge.proto.workflow_activation.QueryWorkflow
