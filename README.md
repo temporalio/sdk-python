@@ -296,6 +296,8 @@ async def create_greeting_activity(info: GreetingInfo) -> str:
 
 Some things to note about the above code:
 
+* Workflows run in a sandbox by default. Users are encouraged to define workflows in files with no side effects or other
+  complicated code. See the [Workflow Sandbox](#workflow-sandbox) section for more details.
 * This workflow continually updates the queryable current greeting when signalled and can complete with the greeting on
   a different signal
 * Workflows are always classes and must have a single `@workflow.run` which is an `async def` function
@@ -580,6 +582,145 @@ method.
 
 Activities are just functions decorated with `@activity.defn`. Simply write different ones and pass those to the worker
 to have different activities called during the test.
+
+#### Workflow Sandbox
+
+By default workflows are run in a sandbox to help avoid non-deterministic code. If a call that is known to be
+non-deterministic is performed, an exception will be thrown in the workflow which will "fail the task" which means the
+workflow will not progress until fixed.
+
+The sandbox is not foolproof and non-determinism can still occur. It is simply a best-effort way to catch bad code
+early. Users are encouraged to define their workflows in files with no other side effects.
+
+##### How the Sandbox Works
+
+The sandbox is made up of two components that work closely together:
+
+* Global state isolation
+* Restrictions preventing known non-deterministic library calls
+
+Global state isolation is performed by using `exec`. Upon workflow start, the file that the workflow is defined in is
+imported into a new sandbox created for that workflow run. In order to keep the sandbox performant a known set of
+"passthrough modules" are passed through from outside of the sandbox when they are imported. These are expected to be
+side-effect free on import and have their non-deterministic aspects restricted. By default the entire Python standard
+library, `temporalio`, and a couple of other modules are passed through from outside of the sandbox. To update this
+list, see "Customizing the Sandbox".
+
+Restrictions preventing known non-deterministic library calls are achieved using proxy objects on modules wrapped around
+the custom importer set in the sandbox. Many restrictions apply at workflow import time and workflow run time, while
+some restrictions only apply at workflow run time. A default set of restrictions is included that prevents most
+dangerous standard library calls. However it is known in Python that some otherwise-non-deterministic invocations, like
+reading a file from disk via `open` or using `os.environ`, are done as part of importing modules. To customize what is
+and isn't restricted, see "Customizing the Sandbox".
+
+##### Avoiding the Sandbox
+
+There are three increasingly-scoped ways to avoid the sandbox. Users are discouraged from avoiding the sandbox if
+possible.
+
+To remove restrictions around a particular block of code, use `with temporalio.workflow.unsafe.sandbox_unrestricted():`.
+The workflow will still be running in the sandbox, but no restrictions for invalid library calls will be applied.
+
+To run an entire workflow outside of a sandbox, set `sandboxed=False` on the `@workflow.defn` decorator when defining
+it. This will run the entire workflow outside of the workflow which means it can share global state and other bad
+things.
+
+To disable the sandbox entirely for a worker, set the `Worker` init's `workflow_runner` keyword argument to 
+`temporalio.worker.UnsandboxedWorkflowRunner()`. This value is defaulted to
+`temporalio.worker.workflow_sandbox.SandboxedWorkflowRunner()` so by changing it to the unsandboxed runner, the sandbox
+will not be used at all.
+
+##### Customizing the Sandbox
+
+⚠️ WARNING: APIs in the `temporalio.worker.workflow_sandbox` module are not yet considered stable and may change in
+future releases.
+
+When creating the `Worker`, the `workflow_runner` is defaulted to
+`temporalio.worker.workflow_sandbox.SandboxedWorkflowRunner()`. The `SandboxedWorkflowRunner`'s init accepts a
+`restrictions` keyword argument that is defaulted to `SandboxRestrictions.default`. The `SandboxRestrictions` dataclass
+is immutable and contains three fields that can be customized, but only two have notable value
+
+###### Passthrough Modules
+
+To make the sandbox quicker when importing known third party libraries, they can be added to the
+`SandboxRestrictions.passthrough_modules` set like so:
+
+```python
+my_restrictions = dataclasses.replace(
+    SandboxRestrictions.default,
+    passthrough_modules=SandboxRestrictions.passthrough_modules_default | SandboxMatcher(access={"pydantic"}),
+)
+my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+```
+
+If an "access" match succeeds for an import, it will simply be forwarded from outside of the sandbox. See the API for
+more details on exact fields and their meaning.
+
+###### Invalid Module Members
+
+`SandboxRestrictions.invalid_module_members` contains a root matcher that applies to all module members. This already
+has a default set which includes things like `datetime.date.today()` which should never be called from a workflow. To
+remove this restriction:
+
+```python
+my_restrictions = dataclasses.replace(
+    SandboxRestrictions.default,
+    invalid_module_members=SandboxRestrictions.invalid_module_members_default.with_child_unrestricted(
+      "datetime", "date", "today",
+    ),
+)
+my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+```
+
+Restrictions can also be added by `|`'ing together matchers, for example to restrict the `datetime.date` class from
+being used altogether:
+
+```python
+my_restrictions = dataclasses.replace(
+    SandboxRestrictions.default,
+    invalid_module_members=SandboxRestrictions.invalid_module_members_default | SandboxMatcher(
+      children={"datetime": SandboxMatcher(use={"date"})},
+    ),
+)
+my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+```
+
+See the API for more details on exact fields and their meaning.
+
+##### Known Sandbox Issues
+
+Below are known sandbox issues. As the sandbox is developed and matures, some may be resolved.
+
+###### Global Import/Builtins
+
+Currently the sandbox references/alters the global `sys.modules` and `builtins` fields while running workflow code. In
+order to prevent affecting other sandboxed code, thread locals are leveraged to only intercept these values during the
+workflow thread running. Therefore, technically if top-level import code starts a thread, it may lose sandbox
+protection.
+
+###### Sandbox is not Secure
+
+The sandbox is built to catch many non-deterministic and state sharing issues, but it is not secure. Some known bad
+calls are intercepted, but for performance reasons, every single attribute get/set cannot be checked. Therefore a simple
+call like `setattr(temporalio.common, "__my_key", "my value")` will leak across sandbox runs.
+
+The sandbox is only a helper, it does not provide full protection.
+
+###### Sandbox Performance
+
+TODO: This is actively being measured; results to come soon
+
+###### Extending Restricted Classes
+
+Currently, extending classes marked as restricted causes an issue with their `__init__` parameters. This does not affect
+most users, but if there is a dependency that is, say, extending `zipfile.ZipFile` an error may occur and the module
+will have to be marked as pass through.
+
+###### is_subclass of ABC-based Restricted Classes
+
+Due to [https://bugs.python.org/issue44847](https://bugs.python.org/issue44847), classes that are wrapped and then
+checked to see if they are subclasses of another via `is_subclass` may fail (see also
+[this wrapt issue](https://github.com/GrahamDumpleton/wrapt/issues/130)).
 
 ### Activities
 
