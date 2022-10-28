@@ -186,7 +186,11 @@ def signal(
         if not name:
             _assert_dynamic_signature(fn)
         # TODO(cretz): Validate type attributes?
-        setattr(fn, "__temporal_signal_definition", _SignalDefinition(name=name, fn=fn))
+        setattr(
+            fn,
+            "__temporal_signal_definition",
+            _SignalDefinition(name=name, fn=fn, is_method=True),
+        )
         return fn
 
     if name is not None or dynamic:
@@ -244,7 +248,11 @@ def query(
         if not name:
             _assert_dynamic_signature(fn)
         # TODO(cretz): Validate type attributes?
-        setattr(fn, "__temporal_query_definition", _QueryDefinition(name=name, fn=fn))
+        setattr(
+            fn,
+            "__temporal_query_definition",
+            _QueryDefinition(name=name, fn=fn, is_method=True),
+        )
         return fn
 
     if name is not None or dynamic:
@@ -820,6 +828,9 @@ class _Definition:
     signals: Mapping[Optional[str], _SignalDefinition]
     queries: Mapping[Optional[str], _QueryDefinition]
     sandboxed: bool
+    # Types loaded on post init if both are None
+    arg_types: Optional[List[Type]] = None
+    ret_type: Optional[Type] = None
 
     @staticmethod
     def from_class(cls: Type) -> Optional[_Definition]:
@@ -962,12 +973,37 @@ class _Definition:
         setattr(cls, "__temporal_workflow_definition", defn)
         setattr(run_fn, "__temporal_workflow_definition", defn)
 
+    def __post_init__(self) -> None:
+        if self.arg_types is None and self.ret_type is None:
+            arg_types, ret_type = temporalio.common._type_hints_from_func(self.run_fn)
+            object.__setattr__(self, "arg_types", arg_types)
+            object.__setattr__(self, "ret_type", ret_type)
+
+
+# Async safe version of partial
+def _bind_method(obj: Any, fn: Callable[..., Any]) -> Callable[..., Any]:
+    # Curry instance on the definition function since that represents an
+    # unbound method
+    if inspect.iscoroutinefunction(fn):
+        # We cannot use functools.partial here because in <= 3.7 that isn't
+        # considered an inspect.iscoroutinefunction
+        fn = cast(Callable[..., Awaitable[Any]], fn)
+
+        async def with_object(*args, **kwargs) -> Any:
+            return await fn(obj, *args, **kwargs)
+
+        return with_object
+    return partial(fn, obj)
+
 
 @dataclass(frozen=True)
 class _SignalDefinition:
     # None if dynamic
     name: Optional[str]
     fn: Callable[..., Union[None, Awaitable[None]]]
+    is_method: bool
+    # Types loaded on post init if None
+    arg_types: Optional[List[Type]] = None
 
     @staticmethod
     def from_fn(fn: Callable) -> Optional[_SignalDefinition]:
@@ -988,16 +1024,37 @@ class _SignalDefinition:
             return defn.name
         return str(signal)
 
+    def __post_init__(self) -> None:
+        if self.arg_types is None:
+            arg_types, _ = temporalio.common._type_hints_from_func(self.fn)
+            object.__setattr__(self, "arg_types", arg_types)
+
+    def bind_fn(self, obj: Any) -> Callable[..., Any]:
+        return _bind_method(obj, self.fn)
+
 
 @dataclass(frozen=True)
 class _QueryDefinition:
     # None if dynamic
     name: Optional[str]
     fn: Callable[..., Any]
+    is_method: bool
+    # Types loaded on post init if both are None
+    arg_types: Optional[List[Type]] = None
+    ret_type: Optional[Type] = None
 
     @staticmethod
     def from_fn(fn: Callable) -> Optional[_QueryDefinition]:
         return getattr(fn, "__temporal_query_definition", None)
+
+    def __post_init__(self) -> None:
+        if self.arg_types is None and self.ret_type is None:
+            arg_types, ret_type = temporalio.common._type_hints_from_func(self.fn)
+            object.__setattr__(self, "arg_types", arg_types)
+            object.__setattr__(self, "ret_type", ret_type)
+
+    def bind_fn(self, obj: Any) -> Callable[..., Any]:
+        return _bind_method(obj, self.fn)
 
 
 # See https://mypy.readthedocs.io/en/latest/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime

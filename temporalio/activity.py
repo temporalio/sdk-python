@@ -21,12 +21,14 @@ from functools import partial
 from typing import (
     Any,
     Callable,
+    List,
     Mapping,
     MutableMapping,
     NoReturn,
     Optional,
     Sequence,
     Tuple,
+    Type,
     Union,
     overload,
 )
@@ -351,6 +353,9 @@ class _Definition:
     name: str
     fn: Callable
     is_async: bool
+    # Types loaded on post init if both are None
+    arg_types: Optional[List[Type]] = None
+    ret_type: Optional[Type] = None
 
     @staticmethod
     def from_callable(fn: Callable) -> Optional[_Definition]:
@@ -396,3 +401,9 @@ class _Definition:
                 is_async=inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
             ),
         )
+
+    def __post_init__(self) -> None:
+        if self.arg_types is None and self.ret_type is None:
+            arg_types, ret_type = temporalio.common._type_hints_from_func(self.fn)
+            object.__setattr__(self, "arg_types", arg_types)
+            object.__setattr__(self, "ret_type", ret_type)

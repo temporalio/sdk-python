@@ -13,7 +13,6 @@ import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from functools import partial
 from typing import (
     Any,
     Awaitable,
@@ -184,7 +183,6 @@ class _WorkflowInstanceImpl(
         self._curr_seqs: Dict[str, int] = {}
         # TODO(cretz): Any concerns about not sharing this? Maybe the types I
         # need to lookup should be done at definition time?
-        self._type_lookup = temporalio.converter._FunctionTypeLookup()
         self._exception_handler: Optional[_ExceptionHandler] = None
         # The actual instance, instantiated on first _run_once
         self._object: Any = None
@@ -203,19 +201,21 @@ class _WorkflowInstanceImpl(
 
         # We maintain signals and queries on this class since handlers can be
         # added during workflow execution
-        self._signals: Dict[
-            Optional[str], Union[temporalio.workflow._SignalDefinition, Callable]
-        ] = dict(self._defn.signals)
-        self._queries: Dict[
-            Optional[str], Union[temporalio.workflow._QueryDefinition, Callable]
-        ] = dict(self._defn.queries)
+        self._signals = dict(self._defn.signals)
+        self._queries = dict(self._defn.queries)
 
         # Add stack trace handler
         # TODO(cretz): Is it ok that this can be forcefully overridden by the
         # workflow author? They could technically override in interceptor
         # anyways. Putting here ensures it ends up in the query list on
         # query-not-found error.
-        self._queries["__stack_trace"] = self._stack_trace
+        self._queries["__stack_trace"] = temporalio.workflow._QueryDefinition(
+            name="__stack_trace",
+            fn=self._stack_trace,
+            is_method=False,
+            arg_types=[],
+            ret_type=str,
+        )
 
         # Maintain buffered signals for later-added dynamic handlers
         self._buffered_signals: Dict[str, List[HandleSignalInput]] = {}
@@ -417,10 +417,8 @@ class _WorkflowInstanceImpl(
         # for checking whether the query definition actually exists.
         arg_types: Optional[List[Type]] = None
         query_defn = self._queries.get(job.query_type)
-        if isinstance(query_defn, temporalio.workflow._QueryDefinition):
-            arg_types, _ = self._type_lookup.get_type_hints(query_defn.fn)
-        elif callable(query_defn):
-            arg_types, _ = self._type_lookup.get_type_hints(query_defn)
+        if query_defn:
+            arg_types = query_defn.arg_types
         args = self._convert_payloads(job.arguments, arg_types)
 
         # Schedule it
@@ -592,10 +590,8 @@ class _WorkflowInstanceImpl(
         # for checking whether the signal definition actually exists.
         arg_types: Optional[List[Type]] = None
         signal_defn = self._signals.get(job.signal_name)
-        if isinstance(signal_defn, temporalio.workflow._SignalDefinition):
-            arg_types, _ = self._type_lookup.get_type_hints(signal_defn.fn)
-        elif callable(signal_defn):
-            arg_types, _ = self._type_lookup.get_type_hints(signal_defn)
+        if signal_defn:
+            arg_types = signal_defn.arg_types
         input = HandleSignalInput(
             signal=job.signal_name,
             args=self._convert_payloads(job.input, arg_types),
@@ -629,12 +625,11 @@ class _WorkflowInstanceImpl(
             command.complete_workflow_execution.result.CopyFrom(result_payloads[0])
 
         # Schedule it
-        arg_types, _ = self._type_lookup.get_type_hints(self._defn.run_fn)
         input = ExecuteWorkflowInput(
             type=self._defn.cls,
             # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
             run_fn=cast(Callable[..., Awaitable[Any]], self._defn.run_fn),
-            args=self._convert_payloads(job.arguments, arg_types),
+            args=self._convert_payloads(job.arguments, self._defn.arg_types),
             headers=job.headers,
         )
         self._primary_task = self.create_task(
@@ -669,7 +664,7 @@ class _WorkflowInstanceImpl(
         elif callable(workflow):
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
             name = defn.name
-            arg_types, _ = self._type_lookup.get_type_hints(defn.run_fn)
+            arg_types = defn.arg_types
         elif workflow is not None:
             raise TypeError("Workflow must be None, a string, or callable")
 
@@ -703,39 +698,17 @@ class _WorkflowInstanceImpl(
 
     def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
         defn = self._queries.get(name)
-        if not defn or callable(defn):
-            # TODO(cretz): Why can't MyPy infer this?
-            return cast(Optional[Callable], defn)
-        # Curry instance on the definition function since that represents an
-        # unbound method
-        if inspect.iscoroutinefunction(defn.fn):
-            # We cannot use functools.partial here because in <= 3.7 that isn't
-            # considered an inspect.iscoroutinefunction
-            fn = cast(Callable[..., Awaitable[Any]], defn.fn)
-
-            async def with_object(*args, **kwargs) -> Any:
-                return await fn(self._object, *args, **kwargs)
-
-            return with_object
-        return partial(defn.fn, self._object)
+        if not defn:
+            return None
+        # Bind if a method
+        return defn.bind_fn(self._object) if defn.is_method else defn.fn
 
     def workflow_get_signal_handler(self, name: Optional[str]) -> Optional[Callable]:
         defn = self._signals.get(name)
-        if not defn or callable(defn):
-            # TODO(cretz): Why can't MyPy infer this?
-            return cast(Optional[Callable], defn)
-        # Curry instance on the definition function since that represents an
-        # unbound method
-        if inspect.iscoroutinefunction(defn.fn):
-            # We cannot use functools.partial here because in <= 3.7 that isn't
-            # considered an inspect.iscoroutinefunction
-            fn = cast(Callable[..., Awaitable[Any]], defn.fn)
-
-            async def with_object(*args, **kwargs) -> Any:
-                return await fn(self._object, *args, **kwargs)
-
-            return with_object
-        return partial(defn.fn, self._object)
+        if not defn:
+            return None
+        # Bind if a method
+        return defn.bind_fn(self._object) if defn.is_method else defn.fn
 
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
@@ -780,7 +753,9 @@ class _WorkflowInstanceImpl(
         self, name: Optional[str], handler: Optional[Callable]
     ) -> None:
         if handler:
-            self._queries[name] = handler
+            self._queries[name] = temporalio.workflow._QueryDefinition(
+                name=name, fn=handler, is_method=False
+            )
         else:
             self._queries.pop(name, None)
 
@@ -788,7 +763,9 @@ class _WorkflowInstanceImpl(
         self, name: Optional[str], handler: Optional[Callable]
     ) -> None:
         if handler:
-            self._signals[name] = handler
+            self._signals[name] = temporalio.workflow._SignalDefinition(
+                name=name, fn=handler, is_method=False
+            )
             # We have to send buffered signals to the handler if they apply
             if name:
                 for input in self._buffered_signals.pop(name, []):
@@ -833,7 +810,8 @@ class _WorkflowInstanceImpl(
         elif callable(activity):
             defn = temporalio.activity._Definition.must_from_callable(activity)
             name = defn.name
-            arg_types, ret_type = self._type_lookup.get_type_hints(activity)
+            arg_types = defn.arg_types
+            ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
 
@@ -882,7 +860,8 @@ class _WorkflowInstanceImpl(
         elif callable(workflow):
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
             name = defn.name
-            arg_types, ret_type = self._type_lookup.get_type_hints(defn.run_fn)
+            arg_types = defn.arg_types
+            ret_type = defn.ret_type
         else:
             raise TypeError("Workflow must be a string or callable")
 
@@ -930,7 +909,8 @@ class _WorkflowInstanceImpl(
         elif callable(activity):
             defn = temporalio.activity._Definition.must_from_callable(activity)
             name = defn.name
-            arg_types, ret_type = self._type_lookup.get_type_hints(activity)
+            arg_types = defn.arg_types
+            ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
 
