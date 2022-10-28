@@ -7,10 +7,7 @@ import pytest
 import temporalio.api.enums.v1
 import temporalio.common
 import temporalio.exceptions
-from temporalio.api.workflowservice.v1 import (
-    DescribeNamespaceRequest,
-    GetSystemInfoRequest,
-)
+from temporalio.api.workflowservice.v1 import GetSystemInfoRequest
 from temporalio.client import (
     CancelWorkflowInput,
     Client,
@@ -29,7 +26,6 @@ from temporalio.client import (
     WorkflowQueryRejectedError,
 )
 from temporalio.testing import WorkflowEnvironment
-from tests.helpers.golang import ExternalGolangServer
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -401,15 +397,6 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
     assert interceptor.traces[3][1].id == handle.id
     assert interceptor.traces[4][0] == "terminate_workflow"
     assert interceptor.traces[4][1].id == handle.id
-
-
-# TODO(cretz): Support TLS on Temporalite test server
-async def test_tls_config(golang_server: ExternalGolangServer):
-    tls_client = await golang_server.new_tls_client()
-    resp = await tls_client.workflow_service.describe_namespace(
-        DescribeNamespaceRequest(namespace=tls_client.namespace)
-    )
-    assert resp.namespace_info.name == tls_client.namespace
 
 
 async def test_lazy_client(client: Client, env: WorkflowEnvironment):

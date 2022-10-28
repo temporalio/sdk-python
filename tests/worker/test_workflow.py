@@ -34,10 +34,7 @@ from typing_extensions import Protocol, runtime_checkable
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType, IndexedValueType
-from temporalio.api.operatorservice.v1 import (
-    AddSearchAttributesRequest,
-    ListSearchAttributesRequest,
-)
+from temporalio.api.operatorservice.v1 import AddSearchAttributesRequest
 from temporalio.api.workflowservice.v1 import (
     GetSearchAttributesRequest,
     GetWorkflowExecutionHistoryRequest,
@@ -70,7 +67,7 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from tests.helpers.golang import ExternalGolangServer
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
 @workflow.defn
@@ -1222,13 +1219,14 @@ class CustomWorkflowRunner(WorkflowRunner):
         self._unsandboxed = UnsandboxedWorkflowRunner()
         self._pairs: List[Tuple[WorkflowActivation, WorkflowActivationCompletion]] = []
 
-    async def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
+    def prepare_workflow(self, defn: workflow._Definition) -> None:
+        pass
+
+    def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         # We need to assert details can be pickled for potential sandbox use
         det_pickled = pickle.loads(pickle.dumps(det))
         assert det == det_pickled
-        return CustomWorkflowInstance(
-            self, await self._unsandboxed.create_instance(det)
-        )
+        return CustomWorkflowInstance(self, self._unsandboxed.create_instance(det))
 
 
 class CustomWorkflowInstance(WorkflowInstance):
@@ -1315,7 +1313,7 @@ sa_prefix = "python_test_"
 def search_attrs_to_dict_with_type(attrs: SearchAttributes) -> Mapping[str, Any]:
     return {
         k: {
-            "type": type(vals[0]).__name__ if vals else "<unknown>",
+            "type": vals[0].__class__.__name__ if vals else "<unknown>",
             "values": [str(v) if isinstance(v, datetime) else v for v in vals],
         }
         for k, vals in attrs.items()
@@ -1351,8 +1349,9 @@ class SearchAttributeWorkflow:
         )
 
 
-async def test_workflow_search_attributes(golang_server: ExternalGolangServer):
-    client = await golang_server.new_client()
+async def test_workflow_search_attributes(client: Client, env_type: str):
+    if env_type != "local":
+        pytest.skip("Only testing search attributes on local which disables cache")
 
     async def search_attributes_present() -> bool:
         resp = await client.workflow_service.get_search_attributes(
@@ -1373,11 +1372,6 @@ async def test_workflow_search_attributes(golang_server: ExternalGolangServer):
                     f"{sa_prefix}datetime": IndexedValueType.INDEXED_VALUE_TYPE_DATETIME,
                 },
             ),
-        )
-        # TODO(cretz): Why is it required to issue this list call before it will
-        # appear in the other RPC list call?
-        await client.operator_service.list_search_attributes(
-            ListSearchAttributesRequest()
         )
     # Confirm now present
     assert await search_attributes_present()
@@ -1440,6 +1434,9 @@ async def test_workflow_search_attributes(golang_server: ExternalGolangServer):
         attrs = {
             k: v for k, v in desc.search_attributes.items() if k.startswith(sa_prefix)
         }
+        # Check against expected, but remove double from expected since it is
+        # no longer present
+        del expected[f"{sa_prefix}double"]
         assert expected == search_attrs_to_dict_with_type(attrs)
 
 
@@ -1936,7 +1933,9 @@ async def test_workflow_local_activity_backoff(client: Client):
 deadlock_thread_event = threading.Event()
 
 
-@workflow.defn
+# We cannot sandbox this because we are intentionally non-deterministic when we
+# set the global threading event
+@workflow.defn(sandboxed=False)
 class DeadlockedWorkflow:
     @workflow.run
     async def run(self) -> None:
@@ -2381,12 +2380,72 @@ async def test_workflow_query_does_not_run_condition(client: Client):
         assert await handle.query(QueryAffectConditionWorkflow.check_condition)
 
 
+@workflow.defn
+class CancelSignalAndTimerFiredInSameTaskWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Start a 1 hour timer
+        self.timer_task = asyncio.create_task(asyncio.sleep(60 * 60))
+        # Wait on it
+        try:
+            await self.timer_task
+            assert False
+        except asyncio.CancelledError:
+            pass
+
+    @workflow.signal
+    def cancel_timer(self) -> None:
+        self.timer_task.cancel()
+
+
+async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
+    client: Client, env: WorkflowEnvironment
+):
+    # This test only works when we support time skipping
+    if not env.supports_time_skipping:
+        pytest.skip("Need to skip time to validate this test")
+
+    # TODO(cretz): There is a bug in the Java test server, probably
+    # https://github.com/temporalio/sdk-java/issues/1138 where the first
+    # unlock-and-sleep hangs when running this test after
+    # test_workflow_cancel_activity. So we create a new test environment here.
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        # Start worker for 30 mins
+        async with new_worker(
+            client, CancelSignalAndTimerFiredInSameTaskWorkflow
+        ) as worker:
+            task_queue = worker.task_queue
+            handle = await client.start_workflow(
+                CancelSignalAndTimerFiredInSameTaskWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+            # Wait 30 mins so the worker is waiting on timer
+            await env.sleep(30 * 60)
+
+        # Listen to handler result in background so the auto-skipping works
+        result_task = asyncio.create_task(handle.result())
+
+        # Now that worker is stopped, send a signal and wait another hour to pass
+        # the timer
+        await handle.signal(CancelSignalAndTimerFiredInSameTaskWorkflow.cancel_timer)
+        await env.sleep(60 * 60)
+
+        # Start worker again and wait for workflow completion
+        async with new_worker(
+            client, CancelSignalAndTimerFiredInSameTaskWorkflow, task_queue=task_queue
+        ):
+            # This used to not complete because a signal cancelling the timer was
+            # not respected by the timer fire
+            await result_task
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
     activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
-    workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
+    workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
 ) -> Worker:
     return Worker(
         client,
