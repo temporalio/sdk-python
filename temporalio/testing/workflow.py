@@ -84,6 +84,7 @@ class WorkflowEnvironment:
         retry_config: Optional[temporalio.client.RetryConfig] = None,
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
+        tls: bool | temporalio.client.TLSConfig = False,
         ip: str = "127.0.0.1",
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
@@ -127,6 +128,8 @@ class WorkflowEnvironment:
             rpc_metadata: See parameter of the same name on
                 :py:meth:`temporalio.client.Client.connect`.
             identity: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
+            tls: See parameter of the same name on
                 :py:meth:`temporalio.client.Client.connect`.
             ip: IP address to bind to, or 127.0.0.1 by default.
             port: Port number to bind to, or an OS-provided port by default.
@@ -189,6 +192,7 @@ class WorkflowEnvironment:
                     data_converter=data_converter,
                     interceptors=interceptors,
                     default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+                    tls=tls,
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
                     identity=identity,

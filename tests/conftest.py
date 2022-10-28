@@ -23,7 +23,6 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
-from tests.helpers.golang import ExternalGolangServer
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 # Due to https://github.com/python/cpython/issues/77906, multiprocessing on
@@ -55,18 +54,20 @@ def event_loop():
     loop.close()
 
 
-@pytest_asyncio.fixture(scope="session")
-async def golang_server() -> AsyncGenerator[ExternalGolangServer, None]:
-    server = await ExternalGolangServer.start()
-    yield server
-    await server.close()
+@pytest.fixture(scope="session")
+def env_type(request: pytest.FixtureRequest) -> str:
+    return request.config.getoption("--workflow-environment")
 
 
 @pytest_asyncio.fixture(scope="session")
-async def env(request) -> AsyncGenerator[WorkflowEnvironment, None]:
-    env_type = request.config.getoption("--workflow-environment")
+async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
-        env = await WorkflowEnvironment.start_local()
+        env = await WorkflowEnvironment.start_local(
+            temporalite_extra_args=[
+                "--dynamic-config-value",
+                "system.forceSearchAttributesCacheRefreshOnRead=true",
+            ]
+        )
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
     else:
