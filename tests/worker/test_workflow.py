@@ -2405,34 +2405,39 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
     if not env.supports_time_skipping:
         pytest.skip("Need to skip time to validate this test")
 
-    # Start worker for 30 mins
-    async with new_worker(
-        client, CancelSignalAndTimerFiredInSameTaskWorkflow
-    ) as worker:
-        task_queue = worker.task_queue
-        handle = await client.start_workflow(
-            CancelSignalAndTimerFiredInSameTaskWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=task_queue,
-        )
-        # Wait 30 mins so the worker is waiting on timer
-        await env.sleep(30 * 60)
+    # TODO(cretz): There is a bug in the Java test server, probably
+    # https://github.com/temporalio/sdk-java/issues/1138 where the first
+    # unlock-and-sleep hangs when running this test after
+    # test_workflow_cancel_activity. So we create a new test environment here.
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        # Start worker for 30 mins
+        async with new_worker(
+            client, CancelSignalAndTimerFiredInSameTaskWorkflow
+        ) as worker:
+            task_queue = worker.task_queue
+            handle = await client.start_workflow(
+                CancelSignalAndTimerFiredInSameTaskWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+            # Wait 30 mins so the worker is waiting on timer
+            await env.sleep(30 * 60)
 
-    # Listen to handler result in background so the auto-skipping works
-    result_task = asyncio.create_task(handle.result())
+        # Listen to handler result in background so the auto-skipping works
+        result_task = asyncio.create_task(handle.result())
 
-    # Now that worker is stopped, send a signal and wait another hour to pass
-    # the timer
-    await handle.signal(CancelSignalAndTimerFiredInSameTaskWorkflow.cancel_timer)
-    await env.sleep(60 * 60)
+        # Now that worker is stopped, send a signal and wait another hour to pass
+        # the timer
+        await handle.signal(CancelSignalAndTimerFiredInSameTaskWorkflow.cancel_timer)
+        await env.sleep(60 * 60)
 
-    # Start worker again and wait for workflow completion
-    async with new_worker(
-        client, CancelSignalAndTimerFiredInSameTaskWorkflow, task_queue=task_queue
-    ):
-        # This used to not complete because a signal cancelling the timer was
-        # not respected by the timer fire
-        await result_task
+        # Start worker again and wait for workflow completion
+        async with new_worker(
+            client, CancelSignalAndTimerFiredInSameTaskWorkflow, task_queue=task_queue
+        ):
+            # This used to not complete because a signal cancelling the timer was
+            # not respected by the timer fire
+            await result_task
 
 
 def new_worker(
