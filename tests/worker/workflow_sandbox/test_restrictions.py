@@ -16,8 +16,8 @@ from temporalio.worker.workflow_sandbox.restrictions import (
 
 
 def test_workflow_sandbox_stdlib_module_names():
-    if sys.version_info != (3, 10):
-        pytest.skip("Test only runs on 3.10")
+    if sys.version_info[1] != 11:
+        pytest.skip("Test only runs on 3.11")
     actual_names = ",".join(sorted(sys.stdlib_module_names))
     # Uncomment to print code for generating these
     code_lines = [""]

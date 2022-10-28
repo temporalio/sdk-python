@@ -158,7 +158,7 @@ class SandboxMatcher:
     An string containing a single asterisk can be used to match all.
     """
 
-    children: Mapping[str, SandboxMatcher] = types.MappingProxyType({})
+    children: Mapping[str, SandboxMatcher] = dataclasses.field(default_factory=dict)
     """Immutable mapping of child matchers."""
 
     match_self: bool = False
@@ -354,7 +354,7 @@ SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.pass
 )
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
-# test will fail if this list doesn't match the 3.10+ Python version it was
+# test will fail if this list doesn't match the latest Python version it was
 # generated against, spitting out the expected list. This is a string instead
 # of a list of strings due to black wanting to format this to one item each
 # line in a list.
@@ -368,27 +368,27 @@ _stdlib_module_names = (
     "_pickle,_posixshmem,_posixsubprocess,_py_abc,_pydecimal,_pyio,_queue,_random,_scproxy,"
     "_sha1,_sha256,_sha3,_sha512,_signal,_sitebuiltins,_socket,_sqlite3,_sre,_ssl,_stat,"
     "_statistics,_string,_strptime,_struct,_symtable,_thread,_threading_local,_tkinter,"
-    "_tracemalloc,_uuid,_warnings,_weakref,_weakrefset,_winapi,_zoneinfo,abc,aifc,antigravity,"
-    "argparse,array,ast,asynchat,asyncio,asyncore,atexit,audioop,base64,bdb,binascii,binhex,"
-    "bisect,builtins,bz2,cProfile,calendar,cgi,cgitb,chunk,cmath,cmd,code,codecs,codeop,"
-    "collections,colorsys,compileall,concurrent,configparser,contextlib,contextvars,copy,"
-    "copyreg,crypt,csv,ctypes,curses,dataclasses,datetime,dbm,decimal,difflib,dis,distutils,"
-    "doctest,email,encodings,ensurepip,enum,errno,faulthandler,fcntl,filecmp,fileinput,"
-    "fnmatch,fractions,ftplib,functools,gc,genericpath,getopt,getpass,gettext,glob,graphlib,"
-    "grp,gzip,hashlib,heapq,hmac,html,http,idlelib,imaplib,imghdr,imp,importlib,inspect,"
-    "io,ipaddress,itertools,json,keyword,lib2to3,linecache,locale,logging,lzma,mailbox,"
-    "mailcap,marshal,math,mimetypes,mmap,modulefinder,msilib,msvcrt,multiprocessing,netrc,"
-    "nis,nntplib,nt,ntpath,nturl2path,numbers,opcode,operator,optparse,os,ossaudiodev,"
-    "pathlib,pdb,pickle,pickletools,pipes,pkgutil,platform,plistlib,poplib,posix,posixpath,"
-    "pprint,profile,pstats,pty,pwd,py_compile,pyclbr,pydoc,pydoc_data,pyexpat,queue,quopri,"
-    "random,re,readline,reprlib,resource,rlcompleter,runpy,sched,secrets,select,selectors,"
-    "shelve,shlex,shutil,signal,site,smtpd,smtplib,sndhdr,socket,socketserver,spwd,sqlite3,"
-    "sre_compile,sre_constants,sre_parse,ssl,stat,statistics,string,stringprep,struct,"
-    "subprocess,sunau,symtable,sys,sysconfig,syslog,tabnanny,tarfile,telnetlib,tempfile,"
-    "termios,textwrap,this,threading,time,timeit,tkinter,token,tokenize,trace,traceback,"
-    "tracemalloc,tty,turtle,turtledemo,types,typing,unicodedata,unittest,urllib,uu,uuid,"
-    "venv,warnings,wave,weakref,webbrowser,winreg,winsound,wsgiref,xdrlib,xml,xmlrpc,zipapp,"
-    "zipfile,zipimport,zlib,zoneinfo"
+    "_tokenize,_tracemalloc,_typing,_uuid,_warnings,_weakref,_weakrefset,_winapi,_zoneinfo,"
+    "abc,aifc,antigravity,argparse,array,ast,asynchat,asyncio,asyncore,atexit,audioop,"
+    "base64,bdb,binascii,bisect,builtins,bz2,cProfile,calendar,cgi,cgitb,chunk,cmath,cmd,"
+    "code,codecs,codeop,collections,colorsys,compileall,concurrent,configparser,contextlib,"
+    "contextvars,copy,copyreg,crypt,csv,ctypes,curses,dataclasses,datetime,dbm,decimal,"
+    "difflib,dis,distutils,doctest,email,encodings,ensurepip,enum,errno,faulthandler,fcntl,"
+    "filecmp,fileinput,fnmatch,fractions,ftplib,functools,gc,genericpath,getopt,getpass,"
+    "gettext,glob,graphlib,grp,gzip,hashlib,heapq,hmac,html,http,idlelib,imaplib,imghdr,"
+    "imp,importlib,inspect,io,ipaddress,itertools,json,keyword,lib2to3,linecache,locale,"
+    "logging,lzma,mailbox,mailcap,marshal,math,mimetypes,mmap,modulefinder,msilib,msvcrt,"
+    "multiprocessing,netrc,nis,nntplib,nt,ntpath,nturl2path,numbers,opcode,operator,optparse,"
+    "os,ossaudiodev,pathlib,pdb,pickle,pickletools,pipes,pkgutil,platform,plistlib,poplib,"
+    "posix,posixpath,pprint,profile,pstats,pty,pwd,py_compile,pyclbr,pydoc,pydoc_data,"
+    "pyexpat,queue,quopri,random,re,readline,reprlib,resource,rlcompleter,runpy,sched,"
+    "secrets,select,selectors,shelve,shlex,shutil,signal,site,smtpd,smtplib,sndhdr,socket,"
+    "socketserver,spwd,sqlite3,sre_compile,sre_constants,sre_parse,ssl,stat,statistics,"
+    "string,stringprep,struct,subprocess,sunau,symtable,sys,sysconfig,syslog,tabnanny,"
+    "tarfile,telnetlib,tempfile,termios,textwrap,this,threading,time,timeit,tkinter,token,"
+    "tokenize,tomllib,trace,traceback,tracemalloc,tty,turtle,turtledemo,types,typing,unicodedata,"
+    "unittest,urllib,uu,uuid,venv,warnings,wave,weakref,webbrowser,winreg,winsound,wsgiref,"
+    "xdrlib,xml,xmlrpc,zipapp,zipfile,zipimport,zlib,zoneinfo"
 )
 
 SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | SandboxMatcher(
@@ -648,7 +648,6 @@ class _RestrictionState:
     obj: object
     context: RestrictionContext
     matcher: SandboxMatcher
-    wrap_dict: bool = True
 
     def assert_child_not_restricted(self, name: str) -> None:
         if (
@@ -793,9 +792,9 @@ class _RestrictedProxy:
         state.assert_child_not_restricted(__name)
         ret = object.__getattribute__(self, "__getattr__")(__name)
 
-        # If there is a child matcher, restrict if we can. As a special case, we
-        # don't wrap __dict__ if we're asked not to.
-        if __name != "__dict__" or state.wrap_dict:
+        # Since Python 3.11, the importer references __spec__ on module, so we
+        # allow that through
+        if __name != "__spec__":
             child_matcher = state.matcher.child_matcher(__name)
             if child_matcher and _is_restrictable(ret):
                 ret = _RestrictedProxy(
