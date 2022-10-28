@@ -166,16 +166,12 @@ class AssertFailWorkflow:
 
 
 async def test_workflow_env_assert(client: Client):
-    try:
-        assert "foo" == "bar"
-        raise NotImplementedError
-    except AssertionError as assertion_err:
-        expected_err = assertion_err
-
     def assert_proper_error(err: Optional[Exception]) -> None:
         assert isinstance(err, ApplicationError)
-        assert err.message == str(expected_err)
-        assert err.type == "AssertionError"
+        # In unsandboxed workflows, this message has extra diff info appended
+        # due to pytest's custom loader that does special assert tricks. But in
+        # sandboxed workflows, this just has the first line.
+        assert err.message.startswith("assert 'foo' == 'bar'")
 
     async with WorkflowEnvironment.from_client(client) as env:
         async with new_worker(env.client, AssertFailWorkflow) as worker:

@@ -49,6 +49,7 @@ class _WorkflowWorker:
         workflows: Sequence[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor],
         workflow_runner: WorkflowRunner,
+        unsandboxed_workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         debug_mode: bool,
@@ -70,6 +71,7 @@ class _WorkflowWorker:
         )
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
         self._workflow_runner = workflow_runner
+        self._unsandboxed_workflow_runner = unsandboxed_workflow_runner
         self._data_converter = data_converter
         # Build the interceptor classes and collect extern functions
         self._extern_functions: MutableMapping[str, Callable] = {}
@@ -98,6 +100,15 @@ class _WorkflowWorker:
             # Confirm name unique
             if defn.name in self._workflows:
                 raise ValueError(f"More than one workflow named {defn.name}")
+            # Prepare the workflow with the runner (this will error in the
+            # sandbox if an import fails somehow)
+            try:
+                if defn.sandboxed:
+                    workflow_runner.prepare_workflow(defn)
+                else:
+                    unsandboxed_workflow_runner.prepare_workflow(defn)
+            except Exception as err:
+                raise RuntimeError(f"Failed validating workflow {defn.name}") from err
             self._workflows[defn.name] = defn
 
     async def run(self) -> None:
@@ -162,7 +173,7 @@ class _WorkflowWorker:
                 # If the workflow is not running yet, create it
                 workflow = self._running_workflows.get(act.run_id)
                 if not workflow:
-                    workflow = await self._create_workflow_instance(act)
+                    workflow = self._create_workflow_instance(act)
                     self._running_workflows[act.run_id] = workflow
                 # Run activation in separate thread so we can check if it's
                 # deadlocked
@@ -254,7 +265,7 @@ class _WorkflowWorker:
                     logger.debug("Shutting down worker on eviction")
                     asyncio.create_task(self._bridge_worker().shutdown())
 
-    async def _create_workflow_instance(
+    def _create_workflow_instance(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> WorkflowInstance:
         # First find the start workflow job
@@ -311,13 +322,15 @@ class _WorkflowWorker:
         )
 
         # Create instance from details
-        return await self._workflow_runner.create_instance(
-            WorkflowInstanceDetails(
-                payload_converter_class=self._data_converter.payload_converter_class,
-                interceptor_classes=self._interceptor_classes,
-                defn=defn,
-                info=info,
-                randomness_seed=start.randomness_seed,
-                extern_functions=self._extern_functions,
-            )
+        det = WorkflowInstanceDetails(
+            payload_converter_class=self._data_converter.payload_converter_class,
+            interceptor_classes=self._interceptor_classes,
+            defn=defn,
+            info=info,
+            randomness_seed=start.randomness_seed,
+            extern_functions=self._extern_functions,
         )
+        if defn.sandboxed:
+            return self._workflow_runner.create_instance(det)
+        else:
+            return self._unsandboxed_workflow_runner.create_instance(det)
