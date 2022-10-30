@@ -28,6 +28,7 @@ from typing import (
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
+from dateutil import parser
 from typing_extensions import Literal
 
 import temporalio.api.common.v1
@@ -697,7 +698,7 @@ def decode_search_attributes(
             val = [val]
         # Convert each item to datetime if necessary
         if v.metadata.get("type") == b"Datetime":
-            val = [datetime.fromisoformat(v) for v in val]
+            val = [parser.isoparse(v) for v in val]
         ret[k] = val
     return ret
 
