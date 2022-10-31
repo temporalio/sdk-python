@@ -1,10 +1,10 @@
 """Client for accessing Temporal."""
 
 from __future__ import annotations
+
 import copy
 import json
 import re
-
 import uuid
 import warnings
 from dataclasses import dataclass
@@ -26,6 +26,7 @@ from typing import (
     cast,
     overload,
 )
+
 import google.protobuf.json_format
 from typing_extensions import Concatenate, TypedDict
 
@@ -34,8 +35,8 @@ import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 import temporalio.api.history.v1
 import temporalio.api.taskqueue.v1
-import temporalio.api.workflowservice.v1
 import temporalio.api.workflow.v1
+import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
@@ -615,7 +616,7 @@ class Client:
 
         This eagerly requests the first page and will raise an exception if
         not available.
-        
+
         Args:
             query: A Temporal visibility list filter. See Temporal documentation
                 concerning visibility list filters.
@@ -629,13 +630,15 @@ class Client:
         Results:
             An async iterator that can be used with ``async for``.
         """
-        return await self._impl.list_workflows(ListWorkflowsInput(
-            query=query,
-            page_size=page_size,
-            next_page_token=next_page_token,
-            rpc_metadata=rpc_metadata,
-            rpc_timeout=rpc_timeout,
-        ))
+        return await self._impl.list_workflows(
+            ListWorkflowsInput(
+                query=query,
+                page_size=page_size,
+                next_page_token=next_page_token,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
 
     @overload
     def get_async_activity_handle(
@@ -700,6 +703,7 @@ class ClientConfig(TypedDict, total=False):
     default_workflow_query_reject_condition: Optional[
         temporalio.common.QueryRejectCondition
     ]
+
 
 class WorkflowHistoryEventFilterType(IntEnum):
     """Type of history events to get for a workflow.
@@ -821,7 +825,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 reason.
             Exception: Other possible failures during result fetching.
         """
-
         # We have to maintain our own run ID because it can change if we follow
         # executions
         hist_run_id = self._result_run_id
@@ -899,8 +902,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                             last_heartbeat_details=[],
                         ),
                     )
-                elif event.HasField("workflow_execution_continued_as_new_event_attributes"):
-                    cont_attr = event.workflow_execution_continued_as_new_event_attributes
+                elif event.HasField(
+                    "workflow_execution_continued_as_new_event_attributes"
+                ):
+                    cont_attr = (
+                        event.workflow_execution_continued_as_new_event_attributes
+                    )
                     if not cont_attr.new_execution_run_id:
                         raise RuntimeError(
                             "Unexpectedly missing new run ID from continue as new"
@@ -998,18 +1005,21 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHistory:
         """Get workflow history.
-        
+
         This is a shortcut for :py:meth:`fetch_history_events` that just fetches
         all events.
         """
         return WorkflowHistory(
             workflow_id=self.id,
-            events=[v async for v in await self.fetch_history_events(
-                event_filter_type=event_filter_type,
-                skip_archival=skip_archival,
-                rpc_metadata=rpc_metadata,
-                rpc_timeout=rpc_timeout,
-            )]
+            events=[
+                v
+                async for v in await self.fetch_history_events(
+                    event_filter_type=event_filter_type,
+                    skip_archival=skip_archival,
+                    rpc_metadata=rpc_metadata,
+                    rpc_timeout=rpc_timeout,
+                )
+            ],
         )
 
     async def fetch_history_events(
@@ -1023,8 +1033,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHistoryEventAsyncIterator:
-        """Get workflow history events.
-        
+        """Get workflow history events as an async iterator.
+
         This does *not* fetch the events eagerly. Only the first iteration of
         the iterator will fetch the first set of events.
 
@@ -1042,9 +1052,16 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Returns:
             An async iterator that doesn't begin fetching until iterated on.
         """
-        return await self._fetch_history_events_for_run(self._run_id,
-            page_size=page_size, next_page_token=next_page_token, wait_new_event=wait_new_event,
-            event_filter_type=event_filter_type, skip_archival=skip_archival, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout)
+        return await self._fetch_history_events_for_run(
+            self._run_id,
+            page_size=page_size,
+            next_page_token=next_page_token,
+            wait_new_event=wait_new_event,
+            event_filter_type=event_filter_type,
+            skip_archival=skip_archival,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
 
     async def _fetch_history_events_for_run(
         self,
@@ -1058,17 +1075,19 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHistoryEventAsyncIterator:
-        return await self._client._impl.fetch_workflow_history_events(FetchWorkflowHistoryEventsInput(
-            id=self._id,
-            run_id=run_id,
-            page_size=page_size,
-            next_page_token=next_page_token,
-            wait_new_event=wait_new_event,
-            event_filter_type=event_filter_type,
-            skip_archival=skip_archival,
-            rpc_metadata=rpc_metadata,
-            rpc_timeout=rpc_timeout,
-        ))
+        return await self._client._impl.fetch_workflow_history_events(
+            FetchWorkflowHistoryEventsInput(
+                id=self._id,
+                run_id=run_id,
+                page_size=page_size,
+                next_page_token=next_page_token,
+                wait_new_event=wait_new_event,
+                event_filter_type=event_filter_type,
+                skip_archival=skip_archival,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
 
     # Overload for no-param query
     @overload
@@ -1503,16 +1522,26 @@ class WorkflowExecution:
         **additional_fields,
     ) -> WorkflowExecution:
         return cls(
-            close_time=info.close_time.ToDatetime().replace(tzinfo=timezone.utc) if info.HasField("close_time") else None,
+            close_time=info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
+            if info.HasField("close_time")
+            else None,
             data_converter=converter,
-            execution_time=info.execution_time.ToDatetime().replace(tzinfo=timezone.utc) if info.HasField("execution_time") else None,
+            execution_time=info.execution_time.ToDatetime().replace(tzinfo=timezone.utc)
+            if info.HasField("execution_time")
+            else None,
             history_length=info.history_length,
             id=info.execution.workflow_id,
-            parent_id=info.parent_execution.workflow_id if info.HasField("parent_execution") else None,
-            parent_run_id=info.parent_execution.run_id if info.HasField("parent_execution") else None,
+            parent_id=info.parent_execution.workflow_id
+            if info.HasField("parent_execution")
+            else None,
+            parent_run_id=info.parent_execution.run_id
+            if info.HasField("parent_execution")
+            else None,
             raw_info=info,
             run_id=info.execution.run_id,
-            search_attributes=temporalio.converter.decode_search_attributes(info.search_attributes),
+            search_attributes=temporalio.converter.decode_search_attributes(
+                info.search_attributes
+            ),
             start_time=info.start_time.ToDatetime().replace(tzinfo=timezone.utc),
             status=WorkflowExecutionStatus(info.status) if info.status else None,
             task_queue=info.task_queue,
@@ -1585,6 +1614,7 @@ class WorkflowExecution:
             )
         )[0]
 
+
 @dataclass
 class WorkflowExecutionDescription(WorkflowExecution):
     """Description for a single workflow execution run."""
@@ -1597,7 +1627,7 @@ class WorkflowExecutionDescription(WorkflowExecution):
         description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
         converter: temporalio.converter.DataConverter,
     ) -> WorkflowExecutionDescription:
-        return WorkflowExecutionDescription._from_raw_info( # type: ignore
+        return WorkflowExecutionDescription._from_raw_info(  # type: ignore
             description.workflow_execution_info,
             converter,
             raw_description=description,
@@ -1632,12 +1662,26 @@ class WorkflowExecutionStatus(IntEnum):
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
     )
 
+
 class WorkflowExecutionAsyncIterator:
+    """Asynchronous iterator for :py:class:`WorkflowExecution`s.
+
+    Most users should use ``async for`` on this iterator and not call any of the
+    methods within. To consume the workflows into histories, call
+    :py:meth:`map_histories`.
+    """
+
     def __init__(
         self,
         client: Client,
         input: ListWorkflowsInput,
     ) -> None:
+        """Create an asynchronous iterator for the given input.
+
+        Users should not create this directly, but rather use
+        :py:meth:`Client.list_workflows`. Those directly creating are expected
+        to immediately :py:meth:`fetch_next_page`.
+        """
         self._client = client
         self._input = input
         self._next_page_token = input.next_page_token
@@ -1646,33 +1690,60 @@ class WorkflowExecutionAsyncIterator:
 
     @property
     def current_page_index(self) -> int:
+        """Index of the entry in the current page that will be returned from
+        the next :py:meth:`__anext__` call.
+        """
         return self._current_page_index
 
     @property
     def current_page(self) -> Sequence[WorkflowExecution]:
+        """Current page.
+
+        Will fail if :py:meth:`fetch_next_page` was never called (always called
+        via normal :py:meth:`Client.list_workflows`.
+        """
         if self._current_page is None:
             raise RuntimeError("No page fetched yet")
         return self._current_page
 
     @property
     def next_page_token(self) -> Optional[bytes]:
+        """Token for the next page request if any."""
         return self._next_page_token
 
     async def fetch_next_page(self, *, page_size: Optional[int] = None) -> None:
-        resp = await self._client.workflow_service.list_workflow_executions(temporalio.api.workflowservice.v1.ListWorkflowExecutionsRequest(
-            namespace=self._client.namespace,
-            page_size=page_size or self._input.page_size,
-            next_page_token=self._next_page_token or b"",
-            query=self._input.query or "",
-        ), retry=True, metadata=self._input.rpc_metadata, timeout=self._input.rpc_timeout)
-        self._current_page = [WorkflowExecution._from_raw_info(v, self._client.data_converter) for v in resp.executions]
+        """Fetch the next page if any.
+
+        Args:
+            page_size: Override the page size this iterator was originally
+                created with.
+        """
+        resp = await self._client.workflow_service.list_workflow_executions(
+            temporalio.api.workflowservice.v1.ListWorkflowExecutionsRequest(
+                namespace=self._client.namespace,
+                page_size=page_size or self._input.page_size,
+                next_page_token=self._next_page_token or b"",
+                query=self._input.query or "",
+            ),
+            retry=True,
+            metadata=self._input.rpc_metadata,
+            timeout=self._input.rpc_timeout,
+        )
+        self._current_page = [
+            WorkflowExecution._from_raw_info(v, self._client.data_converter)
+            for v in resp.executions
+        ]
         self._current_page_index = 0
         self._next_page_token = resp.next_page_token or None
 
     def __aiter__(self) -> WorkflowExecutionAsyncIterator:
+        """Return self as the iterator."""
         return self
 
     async def __anext__(self) -> WorkflowExecution:
+        """Get the next execution on this iterator, fetching next page if
+        necessary.
+        """
         if self._current_page is None:
             raise RuntimeError("No page fetched yet")
         while True:
@@ -1698,24 +1769,49 @@ class WorkflowExecutionAsyncIterator:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> AsyncIterator[WorkflowHistory]:
+        """Create an async iterator consuming all workflows and calling
+        :py:meth:`WorkflowHandle.fetch_history` on each one.
+
+        This is just a shortcut for ``fetch_history``, see that method for
+        parameter details.
+        """
         # TODO(cretz): Document that this consumes the iterator
         async for v in self:
-            yield await self._client.get_workflow_handle(v.id, run_id=v.run_id).fetch_history(
+            yield await self._client.get_workflow_handle(
+                v.id, run_id=v.run_id
+            ).fetch_history(
                 event_filter_type=event_filter_type,
                 skip_archival=skip_archival,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
 
-@dataclass
+
+@dataclass(frozen=True)
 class WorkflowHistory:
-    """A workflow's ID and history."""
+    """A workflow's ID and immutable history."""
 
     workflow_id: str
+    """ID of the workflow."""
+
     events: Sequence[temporalio.api.history.v1.HistoryEvent]
+    """History events for the workflow."""
+
+    @property
+    def run_id(self) -> str:
+        """Run ID extracted from the first event."""
+        if not self.events:
+            raise RuntimeError("No events")
+        if not self.events[0].HasField("workflow_execution_started_event_attributes"):
+            raise RuntimeError("First event is not workflow start")
+        return self.events[
+            0
+        ].workflow_execution_started_event_attributes.original_execution_run_id
 
     @staticmethod
-    def from_json(workflow_id: str, history: Union[str, Dict[str, Any]]) -> WorkflowHistory:
+    def from_json(
+        workflow_id: str, history: Union[str, Dict[str, Any]]
+    ) -> WorkflowHistory:
         """Construct a WorkflowHistory from an ID and a json dump of history.
 
         This is built to work both with Temporal UI/tctl JSON as well as
@@ -1734,44 +1830,75 @@ class WorkflowHistory:
 
     def to_json(self) -> str:
         """Convert this history to JSON.
-        
+
         Note, this does not include the workflow ID.
         """
-        return google.protobuf.json_format.MessageToJson(temporalio.api.history.v1.History(events=self.events))
+        return google.protobuf.json_format.MessageToJson(
+            temporalio.api.history.v1.History(events=self.events)
+        )
 
     def to_json_dict(self) -> Dict[str, Any]:
         """Convert this history to JSON-compatible dict.
-        
+
         Note, this does not include the workflow ID.
         """
-        return google.protobuf.json_format.MessageToDict(temporalio.api.history.v1.History(events=self.events))
+        return google.protobuf.json_format.MessageToDict(
+            temporalio.api.history.v1.History(events=self.events)
+        )
+
 
 @dataclass
 class WorkflowHistoryEventAsyncIterator:
+    """Asynchronous iterator for history events of a workflow.
+
+    Most users should use ``async for`` on this iterator and not call any of the
+    methods within.
+    """
+
     def __init__(
         self,
         client: Client,
         input: FetchWorkflowHistoryEventsInput,
     ) -> None:
+        """Create an asynchronous iterator for the given input.
+
+        Users should not create this directly, but rather use
+        :py:meth:`WorkflowHandle.fetch_history_events`.
+        """
         self._client = client
         self._input = input
         self._next_page_token = input.next_page_token
-        self._current_page: Optional[Sequence[temporalio.api.history.v1.HistoryEvent]] = None
+        self._current_page: Optional[
+            Sequence[temporalio.api.history.v1.HistoryEvent]
+        ] = None
         self._current_page_index = 0
 
     @property
     def current_page_index(self) -> int:
+        """Index of the entry in the current page that will be returned from
+        the next :py:meth:`__anext__` call.
+        """
         return self._current_page_index
 
     @property
-    def current_page(self) -> Optional[Sequence[temporalio.api.history.v1.HistoryEvent]]:
+    def current_page(
+        self,
+    ) -> Optional[Sequence[temporalio.api.history.v1.HistoryEvent]]:
+        """Current page, if it has been fetched yet."""
         return self._current_page
 
     @property
     def next_page_token(self) -> Optional[bytes]:
+        """Token for the next page request if any."""
         return self._next_page_token
 
     async def fetch_next_page(self, *, page_size: Optional[int] = None) -> None:
+        """Fetch the next page if any.
+
+        Args:
+            page_size: Override the page size this iterator was originally
+                created with.
+        """
         resp = await self._client.workflow_service.get_workflow_execution_history(
             temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest(
                 namespace=self._client.namespace,
@@ -1782,9 +1909,14 @@ class WorkflowHistoryEventAsyncIterator:
                 maximum_page_size=self._input.page_size or 0,
                 next_page_token=self._next_page_token or b"",
                 wait_new_event=self._input.wait_new_event,
-                history_event_filter_type=temporalio.api.enums.v1.HistoryEventFilterType.ValueType(self._input.event_filter_type),
+                history_event_filter_type=temporalio.api.enums.v1.HistoryEventFilterType.ValueType(
+                    self._input.event_filter_type
+                ),
                 skip_archival=self._input.skip_archival,
-            ), retry=True, metadata=self._input.rpc_metadata, timeout=self._input.rpc_timeout
+            ),
+            retry=True,
+            metadata=self._input.rpc_metadata,
+            timeout=self._input.rpc_timeout,
         )
         # We don't support raw history
         assert len(resp.raw_history) == 0
@@ -1793,9 +1925,13 @@ class WorkflowHistoryEventAsyncIterator:
         self._next_page_token = resp.next_page_token or None
 
     def __aiter__(self) -> WorkflowHistoryEventAsyncIterator:
+        """Return self as the iterator."""
         return self
 
     async def __anext__(self) -> temporalio.api.history.v1.HistoryEvent:
+        """Get the next execution on this iterator, fetching next page if
+        necessary.
+        """
         while True:
             # No page? fetch and continue
             if self._current_page is None:
@@ -1910,6 +2046,7 @@ class DescribeWorkflowInput:
     run_id: Optional[str]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
+
 
 @dataclass
 class FetchWorkflowHistoryEventsInput:
@@ -2247,11 +2384,15 @@ class _ClientImpl(OutboundInterceptor):
             self._client.data_converter,
         )
 
-    async def fetch_workflow_history_events(self, input: FetchWorkflowHistoryEventsInput) -> WorkflowHistoryEventAsyncIterator:
+    async def fetch_workflow_history_events(
+        self, input: FetchWorkflowHistoryEventsInput
+    ) -> WorkflowHistoryEventAsyncIterator:
         # Just build iterator, don't eagerly fetch
         return WorkflowHistoryEventAsyncIterator(self._client, input)
 
-    async def list_workflows(self, input: ListWorkflowsInput) -> WorkflowExecutionAsyncIterator:
+    async def list_workflows(
+        self, input: ListWorkflowsInput
+    ) -> WorkflowExecutionAsyncIterator:
         # Build the iterator and fetch the first page
         ret = WorkflowExecutionAsyncIterator(self._client, input)
         await ret.fetch_next_page()
@@ -2487,6 +2628,7 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
+
 
 def _history_from_json(
     history: Union[str, Dict[str, Any]]

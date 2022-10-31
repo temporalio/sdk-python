@@ -1,12 +1,29 @@
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Tuple
 
 import pytest
+from google.protobuf import json_format
 
 import temporalio.api.enums.v1
 import temporalio.common
 import temporalio.exceptions
+from temporalio import workflow
+from temporalio.api.enums.v1 import (
+    CancelExternalWorkflowExecutionFailedCause,
+    ContinueAsNewInitiator,
+    EventType,
+    ParentClosePolicy,
+    RetryState,
+    SignalExternalWorkflowExecutionFailedCause,
+    StartChildWorkflowExecutionFailedCause,
+    TaskQueueKind,
+    TimeoutType,
+    WorkflowIdReusePolicy,
+    WorkflowTaskFailedCause,
+)
+from temporalio.api.history.v1 import History
 from temporalio.api.workflowservice.v1 import GetSystemInfoRequest
 from temporalio.client import (
     CancelWorkflowInput,
@@ -24,8 +41,10 @@ from temporalio.client import (
     WorkflowFailureError,
     WorkflowHandle,
     WorkflowQueryRejectedError,
+    _history_from_json,
 )
 from temporalio.testing import WorkflowEnvironment
+from tests.helpers import new_worker
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -415,3 +434,149 @@ async def test_lazy_client(client: Client, env: WorkflowEnvironment):
     assert not lazy_client.service_client.worker_service_client._bridge_client
     await lazy_client.workflow_service.get_system_info(GetSystemInfoRequest())
     assert lazy_client.service_client.worker_service_client._bridge_client
+
+
+@workflow.defn
+class ListableWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return f"Hello, {name}!"
+
+
+async def test_list_workflows_and_fetch_history(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support newer workflow listing")
+
+    # Run 5 workflows. Use the same workflow ID over and over to make sure we
+    # don't clash with other tests
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    expected_id_and_input = []
+    async with new_worker(client, ListableWorkflow) as worker:
+        for i in range(5):
+            await client.execute_workflow(
+                ListableWorkflow.run,
+                f"user{i}",
+                id=workflow_id,
+                task_queue=worker.task_queue,
+            )
+            expected_id_and_input.append((workflow_id, f'"user{i}"'))
+
+    # List them and get their history
+    hist_iter = (
+        await client.list_workflows(f"WorkflowId = '{workflow_id}'")
+    ).map_histories()
+    actual_id_and_input = sorted(
+        [
+            (
+                hist.workflow_id,
+                hist.events[0]
+                .workflow_execution_started_event_attributes.input.payloads[0]
+                .data.decode(),
+            )
+            async for hist in hist_iter
+        ]
+    )
+    assert actual_id_and_input == expected_id_and_input
+
+
+def test_history_from_json():
+    # Take proto, make JSON, convert to dict, alter some enums, confirm that it
+    # alters the enums back and matches original history
+
+    # Make history with some enums, one one each event
+    history = History()
+    history.events.add().request_cancel_external_workflow_execution_failed_event_attributes.cause = (
+        CancelExternalWorkflowExecutionFailedCause.CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
+    )
+    history.events.add().workflow_execution_started_event_attributes.initiator = (
+        ContinueAsNewInitiator.CONTINUE_AS_NEW_INITIATOR_CRON_SCHEDULE
+    )
+    history.events.add().event_type = (
+        EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED
+    )
+    history.events.add().start_child_workflow_execution_initiated_event_attributes.parent_close_policy = (
+        ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON
+    )
+    history.events.add().workflow_execution_failed_event_attributes.retry_state = (
+        RetryState.RETRY_STATE_CANCEL_REQUESTED
+    )
+    history.events.add().signal_external_workflow_execution_failed_event_attributes.cause = (
+        SignalExternalWorkflowExecutionFailedCause.SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
+    )
+    history.events.add().start_child_workflow_execution_failed_event_attributes.cause = (
+        StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+    )
+    history.events.add().workflow_execution_started_event_attributes.task_queue.kind = (
+        TaskQueueKind.TASK_QUEUE_KIND_NORMAL
+    )
+    history.events.add().workflow_task_timed_out_event_attributes.timeout_type = (
+        TimeoutType.TIMEOUT_TYPE_HEARTBEAT
+    )
+    history.events.add().start_child_workflow_execution_initiated_event_attributes.workflow_id_reuse_policy = (
+        WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
+    )
+    history.events.add().workflow_task_failed_event_attributes.cause = (
+        WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_BAD_BINARY
+    )
+    history.events.add().workflow_execution_started_event_attributes.continued_failure.timeout_failure_info.timeout_type = (
+        TimeoutType.TIMEOUT_TYPE_SCHEDULE_TO_CLOSE
+    )
+    history.events.add().activity_task_started_event_attributes.last_failure.activity_failure_info.retry_state = (
+        RetryState.RETRY_STATE_IN_PROGRESS
+    )
+    history.events.add().workflow_execution_failed_event_attributes.failure.cause.child_workflow_execution_failure_info.retry_state = (
+        RetryState.RETRY_STATE_INTERNAL_SERVER_ERROR
+    )
+
+    # Convert to JSON dict and alter enums to pascal versions
+    bad_history_dict = json_format.MessageToDict(history)
+    e = bad_history_dict["events"]
+    e[0]["requestCancelExternalWorkflowExecutionFailedEventAttributes"][
+        "cause"
+    ] = "ExternalWorkflowExecutionNotFound"
+    e[1]["workflowExecutionStartedEventAttributes"]["initiator"] = "CronSchedule"
+    e[2]["eventType"] = "ActivityTaskCancelRequested"
+    e[3]["startChildWorkflowExecutionInitiatedEventAttributes"][
+        "parentClosePolicy"
+    ] = "Abandon"
+    e[4]["workflowExecutionFailedEventAttributes"]["retryState"] = "CancelRequested"
+    e[5]["signalExternalWorkflowExecutionFailedEventAttributes"][
+        "cause"
+    ] = "ExternalWorkflowExecutionNotFound"
+    e[6]["startChildWorkflowExecutionFailedEventAttributes"][
+        "cause"
+    ] = "NamespaceNotFound"
+    e[7]["workflowExecutionStartedEventAttributes"]["taskQueue"]["kind"] = "Normal"
+    e[8]["workflowTaskTimedOutEventAttributes"]["timeoutType"] = "Heartbeat"
+    e[9]["startChildWorkflowExecutionInitiatedEventAttributes"][
+        "workflowIdReusePolicy"
+    ] = "AllowDuplicate"
+    e[10]["workflowTaskFailedEventAttributes"]["cause"] = "BadBinary"
+    e[11]["workflowExecutionStartedEventAttributes"]["continuedFailure"][
+        "timeoutFailureInfo"
+    ]["timeoutType"] = "ScheduleToClose"
+    e[12]["activityTaskStartedEventAttributes"]["lastFailure"]["activityFailureInfo"][
+        "retryState"
+    ] = "InProgress"
+    e[13]["workflowExecutionFailedEventAttributes"]["failure"]["cause"][
+        "childWorkflowExecutionFailureInfo"
+    ]["retryState"] = "InternalServerError"
+
+    # Apply fixes
+    history_from_dict = _history_from_json(bad_history_dict)
+    history_from_json = _history_from_json(json.dumps(bad_history_dict))
+
+    # Check
+    assert json_format.MessageToDict(history) == json_format.MessageToDict(
+        history_from_dict
+    )
+    assert json_format.MessageToDict(history) == json_format.MessageToDict(
+        history_from_json
+    )
+
+    # Confirm double-encode does not cause issues
+    assert json_format.MessageToDict(history) == json_format.MessageToDict(
+        _history_from_json(json_format.MessageToDict(history_from_dict))
+    )

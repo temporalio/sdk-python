@@ -1,35 +1,18 @@
 import asyncio
-import json
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
+from typing import AsyncIterator
 
 import pytest
-from google.protobuf import json_format
 
 from temporalio import activity, workflow
-from temporalio.api.common.v1 import WorkflowExecution
-from temporalio.api.enums.v1 import (
-    CancelExternalWorkflowExecutionFailedCause,
-    ContinueAsNewInitiator,
-    EventType,
-    ParentClosePolicy,
-    RetryState,
-    SignalExternalWorkflowExecutionFailedCause,
-    StartChildWorkflowExecutionFailedCause,
-    TaskQueueKind,
-    TimeoutType,
-    WorkflowIdReusePolicy,
-    WorkflowTaskFailedCause,
-)
-from temporalio.api.history.v1 import History
-from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
-from temporalio.client import Client, WorkflowFailureError
+from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
 from temporalio.exceptions import ApplicationError
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
-from tests.worker.test_workflow import assert_eq_eventually
-from temporalio.client import WorkflowHistory
+from tests.helpers import assert_eq_eventually
 
 
 @activity.defn
@@ -95,8 +78,9 @@ async def test_replayer_workflow_complete(client: Client) -> None:
         assert "Hello, Temporal!" == await handle.result()
 
     # Collect history and replay it
-    history = await get_history(client, handle.id)
-    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history)
+    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
 
 
 async def test_replayer_workflow_complete_json() -> None:
@@ -124,8 +108,9 @@ async def test_replayer_workflow_incomplete(client: Client) -> None:
         await assert_eq_eventually(True, waiting)
 
     # Collect history and replay it
-    history = await get_history(client, handle.id)
-    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history)
+    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
 
 
 async def test_replayer_workflow_failed(client: Client) -> None:
@@ -142,8 +127,9 @@ async def test_replayer_workflow_failed(client: Client) -> None:
         assert err.value.cause.message == "Intentional error"
 
     # Collect history and replay it
-    history = await get_history(client, handle.id)
-    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history)
+    await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
 
 
 async def test_replayer_workflow_nondeterministic(client: Client) -> None:
@@ -158,9 +144,10 @@ async def test_replayer_workflow_nondeterministic(client: Client) -> None:
         await handle.result()
 
     # Collect history and replay it expecting error
-    history = await get_history(client, handle.id)
-    with pytest.raises(workflow.NondeterminismError) as err:
-        await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(history)
+    with pytest.raises(workflow.NondeterminismError):
+        await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
+            await handle.fetch_history()
+        )
 
 
 async def test_replayer_workflow_nondeterministic_json() -> None:
@@ -168,7 +155,7 @@ async def test_replayer_workflow_nondeterministic_json() -> None:
         "r"
     ) as f:
         history_json = f.read()
-    with pytest.raises(workflow.NondeterminismError) as err:
+    with pytest.raises(workflow.NondeterminismError):
         await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
             WorkflowHistory.from_json("fake", history_json)
         )
@@ -232,13 +219,13 @@ async def test_replayer_multiple_histories_fail_slow() -> None:
         yield h3
         callcount += 1
 
-    results = await Replayer(
-        workflows=[SayHelloWorkflow], fail_fast=False
-    ).replay_workflows(histories())
+    results = await Replayer(workflows=[SayHelloWorkflow]).replay_workflows(
+        histories(), raise_on_replay_failure=False
+    )
 
     assert callcount == 4
-    assert results.had_any_failure()
-    assert results.failure_details[bad_hist_run_id] is not None
+    assert results.replay_failures
+    assert results.replay_failures[bad_hist_run_id] is not None
 
 
 @workflow.defn
@@ -260,10 +247,59 @@ async def test_replayer_workflow_not_registered(client: Client) -> None:
         await handle.result()
 
     # Collect history and replay it expecting error
-    history = await get_history(client, handle.id)
     with pytest.raises(RuntimeError) as err:
-        await Replayer(workflows=[SayHelloWorkflowDifferent]).replay_workflow(history)
+        await Replayer(workflows=[SayHelloWorkflowDifferent]).replay_workflow(
+            await handle.fetch_history()
+        )
     assert "SayHelloWorkflow is not registered" in str(err.value)
+
+
+async def test_replayer_multiple_from_client(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support newer workflow listing")
+
+    # Run 5 say-hello's, with second and 4th having non-det errors. Use the same
+    # workflow ID for all of them so that we can query.
+    workflow_id_suffix = f"-{uuid.uuid4()}"
+    async with new_say_hello_worker(client) as worker:
+        workflow_ids = []
+        for i in range(5):
+            workflow_id = f"workflow-{i}{workflow_id_suffix}"
+            workflow_ids.append(workflow_id)
+            await client.execute_workflow(
+                SayHelloWorkflow.run,
+                SayHelloParams(
+                    name="Temporal", should_cause_nondeterminism=i == 1 or i == 3
+                ),
+                id=workflow_id,
+                task_queue=worker.task_queue,
+            )
+
+    # Lazily list then fetch histories the workflows, manually filtering for
+    # the ones we expect
+    async def hist_iter() -> AsyncIterator[WorkflowHistory]:
+        async for exec in await client.list_workflows(
+            "WorkflowType = 'SayHelloWorkflow'"
+        ):
+            if exec.id.endswith(workflow_id_suffix):
+                yield await client.get_workflow_handle(exec.id).fetch_history()
+
+    async with Replayer(workflows=[SayHelloWorkflow]).workflow_replay_iterator(
+        hist_iter()
+    ) as result_iter:
+        results = [r async for r in result_iter]
+
+    # Sort the results and check against expected
+    results = sorted(results, key=lambda r: r.history.workflow_id)
+    assert len(results) == 5
+    for i, workflow_id in enumerate(workflow_ids):
+        assert results[i].history.workflow_id == workflow_id
+        if i == 1 or i == 3:
+            assert isinstance(results[i].replay_failure, workflow.NondeterminismError)
+        else:
+            assert not results[i].replay_failure
 
 
 def new_say_hello_worker(client: Client) -> Worker:
@@ -272,118 +308,4 @@ def new_say_hello_worker(client: Client) -> Worker:
         task_queue=str(uuid.uuid4()),
         workflows=[SayHelloWorkflow],
         activities=[say_hello],
-    )
-
-
-async def get_history(client: Client, workflow_id: str) -> WorkflowHistory:
-    history = History()
-    req = GetWorkflowExecutionHistoryRequest(
-        namespace=client.namespace, execution=WorkflowExecution(workflow_id=workflow_id)
-    )
-    while True:
-        resp = await client.workflow_service.get_workflow_execution_history(req)
-        history.events.extend(resp.history.events)
-        if not resp.next_page_token:
-            return WorkflowHistory(workflow_id, history.events)
-        req.next_page_token = resp.next_page_token
-
-
-def test_history_from_json():
-    # Take proto, make JSON, convert to dict, alter some enums, confirm that it
-    # alters the enums back and matches original history
-
-    # Make history with some enums, one one each event
-    history = History()
-    history.events.add().request_cancel_external_workflow_execution_failed_event_attributes.cause = (
-        CancelExternalWorkflowExecutionFailedCause.CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
-    )
-    history.events.add().workflow_execution_started_event_attributes.initiator = (
-        ContinueAsNewInitiator.CONTINUE_AS_NEW_INITIATOR_CRON_SCHEDULE
-    )
-    history.events.add().event_type = (
-        EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED
-    )
-    history.events.add().start_child_workflow_execution_initiated_event_attributes.parent_close_policy = (
-        ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON
-    )
-    history.events.add().workflow_execution_failed_event_attributes.retry_state = (
-        RetryState.RETRY_STATE_CANCEL_REQUESTED
-    )
-    history.events.add().signal_external_workflow_execution_failed_event_attributes.cause = (
-        SignalExternalWorkflowExecutionFailedCause.SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
-    )
-    history.events.add().start_child_workflow_execution_failed_event_attributes.cause = (
-        StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
-    )
-    history.events.add().workflow_execution_started_event_attributes.task_queue.kind = (
-        TaskQueueKind.TASK_QUEUE_KIND_NORMAL
-    )
-    history.events.add().workflow_task_timed_out_event_attributes.timeout_type = (
-        TimeoutType.TIMEOUT_TYPE_HEARTBEAT
-    )
-    history.events.add().start_child_workflow_execution_initiated_event_attributes.workflow_id_reuse_policy = (
-        WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
-    )
-    history.events.add().workflow_task_failed_event_attributes.cause = (
-        WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_BAD_BINARY
-    )
-    history.events.add().workflow_execution_started_event_attributes.continued_failure.timeout_failure_info.timeout_type = (
-        TimeoutType.TIMEOUT_TYPE_SCHEDULE_TO_CLOSE
-    )
-    history.events.add().activity_task_started_event_attributes.last_failure.activity_failure_info.retry_state = (
-        RetryState.RETRY_STATE_IN_PROGRESS
-    )
-    history.events.add().workflow_execution_failed_event_attributes.failure.cause.child_workflow_execution_failure_info.retry_state = (
-        RetryState.RETRY_STATE_INTERNAL_SERVER_ERROR
-    )
-
-    # Convert to JSON dict and alter enums to pascal versions
-    bad_history_dict = json_format.MessageToDict(history)
-    e = bad_history_dict["events"]
-    e[0]["requestCancelExternalWorkflowExecutionFailedEventAttributes"][
-        "cause"
-    ] = "ExternalWorkflowExecutionNotFound"
-    e[1]["workflowExecutionStartedEventAttributes"]["initiator"] = "CronSchedule"
-    e[2]["eventType"] = "ActivityTaskCancelRequested"
-    e[3]["startChildWorkflowExecutionInitiatedEventAttributes"][
-        "parentClosePolicy"
-    ] = "Abandon"
-    e[4]["workflowExecutionFailedEventAttributes"]["retryState"] = "CancelRequested"
-    e[5]["signalExternalWorkflowExecutionFailedEventAttributes"][
-        "cause"
-    ] = "ExternalWorkflowExecutionNotFound"
-    e[6]["startChildWorkflowExecutionFailedEventAttributes"][
-        "cause"
-    ] = "NamespaceNotFound"
-    e[7]["workflowExecutionStartedEventAttributes"]["taskQueue"]["kind"] = "Normal"
-    e[8]["workflowTaskTimedOutEventAttributes"]["timeoutType"] = "Heartbeat"
-    e[9]["startChildWorkflowExecutionInitiatedEventAttributes"][
-        "workflowIdReusePolicy"
-    ] = "AllowDuplicate"
-    e[10]["workflowTaskFailedEventAttributes"]["cause"] = "BadBinary"
-    e[11]["workflowExecutionStartedEventAttributes"]["continuedFailure"][
-        "timeoutFailureInfo"
-    ]["timeoutType"] = "ScheduleToClose"
-    e[12]["activityTaskStartedEventAttributes"]["lastFailure"]["activityFailureInfo"][
-        "retryState"
-    ] = "InProgress"
-    e[13]["workflowExecutionFailedEventAttributes"]["failure"]["cause"][
-        "childWorkflowExecutionFailureInfo"
-    ]["retryState"] = "InternalServerError"
-
-    # Apply fixes
-    history_from_dict = _history_from_json(bad_history_dict)
-    history_from_json = _history_from_json(json.dumps(bad_history_dict))
-
-    # Check
-    assert json_format.MessageToDict(history) == json_format.MessageToDict(
-        history_from_dict
-    )
-    assert json_format.MessageToDict(history) == json_format.MessageToDict(
-        history_from_json
-    )
-
-    # Confirm double-encode does not cause issues
-    assert json_format.MessageToDict(history) == json_format.MessageToDict(
-        _history_from_json(json_format.MessageToDict(history_from_dict))
     )
