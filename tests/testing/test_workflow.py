@@ -1,4 +1,5 @@
 import asyncio
+import platform
 import uuid
 from datetime import datetime, timedelta, timezone
 from time import monotonic
@@ -35,7 +36,13 @@ class ReallySlowWorkflow:
         pass
 
 
+def skip_if_not_x86() -> None:
+    if platform.machine() not in ("i386", "AMD64", "x86_64"):
+        pytest.skip("Time skipping server does not run outside x86")
+
+
 async def test_workflow_env_time_skipping_basic():
+    skip_if_not_x86()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(env.client, ReallySlowWorkflow) as worker:
             # Check that time is around now
@@ -51,6 +58,7 @@ async def test_workflow_env_time_skipping_basic():
 
 
 async def test_workflow_env_time_skipping_manual():
+    skip_if_not_x86()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(env.client, ReallySlowWorkflow) as worker:
             # Start workflow
@@ -101,6 +109,7 @@ class ActivityWaitWorkflow:
 
 
 async def test_workflow_env_time_skipping_heartbeat_timeout():
+    skip_if_not_x86()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(
             env.client,
@@ -128,6 +137,7 @@ class ShortSleepWorkflow:
 
 
 async def test_workflow_env_time_skipping_disabled():
+    skip_if_not_x86()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(env.client, ShortSleepWorkflow) as worker:
             # Confirm when executing normally it does not sleep for a full 3s

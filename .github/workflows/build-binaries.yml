@@ -1,0 +1,72 @@
+name: Build Binaries
+on:
+  push:
+    branches:
+      - main
+      - "releases/*"
+
+jobs:
+  # Compile the binaries and upload artifacts
+  compile-binaries:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            package-suffix: linux-amd64
+          - os: macos-latest
+            package-suffix: macos-amd64
+          - os: windows-latest
+            package-suffix: windows-amd64
+          - os: ubuntu-arm
+            package-suffix: linux-aarch64
+            # Need the 8 CPU version that has 12GB of RAM, the 4 CPU version
+            # only has 6 GB.
+            runsOn: buildjet-8vcpu-ubuntu-2204-arm
+    runs-on: ${{ matrix.runsOn || matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      # actions/setup-python doesn't yet support ARM
+      - if: ${{ !endsWith(matrix.os, '-arm') }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - if: ${{ matrix.os == 'ubuntu-arm' }}
+        uses: deadsnakes/action@v2.1.1
+        with:
+          python-version: "3.11"
+
+      # Install Rust locally for non-Linux (Linux uses an internal docker
+      # command to build with cibuildwheel which uses rustup install defined
+      # in pyproject.toml)
+      - if: ${{ runner.os != 'Linux' }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - if: ${{ runner.os != 'Linux' }}
+        uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: temporalio/bridge
+
+      # Prepare
+      - run: python -m pip install --upgrade wheel poetry poethepoet
+      - run: poetry install --no-root -E opentelemetry
+
+      # Add the source dist only for Linux x64 for now
+      - if: ${{ matrix.package-suffix == 'linux-amd64' }}
+        run: poetry build --format sdist
+
+      # Build and fix the wheel
+      - run: poetry run cibuildwheel --output-dir dist
+      - run: poe fix-wheel
+
+      # Simple test
+      - run: poe test-dist-single
+
+      # Upload dist
+      - uses: actions/upload-artifact@v2
+        with:
+          name: packages-${{ matrix.package-suffix }}
+          path: dist

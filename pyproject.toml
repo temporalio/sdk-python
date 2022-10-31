@@ -35,7 +35,7 @@ typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3.0"
-cibuildwheel = "^2.7.0"
+cibuildwheel = "^2.11.0"
 grpcio-tools = "^1.48.0"
 isort = "^5.10.1"
 mypy = "^0.971"
@@ -109,11 +109,6 @@ build-verbosity = "1"
 [tool.cibuildwheel.linux]
 before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
 environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
-
-[[tool.cibuildwheel.overrides]]
-# We need the aarch64 target for Rust
-before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable --target aarch64-unknown-linux-gnu -y && yum install -y openssl-devel"
-select = "*_aarch64"
 
 [tool.isort]
 profile = "black"

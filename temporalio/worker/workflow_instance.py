@@ -1135,7 +1135,12 @@ class _WorkflowInstanceImpl(
         self._curr_seqs[type] = seq
         return seq
 
-    def _register_task(self, task: asyncio.Task, *, name: Optional[str]) -> None:
+    def _register_task(
+        self,
+        task: asyncio.Task,
+        *,
+        name: Optional[str],
+    ) -> None:
         # Name not supported on older Python versions
         if sys.version_info >= (3, 8):
             # Put the workflow info at the end of the task name
@@ -1324,8 +1329,13 @@ class _WorkflowInstanceImpl(
         coro: Union[Awaitable[_T], Generator[Any, None, _T]],
         *,
         name: Optional[str] = None,
+        context: Optional[contextvars.Context] = None,
     ) -> asyncio.Task[_T]:
-        task = asyncio.Task(coro, loop=self)
+        # Context only supported on newer Python versions
+        if sys.version_info >= (3, 11):
+            task = asyncio.Task(coro, loop=self, context=context)  # type: ignore
+        else:
+            task = asyncio.Task(coro, loop=self)
         self._register_task(task, name=name)
         return task
 
