@@ -29,6 +29,7 @@ from .interceptor import Interceptor
 from .worker import load_default_build_id
 from .workflow import _WorkflowWorker
 from .workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,8 @@ class Replayer:
         *,
         workflows: Sequence[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
-        workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
+        workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
+        unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
         interceptors: Sequence[Interceptor] = [],
@@ -61,6 +63,7 @@ class Replayer:
             workflows=list(workflows),
             workflow_task_executor=workflow_task_executor,
             workflow_runner=workflow_runner,
+            unsandboxed_workflow_runner=unsandboxed_workflow_runner,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
@@ -156,7 +159,6 @@ class Replayer:
         )
 
         try:
-
             last_replay_failure: Optional[Exception]
             last_replay_run_id: str
             last_replay_complete = asyncio.Event()
@@ -181,6 +183,7 @@ class Replayer:
                 workflows=self._config["workflows"],
                 workflow_task_executor=self._config["workflow_task_executor"],
                 workflow_runner=self._config["workflow_runner"],
+                unsandboxed_workflow_runner=self._config["unsandboxed_workflow_runner"],
                 data_converter=self._config["data_converter"],
                 interceptors=self._config["interceptors"],
                 debug_mode=self._config["debug_mode"],
@@ -233,6 +236,7 @@ class ReplayerConfig(TypedDict, total=False):
     workflows: Sequence[Type]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
+    unsandboxed_workflow_runner: WorkflowRunner
     namespace: str
     data_converter: temporalio.converter.DataConverter
     interceptors: Sequence[Interceptor]

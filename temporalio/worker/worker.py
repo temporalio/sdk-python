@@ -29,6 +29,7 @@ from .activity import SharedStateManager, _ActivityWorker
 from .interceptor import Interceptor
 from .workflow import _WorkflowWorker
 from .workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,8 @@ class Worker:
         workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
-        workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
+        workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
+        unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
@@ -96,6 +98,8 @@ class Worker:
                 provided, the caller is responsible for shutting it down after
                 the worker is shut down.
             workflow_runner: Runner for workflows.
+            unsandboxed_workflow_runner: Runner for workflows that opt-out of
+                sandboxing.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
@@ -171,10 +175,6 @@ class Worker:
         )
         interceptors = interceptors_from_client + list(interceptors)
 
-        # Instead of using the _type_lookup on the client, we create a separate
-        # one here so we can continue to only use the public API of the client
-        type_lookup = temporalio.converter._FunctionTypeLookup()
-
         # Extract the bridge service client. We try the service on the client
         # first, then we support a worker_service_client on the client's service
         # to return underlying service client we can use.
@@ -202,6 +202,7 @@ class Worker:
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
             workflow_runner=workflow_runner,
+            unsandboxed_workflow_runner=unsandboxed_workflow_runner,
             interceptors=interceptors,
             build_id=build_id,
             identity=identity,
@@ -235,7 +236,6 @@ class Worker:
                 shared_state_manager=shared_state_manager,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
-                type_lookup=type_lookup,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
@@ -246,6 +246,7 @@ class Worker:
                 workflows=workflows,
                 workflow_task_executor=workflow_task_executor,
                 workflow_runner=workflow_runner,
+                unsandboxed_workflow_runner=unsandboxed_workflow_runner,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 debug_mode=debug_mode,
@@ -378,6 +379,7 @@ class WorkerConfig(TypedDict, total=False):
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
+    unsandboxed_workflow_runner: WorkflowRunner
     interceptors: Sequence[Interceptor]
     build_id: Optional[str]
     identity: Optional[str]
