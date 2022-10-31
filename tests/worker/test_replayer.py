@@ -3,7 +3,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import AsyncIterator
+from typing import Dict
 
 import pytest
 
@@ -260,46 +260,38 @@ async def test_replayer_multiple_from_client(
     if env.supports_time_skipping:
         pytest.skip("Java test server doesn't support newer workflow listing")
 
-    # Run 5 say-hello's, with second and 4th having non-det errors. Use the same
-    # workflow ID for all of them so that we can query.
-    workflow_id_suffix = f"-{uuid.uuid4()}"
+    # Run 5 say-hello's, with 2nd and 4th having non-det errors. Reuse the same
+    # workflow ID so we can query it using standard visibility.
+    workflow_id = f"workflow-{uuid.uuid4()}"
     async with new_say_hello_worker(client) as worker:
-        workflow_ids = []
+        expected_runs_and_non_det: Dict[str, bool] = {}
         for i in range(5):
-            workflow_id = f"workflow-{i}{workflow_id_suffix}"
-            workflow_ids.append(workflow_id)
-            await client.execute_workflow(
+            should_cause_nondeterminism = i == 1 or i == 3
+            handle = await client.start_workflow(
                 SayHelloWorkflow.run,
                 SayHelloParams(
-                    name="Temporal", should_cause_nondeterminism=i == 1 or i == 3
+                    name="Temporal",
+                    should_cause_nondeterminism=should_cause_nondeterminism,
                 ),
                 id=workflow_id,
                 task_queue=worker.task_queue,
             )
+            assert handle.result_run_id
+            expected_runs_and_non_det[
+                handle.result_run_id
+            ] = should_cause_nondeterminism
+            await handle.result()
 
-    # Lazily list then fetch histories the workflows, manually filtering for
-    # the ones we expect
-    async def hist_iter() -> AsyncIterator[WorkflowHistory]:
-        async for exec in await client.list_workflows(
-            "WorkflowType = 'SayHelloWorkflow'"
-        ):
-            if exec.id.endswith(workflow_id_suffix):
-                yield await client.get_workflow_handle(exec.id).fetch_history()
-
+    # Run replayer with list iterator mapped to histories and collect results
     async with Replayer(workflows=[SayHelloWorkflow]).workflow_replay_iterator(
-        hist_iter()
+        (await client.list_workflows(f"WorkflowId = '{workflow_id}'")).map_histories()
     ) as result_iter:
-        results = [r async for r in result_iter]
+        actual_runs_and_non_det = {
+            r.history.run_id: isinstance(r.replay_failure, workflow.NondeterminismError)
+            async for r in result_iter
+        }
 
-    # Sort the results and check against expected
-    results = sorted(results, key=lambda r: r.history.workflow_id)
-    assert len(results) == 5
-    for i, workflow_id in enumerate(workflow_ids):
-        assert results[i].history.workflow_id == workflow_id
-        if i == 1 or i == 3:
-            assert isinstance(results[i].replay_failure, workflow.NondeterminismError)
-        else:
-            assert not results[i].replay_failure
+    assert expected_runs_and_non_det == actual_runs_and_non_det
 
 
 def new_say_hello_worker(client: Client) -> Worker:

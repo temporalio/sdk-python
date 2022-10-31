@@ -619,7 +619,8 @@ class Client:
 
         Args:
             query: A Temporal visibility list filter. See Temporal documentation
-                concerning visibility list filters.
+                concerning visibility list filters including behavior when left
+                unset.
             page_size: Number of results for each page.
             next_page_token: A previously obtained next page token if doing
                 pagination.
@@ -1667,7 +1668,7 @@ class WorkflowExecutionAsyncIterator:
     """Asynchronous iterator for :py:class:`WorkflowExecution` values.
 
     Most users should use ``async for`` on this iterator and not call any of the
-    methods within. To consume the workflows into histories, call
+    methods within. To consume the workflows as histories, call
     :py:meth:`map_histories`.
     """
 
@@ -1775,7 +1776,6 @@ class WorkflowExecutionAsyncIterator:
         This is just a shortcut for ``fetch_history``, see that method for
         parameter details.
         """
-        # TODO(cretz): Document that this consumes the iterator
         async for v in self:
             yield await self._client.get_workflow_handle(
                 v.id, run_id=v.run_id

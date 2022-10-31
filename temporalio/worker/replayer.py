@@ -298,8 +298,11 @@ class WorkflowReplayResult:
     replay_failure: Optional[Exception]
     """Failure during replay if any.
     
-    This is not to be confused with a workflow failure, rather this is a task
-    failure such as :py:class:`temporalio.workflow.NondeterminismError`.
+    This does not mean your workflow exited by raising an error, but rather that
+    some task failure such as
+    :py:class:`temporalio.workflow.NondeterminismError` was encountered during
+    replay - likely indicating your workflow code is incompatible with the
+    history.
     """
 
 
