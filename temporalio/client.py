@@ -1664,7 +1664,7 @@ class WorkflowExecutionStatus(IntEnum):
 
 
 class WorkflowExecutionAsyncIterator:
-    """Asynchronous iterator for :py:class:`WorkflowExecution`s.
+    """Asynchronous iterator for :py:class:`WorkflowExecution` values.
 
     Most users should use ``async for`` on this iterator and not call any of the
     methods within. To consume the workflows into histories, call
