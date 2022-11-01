@@ -194,6 +194,12 @@ def test_decode_search_attributes():
     )
     assert dttz_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
+    # Check timezone aware, hour offset
+    dttz_check = temporalio.converter.decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00+00:00"')
+    )
+    assert dttz_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
 
 NewIntType = NewType("NewIntType", int)
 MyDataClassAlias = MyDataClass
