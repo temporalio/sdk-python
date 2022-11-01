@@ -4,7 +4,7 @@ import dataclasses
 import sys
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum, IntEnum
 from typing import (
     Any,
@@ -162,6 +162,37 @@ def test_encode_search_attribute_values():
         temporalio.converter.encode_search_attribute_values([datetime.utcnow()])
     with pytest.raises(TypeError, match="must have the same type"):
         temporalio.converter.encode_search_attribute_values(["foo", 123])
+
+
+def test_decode_search_attributes():
+    """Tests decode from protobuf for python types"""
+
+    def payload(key, dtype, data, encoding=None):
+        if encoding is None:
+            encoding = {"encoding": b"json/plain"}
+        check = temporalio.api.common.v1.Payload(
+            data=bytes(data, encoding="utf-8"),
+            metadata={"type": bytes(dtype, encoding="utf-8"), **encoding},
+        )
+        return temporalio.api.common.v1.SearchAttributes(indexed_fields={key: check})
+
+    # Check basic keyword parsing works
+    kw_check = temporalio.converter.decode_search_attributes(
+        payload("kw", "Keyword", '"test-id"')
+    )
+    assert kw_check["kw"][0] == "test-id"
+
+    # Ensure original DT functionality works
+    dt_check = temporalio.converter.decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00"')
+    )
+    assert dt_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0)
+
+    # Check timezone aware works as server is using ISO 8601
+    dttz_check = temporalio.converter.decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00Z"')
+    )
+    assert dttz_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 
 NewIntType = NewType("NewIntType", int)
