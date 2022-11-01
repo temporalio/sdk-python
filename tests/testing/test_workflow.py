@@ -17,7 +17,7 @@ from temporalio.exceptions import (
     TimeoutType,
 )
 from temporalio.testing import WorkflowEnvironment
-from tests.worker.test_workflow import new_worker
+from tests.helpers import new_worker
 
 
 @workflow.defn
