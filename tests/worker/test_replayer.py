@@ -284,7 +284,7 @@ async def test_replayer_multiple_from_client(
 
     # Run replayer with list iterator mapped to histories and collect results
     async with Replayer(workflows=[SayHelloWorkflow]).workflow_replay_iterator(
-        (await client.list_workflows(f"WorkflowId = '{workflow_id}'")).map_histories()
+        client.list_workflows(f"WorkflowId = '{workflow_id}'").map_histories()
     ) as result_iter:
         actual_runs_and_non_det = {
             r.history.run_id: isinstance(r.replay_failure, workflow.NondeterminismError)

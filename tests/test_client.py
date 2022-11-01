@@ -464,9 +464,6 @@ async def test_list_workflows_and_fetch_history(
             expected_id_and_input.append((workflow_id, f'"user{i}"'))
 
     # List them and get their history
-    hist_iter = (
-        await client.list_workflows(f"WorkflowId = '{workflow_id}'")
-    ).map_histories()
     actual_id_and_input = sorted(
         [
             (
@@ -475,7 +472,9 @@ async def test_list_workflows_and_fetch_history(
                 .workflow_execution_started_event_attributes.input.payloads[0]
                 .data.decode(),
             )
-            async for hist in hist_iter
+            async for hist in client.list_workflows(
+                f"WorkflowId = '{workflow_id}'"
+            ).map_histories()
         ]
     )
     assert actual_id_and_input == expected_id_and_input
