@@ -1,0 +1,65 @@
+name: Run Bench
+on:
+  workflow_call:
+    inputs:
+      sandbox-arg:
+        description: "Sandbox argument"
+        required: false
+        default: "--sandbox"
+        type: string
+  workflow_dispatch:
+    inputs:
+      sandbox-arg:
+        description: "Sandbox argument"
+        required: false
+        default: "--sandbox"
+        type: choice
+        options:
+          - "--sandbox"
+          - "--no-sandbox"
+
+jobs:
+  run-bench:
+    strategy:
+      matrix:
+        os: [ubuntu-latest-4-cores, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Prepare
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: temporalio/bridge
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # Build
+      - run: python -m pip install --upgrade wheel poetry poethepoet
+      - run: poetry install --no-root -E opentelemetry
+      - run: poe build-develop-with-release
+      
+      # Run a bunch of bench tests. We run multiple times since results vary.
+
+      - run: poe run-bench --workflow-count 100 --max-cached-workflows 100 --max-concurrent 100 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 100 --max-cached-workflows 100 --max-concurrent 100 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 100 --max-cached-workflows 100 --max-concurrent 100 ${{ inputs.sandbox-arg }}
+
+      - run: poe run-bench --workflow-count 1000 --max-cached-workflows 1000 --max-concurrent 1000 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 1000 --max-cached-workflows 1000 --max-concurrent 1000 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 1000 --max-cached-workflows 1000 --max-concurrent 1000 ${{ inputs.sandbox-arg }}
+
+      - run: poe run-bench --workflow-count 1000 --max-cached-workflows 100 --max-concurrent 100 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 1000 --max-cached-workflows 100 --max-concurrent 100 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 1000 --max-cached-workflows 100 --max-concurrent 100 ${{ inputs.sandbox-arg }}
+
+      - run: poe run-bench --workflow-count 10000 --max-cached-workflows 10000 --max-concurrent 10000 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 10000 --max-cached-workflows 10000 --max-concurrent 10000 ${{ inputs.sandbox-arg }}
+
+      - run: poe run-bench --workflow-count 10000 --max-cached-workflows 1000 --max-concurrent 1000 ${{ inputs.sandbox-arg }}
+      - run: poe run-bench --workflow-count 10000 --max-cached-workflows 1000 --max-concurrent 1000 ${{ inputs.sandbox-arg }}

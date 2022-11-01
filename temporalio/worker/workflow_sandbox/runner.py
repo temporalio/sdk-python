@@ -105,12 +105,18 @@ class _Instance(WorkflowInstance):
         self._create_instance()
 
     def _create_instance(self) -> None:
+        module_name = self.instance_details.defn.cls.__module__
+        # If the module name is __main__ then we change to __temporal_main__ so
+        # we don't trigger top-level execution that happens in __main__. We do
+        # not support importing __main__.
+        if module_name == "__main__":
+            module_name = "__temporal_main__"
         try:
             # Import user code
             self._run_code(
                 "with __temporal_importer.applied():\n"
                 # Import the workflow code
-                f"  from {self.instance_details.defn.cls.__module__} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
+                f"  from {module_name} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
                 f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n",
                 __temporal_importer=self.importer,
             )
