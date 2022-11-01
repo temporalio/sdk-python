@@ -22,7 +22,7 @@ from temporalio.worker.workflow_sandbox import (
     SandboxMatcher,
     SandboxRestrictions,
 )
-from tests.worker.test_workflow import assert_eq_eventually
+from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
 
 global_state = ["global orig"]
