@@ -7,12 +7,14 @@ import collections.abc
 import dataclasses
 import inspect
 import json
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from typing import (
     Any,
+    Callable,
     Dict,
     List,
     Mapping,
@@ -677,6 +679,21 @@ def encode_search_attribute_values(
     return default().payload_converter.to_payloads([safe_vals])[0]
 
 
+def get_iso_datetime_parser() -> Callable[[str], datetime]:
+    """Isolates system version check and returns relevant datetime passer
+
+    Returns:
+        A callable to parse date strings into datetimes.
+    """
+    if sys.version_info >= (3, 11):
+        return datetime.fromisoformat  # noqa
+    else:
+        # Isolate import for py > 3.11, as dependency only installed for < 3.11
+        from dateutil import parser
+
+        return parser.isoparse
+
+
 def decode_search_attributes(
     api: temporalio.api.common.v1.SearchAttributes,
 ) -> temporalio.common.SearchAttributes:
@@ -697,7 +714,8 @@ def decode_search_attributes(
             val = [val]
         # Convert each item to datetime if necessary
         if v.metadata.get("type") == b"Datetime":
-            val = [datetime.fromisoformat(v) for v in val]
+            parser = get_iso_datetime_parser()
+            val = [parser(v) for v in val]
         ret[k] = val
     return ret
 
