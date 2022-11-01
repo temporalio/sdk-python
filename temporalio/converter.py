@@ -878,7 +878,7 @@ def value_to_type(hint: Type, value: Any) -> Any:
     if inspect.isclass(hint) and issubclass(hint, StrEnum):
         if not isinstance(value, str):
             raise TypeError(
-                f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
+                f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"
             )
         return hint(value)
 
