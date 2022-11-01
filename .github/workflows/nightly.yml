@@ -1,0 +1,10 @@
+name: Nightly
+
+on:
+  schedule:
+    # (12 AM PST)
+    - cron: "00 07 * * *"
+
+jobs:
+  nightly:
+    uses: ./.github/workflows/run-bench.yml

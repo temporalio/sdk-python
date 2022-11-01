@@ -1,3 +1,4 @@
+import os
 import shutil
 
 from setuptools import setup
@@ -11,6 +12,8 @@ rust_extensions = [
         binding=Binding.PyO3,
         py_limited_api=True,
         features=["pyo3/abi3-py37"],
+        # Allow local release builds if requested
+        debug=False if os.environ.get("TEMPORAL_BUILD_RELEASE") == "1" else None,
     )
 ]
 
