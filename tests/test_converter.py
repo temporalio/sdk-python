@@ -5,7 +5,7 @@ import sys
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum, StrEnum
 from typing import (
     Any,
     Deque,
@@ -44,6 +44,10 @@ class NonSerializableEnum(Enum):
 
 class SerializableEnum(IntEnum):
     FOO = 1
+
+
+class SerializableStrEnum(StrEnum):
+    FOO = "foo"
 
 
 @dataclass
@@ -107,8 +111,8 @@ async def test_converter_default():
         await assert_payload(NonSerializableClass(), None, None)
     assert "not JSON serializable" in str(excinfo.value)
 
-    # Bad enum type. We do not allow non-int enums due to ambiguity in
-    # rebuilding and other confusion.
+    # Bad enum type. We do not allow non-int or non-str enums due to ambiguity
+    # in rebuilding and other confusion.
     with pytest.raises(TypeError) as excinfo:
         await assert_payload(NonSerializableEnum.FOO, None, None)
     assert "not JSON serializable" in str(excinfo.value)
@@ -294,6 +298,10 @@ def test_json_type_hints():
     # IntEnum
     ok(SerializableEnum, SerializableEnum.FOO)
     ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
+
+    # StrEnum
+    ok(SerializableStrEnum, SerializableStrEnum.FOO)
+    ok(List[SerializableStrEnum], [SerializableStrEnum.FOO, SerializableStrEnum.FOO])
 
     # 3.10+ checks
     if sys.version_info >= (3, 10):

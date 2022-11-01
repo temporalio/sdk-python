@@ -10,7 +10,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from typing import (
     Any,
     Dict,
@@ -869,6 +869,14 @@ def value_to_type(hint: Type, value: Any) -> Any:
     # IntEnum
     if inspect.isclass(hint) and issubclass(hint, IntEnum):
         if not isinstance(value, int):
+            raise TypeError(
+                f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
+            )
+        return hint(value)
+
+    # StrEnum
+    if inspect.isclass(hint) and issubclass(hint, StrEnum):
+        if not isinstance(value, str):
             raise TypeError(
                 f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
             )
