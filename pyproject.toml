@@ -1,20 +1,20 @@
 [tool.poetry]
-name = "temporalio"
-version = "0.1b2"
-description = "Temporal.io Python SDK"
-license = "MIT"
 authors = ["Temporal Technologies Inc <sdk@temporal.io>"]
-readme = "README.md"
-homepage = "https://github.com/temporalio/sdk-python"
-repository = "https://github.com/temporalio/sdk-python"
+description = "Temporal.io Python SDK"
 documentation = "https://docs.temporal.io/docs/python"
+homepage = "https://github.com/temporalio/sdk-python"
 keywords = ["temporal", "workflow"]
+license = "MIT"
+name = "temporalio"
+readme = "README.md"
+repository = "https://github.com/temporalio/sdk-python"
+version = "0.1b2"
 # We need to include proto source that is otherwise excluded via .gitignore.
 # We have chosen to keep all source including Rust source in precompiled wheels
 # for easy viewing. It is also complicated to exclude certain pieces for wheels
 # with Poetry (see https://github.com/python-poetry/poetry/issues/3380).
-include = ["temporalio/api/**/*", "temporalio/bridge/proto/**/*"]
 exclude = ["temporalio/bridge/**/target"]
+include = ["temporalio/api/**/*", "temporalio/bridge/proto/**/*"]
 
 # Known undocumented API for hooking into setup. Unfortunately Poetry does not
 # support this script in a subdirectory like scripts/.
@@ -25,14 +25,14 @@ script = "build.py"
 "Bug Tracker" = "https://github.com/temporalio/sdk-python/issues"
 
 [tool.poetry.dependencies]
-grpcio = { version = "^1.48.0", optional = true }
-opentelemetry-api = { version = "^1.11.1", optional = true }
-opentelemetry-sdk = { version = "^1.11.1", optional = true }
+grpcio = {version = "^1.48.0", optional = true}
+opentelemetry-api = {version = "^1.11.1", optional = true}
+opentelemetry-sdk = {version = "^1.11.1", optional = true}
 protobuf = "~4.21"
 python = "^3.7"
+python-dateutil = "^2.8.2"
 types-protobuf = "~3.20"
 typing-extensions = "^4.2.0"
-python-dateutil = "^2.8.2"
 
 [tool.poetry.dev-dependencies]
 black = "^22.3.0"
@@ -46,7 +46,7 @@ pydantic = "^1.9.1"
 pydocstyle = "^6.1.1"
 # TODO(cretz): Update when https://github.com/twisted/pydoctor/pull/595 released
 # pydoctor = "^22.5.1"
-pydoctor = { git = "https://github.com/cretz/pydoctor.git", branch = "overloads" }
+pydoctor = {git = "https://github.com/cretz/pydoctor.git", branch = "overloads"}
 pytest = "^7.1.2"
 pytest-asyncio = "^0.18.3"
 pytest-timeout = "^2.1.0"
@@ -56,12 +56,12 @@ toml = "^0.10.2"
 twine = "^4.0.1"
 
 [tool.poetry.extras]
-opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 grpc = ["grpc"]
+opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 
 [tool.poe.tasks]
-build-develop = ["build-bridge-develop"]
 build-bridge-develop = "python scripts/setup_bridge.py develop"
+build-develop = ["build-bridge-develop"]
 fix-wheel = "python scripts/fix_wheel.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
 gen-docs = "pydoctor"
@@ -88,15 +88,15 @@ ignore_fail = "return_non_zero"
 cmd = "pip install --no-index --find-links=./dist temporalio"
 [[tool.poe.tasks.test-dist-single.sequence]]
 cmd = "pytest -k test_activity_hello"
-env = { TEMPORAL_INTEGRATION_TEST = "1" }
+env = {TEMPORAL_INTEGRATION_TEST = "1"}
 [[tool.poe.tasks.test-dist-single.sequence]]
 cmd = "pip uninstall temporalio -y"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 log_cli = true
-log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_level = "INFO"
 testpaths = ["tests"]
 timeout = 600
 timeout_func_only = true
@@ -109,7 +109,7 @@ build-verbosity = "1"
 
 [tool.cibuildwheel.linux]
 before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
-environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
+environment = {PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true"}
 
 [[tool.cibuildwheel.overrides]]
 # We need the aarch64 target for Rust
@@ -121,22 +121,23 @@ profile = "black"
 skip_gitignore = true
 
 [tool.mypy]
-ignore_missing_imports = true
 exclude = [
   # Ignore generated code
   'temporalio/api',
   'temporalio/bridge/proto',
 ]
+ignore_missing_imports = true
 
 [tool.pydocstyle]
 convention = "google"
 # https://github.com/PyCQA/pydocstyle/issues/363#issuecomment-625563088
-match_dir = "^(?!(docs|scripts|tests|api|proto|\\.)).*"
 add_ignore = [
   # We like to wrap at a certain number of chars, even long summary sentences.
   # https://github.com/PyCQA/pydocstyle/issues/184
-  "D205", "D415"
+  "D205",
+  "D415",
 ]
+match_dir = "^(?!(docs|scripts|tests|api|proto|\\.)).*"
 
 [tool.pydoctor]
 add-package = ["temporalio"]
