@@ -35,6 +35,9 @@ from typing_extensions import Literal
 import temporalio.api.common.v1
 import temporalio.common
 
+if sys.version_info < (3, 11):
+    from dateutil import parser
+
 
 class PayloadConverter(ABC):
     """Base payload converter to/from multiple payloads/values."""
@@ -679,7 +682,7 @@ def encode_search_attribute_values(
     return default().payload_converter.to_payloads([safe_vals])[0]
 
 
-def get_iso_datetime_parser() -> Callable[[str], datetime]:
+def _get_iso_datetime_parser() -> Callable[[str], datetime]:
     """Isolates system version check and returns relevant datetime passer
 
     Returns:
@@ -689,8 +692,6 @@ def get_iso_datetime_parser() -> Callable[[str], datetime]:
         return datetime.fromisoformat  # noqa
     else:
         # Isolate import for py > 3.11, as dependency only installed for < 3.11
-        from dateutil import parser
-
         return parser.isoparse
 
 
@@ -714,7 +715,7 @@ def decode_search_attributes(
             val = [val]
         # Convert each item to datetime if necessary
         if v.metadata.get("type") == b"Datetime":
-            parser = get_iso_datetime_parser()
+            parser = _get_iso_datetime_parser()
             val = [parser(v) for v in val]
         ret[k] = val
     return ret

@@ -59,9 +59,6 @@ twine = "^4.0.1"
 opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 grpc = ["grpc"]
 
-[tool.poetry.group.dev.dependencies]
-python-dateutil = "^2.8.2"
-
 [tool.poe.tasks]
 build-develop = ["build-bridge-develop"]
 build-bridge-develop = "python scripts/setup_bridge.py develop"
