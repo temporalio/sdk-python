@@ -862,8 +862,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         hist_run_id = fail_attr.new_execution_run_id
                         break
                     raise WorkflowFailureError(
-                        cause=await temporalio.exceptions.decode_failure_to_error(
-                            fail_attr.failure, self._client.data_converter
+                        cause=await self._client.data_converter.decode_failure(
+                            fail_attr.failure
                         ),
                     )
                 elif event.HasField("workflow_execution_canceled_event_attributes"):
@@ -1950,15 +1950,16 @@ class WorkflowHistoryEventAsyncIterator:
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
     """Error that occurs when a workflow is unsuccessful."""
 
-    def __init__(self, *, cause: temporalio.exceptions.FailureError) -> None:
+    def __init__(self, *, cause: BaseException) -> None:
         """Create workflow failure error."""
         super().__init__("Workflow execution failed")
         self.__cause__ = cause
 
     @property
-    def cause(self) -> temporalio.exceptions.FailureError:
+    def cause(self) -> BaseException:
         """Cause of the workflow failure."""
-        return cast(temporalio.exceptions.FailureError, self.__cause__)
+        assert self.__cause__
+        return self.__cause__
 
 
 class WorkflowContinuedAsNewError(temporalio.exceptions.TemporalError):
@@ -2546,9 +2547,7 @@ class _ClientImpl(OutboundInterceptor):
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
         failure = temporalio.api.failure.v1.Failure()
-        await temporalio.exceptions.encode_exception_to_failure(
-            input.error, self._client.data_converter, failure
-        )
+        await self._client.data_converter.encode_failure(input.error, failure)
         last_heartbeat_details = (
             None
             if not input.last_heartbeat_details

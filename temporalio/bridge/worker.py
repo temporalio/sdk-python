@@ -219,8 +219,8 @@ async def decode_activation(
             await _decode_payloads(job.query_workflow.arguments, codec)
         elif job.HasField("resolve_activity"):
             if job.resolve_activity.result.HasField("cancelled"):
-                await temporalio.exceptions.decode_failure(
-                    job.resolve_activity.result.cancelled.failure, codec
+                await codec.decode_failure(
+                    job.resolve_activity.result.cancelled.failure
                 )
             elif job.resolve_activity.result.HasField("completed"):
                 if job.resolve_activity.result.completed.HasField("result"):
@@ -228,13 +228,11 @@ async def decode_activation(
                         job.resolve_activity.result.completed.result, codec
                     )
             elif job.resolve_activity.result.HasField("failed"):
-                await temporalio.exceptions.decode_failure(
-                    job.resolve_activity.result.failed.failure, codec
-                )
+                await codec.decode_failure(job.resolve_activity.result.failed.failure)
         elif job.HasField("resolve_child_workflow_execution"):
             if job.resolve_child_workflow_execution.result.HasField("cancelled"):
-                await temporalio.exceptions.decode_failure(
-                    job.resolve_child_workflow_execution.result.cancelled.failure, codec
+                await codec.decode_failure(
+                    job.resolve_child_workflow_execution.result.cancelled.failure
                 )
             elif job.resolve_child_workflow_execution.result.HasField(
                 "completed"
@@ -245,32 +243,28 @@ async def decode_activation(
                     job.resolve_child_workflow_execution.result.completed.result, codec
                 )
             elif job.resolve_child_workflow_execution.result.HasField("failed"):
-                await temporalio.exceptions.decode_failure(
-                    job.resolve_child_workflow_execution.result.failed.failure, codec
+                await codec.decode_failure(
+                    job.resolve_child_workflow_execution.result.failed.failure
                 )
         elif job.HasField("resolve_child_workflow_execution_start"):
             if job.resolve_child_workflow_execution_start.HasField("cancelled"):
-                await temporalio.exceptions.decode_failure(
-                    job.resolve_child_workflow_execution_start.cancelled.failure, codec
+                await codec.decode_failure(
+                    job.resolve_child_workflow_execution_start.cancelled.failure
                 )
         elif job.HasField("resolve_request_cancel_external_workflow"):
             if job.resolve_request_cancel_external_workflow.HasField("failure"):
-                await temporalio.exceptions.decode_failure(
-                    job.resolve_request_cancel_external_workflow.failure, codec
+                await codec.decode_failure(
+                    job.resolve_request_cancel_external_workflow.failure
                 )
         elif job.HasField("resolve_signal_external_workflow"):
             if job.resolve_signal_external_workflow.HasField("failure"):
-                await temporalio.exceptions.decode_failure(
-                    job.resolve_signal_external_workflow.failure, codec
-                )
+                await codec.decode_failure(job.resolve_signal_external_workflow.failure)
         elif job.HasField("signal_workflow"):
             await _decode_payloads(job.signal_workflow.input, codec)
         elif job.HasField("start_workflow"):
             await _decode_payloads(job.start_workflow.arguments, codec)
             if job.start_workflow.HasField("continued_failure"):
-                await temporalio.exceptions.decode_failure(
-                    job.start_workflow.continued_failure, codec
-                )
+                await codec.decode_failure(job.start_workflow.continued_failure)
             for val in job.start_workflow.memo.fields.values():
                 # This uses API payload not bridge payload
                 new_payload = (await codec.decode([val]))[0]
@@ -285,7 +279,7 @@ async def encode_completion(
 ) -> None:
     """Recursively encode the given completion with the codec."""
     if comp.HasField("failed"):
-        await temporalio.exceptions.encode_failure(comp.failed.failure, codec)
+        await codec.encode_failure(comp.failed.failure)
     elif comp.HasField("successful"):
         for command in comp.successful.commands:
             if command.HasField("complete_workflow_execution"):
@@ -300,14 +294,10 @@ async def encode_completion(
                 for val in command.continue_as_new_workflow_execution.memo.values():
                     await _encode_payload(val, codec)
             elif command.HasField("fail_workflow_execution"):
-                await temporalio.exceptions.encode_failure(
-                    command.fail_workflow_execution.failure, codec
-                )
+                await codec.encode_failure(command.fail_workflow_execution.failure)
             elif command.HasField("respond_to_query"):
                 if command.respond_to_query.HasField("failed"):
-                    await temporalio.exceptions.encode_failure(
-                        command.respond_to_query.failed, codec
-                    )
+                    await codec.encode_failure(command.respond_to_query.failed)
                 elif command.respond_to_query.HasField(
                     "succeeded"
                 ) and command.respond_to_query.succeeded.HasField("response"):

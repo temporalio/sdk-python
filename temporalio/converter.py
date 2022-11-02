@@ -7,12 +7,16 @@ import collections.abc
 import dataclasses
 import inspect
 import json
+import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from typing import (
     Any,
+    Awaitable,
+    Callable,
+    ClassVar,
     Dict,
     List,
     Mapping,
@@ -31,7 +35,10 @@ import google.protobuf.symbol_database
 from typing_extensions import Literal
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
+import temporalio.api.failure.v1
 import temporalio.common
+import temporalio.exceptions
 
 
 class PayloadConverter(ABC):
@@ -537,6 +544,259 @@ class PayloadCodec(ABC):
         # TODO(cretz): Copy too expensive?
         payloads.payloads.extend(new_payloads)
 
+    async def encode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
+        """Encode payloads of a failure."""
+        await self._apply_to_failure_payloads(failure, self.encode_wrapper)
+
+    async def decode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
+        """Decode payloads of a failure."""
+        await self._apply_to_failure_payloads(failure, self.decode_wrapper)
+
+    async def _apply_to_failure_payloads(
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        cb: Callable[[temporalio.api.common.v1.Payloads], Awaitable[None]],
+    ) -> None:
+        if failure.HasField(
+            "application_failure_info"
+        ) and failure.application_failure_info.HasField("details"):
+            await cb(failure.application_failure_info.details)
+        elif failure.HasField(
+            "timeout_failure_info"
+        ) and failure.timeout_failure_info.HasField("last_heartbeat_details"):
+            await cb(failure.timeout_failure_info.last_heartbeat_details)
+        elif failure.HasField(
+            "canceled_failure_info"
+        ) and failure.canceled_failure_info.HasField("details"):
+            await cb(failure.canceled_failure_info.details)
+        elif failure.HasField(
+            "reset_workflow_failure_info"
+        ) and failure.reset_workflow_failure_info.HasField("last_heartbeat_details"):
+            await cb(failure.reset_workflow_failure_info.last_heartbeat_details)
+        if failure.HasField("cause"):
+            await self._apply_to_failure_payloads(failure.cause, cb)
+
+
+class FailureConverter(ABC):
+    """Base failure converter to/from errors."""
+
+    default: ClassVar[FailureConverter]
+
+    @abstractmethod
+    def to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        """Convert the given exception to a Temporal failure.
+
+        Args:
+            exception: The exception to convert.
+            payload_converter: The payload converter to use if needed.
+            failure: The failure to update with error information.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def from_failure(
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        payload_converter: PayloadConverter,
+    ) -> BaseException:
+        """Convert the given error to a Temporal failure.
+
+        Args:
+            error: The error to convert.
+            payload_converter: The payload converter to use if needed.
+
+        Returns:
+            Converted error.
+        """
+        raise NotImplementedError
+
+
+class DefaultFailureConverter(FailureConverter):
+    """Default failure converter."""
+
+    def to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        """See base class."""
+        # If already a failure error, use that
+        if isinstance(exception, temporalio.exceptions.FailureError):
+            self._error_to_failure(exception, payload_converter, failure)
+        else:
+            # Convert to failure error
+            failure_error = temporalio.exceptions.ApplicationError(
+                str(exception), type=exception.__class__.__name__
+            )
+            failure_error.__traceback__ = exception.__traceback__
+            failure_error.__cause__ = exception.__cause__
+            self._error_to_failure(failure_error, payload_converter, failure)
+
+    def _error_to_failure(
+        self,
+        error: temporalio.exceptions.FailureError,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        # If there is an underlying proto already, just use that
+        if error.failure:
+            failure.CopyFrom(error.failure)
+            return
+
+        # Set message, stack, and cause. Obtaining cause follows rules from
+        # https://docs.python.org/3/library/exceptions.html#exception-context
+        failure.message = error.message
+        if error.__traceback__:
+            failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
+        if error.__cause__:
+            self.to_failure(error.__cause__, payload_converter, failure.cause)
+        elif not error.__suppress_context__ and error.__context__:
+            self.to_failure(error.__context__, payload_converter, failure.cause)
+
+        # Set specific subclass values
+        if isinstance(error, temporalio.exceptions.ApplicationError):
+            failure.application_failure_info.SetInParent()
+            if error.type:
+                failure.application_failure_info.type = error.type
+            failure.application_failure_info.non_retryable = error.non_retryable
+            if error.details:
+                failure.application_failure_info.details.CopyFrom(
+                    payload_converter.to_payloads_wrapper(error.details)
+                )
+        elif isinstance(error, temporalio.exceptions.TimeoutError):
+            failure.timeout_failure_info.SetInParent()
+            failure.timeout_failure_info.timeout_type = (
+                temporalio.api.enums.v1.TimeoutType.ValueType(error.type or 0)
+            )
+            if error.last_heartbeat_details:
+                failure.timeout_failure_info.last_heartbeat_details.CopyFrom(
+                    payload_converter.to_payloads_wrapper(error.last_heartbeat_details)
+                )
+        elif isinstance(error, temporalio.exceptions.CancelledError):
+            failure.canceled_failure_info.SetInParent()
+            if error.details:
+                failure.canceled_failure_info.details.CopyFrom(
+                    payload_converter.to_payloads_wrapper(error.details)
+                )
+        elif isinstance(error, temporalio.exceptions.TerminatedError):
+            failure.terminated_failure_info.SetInParent()
+        elif isinstance(error, temporalio.exceptions.ServerError):
+            failure.server_failure_info.SetInParent()
+            failure.server_failure_info.non_retryable = error.non_retryable
+        elif isinstance(error, temporalio.exceptions.ActivityError):
+            failure.activity_failure_info.SetInParent()
+            failure.activity_failure_info.scheduled_event_id = error.scheduled_event_id
+            failure.activity_failure_info.started_event_id = error.started_event_id
+            failure.activity_failure_info.identity = error.identity
+            failure.activity_failure_info.activity_type.name = error.activity_type
+            failure.activity_failure_info.activity_id = error.activity_id
+            failure.activity_failure_info.retry_state = (
+                temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
+            )
+        elif isinstance(error, temporalio.exceptions.ChildWorkflowError):
+            failure.child_workflow_execution_failure_info.SetInParent()
+            failure.child_workflow_execution_failure_info.namespace = error.namespace
+            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = (
+                error.workflow_id
+            )
+            failure.child_workflow_execution_failure_info.workflow_execution.run_id = (
+                error.run_id
+            )
+            failure.child_workflow_execution_failure_info.workflow_type.name = (
+                error.workflow_type
+            )
+            failure.child_workflow_execution_failure_info.initiated_event_id = (
+                error.initiated_event_id
+            )
+            failure.child_workflow_execution_failure_info.started_event_id = (
+                error.started_event_id
+            )
+            failure.child_workflow_execution_failure_info.retry_state = (
+                temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
+            )
+
+    def from_failure(
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        payload_converter: PayloadConverter,
+    ) -> BaseException:
+        """See base class."""
+        err: temporalio.exceptions.FailureError
+        if failure.HasField("application_failure_info"):
+            app_info = failure.application_failure_info
+            err = temporalio.exceptions.ApplicationError(
+                failure.message or "Application error",
+                *payload_converter.from_payloads_wrapper(app_info.details),
+                type=app_info.type or None,
+                non_retryable=app_info.non_retryable,
+            )
+        elif failure.HasField("timeout_failure_info"):
+            timeout_info = failure.timeout_failure_info
+            err = temporalio.exceptions.TimeoutError(
+                failure.message or "Timeout",
+                type=temporalio.exceptions.TimeoutType(int(timeout_info.timeout_type))
+                if timeout_info.timeout_type
+                else None,
+                last_heartbeat_details=payload_converter.from_payloads_wrapper(
+                    timeout_info.last_heartbeat_details
+                ),
+            )
+        elif failure.HasField("canceled_failure_info"):
+            cancel_info = failure.canceled_failure_info
+            err = temporalio.exceptions.CancelledError(
+                failure.message or "Cancelled",
+                *payload_converter.from_payloads_wrapper(cancel_info.details),
+            )
+        elif failure.HasField("terminated_failure_info"):
+            err = temporalio.exceptions.TerminatedError(failure.message or "Terminated")
+        elif failure.HasField("server_failure_info"):
+            server_info = failure.server_failure_info
+            err = temporalio.exceptions.ServerError(
+                failure.message or "Server error",
+                non_retryable=server_info.non_retryable,
+            )
+        elif failure.HasField("activity_failure_info"):
+            act_info = failure.activity_failure_info
+            err = temporalio.exceptions.ActivityError(
+                failure.message or "Activity error",
+                scheduled_event_id=act_info.scheduled_event_id,
+                started_event_id=act_info.started_event_id,
+                identity=act_info.identity,
+                activity_type=act_info.activity_type.name,
+                activity_id=act_info.activity_id,
+                retry_state=temporalio.exceptions.RetryState(int(act_info.retry_state))
+                if act_info.retry_state
+                else None,
+            )
+        elif failure.HasField("child_workflow_execution_failure_info"):
+            child_info = failure.child_workflow_execution_failure_info
+            err = temporalio.exceptions.ChildWorkflowError(
+                failure.message or "Child workflow error",
+                namespace=child_info.namespace,
+                workflow_id=child_info.workflow_execution.workflow_id,
+                run_id=child_info.workflow_execution.run_id,
+                workflow_type=child_info.workflow_type.name,
+                initiated_event_id=child_info.initiated_event_id,
+                started_event_id=child_info.started_event_id,
+                retry_state=temporalio.exceptions.RetryState(
+                    int(child_info.retry_state)
+                )
+                if child_info.retry_state
+                else None,
+            )
+        else:
+            err = temporalio.exceptions.FailureError(failure.message or "Failure error")
+        err._failure = failure
+        if failure.HasField("cause"):
+            err.__cause__ = self.from_failure(failure.cause, payload_converter)
+        return err
+
 
 @dataclass(frozen=True)
 class DataConverter:
@@ -552,10 +812,15 @@ class DataConverter:
     payload_codec: Optional[PayloadCodec] = None
     """Optional codec for encoding payload bytes."""
 
+    failure_converter_class: Type[FailureConverter] = DefaultFailureConverter
+    """Class to instantiate for failure conversion."""
+
     payload_converter: PayloadConverter = dataclasses.field(init=False)
+    failure_converter: FailureConverter = dataclasses.field(init=False)
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
+        object.__setattr__(self, "failure_converter", self.failure_converter_class())
 
     async def encode(
         self, values: Sequence[Any]
@@ -615,6 +880,22 @@ class DataConverter:
         if not payloads or not payloads.payloads:
             return []
         return await self.decode(payloads.payloads, type_hints)
+
+    async def encode_failure(
+        self, exception: BaseException, failure: temporalio.api.failure.v1.Failure
+    ) -> None:
+        """Convert and encode failure."""
+        self.failure_converter.to_failure(exception, self.payload_converter, failure)
+        if self.payload_codec:
+            await self.payload_codec.encode_failure(failure)
+
+    async def decode_failure(
+        self, failure: temporalio.api.failure.v1.Failure
+    ) -> BaseException:
+        """Decode and convert failure."""
+        if self.payload_codec:
+            await self.payload_codec.decode_failure(failure)
+        return self.failure_converter.from_failure(failure, self.payload_converter)
 
 
 _default: Optional[DataConverter] = None

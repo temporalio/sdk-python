@@ -53,6 +53,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         self.create_instance(
             WorkflowInstanceDetails(
                 payload_converter_class=temporalio.converter.default().payload_converter_class,
+                failure_converter_class=temporalio.converter.default().failure_converter_class,
                 interceptor_classes=[],
                 defn=defn,
                 # Just use fake info during validation
