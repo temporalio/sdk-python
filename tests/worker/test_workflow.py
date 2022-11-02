@@ -22,6 +22,7 @@ from typing import (
     Tuple,
     cast,
 )
+from unittest import mock
 
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -1344,6 +1345,20 @@ class SearchAttributeWorkflow:
         )
 
 
+def mock_modify_value_datetime_z(inputs: bytes) -> WorkflowActivation:
+    """Adds a check in case the server sends a 'Z' as part of its UTC format"""
+    job_act = WorkflowActivation.FromString(inputs)
+    for job in job_act.jobs:
+        if not job.HasField("start_workflow"):
+            continue
+        for item in job.start_workflow.search_attributes.indexed_fields.values():
+            if item.metadata.get("type") != b"Datetime":
+                # Only looking for dates
+                continue
+            item.data = item.data.replace(b"+00:00", b"Z")
+    return job_act
+
+
 async def test_workflow_search_attributes(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
@@ -1372,24 +1387,30 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
     assert await search_attributes_present()
 
     async with new_worker(client, SearchAttributeWorkflow) as worker:
-        handle = await client.start_workflow(
-            SearchAttributeWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            search_attributes={
-                f"{sa_prefix}text": ["text1", "text2", "text0"],
-                f"{sa_prefix}keyword": ["keyword1"],
-                f"{sa_prefix}int": [123],
-                f"{sa_prefix}double": [456.78],
-                f"{sa_prefix}bool": [True],
-                f"{sa_prefix}datetime": [
-                    # With UTC
-                    datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc),
-                    # With other offset
-                    datetime(2002, 3, 4, 5, 6, 7, tzinfo=timezone(timedelta(hours=8))),
-                ],
-            },
-        )
+        with mock.patch(
+            "temporalio.bridge.proto.workflow_activation.WorkflowActivation.FromString",
+            side_effect=mock_modify_value_datetime_z,
+        ):
+            handle = await client.start_workflow(
+                SearchAttributeWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                search_attributes={
+                    f"{sa_prefix}text": ["text1", "text2", "text0"],
+                    f"{sa_prefix}keyword": ["keyword1"],
+                    f"{sa_prefix}int": [123],
+                    f"{sa_prefix}double": [456.78],
+                    f"{sa_prefix}bool": [True],
+                    f"{sa_prefix}datetime": [
+                        # With UTC
+                        datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc),
+                        # With other offset
+                        datetime(
+                            2002, 3, 4, 5, 6, 7, tzinfo=timezone(timedelta(hours=8))
+                        ),
+                    ],
+                },
+            )
         # Make sure it started with the right attributes
         expected = {
             f"{sa_prefix}text": {"type": "str", "values": ["text1", "text2", "text0"]},
