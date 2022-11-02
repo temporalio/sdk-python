@@ -32,6 +32,7 @@ protobuf = "~4.21"
 python = "^3.7"
 python-dateutil = { version = "^2.8.2", python = "<3.11" }
 types-protobuf = "~3.20"
+types-python-dateutil = { version = "^2.8.19.2", python = "<3.11" }
 typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
