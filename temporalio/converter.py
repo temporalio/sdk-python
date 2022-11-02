@@ -44,6 +44,8 @@ import temporalio.exceptions
 class PayloadConverter(ABC):
     """Base payload converter to/from multiple payloads/values."""
 
+    default: ClassVar[PayloadConverter]
+
     @abstractmethod
     def to_payloads(
         self, values: Sequence[Any]
@@ -243,15 +245,11 @@ class DefaultPayloadConverter(CompositePayloadConverter):
     the type hint.
     """
 
+    default_encoding_payload_converters: Tuple[EncodingPayloadConverter, ...]
+
     def __init__(self) -> None:
         """Create a default payload converter."""
-        super().__init__(
-            BinaryNullPayloadConverter(),
-            BinaryPlainPayloadConverter(),
-            JSONProtoPayloadConverter(),
-            BinaryProtoPayloadConverter(),
-            JSONPlainPayloadConverter(),
-        )
+        super().__init__(*DefaultPayloadConverter.default_encoding_payload_converters)
 
 
 class BinaryNullPayloadConverter(EncodingPayloadConverter):
@@ -619,6 +617,10 @@ class FailureConverter(ABC):
 class DefaultFailureConverter(FailureConverter):
     """Default failure converter."""
 
+    def __init__(self, *, encode_common_attributes: bool = False) -> None:
+        super().__init__()
+        self._encode_common_attributes = encode_common_attributes
+
     def to_failure(
         self,
         exception: BaseException,
@@ -637,6 +639,16 @@ class DefaultFailureConverter(FailureConverter):
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__
             self._error_to_failure(failure_error, payload_converter, failure)
+        # Encode common attributes if requested
+        if self._encode_common_attributes:
+            # Move message and stack trace to encoded attribute payload
+            failure.encoded_attributes.CopyFrom(
+                payload_converter.to_payloads(
+                    [{"message": failure.message, "stack_trace": failure.stack_trace}]
+                )[0]
+            )
+            failure.message = "Encoded failure"
+            failure.stack_trace = ""
 
     def _error_to_failure(
         self,
@@ -727,6 +739,27 @@ class DefaultFailureConverter(FailureConverter):
         payload_converter: PayloadConverter,
     ) -> BaseException:
         """See base class."""
+        # If encoded attributes are present and have the fields we expect,
+        # extract them
+        if failure.HasField("encoded_attributes"):
+            # Clone the failure to not mutate the incoming failure
+            new_failure = temporalio.api.failure.v1.Failure()
+            new_failure.CopyFrom(failure)
+            failure = new_failure
+            try:
+                encoded_attributes: Dict[str, Any] = payload_converter.from_payloads(
+                    [failure.encoded_attributes]
+                )[0]
+                if isinstance(encoded_attributes, dict):
+                    message = encoded_attributes.get("message")
+                    if isinstance(message, str):
+                        failure.message = message
+                    stack_trace = encoded_attributes.get("stack_trace")
+                    if isinstance(stack_trace, str):
+                        failure.stack_trace = stack_trace
+            except:
+                pass
+
         err: temporalio.exceptions.FailureError
         if failure.HasField("application_failure_info"):
             app_info = failure.application_failure_info
@@ -798,6 +831,11 @@ class DefaultFailureConverter(FailureConverter):
         return err
 
 
+class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
+    def __init__(self) -> None:
+        super().__init__(encode_common_attributes=True)
+
+
 @dataclass(frozen=True)
 class DataConverter:
     """Data converter for converting and encoding payloads to/from Python values.
@@ -817,6 +855,8 @@ class DataConverter:
 
     payload_converter: PayloadConverter = dataclasses.field(init=False)
     failure_converter: FailureConverter = dataclasses.field(init=False)
+
+    default: ClassVar[DataConverter]
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
@@ -898,15 +938,28 @@ class DataConverter:
         return self.failure_converter.from_failure(failure, self.payload_converter)
 
 
-_default: Optional[DataConverter] = None
+DefaultPayloadConverter.default_encoding_payload_converters = (
+    BinaryNullPayloadConverter(),
+    BinaryPlainPayloadConverter(),
+    JSONProtoPayloadConverter(),
+    BinaryProtoPayloadConverter(),
+    JSONPlainPayloadConverter(),
+)
+
+PayloadConverter.default = DefaultPayloadConverter()
+
+FailureConverter.default = DefaultFailureConverter()
+
+DataConverter.default = DataConverter()
 
 
 def default() -> DataConverter:
-    """Default data converter."""
-    global _default
-    if not _default:
-        _default = DataConverter()
-    return _default
+    """Default data converter.
+
+    .. deprecated::
+        Use :py:meth:`DataConverter.default` instead.
+    """
+    return DataConverter.default
 
 
 def encode_search_attributes(
