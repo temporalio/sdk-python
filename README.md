@@ -297,7 +297,8 @@ async def create_greeting_activity(info: GreetingInfo) -> str:
 Some things to note about the above code:
 
 * Workflows run in a sandbox by default. Users are encouraged to define workflows in files with no side effects or other
-  complicated code. See the [Workflow Sandbox](#workflow-sandbox) section for more details.
+  complicated code or unnecessary imports to other third party libraries. See the [Workflow Sandbox](#workflow-sandbox)
+  section for more details.
 * This workflow continually updates the queryable current greeting when signalled and can complete with the greeting on
   a different signal
 * Workflows are always classes and must have a single `@workflow.run` which is an `async def` function
@@ -642,7 +643,7 @@ is immutable and contains three fields that can be customized, but only two have
 
 ###### Passthrough Modules
 
-To make the sandbox quicker when importing known third party libraries, they can be added to the
+To make the sandbox quicker and use less memory when importing known third party libraries, they can be added to the
 `SandboxRestrictions.passthrough_modules` set like so:
 
 ```python
@@ -708,7 +709,17 @@ The sandbox is only a helper, it does not provide full protection.
 
 ###### Sandbox Performance
 
-TODO: This is actively being measured; results to come soon
+The sandbox does not add significant CPU or memory overhead for workflows that are in files which only import standard
+library modules. This is because they are passed through from outside of the sandbox. However, every
+non-standard-library import that is performed at the top of the same file the workflow is in will add CPU overhead (the
+module is re-imported every workflow run) and memory overhead (each module independently cached as part of the workflow
+run for isolation reasons). This becomes more apparent for large numbers of workflow runs.
+
+To mitigate this, users should:
+
+* Define workflows in files that have as few non-standard-library imports as possible
+* Alter the max workflow cache and/or max concurrent workflows settings if memory grows too large
+* Set third-party libraries as passthrough modules if they are known to be side-effect free
 
 ###### Extending Restricted Classes
 

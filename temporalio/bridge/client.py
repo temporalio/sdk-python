@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Mapping, Optional, Type, TypeVar
+from typing import Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
 

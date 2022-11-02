@@ -9,6 +9,7 @@ from __future__ import annotations
 import builtins
 import functools
 import importlib
+import importlib.util
 import logging
 import sys
 import threading
@@ -174,6 +175,25 @@ class Importer:
                 # Put it on the parent
                 if parent:
                     setattr(sys.modules[parent], child, sys.modules[name])
+
+            # If the module is __temporal_main__ and not already in sys.modules,
+            # we load it from whatever file __main__ was originally in
+            if name == "__temporal_main__":
+                orig_mod = _thread_local_sys_modules.orig["__main__"]
+                new_spec = importlib.util.spec_from_file_location(
+                    name, orig_mod.__file__
+                )
+                if not new_spec:
+                    raise ImportError(
+                        f"No spec for __main__ file at {orig_mod.__file__}"
+                    )
+                elif not new_spec.loader:
+                    raise ImportError(
+                        f"Spec for __main__ file at {orig_mod.__file__} has no loader"
+                    )
+                new_mod = importlib.util.module_from_spec(new_spec)
+                sys.modules[name] = new_mod
+                new_spec.loader.exec_module(new_mod)
 
         mod = importlib.__import__(name, globals, locals, fromlist, level)
         # Check for restrictions if necessary and apply
