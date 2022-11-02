@@ -49,7 +49,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
 
-from .interceptor import (
+from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
     HandleQueryInput,

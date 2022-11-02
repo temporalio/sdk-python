@@ -26,12 +26,16 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
 
-from .interceptor import (
+from ._interceptor import (
     Interceptor,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
 )
-from .workflow_instance import WorkflowInstance, WorkflowInstanceDetails, WorkflowRunner
+from ._workflow_instance import (
+    WorkflowInstance,
+    WorkflowInstanceDetails,
+    WorkflowRunner,
+)
 
 logger = logging.getLogger(__name__)
 
