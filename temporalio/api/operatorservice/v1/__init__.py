@@ -38,6 +38,7 @@ __all__ = [
 try:
     import grpc
 
+    from .service_pb2_grpc import OperatorService  # type: ignore
     from .service_pb2_grpc import (
         OperatorServiceServicer,
         OperatorServiceStub,
@@ -46,6 +47,7 @@ try:
 
     __all__.extend(
         [
+            "OperatorService",
             "OperatorServiceServicer",
             "OperatorServiceStub",
             "add_OperatorServiceServicer_to_server",

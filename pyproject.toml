@@ -28,9 +28,9 @@ script = "build.py"
 grpcio = { version = "^1.48.0", optional = true }
 opentelemetry-api = { version = "^1.11.1", optional = true }
 opentelemetry-sdk = { version = "^1.11.1", optional = true }
-protobuf = "~4.21"
+protobuf = "^3.20.1"
 python = "^3.7"
-types-protobuf = "~3.20"
+types-protobuf = "^3.19.21"
 typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
@@ -38,8 +38,8 @@ black = "^22.3.0"
 cibuildwheel = "^2.11.0"
 grpcio-tools = "^1.48.0"
 isort = "^5.10.1"
-mypy = "^0.971"
-mypy-protobuf = "^3.3.0"
+mypy = "^0.961"
+mypy-protobuf = "^3.2.0"
 protoc-wheel-0 = "^21.1"
 psutil = "^5.9.3"
 pydantic = "^1.9.1"
