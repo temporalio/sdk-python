@@ -1988,6 +1988,7 @@ class WorkflowQueryRejectedError(temporalio.exceptions.TemporalError):
         """Get workflow execution status causing rejection."""
         return self._status
 
+
 class WorkflowQueryFailedError(temporalio.exceptions.TemporalError):
     """Error that occurs when a query fails."""
 
@@ -2000,6 +2001,7 @@ class WorkflowQueryFailedError(temporalio.exceptions.TemporalError):
     def message(self) -> str:
         """Get query failed message."""
         return self._message
+
 
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""

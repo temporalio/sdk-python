@@ -662,7 +662,6 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
 class _BridgeServiceClient(ServiceClient):
     @staticmethod
     async def connect(config: ConnectConfig) -> _BridgeServiceClient:
-        # TODO(cretz): Expose telemetry init config
         temporalio.bridge.telemetry.init_telemetry(
             temporalio.bridge.telemetry.TelemetryConfig(),
             warn_if_already_inited=False,
