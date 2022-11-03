@@ -40,9 +40,9 @@ from temporalio.client import (
     WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
+    WorkflowQueryFailedError,
     WorkflowQueryRejectedError,
     _history_from_json,
-    WorkflowQueryFailedError,
 )
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import new_worker

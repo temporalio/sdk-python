@@ -41,10 +41,10 @@ from temporalio.client import (
     Client,
     RPCError,
     RPCStatusCode,
+    WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
     WorkflowQueryFailedError,
-    WorkflowExecutionStatus,
 )
 from temporalio.common import RetryPolicy, SearchAttributes
 from temporalio.converter import DataConverter, PayloadCodec
