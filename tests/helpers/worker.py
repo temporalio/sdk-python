@@ -230,7 +230,7 @@ class ExternalPythonWorker(ExternalWorker):
         self.worker = Worker(
             env.client, task_queue=str(uuid.uuid4()), workflows=[KitchenSinkWorkflow]
         )
-        self.worker._start()
+        self.run_task = asyncio.create_task(self.worker.run())
 
     @property
     def task_queue(self) -> str:
@@ -238,3 +238,4 @@ class ExternalPythonWorker(ExternalWorker):
 
     async def close(self):
         await self.worker.shutdown()
+        await self.run_task

@@ -130,9 +130,8 @@ class _ActivityWorker:
                     raise RuntimeError(f"Unrecognized activity task: {task}")
             except temporalio.bridge.worker.PollShutdownError:
                 return
-            except Exception:
-                # Should never happen
-                logger.exception(f"Activity runner failed")
+            except Exception as err:
+                raise RuntimeError("Activity worker failed") from err
 
     async def shutdown(self, after_graceful_timeout: timedelta) -> None:
         # Set event that we're shutting down (updates all activity tasks)
