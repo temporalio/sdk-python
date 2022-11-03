@@ -72,7 +72,7 @@ class Client:
         target_host: str,
         *,
         namespace: str = "default",
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -139,7 +139,7 @@ class Client:
         service_client: temporalio.service.ServiceClient,
         *,
         namespace: str = "default",
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition

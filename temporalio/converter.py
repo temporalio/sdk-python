@@ -45,6 +45,7 @@ class PayloadConverter(ABC):
     """Base payload converter to/from multiple payloads/values."""
 
     default: ClassVar[PayloadConverter]
+    """Default payload converter."""
 
     @abstractmethod
     def to_payloads(
@@ -240,12 +241,14 @@ class DefaultPayloadConverter(CompositePayloadConverter):
     """Default payload converter compatible with other Temporal SDKs.
 
     This handles None, bytes, all protobuf message types, and any type that
-    :py:func:`json.dump` accepts. In addition, this supports encoding
-    :py:mod:`dataclasses` and also decoding them provided the data class is in
-    the type hint.
+    :py:func:`json.dump` accepts. A singleton instance of this is available at
+    :py:attr:`PayloadConverter.default`.
     """
 
     default_encoding_payload_converters: Tuple[EncodingPayloadConverter, ...]
+    """Default set of encoding payload converters the default payload converter
+    uses.
+    """
 
     def __init__(self) -> None:
         """Create a default payload converter."""
@@ -576,9 +579,16 @@ class PayloadCodec(ABC):
 
 
 class FailureConverter(ABC):
-    """Base failure converter to/from errors."""
+    """Base failure converter to/from errors.
+
+    Note, for workflow exceptions, :py:attr:`to_failure` is only invoked if the
+    exception is an instance of :py:class:`temporalio.exceptions.FailureError`.
+    Users should extend :py:class:`temporalio.exceptions.ApplicationError` if
+    they want a custom workflow exception to work with this class.
+    """
 
     default: ClassVar[FailureConverter]
+    """Default failure converter."""
 
     @abstractmethod
     def to_failure(
@@ -588,6 +598,8 @@ class FailureConverter(ABC):
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
         """Convert the given exception to a Temporal failure.
+
+        Users should make sure not to alter the ``exception`` input.
 
         Args:
             exception: The exception to convert.
@@ -602,10 +614,12 @@ class FailureConverter(ABC):
         failure: temporalio.api.failure.v1.Failure,
         payload_converter: PayloadConverter,
     ) -> BaseException:
-        """Convert the given error to a Temporal failure.
+        """Convert the given Temporal failure to an exception.
+
+        Users should make sure not to alter the ``failure`` input.
 
         Args:
-            error: The error to convert.
+            failure: The failure to convert.
             payload_converter: The payload converter to use if needed.
 
         Returns:
@@ -615,9 +629,20 @@ class FailureConverter(ABC):
 
 
 class DefaultFailureConverter(FailureConverter):
-    """Default failure converter."""
+    """Default failure converter.
+
+    A singleton instance of this is available at
+    :py:attr:`FailureConverter.default`.
+    """
 
     def __init__(self, *, encode_common_attributes: bool = False) -> None:
+        """Create the default failure converter.
+
+        Args:
+            encode_common_attributes: If ``True``, the message and stack trace
+                of the failure will be moved into the encoded attribute section
+                of the failure which can be encoded with a codec.
+        """
         super().__init__()
         self._encode_common_attributes = encode_common_attributes
 
@@ -832,7 +857,12 @@ class DefaultFailureConverter(FailureConverter):
 
 
 class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
+    """Implementation of :py:class:`DefaultFailureConverter` which moves message
+    and stack trace to encoded attributes subject to a codec.
+    """
+
     def __init__(self) -> None:
+        """Create a default failure converter with encoded attributes."""
         super().__init__(encode_common_attributes=True)
 
 
@@ -854,9 +884,13 @@ class DataConverter:
     """Class to instantiate for failure conversion."""
 
     payload_converter: PayloadConverter = dataclasses.field(init=False)
+    """Payload converter created from the :py:attr:`payload_converter_class`."""
+
     failure_converter: FailureConverter = dataclasses.field(init=False)
+    """Failure converter created from the :py:attr:`failure_converter_class`."""
 
     default: ClassVar[DataConverter]
+    """Singleton default data converter."""
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
@@ -946,11 +980,11 @@ DefaultPayloadConverter.default_encoding_payload_converters = (
     JSONPlainPayloadConverter(),
 )
 
-PayloadConverter.default = DefaultPayloadConverter()
-
-FailureConverter.default = DefaultFailureConverter()
-
 DataConverter.default = DataConverter()
+
+PayloadConverter.default = DataConverter.default.payload_converter
+
+FailureConverter.default = DataConverter.default.failure_converter
 
 
 def default() -> DataConverter:

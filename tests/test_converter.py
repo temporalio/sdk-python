@@ -343,8 +343,10 @@ async def test_exception_format():
 
     # Convert to failure and back
     failure = Failure()
-    await temporalio.converter.default().encode_failure(actual_err, failure)
-    failure_error = await temporalio.converter.default().decode_failure(failure)
+    await temporalio.converter.DataConverter.default.encode_failure(actual_err, failure)
+    failure_error = await temporalio.converter.DataConverter.default.decode_failure(
+        failure
+    )
     # Confirm type is prepended
     assert isinstance(failure_error, ApplicationError)
     assert "RuntimeError: error2" == str(failure_error)
