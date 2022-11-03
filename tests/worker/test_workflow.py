@@ -2377,6 +2377,9 @@ async def test_workflow_query_does_not_run_condition(client: Client):
 
 @workflow.defn
 class CancelSignalAndTimerFiredInSameTaskWorkflow:
+    def __init__(self):
+        self.timer_task: asyncio.Task = None
+
     @workflow.run
     async def run(self) -> None:
         # Start a 1 hour timer
@@ -2390,7 +2393,8 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
 
     @workflow.signal
     def cancel_timer(self) -> None:
-        self.timer_task.cancel()
+        if self.timer_task:
+            self.timer_task.cancel()
 
 
 async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
