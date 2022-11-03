@@ -5,7 +5,7 @@ import sys
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum, IntEnum, StrEnum
+from enum import Enum, IntEnum
 from typing import (
     Any,
     Deque,
@@ -33,6 +33,10 @@ import temporalio.common
 import temporalio.converter
 from temporalio.api.common.v1 import Payload as AnotherNameForPayload
 
+# StrEnum is available in 3.11+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+
 
 class NonSerializableClass:
     pass
@@ -46,8 +50,10 @@ class SerializableEnum(IntEnum):
     FOO = 1
 
 
-class SerializableStrEnum(StrEnum):
-    FOO = "foo"
+if sys.version_info >= (3, 11):
+
+    class SerializableStrEnum(StrEnum):
+        FOO = "foo"
 
 
 @dataclass
@@ -299,9 +305,14 @@ def test_json_type_hints():
     ok(SerializableEnum, SerializableEnum.FOO)
     ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
 
-    # StrEnum
-    ok(SerializableStrEnum, SerializableStrEnum.FOO)
-    ok(List[SerializableStrEnum], [SerializableStrEnum.FOO, SerializableStrEnum.FOO])
+    # StrEnum is available in 3.11+
+    if sys.version_info >= (3, 11):
+        # StrEnum
+        ok(SerializableStrEnum, SerializableStrEnum.FOO)
+        ok(
+            List[SerializableStrEnum],
+            [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
+        )
 
     # 3.10+ checks
     if sys.version_info >= (3, 10):
