@@ -1469,7 +1469,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             # an # interceptor could have changed the name
             if not handler:
                 raise RuntimeError(
-                    f"Query handler for {input.query} expected but not found"
+                    f"Query handler for '{input.query}' expected but not found"
                 )
         # Put name first if dynamic
         args = list(input.args) if not dynamic else [input.query] + list(input.args)

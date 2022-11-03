@@ -1988,6 +1988,18 @@ class WorkflowQueryRejectedError(temporalio.exceptions.TemporalError):
         """Get workflow execution status causing rejection."""
         return self._status
 
+class WorkflowQueryFailedError(temporalio.exceptions.TemporalError):
+    """Error that occurs when a query fails."""
+
+    def __init__(self, message: str) -> None:
+        """Create workflow query failed error."""
+        super().__init__(message)
+        self._message = message
+
+    @property
+    def message(self) -> str:
+        """Get query failed message."""
+        return self._message
 
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""
@@ -2409,9 +2421,17 @@ class _ClientImpl(OutboundInterceptor):
             )
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.query.header.fields)
-        resp = await self._client.workflow_service.query_workflow(
-            req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
-        )
+        try:
+            resp = await self._client.workflow_service.query_workflow(
+                req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+            )
+        except RPCError as err:
+            # If the status is INVALID_ARGUMENT, we can assume it's a query
+            # failed error
+            if err.status == RPCStatusCode.INVALID_ARGUMENT:
+                raise WorkflowQueryFailedError(err.message)
+            else:
+                raise
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
                 WorkflowExecutionStatus(resp.query_rejected.status)
