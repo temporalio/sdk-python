@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use temporal_sdk_core::{
     telemetry_init, Logger, MetricsExporter, OtelCollectorOptions, TelemetryOptions,
-    TelemetryOptionsBuilder, TraceExporter,
+    TelemetryOptionsBuilder, TraceExportConfig, TraceExporter,
 };
 use url::Url;
 
@@ -17,22 +17,37 @@ pub struct TelemetryRef {
 
 #[derive(FromPyObject)]
 pub struct TelemetryConfig {
-    tracing_filter: Option<String>,
-    otel_tracing: Option<OtelCollectorConfig>,
-    log_console: bool,
-    log_forwarding_level: Option<String>,
-    otel_metrics: Option<OtelCollectorConfig>,
-    prometheus_metrics: Option<PrometheusMetricsConfig>,
+    tracing: Option<TracingConfig>,
+    logging: Option<LoggingConfig>,
+    metrics: Option<MetricsConfig>,
 }
 
 #[derive(FromPyObject)]
-pub struct OtelCollectorConfig {
+pub struct TracingConfig {
+    filter: String,
+    opentelemetry: OpenTelemetryConfig,
+}
+
+#[derive(FromPyObject)]
+pub struct LoggingConfig {
+    filter: String,
+    forward: bool,
+}
+
+#[derive(FromPyObject)]
+pub struct MetricsConfig {
+    opentelemetry: Option<OpenTelemetryConfig>,
+    prometheus: Option<PrometheusConfig>,
+}
+
+#[derive(FromPyObject)]
+pub struct OpenTelemetryConfig {
     url: String,
     headers: HashMap<String, String>,
 }
 
 #[derive(FromPyObject)]
-pub struct PrometheusMetricsConfig {
+pub struct PrometheusConfig {
     bind_address: String,
 }
 
@@ -51,37 +66,36 @@ impl TryFrom<TelemetryConfig> for TelemetryOptions {
 
     fn try_from(conf: TelemetryConfig) -> PyResult<Self> {
         let mut build = TelemetryOptionsBuilder::default();
-        if let Some(v) = conf.tracing_filter {
-            build.tracing_filter(v);
+        if let Some(v) = conf.tracing {
+            build.tracing(TraceExportConfig {
+                filter: v.filter,
+                exporter: TraceExporter::Otel(v.opentelemetry.try_into()?),
+            });
         }
-        if let Some(v) = conf.otel_tracing {
-            build.tracing(TraceExporter::Otel(v.try_into()?));
+        if let Some(v) = conf.logging {
+            build.logging(if v.forward {
+                Logger::Forward { filter: v.filter }
+            } else {
+                Logger::Console { filter: v.filter }
+            });
         }
-        if let Some(ref v) = conf.log_forwarding_level {
-            if conf.log_console {
+        if let Some(v) = conf.metrics {
+            build.metrics(if let Some(t) = v.opentelemetry {
+                if v.prometheus.is_some() {
+                    return Err(PyValueError::new_err(
+                        "Cannot have OpenTelemetry and Prometheus metrics",
+                    ));
+                }
+                MetricsExporter::Otel(t.try_into()?)
+            } else if let Some(t) = v.prometheus {
+                MetricsExporter::Prometheus(SocketAddr::from_str(&t.bind_address).map_err(
+                    |err| PyValueError::new_err(format!("Invalid Prometheus address: {}", err)),
+                )?)
+            } else {
                 return Err(PyValueError::new_err(
-                    "Cannot have log forwarding level and log console",
+                    "Either OpenTelemetry or Prometheus config must be provided",
                 ));
-            }
-            build.logging(Logger::Forward(log::LevelFilter::from_str(v).map_err(
-                |err| PyValueError::new_err(format!("Invalid log level: {}", err)),
-            )?));
-        } else if conf.log_console {
-            build.logging(Logger::Console);
-        }
-        if let Some(v) = conf.otel_metrics {
-            if conf.prometheus_metrics.is_some() {
-                return Err(PyValueError::new_err(
-                    "Cannot have OTel and Prometheus metrics",
-                ));
-            }
-            build.metrics(MetricsExporter::Otel(v.try_into()?));
-        } else if let Some(v) = conf.prometheus_metrics {
-            build.metrics(MetricsExporter::Prometheus(
-                SocketAddr::from_str(&v.bind_address).map_err(|err| {
-                    PyValueError::new_err(format!("Invalid Prometheus address: {}", err))
-                })?,
-            ));
+            });
         }
         build
             .build()
@@ -89,10 +103,10 @@ impl TryFrom<TelemetryConfig> for TelemetryOptions {
     }
 }
 
-impl TryFrom<OtelCollectorConfig> for OtelCollectorOptions {
+impl TryFrom<OpenTelemetryConfig> for OtelCollectorOptions {
     type Error = PyErr;
 
-    fn try_from(conf: OtelCollectorConfig) -> PyResult<Self> {
+    fn try_from(conf: OpenTelemetryConfig) -> PyResult<Self> {
         Ok(OtelCollectorOptions {
             url: Url::parse(&conf.url)
                 .map_err(|err| PyValueError::new_err(format!("Invalid OTel URL: {}", err)))?,
