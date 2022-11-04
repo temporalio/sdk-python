@@ -7,6 +7,7 @@ import collections.abc
 import dataclasses
 import inspect
 import json
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -32,6 +33,10 @@ from typing_extensions import Literal
 
 import temporalio.api.common.v1
 import temporalio.common
+
+# StrEnum is available in 3.11+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
 
 
 class PayloadConverter(ABC):
@@ -873,6 +878,15 @@ def value_to_type(hint: Type, value: Any) -> Any:
                 f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
             )
         return hint(value)
+
+    # StrEnum, available in 3.11+
+    if sys.version_info >= (3, 11):
+        if inspect.isclass(hint) and issubclass(hint, StrEnum):
+            if not isinstance(value, str):
+                raise TypeError(
+                    f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"
+                )
+            return hint(value)
 
     # Iterable. We intentionally put this last as it catches several others.
     if inspect.isclass(origin) and issubclass(origin, collections.abc.Iterable):
