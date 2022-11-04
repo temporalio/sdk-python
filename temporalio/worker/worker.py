@@ -413,6 +413,12 @@ class Worker:
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks)
+        # Sometimes both workers throw an exception and since we only take the
+        # first, Python may complain with "Task exception was never retrieved"
+        # if we don't get the others. Therefore we call cancel on each task
+        # which suppresses this.
+        for task in tasks:
+            task.cancel()
 
         # Shutdown the activity worker (there is no workflow worker shutdown)
         if self._activity_worker:
@@ -420,7 +426,12 @@ class Worker:
         # Wait for the bridge to report everything is completed
         await bridge_shutdown_task
         # Do final shutdown
-        await self._bridge_worker.finalize_shutdown()
+        try:
+            await self._bridge_worker.finalize_shutdown()
+        except:
+            # Ignore errors here that can arise in some tests where the bridge
+            # worker still has a reference
+            pass
 
         # Mark as shutdown complete and re-raise exception if present
         self._shutdown_complete_event.set()

@@ -50,6 +50,17 @@ async def test_worker_fatal_error_run(client: Client):
     assert str(err.value) == "Activity worker failed"
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
+    # Run worker with them both injected (was causing warning for not retrieving
+    # the second error)
+    worker = create_worker(client)
+    with pytest.raises(RuntimeError) as err:
+        with WorkerFailureInjector(worker) as inj:
+            inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
+            inj.activity.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
+            await worker.run()
+    assert str(err.value).endswith("worker failed")
+    assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
+
 
 async def test_worker_fatal_error_with(client: Client):
     # Start the worker, wait a short bit, fail it, wait for long time (will be
