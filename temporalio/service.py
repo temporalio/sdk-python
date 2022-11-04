@@ -206,6 +206,11 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+        """Update service client's RPC metadata."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def _rpc_call(
         self,
         rpc: str,
@@ -691,6 +696,14 @@ class _BridgeServiceClient(ServiceClient):
     def worker_service_client(self) -> _BridgeServiceClient:
         """Underlying service client."""
         return self
+
+    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+        """Update Core client metadata."""
+        # Mutate the bridge config and then only mutate the running client
+        # metadata if already connected
+        self._bridge_config.metadata = metadata
+        if self._bridge_client:
+            self._bridge_client.update_metadata(metadata)
 
     async def _rpc_call(
         self,

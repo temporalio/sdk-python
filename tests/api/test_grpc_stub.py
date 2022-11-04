@@ -39,12 +39,16 @@ def assert_time_remaining(context: ServicerContext, expected: int) -> None:
 
 
 class SimpleWorkflowServer(WorkflowServiceServicer):
+    def __init__(self) -> None:
+        super().__init__()
+        self.expected_client_key_value = "client_value"
+
     async def GetSystemInfo(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
         self,
         request: GetSystemInfoRequest,
         context: ServicerContext,
     ) -> GetSystemInfoResponse:
-        assert_metadata(context, client_key="client_value")
+        assert_metadata(context, client_key=self.expected_client_key_value)
         return GetSystemInfoResponse()
 
     async def CountWorkflowExecutions(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
@@ -52,7 +56,9 @@ class SimpleWorkflowServer(WorkflowServiceServicer):
         request: CountWorkflowExecutionsRequest,
         context: ServicerContext,
     ) -> CountWorkflowExecutionsResponse:
-        assert_metadata(context, client_key="client_value", rpc_key="rpc_value")
+        assert_metadata(
+            context, client_key=self.expected_client_key_value, rpc_key="rpc_value"
+        )
         assert_time_remaining(context, 123)
         assert request.namespace == "my namespace"
         assert request.query == "my query"
@@ -87,7 +93,8 @@ async def test_python_grpc_stub():
 
     # Start server
     server = grpc_server()
-    add_WorkflowServiceServicer_to_server(SimpleWorkflowServer(), server)
+    workflow_server = SimpleWorkflowServer()
+    add_WorkflowServiceServicer_to_server(workflow_server, server)
     add_OperatorServiceServicer_to_server(SimpleOperatorServer(), server)
     add_TestServiceServicer_to_server(SimpleTestServer(), server)
     port = server.add_insecure_port("[::]:0")
@@ -115,4 +122,13 @@ async def test_python_grpc_stub():
         Empty(), metadata=metadata, timeout=timeout
     )
     assert time_resp.time.seconds == 123
+
+    # Make another call to get system info after changing the client-level
+    # header
+    new_metadata = dict(client.rpc_metadata)
+    new_metadata["client_key"] = "changed_value"
+    client.rpc_metadata = new_metadata
+    workflow_server.expected_client_key_value = "changed_value"
+    await client.workflow_service.get_system_info(GetSystemInfoRequest())
+
     await server.stop(grace=None)

@@ -93,6 +93,10 @@ macro_rules! rpc_call {
 
 #[pymethods]
 impl ClientRef {
+    fn update_metadata(&self, headers: HashMap<String, String>) {
+        self.retry_client.get_client().set_headers(headers);
+    }
+
     fn call_workflow_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
         let mut retry_client = self.retry_client.clone();
         future_into_py(py, async move {

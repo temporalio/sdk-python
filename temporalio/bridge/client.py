@@ -78,6 +78,10 @@ class Client:
         """Initialize client with underlying SDK Core reference."""
         self._ref = ref
 
+    def update_metadata(self, metadata: Mapping[str, str]) -> None:
+        """Update underlying metadata on Core client."""
+        self._ref.update_metadata(metadata)
+
     async def call(
         self,
         *,

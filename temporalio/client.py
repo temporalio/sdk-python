@@ -207,6 +207,26 @@ class Client:
         """Data converter used by this client."""
         return self._config["data_converter"]
 
+    @property
+    def rpc_metadata(self) -> Mapping[str, str]:
+        """Headers for every call made by this client.
+
+        Do not use mutate this mapping. Rather, set this property with an
+        entirely new mapping to change the headers.
+        """
+        return self.service_client.config.rpc_metadata
+
+    @rpc_metadata.setter
+    def rpc_metadata(self, value: Mapping[str, str]) -> None:
+        """Update the headers for this client.
+
+        Do not mutate this mapping after set. Rather, set an entirely new
+        mapping if changes are needed.
+        """
+        # Update config and perform update
+        self.service_client.config.rpc_metadata = value
+        self.service_client.update_rpc_metadata(value)
+
     # Overload for no-param workflow
     @overload
     async def start_workflow(
