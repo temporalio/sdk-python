@@ -226,6 +226,7 @@ class StartActivityInput:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cancellation_type: temporalio.workflow.ActivityCancellationType
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    disable_eager_execution: bool
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]

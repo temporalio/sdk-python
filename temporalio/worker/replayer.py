@@ -218,6 +218,7 @@ class Replayer:
                     interceptors=self._config["interceptors"],
                     debug_mode=self._config["debug_mode"],
                     on_eviction_hook=on_eviction_hook,
+                    disable_eager_activity_execution=False,
                 ).run()
             )
 

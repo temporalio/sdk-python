@@ -71,6 +71,7 @@ class Worker:
         graceful_shutdown_timeout: timedelta = timedelta(),
         shared_state_manager: Optional[SharedStateManager] = None,
         debug_mode: bool = False,
+        disable_eager_activity_execution: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -163,6 +164,10 @@ class Worker:
                 sandboxing in order to make using a debugger easier. If false
                 but the environment variable ``TEMPORAL_DEBUG`` is truthy, this
                 will be set to true.
+            disable_eager_activity_execution: If true, will disable eager
+                activity execution. Eager activity execution is an optimization
+                on some servers that sends activities back to the same worker as
+                the calling workflow if they can run there.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
@@ -222,6 +227,7 @@ class Worker:
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
+            disable_eager_activity_execution=disable_eager_activity_execution,
         )
         self._task: Optional[asyncio.Task] = None
 
@@ -250,6 +256,8 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 debug_mode=debug_mode,
+                disable_eager_activity_execution=disable_eager_activity_execution,
+                on_eviction_hook=None,
             )
 
         # We need an already connected client
@@ -399,6 +407,7 @@ class WorkerConfig(TypedDict, total=False):
     graceful_shutdown_timeout: timedelta
     shared_state_manager: Optional[SharedStateManager]
     debug_mode: bool
+    disable_eager_activity_execution: bool
 
 
 _default_build_id: Optional[str] = None
