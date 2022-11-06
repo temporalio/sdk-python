@@ -37,7 +37,7 @@ import temporalio.common
 
 if sys.version_info < (3, 11):
     # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
-    from dateutil import parser
+    from dateutil import parser  # type: ignore
 
 
 class PayloadConverter(ABC):
