@@ -38,6 +38,9 @@ import temporalio.common
 if sys.version_info < (3, 11):
     # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
     from dateutil import parser  # type: ignore
+# StrEnum is available in 3.11+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
 
 
 class PayloadConverter(ABC):
@@ -893,6 +896,15 @@ def value_to_type(hint: Type, value: Any) -> Any:
                 f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
             )
         return hint(value)
+
+    # StrEnum, available in 3.11+
+    if sys.version_info >= (3, 11):
+        if inspect.isclass(hint) and issubclass(hint, StrEnum):
+            if not isinstance(value, str):
+                raise TypeError(
+                    f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"
+                )
+            return hint(value)
 
     # Iterable. We intentionally put this last as it catches several others.
     if inspect.isclass(origin) and issubclass(origin, collections.abc.Iterable):
