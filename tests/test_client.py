@@ -40,6 +40,7 @@ from temporalio.client import (
     WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
+    WorkflowQueryFailedError,
     WorkflowQueryRejectedError,
     _history_from_json,
 )
@@ -246,10 +247,8 @@ async def test_query(client: Client, worker: ExternalWorker):
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Try a query not on the workflow
-    with pytest.raises(RPCError) as err:
+    with pytest.raises(WorkflowQueryFailedError) as err:
         await handle.query("does not exist")
-    # TODO(cretz): Is this the status we expect all SDKs to report?
-    assert err.value.status == RPCStatusCode.INVALID_ARGUMENT
 
 
 async def test_query_rejected(client: Client, worker: ExternalWorker):

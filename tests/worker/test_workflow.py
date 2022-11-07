@@ -42,8 +42,10 @@ from temporalio.client import (
     Client,
     RPCError,
     RPCStatusCode,
+    WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
+    WorkflowQueryFailedError,
 )
 from temporalio.common import RetryPolicy, SearchAttributes
 from temporalio.converter import (
@@ -366,10 +368,16 @@ async def test_workflow_signal_and_query_errors(client: Client):
         assert isinstance(err.value.cause, ApplicationError)
         assert list(err.value.cause.details) == [123]
         # Fail query (no details on query failure)
-        with pytest.raises(RPCError) as rpc_err:
+        with pytest.raises(WorkflowQueryFailedError) as rpc_err:
             await handle.query(SignalAndQueryErrorsWorkflow.bad_query)
-        assert rpc_err.value.status is RPCStatusCode.INVALID_ARGUMENT
         assert str(rpc_err.value) == "query fail"
+        # Unrecognized query
+        with pytest.raises(WorkflowQueryFailedError) as rpc_err:
+            await handle.query("non-existent query")
+        assert (
+            str(rpc_err.value)
+            == "Query handler for 'non-existent query' expected but not found"
+        )
 
 
 @workflow.defn
@@ -724,6 +732,7 @@ async def test_workflow_simple_cancel(client: Client):
         with pytest.raises(WorkflowFailureError) as err:
             await handle.result()
         assert isinstance(err.value.cause, CancelledError)
+        assert (await handle.describe()).status == WorkflowExecutionStatus.CANCELED
 
 
 @workflow.defn

@@ -9,6 +9,8 @@ import warnings
 from dataclasses import dataclass
 from typing import Mapping, Optional
 
+from typing_extensions import Literal
+
 import temporalio.bridge.temporal_sdk_bridge
 
 
@@ -22,6 +24,7 @@ class TelemetryConfig:
     log_forwarding_level: Optional[str] = None
     otel_metrics: Optional[OtelCollectorConfig] = None
     prometheus_metrics: Optional[PrometheusMetricsConfig] = None
+    metric_temporality: Literal["cumulative", "delta"] = "cumulative"
 
 
 @dataclass

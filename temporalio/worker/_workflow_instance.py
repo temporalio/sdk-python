@@ -1202,45 +1202,53 @@ class _WorkflowInstanceImpl(
         except _ContinueAsNewError as err:
             logger.debug("Workflow requested continue as new")
             err._apply_command(self._add_command())
-        except temporalio.exceptions.FailureError as err:
+
+        # Note in some Python versions, cancelled error does not extend
+        # exception
+        # TODO(cretz): Should I fail the task on BaseException too (e.g.
+        # KeyboardInterrupt)?
+        except (Exception, asyncio.CancelledError) as err:
             logger.debug(
                 f"Workflow raised failure with run ID {self._info.run_id}",
                 exc_info=True,
             )
-            # If a cancel was requested, and the failure is from an activity or
-            # child, and its cause was a cancellation, we want to use that cause
-            # instead because it means a cancel bubbled up while waiting on an
-            # activity or child.
-            if (
-                self._cancel_requested
-                and (
-                    isinstance(err, temporalio.exceptions.ActivityError)
-                    or isinstance(err, temporalio.exceptions.ChildWorkflowError)
-                )
-                and isinstance(err.cause, temporalio.exceptions.CancelledError)
-            ):
-                err = err.cause
 
-            command = self._add_command()
-            command.fail_workflow_execution.failure.SetInParent()
-            try:
-                self._failure_converter.to_failure(
-                    err,
-                    self._payload_converter,
-                    command.fail_workflow_execution.failure,
+            # All asyncio cancelled errors become Temporal cancelled errors
+            if isinstance(err, asyncio.CancelledError):
+                err = temporalio.exceptions.CancelledError(str(err))
+
+            # If a cancel was ever requested and this is a cancellation, or an
+            # activity/child cancellation, we add a cancel command. Technically
+            # this means that a swallowed cancel followed by, say, an activity
+            # cancel later on will show the workflow as cancelled. But this is
+            # a Temporal limitation in that cancellation is a state not an
+            # event.
+            if self._cancel_requested and (
+                isinstance(err, temporalio.exceptions.CancelledError)
+                or (
+                    (
+                        isinstance(err, temporalio.exceptions.ActivityError)
+                        or isinstance(err, temporalio.exceptions.ChildWorkflowError)
+                    )
+                    and isinstance(err.cause, temporalio.exceptions.CancelledError)
                 )
-            except Exception as inner_err:
-                raise ValueError("Failed converting workflow exception") from inner_err
-        except asyncio.CancelledError as err:
-            command = self._add_command()
-            command.fail_workflow_execution.failure.SetInParent()
-            self._failure_converter.to_failure(
-                temporalio.exceptions.CancelledError(str(err)),
-                self._payload_converter,
-                command.fail_workflow_execution.failure,
-            )
-        except Exception as err:
-            self._current_activation_error = err
+            ):
+                self._add_command().cancel_workflow_execution.SetInParent()
+            elif isinstance(err, temporalio.exceptions.FailureError):
+                # All other failure errors fail the workflow
+                failure = self._add_command().fail_workflow_execution.failure
+                failure.SetInParent()
+                try:
+                    self._failure_converter.to_failure(
+                        err, self._payload_converter, failure
+                    )
+                except Exception as inner_err:
+                    raise ValueError(
+                        "Failed converting workflow exception"
+                    ) from inner_err
+            else:
+                # All other exceptions fail the task
+                self._current_activation_error = err
 
     async def _signal_external_workflow(
         self,
@@ -1471,7 +1479,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             # an # interceptor could have changed the name
             if not handler:
                 raise RuntimeError(
-                    f"Query handler for {input.query} expected but not found"
+                    f"Query handler for '{input.query}' expected but not found"
                 )
         # Put name first if dynamic
         args = list(input.args) if not dynamic else [input.query] + list(input.args)
