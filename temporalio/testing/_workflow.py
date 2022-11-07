@@ -76,7 +76,7 @@ class WorkflowEnvironment:
     async def start_local(
         *,
         namespace: str = "default",
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -212,7 +212,7 @@ class WorkflowEnvironment:
     @staticmethod
     async def start_time_skipping(
         *,
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition

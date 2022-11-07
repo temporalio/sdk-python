@@ -11,7 +11,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Type
 
 import pytest
 
-import temporalio.worker.workflow_sandbox.restrictions
+import temporalio.worker.workflow_sandbox._restrictions
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.exceptions import ApplicationError
@@ -252,7 +252,7 @@ class DateOperatorWorkflow:
     async def run(self) -> int:
         assert (
             type(date(2010, 1, 20))
-            == temporalio.worker.workflow_sandbox.restrictions._RestrictedProxy
+            == temporalio.worker.workflow_sandbox._restrictions._RestrictedProxy
         )
         return (date(2010, 1, 20) - date(2010, 1, 1)).days
 

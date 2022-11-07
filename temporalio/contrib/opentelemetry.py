@@ -83,7 +83,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
             default_text_map_propagator
         )
         # TODO(cretz): Should I be using the configured one at the client and activity level?
-        self.payload_converter = temporalio.converter.default().payload_converter
+        self.payload_converter = temporalio.converter.PayloadConverter.default
 
     def intercept_client(
         self, next: temporalio.client.OutboundInterceptor
@@ -309,7 +309,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             default_text_map_propagator
         )
         # TODO(cretz): Should I be using the configured one for this workflow?
-        self.payload_converter = temporalio.converter.default().payload_converter
+        self.payload_converter = temporalio.converter.PayloadConverter.default
         # This is the context for the overall workflow, lazily created
         self._workflow_context_carrier: Optional[_CarrierDict] = None
 
