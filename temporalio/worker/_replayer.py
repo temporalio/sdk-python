@@ -18,10 +18,10 @@ import temporalio.client
 import temporalio.converter
 import temporalio.workflow
 
-from .interceptor import Interceptor
-from .worker import load_default_build_id
-from .workflow import _WorkflowWorker
-from .workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from ._interceptor import Interceptor
+from ._worker import load_default_build_id
+from ._workflow import _WorkflowWorker
+from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)

@@ -33,7 +33,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 
-from .interceptor import (
+from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
     ExecuteActivityInput,

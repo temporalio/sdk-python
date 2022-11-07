@@ -6,7 +6,7 @@ from typing import ClassVar, Dict, Optional
 
 import pytest
 
-from temporalio.worker.workflow_sandbox.restrictions import (
+from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictedWorkflowAccessError,
     RestrictionContext,
     SandboxMatcher,

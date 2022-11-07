@@ -1,7 +1,7 @@
 import pytest
 
-from temporalio.worker.workflow_sandbox.importer import Importer
-from temporalio.worker.workflow_sandbox.restrictions import (
+from temporalio.worker.workflow_sandbox._importer import Importer
+from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictedWorkflowAccessError,
     RestrictionContext,
 )
