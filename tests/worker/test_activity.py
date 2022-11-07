@@ -283,6 +283,31 @@ async def test_sync_activity_thread_cancel(client: Client, worker: ExternalWorke
     assert result.result == "Cancelled"
 
 
+async def test_sync_activity_thread_cancel_uncaught(
+    client: Client, worker: ExternalWorker
+):
+    @activity.defn
+    def wait_cancel() -> str:
+        while not activity.is_cancelled():
+            time.sleep(1)
+            activity.heartbeat()
+        raise CancelledError("Cancelled")
+
+    with pytest.raises(WorkflowFailureError) as err:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            await _execute_workflow_with_activity(
+                client,
+                worker,
+                wait_cancel,
+                cancel_after_ms=100,
+                wait_for_cancellation=True,
+                heartbeat_timeout_ms=3000,
+                worker_config={"activity_executor": executor},
+            )
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, CancelledError)
+
+
 @activity.defn
 def picklable_activity_wait_cancel() -> str:
     while not activity.is_cancelled():
@@ -303,6 +328,32 @@ async def test_sync_activity_process_cancel(client: Client, worker: ExternalWork
             worker_config={"activity_executor": executor},
         )
     assert result.result == "Cancelled"
+
+
+@activity.defn
+def picklable_activity_raise_cancel() -> str:
+    while not activity.is_cancelled():
+        time.sleep(1)
+        activity.heartbeat()
+    raise CancelledError("Cancelled")
+
+
+async def test_sync_activity_process_cancel_uncaught(
+    client: Client, worker: ExternalWorker
+):
+    with pytest.raises(WorkflowFailureError) as err:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            result = await _execute_workflow_with_activity(
+                client,
+                worker,
+                picklable_activity_raise_cancel,
+                cancel_after_ms=100,
+                wait_for_cancellation=True,
+                heartbeat_timeout_ms=3000,
+                worker_config={"activity_executor": executor},
+            )
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, CancelledError)
 
 
 async def test_activity_does_not_exist(client: Client, worker: ExternalWorker):

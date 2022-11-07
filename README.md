@@ -783,8 +783,9 @@ Synchronous activities, i.e. functions that do not have `async def`, can be used
 activities.
 
 Cancellation for synchronous activities is done in the background and the activity must choose to listen for it and
-react appropriately. An activity must heartbeat to receive cancellation and there are other ways to be notified about
-cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
+react appropriately. If after cancellation is obtained an unwrapped `temporalio.exceptions.CancelledError` is raised,
+the activity will be marked cancelled. An activity must heartbeat to receive cancellation and there are other ways to be
+notified about cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
 
 Note, all calls from an activity to functions in the `temporalio.activity` package are powered by
 [contextvars](https://docs.python.org/3/library/contextvars.html). Therefore, new threads starting _inside_ of

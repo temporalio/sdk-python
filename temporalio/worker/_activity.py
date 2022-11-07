@@ -401,6 +401,7 @@ class _ActivityWorker:
         except (
             Exception,
             asyncio.CancelledError,
+            temporalio.exceptions.CancelledError,
             temporalio.activity._CompleteAsyncError,
         ) as err:
             try:
@@ -408,7 +409,10 @@ class _ActivityWorker:
                     temporalio.activity.logger.debug("Completing asynchronously")
                     completion.result.will_complete_async.SetInParent()
                 elif (
-                    isinstance(err, asyncio.CancelledError)
+                    isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    )
                     and running_activity.cancelled_due_to_heartbeat_error
                 ):
                     err = running_activity.cancelled_due_to_heartbeat_error
@@ -419,7 +423,10 @@ class _ActivityWorker:
                         err, completion.result.failed.failure
                     )
                 elif (
-                    isinstance(err, asyncio.CancelledError)
+                    isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    )
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
