@@ -662,7 +662,6 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
 class _BridgeServiceClient(ServiceClient):
     @staticmethod
     async def connect(config: ConnectConfig) -> _BridgeServiceClient:
-        # TODO(cretz): Expose telemetry init config
         temporalio.bridge.telemetry.init_telemetry(
             temporalio.bridge.telemetry.TelemetryConfig(),
             warn_if_already_inited=False,
@@ -754,8 +753,14 @@ class RPCError(temporalio.exceptions.TemporalError):
     def __init__(self, message: str, status: RPCStatusCode, details: bytes) -> None:
         """Initialize RPC error."""
         super().__init__(message)
+        self._message = message
         self._status = status
         self._details = details
+
+    @property
+    def message(self) -> str:
+        """Message for the error."""
+        return self._message
 
     @property
     def status(self) -> RPCStatusCode:

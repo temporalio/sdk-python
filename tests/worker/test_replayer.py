@@ -124,6 +124,7 @@ async def test_replayer_workflow_failed(client: Client) -> None:
         )
         with pytest.raises(WorkflowFailureError) as err:
             await handle.result()
+        assert isinstance(err.value.cause, ApplicationError)
         assert err.value.cause.message == "Intentional error"
 
     # Collect history and replay it

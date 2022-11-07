@@ -7,12 +7,17 @@ import collections.abc
 import dataclasses
 import inspect
 import json
+import sys
+import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from typing import (
     Any,
+    Awaitable,
+    Callable,
+    ClassVar,
     Dict,
     List,
     Mapping,
@@ -31,11 +36,24 @@ import google.protobuf.symbol_database
 from typing_extensions import Literal
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
+import temporalio.api.failure.v1
 import temporalio.common
+import temporalio.exceptions
+
+if sys.version_info < (3, 11):
+    # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
+    from dateutil import parser  # type: ignore
+# StrEnum is available in 3.11+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
 
 
 class PayloadConverter(ABC):
     """Base payload converter to/from multiple payloads/values."""
+
+    default: ClassVar[PayloadConverter]
+    """Default payload converter."""
 
     @abstractmethod
     def to_payloads(
@@ -231,20 +249,18 @@ class DefaultPayloadConverter(CompositePayloadConverter):
     """Default payload converter compatible with other Temporal SDKs.
 
     This handles None, bytes, all protobuf message types, and any type that
-    :py:func:`json.dump` accepts. In addition, this supports encoding
-    :py:mod:`dataclasses` and also decoding them provided the data class is in
-    the type hint.
+    :py:func:`json.dump` accepts. A singleton instance of this is available at
+    :py:attr:`PayloadConverter.default`.
+    """
+
+    default_encoding_payload_converters: Tuple[EncodingPayloadConverter, ...]
+    """Default set of encoding payload converters the default payload converter
+    uses.
     """
 
     def __init__(self) -> None:
         """Create a default payload converter."""
-        super().__init__(
-            BinaryNullPayloadConverter(),
-            BinaryPlainPayloadConverter(),
-            JSONProtoPayloadConverter(),
-            BinaryProtoPayloadConverter(),
-            JSONPlainPayloadConverter(),
-        )
+        super().__init__(*DefaultPayloadConverter.default_encoding_payload_converters)
 
 
 class BinaryNullPayloadConverter(EncodingPayloadConverter):
@@ -537,6 +553,326 @@ class PayloadCodec(ABC):
         # TODO(cretz): Copy too expensive?
         payloads.payloads.extend(new_payloads)
 
+    async def encode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
+        """Encode payloads of a failure."""
+        await self._apply_to_failure_payloads(failure, self.encode_wrapper)
+
+    async def decode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
+        """Decode payloads of a failure."""
+        await self._apply_to_failure_payloads(failure, self.decode_wrapper)
+
+    async def _apply_to_failure_payloads(
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        cb: Callable[[temporalio.api.common.v1.Payloads], Awaitable[None]],
+    ) -> None:
+        if failure.HasField(
+            "application_failure_info"
+        ) and failure.application_failure_info.HasField("details"):
+            await cb(failure.application_failure_info.details)
+        elif failure.HasField(
+            "timeout_failure_info"
+        ) and failure.timeout_failure_info.HasField("last_heartbeat_details"):
+            await cb(failure.timeout_failure_info.last_heartbeat_details)
+        elif failure.HasField(
+            "canceled_failure_info"
+        ) and failure.canceled_failure_info.HasField("details"):
+            await cb(failure.canceled_failure_info.details)
+        elif failure.HasField(
+            "reset_workflow_failure_info"
+        ) and failure.reset_workflow_failure_info.HasField("last_heartbeat_details"):
+            await cb(failure.reset_workflow_failure_info.last_heartbeat_details)
+        if failure.HasField("cause"):
+            await self._apply_to_failure_payloads(failure.cause, cb)
+
+
+class FailureConverter(ABC):
+    """Base failure converter to/from errors.
+
+    Note, for workflow exceptions, :py:attr:`to_failure` is only invoked if the
+    exception is an instance of :py:class:`temporalio.exceptions.FailureError`.
+    Users should extend :py:class:`temporalio.exceptions.ApplicationError` if
+    they want a custom workflow exception to work with this class.
+    """
+
+    default: ClassVar[FailureConverter]
+    """Default failure converter."""
+
+    @abstractmethod
+    def to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        """Convert the given exception to a Temporal failure.
+
+        Users should make sure not to alter the ``exception`` input.
+
+        Args:
+            exception: The exception to convert.
+            payload_converter: The payload converter to use if needed.
+            failure: The failure to update with error information.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def from_failure(
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        payload_converter: PayloadConverter,
+    ) -> BaseException:
+        """Convert the given Temporal failure to an exception.
+
+        Users should make sure not to alter the ``failure`` input.
+
+        Args:
+            failure: The failure to convert.
+            payload_converter: The payload converter to use if needed.
+
+        Returns:
+            Converted error.
+        """
+        raise NotImplementedError
+
+
+class DefaultFailureConverter(FailureConverter):
+    """Default failure converter.
+
+    A singleton instance of this is available at
+    :py:attr:`FailureConverter.default`.
+    """
+
+    def __init__(self, *, encode_common_attributes: bool = False) -> None:
+        """Create the default failure converter.
+
+        Args:
+            encode_common_attributes: If ``True``, the message and stack trace
+                of the failure will be moved into the encoded attribute section
+                of the failure which can be encoded with a codec.
+        """
+        super().__init__()
+        self._encode_common_attributes = encode_common_attributes
+
+    def to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        """See base class."""
+        # If already a failure error, use that
+        if isinstance(exception, temporalio.exceptions.FailureError):
+            self._error_to_failure(exception, payload_converter, failure)
+        else:
+            # Convert to failure error
+            failure_error = temporalio.exceptions.ApplicationError(
+                str(exception), type=exception.__class__.__name__
+            )
+            failure_error.__traceback__ = exception.__traceback__
+            failure_error.__cause__ = exception.__cause__
+            self._error_to_failure(failure_error, payload_converter, failure)
+        # Encode common attributes if requested
+        if self._encode_common_attributes:
+            # Move message and stack trace to encoded attribute payload
+            failure.encoded_attributes.CopyFrom(
+                payload_converter.to_payloads(
+                    [{"message": failure.message, "stack_trace": failure.stack_trace}]
+                )[0]
+            )
+            failure.message = "Encoded failure"
+            failure.stack_trace = ""
+
+    def _error_to_failure(
+        self,
+        error: temporalio.exceptions.FailureError,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        # If there is an underlying proto already, just use that
+        if error.failure:
+            failure.CopyFrom(error.failure)
+            return
+
+        # Set message, stack, and cause. Obtaining cause follows rules from
+        # https://docs.python.org/3/library/exceptions.html#exception-context
+        failure.message = error.message
+        if error.__traceback__:
+            failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
+        if error.__cause__:
+            self.to_failure(error.__cause__, payload_converter, failure.cause)
+        elif not error.__suppress_context__ and error.__context__:
+            self.to_failure(error.__context__, payload_converter, failure.cause)
+
+        # Set specific subclass values
+        if isinstance(error, temporalio.exceptions.ApplicationError):
+            failure.application_failure_info.SetInParent()
+            if error.type:
+                failure.application_failure_info.type = error.type
+            failure.application_failure_info.non_retryable = error.non_retryable
+            if error.details:
+                failure.application_failure_info.details.CopyFrom(
+                    payload_converter.to_payloads_wrapper(error.details)
+                )
+        elif isinstance(error, temporalio.exceptions.TimeoutError):
+            failure.timeout_failure_info.SetInParent()
+            failure.timeout_failure_info.timeout_type = (
+                temporalio.api.enums.v1.TimeoutType.ValueType(error.type or 0)
+            )
+            if error.last_heartbeat_details:
+                failure.timeout_failure_info.last_heartbeat_details.CopyFrom(
+                    payload_converter.to_payloads_wrapper(error.last_heartbeat_details)
+                )
+        elif isinstance(error, temporalio.exceptions.CancelledError):
+            failure.canceled_failure_info.SetInParent()
+            if error.details:
+                failure.canceled_failure_info.details.CopyFrom(
+                    payload_converter.to_payloads_wrapper(error.details)
+                )
+        elif isinstance(error, temporalio.exceptions.TerminatedError):
+            failure.terminated_failure_info.SetInParent()
+        elif isinstance(error, temporalio.exceptions.ServerError):
+            failure.server_failure_info.SetInParent()
+            failure.server_failure_info.non_retryable = error.non_retryable
+        elif isinstance(error, temporalio.exceptions.ActivityError):
+            failure.activity_failure_info.SetInParent()
+            failure.activity_failure_info.scheduled_event_id = error.scheduled_event_id
+            failure.activity_failure_info.started_event_id = error.started_event_id
+            failure.activity_failure_info.identity = error.identity
+            failure.activity_failure_info.activity_type.name = error.activity_type
+            failure.activity_failure_info.activity_id = error.activity_id
+            failure.activity_failure_info.retry_state = (
+                temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
+            )
+        elif isinstance(error, temporalio.exceptions.ChildWorkflowError):
+            failure.child_workflow_execution_failure_info.SetInParent()
+            failure.child_workflow_execution_failure_info.namespace = error.namespace
+            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = (
+                error.workflow_id
+            )
+            failure.child_workflow_execution_failure_info.workflow_execution.run_id = (
+                error.run_id
+            )
+            failure.child_workflow_execution_failure_info.workflow_type.name = (
+                error.workflow_type
+            )
+            failure.child_workflow_execution_failure_info.initiated_event_id = (
+                error.initiated_event_id
+            )
+            failure.child_workflow_execution_failure_info.started_event_id = (
+                error.started_event_id
+            )
+            failure.child_workflow_execution_failure_info.retry_state = (
+                temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
+            )
+
+    def from_failure(
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        payload_converter: PayloadConverter,
+    ) -> BaseException:
+        """See base class."""
+        # If encoded attributes are present and have the fields we expect,
+        # extract them
+        if failure.HasField("encoded_attributes"):
+            # Clone the failure to not mutate the incoming failure
+            new_failure = temporalio.api.failure.v1.Failure()
+            new_failure.CopyFrom(failure)
+            failure = new_failure
+            try:
+                encoded_attributes: Dict[str, Any] = payload_converter.from_payloads(
+                    [failure.encoded_attributes]
+                )[0]
+                if isinstance(encoded_attributes, dict):
+                    message = encoded_attributes.get("message")
+                    if isinstance(message, str):
+                        failure.message = message
+                    stack_trace = encoded_attributes.get("stack_trace")
+                    if isinstance(stack_trace, str):
+                        failure.stack_trace = stack_trace
+            except:
+                pass
+
+        err: temporalio.exceptions.FailureError
+        if failure.HasField("application_failure_info"):
+            app_info = failure.application_failure_info
+            err = temporalio.exceptions.ApplicationError(
+                failure.message or "Application error",
+                *payload_converter.from_payloads_wrapper(app_info.details),
+                type=app_info.type or None,
+                non_retryable=app_info.non_retryable,
+            )
+        elif failure.HasField("timeout_failure_info"):
+            timeout_info = failure.timeout_failure_info
+            err = temporalio.exceptions.TimeoutError(
+                failure.message or "Timeout",
+                type=temporalio.exceptions.TimeoutType(int(timeout_info.timeout_type))
+                if timeout_info.timeout_type
+                else None,
+                last_heartbeat_details=payload_converter.from_payloads_wrapper(
+                    timeout_info.last_heartbeat_details
+                ),
+            )
+        elif failure.HasField("canceled_failure_info"):
+            cancel_info = failure.canceled_failure_info
+            err = temporalio.exceptions.CancelledError(
+                failure.message or "Cancelled",
+                *payload_converter.from_payloads_wrapper(cancel_info.details),
+            )
+        elif failure.HasField("terminated_failure_info"):
+            err = temporalio.exceptions.TerminatedError(failure.message or "Terminated")
+        elif failure.HasField("server_failure_info"):
+            server_info = failure.server_failure_info
+            err = temporalio.exceptions.ServerError(
+                failure.message or "Server error",
+                non_retryable=server_info.non_retryable,
+            )
+        elif failure.HasField("activity_failure_info"):
+            act_info = failure.activity_failure_info
+            err = temporalio.exceptions.ActivityError(
+                failure.message or "Activity error",
+                scheduled_event_id=act_info.scheduled_event_id,
+                started_event_id=act_info.started_event_id,
+                identity=act_info.identity,
+                activity_type=act_info.activity_type.name,
+                activity_id=act_info.activity_id,
+                retry_state=temporalio.exceptions.RetryState(int(act_info.retry_state))
+                if act_info.retry_state
+                else None,
+            )
+        elif failure.HasField("child_workflow_execution_failure_info"):
+            child_info = failure.child_workflow_execution_failure_info
+            err = temporalio.exceptions.ChildWorkflowError(
+                failure.message or "Child workflow error",
+                namespace=child_info.namespace,
+                workflow_id=child_info.workflow_execution.workflow_id,
+                run_id=child_info.workflow_execution.run_id,
+                workflow_type=child_info.workflow_type.name,
+                initiated_event_id=child_info.initiated_event_id,
+                started_event_id=child_info.started_event_id,
+                retry_state=temporalio.exceptions.RetryState(
+                    int(child_info.retry_state)
+                )
+                if child_info.retry_state
+                else None,
+            )
+        else:
+            err = temporalio.exceptions.FailureError(failure.message or "Failure error")
+        err._failure = failure
+        if failure.HasField("cause"):
+            err.__cause__ = self.from_failure(failure.cause, payload_converter)
+        return err
+
+
+class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
+    """Implementation of :py:class:`DefaultFailureConverter` which moves message
+    and stack trace to encoded attributes subject to a codec.
+    """
+
+    def __init__(self) -> None:
+        """Create a default failure converter with encoded attributes."""
+        super().__init__(encode_common_attributes=True)
+
 
 @dataclass(frozen=True)
 class DataConverter:
@@ -552,10 +888,21 @@ class DataConverter:
     payload_codec: Optional[PayloadCodec] = None
     """Optional codec for encoding payload bytes."""
 
+    failure_converter_class: Type[FailureConverter] = DefaultFailureConverter
+    """Class to instantiate for failure conversion."""
+
     payload_converter: PayloadConverter = dataclasses.field(init=False)
+    """Payload converter created from the :py:attr:`payload_converter_class`."""
+
+    failure_converter: FailureConverter = dataclasses.field(init=False)
+    """Failure converter created from the :py:attr:`failure_converter_class`."""
+
+    default: ClassVar[DataConverter]
+    """Singleton default data converter."""
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
+        object.__setattr__(self, "failure_converter", self.failure_converter_class())
 
     async def encode(
         self, values: Sequence[Any]
@@ -616,16 +963,45 @@ class DataConverter:
             return []
         return await self.decode(payloads.payloads, type_hints)
 
+    async def encode_failure(
+        self, exception: BaseException, failure: temporalio.api.failure.v1.Failure
+    ) -> None:
+        """Convert and encode failure."""
+        self.failure_converter.to_failure(exception, self.payload_converter, failure)
+        if self.payload_codec:
+            await self.payload_codec.encode_failure(failure)
 
-_default: Optional[DataConverter] = None
+    async def decode_failure(
+        self, failure: temporalio.api.failure.v1.Failure
+    ) -> BaseException:
+        """Decode and convert failure."""
+        if self.payload_codec:
+            await self.payload_codec.decode_failure(failure)
+        return self.failure_converter.from_failure(failure, self.payload_converter)
+
+
+DefaultPayloadConverter.default_encoding_payload_converters = (
+    BinaryNullPayloadConverter(),
+    BinaryPlainPayloadConverter(),
+    JSONProtoPayloadConverter(),
+    BinaryProtoPayloadConverter(),
+    JSONPlainPayloadConverter(),
+)
+
+DataConverter.default = DataConverter()
+
+PayloadConverter.default = DataConverter.default.payload_converter
+
+FailureConverter.default = DataConverter.default.failure_converter
 
 
 def default() -> DataConverter:
-    """Default data converter."""
-    global _default
-    if not _default:
-        _default = DataConverter()
-    return _default
+    """Default data converter.
+
+    .. deprecated::
+        Use :py:meth:`DataConverter.default` instead.
+    """
+    return DataConverter.default
 
 
 def encode_search_attributes(
@@ -677,6 +1053,19 @@ def encode_search_attribute_values(
     return default().payload_converter.to_payloads([safe_vals])[0]
 
 
+def _get_iso_datetime_parser() -> Callable[[str], datetime]:
+    """Isolates system version check and returns relevant datetime passer
+
+    Returns:
+        A callable to parse date strings into datetimes.
+    """
+    if sys.version_info >= (3, 11):
+        return datetime.fromisoformat  # noqa
+    else:
+        # Isolate import for py > 3.11, as dependency only installed for < 3.11
+        return parser.isoparse
+
+
 def decode_search_attributes(
     api: temporalio.api.common.v1.SearchAttributes,
 ) -> temporalio.common.SearchAttributes:
@@ -697,7 +1086,8 @@ def decode_search_attributes(
             val = [val]
         # Convert each item to datetime if necessary
         if v.metadata.get("type") == b"Datetime":
-            val = [datetime.fromisoformat(v) for v in val]
+            parser = _get_iso_datetime_parser()
+            val = [parser(v) for v in val]
         ret[k] = val
     return ret
 
@@ -873,6 +1263,15 @@ def value_to_type(hint: Type, value: Any) -> Any:
                 f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
             )
         return hint(value)
+
+    # StrEnum, available in 3.11+
+    if sys.version_info >= (3, 11):
+        if inspect.isclass(hint) and issubclass(hint, StrEnum):
+            if not isinstance(value, str):
+                raise TypeError(
+                    f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"
+                )
+            return hint(value)
 
     # Iterable. We intentionally put this last as it catches several others.
     if inspect.isclass(origin) and issubclass(origin, collections.abc.Iterable):

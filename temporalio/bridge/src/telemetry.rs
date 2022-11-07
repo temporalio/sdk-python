@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use temporal_sdk_core::{
-    telemetry_init, Logger, MetricsExporter, OtelCollectorOptions, TelemetryOptions,
-    TelemetryOptionsBuilder, TraceExporter,
+    telemetry_init, Logger, MetricTemporality, MetricsExporter, OtelCollectorOptions,
+    TelemetryOptions, TelemetryOptionsBuilder, TraceExporter,
 };
 use url::Url;
 
@@ -23,6 +23,7 @@ pub struct TelemetryConfig {
     log_forwarding_level: Option<String>,
     otel_metrics: Option<OtelCollectorConfig>,
     prometheus_metrics: Option<PrometheusMetricsConfig>,
+    metric_temporality: String,
 }
 
 #[derive(FromPyObject)]
@@ -82,6 +83,19 @@ impl TryFrom<TelemetryConfig> for TelemetryOptions {
                     PyValueError::new_err(format!("Invalid Prometheus address: {}", err))
                 })?,
             ));
+        }
+        match conf.metric_temporality.as_str() {
+            "cumulative" => {
+                build.metric_temporality(MetricTemporality::Cumulative);
+            }
+            "delta" => {
+                build.metric_temporality(MetricTemporality::Delta);
+            }
+            _ => {
+                return Err(PyValueError::new_err(
+                    "Invalid metric temporality, expected 'cumulative' or 'delta'",
+                ));
+            }
         }
         build
             .build()

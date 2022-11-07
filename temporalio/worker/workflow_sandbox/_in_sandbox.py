@@ -10,7 +10,7 @@ from typing import Type
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
-import temporalio.worker.workflow_instance
+import temporalio.worker._workflow_instance
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ class InSandbox:
 
     def __init__(
         self,
-        instance_details: temporalio.worker.workflow_instance.WorkflowInstanceDetails,
-        runner_class: Type[temporalio.worker.workflow_instance.WorkflowRunner],
+        instance_details: temporalio.worker._workflow_instance.WorkflowInstanceDetails,
+        runner_class: Type[temporalio.worker._workflow_instance.WorkflowRunner],
         workflow_class: Type,
     ) -> None:
         """Create in-sandbox instance."""

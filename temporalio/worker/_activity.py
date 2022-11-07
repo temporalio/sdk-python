@@ -33,7 +33,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 
-from .interceptor import (
+from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
     ExecuteActivityInput,
@@ -130,9 +130,8 @@ class _ActivityWorker:
                     raise RuntimeError(f"Unrecognized activity task: {task}")
             except temporalio.bridge.worker.PollShutdownError:
                 return
-            except Exception:
-                # Should never happen
-                logger.exception(f"Activity runner failed")
+            except Exception as err:
+                raise RuntimeError("Activity worker failed") from err
 
     async def shutdown(self, after_graceful_timeout: timedelta) -> None:
         # Set event that we're shutting down (updates all activity tasks)
@@ -420,10 +419,8 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
                     )
-                    await temporalio.exceptions.encode_exception_to_failure(
-                        err,
-                        self._data_converter,
-                        completion.result.failed.failure,
+                    await self._data_converter.encode_failure(
+                        err, completion.result.failed.failure
                     )
                 elif (
                     isinstance(
@@ -433,20 +430,17 @@ class _ActivityWorker:
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
-                    await temporalio.exceptions.encode_error_to_failure(
+                    await self._data_converter.encode_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
-                        self._data_converter,
                         completion.result.cancelled.failure,
                     )
                 else:
                     temporalio.activity.logger.warning(
                         "Completing activity as failed", exc_info=True
                     )
-                    await temporalio.exceptions.encode_exception_to_failure(
-                        err,
-                        self._data_converter,
-                        completion.result.failed.failure,
+                    await self._data_converter.encode_failure(
+                        err, completion.result.failed.failure
                     )
             except Exception as inner_err:
                 temporalio.activity.logger.exception(

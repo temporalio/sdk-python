@@ -174,8 +174,9 @@ other_ns_client = Client(**config)
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
 `temporalio.converter.DataConverter` can be set via the `data_converter` client parameter. Data converters are a
-combination of payload converters and payload codecs. The former converts Python values to/from serialized bytes, and
-the latter converts bytes to bytes (e.g. for compression or encryption).
+combination of payload converters, payload codecs, and failure converters. Payload converters convert Python values
+to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption). Failure converters
+convert exceptions to/from serialized failures.
 
 The default data converter supports converting multiple types including:
 
@@ -188,7 +189,7 @@ The default data converter supports converting multiple types including:
   * Iterables including ones JSON dump may not support by default, e.g. `set`
   * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
     [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
-  * [IntEnum](https://docs.python.org/3/library/enum.html) based enumerates
+  * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
 
 For converting from JSON, the workflow/activity type hint is taken into account to convert to the proper type. Care has
 been taken to support all common typings including `Optional`, `Union`, all forms of iterables and mappings, `NewType`,
