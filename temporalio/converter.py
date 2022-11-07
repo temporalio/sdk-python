@@ -14,6 +14,7 @@ from datetime import datetime
 from enum import IntEnum
 from typing import (
     Any,
+    Callable,
     Dict,
     List,
     Mapping,
@@ -34,6 +35,9 @@ from typing_extensions import Literal
 import temporalio.api.common.v1
 import temporalio.common
 
+if sys.version_info < (3, 11):
+    # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
+    from dateutil import parser  # type: ignore
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
     from enum import StrEnum
@@ -682,6 +686,19 @@ def encode_search_attribute_values(
     return default().payload_converter.to_payloads([safe_vals])[0]
 
 
+def _get_iso_datetime_parser() -> Callable[[str], datetime]:
+    """Isolates system version check and returns relevant datetime passer
+
+    Returns:
+        A callable to parse date strings into datetimes.
+    """
+    if sys.version_info >= (3, 11):
+        return datetime.fromisoformat  # noqa
+    else:
+        # Isolate import for py > 3.11, as dependency only installed for < 3.11
+        return parser.isoparse
+
+
 def decode_search_attributes(
     api: temporalio.api.common.v1.SearchAttributes,
 ) -> temporalio.common.SearchAttributes:
@@ -702,7 +719,8 @@ def decode_search_attributes(
             val = [val]
         # Convert each item to datetime if necessary
         if v.metadata.get("type") == b"Datetime":
-            val = [datetime.fromisoformat(v) for v in val]
+            parser = _get_iso_datetime_parser()
+            val = [parser(v) for v in val]
         ret[k] = val
     return ret
 
