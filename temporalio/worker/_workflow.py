@@ -129,9 +129,8 @@ class _WorkflowWorker:
                 setattr(task, "__temporal_task_tag", task_tag)
         except temporalio.bridge.worker.PollShutdownError:
             pass
-        except Exception:
-            # Should never happen
-            logger.exception(f"Workflow runner failed")
+        except Exception as err:
+            raise RuntimeError("Workflow worker failed") from err
         finally:
             # Collect all tasks and wait for them to complete
             our_tasks = [
