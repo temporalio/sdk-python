@@ -18,10 +18,10 @@ import temporalio.client
 import temporalio.converter
 import temporalio.workflow
 
-from .interceptor import Interceptor
-from .worker import load_default_build_id
-from .workflow import _WorkflowWorker
-from .workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from ._interceptor import Interceptor
+from ._worker import load_default_build_id
+from ._workflow import _WorkflowWorker
+from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class Replayer:
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         namespace: str = "ReplayNamespace",
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,

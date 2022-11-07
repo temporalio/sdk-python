@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import sys
+import traceback
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum, IntEnum
 from typing import (
     Any,
@@ -32,6 +34,12 @@ import temporalio.api.common.v1
 import temporalio.common
 import temporalio.converter
 from temporalio.api.common.v1 import Payload as AnotherNameForPayload
+from temporalio.api.failure.v1 import Failure
+from temporalio.exceptions import ApplicationError, FailureError
+
+# StrEnum is available in 3.11+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
 
 
 class NonSerializableClass:
@@ -44,6 +52,12 @@ class NonSerializableEnum(Enum):
 
 class SerializableEnum(IntEnum):
     FOO = 1
+
+
+if sys.version_info >= (3, 11):
+
+    class SerializableStrEnum(StrEnum):
+        FOO = "foo"
 
 
 @dataclass
@@ -107,8 +121,8 @@ async def test_converter_default():
         await assert_payload(NonSerializableClass(), None, None)
     assert "not JSON serializable" in str(excinfo.value)
 
-    # Bad enum type. We do not allow non-int enums due to ambiguity in
-    # rebuilding and other confusion.
+    # Bad enum type. We do not allow non-int or non-str enums due to ambiguity
+    # in rebuilding and other confusion.
     with pytest.raises(TypeError) as excinfo:
         await assert_payload(NonSerializableEnum.FOO, None, None)
     assert "not JSON serializable" in str(excinfo.value)
@@ -162,6 +176,43 @@ def test_encode_search_attribute_values():
         temporalio.converter.encode_search_attribute_values([datetime.utcnow()])
     with pytest.raises(TypeError, match="must have the same type"):
         temporalio.converter.encode_search_attribute_values(["foo", 123])
+
+
+def test_decode_search_attributes():
+    """Tests decode from protobuf for python types"""
+
+    def payload(key, dtype, data, encoding=None):
+        if encoding is None:
+            encoding = {"encoding": b"json/plain"}
+        check = temporalio.api.common.v1.Payload(
+            data=bytes(data, encoding="utf-8"),
+            metadata={"type": bytes(dtype, encoding="utf-8"), **encoding},
+        )
+        return temporalio.api.common.v1.SearchAttributes(indexed_fields={key: check})
+
+    # Check basic keyword parsing works
+    kw_check = temporalio.converter.decode_search_attributes(
+        payload("kw", "Keyword", '"test-id"')
+    )
+    assert kw_check["kw"][0] == "test-id"
+
+    # Ensure original DT functionality works
+    dt_check = temporalio.converter.decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00"')
+    )
+    assert dt_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0)
+
+    # Check timezone aware works as server is using ISO 8601
+    dttz_check = temporalio.converter.decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00Z"')
+    )
+    assert dttz_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    # Check timezone aware, hour offset
+    dttz_check = temporalio.converter.decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00+00:00"')
+    )
+    assert dttz_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 
 NewIntType = NewType("NewIntType", int)
@@ -295,6 +346,15 @@ def test_json_type_hints():
     ok(SerializableEnum, SerializableEnum.FOO)
     ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
 
+    # StrEnum is available in 3.11+
+    if sys.version_info >= (3, 11):
+        # StrEnum
+        ok(SerializableStrEnum, SerializableStrEnum.FOO)
+        ok(
+            List[SerializableStrEnum],
+            [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
+        )
+
     # 3.10+ checks
     if sys.version_info >= (3, 10):
         ok(list[int], [1, 2])
@@ -308,3 +368,59 @@ def test_json_type_hints():
     )
     ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
     fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
+
+
+# This is an example of appending the stack to every Temporal failure error
+def append_temporal_stack(exc: Optional[BaseException]) -> None:
+    while exc:
+        # Only append if it doesn't appear already there
+        if (
+            isinstance(exc, FailureError)
+            and exc.failure
+            and exc.failure.stack_trace
+            and len(exc.args) == 1
+            and "\nStack:\n" not in exc.args[0]
+        ):
+            exc.args = (f"{exc}\nStack:\n{exc.failure.stack_trace.rstrip()}",)
+        exc = exc.__cause__
+
+
+async def test_exception_format():
+    # Cause a nested exception
+    actual_err: Exception
+    try:
+        try:
+            raise ValueError("error1")
+        except Exception as err:
+            raise RuntimeError("error2") from err
+    except Exception as err:
+        actual_err = err
+    assert actual_err
+
+    # Convert to failure and back
+    failure = Failure()
+    await temporalio.converter.DataConverter.default.encode_failure(actual_err, failure)
+    failure_error = await temporalio.converter.DataConverter.default.decode_failure(
+        failure
+    )
+    # Confirm type is prepended
+    assert isinstance(failure_error, ApplicationError)
+    assert "RuntimeError: error2" == str(failure_error)
+    assert isinstance(failure_error.cause, ApplicationError)
+    assert "ValueError: error1" == str(failure_error.cause)
+
+    # Append the stack and format the exception and check the output
+    append_temporal_stack(failure_error)
+    output = "".join(
+        traceback.format_exception(
+            type(failure_error), failure_error, failure_error.__traceback__
+        )
+    )
+    assert "temporalio.exceptions.ApplicationError: ValueError: error1" in output
+    assert "temporalio.exceptions.ApplicationError: RuntimeError: error" in output
+    assert output.count("\nStack:\n") == 2
+
+    # This shows how it might look for those with debugging on
+    logging.getLogger(__name__).debug(
+        "Showing appended exception", exc_info=failure_error
+    )

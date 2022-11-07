@@ -55,12 +55,12 @@ customize, and work around sandbox issues.
 #   * https://github.com/GrahamDumpleton/wrapt/issues/130
 
 
-from .restrictions import (
+from ._restrictions import (
     RestrictedWorkflowAccessError,
     SandboxMatcher,
     SandboxRestrictions,
 )
-from .runner import SandboxedWorkflowRunner
+from ._runner import SandboxedWorkflowRunner
 
 __all__ = [
     "RestrictedWorkflowAccessError",

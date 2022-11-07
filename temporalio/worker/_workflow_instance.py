@@ -49,7 +49,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
 
-from .interceptor import (
+from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
     HandleQueryInput,
@@ -104,6 +104,7 @@ class WorkflowInstanceDetails:
     """Immutable, serializable details for creating a workflow instance."""
 
     payload_converter_class: Type[temporalio.converter.PayloadConverter]
+    failure_converter_class: Type[temporalio.converter.FailureConverter]
     interceptor_classes: Sequence[Type[WorkflowInboundInterceptor]]
     defn: temporalio.workflow._Definition
     info: temporalio.workflow.Info
@@ -161,6 +162,7 @@ class _WorkflowInstanceImpl(
         WorkflowInstance.__init__(self)
         temporalio.workflow._Runtime.__init__(self)
         self._payload_converter = det.payload_converter_class()
+        self._failure_converter = det.failure_converter_class()
         self._defn = det.defn
         self._info = det.info
         self._extern_functions = det.extern_functions
@@ -292,7 +294,7 @@ class _WorkflowInstanceImpl(
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()
             try:
-                temporalio.exceptions.apply_exception_to_failure(
+                self._failure_converter.to_failure(
                     err,
                     self._payload_converter,
                     self._current_completion.failed.failure,
@@ -403,7 +405,7 @@ class _WorkflowInstanceImpl(
                 command.respond_to_query.succeeded.response.CopyFrom(result_payloads[0])
             except Exception as err:
                 try:
-                    temporalio.exceptions.apply_exception_to_failure(
+                    self._failure_converter.to_failure(
                         err,
                         self._payload_converter,
                         command.respond_to_query.failed,
@@ -457,13 +459,13 @@ class _WorkflowInstanceImpl(
             handle._resolve_success(ret)
         elif job.result.HasField("failed"):
             handle._resolve_failure(
-                temporalio.exceptions.failure_to_error(
+                self._failure_converter.from_failure(
                     job.result.failed.failure, self._payload_converter
                 )
             )
         elif job.result.HasField("cancelled"):
             handle._resolve_failure(
-                temporalio.exceptions.failure_to_error(
+                self._failure_converter.from_failure(
                     job.result.cancelled.failure, self._payload_converter
                 )
             )
@@ -494,13 +496,13 @@ class _WorkflowInstanceImpl(
             handle._resolve_success(ret)
         elif job.result.HasField("failed"):
             handle._resolve_failure(
-                temporalio.exceptions.failure_to_error(
+                self._failure_converter.from_failure(
                     job.result.failed.failure, self._payload_converter
                 )
             )
         elif job.result.HasField("cancelled"):
             handle._resolve_failure(
-                temporalio.exceptions.failure_to_error(
+                self._failure_converter.from_failure(
                     job.result.cancelled.failure, self._payload_converter
                 )
             )
@@ -538,7 +540,7 @@ class _WorkflowInstanceImpl(
         elif job.HasField("cancelled"):
             self._pending_child_workflows.pop(job.seq)
             handle._resolve_failure(
-                temporalio.exceptions.failure_to_error(
+                self._failure_converter.from_failure(
                     job.cancelled.failure, self._payload_converter
                 )
             )
@@ -557,7 +559,7 @@ class _WorkflowInstanceImpl(
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
             fut.set_exception(
-                temporalio.exceptions.failure_to_error(
+                self._failure_converter.from_failure(
                     job.failure, self._payload_converter
                 )
             )
@@ -576,7 +578,7 @@ class _WorkflowInstanceImpl(
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
             fut.set_exception(
-                temporalio.exceptions.failure_to_error(
+                self._failure_converter.from_failure(
                     job.failure, self._payload_converter
                 )
             )
@@ -1200,45 +1202,53 @@ class _WorkflowInstanceImpl(
         except _ContinueAsNewError as err:
             logger.debug("Workflow requested continue as new")
             err._apply_command(self._add_command())
-        except temporalio.exceptions.FailureError as err:
+
+        # Note in some Python versions, cancelled error does not extend
+        # exception
+        # TODO(cretz): Should I fail the task on BaseException too (e.g.
+        # KeyboardInterrupt)?
+        except (Exception, asyncio.CancelledError) as err:
             logger.debug(
                 f"Workflow raised failure with run ID {self._info.run_id}",
                 exc_info=True,
             )
-            # If a cancel was requested, and the failure is from an activity or
-            # child, and its cause was a cancellation, we want to use that cause
-            # instead because it means a cancel bubbled up while waiting on an
-            # activity or child.
-            if (
-                self._cancel_requested
-                and (
-                    isinstance(err, temporalio.exceptions.ActivityError)
-                    or isinstance(err, temporalio.exceptions.ChildWorkflowError)
-                )
-                and isinstance(err.cause, temporalio.exceptions.CancelledError)
-            ):
-                err = err.cause
 
-            command = self._add_command()
-            command.fail_workflow_execution.failure.SetInParent()
-            try:
-                temporalio.exceptions.apply_exception_to_failure(
-                    err,
-                    self._payload_converter,
-                    command.fail_workflow_execution.failure,
+            # All asyncio cancelled errors become Temporal cancelled errors
+            if isinstance(err, asyncio.CancelledError):
+                err = temporalio.exceptions.CancelledError(str(err))
+
+            # If a cancel was ever requested and this is a cancellation, or an
+            # activity/child cancellation, we add a cancel command. Technically
+            # this means that a swallowed cancel followed by, say, an activity
+            # cancel later on will show the workflow as cancelled. But this is
+            # a Temporal limitation in that cancellation is a state not an
+            # event.
+            if self._cancel_requested and (
+                isinstance(err, temporalio.exceptions.CancelledError)
+                or (
+                    (
+                        isinstance(err, temporalio.exceptions.ActivityError)
+                        or isinstance(err, temporalio.exceptions.ChildWorkflowError)
+                    )
+                    and isinstance(err.cause, temporalio.exceptions.CancelledError)
                 )
-            except Exception as inner_err:
-                raise ValueError("Failed converting workflow exception") from inner_err
-        except asyncio.CancelledError as err:
-            command = self._add_command()
-            command.fail_workflow_execution.failure.SetInParent()
-            temporalio.exceptions.apply_exception_to_failure(
-                temporalio.exceptions.CancelledError(str(err)),
-                self._payload_converter,
-                command.fail_workflow_execution.failure,
-            )
-        except Exception as err:
-            self._current_activation_error = err
+            ):
+                self._add_command().cancel_workflow_execution.SetInParent()
+            elif isinstance(err, temporalio.exceptions.FailureError):
+                # All other failure errors fail the workflow
+                failure = self._add_command().fail_workflow_execution.failure
+                failure.SetInParent()
+                try:
+                    self._failure_converter.to_failure(
+                        err, self._payload_converter, failure
+                    )
+                except Exception as inner_err:
+                    raise ValueError(
+                        "Failed converting workflow exception"
+                    ) from inner_err
+            else:
+                # All other exceptions fail the task
+                self._current_activation_error = err
 
     async def _signal_external_workflow(
         self,
@@ -1469,7 +1479,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             # an # interceptor could have changed the name
             if not handler:
                 raise RuntimeError(
-                    f"Query handler for {input.query} expected but not found"
+                    f"Query handler for '{input.query}' expected but not found"
                 )
         # Put name first if dynamic
         args = list(input.args) if not dynamic else [input.query] + list(input.args)
@@ -1580,7 +1590,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         # We intentionally let this error if already done
         self._result_fut.set_result(result)
 
-    def _resolve_failure(self, err: Exception) -> None:
+    def _resolve_failure(self, err: BaseException) -> None:
         # If it was never started, we don't need to set this failure. In cases
         # where this is cancelled before started, setting this exception causes
         # a Python warning to be emitted because this future is never awaited
@@ -1725,7 +1735,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         # We intentionally let this error if already done
         self._result_fut.set_result(result)
 
-    def _resolve_failure(self, err: Exception) -> None:
+    def _resolve_failure(self, err: BaseException) -> None:
         if self._start_fut.done():
             # We intentionally let this error if already done
             self._result_fut.set_exception(err)

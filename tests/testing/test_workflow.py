@@ -176,7 +176,7 @@ class AssertFailWorkflow:
 
 
 async def test_workflow_env_assert(client: Client):
-    def assert_proper_error(err: Optional[Exception]) -> None:
+    def assert_proper_error(err: Optional[BaseException]) -> None:
         assert isinstance(err, ApplicationError)
         # In unsandboxed workflows, this message has extra diff info appended
         # due to pytest's custom loader that does special assert tricks. But in

@@ -30,6 +30,7 @@ from typing_extensions import Protocol, runtime_checkable
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType, IndexedValueType
+from temporalio.api.failure.v1 import Failure
 from temporalio.api.operatorservice.v1 import AddSearchAttributesRequest
 from temporalio.api.workflowservice.v1 import (
     GetSearchAttributesRequest,
@@ -41,11 +42,19 @@ from temporalio.client import (
     Client,
     RPCError,
     RPCStatusCode,
+    WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
+    WorkflowQueryFailedError,
 )
 from temporalio.common import RetryPolicy, SearchAttributes
-from temporalio.converter import DataConverter, PayloadCodec
+from temporalio.converter import (
+    DataConverter,
+    DefaultFailureConverterWithEncodedAttributes,
+    FailureConverter,
+    PayloadCodec,
+    PayloadConverter,
+)
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -359,10 +368,16 @@ async def test_workflow_signal_and_query_errors(client: Client):
         assert isinstance(err.value.cause, ApplicationError)
         assert list(err.value.cause.details) == [123]
         # Fail query (no details on query failure)
-        with pytest.raises(RPCError) as rpc_err:
+        with pytest.raises(WorkflowQueryFailedError) as rpc_err:
             await handle.query(SignalAndQueryErrorsWorkflow.bad_query)
-        assert rpc_err.value.status is RPCStatusCode.INVALID_ARGUMENT
         assert str(rpc_err.value) == "query fail"
+        # Unrecognized query
+        with pytest.raises(WorkflowQueryFailedError) as rpc_err:
+            await handle.query("non-existent query")
+        assert (
+            str(rpc_err.value)
+            == "Query handler for 'non-existent query' expected but not found"
+        )
 
 
 @workflow.defn
@@ -717,6 +732,7 @@ async def test_workflow_simple_cancel(client: Client):
         with pytest.raises(WorkflowFailureError) as err:
             await handle.result()
         assert isinstance(err.value.cause, CancelledError)
+        assert (await handle.describe()).status == WorkflowExecutionStatus.CANCELED
 
 
 @workflow.defn
@@ -2433,3 +2449,88 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire
             await result_task
+
+
+class MyCustomError(ApplicationError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, type="MyCustomError", non_retryable=True)
+
+
+@activity.defn
+async def custom_error_activity() -> NoReturn:
+    raise MyCustomError("activity error!")
+
+
+@workflow.defn
+class CustomErrorWorkflow:
+    @workflow.run
+    async def run(self) -> NoReturn:
+        try:
+            await workflow.execute_activity(
+                custom_error_activity, schedule_to_close_timeout=timedelta(seconds=30)
+            )
+        except ActivityError:
+            raise MyCustomError("workflow error!")
+
+
+class CustomFailureConverter(DefaultFailureConverterWithEncodedAttributes):
+    # We'll override from failure to convert back to our type
+    def from_failure(
+        self, failure: Failure, payload_converter: PayloadConverter
+    ) -> BaseException:
+        err = super().from_failure(failure, payload_converter)
+        if isinstance(err, ApplicationError) and err.type == "MyCustomError":
+            my_err = MyCustomError(err.message)
+            my_err.__cause__ = err.__cause__
+            err = my_err
+        return err
+
+
+async def test_workflow_custom_failure_converter(client: Client):
+    # Clone the client but change the data converter to use our failure
+    # converter
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        config["data_converter"],
+        failure_converter_class=CustomFailureConverter,
+    )
+    client = Client(**config)
+
+    # Run workflow and confirm error
+    with pytest.raises(WorkflowFailureError) as err:
+        async with new_worker(
+            client, CustomErrorWorkflow, activities=[custom_error_activity]
+        ) as worker:
+            handle = await client.start_workflow(
+                CustomErrorWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle.result()
+
+    # Check error is as expected
+    assert isinstance(err.value.cause, MyCustomError)
+    assert err.value.cause.message == "workflow error!"
+    assert isinstance(err.value.cause.cause, ActivityError)
+    assert isinstance(err.value.cause.cause.cause, MyCustomError)
+    assert err.value.cause.cause.cause.message == "activity error!"
+    assert err.value.cause.cause.cause.cause is None
+
+    # Check in history it is encoded
+    failure = (
+        (await handle.fetch_history())
+        .events[-1]
+        .workflow_execution_failed_event_attributes.failure
+    )
+    assert failure.application_failure_info.type == "MyCustomError"
+    while True:
+        assert failure.message == "Encoded failure"
+        assert failure.stack_trace == ""
+        attrs: Dict[str, Any] = PayloadConverter.default.from_payloads(
+            [failure.encoded_attributes]
+        )[0]
+        assert "message" in attrs
+        assert "stack_trace" in attrs
+        if not failure.HasField("cause"):
+            break
+        failure = failure.cause

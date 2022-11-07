@@ -25,10 +25,10 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.service
 
-from .activity import SharedStateManager, _ActivityWorker
-from .interceptor import Interceptor
-from .workflow import _WorkflowWorker
-from .workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from ._activity import SharedStateManager, _ActivityWorker
+from ._interceptor import Interceptor
+from ._workflow import _WorkflowWorker
+from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
