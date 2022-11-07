@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import sys
+import traceback
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -32,6 +34,8 @@ import temporalio.api.common.v1
 import temporalio.common
 import temporalio.converter
 from temporalio.api.common.v1 import Payload as AnotherNameForPayload
+from temporalio.api.failure.v1 import Failure
+from temporalio.exceptions import ApplicationError, FailureError
 
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
@@ -364,3 +368,59 @@ def test_json_type_hints():
     )
     ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
     fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
+
+
+# This is an example of appending the stack to every Temporal failure error
+def append_temporal_stack(exc: Optional[BaseException]) -> None:
+    while exc:
+        # Only append if it doesn't appear already there
+        if (
+            isinstance(exc, FailureError)
+            and exc.failure
+            and exc.failure.stack_trace
+            and len(exc.args) == 1
+            and "\nStack:\n" not in exc.args[0]
+        ):
+            exc.args = (f"{exc}\nStack:\n{exc.failure.stack_trace.rstrip()}",)
+        exc = exc.__cause__
+
+
+async def test_exception_format():
+    # Cause a nested exception
+    actual_err: Exception
+    try:
+        try:
+            raise ValueError("error1")
+        except Exception as err:
+            raise RuntimeError("error2") from err
+    except Exception as err:
+        actual_err = err
+    assert actual_err
+
+    # Convert to failure and back
+    failure = Failure()
+    await temporalio.converter.DataConverter.default.encode_failure(actual_err, failure)
+    failure_error = await temporalio.converter.DataConverter.default.decode_failure(
+        failure
+    )
+    # Confirm type is prepended
+    assert isinstance(failure_error, ApplicationError)
+    assert "RuntimeError: error2" == str(failure_error)
+    assert isinstance(failure_error.cause, ApplicationError)
+    assert "ValueError: error1" == str(failure_error.cause)
+
+    # Append the stack and format the exception and check the output
+    append_temporal_stack(failure_error)
+    output = "".join(
+        traceback.format_exception(
+            type(failure_error), failure_error, failure_error.__traceback__
+        )
+    )
+    assert "temporalio.exceptions.ApplicationError: ValueError: error1" in output
+    assert "temporalio.exceptions.ApplicationError: RuntimeError: error" in output
+    assert output.count("\nStack:\n") == 2
+
+    # This shows how it might look for those with debugging on
+    logging.getLogger(__name__).debug(
+        "Showing appended exception", exc_info=failure_error
+    )

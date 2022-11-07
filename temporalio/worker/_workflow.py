@@ -203,7 +203,7 @@ class _WorkflowWorker:
             # Set completion failure
             completion.failed.failure.SetInParent()
             try:
-                temporalio.exceptions.apply_exception_to_failure(
+                self._data_converter.failure_converter.to_failure(
                     err,
                     self._data_converter.payload_converter,
                     completion.failed.failure,
@@ -328,6 +328,7 @@ class _WorkflowWorker:
         # Create instance from details
         det = WorkflowInstanceDetails(
             payload_converter_class=self._data_converter.payload_converter_class,
+            failure_converter_class=self._data_converter.failure_converter_class,
             interceptor_classes=self._interceptor_classes,
             defn=defn,
             info=info,

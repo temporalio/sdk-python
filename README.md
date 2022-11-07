@@ -174,8 +174,9 @@ other_ns_client = Client(**config)
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
 `temporalio.converter.DataConverter` can be set via the `data_converter` client parameter. Data converters are a
-combination of payload converters and payload codecs. The former converts Python values to/from serialized bytes, and
-the latter converts bytes to bytes (e.g. for compression or encryption).
+combination of payload converters, payload codecs, and failure converters. Payload converters convert Python values
+to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption). Failure converters
+convert exceptions to/from serialized failures.
 
 The default data converter supports converting multiple types including:
 

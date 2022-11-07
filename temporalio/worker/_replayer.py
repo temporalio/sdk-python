@@ -38,7 +38,7 @@ class Replayer:
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         namespace: str = "ReplayNamespace",
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
