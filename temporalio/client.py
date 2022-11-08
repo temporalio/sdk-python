@@ -65,6 +65,12 @@ class Client:
     :py:attr:`service` property provides access to a raw gRPC client. To create
     another client, like for a different namespace, :py:func:`Client` may be
     directly instantiated with a :py:attr:`service` of another.
+
+    Clients are not thread-safe and should only be used in the event loop they
+    are first connected in. If a client needs to be used from another thread
+    than where it was created, make sure the event loop where it was created is
+    captured, and then call :py:func:`asyncio.run_coroutine_threadsafe` with the
+    client call and that event loop.
     """
 
     @staticmethod
