@@ -9,6 +9,7 @@ import inspect
 import json
 import sys
 import traceback
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -426,6 +427,9 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Support for non-list iterables like set
         if not isinstance(o, list) and isinstance(o, collections.abc.Iterable):
             return list(o)
+        # Support for UUID
+        if isinstance(o, uuid.UUID):
+            return str(o)
         return super().default(o)
 
 
@@ -1272,6 +1276,10 @@ def value_to_type(hint: Type, value: Any) -> Any:
                     f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"
                 )
             return hint(value)
+
+    # UUID
+    if inspect.isclass(hint) and issubclass(hint, uuid.UUID):
+        return hint(value)
 
     # Iterable. We intentionally put this last as it catches several others.
     if inspect.isclass(origin) and issubclass(origin, collections.abc.Iterable):
