@@ -25,6 +25,7 @@ from typing import (
     Type,
     Union,
 )
+from uuid import UUID, uuid4
 
 import pydantic
 import pytest
@@ -224,6 +225,7 @@ class NestedDataClass:
     foo: str
     bar: List[NestedDataClass] = dataclasses.field(default_factory=list)
     baz: Optional[NestedDataClass] = None
+    qux: Optional[UUID] = None
 
 
 class MyTypedDict(TypedDict):
@@ -239,6 +241,7 @@ class MyTypedDictNotTotal(TypedDict, total=False):
 class MyPydanticClass(pydantic.BaseModel):
     foo: str
     bar: List[MyPydanticClass]
+    baz: Optional[UUID] = None
 
 
 def test_json_type_hints():
@@ -287,6 +290,7 @@ def test_json_type_hints():
     ok(NestedDataClass, NestedDataClass("foo"))
     ok(NestedDataClass, NestedDataClass("foo", baz=NestedDataClass("bar")))
     ok(NestedDataClass, NestedDataClass("foo", bar=[NestedDataClass("bar")]))
+    ok(NestedDataClass, NestedDataClass("foo", qux=uuid4()))
     # Missing required dataclass fields causes failure
     ok(NestedDataClass, {"foo": "bar"}, NestedDataClass("bar"))
     fail(NestedDataClass, {})
@@ -346,6 +350,8 @@ def test_json_type_hints():
     ok(SerializableEnum, SerializableEnum.FOO)
     ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
 
+    # UUID
+
     # StrEnum is available in 3.11+
     if sys.version_info >= (3, 11):
         # StrEnum
@@ -364,7 +370,9 @@ def test_json_type_hints():
     # Pydantic
     ok(
         MyPydanticClass,
-        MyPydanticClass(foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])]),
+        MyPydanticClass(
+            foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()
+        ),
     )
     ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
     fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])

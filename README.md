@@ -189,7 +189,11 @@ The default data converter supports converting multiple types including:
   * Iterables including ones JSON dump may not support by default, e.g. `set`
   * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
     [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
+    * Note, this doesn't mean every Pydantic field can be converted, only fields which the data converter supports
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
+  * [UUID](https://docs.python.org/3/library/uuid.html)
+
+This notably doesn't include any `date`, `time`, or `datetime` objects as they may not work across SDKs.
 
 For converting from JSON, the workflow/activity type hint is taken into account to convert to the proper type. Care has
 been taken to support all common typings including `Optional`, `Union`, all forms of iterables and mappings, `NewType`,
