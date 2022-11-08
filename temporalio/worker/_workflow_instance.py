@@ -191,9 +191,8 @@ class _WorkflowInstanceImpl(
         self._is_replaying: bool = False
         self._random = random.Random(det.randomness_seed)
 
-        # Patches we have been notified of and patches that have been sent
+        # Patches we have been notified of and memoized patch responses
         self._patches_notified: Set[str] = set()
-        self._patches_sent: Set[str] = set()
         self._patches_memoized: Dict[str, bool] = {}
 
         # Tasks stored by asyncio are weak references and therefore can get GC'd
@@ -748,12 +747,10 @@ class _WorkflowInstanceImpl(
 
         use_patch = not self._is_replaying or id in self._patches_notified
         self._patches_memoized[id] = use_patch
-        # Only add patch command if never sent before for this ID
-        if use_patch and not id in self._patches_sent:
+        if use_patch:
             command = self._add_command()
             command.set_patch_marker.patch_id = id
             command.set_patch_marker.deprecated = deprecated
-            self._patches_sent.add(id)
         return use_patch
 
     def workflow_random(self) -> random.Random:
