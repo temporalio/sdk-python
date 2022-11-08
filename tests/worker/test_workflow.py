@@ -67,6 +67,7 @@ from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
+    Worker,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
@@ -2067,6 +2068,87 @@ async def test_workflow_patch(client: Client):
         # TODO(cretz): This causes a non-determinism failure due to having the
         # patch marker, but we don't have an easy way to test it
         # await query_result(patch_handle)
+
+
+@workflow.defn(name="patch-memoized")
+class PatchMemoizedWorkflowUnpatched:
+    def __init__(self, *, should_patch: bool = False) -> None:
+        self.should_patch = should_patch
+        self._waiting_signal = True
+
+    @workflow.run
+    async def run(self) -> List[str]:
+        results: List[str] = []
+        if self.should_patch and workflow.patched("some-patch"):
+            results.append("pre-patch")
+        self._waiting_signal = True
+        await workflow.wait_condition(lambda: not self._waiting_signal)
+        results.append("some-value")
+        if self.should_patch and workflow.patched("some-patch"):
+            results.append("post-patch")
+        return results
+
+    @workflow.signal
+    def signal(self) -> None:
+        self._waiting_signal = False
+
+    @workflow.query
+    def waiting_signal(self) -> bool:
+        return self._waiting_signal
+
+
+@workflow.defn(name="patch-memoized")
+class PatchMemoizedWorkflowPatched(PatchMemoizedWorkflowUnpatched):
+    def __init__(self) -> None:
+        super().__init__(should_patch=True)
+
+    @workflow.run
+    async def run(self) -> List[str]:
+        return await super().run()
+
+
+async def test_workflow_patch_memoized(client: Client):
+    # Start a worker with the workflow unpatched and wait until halfway through
+    task_queue = f"tq-{uuid.uuid4()}"
+    async with Worker(
+        client, task_queue=task_queue, workflows=[PatchMemoizedWorkflowUnpatched]
+    ):
+        pre_patch_handle = await client.start_workflow(
+            PatchMemoizedWorkflowUnpatched.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        # Need to wait until it has gotten halfway through
+        async def waiting_signal() -> bool:
+            return await pre_patch_handle.query(
+                PatchMemoizedWorkflowUnpatched.waiting_signal
+            )
+
+        await assert_eq_eventually(True, waiting_signal)
+
+    # Now start the worker again, but this time with a patched workflow
+    async with Worker(
+        client, task_queue=task_queue, workflows=[PatchMemoizedWorkflowPatched]
+    ):
+        # Start a new workflow post patch
+        post_patch_handle = await client.start_workflow(
+            PatchMemoizedWorkflowPatched.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        # Send signal to both and check results
+        await pre_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
+        await post_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
+
+        # Confirm expected values
+        assert ["some-value"] == await pre_patch_handle.result()
+        assert [
+            "pre-patch",
+            "some-value",
+            "post-patch",
+        ] == await post_patch_handle.result()
 
 
 @workflow.defn
