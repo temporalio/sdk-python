@@ -14,6 +14,8 @@ use temporal_client::{
 use tonic::metadata::MetadataKey;
 use url::Url;
 
+use crate::runtime;
+
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
 type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
@@ -61,18 +63,22 @@ struct RpcCall {
     timeout_millis: Option<u64>,
 }
 
-pub fn connect_client(py: Python, config: ClientConfig) -> PyResult<&PyAny> {
-    // TODO(cretz): Add metrics_meter?
+pub fn connect_client<'a>(
+    py: Python<'a>,
+    runtime: &runtime::RuntimeRef,
+    config: ClientConfig,
+) -> PyResult<&'a PyAny> {
     let headers = if config.metadata.is_empty() {
         None
     } else {
         Some(Arc::new(RwLock::new(config.metadata.clone())))
     };
     let opts: ClientOptions = config.try_into()?;
+    let metric_meter = runtime.runtime.metric_meter().cloned();
     future_into_py(py, async move {
         Ok(ClientRef {
             retry_client: opts
-                .connect_no_namespace(None, headers)
+                .connect_no_namespace(metric_meter.as_ref(), headers)
                 .await
                 .map_err(|err| {
                     PyRuntimeError::new_err(format!("Failed client connect: {}", err))

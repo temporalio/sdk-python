@@ -11,6 +11,7 @@ from typing import Mapping, Optional, Type, TypeVar
 
 import google.protobuf.message
 
+import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 from temporalio.bridge.temporal_sdk_bridge import RPCError
 
@@ -68,14 +69,24 @@ class Client:
     """RPC client using SDK Core."""
 
     @staticmethod
-    async def connect(config: ClientConfig) -> Client:
+    async def connect(
+        runtime: temporalio.bridge.runtime.Runtime, config: ClientConfig
+    ) -> Client:
         """Establish connection with server."""
         return Client(
-            await temporalio.bridge.temporal_sdk_bridge.connect_client(config)
+            runtime,
+            await temporalio.bridge.temporal_sdk_bridge.connect_client(
+                runtime._ref, config
+            ),
         )
 
-    def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.ClientRef):
+    def __init__(
+        self,
+        runtime: temporalio.bridge.runtime.Runtime,
+        ref: temporalio.bridge.temporal_sdk_bridge.ClientRef,
+    ):
         """Initialize client with underlying SDK Core reference."""
+        self._runtime = runtime
         self._ref = ref
 
     def update_metadata(self, metadata: Mapping[str, str]) -> None:

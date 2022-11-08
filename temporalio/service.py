@@ -21,7 +21,7 @@ import temporalio.api.testservice.v1
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto.health.v1
-import temporalio.bridge.telemetry
+import temporalio.bridge.runtime
 import temporalio.exceptions
 
 __version__ = "0.1b2"
@@ -102,6 +102,7 @@ class ConnectConfig:
     rpc_metadata: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
+    runtime: Optional[temporalio.bridge.runtime.Runtime] = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -667,11 +668,6 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
 class _BridgeServiceClient(ServiceClient):
     @staticmethod
     async def connect(config: ConnectConfig) -> _BridgeServiceClient:
-        # TODO(cretz): Expose telemetry init config
-        temporalio.bridge.telemetry.init_telemetry(
-            temporalio.bridge.telemetry.TelemetryConfig(),
-            warn_if_already_inited=False,
-        )
         client = _BridgeServiceClient(config)
         # If not lazy, try to connect
         if not config.lazy:
@@ -688,7 +684,8 @@ class _BridgeServiceClient(ServiceClient):
         async with self._bridge_client_connect_lock:
             if not self._bridge_client:
                 self._bridge_client = await temporalio.bridge.client.Client.connect(
-                    self._bridge_config
+                    self.config.runtime or temporalio.bridge.runtime.Runtime.default(),
+                    self._bridge_config,
                 )
             return self._bridge_client
 

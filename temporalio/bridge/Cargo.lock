@@ -2189,7 +2189,6 @@ dependencies = [
 name = "temporal-sdk-core-api"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "derive_builder",
  "opentelemetry",
@@ -2200,6 +2199,7 @@ dependencies = [
  "thiserror",
  "tonic",
  "tracing-core",
+ "url",
 ]
 
 [[package]]

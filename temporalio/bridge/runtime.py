@@ -5,11 +5,57 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from typing import ClassVar, Mapping, Optional
 
 import temporalio.bridge.temporal_sdk_bridge
+
+_default_runtime: Optional[Runtime] = None
+
+
+class Runtime:
+    """Runtime for SDK Core.
+
+    Users are encouraged to use :py:meth:`default`. It can be set with
+    :py:meth:`set_default`.
+    """
+
+    @staticmethod
+    def default() -> Runtime:
+        """Get the default runtime, creating if not already created.
+
+        If the default runtime needs to be different, it should be done with
+        :py:meth:`set_default` before this is called or ever used.
+
+        Returns:
+            The default runtime.
+        """
+        global _default_runtime
+        if not _default_runtime:
+            _default_runtime = Runtime(telemetry=TelemetryConfig())
+        return _default_runtime
+
+    @staticmethod
+    def set_default(runtime: Runtime, *, error_if_already_set: bool = True) -> None:
+        """Set the default runtime to the given runtime.
+
+        This should be called before any Temporal client is created, but can
+        change the existing one. Any clients and workers created with the
+        previous runtime will stay on that runtime.
+
+        Args:
+            runtime: The runtime to set.
+            error_if_already_set: If True and default is already set, this will
+                raise a RuntimeError.
+        """
+        global _default_runtime
+        if _default_runtime and error_if_already_set:
+            raise RuntimeError("Runtime default already set")
+        _default_runtime = runtime
+
+    def __init__(self, *, telemetry: TelemetryConfig) -> None:
+        """Create a default runtime with the given telemetry config."""
+        self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(telemetry)
 
 
 def format_filter(core_level: str, other_level: str) -> str:
@@ -99,34 +145,3 @@ class TelemetryConfig:
 
     metrics: Optional[PrometheusConfig] = None
     """Metrics configuration."""
-
-
-_inited = False
-
-
-def init_telemetry(
-    config: TelemetryConfig, *, warn_if_already_inited: bool = True
-) -> bool:
-    """Initialize telemetry with the given configuration.
-
-    This must be called before any Temporal client is created. Does nothing if
-    already called.
-
-    .. warning::
-        This API is not stable and may change in a future release.
-
-    Args:
-        config: Telemetry config.
-        warn_if_already_inited: If True and telemetry is already initialized,
-            this will emit a warning.
-    """
-    global _inited
-    if _inited:
-        if warn_if_already_inited:
-            warnings.warn(
-                "Telemetry initialization already called, ignoring successive calls"
-            )
-        return False
-    temporalio.bridge.temporal_sdk_bridge.init_telemetry(config)
-    _inited = True
-    return True

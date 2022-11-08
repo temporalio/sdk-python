@@ -15,6 +15,7 @@ use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::client;
+use crate::runtime;
 
 pyo3::create_exception!(temporal_sdk_bridge, PollShutdownError, PyException);
 
@@ -44,21 +45,32 @@ pub struct WorkerConfig {
     max_task_queue_activities_per_second: Option<f64>,
 }
 
-pub fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> PyResult<WorkerRef> {
+pub fn new_worker(
+    runtime: &runtime::RuntimeRef,
+    client: &client::ClientRef,
+    config: WorkerConfig,
+) -> PyResult<WorkerRef> {
     // This must be run with the Tokio context available
     let _guard = pyo3_asyncio::tokio::get_runtime().enter();
     let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
+    let worker = temporal_sdk_core::init_worker(
+        &runtime.runtime,
+        config,
+        client.retry_client.clone().into_inner(),
+    )
+    .map_err(|err| PyValueError::new_err(format!("Failed creating worker: {}", err)))?;
     Ok(WorkerRef {
-        worker: Some(Arc::new(temporal_sdk_core::init_worker(
-            config,
-            client.retry_client.clone().into_inner(),
-        ))),
+        worker: Some(Arc::new(worker)),
     })
 }
 
-pub fn new_replay_worker(py: Python, config: WorkerConfig) -> PyResult<&PyTuple> {
+pub fn new_replay_worker<'a>(
+    py: Python<'a>,
+    runtime: &runtime::RuntimeRef,
+    config: WorkerConfig,
+) -> PyResult<&'a PyTuple> {
     // This must be run with the Tokio context available
-    let _guard = pyo3_asyncio::tokio::get_runtime().enter();
+    let _guard = runtime.runtime.tokio_handle().enter();
     let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
     let (history_pusher, stream) = HistoryPusher::new();
     let worker = WorkerRef {

@@ -37,6 +37,7 @@ import temporalio.api.history.v1
 import temporalio.api.taskqueue.v1
 import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
+import temporalio.bridge.runtime
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
@@ -82,6 +83,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
         lazy: bool = False,
+        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -117,6 +119,7 @@ class Client:
             lazy: If true, the client will not connect until the first call is
                 attempted or a worker is created with it. Lazy clients cannot be
                 used for workers.
+            runtime: The runtime for this client, or the default if unset.
         """
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
@@ -125,6 +128,7 @@ class Client:
             rpc_metadata=rpc_metadata,
             identity=identity or "",
             lazy=lazy,
+            runtime=runtime,
         )
         return Client(
             await temporalio.service.ServiceClient.connect(connect_config),

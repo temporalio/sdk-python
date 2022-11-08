@@ -3,16 +3,16 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use temporal_sdk_core::{
-    telemetry_init, Logger, MetricsExporter, OtelCollectorOptions, TelemetryOptions,
-    TelemetryOptionsBuilder, TraceExportConfig, TraceExporter,
+use temporal_sdk_core::CoreRuntime;
+use temporal_sdk_core_api::telemetry::{
+    Logger, MetricsExporter, OtelCollectorOptions, TelemetryOptions, TelemetryOptionsBuilder,
+    TraceExportConfig, TraceExporter,
 };
 use url::Url;
 
 #[pyclass]
-pub struct TelemetryRef {
-    // TODO(cretz): This is private
-    // telemetry: &'static temporal_sdk_core::telemetry::GlobalTelemDat,
+pub struct RuntimeRef {
+    pub(crate) runtime: CoreRuntime,
 }
 
 #[derive(FromPyObject)]
@@ -51,13 +51,13 @@ pub struct PrometheusConfig {
     bind_address: String,
 }
 
-pub fn init_telemetry(config: TelemetryConfig) -> PyResult<TelemetryRef> {
-    let opts: TelemetryOptions = config.try_into()?;
-    telemetry_init(&opts).map_err(|err| {
-        PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err))
-    })?;
-    Ok(TelemetryRef {
-        // telemetry: telem_dat,
+pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
+    // We need to be in Tokio context to create the runtime
+    let _guard = pyo3_asyncio::tokio::get_runtime().enter();
+    Ok(RuntimeRef {
+        runtime: CoreRuntime::new_assume_tokio(telemetry_config.try_into()?).map_err(|err| {
+            PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err))
+        })?,
     })
 }
 
