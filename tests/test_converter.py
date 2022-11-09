@@ -351,6 +351,8 @@ def test_json_type_hints():
     ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
 
     # UUID
+    ok(UUID, uuid4())
+    ok(List[UUID], [uuid4(), uuid4()])
 
     # StrEnum is available in 3.11+
     if sys.version_info >= (3, 11):
