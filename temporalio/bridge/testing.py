@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
+import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 
 
@@ -47,17 +48,25 @@ class EphemeralServer:
     """Python representation of a Rust ephemeral server."""
 
     @staticmethod
-    async def start_temporalite(config: TemporaliteConfig) -> EphemeralServer:
+    async def start_temporalite(
+        runtime: temporalio.bridge.runtime.Runtime, config: TemporaliteConfig
+    ) -> EphemeralServer:
         """Start a Temporalite instance."""
         return EphemeralServer(
-            await temporalio.bridge.temporal_sdk_bridge.start_temporalite(config)
+            await temporalio.bridge.temporal_sdk_bridge.start_temporalite(
+                runtime._ref, config
+            )
         )
 
     @staticmethod
-    async def start_test_server(config: TestServerConfig) -> EphemeralServer:
+    async def start_test_server(
+        runtime: temporalio.bridge.runtime.Runtime, config: TestServerConfig
+    ) -> EphemeralServer:
         """Start a test server instance."""
         return EphemeralServer(
-            await temporalio.bridge.temporal_sdk_bridge.start_test_server(config)
+            await temporalio.bridge.temporal_sdk_bridge.start_test_server(
+                runtime._ref, config
+            )
         )
 
     def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.EphemeralServerRef):

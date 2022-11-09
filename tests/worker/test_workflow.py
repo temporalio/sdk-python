@@ -1454,7 +1454,7 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-async def test_workflow_logging(client: Client):
+async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
     # Use queue to capture log statements
     log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
     handler = logging.handlers.QueueHandler(log_queue)
@@ -1469,8 +1469,12 @@ async def test_workflow_logging(client: Client):
         return None
 
     try:
-        # Log two signals and kill worker before completing
-        async with new_worker(client, LoggingWorkflow) as worker:
+        # Log two signals and kill worker before completing. Need to disable
+        # workflow cache since we restart the worker and don't want to pay the
+        # sticky queue penalty.
+        async with new_worker(
+            client, LoggingWorkflow, max_cached_workflows=0
+        ) as worker:
             handle = await client.start_workflow(
                 LoggingWorkflow.run,
                 id=f"workflow-{uuid.uuid4()}",
@@ -1492,10 +1496,14 @@ async def test_workflow_logging(client: Client):
             and record.__dict__["workflow_info"].workflow_type == "LoggingWorkflow"
         )
 
-        # Clear queue and start a new one with more signals
+        # Clear queue and start a new one with more signals. We have to call
+        # reset sticky queue to save penalty on same-queue worker restart.
         log_queue.queue.clear()
         async with new_worker(
-            client, LoggingWorkflow, task_queue=worker.task_queue
+            client,
+            LoggingWorkflow,
+            task_queue=worker.task_queue,
+            max_cached_workflows=0,
         ) as worker:
             # Send a couple signals
             await handle.signal(LoggingWorkflow.my_signal, "signal 3")
@@ -2405,9 +2413,10 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
     # unlock-and-sleep hangs when running this test after
     # test_workflow_cancel_activity. So we create a new test environment here.
     async with await WorkflowEnvironment.start_time_skipping() as env:
-        # Start worker for 30 mins
+        # Start worker for 30 mins. Need to disable workflow cache since we
+        # restart the worker and don't want to pay the sticky queue penalty.
         async with new_worker(
-            client, CancelSignalAndTimerFiredInSameTaskWorkflow
+            client, CancelSignalAndTimerFiredInSameTaskWorkflow, max_cached_workflows=0
         ) as worker:
             task_queue = worker.task_queue
             handle = await client.start_workflow(
@@ -2428,7 +2437,10 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
 
         # Start worker again and wait for workflow completion
         async with new_worker(
-            client, CancelSignalAndTimerFiredInSameTaskWorkflow, task_queue=task_queue
+            client,
+            CancelSignalAndTimerFiredInSameTaskWorkflow,
+            task_queue=task_queue,
+            max_cached_workflows=0,
         ):
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire

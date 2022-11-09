@@ -17,7 +17,8 @@ class Runtime:
     """Runtime for SDK Core.
 
     Users are encouraged to use :py:meth:`default`. It can be set with
-    :py:meth:`set_default`.
+    :py:meth:`set_default`. Every time a new runtime is created, a new internal
+    thread pool is created.
     """
 
     @staticmethod
@@ -54,7 +55,10 @@ class Runtime:
         _default_runtime = runtime
 
     def __init__(self, *, telemetry: TelemetryConfig) -> None:
-        """Create a default runtime with the given telemetry config."""
+        """Create a default runtime with the given telemetry config.
+
+        Each new runtime creates a new internal thread pool, so use sparingly.
+        """
         self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(telemetry)
 
 

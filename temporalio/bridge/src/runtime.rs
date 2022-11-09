@@ -1,8 +1,11 @@
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
+use std::future::Future;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::str::FromStr;
+use std::sync::Arc;
 use temporal_sdk_core::CoreRuntime;
 use temporal_sdk_core_api::telemetry::{
     Logger, MetricsExporter, OtelCollectorOptions, TelemetryOptions, TelemetryOptionsBuilder,
@@ -12,7 +15,12 @@ use url::Url;
 
 #[pyclass]
 pub struct RuntimeRef {
-    pub(crate) runtime: CoreRuntime,
+    pub(crate) runtime: Runtime,
+}
+
+#[derive(Clone)]
+pub(crate) struct Runtime {
+    pub(crate) core: Arc<CoreRuntime>,
 }
 
 #[derive(FromPyObject)]
@@ -52,13 +60,30 @@ pub struct PrometheusConfig {
 }
 
 pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
-    // We need to be in Tokio context to create the runtime
-    let _guard = pyo3_asyncio::tokio::get_runtime().enter();
     Ok(RuntimeRef {
-        runtime: CoreRuntime::new_assume_tokio(telemetry_config.try_into()?).map_err(|err| {
-            PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err))
-        })?,
+        runtime: Runtime {
+            core: Arc::new(
+                CoreRuntime::new(
+                    telemetry_config.try_into()?,
+                    tokio::runtime::Builder::new_multi_thread(),
+                )
+                .map_err(|err| {
+                    PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err))
+                })?,
+            ),
+        },
     })
+}
+
+impl Runtime {
+    pub fn future_into_py<'a, F, T>(&self, py: Python<'a>, fut: F) -> PyResult<&'a PyAny>
+    where
+        F: Future<Output = PyResult<T>> + Send + 'static,
+        T: IntoPy<PyObject>,
+    {
+        let _guard = self.core.tokio_handle().enter();
+        pyo3_asyncio::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
+    }
 }
 
 impl TryFrom<TelemetryConfig> for TelemetryOptions {
@@ -112,5 +137,52 @@ impl TryFrom<OpenTelemetryConfig> for OtelCollectorOptions {
                 .map_err(|err| PyValueError::new_err(format!("Invalid OTel URL: {}", err)))?,
             headers: conf.headers,
         })
+    }
+}
+
+// Code below through the rest of the file is similar to
+// https://github.com/awestlake87/pyo3-asyncio/blob/v0.16.0/src/tokio.rs but
+// altered to support spawning based on current Tokio runtime instead of a
+// single static one
+
+struct TokioRuntime;
+
+tokio::task_local! {
+    static TASK_LOCALS: once_cell::unsync::OnceCell<pyo3_asyncio::TaskLocals>;
+}
+
+impl pyo3_asyncio::generic::Runtime for TokioRuntime {
+    type JoinError = tokio::task::JoinError;
+    type JoinHandle = tokio::task::JoinHandle<()>;
+
+    fn spawn<F>(fut: F) -> Self::JoinHandle
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        tokio::runtime::Handle::current().spawn(async move {
+            fut.await;
+        })
+    }
+}
+
+impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
+    fn scope<F, R>(
+        locals: pyo3_asyncio::TaskLocals,
+        fut: F,
+    ) -> Pin<Box<dyn Future<Output = R> + Send>>
+    where
+        F: Future<Output = R> + Send + 'static,
+    {
+        let cell = once_cell::unsync::OnceCell::new();
+        cell.set(locals).unwrap();
+
+        Box::pin(TASK_LOCALS.scope(cell, fut))
+    }
+
+    fn get_task_locals() -> Option<pyo3_asyncio::TaskLocals> {
+        match TASK_LOCALS.try_with(|c| c.get().map(|locals| locals.clone())) {
+            Ok(locals) => locals,
+            Err(_) => None,
+        }
     }
 }

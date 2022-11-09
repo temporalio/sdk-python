@@ -1177,9 +1177,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "opaque-debug"
@@ -2109,6 +2109,7 @@ name = "temporal-sdk-bridge"
 version = "0.1.0"
 dependencies = [
  "log",
+ "once_cell",
  "parking_lot",
  "prost",
  "prost-types",
@@ -2121,6 +2122,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+ "tracing",
  "url",
 ]
 

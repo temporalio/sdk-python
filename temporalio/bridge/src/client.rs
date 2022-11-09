@@ -1,7 +1,6 @@
 use parking_lot::RwLock;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3_asyncio::tokio::future_into_py;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -23,6 +22,7 @@ type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
 #[pyclass]
 pub struct ClientRef {
     pub(crate) retry_client: Client,
+    runtime: runtime::Runtime,
 }
 
 #[derive(FromPyObject)]
@@ -65,7 +65,7 @@ struct RpcCall {
 
 pub fn connect_client<'a>(
     py: Python<'a>,
-    runtime: &runtime::RuntimeRef,
+    runtime_ref: &runtime::RuntimeRef,
     config: ClientConfig,
 ) -> PyResult<&'a PyAny> {
     let headers = if config.metadata.is_empty() {
@@ -74,15 +74,16 @@ pub fn connect_client<'a>(
         Some(Arc::new(RwLock::new(config.metadata.clone())))
     };
     let opts: ClientOptions = config.try_into()?;
-    let metric_meter = runtime.runtime.metric_meter().cloned();
-    future_into_py(py, async move {
+    let runtime = runtime_ref.runtime.clone();
+    runtime_ref.runtime.future_into_py(py, async move {
         Ok(ClientRef {
             retry_client: opts
-                .connect_no_namespace(metric_meter.as_ref(), headers)
+                .connect_no_namespace(runtime.core.metric_meter(), headers)
                 .await
                 .map_err(|err| {
                     PyRuntimeError::new_err(format!("Failed client connect: {}", err))
                 })?,
+            runtime,
         })
     })
 }
@@ -105,7 +106,7 @@ impl ClientRef {
 
     fn call_workflow_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
         let mut retry_client = self.retry_client.clone();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "count_workflow_executions" => {
                     rpc_call!(retry_client, call, count_workflow_executions)
@@ -247,7 +248,7 @@ impl ClientRef {
 
     fn call_operator_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
         let mut retry_client = self.retry_client.clone();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "add_or_update_remote_cluster" => {
                     rpc_call!(retry_client, call, add_or_update_remote_cluster)
@@ -283,7 +284,7 @@ impl ClientRef {
 
     fn call_test_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
         let mut retry_client = self.retry_client.clone();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "get_current_time" => rpc_call!(retry_client, call, get_current_time),
                 "lock_time_skipping" => rpc_call!(retry_client, call, lock_time_skipping),
@@ -307,7 +308,7 @@ impl ClientRef {
 
     fn call_health_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
         let mut retry_client = self.retry_client.clone();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "check" => rpc_call!(retry_client, call, check),
                 _ => {

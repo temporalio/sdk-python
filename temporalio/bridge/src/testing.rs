@@ -1,11 +1,13 @@
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3_asyncio::tokio::future_into_py;
 use temporal_sdk_core::ephemeral_server;
+
+use crate::runtime;
 
 #[pyclass]
 pub struct EphemeralServerRef {
     server: Option<ephemeral_server::EphemeralServer>,
+    runtime: runtime::Runtime,
 }
 
 #[derive(FromPyObject)]
@@ -36,24 +38,36 @@ pub struct TestServerConfig {
     extra_args: Vec<String>,
 }
 
-pub fn start_temporalite(py: Python, config: TemporaliteConfig) -> PyResult<&PyAny> {
+pub fn start_temporalite<'a>(
+    py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
+    config: TemporaliteConfig,
+) -> PyResult<&'a PyAny> {
     let opts: ephemeral_server::TemporaliteConfig = config.try_into()?;
-    future_into_py(py, async move {
+    let runtime = runtime_ref.runtime.clone();
+    runtime_ref.runtime.future_into_py(py, async move {
         Ok(EphemeralServerRef {
             server: Some(opts.start_server().await.map_err(|err| {
                 PyRuntimeError::new_err(format!("Failed starting Temporalite: {}", err))
             })?),
+            runtime,
         })
     })
 }
 
-pub fn start_test_server(py: Python, config: TestServerConfig) -> PyResult<&PyAny> {
+pub fn start_test_server<'a>(
+    py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
+    config: TestServerConfig,
+) -> PyResult<&'a PyAny> {
     let opts: ephemeral_server::TestServerConfig = config.try_into()?;
-    future_into_py(py, async move {
+    let runtime = runtime_ref.runtime.clone();
+    runtime_ref.runtime.future_into_py(py, async move {
         Ok(EphemeralServerRef {
             server: Some(opts.start_server().await.map_err(|err| {
                 PyRuntimeError::new_err(format!("Failed starting test server: {}", err))
             })?),
+            runtime,
         })
     })
 }
@@ -80,7 +94,7 @@ impl EphemeralServerRef {
 
     fn shutdown<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let server = self.server.take();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             if let Some(mut server) = server {
                 server.shutdown().await.map_err(|err| {
                     PyRuntimeError::new_err(format!("Failed shutting down Temporalite: {}", err))

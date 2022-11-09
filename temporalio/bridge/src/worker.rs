@@ -2,7 +2,6 @@ use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
-use pyo3_asyncio::tokio::future_into_py;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
@@ -22,6 +21,7 @@ pyo3::create_exception!(temporal_sdk_bridge, PollShutdownError, PyException);
 #[pyclass]
 pub struct WorkerRef {
     worker: Option<Arc<temporal_sdk_core::Worker>>,
+    runtime: runtime::Runtime,
 }
 
 #[derive(FromPyObject)]
@@ -45,40 +45,49 @@ pub struct WorkerConfig {
     max_task_queue_activities_per_second: Option<f64>,
 }
 
+macro_rules! enter_sync {
+    ($runtime:expr) => {
+        temporal_sdk_core::telemetry::set_trace_subscriber_for_current_thread(
+            $runtime.core.trace_subscriber(),
+        );
+        let _guard = $runtime.core.tokio_handle().enter();
+    };
+}
+
 pub fn new_worker(
-    runtime: &runtime::RuntimeRef,
+    runtime_ref: &runtime::RuntimeRef,
     client: &client::ClientRef,
     config: WorkerConfig,
 ) -> PyResult<WorkerRef> {
-    // This must be run with the Tokio context available
-    let _guard = pyo3_asyncio::tokio::get_runtime().enter();
+    enter_sync!(runtime_ref.runtime);
     let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
     let worker = temporal_sdk_core::init_worker(
-        &runtime.runtime,
+        &runtime_ref.runtime.core,
         config,
         client.retry_client.clone().into_inner(),
     )
     .map_err(|err| PyValueError::new_err(format!("Failed creating worker: {}", err)))?;
     Ok(WorkerRef {
         worker: Some(Arc::new(worker)),
+        runtime: runtime_ref.runtime.clone(),
     })
 }
 
 pub fn new_replay_worker<'a>(
     py: Python<'a>,
-    runtime: &runtime::RuntimeRef,
+    runtime_ref: &runtime::RuntimeRef,
     config: WorkerConfig,
 ) -> PyResult<&'a PyTuple> {
-    // This must be run with the Tokio context available
-    let _guard = runtime.runtime.tokio_handle().enter();
+    enter_sync!(runtime_ref.runtime);
     let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
-    let (history_pusher, stream) = HistoryPusher::new();
+    let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
     let worker = WorkerRef {
         worker: Some(Arc::new(
             temporal_sdk_core::init_replay_worker(config, stream).map_err(|err| {
                 PyValueError::new_err(format!("Failed creating replay worker: {}", err))
             })?,
         )),
+        runtime: runtime_ref.runtime.clone(),
     };
     Ok(PyTuple::new(
         py,
@@ -90,7 +99,7 @@ pub fn new_replay_worker<'a>(
 impl WorkerRef {
     fn poll_workflow_activation<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_workflow_activation().await {
                 Ok(act) => act.encode_to_vec(),
                 Err(PollWfError::ShutDown) => return Err(PollShutdownError::new_err(())),
@@ -103,7 +112,7 @@ impl WorkerRef {
 
     fn poll_activity_task<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_activity_task().await {
                 Ok(task) => task.encode_to_vec(),
                 Err(PollActivityError::ShutDown) => return Err(PollShutdownError::new_err(())),
@@ -122,7 +131,7 @@ impl WorkerRef {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = WorkflowActivationCompletion::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             worker
                 .complete_workflow_activation(completion)
                 .await
@@ -137,7 +146,7 @@ impl WorkerRef {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = ActivityTaskCompletion::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             worker
                 .complete_activity_task(completion)
                 .await
@@ -149,6 +158,7 @@ impl WorkerRef {
     }
 
     fn record_activity_heartbeat(&self, proto: &PyBytes) -> PyResult<()> {
+        enter_sync!(self.runtime);
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
         self.worker
@@ -159,6 +169,7 @@ impl WorkerRef {
     }
 
     fn request_workflow_eviction(&self, run_id: &str) -> PyResult<()> {
+        enter_sync!(self.runtime);
         self.worker
             .as_ref()
             .unwrap()
@@ -168,7 +179,7 @@ impl WorkerRef {
 
     fn shutdown<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             worker.shutdown().await;
             Ok(())
         })
@@ -183,7 +194,7 @@ impl WorkerRef {
                 Arc::strong_count(&arc)
             ))
         })?;
-        future_into_py(py, async move {
+        self.runtime.future_into_py(py, async move {
             worker.finalize_shutdown().await;
             Ok(())
         })
@@ -227,12 +238,19 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
 #[pyclass]
 pub struct HistoryPusher {
     tx: Option<Sender<HistoryForReplay>>,
+    runtime: runtime::Runtime,
 }
 
 impl HistoryPusher {
-    fn new() -> (Self, ReceiverStream<HistoryForReplay>) {
+    fn new(runtime: runtime::Runtime) -> (Self, ReceiverStream<HistoryForReplay>) {
         let (tx, rx) = channel(1);
-        (Self { tx: Some(tx) }, ReceiverStream::new(rx))
+        (
+            Self {
+                tx: Some(tx),
+                runtime,
+            },
+            ReceiverStream::new(rx),
+        )
     }
 }
 
@@ -254,7 +272,8 @@ impl HistoryPusher {
                 "Replay worker is no longer accepting new histories",
             ));
         };
-        future_into_py(py, async move {
+        // We accept this doesn't have logging/tracing
+        self.runtime.future_into_py(py, async move {
             tx.send(HistoryForReplay::new(history, wfid))
                 .await
                 .map_err(|_| {
