@@ -1513,8 +1513,7 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
             and record.__dict__["workflow_info"].workflow_type == "LoggingWorkflow"
         )
 
-        # Clear queue and start a new one with more signals. We have to call
-        # reset sticky queue to save penalty on same-queue worker restart.
+        # Clear queue and start a new one with more signals
         log_queue.queue.clear()
         async with new_worker(
             client,

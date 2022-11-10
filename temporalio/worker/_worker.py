@@ -170,7 +170,8 @@ class Worker:
             disable_eager_activity_execution: If true, will disable eager
                 activity execution. Eager activity execution is an optimization
                 on some servers that sends activities back to the same worker as
-                the calling workflow if they can run there.
+                the calling workflow if they can run there. This setting is
+                experimental and may be removed in a future release.
             on_fatal_error: An async function that can handle a failure before
                 the worker shutdown commences. This cannot stop the shutdown and
                 any exception raised is logged and ignored.
