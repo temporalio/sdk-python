@@ -12,18 +12,18 @@ from typing import Any, Type
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.converter
-import temporalio.worker.workflow_instance
+import temporalio.worker._workflow_instance
 import temporalio.workflow
 
 # Workflow instance has to be relative import
-from ...worker.workflow_instance import (
+from .._workflow_instance import (
     UnsandboxedWorkflowRunner,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from .importer import Importer
-from .restrictions import RestrictionContext, SandboxRestrictions
+from ._importer import Importer
+from ._restrictions import RestrictionContext, SandboxRestrictions
 
 
 class SandboxedWorkflowRunner(WorkflowRunner):
@@ -52,7 +52,8 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         # Just create with fake info which validates
         self.create_instance(
             WorkflowInstanceDetails(
-                payload_converter_class=temporalio.converter.default().payload_converter_class,
+                payload_converter_class=temporalio.converter.DataConverter.default.payload_converter_class,
+                failure_converter_class=temporalio.converter.DataConverter.default.failure_converter_class,
                 interceptor_classes=[],
                 defn=defn,
                 # Just use fake info during validation
@@ -128,7 +129,7 @@ class _Instance(WorkflowInstance):
             # Create the sandbox instance
             self._run_code(
                 "with __temporal_importer.applied():\n"
-                "  from temporalio.worker.workflow_sandbox.in_sandbox import InSandbox\n"
+                "  from temporalio.worker.workflow_sandbox._in_sandbox import InSandbox\n"
                 "  __temporal_in_sandbox = InSandbox(__temporal_instance_details, __temporal_runner_class, __temporal_workflow_class)\n",
                 __temporal_importer=self.importer,
                 __temporal_instance_details=self.instance_details,

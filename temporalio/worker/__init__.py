@@ -1,7 +1,7 @@
 """Worker for processing Temporal workflows and/or activities."""
 
-from .activity import SharedHeartbeatSender, SharedStateManager
-from .interceptor import (
+from ._activity import SharedHeartbeatSender, SharedStateManager
+from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
     ContinueAsNewInput,
@@ -19,9 +19,9 @@ from .interceptor import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
-from .replayer import Replayer, ReplayerConfig
-from .worker import Worker, WorkerConfig
-from .workflow_instance import (
+from ._replayer import Replayer, ReplayerConfig
+from ._worker import Worker, WorkerConfig
+from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
     WorkflowInstance,
     WorkflowInstanceDetails,

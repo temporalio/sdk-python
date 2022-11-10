@@ -66,6 +66,12 @@ class Client:
     :py:attr:`service` property provides access to a raw gRPC client. To create
     another client, like for a different namespace, :py:func:`Client` may be
     directly instantiated with a :py:attr:`service` of another.
+
+    Clients are not thread-safe and should only be used in the event loop they
+    are first connected in. If a client needs to be used from another thread
+    than where it was created, make sure the event loop where it was created is
+    captured, and then call :py:func:`asyncio.run_coroutine_threadsafe` with the
+    client call and that event loop.
     """
 
     @staticmethod
@@ -73,7 +79,7 @@ class Client:
         target_host: str,
         *,
         namespace: str = "default",
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -143,7 +149,7 @@ class Client:
         service_client: temporalio.service.ServiceClient,
         *,
         namespace: str = "default",
-        data_converter: temporalio.converter.DataConverter = temporalio.converter.default(),
+        data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -886,8 +892,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         hist_run_id = fail_attr.new_execution_run_id
                         break
                     raise WorkflowFailureError(
-                        cause=await temporalio.exceptions.decode_failure_to_error(
-                            fail_attr.failure, self._client.data_converter
+                        cause=await self._client.data_converter.decode_failure(
+                            fail_attr.failure
                         ),
                     )
                 elif event.HasField("workflow_execution_canceled_event_attributes"):
@@ -1974,15 +1980,16 @@ class WorkflowHistoryEventAsyncIterator:
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
     """Error that occurs when a workflow is unsuccessful."""
 
-    def __init__(self, *, cause: temporalio.exceptions.FailureError) -> None:
+    def __init__(self, *, cause: BaseException) -> None:
         """Create workflow failure error."""
         super().__init__("Workflow execution failed")
         self.__cause__ = cause
 
     @property
-    def cause(self) -> temporalio.exceptions.FailureError:
+    def cause(self) -> BaseException:
         """Cause of the workflow failure."""
-        return cast(temporalio.exceptions.FailureError, self.__cause__)
+        assert self.__cause__
+        return self.__cause__
 
 
 class WorkflowContinuedAsNewError(temporalio.exceptions.TemporalError):
@@ -2011,6 +2018,20 @@ class WorkflowQueryRejectedError(temporalio.exceptions.TemporalError):
     def status(self) -> Optional[WorkflowExecutionStatus]:
         """Get workflow execution status causing rejection."""
         return self._status
+
+
+class WorkflowQueryFailedError(temporalio.exceptions.TemporalError):
+    """Error that occurs when a query fails."""
+
+    def __init__(self, message: str) -> None:
+        """Create workflow query failed error."""
+        super().__init__(message)
+        self._message = message
+
+    @property
+    def message(self) -> str:
+        """Get query failed message."""
+        return self._message
 
 
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
@@ -2433,9 +2454,17 @@ class _ClientImpl(OutboundInterceptor):
             )
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.query.header.fields)
-        resp = await self._client.workflow_service.query_workflow(
-            req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
-        )
+        try:
+            resp = await self._client.workflow_service.query_workflow(
+                req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+            )
+        except RPCError as err:
+            # If the status is INVALID_ARGUMENT, we can assume it's a query
+            # failed error
+            if err.status == RPCStatusCode.INVALID_ARGUMENT:
+                raise WorkflowQueryFailedError(err.message)
+            else:
+                raise
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
                 WorkflowExecutionStatus(resp.query_rejected.status)
@@ -2570,9 +2599,7 @@ class _ClientImpl(OutboundInterceptor):
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
         failure = temporalio.api.failure.v1.Failure()
-        await temporalio.exceptions.encode_exception_to_failure(
-            input.error, self._client.data_converter, failure
-        )
+        await self._client.data_converter.encode_failure(input.error, failure)
         last_heartbeat_details = (
             None
             if not input.last_heartbeat_details

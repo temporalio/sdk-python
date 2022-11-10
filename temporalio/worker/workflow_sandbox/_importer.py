@@ -35,7 +35,7 @@ from typing_extensions import ParamSpec
 
 import temporalio.workflow
 
-from .restrictions import (
+from ._restrictions import (
     RestrictedModule,
     RestrictedWorkflowAccessError,
     RestrictionContext,

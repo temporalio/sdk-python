@@ -30,6 +30,7 @@ opentelemetry-api = { version = "^1.11.1", optional = true }
 opentelemetry-sdk = { version = "^1.11.1", optional = true }
 protobuf = "~4.21"
 python = "^3.7"
+python-dateutil = { version = "^2.8.2", python = "<3.11" }
 types-protobuf = "~3.20"
 typing-extensions = "^4.2.0"
 
@@ -64,7 +65,7 @@ build-develop = "python scripts/setup_bridge.py develop"
 build-develop-with-release = { cmd = "python scripts/setup_bridge.py develop", env = { TEMPORAL_BUILD_RELEASE = "1" }}
 fix-wheel = "python scripts/fix_wheel.py"
 format = [{cmd = "black ."}, {cmd = "isort ."}]
-gen-docs = "pydoctor"
+gen-docs = "python scripts/gen_docs.py"
 gen-protos = "python scripts/gen_protos.py"
 lint = [
   {cmd = "black --check ."},
@@ -121,7 +122,7 @@ ignore_missing_imports = true
 exclude = [
   # Ignore generated code
   'temporalio/api',
-  'temporalio/bridge/proto',
+  'temporalio/bridge/proto'
 ]
 
 [tool.pydocstyle]

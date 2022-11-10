@@ -1,4 +1,4 @@
-from temporalio.worker.workflow_sandbox.restrictions import (
+from temporalio.worker.workflow_sandbox._restrictions import (
     SandboxMatcher,
     SandboxRestrictions,
 )

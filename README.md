@@ -174,8 +174,9 @@ other_ns_client = Client(**config)
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
 `temporalio.converter.DataConverter` can be set via the `data_converter` client parameter. Data converters are a
-combination of payload converters and payload codecs. The former converts Python values to/from serialized bytes, and
-the latter converts bytes to bytes (e.g. for compression or encryption).
+combination of payload converters, payload codecs, and failure converters. Payload converters convert Python values
+to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption). Failure converters
+convert exceptions to/from serialized failures.
 
 The default data converter supports converting multiple types including:
 
@@ -188,7 +189,11 @@ The default data converter supports converting multiple types including:
   * Iterables including ones JSON dump may not support by default, e.g. `set`
   * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
     [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
-  * [IntEnum](https://docs.python.org/3/library/enum.html) based enumerates
+    * Note, this doesn't mean every Pydantic field can be converted, only fields which the data converter supports
+  * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
+  * [UUID](https://docs.python.org/3/library/uuid.html)
+
+This notably doesn't include any `date`, `time`, or `datetime` objects as they may not work across SDKs.
 
 For converting from JSON, the workflow/activity type hint is taken into account to convert to the proper type. Care has
 been taken to support all common typings including `Optional`, `Union`, all forms of iterables and mappings, `NewType`,
@@ -782,8 +787,9 @@ Synchronous activities, i.e. functions that do not have `async def`, can be used
 activities.
 
 Cancellation for synchronous activities is done in the background and the activity must choose to listen for it and
-react appropriately. An activity must heartbeat to receive cancellation and there are other ways to be notified about
-cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
+react appropriately. If after cancellation is obtained an unwrapped `temporalio.exceptions.CancelledError` is raised,
+the activity will be marked cancelled. An activity must heartbeat to receive cancellation and there are other ways to be
+notified about cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
 
 Note, all calls from an activity to functions in the `temporalio.activity` package are powered by
 [contextvars](https://docs.python.org/3/library/contextvars.html). Therefore, new threads starting _inside_ of

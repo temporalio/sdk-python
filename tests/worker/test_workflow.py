@@ -30,6 +30,7 @@ from typing_extensions import Protocol, runtime_checkable
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType, IndexedValueType
+from temporalio.api.failure.v1 import Failure
 from temporalio.api.operatorservice.v1 import AddSearchAttributesRequest
 from temporalio.api.workflowservice.v1 import (
     GetSearchAttributesRequest,
@@ -41,11 +42,19 @@ from temporalio.client import (
     Client,
     RPCError,
     RPCStatusCode,
+    WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
+    WorkflowQueryFailedError,
 )
 from temporalio.common import RetryPolicy, SearchAttributes
-from temporalio.converter import DataConverter, PayloadCodec
+from temporalio.converter import (
+    DataConverter,
+    DefaultFailureConverterWithEncodedAttributes,
+    FailureConverter,
+    PayloadCodec,
+    PayloadConverter,
+)
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -58,6 +67,7 @@ from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
+    Worker,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
@@ -359,10 +369,16 @@ async def test_workflow_signal_and_query_errors(client: Client):
         assert isinstance(err.value.cause, ApplicationError)
         assert list(err.value.cause.details) == [123]
         # Fail query (no details on query failure)
-        with pytest.raises(RPCError) as rpc_err:
+        with pytest.raises(WorkflowQueryFailedError) as rpc_err:
             await handle.query(SignalAndQueryErrorsWorkflow.bad_query)
-        assert rpc_err.value.status is RPCStatusCode.INVALID_ARGUMENT
         assert str(rpc_err.value) == "query fail"
+        # Unrecognized query
+        with pytest.raises(WorkflowQueryFailedError) as rpc_err:
+            await handle.query("non-existent query")
+        assert (
+            str(rpc_err.value)
+            == "Query handler for 'non-existent query' expected but not found"
+        )
 
 
 @workflow.defn
@@ -717,6 +733,7 @@ async def test_workflow_simple_cancel(client: Client):
         with pytest.raises(WorkflowFailureError) as err:
             await handle.result()
         assert isinstance(err.value.cause, CancelledError)
+        assert (await handle.describe()).status == WorkflowExecutionStatus.CANCELED
 
 
 @workflow.defn
@@ -2061,6 +2078,95 @@ async def test_workflow_patch(client: Client):
         # await query_result(patch_handle)
 
 
+@workflow.defn(name="patch-memoized")
+class PatchMemoizedWorkflowUnpatched:
+    def __init__(self, *, should_patch: bool = False) -> None:
+        self.should_patch = should_patch
+        self._waiting_signal = True
+
+    @workflow.run
+    async def run(self) -> List[str]:
+        results: List[str] = []
+        if self.should_patch and workflow.patched("some-patch"):
+            results.append("pre-patch")
+        self._waiting_signal = True
+        await workflow.wait_condition(lambda: not self._waiting_signal)
+        results.append("some-value")
+        if self.should_patch and workflow.patched("some-patch"):
+            results.append("post-patch")
+        return results
+
+    @workflow.signal
+    def signal(self) -> None:
+        self._waiting_signal = False
+
+    @workflow.query
+    def waiting_signal(self) -> bool:
+        return self._waiting_signal
+
+
+@workflow.defn(name="patch-memoized")
+class PatchMemoizedWorkflowPatched(PatchMemoizedWorkflowUnpatched):
+    def __init__(self) -> None:
+        super().__init__(should_patch=True)
+
+    @workflow.run
+    async def run(self) -> List[str]:
+        return await super().run()
+
+
+async def test_workflow_patch_memoized(client: Client):
+    # Start a worker with the workflow unpatched and wait until halfway through.
+    # Need to disable workflow cache since we restart the worker and don't want
+    # to pay the sticky queue penalty.
+    task_queue = f"tq-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[PatchMemoizedWorkflowUnpatched],
+        max_cached_workflows=0,
+    ):
+        pre_patch_handle = await client.start_workflow(
+            PatchMemoizedWorkflowUnpatched.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        # Need to wait until it has gotten halfway through
+        async def waiting_signal() -> bool:
+            return await pre_patch_handle.query(
+                PatchMemoizedWorkflowUnpatched.waiting_signal
+            )
+
+        await assert_eq_eventually(True, waiting_signal)
+
+    # Now start the worker again, but this time with a patched workflow
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[PatchMemoizedWorkflowPatched],
+        max_cached_workflows=0,
+    ):
+        # Start a new workflow post patch
+        post_patch_handle = await client.start_workflow(
+            PatchMemoizedWorkflowPatched.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        # Send signal to both and check results
+        await pre_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
+        await post_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
+
+        # Confirm expected values
+        assert ["some-value"] == await pre_patch_handle.result()
+        assert [
+            "pre-patch",
+            "some-value",
+            "post-patch",
+        ] == await post_patch_handle.result()
+
+
 @workflow.defn
 class UUIDWorkflow:
     def __init__(self) -> None:
@@ -2445,3 +2551,88 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire
             await result_task
+
+
+class MyCustomError(ApplicationError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, type="MyCustomError", non_retryable=True)
+
+
+@activity.defn
+async def custom_error_activity() -> NoReturn:
+    raise MyCustomError("activity error!")
+
+
+@workflow.defn
+class CustomErrorWorkflow:
+    @workflow.run
+    async def run(self) -> NoReturn:
+        try:
+            await workflow.execute_activity(
+                custom_error_activity, schedule_to_close_timeout=timedelta(seconds=30)
+            )
+        except ActivityError:
+            raise MyCustomError("workflow error!")
+
+
+class CustomFailureConverter(DefaultFailureConverterWithEncodedAttributes):
+    # We'll override from failure to convert back to our type
+    def from_failure(
+        self, failure: Failure, payload_converter: PayloadConverter
+    ) -> BaseException:
+        err = super().from_failure(failure, payload_converter)
+        if isinstance(err, ApplicationError) and err.type == "MyCustomError":
+            my_err = MyCustomError(err.message)
+            my_err.__cause__ = err.__cause__
+            err = my_err
+        return err
+
+
+async def test_workflow_custom_failure_converter(client: Client):
+    # Clone the client but change the data converter to use our failure
+    # converter
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        config["data_converter"],
+        failure_converter_class=CustomFailureConverter,
+    )
+    client = Client(**config)
+
+    # Run workflow and confirm error
+    with pytest.raises(WorkflowFailureError) as err:
+        async with new_worker(
+            client, CustomErrorWorkflow, activities=[custom_error_activity]
+        ) as worker:
+            handle = await client.start_workflow(
+                CustomErrorWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle.result()
+
+    # Check error is as expected
+    assert isinstance(err.value.cause, MyCustomError)
+    assert err.value.cause.message == "workflow error!"
+    assert isinstance(err.value.cause.cause, ActivityError)
+    assert isinstance(err.value.cause.cause.cause, MyCustomError)
+    assert err.value.cause.cause.cause.message == "activity error!"
+    assert err.value.cause.cause.cause.cause is None
+
+    # Check in history it is encoded
+    failure = (
+        (await handle.fetch_history())
+        .events[-1]
+        .workflow_execution_failed_event_attributes.failure
+    )
+    assert failure.application_failure_info.type == "MyCustomError"
+    while True:
+        assert failure.message == "Encoded failure"
+        assert failure.stack_trace == ""
+        attrs: Dict[str, Any] = PayloadConverter.default.from_payloads(
+            [failure.encoded_attributes]
+        )[0]
+        assert "message" in attrs
+        assert "stack_trace" in attrs
+        if not failure.HasField("cause"):
+            break
+        failure = failure.cause
