@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
 mod client;
-mod telemetry;
+mod runtime;
 mod testing;
 mod worker;
 
@@ -13,9 +13,9 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<client::ClientRef>()?;
     m.add_function(wrap_pyfunction!(connect_client, m)?)?;
 
-    // Telemetry stuff
-    m.add_class::<telemetry::TelemetryRef>()?;
-    m.add_function(wrap_pyfunction!(init_telemetry, m)?)?;
+    // Runtime stuff
+    m.add_class::<runtime::RuntimeRef>()?;
+    m.add_function(wrap_pyfunction!(init_runtime, m)?)?;
 
     // Testing stuff
     m.add_class::<testing::EphemeralServerRef>()?;
@@ -35,34 +35,51 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[pyfunction]
-fn connect_client(py: Python, config: client::ClientConfig) -> PyResult<&PyAny> {
-    client::connect_client(py, config)
+fn connect_client<'a>(
+    py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
+    config: client::ClientConfig,
+) -> PyResult<&'a PyAny> {
+    client::connect_client(py, &runtime_ref, config)
 }
 
 #[pyfunction]
-fn init_telemetry(config: telemetry::TelemetryConfig) -> PyResult<telemetry::TelemetryRef> {
-    telemetry::init_telemetry(config)
+fn init_runtime(telemetry_config: runtime::TelemetryConfig) -> PyResult<runtime::RuntimeRef> {
+    runtime::init_runtime(telemetry_config)
 }
 
 #[pyfunction]
-fn start_temporalite(py: Python, config: testing::TemporaliteConfig) -> PyResult<&PyAny> {
-    testing::start_temporalite(py, config)
+fn start_temporalite<'a>(
+    py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
+    config: testing::TemporaliteConfig,
+) -> PyResult<&'a PyAny> {
+    testing::start_temporalite(py, &runtime_ref, config)
 }
 
 #[pyfunction]
-fn start_test_server(py: Python, config: testing::TestServerConfig) -> PyResult<&PyAny> {
-    testing::start_test_server(py, config)
+fn start_test_server<'a>(
+    py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
+    config: testing::TestServerConfig,
+) -> PyResult<&'a PyAny> {
+    testing::start_test_server(py, &runtime_ref, config)
 }
 
 #[pyfunction]
 fn new_worker(
+    runtime_ref: &runtime::RuntimeRef,
     client: &client::ClientRef,
     config: worker::WorkerConfig,
 ) -> PyResult<worker::WorkerRef> {
-    worker::new_worker(&client, config)
+    worker::new_worker(&runtime_ref, &client, config)
 }
 
 #[pyfunction]
-fn new_replay_worker(py: Python, config: worker::WorkerConfig) -> PyResult<&PyTuple> {
-    worker::new_replay_worker(py, config)
+fn new_replay_worker<'a>(
+    py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
+    config: worker::WorkerConfig,
+) -> PyResult<&'a PyTuple> {
+    worker::new_replay_worker(py, &runtime_ref, config)
 }

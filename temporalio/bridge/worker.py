@@ -18,6 +18,7 @@ import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
@@ -54,22 +55,23 @@ class Worker:
     def create(client: temporalio.bridge.client.Client, config: WorkerConfig) -> Worker:
         """Create a bridge worker from a bridge client."""
         return Worker(
-            temporalio.bridge.temporal_sdk_bridge.new_worker(client._ref, config)
+            temporalio.bridge.temporal_sdk_bridge.new_worker(
+                client._runtime._ref, client._ref, config
+            )
         )
 
     @staticmethod
     def for_replay(
+        runtime: temporalio.bridge.runtime.Runtime,
         config: WorkerConfig,
     ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
         """Create a bridge replay worker."""
-        temporalio.bridge.telemetry.init_telemetry(
-            temporalio.bridge.telemetry.TelemetryConfig(),
-            warn_if_already_inited=False,
-        )
         [
             replay_worker,
             pusher,
-        ] = temporalio.bridge.temporal_sdk_bridge.new_replay_worker(config)
+        ] = temporalio.bridge.temporal_sdk_bridge.new_replay_worker(
+            runtime._ref, config
+        )
         return Worker(replay_worker), pusher
 
     def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.WorkerRef) -> None:

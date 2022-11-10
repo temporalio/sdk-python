@@ -15,6 +15,7 @@ def new_worker(
     activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
     workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
+    max_cached_workflows: int = 1000,
 ) -> Worker:
     return Worker(
         client,
@@ -22,6 +23,7 @@ def new_worker(
         workflows=workflows,
         activities=activities,
         workflow_runner=workflow_runner,
+        max_cached_workflows=max_cached_workflows,
     )
 
 

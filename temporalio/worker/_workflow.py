@@ -57,11 +57,12 @@ class _WorkflowWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         debug_mode: bool,
+        disable_eager_activity_execution: bool,
         on_eviction_hook: Optional[
             Callable[
                 [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
             ]
-        ] = None,
+        ],
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -88,6 +89,7 @@ class _WorkflowWorker:
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
         self._running_workflows: Dict[str, WorkflowInstance] = {}
+        self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
         self._throw_after_activation: Optional[Exception] = None
 
@@ -333,6 +335,7 @@ class _WorkflowWorker:
             info=info,
             randomness_seed=start.randomness_seed,
             extern_functions=self._extern_functions,
+            disable_eager_activity_execution=self._disable_eager_activity_execution,
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)

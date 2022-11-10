@@ -13,6 +13,7 @@ from typing_extensions import TypedDict
 
 import temporalio.api.history.v1
 import temporalio.bridge.proto.workflow_activation
+import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
@@ -43,12 +44,14 @@ class Replayer:
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         debug_mode: bool = False,
+        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
         See :py:meth:`temporalio.worker.Worker.__init__` for a description of
-        arguments. The same arguments need to be passed to the replayer that
-        were passed to the worker when the workflow originally ran.
+        most of the arguments. The same arguments need to be passed to the
+        replayer that were passed to the worker when the workflow originally
+        ran.
         """
         if not workflows:
             raise ValueError("At least one workflow must be specified")
@@ -63,6 +66,7 @@ class Replayer:
             build_id=build_id,
             identity=identity,
             debug_mode=debug_mode,
+            runtime=runtime,
         )
 
     def config(self) -> ReplayerConfig:
@@ -150,6 +154,7 @@ class Replayer:
         # Create bridge worker
         task_queue = f"replay-{self._config['build_id']}"
         bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
+            self._config["runtime"] or temporalio.bridge.runtime.Runtime.default(),
             temporalio.bridge.worker.WorkerConfig(
                 namespace=self._config["namespace"],
                 task_queue=task_queue,
@@ -218,6 +223,7 @@ class Replayer:
                     interceptors=self._config["interceptors"],
                     debug_mode=self._config["debug_mode"],
                     on_eviction_hook=on_eviction_hook,
+                    disable_eager_activity_execution=False,
                 ).run()
             )
 
@@ -286,6 +292,7 @@ class ReplayerConfig(TypedDict, total=False):
     build_id: Optional[str]
     identity: Optional[str]
     debug_mode: bool
+    runtime: Optional[temporalio.bridge.runtime.Runtime]
 
 
 @dataclass(frozen=True)

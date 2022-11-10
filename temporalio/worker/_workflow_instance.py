@@ -110,6 +110,7 @@ class WorkflowInstanceDetails:
     info: temporalio.workflow.Info
     randomness_seed: int
     extern_functions: Mapping[str, Callable]
+    disable_eager_activity_execution: bool
 
 
 class WorkflowInstance(ABC):
@@ -166,6 +167,7 @@ class _WorkflowInstanceImpl(
         self._defn = det.defn
         self._info = det.info
         self._extern_functions = det.extern_functions
+        self._disable_eager_activity_execution = det.disable_eager_activity_execution
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time_ns = 0
         self._cancel_requested = False
@@ -835,6 +837,7 @@ class _WorkflowInstanceImpl(
                 retry_policy=retry_policy,
                 cancellation_type=cancellation_type,
                 headers={},
+                disable_eager_execution=self._disable_eager_activity_execution,
                 arg_types=arg_types,
                 ret_type=ret_type,
             )
@@ -1665,6 +1668,9 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 command.schedule_activity.heartbeat_timeout.FromTimedelta(
                     self._input.heartbeat_timeout
                 )
+            command.schedule_activity.do_not_eagerly_execute = (
+                self._input.disable_eager_execution
+            )
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:
                 command.schedule_local_activity.local_retry_threshold.FromTimedelta(

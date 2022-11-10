@@ -1177,9 +1177,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "opaque-debug"
@@ -1756,11 +1756,11 @@ dependencies = [
 
 [[package]]
 name = "ringbuf"
-version = "0.2.8"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f65af18d50f789e74aaf23bbb3f65dcd22a3cb6e029b5bced149f6bd57c5c2a2"
+checksum = "89e68dd9c1d8f7bb0c664e1556b1521809bc6fa62d92bb3b813adf8611caa0eb"
 dependencies = [
- "cache-padded",
+ "crossbeam-utils",
 ]
 
 [[package]]
@@ -2109,6 +2109,7 @@ name = "temporal-sdk-bridge"
 version = "0.1.0"
 dependencies = [
  "log",
+ "once_cell",
  "parking_lot",
  "prost",
  "prost-types",
@@ -2121,6 +2122,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+ "tracing",
  "url",
 ]
 
@@ -2189,16 +2191,17 @@ dependencies = [
 name = "temporal-sdk-core-api"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "derive_builder",
- "log",
  "opentelemetry",
  "prost-types",
+ "serde_json",
  "temporal-client",
  "temporal-sdk-core-protos",
  "thiserror",
  "tonic",
+ "tracing-core",
+ "url",
 ]
 
 [[package]]

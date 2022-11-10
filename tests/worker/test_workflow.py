@@ -1471,7 +1471,7 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-async def test_workflow_logging(client: Client):
+async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
     # Use queue to capture log statements
     log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
     handler = logging.handlers.QueueHandler(log_queue)
@@ -1486,8 +1486,12 @@ async def test_workflow_logging(client: Client):
         return None
 
     try:
-        # Log two signals and kill worker before completing
-        async with new_worker(client, LoggingWorkflow) as worker:
+        # Log two signals and kill worker before completing. Need to disable
+        # workflow cache since we restart the worker and don't want to pay the
+        # sticky queue penalty.
+        async with new_worker(
+            client, LoggingWorkflow, max_cached_workflows=0
+        ) as worker:
             handle = await client.start_workflow(
                 LoggingWorkflow.run,
                 id=f"workflow-{uuid.uuid4()}",
@@ -1512,7 +1516,10 @@ async def test_workflow_logging(client: Client):
         # Clear queue and start a new one with more signals
         log_queue.queue.clear()
         async with new_worker(
-            client, LoggingWorkflow, task_queue=worker.task_queue
+            client,
+            LoggingWorkflow,
+            task_queue=worker.task_queue,
+            max_cached_workflows=0,
         ) as worker:
             # Send a couple signals
             await handle.signal(LoggingWorkflow.my_signal, "signal 3")
@@ -2042,26 +2049,35 @@ async def test_workflow_patch(client: Client):
     async def query_result(handle: WorkflowHandle) -> str:
         return await handle.query(PatchWorkflowBase.result)
 
-    # Run a simple pre-patch workflow
-    async with new_worker(client, PrePatchWorkflow, task_queue=task_queue):
+    # Run a simple pre-patch workflow. Need to disable workflow cache since we
+    # restart the worker and don't want to pay the sticky queue penalty.
+    async with new_worker(
+        client, PrePatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+    ):
         pre_patch_handle = await execute()
         assert "pre-patch" == await query_result(pre_patch_handle)
 
     # Confirm patched workflow gives old result for pre-patched but new result
     # for patched
-    async with new_worker(client, PatchWorkflow, task_queue=task_queue):
+    async with new_worker(
+        client, PatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+    ):
         patch_handle = await execute()
         assert "post-patch" == await query_result(patch_handle)
         assert "pre-patch" == await query_result(pre_patch_handle)
 
     # Confirm what works during deprecated
-    async with new_worker(client, DeprecatePatchWorkflow, task_queue=task_queue):
+    async with new_worker(
+        client, DeprecatePatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+    ):
         deprecate_patch_handle = await execute()
         assert "post-patch" == await query_result(deprecate_patch_handle)
         assert "post-patch" == await query_result(patch_handle)
 
     # Confirm what works when deprecation gone
-    async with new_worker(client, PostPatchWorkflow, task_queue=task_queue):
+    async with new_worker(
+        client, PostPatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+    ):
         post_patch_handle = await execute()
         assert "post-patch" == await query_result(post_patch_handle)
         assert "post-patch" == await query_result(deprecate_patch_handle)
@@ -2108,10 +2124,15 @@ class PatchMemoizedWorkflowPatched(PatchMemoizedWorkflowUnpatched):
 
 
 async def test_workflow_patch_memoized(client: Client):
-    # Start a worker with the workflow unpatched and wait until halfway through
+    # Start a worker with the workflow unpatched and wait until halfway through.
+    # Need to disable workflow cache since we restart the worker and don't want
+    # to pay the sticky queue penalty.
     task_queue = f"tq-{uuid.uuid4()}"
     async with Worker(
-        client, task_queue=task_queue, workflows=[PatchMemoizedWorkflowUnpatched]
+        client,
+        task_queue=task_queue,
+        workflows=[PatchMemoizedWorkflowUnpatched],
+        max_cached_workflows=0,
     ):
         pre_patch_handle = await client.start_workflow(
             PatchMemoizedWorkflowUnpatched.run,
@@ -2129,7 +2150,10 @@ async def test_workflow_patch_memoized(client: Client):
 
     # Now start the worker again, but this time with a patched workflow
     async with Worker(
-        client, task_queue=task_queue, workflows=[PatchMemoizedWorkflowPatched]
+        client,
+        task_queue=task_queue,
+        workflows=[PatchMemoizedWorkflowPatched],
+        max_cached_workflows=0,
     ):
         # Start a new workflow post patch
         post_patch_handle = await client.start_workflow(
@@ -2167,12 +2191,13 @@ class UUIDWorkflow:
 
 async def test_workflow_uuid(client: Client):
     task_queue = str(uuid.uuid4())
-    async with new_worker(client, UUIDWorkflow, task_queue=task_queue):
-        # Get two handle UUID results
+    async with new_worker(
+        client, UUIDWorkflow, task_queue=task_queue, max_cached_workflows=0
+    ):
+        # Get two handle UUID results. Need to disable workflow cache since we
+        # restart the worker and don't want to pay the sticky queue penalty.
         handle1 = await client.start_workflow(
-            UUIDWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=task_queue,
+            UUIDWorkflow.run, id=f"workflow-{uuid.uuid4()}", task_queue=task_queue
         )
         await handle1.result()
         handle1_query_result = await handle1.query(UUIDWorkflow.result)
@@ -2192,7 +2217,9 @@ async def test_workflow_uuid(client: Client):
         assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
 
     # Now confirm those results are the same even on a new worker
-    async with new_worker(client, UUIDWorkflow, task_queue=task_queue):
+    async with new_worker(
+        client, UUIDWorkflow, task_queue=task_queue, max_cached_workflows=0
+    ):
         assert handle1_query_result == await handle1.query(UUIDWorkflow.result)
         assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
 
@@ -2503,9 +2530,10 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
     # unlock-and-sleep hangs when running this test after
     # test_workflow_cancel_activity. So we create a new test environment here.
     async with await WorkflowEnvironment.start_time_skipping() as env:
-        # Start worker for 30 mins
+        # Start worker for 30 mins. Need to disable workflow cache since we
+        # restart the worker and don't want to pay the sticky queue penalty.
         async with new_worker(
-            client, CancelSignalAndTimerFiredInSameTaskWorkflow
+            client, CancelSignalAndTimerFiredInSameTaskWorkflow, max_cached_workflows=0
         ) as worker:
             task_queue = worker.task_queue
             handle = await client.start_workflow(
@@ -2526,7 +2554,10 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
 
         # Start worker again and wait for workflow completion
         async with new_worker(
-            client, CancelSignalAndTimerFiredInSameTaskWorkflow, task_queue=task_queue
+            client,
+            CancelSignalAndTimerFiredInSameTaskWorkflow,
+            task_queue=task_queue,
+            max_cached_workflows=0,
         ):
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire

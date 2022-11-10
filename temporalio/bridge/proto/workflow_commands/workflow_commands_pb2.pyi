@@ -90,6 +90,7 @@ class WorkflowCommand(google.protobuf.message.Message):
     SCHEDULE_LOCAL_ACTIVITY_FIELD_NUMBER: builtins.int
     REQUEST_CANCEL_LOCAL_ACTIVITY_FIELD_NUMBER: builtins.int
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    MODIFY_WORKFLOW_PROPERTIES_FIELD_NUMBER: builtins.int
     @property
     def start_timer(self) -> global___StartTimer: ...
     @property
@@ -138,6 +139,8 @@ class WorkflowCommand(google.protobuf.message.Message):
     def upsert_workflow_search_attributes(
         self,
     ) -> global___UpsertWorkflowSearchAttributes: ...
+    @property
+    def modify_workflow_properties(self) -> global___ModifyWorkflowProperties: ...
     def __init__(
         self,
         *,
@@ -165,6 +168,7 @@ class WorkflowCommand(google.protobuf.message.Message):
         request_cancel_local_activity: global___RequestCancelLocalActivity | None = ...,
         upsert_workflow_search_attributes: global___UpsertWorkflowSearchAttributes
         | None = ...,
+        modify_workflow_properties: global___ModifyWorkflowProperties | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -183,6 +187,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"continue_as_new_workflow_execution",
             "fail_workflow_execution",
             b"fail_workflow_execution",
+            "modify_workflow_properties",
+            b"modify_workflow_properties",
             "request_cancel_activity",
             b"request_cancel_activity",
             "request_cancel_external_workflow_execution",
@@ -226,6 +232,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"continue_as_new_workflow_execution",
             "fail_workflow_execution",
             b"fail_workflow_execution",
+            "modify_workflow_properties",
+            b"modify_workflow_properties",
             "request_cancel_activity",
             b"request_cancel_activity",
             "request_cancel_external_workflow_execution",
@@ -273,6 +281,7 @@ class WorkflowCommand(google.protobuf.message.Message):
         "schedule_local_activity",
         "request_cancel_local_activity",
         "upsert_workflow_search_attributes",
+        "modify_workflow_properties",
     ] | None: ...
 
 global___WorkflowCommand = WorkflowCommand
@@ -352,7 +361,6 @@ class ScheduleActivity(google.protobuf.message.Message):
     SEQ_FIELD_NUMBER: builtins.int
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
-    NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     HEADERS_FIELD_NUMBER: builtins.int
     ARGUMENTS_FIELD_NUMBER: builtins.int
@@ -367,7 +375,6 @@ class ScheduleActivity(google.protobuf.message.Message):
     """/ Lang's incremental sequence number, used as the operation identifier"""
     activity_id: builtins.str
     activity_type: builtins.str
-    namespace: builtins.str
     task_queue: builtins.str
     """The name of the task queue to place this activity request in"""
     @property
@@ -422,7 +429,6 @@ class ScheduleActivity(google.protobuf.message.Message):
         seq: builtins.int = ...,
         activity_id: builtins.str = ...,
         activity_type: builtins.str = ...,
-        namespace: builtins.str = ...,
         task_queue: builtins.str = ...,
         headers: collections.abc.Mapping[
             builtins.str, temporalio.api.common.v1.message_pb2.Payload
@@ -472,8 +478,6 @@ class ScheduleActivity(google.protobuf.message.Message):
             b"headers",
             "heartbeat_timeout",
             b"heartbeat_timeout",
-            "namespace",
-            b"namespace",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -1531,3 +1535,27 @@ class UpsertWorkflowSearchAttributes(google.protobuf.message.Message):
     ) -> None: ...
 
 global___UpsertWorkflowSearchAttributes = UpsertWorkflowSearchAttributes
+
+class ModifyWorkflowProperties(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UPSERTED_MEMO_FIELD_NUMBER: builtins.int
+    @property
+    def upserted_memo(self) -> temporalio.api.common.v1.message_pb2.Memo:
+        """If set, update the workflow memo with the provided values. The values will be merged with
+        the existing memo. If the user wants to delete values, a default/empty Payload should be
+        used as the value for the key being deleted.
+        """
+    def __init__(
+        self,
+        *,
+        upserted_memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["upserted_memo", b"upserted_memo"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["upserted_memo", b"upserted_memo"]
+    ) -> None: ...
+
+global___ModifyWorkflowProperties = ModifyWorkflowProperties

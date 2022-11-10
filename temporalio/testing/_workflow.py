@@ -22,6 +22,7 @@ from typing import (
 import google.protobuf.empty_pb2
 
 import temporalio.api.testservice.v1
+import temporalio.bridge.runtime
 import temporalio.bridge.testing
 import temporalio.client
 import temporalio.common
@@ -89,6 +90,7 @@ class WorkflowEnvironment:
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
         ui: bool = False,
+        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
         temporalite_existing_path: Optional[str] = None,
         temporalite_database_filename: Optional[str] = None,
         temporalite_log_format: str = "pretty",
@@ -136,6 +138,7 @@ class WorkflowEnvironment:
             download_dest_dir: Directory to download binary to if a download is
                 needed. If unset, this is the system's temporary directory.
             ui: If ``True``, will start a UI in Temporalite.
+            runtime: Specific runtime to use or default if unset.
             temporalite_existing_path: Existing path to the Temporalite binary.
                 If present, no download will be attempted to fetch the binary.
             temporalite_database_filename: Path to the Sqlite database to use
@@ -166,7 +169,9 @@ class WorkflowEnvironment:
             else:
                 temporalite_log_level = "fatal"
         # Start Temporalite
+        runtime = runtime or temporalio.bridge.runtime.Runtime.default()
         server = await temporalio.bridge.testing.EphemeralServer.start_temporalite(
+            runtime,
             temporalio.bridge.testing.TemporaliteConfig(
                 existing_path=temporalite_existing_path,
                 sdk_name="sdk-python",
@@ -181,7 +186,7 @@ class WorkflowEnvironment:
                 log_format=temporalite_log_format,
                 log_level=temporalite_log_level,
                 extra_args=temporalite_extra_args,
-            )
+            ),
         )
         # If we can't connect to the server, we should shut it down
         try:
@@ -196,6 +201,7 @@ class WorkflowEnvironment:
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
                     identity=identity,
+                    runtime=runtime,
                 ),
                 server,
             )
@@ -222,6 +228,7 @@ class WorkflowEnvironment:
         identity: Optional[str] = None,
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
+        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
         test_server_existing_path: Optional[str] = None,
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
@@ -269,6 +276,7 @@ class WorkflowEnvironment:
             port: Port number to bind to, or an OS-provided port by default.
             download_dest_dir: Directory to download binary to if a download is
                 needed. If unset, this is the system's temporary directory.
+            runtime: Specific runtime to use or default if unset.
             test_server_existing_path: Existing path to the test server binary.
                 If present, no download will be attempted to fetch the binary.
             test_server_download_version: Specific test server version to
@@ -280,7 +288,9 @@ class WorkflowEnvironment:
             The started workflow environment with time skipping.
         """
         # Start test server
+        runtime = runtime or temporalio.bridge.runtime.Runtime.default()
         server = await temporalio.bridge.testing.EphemeralServer.start_test_server(
+            runtime,
             temporalio.bridge.testing.TestServerConfig(
                 existing_path=test_server_existing_path,
                 sdk_name="sdk-python",
@@ -289,7 +299,7 @@ class WorkflowEnvironment:
                 download_dest_dir=download_dest_dir,
                 port=port,
                 extra_args=test_server_extra_args,
-            )
+            ),
         )
         # If we can't connect to the server, we should shut it down
         try:
@@ -302,6 +312,7 @@ class WorkflowEnvironment:
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
                     identity=identity,
+                    runtime=runtime,
                 ),
                 server,
             )

@@ -78,6 +78,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 ),
                 randomness_seed=-1,
                 extern_functions={},
+                disable_eager_activity_execution=False,
             ),
         )
 

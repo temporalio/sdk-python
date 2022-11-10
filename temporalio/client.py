@@ -37,6 +37,7 @@ import temporalio.api.history.v1
 import temporalio.api.taskqueue.v1
 import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
+import temporalio.bridge.runtime
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
@@ -88,6 +89,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
         lazy: bool = False,
+        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -123,6 +125,7 @@ class Client:
             lazy: If true, the client will not connect until the first call is
                 attempted or a worker is created with it. Lazy clients cannot be
                 used for workers.
+            runtime: The runtime for this client, or the default if unset.
         """
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
@@ -131,6 +134,7 @@ class Client:
             rpc_metadata=rpc_metadata,
             identity=identity or "",
             lazy=lazy,
+            runtime=runtime,
         )
         return Client(
             await temporalio.service.ServiceClient.connect(connect_config),
@@ -212,6 +216,26 @@ class Client:
     def data_converter(self) -> temporalio.converter.DataConverter:
         """Data converter used by this client."""
         return self._config["data_converter"]
+
+    @property
+    def rpc_metadata(self) -> Mapping[str, str]:
+        """Headers for every call made by this client.
+
+        Do not use mutate this mapping. Rather, set this property with an
+        entirely new mapping to change the headers.
+        """
+        return self.service_client.config.rpc_metadata
+
+    @rpc_metadata.setter
+    def rpc_metadata(self, value: Mapping[str, str]) -> None:
+        """Update the headers for this client.
+
+        Do not mutate this mapping after set. Rather, set an entirely new
+        mapping if changes are needed.
+        """
+        # Update config and perform update
+        self.service_client.config.rpc_metadata = value
+        self.service_client.update_rpc_metadata(value)
 
     # Overload for no-param workflow
     @overload
