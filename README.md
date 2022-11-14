@@ -463,8 +463,15 @@ While running in a workflow, in addition to features documented elsewhere, the f
 
 #### Exceptions
 
-* Workflows can raise exceptions to fail the workflow
-* Using `temporalio.exceptions.ApplicationError`, exceptions can be marked as non-retryable or include details
+* Workflows can raise exceptions to fail the workflow or the "workflow task" (i.e. suspend the workflow retrying).
+* Exceptions that are instances of `temporalio.exceptions.FailureError` will fail the workflow with that exception
+  * For failing the workflow explicitly with a user exception, use `temporalio.exceptions.ApplicationError`. This can
+    be marked non-retryable or include details as needed.
+  * Other exceptions that come from activity execution, child execution, cancellation, etc are already instances of
+    `FailureError` and will fail the workflow when uncaught.
+* All other exceptions fail the "workflow task" which means the workflow will continually retry until the workflow is
+  fixed. This is helpful for bad code or other non-predictable exceptions. To actually fail the workflow, use an
+  `ApplicationError` as mentioned above.
 
 #### External Workflows
 
