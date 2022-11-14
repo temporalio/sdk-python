@@ -67,6 +67,9 @@ class Importer:
         self.new_modules: Dict[str, types.ModuleType] = {
             "sys": sys,
             "builtins": builtins,
+            # Even though we don't want to, we have to have __main__ because
+            # stdlib packages like inspect and others expect it to be present
+            "__main__": types.ModuleType("__main__"),
         }
         self.modules_checked_for_restrictions: Set[str] = set()
         self.import_func = self._import if not LOG_TRACE else self._traced_import

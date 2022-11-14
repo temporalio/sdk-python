@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import inspect
 import os
 import time
 import uuid
@@ -262,6 +263,48 @@ async def test_workflow_sandbox_operator(client: Client):
     async with new_worker(client, DateOperatorWorkflow) as worker:
         assert 19 == await client.execute_workflow(
             DateOperatorWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
+global_in_sandbox = workflow.unsafe.in_sandbox()
+
+
+@workflow.defn
+class InSandboxWorkflow:
+    def __init__(self) -> None:
+        assert global_in_sandbox
+        assert workflow.unsafe.in_sandbox()
+
+    @workflow.run
+    async def run(self) -> None:
+        assert global_in_sandbox
+        assert workflow.unsafe.in_sandbox()
+
+
+async def test_workflow_sandbox_assert(client: Client):
+    async with new_worker(client, InSandboxWorkflow) as worker:
+        assert not global_in_sandbox
+        assert not workflow.unsafe.in_sandbox()
+        await client.execute_workflow(
+            InSandboxWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
+@workflow.defn
+class AccessStackWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return inspect.stack()[0].function
+
+
+async def test_workflow_sandbox_access_stack(client: Client):
+    async with new_worker(client, AccessStackWorkflow) as worker:
+        assert "run" == await client.execute_workflow(
+            AccessStackWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
