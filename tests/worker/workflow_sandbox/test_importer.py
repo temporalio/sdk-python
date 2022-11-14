@@ -1,6 +1,12 @@
+import sys
+
 import pytest
 
-from temporalio.worker.workflow_sandbox._importer import Importer
+from temporalio.worker.workflow_sandbox._importer import (
+    Importer,
+    _thread_local_sys_modules,
+    _ThreadLocalSysModules,
+)
 from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictedWorkflowAccessError,
     RestrictionContext,
@@ -76,3 +82,22 @@ def test_workflow_sandbox_importer_invalid_module_members():
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module_members.invalid_function.__call__"
     )
+
+
+def test_thread_local_sys_module_attrs():
+    if sys.version_info < (3, 9):
+        pytest.skip("Dict or methods only in >= 3.9")
+    # Python chose not to put everything in MutableMapping they do in dict, see
+    # https://bugs.python.org/issue22101. Therefore we manually confirm that
+    # every attribute of sys modules is also in thread local sys modules to
+    # ensure compatibility.
+    for attr in dir(sys.modules):
+        getattr(_thread_local_sys_modules, attr)
+
+    # Let's also test "or" and "copy"
+    norm = {"foo": 123}
+    thread_local = _ThreadLocalSysModules({"foo": 123})
+    assert (norm | {"bar": 456}) == (thread_local | {"bar": 456})
+    norm |= {"baz": 789}
+    thread_local |= {"baz": 789}
+    assert norm.copy() == thread_local.copy()
