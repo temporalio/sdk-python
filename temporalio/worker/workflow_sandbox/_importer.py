@@ -67,6 +67,9 @@ class Importer:
         self.new_modules: Dict[str, types.ModuleType] = {
             "sys": sys,
             "builtins": builtins,
+            # Even though we don't want to, we have to have __main__ because
+            # stdlib packages like inspect and others expect it to be present
+            "__main__": types.ModuleType("__main__"),
         }
         self.modules_checked_for_restrictions: Set[str] = set()
         self.import_func = self._import if not LOG_TRACE else self._traced_import
@@ -334,7 +337,7 @@ class _ThreadLocalOverride(Generic[_T]):
 
 
 class _ThreadLocalSysModules(
-    _ThreadLocalOverride[MutableMapping[str, types.ModuleType]],
+    _ThreadLocalOverride[Dict[str, types.ModuleType]],
     MutableMapping[str, types.ModuleType],
 ):
     def __contains__(self, key: object) -> bool:
@@ -354,6 +357,35 @@ class _ThreadLocalSysModules(
 
     def __setitem__(self, key: str, value: types.ModuleType) -> None:
         self.current[key] = value
+
+    # Below methods are not in mutable mapping. Python chose not to put
+    # everything in MutableMapping they do in dict (see
+    # https://bugs.python.org/issue22101). So when someone calls
+    # sys.modules.copy() it breaks (which is exactly what the inspect module
+    # does sometimes).
+
+    def __or__(
+        self, other: Mapping[str, types.ModuleType]
+    ) -> Dict[str, types.ModuleType]:
+        if sys.version_info < (3, 9):
+            raise NotImplementedError
+        return self.current.__or__(other)
+
+    def __ior__(
+        self, other: Mapping[str, types.ModuleType]
+    ) -> Dict[str, types.ModuleType]:
+        if sys.version_info < (3, 9):
+            raise NotImplementedError
+        return self.current.__ior__(other)
+
+    __ror__ = __or__
+
+    def copy(self) -> Dict[str, types.ModuleType]:
+        return self.current.copy()
+
+    @classmethod
+    def fromkeys(cls, *args, **kwargs) -> Any:
+        return dict.fromkeys(*args, **kwargs)
 
 
 _thread_local_sys_modules = _ThreadLocalSysModules(sys.modules)

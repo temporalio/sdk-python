@@ -51,7 +51,6 @@ from temporalio.common import RetryPolicy, SearchAttributes
 from temporalio.converter import (
     DataConverter,
     DefaultFailureConverterWithEncodedAttributes,
-    FailureConverter,
     PayloadCodec,
     PayloadConverter,
 )

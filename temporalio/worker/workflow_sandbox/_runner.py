@@ -156,7 +156,9 @@ class _Instance(WorkflowInstance):
         for k, v in extra_globals.items():
             self.globals_and_locals[k] = v
         try:
+            temporalio.workflow.unsafe._set_in_sandbox(True)
             exec(code, self.globals_and_locals, self.globals_and_locals)
         finally:
+            temporalio.workflow.unsafe._set_in_sandbox(False)
             for k, v in extra_globals.items():
                 del self.globals_and_locals[k]

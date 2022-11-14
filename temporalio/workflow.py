@@ -713,6 +713,7 @@ async def wait_condition(
 
 
 _sandbox_unrestricted = threading.local()
+_in_sandbox = threading.local()
 
 
 class unsafe:
@@ -722,6 +723,19 @@ class unsafe:
 
     def __init__(self) -> None:  # noqa: D107
         raise NotImplementedError
+
+    @staticmethod
+    def in_sandbox() -> bool:
+        """Whether the code is executing on a sandboxed thread.
+
+        Returns:
+            True if the code is executing in the sandbox thread.
+        """
+        return getattr(_in_sandbox, "value", False)
+
+    @staticmethod
+    def _set_in_sandbox(v: bool) -> None:
+        _in_sandbox.value = v
 
     @staticmethod
     def is_replaying() -> bool:
