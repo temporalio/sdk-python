@@ -35,6 +35,14 @@ import temporalio.exceptions
 import temporalio.worker
 import temporalio.workflow
 
+# OpenTelemetry dynamically, lazily chooses its context implementation at
+# runtime. When first accessed, they use pkg_resources.iter_entry_points + load.
+# The load uses built-in open() which we don't allow in sandbox mode at runtime,
+# only import time. Therefore if the first use of a OTel context is inside the
+# sandbox, which it may be for a workflow worker, this will fail. So instead we
+# eagerly reference it here to force loading at import time instead of lazily.
+opentelemetry.context.get_current()
+
 default_text_map_propagator = opentelemetry.propagators.composite.CompositePropagator(
     [
         opentelemetry.trace.propagation.tracecontext.TraceContextTextMapPropagator(),
