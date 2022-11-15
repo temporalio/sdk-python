@@ -11,6 +11,7 @@ from typing import Type
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.worker._workflow_instance
+import temporalio.workflow
 
 logger = logging.getLogger(__name__)
 
@@ -34,22 +35,10 @@ class InSandbox:
     ) -> None:
         """Create in-sandbox instance."""
         _trace("Initializing workflow %s in sandbox", workflow_class)
-        # We have to replace the given instance instance details with new one
-        # replacing references to the workflow class
-        old_defn = instance_details.defn
-        new_defn = dataclasses.replace(
-            old_defn,
-            cls=workflow_class,
-            run_fn=getattr(workflow_class, old_defn.run_fn.__name__),
-            signals={
-                k: dataclasses.replace(v, fn=getattr(workflow_class, v.fn.__name__))
-                for k, v in old_defn.signals.items()
-            },
-            queries={
-                k: dataclasses.replace(v, fn=getattr(workflow_class, v.fn.__name__))
-                for k, v in old_defn.queries.items()
-            },
-        )
+        # We expect to be able to get the workflow definition back off the
+        # class. We can't use the definition that was given to us because it has
+        # type hints and references to outside-of-sandbox types.
+        new_defn = temporalio.workflow._Definition.must_from_class(workflow_class)
         new_instance_details = dataclasses.replace(instance_details, defn=new_defn)
 
         # Instantiate the runner and the instance

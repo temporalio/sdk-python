@@ -7,13 +7,14 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
+from enum import IntEnum
 from typing import Callable, Dict, List, Optional, Sequence, Type
 
 import pytest
 
 import temporalio.worker.workflow_sandbox._restrictions
-from temporalio import workflow
+from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
@@ -205,6 +206,8 @@ async def test_workflow_sandbox_restrictions(client: Client):
             # General library allowed calls
             "import datetime\ndatetime.date(2001, 1, 1)",
             "import uuid\nuuid.uuid5(uuid.NAMESPACE_DNS, 'example.com')",
+            # Other imports we want to allow
+            "from concurrent.futures import ThreadPoolExecutor",
         ]
         for code in valid_code_to_check:
             await client.execute_workflow(
@@ -305,6 +308,53 @@ async def test_workflow_sandbox_access_stack(client: Client):
     async with new_worker(client, AccessStackWorkflow) as worker:
         assert "run" == await client.execute_workflow(
             AccessStackWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
+class InstanceCheckEnum(IntEnum):
+    FOO = 1
+    BAR = 2
+
+
+@dataclass
+class InstanceCheckData:
+    some_enum: InstanceCheckEnum
+
+
+@activity.defn
+async def instance_check_activity(param: InstanceCheckData) -> InstanceCheckData:
+    assert isinstance(param, InstanceCheckData)
+    assert param.some_enum is InstanceCheckEnum.BAR
+    return param
+
+
+@workflow.defn
+class InstanceCheckWorkflow:
+    @workflow.run
+    async def run(self, param: InstanceCheckData) -> InstanceCheckData:
+        assert isinstance(param, InstanceCheckData)
+        assert param.some_enum is InstanceCheckEnum.BAR
+        # Exec child if not a child, otherwise exec activity
+        if workflow.info().parent is None:
+            return await workflow.execute_child_workflow(
+                InstanceCheckWorkflow.run, param
+            )
+        return await workflow.execute_activity(
+            instance_check_activity,
+            param,
+            schedule_to_close_timeout=timedelta(minutes=1),
+        )
+
+
+async def test_workflow_sandbox_instance_check(client: Client):
+    async with new_worker(
+        client, InstanceCheckWorkflow, activities=[instance_check_activity]
+    ) as worker:
+        await client.execute_workflow(
+            InstanceCheckWorkflow.run,
+            InstanceCheckData(some_enum=InstanceCheckEnum.BAR),
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
