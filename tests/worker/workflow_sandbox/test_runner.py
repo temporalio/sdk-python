@@ -206,6 +206,8 @@ async def test_workflow_sandbox_restrictions(client: Client):
             # General library allowed calls
             "import datetime\ndatetime.date(2001, 1, 1)",
             "import uuid\nuuid.uuid5(uuid.NAMESPACE_DNS, 'example.com')",
+            # Other imports we want to allow
+            "from concurrent.futures import ThreadPoolExecutor",
         ]
         for code in valid_code_to_check:
             await client.execute_workflow(

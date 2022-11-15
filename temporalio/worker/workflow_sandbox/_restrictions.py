@@ -437,7 +437,7 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         # TODO(cretz): Fix issues with class extensions on restricted proxy
         # "argparse": SandboxMatcher.all_uses_runtime,
         "bz2": SandboxMatcher(use={"open"}),
-        "concurrent": SandboxMatcher.all_uses_runtime,
+        "concurrent": SandboxMatcher(children={"futures": SandboxMatcher.all_uses_runtime}),
         # Python's own re lib registers itself. This is mostly ok to not
         # restrict since it's just global picklers that people may want to
         # register globally.
