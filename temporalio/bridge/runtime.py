@@ -147,5 +147,5 @@ class TelemetryConfig:
     logging: Optional[LoggingConfig] = LoggingConfig.default
     """Logging configuration."""
 
-    metrics: Optional[PrometheusConfig] = None
+    metrics: Optional[MetricsConfig] = None
     """Metrics configuration."""
