@@ -38,6 +38,71 @@ event loop. This means task management, sleep, cancellation, etc have all been d
 
 The Python SDK is under development. There are no compatibility guarantees at this time.
 
+---
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Contents**
+
+- [Quick Start](#quick-start)
+  - [Installation](#installation)
+  - [Implementing a Workflow](#implementing-a-workflow)
+  - [Running a Workflow](#running-a-workflow)
+- [Usage](#usage)
+  - [Client](#client)
+    - [Data Conversion](#data-conversion)
+  - [Workers](#workers)
+  - [Workflows](#workflows)
+    - [Definition](#definition)
+    - [Running](#running)
+    - [Invoking Activities](#invoking-activities)
+    - [Invoking Child Workflows](#invoking-child-workflows)
+    - [Timers](#timers)
+    - [Conditions](#conditions)
+    - [Asyncio and Cancellation](#asyncio-and-cancellation)
+    - [Workflow Utilities](#workflow-utilities)
+    - [Exceptions](#exceptions)
+    - [External Workflows](#external-workflows)
+    - [Testing](#testing)
+      - [Automatic Time Skipping](#automatic-time-skipping)
+      - [Manual Time Skipping](#manual-time-skipping)
+      - [Mocking Activities](#mocking-activities)
+    - [Workflow Sandbox](#workflow-sandbox)
+      - [How the Sandbox Works](#how-the-sandbox-works)
+      - [Avoiding the Sandbox](#avoiding-the-sandbox)
+      - [Customizing the Sandbox](#customizing-the-sandbox)
+        - [Passthrough Modules](#passthrough-modules)
+        - [Invalid Module Members](#invalid-module-members)
+      - [Known Sandbox Issues](#known-sandbox-issues)
+        - [Global Import/Builtins](#global-importbuiltins)
+        - [Sandbox is not Secure](#sandbox-is-not-secure)
+        - [Sandbox Performance](#sandbox-performance)
+        - [Extending Restricted Classes](#extending-restricted-classes)
+        - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
+  - [Activities](#activities)
+    - [Definition](#definition-1)
+    - [Types of Activities](#types-of-activities)
+      - [Asynchronous Activities](#asynchronous-activities)
+      - [Synchronous Activities](#synchronous-activities)
+        - [Synchronous Multithreaded Activities](#synchronous-multithreaded-activities)
+        - [Synchronous Multiprocess/Other Activities](#synchronous-multiprocessother-activities)
+    - [Activity Context](#activity-context)
+      - [Heartbeating and Cancellation](#heartbeating-and-cancellation)
+      - [Worker Shutdown](#worker-shutdown)
+    - [Testing](#testing-1)
+  - [Workflow Replay](#workflow-replay)
+  - [OpenTelemetry Support](#opentelemetry-support)
+- [Development](#development)
+  - [Building](#building)
+    - [Prepare](#prepare)
+    - [Build](#build)
+    - [Use](#use)
+  - [Local SDK development environment](#local-sdk-development-environment)
+    - [Testing](#testing-2)
+  - [Style](#style)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Quick Start
 
 ### Installation
