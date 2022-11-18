@@ -67,3 +67,12 @@ jobs:
       - name: Deploy prod API docs
         if: ${{ github.ref == 'refs/heads/main' && matrix.docsTarget }}
         run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --name python --scope temporal --prod --yes
+
+  # Runs the sdk features repo tests with this repo's current SDK code
+  sdk-features-tests:
+    uses: temporalio/sdk-features/.github/workflows/python.yaml@main
+    with:
+      python-repo-path: ${{github.event.pull_request.head.repo.full_name}}
+      version: ${{github.event.pull_request.head.ref}}
+      version-is-repo-ref: true
+
