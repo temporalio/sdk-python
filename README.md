@@ -5,7 +5,7 @@
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
 [Temporal](https://temporal.io/) is a distributed, scalable, durable, and highly available orchestration engine used to
-execute asynchronous long-running business logic in a scalable and resilient way.
+execute asynchronous, long-running business logic in a scalable and resilient way.
 
 "Temporal Python SDK" is the framework for authoring workflows and activities using the Python programming language.
 
