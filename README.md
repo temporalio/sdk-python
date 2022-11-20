@@ -105,8 +105,6 @@ The Python SDK is under development. There are no compatibility guarantees at th
 
 ## Quick Start
 
-## Fail git
-
 ### Installation
 
 Install the `temporalio` package from [PyPI](https://pypi.org/project/temporalio).
