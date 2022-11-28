@@ -122,8 +122,8 @@ if __name__ == "__main__":
         capture_output=True,
         text=True,
     )
-    proto_version: Optional[str] = None
-    grpcio_tools_version: Optional[str] = None
+    proto_version = ""
+    grpcio_tools_version = ""
     for line in proc.stdout.splitlines():
         if line.startswith("protobuf"):
             _, _, proto_version = line.partition("==")

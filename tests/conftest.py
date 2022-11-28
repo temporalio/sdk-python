@@ -21,6 +21,19 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
         sys.prefix
     ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
 
+# Unless specifically overridden, we expect tests to run under protobuf 4.x lib
+import google.protobuf
+
+protobuf_version = google.protobuf.__version__
+if os.getenv("TEMPORAL_TEST_PROTO3"):
+    assert protobuf_version.startswith(
+        "3."
+    ), f"Expected protobuf 3.x, got {protobuf_version}"
+else:
+    assert protobuf_version.startswith(
+        "4."
+    ), f"Expected protobuf 4.x, got {protobuf_version}"
+
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
