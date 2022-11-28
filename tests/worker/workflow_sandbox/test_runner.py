@@ -360,6 +360,9 @@ async def test_workflow_sandbox_instance_check(client: Client):
         )
 
 
+# async def test_workflow_sandbox_with_grpc
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
