@@ -14,13 +14,15 @@ api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
 health_proto_dir = proto_dir / "grpc"
 testsrv_proto_dir = proto_dir / "testsrv_upstream"
+test_proto_dir = base_dir / "tests"
 
 # Exclude testsrv dependencies protos
-proto_paths = (
+proto_paths = [
     v
     for v in proto_dir.glob("**/*.proto")
     if not str(v).startswith(str(testsrv_proto_dir / "dependencies"))
-)
+]
+proto_paths.extend(test_proto_dir.glob("**/*.proto"))
 
 api_out_dir = base_dir / "temporalio" / "api"
 sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
@@ -147,6 +149,7 @@ if __name__ == "__main__":
                 f"--proto_path={core_proto_dir}",
                 f"--proto_path={testsrv_proto_dir}",
                 f"--proto_path={health_proto_dir}",
+                f"--proto_path={test_proto_dir}",
                 f"--python_out={temp_dir}",
                 f"--grpc_python_out={temp_dir}",
                 f"--mypy_out={temp_dir}",
@@ -170,4 +173,16 @@ if __name__ == "__main__":
             p.replace(sdk_out_dir / p.name)
         shutil.rmtree(sdk_out_dir / "health", ignore_errors=True)
         (temp_dir / "health").replace(sdk_out_dir / "health")
+        # Move test protos
+        for v in ["__init__.py", "proto_message_pb2.py", "proto_message_pb2.pyi"]:
+            shutil.copy2(
+                temp_dir / "worker" / "workflow_sandbox" / "testmodules" / "proto" / v,
+                test_proto_dir
+                / "worker"
+                / "workflow_sandbox"
+                / "testmodules"
+                / "proto"
+                / v,
+            )
+
     print("Done", file=sys.stderr)

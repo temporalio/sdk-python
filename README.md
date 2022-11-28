@@ -982,7 +982,7 @@ currently recommends 4.x and that is the primary supported version. Some librari
 
 To support these, Temporal Python SDK allows any protobuf library >= 3.19. However, the C extension in older Python
 versions can cause issues with the sandbox due to global state sharing. Temporal strongly recommends using the latest
-protobuf 4.x library unless you absolutely cannot at which point all proto libraries should be marked as
+protobuf 4.x library unless you absolutely cannot at which point some proto libraries may have to be marked as
 [Passthrough Modules](#passthrough-modules).
 
 ## Development
