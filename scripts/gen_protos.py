@@ -6,7 +6,7 @@ import sys
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import List, Mapping
+from typing import List, Mapping, Optional
 
 base_dir = Path(__file__).parent.parent
 proto_dir = base_dir / "temporalio" / "bridge" / "sdk-core" / "protos"
@@ -14,16 +14,15 @@ api_proto_dir = proto_dir / "api_upstream"
 core_proto_dir = proto_dir / "local"
 health_proto_dir = proto_dir / "grpc"
 testsrv_proto_dir = proto_dir / "testsrv_upstream"
-# Needed for descriptor.proto which was removed as part of
-# https://github.com/grpc/grpc/pull/30377
-additional_well_known_proto_dir = base_dir / "scripts" / "_proto"
+test_proto_dir = base_dir / "tests"
 
 # Exclude testsrv dependencies protos
-proto_paths = (
+proto_paths = [
     v
     for v in proto_dir.glob("**/*.proto")
     if not str(v).startswith(str(testsrv_proto_dir / "dependencies"))
-)
+]
+proto_paths.extend(test_proto_dir.glob("**/*.proto"))
 
 api_out_dir = base_dir / "temporalio" / "api"
 sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
@@ -114,6 +113,31 @@ def fix_generated_output(base_path: Path):
 
 
 if __name__ == "__main__":
+    # Due to issues with the Python protobuf 3.x vs protobuf 4.x libraries, we
+    # must require that grpcio tools be on 1.48.x and protobuf be on 3.x for
+    # generation of protos. We can't check __version__ on the module (not
+    # present), and we can't use importlib.metadata due to its absence in 3.7,
+    # so we just run pip and check there.
+    proc = subprocess.run(
+        ["pip", "list", "--format", "freeze"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    proto_version = ""
+    grpcio_tools_version = ""
+    for line in proc.stdout.splitlines():
+        if line.startswith("protobuf"):
+            _, _, proto_version = line.partition("==")
+        elif line.startswith("grpcio-tools"):
+            _, _, grpcio_tools_version = line.partition("==")
+    assert proto_version.startswith(
+        "3."
+    ), f"expected 3.x protobuf, found {proto_version}"
+    assert grpcio_tools_version.startswith(
+        "1.48."
+    ), f"expected 1.48.x grpcio-tools, found {grpcio_tools_version}"
+
     print("Generating protos...", file=sys.stderr)
     with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir_raw:
         temp_dir = Path(temp_dir_raw)
@@ -125,7 +149,7 @@ if __name__ == "__main__":
                 f"--proto_path={core_proto_dir}",
                 f"--proto_path={testsrv_proto_dir}",
                 f"--proto_path={health_proto_dir}",
-                f"--proto_path={additional_well_known_proto_dir}",
+                f"--proto_path={test_proto_dir}",
                 f"--python_out={temp_dir}",
                 f"--grpc_python_out={temp_dir}",
                 f"--mypy_out={temp_dir}",
@@ -149,4 +173,16 @@ if __name__ == "__main__":
             p.replace(sdk_out_dir / p.name)
         shutil.rmtree(sdk_out_dir / "health", ignore_errors=True)
         (temp_dir / "health").replace(sdk_out_dir / "health")
+        # Move test protos
+        for v in ["__init__.py", "proto_message_pb2.py", "proto_message_pb2.pyi"]:
+            shutil.copy2(
+                temp_dir / "worker" / "workflow_sandbox" / "testmodules" / "proto" / v,
+                test_proto_dir
+                / "worker"
+                / "workflow_sandbox"
+                / "testmodules"
+                / "proto"
+                / v,
+            )
+
     print("Done", file=sys.stderr)

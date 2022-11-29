@@ -18,6 +18,8 @@ jobs:
           - os: ubuntu-latest
             python: "3.11"
             docsTarget: true
+          - os: ubuntu-latest
+            python: "3.7"
             protoCheckTarget: true
           - os: ubuntu-arm
             runsOn: buildjet-4vcpu-ubuntu-2204-arm
@@ -52,13 +54,21 @@ jobs:
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
 
-      # Confirm protos are already generated properly
-      - name: Check generated protos
+      # Confirm protos are already generated properly with older protobuf
+      # library and run test with that older version. We must downgrade protobuf
+      # so we can generate 3.x and 4.x compatible API. We have to use older
+      # Python to run this check because the grpcio-tools version we use
+      # is <= 3.10.
+      - name: Check generated protos and test protobuf 3.x
         if: ${{ matrix.protoCheckTarget }}
+        env:
+          TEMPORAL_TEST_PROTO3: 1
         run: |
+          poetry add "protobuf<4"
           poe gen-protos
           poe format
-          [[ -z $(git status --porcelain) ]] || (git diff; echo "Protos changed"; exit 1)
+          [[ -z $(git status --porcelain temporalio) ]] || (git diff; echo "Protos changed"; exit 1)
+          poe test -s -o log_cli_level=DEBUG
 
       # Do docs stuff (only on one host)
       - name: Build API docs

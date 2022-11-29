@@ -234,6 +234,7 @@ class SandboxMatcher:
         """
         # We prefer to avoid recursion
         matcher: Optional[SandboxMatcher] = self
+        only_runtime = self.only_runtime
         for v in child_path:
             # Use all if it matches self, access, _or_ use. Use doesn't match
             # self but matches all children.
@@ -245,16 +246,21 @@ class SandboxMatcher:
                 or "*" in matcher.access
                 or "*" in matcher.use
             ):
-                if self.only_runtime:
+                if only_runtime:
                     return SandboxMatcher.all_runtime
                 return SandboxMatcher.all
             matcher = matcher.children.get(v) or matcher.children.get("*")
             if not matcher:
                 return None
+            # If this matcher is runtime only, then we ensure all children are
+            if matcher.only_runtime:
+                only_runtime = True
         return matcher
 
     def __or__(self, other: SandboxMatcher) -> SandboxMatcher:
         """Combine this matcher with another."""
+        if self.only_runtime != other.only_runtime:
+            raise ValueError("Cannot combine only-runtime and non-only-runtime")
         if self.match_self or other.match_self:
             return SandboxMatcher.all
         new_children = dict(self.children) if self.children else {}
@@ -268,6 +274,7 @@ class SandboxMatcher:
             access=self.access | other.access,
             use=self.use | other.use,
             children=new_children,
+            only_runtime=self.only_runtime,
         )
 
     def with_child_unrestricted(self, *child_path: str) -> SandboxMatcher:
@@ -475,7 +482,7 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         "lzma": SandboxMatcher(use={"open"}),
         "marshal": SandboxMatcher(use={"dump", "load"}),
         "mmap": SandboxMatcher.all_uses_runtime,
-        "multiprocessing": SandboxMatcher.all_uses,
+        "multiprocessing": SandboxMatcher.all_uses_runtime,
         # We cannot restrict linecache because some packages like attrs' attr
         # use it during dynamic code generation
         # "linecache": SandboxMatcher.all_uses,

@@ -92,6 +92,7 @@ The Python SDK is under development. There are no compatibility guarantees at th
     - [Testing](#testing-1)
   - [Workflow Replay](#workflow-replay)
   - [OpenTelemetry Support](#opentelemetry-support)
+  - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
 - [Development](#development)
   - [Building](#building)
     - [Prepare](#prepare)
@@ -99,6 +100,7 @@ The Python SDK is under development. There are no compatibility guarantees at th
     - [Use](#use)
   - [Local SDK development environment](#local-sdk-development-environment)
     - [Testing](#testing-2)
+    - [Proto Generation and Testing](#proto-generation-and-testing)
   - [Style](#style)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -971,6 +973,18 @@ as an interceptor on the `interceptors` argument of `Client.connect`. When set, 
 calls and for all activity and workflow invocations on the worker, spans will be created and properly serialized through
 the server to give one proper trace for a workflow execution.
 
+### Protobuf 3.x vs 4.x
+
+Python currently has two somewhat-incompatible protobuf library versions - the 3.x series and the 4.x series. Python
+currently recommends 4.x and that is the primary supported version. Some libraries like
+[Pulumi](https://github.com/pulumi/pulumi) require 4.x. Other libraries such as [ONNX](https://github.com/onnx/onnx) and
+[Streamlit](https://github.com/streamlit/streamlit), for one reason or another, have/will not leave 3.x.
+
+To support these, Temporal Python SDK allows any protobuf library >= 3.19. However, the C extension in older Python
+versions can cause issues with the sandbox due to global state sharing. Temporal strongly recommends using the latest
+protobuf 4.x library unless you absolutely cannot at which point some proto libraries may have to be marked as
+[Passthrough Modules](#passthrough-modules).
+
 ## Development
 
 The Python SDK is built to work with Python 3.7 and newer. It is built using
@@ -1116,6 +1130,16 @@ poe test
 This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
 server, pass `--workflow-environment time-skipping`. To run against the `default` namespace of an already-running
 server, pass the `host:port` to `--workflow-environment`.
+
+#### Proto Generation and Testing
+
+To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
+protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"`. Then the protobuf files can be
+generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var
+to `1` prior to running tests.
+
+Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore `pyproject.toml` and
+run `poetry update protobuf grpcio-tools`.
 
 ### Style
 

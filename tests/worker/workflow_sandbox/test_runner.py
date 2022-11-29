@@ -26,6 +26,7 @@ from temporalio.worker.workflow_sandbox import (
 )
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
+from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
 
 global_state = ["global orig"]
 # We just access os.name in here to show we _can_. It's access-restricted at
@@ -358,6 +359,28 @@ async def test_workflow_sandbox_instance_check(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
+
+@workflow.defn
+class UseProtoWorkflow:
+    @workflow.run
+    async def run(self, param: SomeMessage) -> SomeMessage:
+        print("In: ", id(SomeMessage))
+        assert isinstance(param, SomeMessage)
+        return param
+
+
+async def test_workflow_sandbox_with_proto(client: Client):
+    async with new_worker(client, UseProtoWorkflow) as worker:
+        param = SomeMessage()
+        param.some_duration.FromTimedelta(timedelta(seconds=123))
+        result = await client.execute_workflow(
+            UseProtoWorkflow.run,
+            param,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result is not param and result == param
 
 
 def new_worker(
