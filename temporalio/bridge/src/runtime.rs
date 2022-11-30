@@ -1,5 +1,6 @@
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::AsPyPointer;
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
@@ -73,6 +74,10 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
             ),
         },
     })
+}
+
+pub fn raise_in_thread<'a>(_py: Python<'a>, thread_id: i32, exc: &PyAny) -> bool {
+    unsafe { pyo3::ffi::PyThreadState_SetAsyncExc(thread_id, exc.as_ptr()) == 1 }
 }
 
 impl Runtime {

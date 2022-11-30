@@ -13,9 +13,10 @@ import queue
 import threading
 import warnings
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Tuple, Type, Union
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
@@ -27,6 +28,7 @@ import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.activity_task
 import temporalio.bridge.proto.common
+import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
@@ -275,6 +277,8 @@ class _ActivityWorker:
                         # No async event
                         async_event=None,
                     )
+                    if not activity_def.no_thread_cancel_exception:
+                        running_activity.cancel_thread_raiser = _ThreadExceptionRaiser()
                 else:
                     manager = self._shared_state_manager
                     # Pre-checked on worker init
@@ -367,7 +371,6 @@ class _ActivityWorker:
                 args=args,
                 executor=None if not running_activity.sync else self._activity_executor,
                 headers=start.header_fields,
-                _cancelled_event=running_activity.cancelled_event,
             )
 
             # Set the context early so the logging adapter works and
@@ -378,6 +381,9 @@ class _ActivityWorker:
                     heartbeat=None,
                     cancelled_event=running_activity.cancelled_event,
                     worker_shutdown_event=self._worker_shutdown_event,
+                    shield_thread_cancel_exception=None
+                    if not running_activity.cancel_thread_raiser
+                    else running_activity.cancel_thread_raiser.shielded,
                 )
             )
             temporalio.activity.logger.debug("Starting activity")
@@ -385,7 +391,9 @@ class _ActivityWorker:
             # Build the interceptors chaining in reverse. We build a context right
             # now even though the info() can't be intercepted and heartbeat() will
             # fail. The interceptors may want to use the info() during init.
-            impl: ActivityInboundInterceptor = _ActivityInboundImpl(self)
+            impl: ActivityInboundInterceptor = _ActivityInboundImpl(
+                self, running_activity
+            )
             for interceptor in reversed(list(self._interceptors)):
                 impl = interceptor.intercept_activity(impl)
             # Init
@@ -481,6 +489,7 @@ class _RunningActivity:
     task: Optional[asyncio.Task] = None
     cancelled_event: Optional[temporalio.activity._CompositeEvent] = None
     last_heartbeat_task: Optional[asyncio.Task] = None
+    cancel_thread_raiser: Optional[_ThreadExceptionRaiser] = None
     sync: bool = False
     done: bool = False
     cancelled_by_request: bool = False
@@ -496,16 +505,63 @@ class _RunningActivity:
         self.cancelled_due_to_heartbeat_error = cancelled_due_to_heartbeat_error
         if self.cancelled_event:
             self.cancelled_event.set()
-        # We do not cancel the task of sync activities
-        if not self.sync and self.task and not self.done:
-            # TODO(cretz): Check that Python >= 3.9 and set msg?
-            self.task.cancel()
+        if not self.done:
+            # If there's a thread raiser, use it
+            if self.cancel_thread_raiser:
+                self.cancel_thread_raiser.raise_in_thread(
+                    temporalio.exceptions.CancelledError
+                )
+            # If not sync and there's a task, cancel it
+            if not self.sync and self.task:
+                # TODO(cretz): Check that Python >= 3.9 and set msg?
+                self.task.cancel()
+
+
+class _ThreadExceptionRaiser:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._thread_id: Optional[int] = None
+        self._pending_exception: Optional[Type[Exception]] = None
+        self._shield_depth = 0
+
+    def set_thread_id(self, thread_id: int) -> None:
+        with self._lock:
+            self._thread_id = thread_id
+
+    def raise_in_thread(self, exc_type: Type[Exception]) -> None:
+        with self._lock:
+            self._pending_exception = exc_type
+            self._raise_in_thread_if_pending_unlocked()
+
+    @contextmanager
+    def shielded(self) -> Iterator[None]:
+        with self._lock:
+            self._shield_depth += 1
+        try:
+            yield None
+        finally:
+            with self._lock:
+                self._shield_depth -= 1
+                self._raise_in_thread_if_pending_unlocked()
+
+    def _raise_in_thread_if_pending_unlocked(self) -> None:
+        # Does not apply if no thread ID
+        if self._thread_id is not None:
+            # Raise and reset if depth is 0
+            if self._shield_depth == 0 and self._pending_exception:
+                temporalio.bridge.runtime.Runtime._raise_in_thread(
+                    self._thread_id, self._pending_exception
+                )
+                self._pending_exception = None
 
 
 class _ActivityInboundImpl(ActivityInboundInterceptor):
-    def __init__(self, worker: _ActivityWorker) -> None:
+    def __init__(
+        self, worker: _ActivityWorker, running_activity: _RunningActivity
+    ) -> None:
         # We are intentionally not calling the base class's __init__ here
         self._worker = worker
+        self._running_activity = running_activity
 
     def init(self, outbound: ActivityOutboundInterceptor) -> None:
         # Set the context callables. We are setting values instead of replacing
@@ -559,17 +615,20 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                 )
 
             try:
-                # Shutdown event always present here
-                shutdown_event = self._worker._worker_shutdown_event
-                assert shutdown_event
+                # Cancel and shutdown event always present here
+                cancelled_event = self._running_activity.cancelled_event
+                assert cancelled_event
+                worker_shutdown_event = self._worker._worker_shutdown_event
+                assert worker_shutdown_event
                 return await loop.run_in_executor(
                     input.executor,
                     _execute_sync_activity,
                     info,
                     heartbeat,
+                    self._running_activity.cancel_thread_raiser,
                     # Only thread event, this may cross a process boundary
-                    input._cancelled_event.thread_event,
-                    shutdown_event.thread_event,
+                    cancelled_event.thread_event,
+                    worker_shutdown_event.thread_event,
                     input.fn,
                     *input.args,
                 )
@@ -599,11 +658,17 @@ class _ActivityOutboundImpl(ActivityOutboundInterceptor):
 def _execute_sync_activity(
     info: temporalio.activity.Info,
     heartbeat: Union[Callable[..., None], SharedHeartbeatSender],
+    # This is only set for threaded activities
+    cancel_thread_raiser: Optional[_ThreadExceptionRaiser],
     cancelled_event: threading.Event,
     worker_shutdown_event: threading.Event,
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
+    if cancel_thread_raiser:
+        thread_id = threading.current_thread().ident
+        if thread_id is not None:
+            cancel_thread_raiser.set_thread_id(thread_id)
     heartbeat_fn: Callable[..., None]
     if isinstance(heartbeat, SharedHeartbeatSender):
         # To make mypy happy
@@ -623,6 +688,9 @@ def _execute_sync_activity(
             worker_shutdown_event=temporalio.activity._CompositeEvent(
                 thread_event=worker_shutdown_event, async_event=None
             ),
+            shield_thread_cancel_exception=None
+            if not cancel_thread_raiser
+            else cancel_thread_raiser.shielded,
         )
     )
     return fn(*args)

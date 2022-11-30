@@ -97,7 +97,7 @@ class ApplicationError(FailureError):
 class CancelledError(FailureError):
     """Error raised on workflow/activity cancellation."""
 
-    def __init__(self, message: str, *details: Any) -> None:
+    def __init__(self, message: str = "Cancelled", *details: Any) -> None:
         """Initialize a cancelled error."""
         super().__init__(message)
         self._details = details

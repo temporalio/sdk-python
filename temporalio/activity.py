@@ -15,12 +15,13 @@ import dataclasses
 import inspect
 import logging
 import threading
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from functools import partial
 from typing import (
     Any,
     Callable,
+    Iterator,
     List,
     Mapping,
     MutableMapping,
@@ -34,7 +35,6 @@ from typing import (
 )
 
 import temporalio.common
-import temporalio.exceptions
 
 from .types import CallableType
 
@@ -45,11 +45,18 @@ def defn(fn: CallableType) -> CallableType:
 
 
 @overload
-def defn(*, name: str) -> Callable[[CallableType], CallableType]:
+def defn(
+    *, name: Optional[str] = None, no_thread_cancel_exception: bool = False
+) -> Callable[[CallableType], CallableType]:
     ...
 
 
-def defn(fn: Optional[CallableType] = None, *, name: Optional[str] = None):
+def defn(
+    fn: Optional[CallableType] = None,
+    *,
+    name: Optional[str] = None,
+    no_thread_cancel_exception: bool = False,
+):
     """Decorator for activity functions.
 
     Activities can be async or non-async.
@@ -57,20 +64,22 @@ def defn(fn: Optional[CallableType] = None, *, name: Optional[str] = None):
     Args:
         fn: The function to decorate.
         name: Name to use for the activity. Defaults to function ``__name__``.
+        no_thread_cancel_exception: If set to true, an exception will not be
+            raised in synchronous, threaded activities upon cancellation.
     """
 
-    def with_name(name: str, fn: CallableType) -> CallableType:
+    def decorator(fn: CallableType) -> CallableType:
         # This performs validation
-        _Definition._apply_to_callable(fn, name)
+        _Definition._apply_to_callable(
+            fn,
+            activity_name=name or fn.__name__,
+            no_thread_cancel_exception=no_thread_cancel_exception,
+        )
         return fn
 
-    # If name option is available, return decorator function
-    if name is not None:
-        return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot invoke defn without function or name")
-    # Otherwise just run decorator function
-    return with_name(fn.__name__, fn)
+    if fn is not None:
+        return decorator(fn)
+    return decorator
 
 
 @dataclass(frozen=True)
@@ -122,6 +131,7 @@ class _Context:
     heartbeat: Optional[Callable[..., None]]
     cancelled_event: _CompositeEvent
     worker_shutdown_event: _CompositeEvent
+    shield_thread_cancel_exception: Optional[Callable[[], AbstractContextManager]]
     _logger_details: Optional[Mapping[str, Any]] = None
 
     @staticmethod
@@ -219,6 +229,36 @@ def is_cancelled() -> bool:
         RuntimeError: When not in an activity.
     """
     return _Context.current().cancelled_event.is_set()
+
+
+@contextmanager
+def shield_thread_cancel_exception() -> Iterator[None]:
+    """Context manager for synchronous multithreaded activities to delay
+    cancellation exceptions.
+
+    By default, heartbeating synchronous multithreaded activities have an
+    exception thrown inside when cancellation occurs. Code within a "with" block
+    of this context manager will delay that throwing until the end. Even if the
+    block returns a value or throws its own exception, if a cancellation
+    exception is pending, it is thrown instead. Therefore users are encouraged
+    to not throw out of this block and can surround this with a try/except if
+    they wish to catch a cancellation.
+
+    This properly supports nested calls and will only throw after the last one.
+
+    This just runs the blocks with no extra effects for async activities or
+    synchronous multiprocess/other activities.
+
+    Raises:
+        temporalio.exceptions.CancelledError: If a cancellation occurs anytime
+            during this block and this is not nested in another shield block.
+    """
+    shield_context = _Context.current().shield_thread_cancel_exception
+    if not shield_context:
+        yield None
+    else:
+        with shield_context():
+            yield None
 
 
 async def wait_for_cancelled() -> None:
@@ -353,6 +393,7 @@ class _Definition:
     name: str
     fn: Callable
     is_async: bool
+    no_thread_cancel_exception: bool
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
@@ -379,7 +420,9 @@ class _Definition:
         )
 
     @staticmethod
-    def _apply_to_callable(fn: Callable, activity_name: str) -> None:
+    def _apply_to_callable(
+        fn: Callable, *, activity_name: str, no_thread_cancel_exception: bool = False
+    ) -> None:
         # Validate the activity
         if hasattr(fn, "__temporal_activity_definition"):
             raise ValueError("Function already contains activity definition")
@@ -399,6 +442,7 @@ class _Definition:
                 # iscoroutinefunction does not return true for async __call__
                 # TODO(cretz): Why can't MyPy handle this?
                 is_async=inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
+                no_thread_cancel_exception=no_thread_cancel_exception,
             ),
         )
 

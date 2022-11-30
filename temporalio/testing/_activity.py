@@ -12,6 +12,8 @@ from typing import Any, Callable, Optional, Set, TypeVar
 from typing_extensions import ParamSpec
 
 import temporalio.activity
+import temporalio.exceptions
+import temporalio.worker._activity
 
 _Params = ParamSpec("_Params")
 _Return = TypeVar("_Return")
@@ -111,6 +113,17 @@ class _Activity:
         self.env = env
         self.fn = fn
         self.is_async = inspect.iscoroutinefunction(fn)
+        self.cancel_thread_raiser: Optional[
+            temporalio.worker._activity._ThreadExceptionRaiser
+        ] = None
+        if not self.is_async:
+            # If there is a definition and they disable thread raising, don't
+            # set
+            defn = temporalio.activity._Definition.from_callable(fn)
+            if not defn or not defn.no_thread_cancel_exception:
+                self.cancel_thread_raiser = (
+                    temporalio.worker._activity._ThreadExceptionRaiser()
+                )
         # Create context
         self.context = temporalio.activity._Context(
             info=lambda: env.info,
@@ -123,10 +136,18 @@ class _Activity:
                 thread_event=threading.Event(),
                 async_event=asyncio.Event() if self.is_async else None,
             ),
+            shield_thread_cancel_exception=None
+            if not self.cancel_thread_raiser
+            else self.cancel_thread_raiser.shielded,
         )
         self.task: Optional[asyncio.Task] = None
 
     def run(self, *args, **kwargs) -> Any:
+        if self.cancel_thread_raiser:
+            thread_id = threading.current_thread().ident
+            if thread_id is not None:
+                self.cancel_thread_raiser.set_thread_id(thread_id)
+
         @contextmanager
         def activity_context():
             # Set cancelled and shutdown if already so in environment
@@ -163,6 +184,10 @@ class _Activity:
     def cancel(self) -> None:
         if not self.context.cancelled_event.is_set():
             self.context.cancelled_event.set()
+        if self.cancel_thread_raiser:
+            self.cancel_thread_raiser.raise_in_thread(
+                temporalio.exceptions.CancelledError
+            )
         if self.task and not self.task.done():
             self.task.cancel()
 

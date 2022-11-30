@@ -6,7 +6,7 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar, Mapping, Optional
+from typing import ClassVar, Mapping, Optional, Type
 
 import temporalio.bridge.temporal_sdk_bridge
 
@@ -53,6 +53,13 @@ class Runtime:
         if _default_runtime and error_if_already_set:
             raise RuntimeError("Runtime default already set")
         _default_runtime = runtime
+
+    @staticmethod
+    def _raise_in_thread(thread_id: int, exc_type: Type[BaseException]) -> bool:
+        """Internal helper for raising an exception in thread."""
+        return temporalio.bridge.temporal_sdk_bridge.raise_in_thread(
+            thread_id, exc_type
+        )
 
     def __init__(self, *, telemetry: TelemetryConfig) -> None:
         """Create a default runtime with the given telemetry config.
