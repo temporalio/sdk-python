@@ -87,7 +87,6 @@ class ExecuteActivityInput:
     args: Sequence[Any]
     executor: Optional[concurrent.futures.Executor]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    _cancelled_event: temporalio.activity._CompositeEvent
 
 
 class ActivityInboundInterceptor:

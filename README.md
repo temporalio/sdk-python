@@ -850,8 +850,8 @@ activities no special worker parameters are needed.
 
 Cancellation for asynchronous activities is done via
 [`asyncio.Task.cancel`](https://docs.python.org/3/library/asyncio-task.html#asyncio.Task.cancel). This means that
-`asyncio.CancelledError` will be raised (and can be caught, but it is not recommended). An activity must heartbeat to
-receive cancellation and there are other ways to be notified about cancellation (see "Activity Context" and
+`asyncio.CancelledError` will be raised (and can be caught, but it is not recommended). A non-local activity must
+heartbeat to receive cancellation and there are other ways to be notified about cancellation (see "Activity Context" and
 "Heartbeating and Cancellation" later).
 
 ##### Synchronous Activities
@@ -860,10 +860,10 @@ Synchronous activities, i.e. functions that do not have `async def`, can be used
 `activity_executor` worker parameter must be set with a `concurrent.futures.Executor` instance to use for executing the
 activities.
 
-Cancellation for synchronous activities is done in the background and the activity must choose to listen for it and
-react appropriately. If after cancellation is obtained an unwrapped `temporalio.exceptions.CancelledError` is raised,
-the activity will be marked cancelled. An activity must heartbeat to receive cancellation and there are other ways to be
-notified about cancellation (see "Activity Context" and "Heartbeating and Cancellation" later).
+All long running, non-local activities should heartbeat so they can be cancelled. Cancellation in threaded activities
+throws but multiprocess/other activities does not. The sections below on each synchronous type explain further. There
+are also calls on the context that can check for cancellation. For more information, see "Activity Context" and
+"Heartbeating and Cancellation" sections later.
 
 Note, all calls from an activity to functions in the `temporalio.activity` package are powered by
 [contextvars](https://docs.python.org/3/library/contextvars.html). Therefore, new threads starting _inside_ of
@@ -875,6 +875,15 @@ function in the new threads.
 If `activity_executor` is set to an instance of `concurrent.futures.ThreadPoolExecutor` then the synchronous activities
 are considered multithreaded activities. Besides `activity_executor`, no other worker parameters are required for
 synchronous multithreaded activities.
+
+By default, cancellation of a synchronous multithreaded activity is done via a `temporalio.exceptions.CancelledError`
+thrown into the activity thread. Activities that do not wish to have cancellation thrown can set
+`no_thread_cancel_exception=True` in the `@activity.defn` decorator.
+
+Code that wishes to be temporarily shielded from the cancellation exception can run inside
+`with activity.shield_thread_cancel_exception():`. But once the last nested form of that block is finished, even if
+there is a return statement within, it will throw the cancellation if there was one. A `try` +
+`except temporalio.exceptions.CancelledError` would have to surround the `with` to handle the cancellation explicitly.
 
 ###### Synchronous Multiprocess/Other Activities
 
@@ -901,6 +910,8 @@ calls in the `temporalio.activity` package make use of it. Specifically:
 * `is_cancelled()` - Whether a cancellation has been requested on this activity
 * `wait_for_cancelled()` - `async` call to wait for cancellation request
 * `wait_for_cancelled_sync(timeout)` - Synchronous blocking call to wait for cancellation request
+* `shield_thread_cancel_exception()` - Context manager for use in `with` clauses by synchronous multithreaded activities
+  to prevent cancel exception from being thrown during the block of code
 * `is_worker_shutdown()` - Whether the worker has started graceful shutdown
 * `wait_for_worker_shutdown()` - `async` call to wait for start of graceful worker shutdown
 * `wait_for_worker_shutdown_sync(timeout)` - Synchronous blocking call to wait for start of graceful worker shutdown
@@ -912,14 +923,16 @@ occurs. Synchronous activities cannot call any of the `async` functions.
 
 ##### Heartbeating and Cancellation
 
-In order for an activity to be notified of cancellation requests, they must invoke `temporalio.activity.heartbeat()`.
-It is strongly recommended that all but the fastest executing activities call this function regularly. "Types of
-Activities" has specifics on cancellation for asynchronous and synchronous activities.
+In order for a non-local activity to be notified of cancellation requests, it must invoke
+`temporalio.activity.heartbeat()`. It is strongly recommended that all but the fastest executing activities call this
+function regularly. "Types of Activities" has specifics on cancellation for asynchronous and synchronous activities.
 
 In addition to obtaining cancellation information, heartbeats also support detail data that is persisted on the server
 for retrieval during activity retry. If an activity calls `temporalio.activity.heartbeat(123, 456)` and then fails and
 is retried, `temporalio.activity.info().heartbeat_details` will return an iterable containing `123` and `456` on the
 next run.
+
+Heartbeating has no effect on local activities.
 
 ##### Worker Shutdown
 

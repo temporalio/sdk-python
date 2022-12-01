@@ -16,6 +16,7 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     // Runtime stuff
     m.add_class::<runtime::RuntimeRef>()?;
     m.add_function(wrap_pyfunction!(init_runtime, m)?)?;
+    m.add_function(wrap_pyfunction!(raise_in_thread, m)?)?;
 
     // Testing stuff
     m.add_class::<testing::EphemeralServerRef>()?;
@@ -46,6 +47,11 @@ fn connect_client<'a>(
 #[pyfunction]
 fn init_runtime(telemetry_config: runtime::TelemetryConfig) -> PyResult<runtime::RuntimeRef> {
     runtime::init_runtime(telemetry_config)
+}
+
+#[pyfunction]
+fn raise_in_thread<'a>(py: Python<'a>, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+    runtime::raise_in_thread(py, thread_id, exc)
 }
 
 #[pyfunction]

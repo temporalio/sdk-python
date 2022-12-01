@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, List, NoReturn, Optional, Sequence
 
 import pytest
 
@@ -262,13 +262,18 @@ async def test_activity_cancel_throw(client: Client, worker: ExternalWorker):
     assert isinstance(err.value.cause.cause, CancelledError)
 
 
-async def test_sync_activity_thread_cancel(client: Client, worker: ExternalWorker):
+async def test_sync_activity_thread_cancel_caught(
+    client: Client, worker: ExternalWorker
+):
     @activity.defn
     def wait_cancel() -> str:
-        while not activity.is_cancelled():
-            time.sleep(1)
-            activity.heartbeat()
-        return "Cancelled"
+        try:
+            while True:
+                time.sleep(1)
+                activity.heartbeat()
+        except CancelledError:
+            assert activity.is_cancelled()
+            return "Cancelled"
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
@@ -287,11 +292,10 @@ async def test_sync_activity_thread_cancel_uncaught(
     client: Client, worker: ExternalWorker
 ):
     @activity.defn
-    def wait_cancel() -> str:
-        while not activity.is_cancelled():
+    def wait_cancel() -> NoReturn:
+        while True:
             time.sleep(1)
             activity.heartbeat()
-        raise CancelledError("Cancelled")
 
     with pytest.raises(WorkflowFailureError) as err:
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -306,6 +310,69 @@ async def test_sync_activity_thread_cancel_uncaught(
             )
     assert isinstance(err.value.cause, ActivityError)
     assert isinstance(err.value.cause.cause, CancelledError)
+
+
+async def test_sync_activity_thread_cancel_exception_disabled(
+    client: Client, worker: ExternalWorker
+):
+    @activity.defn(no_thread_cancel_exception=True)
+    def wait_cancel() -> str:
+        while True:
+            time.sleep(1)
+            activity.heartbeat()
+            if activity.is_cancelled():
+                # Heartbeat again just to confirm nothing happens
+                time.sleep(1)
+                activity.heartbeat()
+                return "Cancelled"
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            wait_cancel,
+            cancel_after_ms=100,
+            wait_for_cancellation=True,
+            heartbeat_timeout_ms=3000,
+            worker_config={"activity_executor": executor},
+        )
+    assert result.result == "Cancelled"
+
+
+async def test_sync_activity_thread_cancel_exception_shielded(
+    client: Client, worker: ExternalWorker
+):
+    events: List[str] = []
+
+    @activity.defn
+    def wait_cancel() -> None:
+        events.append("pre1")
+        with activity.shield_thread_cancel_exception():
+            events.append("pre2")
+            with activity.shield_thread_cancel_exception():
+                events.append("pre3")
+                while not activity.is_cancelled():
+                    time.sleep(1)
+                    activity.heartbeat()
+                events.append("post3")
+            events.append("post2")
+        events.append("post1")
+
+    with pytest.raises(WorkflowFailureError) as err:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            await _execute_workflow_with_activity(
+                client,
+                worker,
+                wait_cancel,
+                cancel_after_ms=100,
+                wait_for_cancellation=True,
+                heartbeat_timeout_ms=3000,
+                worker_config={"activity_executor": executor},
+            )
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, CancelledError)
+    # This will have every event except post1 because that's where it throws
+    assert events == ["pre1", "pre2", "pre3", "post3", "post2"]
 
 
 @activity.defn

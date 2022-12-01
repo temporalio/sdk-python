@@ -1,8 +1,10 @@
 import asyncio
 import threading
+import time
 from contextvars import copy_context
 
 from temporalio import activity
+from temporalio.exceptions import CancelledError
 from temporalio.testing import ActivityEnvironment
 
 
@@ -42,6 +44,7 @@ async def test_activity_env_async():
 
 def test_activity_env_sync():
     waiting = threading.Event()
+    properly_cancelled = False
 
     def do_stuff(param: str) -> None:
         activity.heartbeat(f"param: {param}")
@@ -58,8 +61,18 @@ def test_activity_env_sync():
 
         # Wait for cancel
         waiting.set()
-        activity.wait_for_cancelled_sync()
-        activity.heartbeat("cancelled")
+        try:
+            # Confirm shielding works
+            with activity.shield_thread_cancel_exception():
+                try:
+                    while not activity.is_cancelled():
+                        time.sleep(0.2)
+                    time.sleep(0.2)
+                except:
+                    raise RuntimeError("Unexpected")
+        except CancelledError:
+            nonlocal properly_cancelled
+            properly_cancelled = True
 
     env = ActivityEnvironment()
     # Set heartbeat handler to add to list
@@ -70,9 +83,11 @@ def test_activity_env_sync():
     thread.start()
     waiting.wait()
     # Cancel and confirm done
+    time.sleep(1)
     env.cancel()
     thread.join()
-    assert heartbeats == ["param: param1", "task, type: unknown", "cancelled"]
+    assert heartbeats == ["param: param1", "task, type: unknown"]
+    assert properly_cancelled
 
 
 async def test_activity_env_assert():
