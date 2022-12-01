@@ -50,7 +50,7 @@ fn init_runtime(telemetry_config: runtime::TelemetryConfig) -> PyResult<runtime:
 }
 
 #[pyfunction]
-fn raise_in_thread<'a>(py: Python<'a>, thread_id: i32, exc: &PyAny) -> bool {
+fn raise_in_thread<'a>(py: Python<'a>, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
     runtime::raise_in_thread(py, thread_id, exc)
 }
 
