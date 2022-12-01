@@ -78,6 +78,7 @@ The Python SDK is under development. There are no compatibility guarantees at th
         - [Sandbox is not Secure](#sandbox-is-not-secure)
         - [Sandbox Performance](#sandbox-performance)
         - [Extending Restricted Classes](#extending-restricted-classes)
+        - [Certain Standard Library Calls on Restricted Objects](#certain-standard-library-calls-on-restricted-objects)
         - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
   - [Activities](#activities)
     - [Definition](#definition-1)
@@ -802,9 +803,22 @@ To mitigate this, users should:
 
 ###### Extending Restricted Classes
 
-Currently, extending classes marked as restricted causes an issue with their `__init__` parameters. This does not affect
-most users, but if there is a dependency that is, say, extending `zipfile.ZipFile` an error may occur and the module
-will have to be marked as pass through.
+Extending a restricted class causes Python to instantiate the restricted metaclass which is unsupported. Therefore if
+you attempt to use a class in the sandbox that extends a restricted class, it will fail. For example, if you have a
+`class MyZipFile(zipfile.ZipFile)` and try to use that class inside a workflow, it will fail.
+
+Classes used inside the workflow should not extend restricted classes. For situations where third-party modules need to
+at import time, they should be marked as pass through modules.
+
+###### Certain Standard Library Calls on Restricted Objects
+
+If an object is restricted, internal C Python validation may fail in some cases. For example, running
+`dict.items(os.__dict__)` will fail with:
+
+> descriptor 'items' for 'dict' objects doesn't apply to a '_RestrictedProxy' object
+
+This is a low-level check that cannot be subverted. The solution is to not use restricted objects inside the sandbox.
+For situations where third-party modules need to at import time, they should be marked as pass through modules.
 
 ###### is_subclass of ABC-based Restricted Classes
 

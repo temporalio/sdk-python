@@ -33,9 +33,12 @@ global_state = ["global orig"]
 # runtime only
 _ = os.name
 
-# TODO(cretz): This fails because you can't subclass a restricted class
-# class MyZipFile(zipfile.ZipFile):
-#     pass
+# This used to fail because our __init__ couldn't handle metaclass init
+import zipfile
+
+
+class MyZipFile(zipfile.ZipFile):
+    pass
 
 
 @dataclass
@@ -76,7 +79,6 @@ class GlobalStateWorkflow:
     [
         # TODO(cretz): Disabling until https://github.com/protocolbuffers/upb/pull/804
         # SandboxRestrictions.passthrough_modules_minimum,
-        # TODO(cretz): See what is failing here
         SandboxRestrictions.passthrough_modules_with_temporal,
         SandboxRestrictions.passthrough_modules_maximum,
     ],
@@ -381,6 +383,35 @@ async def test_workflow_sandbox_with_proto(client: Client):
             task_queue=worker.task_queue,
         )
         assert result is not param and result == param
+
+
+@workflow.defn
+class KnownIssuesWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Calling an internally defined method passing in self that is a
+        # restricted proxy object will fail
+        try:
+            dict.items(os.__dict__)
+            raise ApplicationError("Expected failure")
+        except TypeError:
+            pass
+
+        # Using a subclass of a proxied class is unsupported
+        try:
+            MyZipFile("some/path")
+            raise ApplicationError("Expected failure")
+        except RuntimeError as err:
+            assert "Restriction state not present" in str(err)
+
+
+async def test_workflow_sandbox_known_issues(client: Client):
+    async with new_worker(client, KnownIssuesWorkflow) as worker:
+        await client.execute_workflow(
+            KnownIssuesWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
 
 
 def new_worker(

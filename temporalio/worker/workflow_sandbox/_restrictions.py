@@ -651,7 +651,14 @@ class _RestrictionState:
     def from_proxy(v: _RestrictedProxy) -> _RestrictionState:
         # To prevent recursion, must use __getattribute__ on object to get the
         # restriction state
-        return object.__getattribute__(v, "__temporal_state")
+        try:
+            return object.__getattribute__(v, "__temporal_state")
+        except AttributeError:
+            # This mostly occurs when accessing a field of an extended class on
+            # that has been proxied
+            raise RuntimeError(
+                "Restriction state not present. Using subclasses of proxied objects is unsupported."
+            ) from None
 
     name: str
     obj: object
@@ -787,13 +794,27 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    def __init__(
-        self, name: str, obj: Any, context: RestrictionContext, matcher: SandboxMatcher
-    ) -> None:
-        _trace("__init__ on %s", name)
-        _RestrictionState(
-            name=name, obj=obj, context=context, matcher=matcher
-        ).set_on_proxy(self)
+    def __init__(self, *args, **kwargs) -> None:
+        # When we instantiate this class, we have the signature of:
+        #   __init__(
+        #       self,
+        #       name: str,
+        #       obj: Any,
+        #       context: RestrictionContext,
+        #       matcher: SandboxMatcher
+        #   )
+        # However when Python subclasses a class, it calls metaclass() on the
+        # class object which doesn't match these args. For now, we'll just
+        # ignore inits on these metadata classes.
+        # TODO(cretz): Properly support subclassing restricted classes in
+        # sandbox
+        if isinstance(args[2], RestrictionContext):
+            _trace("__init__ on %s", args[0])
+            _RestrictionState(
+                name=args[0], obj=args[1], context=args[2], matcher=args[3]
+            ).set_on_proxy(self)
+        else:
+            _trace("__init__ unrecognized with args %s", args)
 
     def __getattribute__(self, __name: str) -> Any:
         state = _RestrictionState.from_proxy(self)
@@ -802,7 +823,7 @@ class _RestrictedProxy:
         ret = object.__getattribute__(self, "__getattr__")(__name)
 
         # Since Python 3.11, the importer references __spec__ on module, so we
-        # allow that through
+        # allow that through.
         if __name != "__spec__":
             child_matcher = state.matcher.child_matcher(__name)
             if child_matcher and _is_restrictable(ret):
