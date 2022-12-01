@@ -236,13 +236,13 @@ def shield_thread_cancel_exception() -> Iterator[None]:
     """Context manager for synchronous multithreaded activities to delay
     cancellation exceptions.
 
-    By default, heartbeating synchronous multithreaded activities have an
-    exception thrown inside when cancellation occurs. Code within a "with" block
-    of this context manager will delay that throwing until the end. Even if the
-    block returns a value or throws its own exception, if a cancellation
-    exception is pending, it is thrown instead. Therefore users are encouraged
-    to not throw out of this block and can surround this with a try/except if
-    they wish to catch a cancellation.
+    By default, synchronous multithreaded activities have an exception thrown
+    inside when cancellation occurs. Code within a "with" block of this context
+    manager will delay that throwing until the end. Even if the block returns a
+    value or throws its own exception, if a cancellation exception is pending,
+    it is thrown instead. Therefore users are encouraged to not throw out of
+    this block and can surround this with a try/except if they wish to catch a
+    cancellation.
 
     This properly supports nested calls and will only throw after the last one.
 
