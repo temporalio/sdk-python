@@ -11,7 +11,6 @@ from datetime import date, datetime, timedelta
 from enum import IntEnum
 from typing import Callable, Dict, List, Optional, Sequence, Set, Type
 
-import pydantic
 import pytest
 
 import temporalio.worker.workflow_sandbox._restrictions
@@ -387,6 +386,10 @@ async def test_workflow_sandbox_with_proto(client: Client):
             task_queue=worker.task_queue,
         )
         assert result is not param and result == param
+
+
+with workflow.unsafe.imports_passed_through():
+    import pydantic
 
 
 class PydanticMessage(pydantic.BaseModel):
