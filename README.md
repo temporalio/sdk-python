@@ -673,6 +673,10 @@ workflow will not progress until fixed.
 The sandbox is not foolproof and non-determinism can still occur. It is simply a best-effort way to catch bad code
 early. Users are encouraged to define their workflows in files with no other side effects.
 
+The sandbox offers a mechanism to pass through modules from outside the sandbox. By default this already includes all
+standard library modules and Temporal modules. **For performance and behavior reasons, users are encouraged to pass
+through all third party modules whose calls will be deterministic.** See "Passthrough Modules" below on how to do this.
+
 ##### How the Sandbox Works
 
 The sandbox is made up of two components that work closely together:
@@ -719,23 +723,46 @@ future releases.
 When creating the `Worker`, the `workflow_runner` is defaulted to
 `temporalio.worker.workflow_sandbox.SandboxedWorkflowRunner()`. The `SandboxedWorkflowRunner`'s init accepts a
 `restrictions` keyword argument that is defaulted to `SandboxRestrictions.default`. The `SandboxRestrictions` dataclass
-is immutable and contains three fields that can be customized, but only two have notable value
+is immutable and contains three fields that can be customized, but only two have notable value. See below.
 
 ###### Passthrough Modules
 
-To make the sandbox quicker and use less memory when importing known third party libraries, they can be added to the
-`SandboxRestrictions.passthrough_modules` set like so:
+By default the sandbox completely reloads non-standard-library and non-Temporal modules for every workflow run. To make
+the sandbox quicker and use less memory when importing known-side-effect-free third party modules, they can be marked
+as passthrough modules.
+
+**For performance and behavior reasons, users are encouraged to pass through all third party modules whose calls will be
+deterministic.**
+
+One way to pass through a module is at import time in the workflow file using the `imports_passed_through` context
+manager like so:
 
 ```python
-my_restrictions = dataclasses.replace(
-    SandboxRestrictions.default,
-    passthrough_modules=SandboxRestrictions.passthrough_modules_default | SandboxMatcher(access={"pydantic"}),
-)
-my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+# my_workflow_file.py
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    import pydantic
+
+@workflow.defn
+class MyWorkflow:
+    ...
 ```
 
-If an "access" match succeeds for an import, it will simply be forwarded from outside of the sandbox. See the API for
-more details on exact fields and their meaning.
+Alternatively, this can be done at worker creation time by customizing the runner's restrictions. For example:
+
+```python
+my_worker = Worker(
+  ...,
+  workflow_runner=SandboxedWorkflowRunner(
+    restrictions=SandboxRestrictions.default.with_passthrough_modules("pydantic")
+  )
+)
+```
+
+In both of these cases, now the `pydantic` module will be passed through from outside of the sandbox instead of
+being reloaded for every workflow run.
 
 ###### Invalid Module Members
 

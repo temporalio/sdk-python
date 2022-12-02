@@ -252,10 +252,20 @@ class Importer:
             raise RestrictedWorkflowAccessError(name)
 
     def _maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
-        if not self.restrictions.passthrough_modules.match_access(
-            self.restriction_context, *name.split(".")
+        # If imports not passed through and name not in passthrough modules,
+        # check parents
+        if (
+            not temporalio.workflow.unsafe.is_imports_passed_through()
+            and name not in self.restrictions.passthrough_modules
         ):
-            return None
+            end_dot = -1
+            while True:
+                end_dot = name.find(".", end_dot + 1)
+                if end_dot == -1:
+                    return None
+                elif name[:end_dot] in self.restrictions.passthrough_modules:
+                    break
+        # Do the pass through
         with self._unapplied():
             _trace("Passing module %s through from host", name)
             global _trace_depth

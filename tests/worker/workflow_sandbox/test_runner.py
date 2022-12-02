@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
-from typing import Callable, Dict, List, Optional, Sequence, Type
+from typing import Callable, Dict, List, Optional, Sequence, Set, Type
 
 import pytest
 from pydantic import BaseModel
@@ -90,7 +90,7 @@ class GlobalStateWorkflow:
 )
 async def test_workflow_sandbox_global_state(
     client: Client,
-    sandboxed_passthrough_modules: SandboxMatcher,
+    sandboxed_passthrough_modules: Set[str],
 ):
     global global_state
     async with new_worker(
@@ -445,7 +445,7 @@ def new_worker(
     *workflows: Type,
     activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
-    sandboxed_passthrough_modules: Optional[SandboxMatcher] = None,
+    sandboxed_passthrough_modules: Set[str] = set(),
     sandboxed_invalid_module_members: Optional[SandboxMatcher] = None,
 ) -> Worker:
     restrictions = SandboxRestrictions.default

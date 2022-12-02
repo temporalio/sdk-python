@@ -59,13 +59,12 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
 class SandboxRestrictions:
     """Set of restrictions that can be applied to a sandbox."""
 
-    passthrough_modules: SandboxMatcher
+    passthrough_modules: Set[str]
     """
     Modules which pass through because we know they are side-effect free (or the
     side-effecting pieces are restricted). These modules will not be reloaded,
-    but instead will just be forwarded from outside of the sandbox. The check
-    whether a module matches here is an access match using the fully qualified
-    module name.
+    but instead will just be forwarded from outside of the sandbox. Any module
+    listed will apply to all children.
     """
 
     invalid_modules: SandboxMatcher
@@ -84,19 +83,19 @@ class SandboxRestrictions:
     fully qualified path to the item.
     """
 
-    passthrough_modules_minimum: ClassVar[SandboxMatcher]
+    passthrough_modules_minimum: ClassVar[Set[str]]
     """Set of modules that must be passed through at the minimum."""
 
-    passthrough_modules_with_temporal: ClassVar[SandboxMatcher]
+    passthrough_modules_with_temporal: ClassVar[Set[str]]
     """Minimum modules that must be passed through and the Temporal modules."""
 
-    passthrough_modules_maximum: ClassVar[SandboxMatcher]
+    passthrough_modules_maximum: ClassVar[Set[str]]
     """
     All modules that can be passed through. This includes all standard library
     modules.
     """
 
-    passthrough_modules_default: ClassVar[SandboxMatcher]
+    passthrough_modules_default: ClassVar[Set[str]]
     """Same as :py:attr:`passthrough_modules_maximum`."""
 
     invalid_module_members_default: ClassVar[SandboxMatcher]
@@ -109,6 +108,14 @@ class SandboxRestrictions:
     """
     Combination of :py:attr:`passthrough_modules_default`,
     :py:attr:`invalid_module_members_default`, and no invalid modules."""
+
+    def with_passthrough_modules(self, *modules: str) -> SandboxRestrictions:
+        """Create a new restriction set with the given modules added to the
+        :py:attr:`passthrough_modules` set.
+        """
+        return dataclasses.replace(
+            self, passthrough_modules=self.passthrough_modules | set(modules)
+        )
 
 
 # We intentionally use specific fields instead of generic "matcher" callbacks
@@ -321,44 +328,37 @@ SandboxMatcher.none = SandboxMatcher()
 SandboxMatcher.all_uses = SandboxMatcher(use={"*"})
 SandboxMatcher.all_uses_runtime = SandboxMatcher(use={"*"}, only_runtime=True)
 
-SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
-    access={
-        "grpc",
-        # Due to some side-effecting calls made on import, these need to be
-        # allowed
-        "pathlib",
-        "importlib",
-        # Python 3.7 libs often import this to support things in older Python.
-        # This does not work natively due to an issue with extending
-        # zipfile.ZipFile. TODO(cretz): Fix when subclassing restricted classes
-        # is fixed.
-        "importlib_metadata",
-    },
-    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143.
-    # This unfortunately means that for now, everyone using Python protos has to
-    # pass their module through :-(
-    children={
-        "google": SandboxMatcher(access={"protobuf"}),
-        "temporalio": SandboxMatcher(
-            access={"api"}, children={"bridge": SandboxMatcher(access={"proto"})}
-        ),
-    },
-)
+SandboxRestrictions.passthrough_modules_minimum = {
+    "grpc",
+    # Due to some side-effecting calls made on import, these need to be
+    # allowed
+    "pathlib",
+    "importlib",
+    # Python 3.7 libs often import this to support things in older Python.
+    # This does not work natively due to an issue with extending
+    # zipfile.ZipFile. TODO(cretz): Fix when subclassing restricted classes
+    # is fixed.
+    "importlib_metadata",
+    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
+    # for older versions. This unfortunately means that on those versions,
+    # everyone using Python protos has to pass their module through.
+    "google.protobuf",
+    "temporalio.api",
+    "temporalio.bridge.proto",
+}
 
-SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | SandboxMatcher(
-    access={
-        # is_subclass is broken in sandbox due to Python bug on ABC C extension.
-        # So we have to include all things that might extend an ABC class and
-        # do a subclass check. See https://bugs.python.org/issue44847 and
-        # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
-        "asyncio",
-        "abc",
-        "temporalio",
-        # Due to pkg_resources use of base classes caused by the ABC issue
-        # above, and Otel's use of pkg_resources, we pass it through
-        "pkg_resources",
-    }
-)
+SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | {
+    # is_subclass is broken in sandbox due to Python bug on ABC C extension.
+    # So we have to include all things that might extend an ABC class and
+    # do a subclass check. See https://bugs.python.org/issue44847 and
+    # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
+    "asyncio",
+    "abc",
+    "temporalio",
+    # Due to pkg_resources use of base classes caused by the ABC issue
+    # above, and Otel's use of pkg_resources, we pass it through
+    "pkg_resources",
+}
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
 # test will fail if this list doesn't match the latest Python version it was
@@ -398,17 +398,15 @@ _stdlib_module_names = (
     "xdrlib,xml,xmlrpc,zipapp,zipfile,zipimport,zlib,zoneinfo"
 )
 
-SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | SandboxMatcher(
-    access={
-        # All stdlib modules except "sys" and their children. Children are not
-        # listed in stdlib names but we need them because in some cases (e.g. os
-        # manually setting sys.modules["os.path"]) they have certain child
-        # expectations.
-        v
-        for v in _stdlib_module_names.split(",")
-        if v != "sys"
-    }
-)
+SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | {
+    # All stdlib modules except "sys" and their children. Children are not
+    # listed in stdlib names but we need them because in some cases (e.g. os
+    # manually setting sys.modules["os.path"]) they have certain child
+    # expectations.
+    v
+    for v in _stdlib_module_names.split(",")
+    if v != "sys"
+}
 
 SandboxRestrictions.passthrough_modules_default = (
     SandboxRestrictions.passthrough_modules_maximum
