@@ -7,11 +7,12 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from enum import IntEnum
 from typing import Callable, Dict, List, Optional, Sequence, Type
 
 import pytest
+from pydantic import BaseModel
 
 import temporalio.worker.workflow_sandbox._restrictions
 from temporalio import activity, workflow
@@ -39,6 +40,10 @@ import zipfile
 
 class MyZipFile(zipfile.ZipFile):
     pass
+
+
+# This used to fail because subclass checks were inaccurate
+assert issubclass(datetime, datetime)
 
 
 @dataclass
@@ -367,7 +372,6 @@ async def test_workflow_sandbox_instance_check(client: Client):
 class UseProtoWorkflow:
     @workflow.run
     async def run(self, param: SomeMessage) -> SomeMessage:
-        print("In: ", id(SomeMessage))
         assert isinstance(param, SomeMessage)
         return param
 
@@ -383,6 +387,28 @@ async def test_workflow_sandbox_with_proto(client: Client):
             task_queue=worker.task_queue,
         )
         assert result is not param and result == param
+
+
+class PydanticMessage(BaseModel):
+    content: datetime
+
+
+@workflow.defn
+class UsePydanticDateTimeWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # This used to fail due to datetime subclass check in Pydantic
+        message = PydanticMessage(content=workflow.now())
+        assert isinstance(message.content, datetime)
+
+
+async def test_workflow_sandbox_with_pydantic_datetime(client: Client):
+    async with new_worker(client, UsePydanticDateTimeWorkflow) as worker:
+        await client.execute_workflow(
+            UsePydanticDateTimeWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
 
 
 @workflow.defn

@@ -33,15 +33,20 @@ def test_workflow_sandbox_importer_passthrough_module():
     assert outside1.module_state == ["module orig"]
     assert outside2.module_state == ["module orig"]
 
-    # Now import both via importer
+    # Now import via importer
     with Importer(restrictions, RestrictionContext()).applied():
         import tests.worker.workflow_sandbox.testmodules.passthrough_module as inside1
         import tests.worker.workflow_sandbox.testmodules.stateful_module as inside2
+
+        from .testmodules import stateful_module as inside_relative2
 
     # Now if we alter inside1, it's passthrough so it affects outside1
     inside1.module_state = ["another val"]
     assert outside1.module_state == ["another val"]
     assert id(inside1) == id(outside1)
+
+    # Confirm relative is same as non-relative
+    assert id(inside2) == id(inside_relative2)
 
     # But if we alter non-passthrough inside2 it does not affect outside2
     inside2.module_state = ["another val"]

@@ -640,6 +640,13 @@ class RestrictionContext:
             if we're just importing it.
     """
 
+    @staticmethod
+    def unwrap_if_proxied(v: Any) -> Any:
+        """Unwrap a proxy object if proxied."""
+        if type(v) is _RestrictedProxy:
+            v = _RestrictionState.from_proxy(v).obj
+        return v
+
     def __init__(self) -> None:
         """Create a restriction context."""
         self.is_runtime = False
@@ -897,7 +904,6 @@ class _RestrictedProxy:
     # __slots__ used by proxy itself
     # __dict__ (__getattr__)
     # __weakref__ (__getattr__)
-    # __init_subclass__ (proxying metaclass not supported)
     # __prepare__ (metaclass)
     __class__ = _RestrictedProxyLookup(  # type: ignore
         fallback_func=lambda self: type(self), is_attr=True

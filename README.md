@@ -731,7 +731,7 @@ my_restrictions = dataclasses.replace(
     SandboxRestrictions.default,
     passthrough_modules=SandboxRestrictions.passthrough_modules_default | SandboxMatcher(access={"pydantic"}),
 )
-my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
 ```
 
 If an "access" match succeeds for an import, it will simply be forwarded from outside of the sandbox. See the API for
@@ -750,7 +750,7 @@ my_restrictions = dataclasses.replace(
       "datetime", "date", "today",
     ),
 )
-my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
 ```
 
 Restrictions can also be added by `|`'ing together matchers, for example to restrict the `datetime.date` class from
@@ -763,7 +763,7 @@ my_restrictions = dataclasses.replace(
       children={"datetime": SandboxMatcher(use={"date"})},
     ),
 )
-my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
 ```
 
 See the API for more details on exact fields and their meaning.
