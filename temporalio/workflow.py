@@ -714,6 +714,7 @@ async def wait_condition(
 
 _sandbox_unrestricted = threading.local()
 _in_sandbox = threading.local()
+_imports_passed_through = threading.local()
 
 
 class unsafe:
@@ -772,6 +773,35 @@ class unsafe:
             yield None
         finally:
             _sandbox_unrestricted.value = False
+
+    @staticmethod
+    def is_imports_passed_through() -> bool:
+        """Whether the current block of code is in
+        :py:meth:imports_passed_through.
+
+        Returns:
+            True if the current code's imports will be passed through
+        """
+        # See comment in is_sandbox_unrestricted for why we allow unset instead
+        # of just global false.
+        return getattr(_imports_passed_through, "value", False)
+
+    @staticmethod
+    @contextmanager
+    def imports_passed_through() -> Iterator[None]:
+        """Context manager to mark all imports that occur within it as passed
+        through (meaning not reloaded by the sandbox).
+        """
+        # Only apply if not already applied. Nested calls just continue
+        # passed through.
+        if unsafe.is_imports_passed_through():
+            yield None
+            return
+        _imports_passed_through.value = True
+        try:
+            yield None
+        finally:
+            _imports_passed_through.value = False
 
 
 class LoggerAdapter(logging.LoggerAdapter):

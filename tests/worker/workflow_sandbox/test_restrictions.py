@@ -10,6 +10,7 @@ from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictedWorkflowAccessError,
     RestrictionContext,
     SandboxMatcher,
+    SandboxRestrictions,
     _RestrictedProxy,
     _stdlib_module_names,
 )
@@ -32,6 +33,14 @@ def test_workflow_sandbox_stdlib_module_names():
     assert (
         actual_names == _stdlib_module_names
     ), f"Expecting names as {actual_names}. In code as:\n{code}"
+
+
+def test_workflow_sandbox_restrictions_add_passthrough_modules():
+    updated = SandboxRestrictions.default.with_passthrough_modules("module1", "module2")
+    assert (
+        "module1" in updated.passthrough_modules
+        and "module2" in updated.passthrough_modules
+    )
 
 
 @dataclass

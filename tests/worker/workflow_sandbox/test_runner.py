@@ -7,10 +7,11 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from enum import IntEnum
-from typing import Callable, Dict, List, Optional, Sequence, Type
+from typing import Callable, Dict, List, Optional, Sequence, Set, Type
 
+import pydantic
 import pytest
 
 import temporalio.worker.workflow_sandbox._restrictions
@@ -33,9 +34,16 @@ global_state = ["global orig"]
 # runtime only
 _ = os.name
 
-# TODO(cretz): This fails because you can't subclass a restricted class
-# class MyZipFile(zipfile.ZipFile):
-#     pass
+# This used to fail because our __init__ couldn't handle metaclass init
+import zipfile
+
+
+class MyZipFile(zipfile.ZipFile):
+    pass
+
+
+# This used to fail because subclass checks were inaccurate
+assert issubclass(datetime, datetime)
 
 
 @dataclass
@@ -76,14 +84,13 @@ class GlobalStateWorkflow:
     [
         # TODO(cretz): Disabling until https://github.com/protocolbuffers/upb/pull/804
         # SandboxRestrictions.passthrough_modules_minimum,
-        # TODO(cretz): See what is failing here
         SandboxRestrictions.passthrough_modules_with_temporal,
         SandboxRestrictions.passthrough_modules_maximum,
     ],
 )
 async def test_workflow_sandbox_global_state(
     client: Client,
-    sandboxed_passthrough_modules: SandboxMatcher,
+    sandboxed_passthrough_modules: Set[str],
 ):
     global global_state
     async with new_worker(
@@ -365,7 +372,6 @@ async def test_workflow_sandbox_instance_check(client: Client):
 class UseProtoWorkflow:
     @workflow.run
     async def run(self, param: SomeMessage) -> SomeMessage:
-        print("In: ", id(SomeMessage))
         assert isinstance(param, SomeMessage)
         return param
 
@@ -383,12 +389,53 @@ async def test_workflow_sandbox_with_proto(client: Client):
         assert result is not param and result == param
 
 
+class PydanticMessage(pydantic.BaseModel):
+    content: datetime
+
+
+@workflow.defn
+class KnownIssuesWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Calling an internally defined method passing in self that is a
+        # restricted proxy object will fail
+        try:
+            dict.items(os.__dict__)
+            raise ApplicationError("Expected failure")
+        except TypeError:
+            pass
+
+        # Using a subclass of a proxied class is unsupported
+        try:
+            MyZipFile("some/path")
+            raise ApplicationError("Expected failure")
+        except RuntimeError as err:
+            assert "Restriction state not present" in str(err)
+
+        # Using a datetime in binary-compiled Pydantic skips our issubclass when
+        # building their validators causing it to use date instead
+        # TODO(cretz): https://github.com/temporalio/sdk-python/issues/207
+        if pydantic.compiled:
+            assert isinstance(PydanticMessage(content=workflow.now()).content, date)
+        else:
+            assert isinstance(PydanticMessage(content=workflow.now()).content, datetime)
+
+
+async def test_workflow_sandbox_known_issues(client: Client):
+    async with new_worker(client, KnownIssuesWorkflow) as worker:
+        await client.execute_workflow(
+            KnownIssuesWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
 def new_worker(
     client: Client,
     *workflows: Type,
     activities: Sequence[Callable] = [],
     task_queue: Optional[str] = None,
-    sandboxed_passthrough_modules: Optional[SandboxMatcher] = None,
+    sandboxed_passthrough_modules: Set[str] = set(),
     sandboxed_invalid_module_members: Optional[SandboxMatcher] = None,
 ) -> Worker:
     restrictions = SandboxRestrictions.default

@@ -59,13 +59,12 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
 class SandboxRestrictions:
     """Set of restrictions that can be applied to a sandbox."""
 
-    passthrough_modules: SandboxMatcher
+    passthrough_modules: Set[str]
     """
     Modules which pass through because we know they are side-effect free (or the
     side-effecting pieces are restricted). These modules will not be reloaded,
-    but instead will just be forwarded from outside of the sandbox. The check
-    whether a module matches here is an access match using the fully qualified
-    module name.
+    but instead will just be forwarded from outside of the sandbox. Any module
+    listed will apply to all children.
     """
 
     invalid_modules: SandboxMatcher
@@ -84,19 +83,19 @@ class SandboxRestrictions:
     fully qualified path to the item.
     """
 
-    passthrough_modules_minimum: ClassVar[SandboxMatcher]
+    passthrough_modules_minimum: ClassVar[Set[str]]
     """Set of modules that must be passed through at the minimum."""
 
-    passthrough_modules_with_temporal: ClassVar[SandboxMatcher]
+    passthrough_modules_with_temporal: ClassVar[Set[str]]
     """Minimum modules that must be passed through and the Temporal modules."""
 
-    passthrough_modules_maximum: ClassVar[SandboxMatcher]
+    passthrough_modules_maximum: ClassVar[Set[str]]
     """
     All modules that can be passed through. This includes all standard library
     modules.
     """
 
-    passthrough_modules_default: ClassVar[SandboxMatcher]
+    passthrough_modules_default: ClassVar[Set[str]]
     """Same as :py:attr:`passthrough_modules_maximum`."""
 
     invalid_module_members_default: ClassVar[SandboxMatcher]
@@ -109,6 +108,14 @@ class SandboxRestrictions:
     """
     Combination of :py:attr:`passthrough_modules_default`,
     :py:attr:`invalid_module_members_default`, and no invalid modules."""
+
+    def with_passthrough_modules(self, *modules: str) -> SandboxRestrictions:
+        """Create a new restriction set with the given modules added to the
+        :py:attr:`passthrough_modules` set.
+        """
+        return dataclasses.replace(
+            self, passthrough_modules=self.passthrough_modules | set(modules)
+        )
 
 
 # We intentionally use specific fields instead of generic "matcher" callbacks
@@ -321,44 +328,40 @@ SandboxMatcher.none = SandboxMatcher()
 SandboxMatcher.all_uses = SandboxMatcher(use={"*"})
 SandboxMatcher.all_uses_runtime = SandboxMatcher(use={"*"}, only_runtime=True)
 
-SandboxRestrictions.passthrough_modules_minimum = SandboxMatcher(
-    access={
-        "grpc",
-        # Due to some side-effecting calls made on import, these need to be
-        # allowed
-        "pathlib",
-        "importlib",
-        # Python 3.7 libs often import this to support things in older Python.
-        # This does not work natively due to an issue with extending
-        # zipfile.ZipFile. TODO(cretz): Fix when subclassing restricted classes
-        # is fixed.
-        "importlib_metadata",
-    },
-    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143.
-    # This unfortunately means that for now, everyone using Python protos has to
-    # pass their module through :-(
-    children={
-        "google": SandboxMatcher(access={"protobuf"}),
-        "temporalio": SandboxMatcher(
-            access={"api"}, children={"bridge": SandboxMatcher(access={"proto"})}
-        ),
-    },
-)
+SandboxRestrictions.passthrough_modules_minimum = {
+    "grpc",
+    # Due to some side-effecting calls made on import, these need to be
+    # allowed
+    "pathlib",
+    "importlib",
+    # Python 3.7 libs often import this to support things in older Python.
+    # This does not work natively due to an issue with extending
+    # zipfile.ZipFile. TODO(cretz): Fix when subclassing restricted classes
+    # is fixed.
+    "importlib_metadata",
+    # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
+    # for older versions. This unfortunately means that on those versions,
+    # everyone using Python protos has to pass their module through.
+    "google.protobuf",
+    "temporalio.api",
+    "temporalio.bridge.proto",
+}
 
-SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | SandboxMatcher(
-    access={
-        # is_subclass is broken in sandbox due to Python bug on ABC C extension.
-        # So we have to include all things that might extend an ABC class and
-        # do a subclass check. See https://bugs.python.org/issue44847 and
-        # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
-        "asyncio",
-        "abc",
-        "temporalio",
-        # Due to pkg_resources use of base classes caused by the ABC issue
-        # above, and Otel's use of pkg_resources, we pass it through
-        "pkg_resources",
-    }
-)
+SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | {
+    # is_subclass is broken in sandbox due to Python bug on ABC C extension.
+    # So we have to include all things that might extend an ABC class and
+    # do a subclass check. See https://bugs.python.org/issue44847 and
+    # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
+    "asyncio",
+    "abc",
+    "temporalio",
+    # Due to pkg_resources use of base classes caused by the ABC issue
+    # above, and Otel's use of pkg_resources, we pass it through
+    "pkg_resources",
+    # Due to how Pydantic is importing lazily inside of some classes, we choose
+    # to always pass it through
+    "pydantic",
+}
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
 # test will fail if this list doesn't match the latest Python version it was
@@ -398,17 +401,15 @@ _stdlib_module_names = (
     "xdrlib,xml,xmlrpc,zipapp,zipfile,zipimport,zlib,zoneinfo"
 )
 
-SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | SandboxMatcher(
-    access={
-        # All stdlib modules except "sys" and their children. Children are not
-        # listed in stdlib names but we need them because in some cases (e.g. os
-        # manually setting sys.modules["os.path"]) they have certain child
-        # expectations.
-        v
-        for v in _stdlib_module_names.split(",")
-        if v != "sys"
-    }
-)
+SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | {
+    # All stdlib modules except "sys" and their children. Children are not
+    # listed in stdlib names but we need them because in some cases (e.g. os
+    # manually setting sys.modules["os.path"]) they have certain child
+    # expectations.
+    v
+    for v in _stdlib_module_names.split(",")
+    if v != "sys"
+}
 
 SandboxRestrictions.passthrough_modules_default = (
     SandboxRestrictions.passthrough_modules_maximum
@@ -640,6 +641,13 @@ class RestrictionContext:
             if we're just importing it.
     """
 
+    @staticmethod
+    def unwrap_if_proxied(v: Any) -> Any:
+        """Unwrap a proxy object if proxied."""
+        if type(v) is _RestrictedProxy:
+            v = _RestrictionState.from_proxy(v).obj
+        return v
+
     def __init__(self) -> None:
         """Create a restriction context."""
         self.is_runtime = False
@@ -651,7 +659,14 @@ class _RestrictionState:
     def from_proxy(v: _RestrictedProxy) -> _RestrictionState:
         # To prevent recursion, must use __getattribute__ on object to get the
         # restriction state
-        return object.__getattribute__(v, "__temporal_state")
+        try:
+            return object.__getattribute__(v, "__temporal_state")
+        except AttributeError:
+            # This mostly occurs when accessing a field of an extended class on
+            # that has been proxied
+            raise RuntimeError(
+                "Restriction state not present. Using subclasses of proxied objects is unsupported."
+            ) from None
 
     name: str
     obj: object
@@ -787,13 +802,27 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    def __init__(
-        self, name: str, obj: Any, context: RestrictionContext, matcher: SandboxMatcher
-    ) -> None:
-        _trace("__init__ on %s", name)
-        _RestrictionState(
-            name=name, obj=obj, context=context, matcher=matcher
-        ).set_on_proxy(self)
+    def __init__(self, *args, **kwargs) -> None:
+        # When we instantiate this class, we have the signature of:
+        #   __init__(
+        #       self,
+        #       name: str,
+        #       obj: Any,
+        #       context: RestrictionContext,
+        #       matcher: SandboxMatcher
+        #   )
+        # However when Python subclasses a class, it calls metaclass() on the
+        # class object which doesn't match these args. For now, we'll just
+        # ignore inits on these metadata classes.
+        # TODO(cretz): Properly support subclassing restricted classes in
+        # sandbox
+        if isinstance(args[2], RestrictionContext):
+            _trace("__init__ on %s", args[0])
+            _RestrictionState(
+                name=args[0], obj=args[1], context=args[2], matcher=args[3]
+            ).set_on_proxy(self)
+        else:
+            _trace("__init__ unrecognized with args %s", args)
 
     def __getattribute__(self, __name: str) -> Any:
         state = _RestrictionState.from_proxy(self)
@@ -802,7 +831,7 @@ class _RestrictedProxy:
         ret = object.__getattribute__(self, "__getattr__")(__name)
 
         # Since Python 3.11, the importer references __spec__ on module, so we
-        # allow that through
+        # allow that through.
         if __name != "__spec__":
             child_matcher = state.matcher.child_matcher(__name)
             if child_matcher and _is_restrictable(ret):
@@ -876,7 +905,6 @@ class _RestrictedProxy:
     # __slots__ used by proxy itself
     # __dict__ (__getattr__)
     # __weakref__ (__getattr__)
-    # __init_subclass__ (proxying metaclass not supported)
     # __prepare__ (metaclass)
     __class__ = _RestrictedProxyLookup(  # type: ignore
         fallback_func=lambda self: type(self), is_attr=True

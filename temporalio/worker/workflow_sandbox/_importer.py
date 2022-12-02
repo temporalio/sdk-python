@@ -14,6 +14,7 @@ import logging
 import sys
 import threading
 import types
+import warnings
 from contextlib import ExitStack, contextmanager
 from typing import (
     Any,
@@ -29,6 +30,7 @@ from typing import (
     Set,
     Tuple,
     TypeVar,
+    no_type_check,
 )
 
 from typing_extensions import ParamSpec
@@ -107,6 +109,33 @@ class Importer:
                         )
                     )
 
+            # Need to unwrap params for isinstance and issubclass. We have
+            # chosen to do it this way instead of customize __instancecheck__
+            # and __subclasscheck__ because we may have proxied the second
+            # parameter which does not have a way to override. It is unfortunate
+            # we have to change these globals for everybody.
+            def unwrap_second_param(orig: Any, a: Any, b: Any) -> Any:
+                a = RestrictionContext.unwrap_if_proxied(a)
+                b = RestrictionContext.unwrap_if_proxied(b)
+                return orig(a, b)
+
+            thread_local_is_inst = _get_thread_local_builtin("isinstance")
+            self.restricted_builtins.append(
+                (
+                    "isinstance",
+                    thread_local_is_inst,
+                    functools.partial(unwrap_second_param, thread_local_is_inst.orig),
+                )
+            )
+            thread_local_is_sub = _get_thread_local_builtin("issubclass")
+            self.restricted_builtins.append(
+                (
+                    "issubclass",
+                    thread_local_is_sub,
+                    functools.partial(unwrap_second_param, thread_local_is_sub.orig),
+                )
+            )
+
     @contextmanager
     def applied(self) -> Iterator[None]:
         """Context manager to apply this restrictive import.
@@ -153,17 +182,21 @@ class Importer:
         fromlist: Sequence[str] = (),
         level: int = 0,
     ) -> types.ModuleType:
+        # We have to resolve the full name, it can be relative at different
+        # levels
+        full_name = _resolve_module_name(name, globals, level)
+
         # Check module restrictions and passthrough modules
-        if name not in sys.modules:
+        if full_name not in sys.modules:
             # Make sure not an entirely invalid module
-            self._assert_valid_module(name)
+            self._assert_valid_module(full_name)
 
             # Check if passthrough
-            passthrough_mod = self._maybe_passthrough_module(name)
+            passthrough_mod = self._maybe_passthrough_module(full_name)
             if passthrough_mod:
                 # Load all parents. Usually Python does this for us, but not on
                 # passthrough.
-                parent, _, child = name.rpartition(".")
+                parent, _, child = full_name.rpartition(".")
                 if parent and parent not in sys.modules:
                     _trace(
                         "Importing parent module %s before passing through %s",
@@ -174,17 +207,17 @@ class Importer:
                     # Set the passthrough on the parent
                     setattr(sys.modules[parent], child, passthrough_mod)
                 # Set the passthrough on sys.modules and on the parent
-                sys.modules[name] = passthrough_mod
+                sys.modules[full_name] = passthrough_mod
                 # Put it on the parent
                 if parent:
-                    setattr(sys.modules[parent], child, sys.modules[name])
+                    setattr(sys.modules[parent], child, sys.modules[full_name])
 
             # If the module is __temporal_main__ and not already in sys.modules,
             # we load it from whatever file __main__ was originally in
-            if name == "__temporal_main__":
+            if full_name == "__temporal_main__":
                 orig_mod = _thread_local_sys_modules.orig["__main__"]
                 new_spec = importlib.util.spec_from_file_location(
-                    name, orig_mod.__file__
+                    full_name, orig_mod.__file__
                 )
                 if not new_spec:
                     raise ImportError(
@@ -195,7 +228,7 @@ class Importer:
                         f"Spec for __main__ file at {orig_mod.__file__} has no loader"
                     )
                 new_mod = importlib.util.module_from_spec(new_spec)
-                sys.modules[name] = new_mod
+                sys.modules[full_name] = new_mod
                 new_spec.loader.exec_module(new_mod)
 
         mod = importlib.__import__(name, globals, locals, fromlist, level)
@@ -219,10 +252,20 @@ class Importer:
             raise RestrictedWorkflowAccessError(name)
 
     def _maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
-        if not self.restrictions.passthrough_modules.match_access(
-            self.restriction_context, *name.split(".")
+        # If imports not passed through and name not in passthrough modules,
+        # check parents
+        if (
+            not temporalio.workflow.unsafe.is_imports_passed_through()
+            and name not in self.restrictions.passthrough_modules
         ):
-            return None
+            end_dot = -1
+            while True:
+                end_dot = name.find(".", end_dot + 1)
+                if end_dot == -1:
+                    return None
+                elif name[:end_dot] in self.restrictions.passthrough_modules:
+                    break
+        # Do the pass through
         with self._unapplied():
             _trace("Passing module %s through from host", name)
             global _trace_depth
@@ -409,3 +452,50 @@ def _get_thread_local_builtin(name: str) -> _ThreadLocalCallable:
         ret = _ThreadLocalCallable(getattr(builtins, name))
         _thread_local_builtins[name] = ret
     return ret
+
+
+def _resolve_module_name(
+    name: str, globals: Optional[Mapping[str, object]], level: int
+) -> str:
+    if level == 0:
+        return name
+    # Calc the package from globals
+    package = _calc___package__(globals or {})
+    # Logic taken from importlib._resolve_name
+    bits = package.rsplit(".", level - 1)
+    if len(bits) < level:
+        raise ImportError("Attempted relative import beyond top-level package")
+    base = bits[0]
+    return f"{base}.{name}" if name else base
+
+
+# Copied from importlib._calc__package__
+@no_type_check
+def _calc___package__(globals: Mapping[str, object]) -> str:
+    """Calculate what __package__ should be.
+    __package__ is not guaranteed to be defined or could be set to None
+    to represent that its proper value is unknown.
+    """
+    package = globals.get("__package__")
+    spec = globals.get("__spec__")
+    if package is not None:
+        if spec is not None and package != spec.parent:
+            warnings.warn(
+                "__package__ != __spec__.parent " f"({package!r} != {spec.parent!r})",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+        return package
+    elif spec is not None:
+        return spec.parent
+    else:
+        warnings.warn(
+            "can't resolve package from __spec__ or __package__, "
+            "falling back on __name__ and __path__",
+            ImportWarning,
+            stacklevel=3,
+        )
+        package = globals["__name__"]
+        if "__path__" not in globals:
+            package = package.rpartition(".")[0]
+    return package

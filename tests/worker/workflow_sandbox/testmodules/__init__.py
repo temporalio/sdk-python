@@ -5,10 +5,7 @@ from temporalio.worker.workflow_sandbox._restrictions import (
 
 restrictions = SandboxRestrictions(
     passthrough_modules=SandboxRestrictions.passthrough_modules_minimum
-    | SandboxMatcher.nested_child(
-        "tests.worker.workflow_sandbox.testmodules".split("."),
-        SandboxMatcher(access={"passthrough_module"}),
-    ),
+    | {"tests.worker.workflow_sandbox.testmodules.passthrough_module"},
     invalid_modules=SandboxMatcher.nested_child(
         "tests.worker.workflow_sandbox.testmodules".split("."),
         SandboxMatcher(access={"invalid_module"}),

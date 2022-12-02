@@ -78,7 +78,9 @@ The Python SDK is under development. There are no compatibility guarantees at th
         - [Sandbox is not Secure](#sandbox-is-not-secure)
         - [Sandbox Performance](#sandbox-performance)
         - [Extending Restricted Classes](#extending-restricted-classes)
+        - [Certain Standard Library Calls on Restricted Objects](#certain-standard-library-calls-on-restricted-objects)
         - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
+        - [Compiled Pydantic Sometimes Using Wrong Types](#compiled-pydantic-sometimes-using-wrong-types)
   - [Activities](#activities)
     - [Definition](#definition-1)
     - [Types of Activities](#types-of-activities)
@@ -672,6 +674,10 @@ workflow will not progress until fixed.
 The sandbox is not foolproof and non-determinism can still occur. It is simply a best-effort way to catch bad code
 early. Users are encouraged to define their workflows in files with no other side effects.
 
+The sandbox offers a mechanism to pass through modules from outside the sandbox. By default this already includes all
+standard library modules and Temporal modules. **For performance and behavior reasons, users are encouraged to pass
+through all third party modules whose calls will be deterministic.** See "Passthrough Modules" below on how to do this.
+
 ##### How the Sandbox Works
 
 The sandbox is made up of two components that work closely together:
@@ -718,23 +724,46 @@ future releases.
 When creating the `Worker`, the `workflow_runner` is defaulted to
 `temporalio.worker.workflow_sandbox.SandboxedWorkflowRunner()`. The `SandboxedWorkflowRunner`'s init accepts a
 `restrictions` keyword argument that is defaulted to `SandboxRestrictions.default`. The `SandboxRestrictions` dataclass
-is immutable and contains three fields that can be customized, but only two have notable value
+is immutable and contains three fields that can be customized, but only two have notable value. See below.
 
 ###### Passthrough Modules
 
-To make the sandbox quicker and use less memory when importing known third party libraries, they can be added to the
-`SandboxRestrictions.passthrough_modules` set like so:
+By default the sandbox completely reloads non-standard-library and non-Temporal modules for every workflow run. To make
+the sandbox quicker and use less memory when importing known-side-effect-free third party modules, they can be marked
+as passthrough modules.
+
+**For performance and behavior reasons, users are encouraged to pass through all third party modules whose calls will be
+deterministic.**
+
+One way to pass through a module is at import time in the workflow file using the `imports_passed_through` context
+manager like so:
 
 ```python
-my_restrictions = dataclasses.replace(
-    SandboxRestrictions.default,
-    passthrough_modules=SandboxRestrictions.passthrough_modules_default | SandboxMatcher(access={"pydantic"}),
-)
-my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+# my_workflow_file.py
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    import pydantic
+
+@workflow.defn
+class MyWorkflow:
+    ...
 ```
 
-If an "access" match succeeds for an import, it will simply be forwarded from outside of the sandbox. See the API for
-more details on exact fields and their meaning.
+Alternatively, this can be done at worker creation time by customizing the runner's restrictions. For example:
+
+```python
+my_worker = Worker(
+  ...,
+  workflow_runner=SandboxedWorkflowRunner(
+    restrictions=SandboxRestrictions.default.with_passthrough_modules("pydantic")
+  )
+)
+```
+
+In both of these cases, now the `pydantic` module will be passed through from outside of the sandbox instead of
+being reloaded for every workflow run.
 
 ###### Invalid Module Members
 
@@ -749,7 +778,7 @@ my_restrictions = dataclasses.replace(
       "datetime", "date", "today",
     ),
 )
-my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
 ```
 
 Restrictions can also be added by `|`'ing together matchers, for example to restrict the `datetime.date` class from
@@ -762,7 +791,7 @@ my_restrictions = dataclasses.replace(
       children={"datetime": SandboxMatcher(use={"date"})},
     ),
 )
-my_worker = Worker(..., runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
+my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
 ```
 
 See the API for more details on exact fields and their meaning.
@@ -802,15 +831,38 @@ To mitigate this, users should:
 
 ###### Extending Restricted Classes
 
-Currently, extending classes marked as restricted causes an issue with their `__init__` parameters. This does not affect
-most users, but if there is a dependency that is, say, extending `zipfile.ZipFile` an error may occur and the module
-will have to be marked as pass through.
+Extending a restricted class causes Python to instantiate the restricted metaclass which is unsupported. Therefore if
+you attempt to use a class in the sandbox that extends a restricted class, it will fail. For example, if you have a
+`class MyZipFile(zipfile.ZipFile)` and try to use that class inside a workflow, it will fail.
+
+Classes used inside the workflow should not extend restricted classes. For situations where third-party modules need to
+at import time, they should be marked as pass through modules.
+
+###### Certain Standard Library Calls on Restricted Objects
+
+If an object is restricted, internal C Python validation may fail in some cases. For example, running
+`dict.items(os.__dict__)` will fail with:
+
+> descriptor 'items' for 'dict' objects doesn't apply to a '_RestrictedProxy' object
+
+This is a low-level check that cannot be subverted. The solution is to not use restricted objects inside the sandbox.
+For situations where third-party modules need to at import time, they should be marked as pass through modules.
 
 ###### is_subclass of ABC-based Restricted Classes
 
 Due to [https://bugs.python.org/issue44847](https://bugs.python.org/issue44847), classes that are wrapped and then
 checked to see if they are subclasses of another via `is_subclass` may fail (see also
 [this wrapt issue](https://github.com/GrahamDumpleton/wrapt/issues/130)).
+
+###### Compiled Pydantic Sometimes Using Wrong Types
+
+If the Pydantic dependency is in compiled form (the default) and you are using a Pydantic model inside a workflow
+sandbox that uses a `datetime` type, it will grab the wrong validator and use `date` instead. This is because our
+patched form of `issubclass` is bypassed by compiled Pydantic.
+
+To work around, either don't use `datetime`-based Pydantic model fields in workflows, or mark `datetime` library as
+passthrough (means you lose protection against calling the non-deterministic `now()`), or use non-compiled Pydantic
+dependency.
 
 ### Activities
 
