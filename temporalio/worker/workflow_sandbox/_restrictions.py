@@ -358,6 +358,9 @@ SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.pass
     # Due to pkg_resources use of base classes caused by the ABC issue
     # above, and Otel's use of pkg_resources, we pass it through
     "pkg_resources",
+    # Due to how Pydantic is importing lazily inside of some classes, we choose
+    # to always pass it through
+    "pydantic",
 }
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A

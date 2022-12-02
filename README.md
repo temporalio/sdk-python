@@ -80,6 +80,7 @@ The Python SDK is under development. There are no compatibility guarantees at th
         - [Extending Restricted Classes](#extending-restricted-classes)
         - [Certain Standard Library Calls on Restricted Objects](#certain-standard-library-calls-on-restricted-objects)
         - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
+        - [Compiled Pydantic Sometimes Using Wrong Types](#compiled-pydantic-sometimes-using-wrong-types)
   - [Activities](#activities)
     - [Definition](#definition-1)
     - [Types of Activities](#types-of-activities)
