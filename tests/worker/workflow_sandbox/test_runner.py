@@ -11,8 +11,8 @@ from datetime import date, datetime, timedelta
 from enum import IntEnum
 from typing import Callable, Dict, List, Optional, Sequence, Set, Type
 
+import pydantic
 import pytest
-from pydantic import BaseModel
 
 import temporalio.worker.workflow_sandbox._restrictions
 from temporalio import activity, workflow
@@ -389,26 +389,8 @@ async def test_workflow_sandbox_with_proto(client: Client):
         assert result is not param and result == param
 
 
-class PydanticMessage(BaseModel):
+class PydanticMessage(pydantic.BaseModel):
     content: datetime
-
-
-@workflow.defn
-class UsePydanticDateTimeWorkflow:
-    @workflow.run
-    async def run(self) -> None:
-        # This used to fail due to datetime subclass check in Pydantic
-        message = PydanticMessage(content=workflow.now())
-        assert isinstance(message.content, datetime)
-
-
-async def test_workflow_sandbox_with_pydantic_datetime(client: Client):
-    async with new_worker(client, UsePydanticDateTimeWorkflow) as worker:
-        await client.execute_workflow(
-            UsePydanticDateTimeWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
 
 
 @workflow.defn
@@ -429,6 +411,14 @@ class KnownIssuesWorkflow:
             raise ApplicationError("Expected failure")
         except RuntimeError as err:
             assert "Restriction state not present" in str(err)
+
+        # Using a datetime in binary-compiled Pydantic skips our issubclass when
+        # building their validators causing it to use date instead
+        # TODO(cretz): https://github.com/temporalio/sdk-python/issues/207
+        if pydantic.compiled:
+            assert isinstance(PydanticMessage(content=workflow.now()).content, date)
+        else:
+            assert isinstance(PydanticMessage(content=workflow.now()).content, datetime)
 
 
 async def test_workflow_sandbox_known_issues(client: Client):

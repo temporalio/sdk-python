@@ -853,6 +853,16 @@ Due to [https://bugs.python.org/issue44847](https://bugs.python.org/issue44847),
 checked to see if they are subclasses of another via `is_subclass` may fail (see also
 [this wrapt issue](https://github.com/GrahamDumpleton/wrapt/issues/130)).
 
+###### Compiled Pydantic Sometimes Using Wrong Types
+
+If the Pydantic dependency is in compiled form (the default) and you are using a Pydantic model inside a workflow
+sandbox that uses a `datetime` type, it will grab the wrong validator and use `date` instead. This is because our
+patched form of `issubclass` is bypassed by compiled Pydantic.
+
+To work around, either don't use `datetime`-based Pydantic model fields in workflows, or mark `datetime` library as
+passthrough (means you lose protection against calling the non-deterministic `now()`), or use non-compiled Pydantic
+dependency.
+
 ### Activities
 
 #### Definition
