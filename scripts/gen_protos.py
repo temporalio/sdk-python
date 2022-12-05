@@ -15,6 +15,7 @@ core_proto_dir = proto_dir / "local"
 health_proto_dir = proto_dir / "grpc"
 testsrv_proto_dir = proto_dir / "testsrv_upstream"
 test_proto_dir = base_dir / "tests"
+additional_proto_dir = base_dir / "scripts" / "_proto"
 
 # Exclude testsrv dependencies protos
 proto_paths = [
@@ -23,6 +24,7 @@ proto_paths = [
     if not str(v).startswith(str(testsrv_proto_dir / "dependencies"))
 ]
 proto_paths.extend(test_proto_dir.glob("**/*.proto"))
+proto_paths.extend(additional_proto_dir.glob("**/*.proto"))
 
 api_out_dir = base_dir / "temporalio" / "api"
 sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
@@ -150,6 +152,7 @@ if __name__ == "__main__":
                 f"--proto_path={testsrv_proto_dir}",
                 f"--proto_path={health_proto_dir}",
                 f"--proto_path={test_proto_dir}",
+                f"--proto_path={additional_proto_dir}",
                 f"--python_out={temp_dir}",
                 f"--grpc_python_out={temp_dir}",
                 f"--mypy_out={temp_dir}",
@@ -157,9 +160,14 @@ if __name__ == "__main__":
                 *map(str, proto_paths),
             ]
         )
-        # Remove health gRPC parts
-        (temp_dir / "health" / "v1" / "health_pb2_grpc.py").unlink()
-        (temp_dir / "health" / "v1" / "health_pb2_grpc.pyi").unlink()
+        # Remove every _grpc.py file that isn't part of a Temporal "service"
+        for grpc_file in temp_dir.glob("**/*_grpc.py*"):
+            if (
+                len(grpc_file.parents) < 2
+                or grpc_file.parents[0].name != "v1"
+                or not grpc_file.parents[1].name.endswith("service")
+            ):
+                grpc_file.unlink()
         # Apply fixes before moving code
         fix_generated_output(temp_dir)
         # Move protos

@@ -1,3 +1,4 @@
+from .grpc_status_pb2 import GrpcStatus
 from .message_pb2 import (
     ActivityType,
     DataBlob,
@@ -14,6 +15,7 @@ from .message_pb2 import (
 __all__ = [
     "ActivityType",
     "DataBlob",
+    "GrpcStatus",
     "Header",
     "Memo",
     "Payload",

@@ -16,6 +16,7 @@ from typing import Generic, Mapping, Optional, Type, TypeVar, Union
 import google.protobuf.empty_pb2
 import google.protobuf.message
 
+import temporalio.api.common.v1
 import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
 import temporalio.api.workflowservice.v1
@@ -761,12 +762,15 @@ class RPCStatusCode(IntEnum):
 class RPCError(temporalio.exceptions.TemporalError):
     """Error during RPC call."""
 
-    def __init__(self, message: str, status: RPCStatusCode, details: bytes) -> None:
+    def __init__(
+        self, message: str, status: RPCStatusCode, raw_grpc_status: bytes
+    ) -> None:
         """Initialize RPC error."""
         super().__init__(message)
         self._message = message
         self._status = status
-        self._details = details
+        self._raw_grpc_status = raw_grpc_status
+        self._grpc_status: Optional[temporalio.api.common.v1.GrpcStatus] = None
 
     @property
     def message(self) -> str:
@@ -779,6 +783,15 @@ class RPCError(temporalio.exceptions.TemporalError):
         return self._status
 
     @property
-    def details(self) -> bytes:
-        """Any details on the error."""
-        return self._details
+    def raw_grpc_status(self) -> bytes:
+        """Raw gRPC status bytes."""
+        return self._raw_grpc_status
+
+    @property
+    def grpc_status(self) -> temporalio.api.common.v1.GrpcStatus:
+        """gRPC status with details."""
+        if self._grpc_status is None:
+            status = temporalio.api.common.v1.GrpcStatus()
+            status.ParseFromString(self._raw_grpc_status)
+            self._grpc_status = status
+        return self._grpc_status
