@@ -12,12 +12,7 @@ from typing import Callable, Dict, List, MutableMapping, Optional, Sequence, Typ
 import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.bridge.client
-import temporalio.bridge.proto
-import temporalio.bridge.proto.activity_result
-import temporalio.bridge.proto.child_workflow
-import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
-import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.worker
 import temporalio.client

@@ -9,11 +9,13 @@ import grpc
 import pytest
 
 import temporalio
+import temporalio.api.errordetails.v1
 import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
 import temporalio.api.workflowservice.v1
 import temporalio.service
 from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
 
 
 def test_all_grpc_calls_present(client: Client):
@@ -124,3 +126,24 @@ async def test_check_health(client: Client):
     with pytest.raises(temporalio.service.RPCError) as err:
         assert await client.service_client.check_health(service="whatever")
     assert err.value.status == temporalio.service.RPCStatusCode.NOT_FOUND
+
+
+async def test_grpc_status(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1557"
+        )
+    # Try to make a simple client call on a non-existent namespace
+    with pytest.raises(temporalio.service.RPCError) as err:
+        await client.workflow_service.describe_namespace(
+            temporalio.api.workflowservice.v1.DescribeNamespaceRequest(
+                namespace="does not exist",
+            )
+        )
+    # Confirm right failure type
+    assert not err.value.grpc_status.details[0].Is(
+        temporalio.api.errordetails.v1.QueryFailedFailure.DESCRIPTOR
+    )
+    assert err.value.grpc_status.details[0].Is(
+        temporalio.api.errordetails.v1.NamespaceNotFoundFailure.DESCRIPTOR
+    )

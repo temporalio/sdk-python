@@ -239,7 +239,6 @@ class StartChildWorkflowInput:
     args: Sequence[Any]
     id: str
     task_queue: Optional[str]
-    namespace: Optional[str]
     cancellation_type: temporalio.workflow.ChildWorkflowCancellationType
     parent_close_policy: temporalio.workflow.ParentClosePolicy
     execution_timeout: Optional[timedelta]

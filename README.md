@@ -1013,18 +1013,34 @@ affect calls activity code might make to functions on the `temporalio.activity` 
 ### Workflow Replay
 
 Given a workflow's history, it can be replayed locally to check for things like non-determinism errors. For example,
-assuming `history_json_str` is populated with a JSON string history either exported from the web UI or from `tctl`, the
+assuming `history_str` is populated with a JSON string history either exported from the web UI or from `tctl`, the
 following function will replay it:
 
 ```python
+from temporalio.client import WorkflowHistory
 from temporalio.worker import Replayer
 
-async def run_replayer(history_json_str: str):
+async def run_replayer(history_str: str):
   replayer = Replayer(workflows=[SayHello])
-  await replayer.replay_workflow(history_json_str)
+  await replayer.replay_workflow(WorkflowHistory.from_json(history_str))
 ```
 
 This will throw an error if any non-determinism is detected.
+
+Replaying from workflow history is a powerful concept that many use to test that workflow alterations won't cause
+non-determinisms with past-complete workflows. The following code will make sure that all workflow histories for a
+certain workflow type (i.e. workflow class) are safe with the current code.
+
+```python
+from temporalio.client import Client, WorkflowHistory
+from temporalio.worker import Replayer
+
+async def check_past_histories(my_client: Client):
+  replayer = Replayer(workflows=[SayHello])
+  await replayer.replay_workflows(
+    await my_client.list_workflows("WorkflowType = 'SayHello'").map_histories(),
+  )
+```
 
 ### OpenTelemetry Support
 

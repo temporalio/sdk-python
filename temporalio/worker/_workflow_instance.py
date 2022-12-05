@@ -849,7 +849,6 @@ class _WorkflowInstanceImpl(
         *args: Any,
         id: str,
         task_queue: Optional[str],
-        namespace: Optional[str],
         cancellation_type: temporalio.workflow.ChildWorkflowCancellationType,
         parent_close_policy: temporalio.workflow.ParentClosePolicy,
         execution_timeout: Optional[timedelta],
@@ -881,7 +880,6 @@ class _WorkflowInstanceImpl(
                 args=args,
                 id=id,
                 task_queue=task_queue,
-                namespace=namespace,
                 cancellation_type=cancellation_type,
                 parent_close_policy=parent_close_policy,
                 execution_timeout=execution_timeout,
@@ -1762,7 +1760,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     ) -> None:
         v = command.start_child_workflow_execution
         v.seq = self._seq
-        v.namespace = self._input.namespace or self._instance._info.namespace
+        v.namespace = self._instance._info.namespace
         v.workflow_id = self._input.id
         v.workflow_type = self._input.workflow
         v.task_queue = self._input.task_queue or self._instance._info.task_queue

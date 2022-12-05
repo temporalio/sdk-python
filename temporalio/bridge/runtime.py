@@ -135,6 +135,7 @@ class OpenTelemetryConfig:
 
     url: str
     headers: Mapping[str, str]
+    metric_periodicity_millis: Optional[int] = None
 
 
 @dataclass(frozen=True)
