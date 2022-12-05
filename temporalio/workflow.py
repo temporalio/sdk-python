@@ -462,7 +462,6 @@ class _Runtime(ABC):
         *args: Any,
         id: str,
         task_queue: Optional[str],
-        namespace: Optional[str],
         cancellation_type: ChildWorkflowCancellationType,
         parent_close_policy: ParentClosePolicy,
         execution_timeout: Optional[timedelta],
@@ -3019,7 +3018,6 @@ class ChildWorkflowConfig(TypedDict, total=False):
 
     id: Optional[str]
     task_queue: Optional[str]
-    namespace: Optional[str]
     cancellation_type: ChildWorkflowCancellationType
     parent_close_policy: ParentClosePolicy
     execution_timeout: Optional[timedelta]
@@ -3039,7 +3037,6 @@ async def start_child_workflow(
     *,
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3062,7 +3059,6 @@ async def start_child_workflow(
     *,
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3085,7 +3081,6 @@ async def start_child_workflow(
     args: Sequence[Any],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3109,7 +3104,6 @@ async def start_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3131,7 +3125,6 @@ async def start_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3154,8 +3147,6 @@ async def start_child_workflow(
             defaults to :py:func:`uuid4`.
         task_queue: Task queue to run the workflow on. Defaults to the current
             workflow's task queue.
-        namespace: Namespace to run the child workflow on. Defaults to the
-            current workflow's namespace.
         cancellation_type: How the child workflow will react to cancellation.
         parent_close_policy: How to handle the child workflow when the parent
             workflow closes.
@@ -3177,7 +3168,6 @@ async def start_child_workflow(
         *temporalio.common._arg_or_args(arg, args),
         id=id or str(uuid4()),
         task_queue=task_queue,
-        namespace=namespace,
         cancellation_type=cancellation_type,
         parent_close_policy=parent_close_policy,
         execution_timeout=execution_timeout,
@@ -3198,7 +3188,6 @@ async def execute_child_workflow(
     *,
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3221,7 +3210,6 @@ async def execute_child_workflow(
     *,
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3244,7 +3232,6 @@ async def execute_child_workflow(
     args: Sequence[Any],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3268,7 +3255,6 @@ async def execute_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3290,7 +3276,6 @@ async def execute_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
-    namespace: Optional[str] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3313,7 +3298,6 @@ async def execute_child_workflow(
         *temporalio.common._arg_or_args(arg, args),
         id=id or str(uuid4()),
         task_queue=task_queue,
-        namespace=namespace,
         cancellation_type=cancellation_type,
         parent_close_policy=parent_close_policy,
         execution_timeout=execution_timeout,
