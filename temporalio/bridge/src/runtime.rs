@@ -7,6 +7,7 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use temporal_sdk_core::CoreRuntime;
 use temporal_sdk_core_api::telemetry::{
     Logger, MetricsExporter, OtelCollectorOptions, TelemetryOptions, TelemetryOptionsBuilder,
@@ -53,6 +54,7 @@ pub struct MetricsConfig {
 pub struct OpenTelemetryConfig {
     url: String,
     headers: HashMap<String, String>,
+    metric_periodicity_millis: Option<u64>,
 }
 
 #[derive(FromPyObject)]
@@ -141,6 +143,7 @@ impl TryFrom<OpenTelemetryConfig> for OtelCollectorOptions {
             url: Url::parse(&conf.url)
                 .map_err(|err| PyValueError::new_err(format!("Invalid OTel URL: {}", err)))?,
             headers: conf.headers,
+            metric_periodicity: conf.metric_periodicity_millis.map(Duration::from_millis),
         })
     }
 }
