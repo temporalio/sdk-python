@@ -15,6 +15,7 @@ import temporalio.api.testservice.v1
 import temporalio.api.workflowservice.v1
 import temporalio.service
 from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
 
 
 def test_all_grpc_calls_present(client: Client):
@@ -127,7 +128,11 @@ async def test_check_health(client: Client):
     assert err.value.status == temporalio.service.RPCStatusCode.NOT_FOUND
 
 
-async def test_grpc_status(client: Client):
+async def test_grpc_status(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1557"
+        )
     # Try to make a simple client call on a non-existent namespace
     with pytest.raises(temporalio.service.RPCError) as err:
         await client.workflow_service.describe_namespace(

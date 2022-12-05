@@ -789,7 +789,7 @@ class RPCError(temporalio.exceptions.TemporalError):
 
     @property
     def grpc_status(self) -> temporalio.api.common.v1.GrpcStatus:
-        """gRPC status with details."""
+        """Status of the gRPC call with details."""
         if self._grpc_status is None:
             status = temporalio.api.common.v1.GrpcStatus()
             status.ParseFromString(self._raw_grpc_status)
