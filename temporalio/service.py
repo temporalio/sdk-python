@@ -25,7 +25,7 @@ import temporalio.bridge.proto.health.v1
 import temporalio.bridge.runtime
 import temporalio.exceptions
 
-__version__ = "0.1b3"
+__version__ = "0.1b4"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
