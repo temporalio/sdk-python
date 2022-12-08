@@ -10,10 +10,9 @@ execute asynchronous, long-running business logic in a scalable and resilient wa
 "Temporal Python SDK" is the framework for authoring workflows and activities using the Python programming language.
 
 Also see:
-
-* [Code Samples](https://github.com/temporalio/samples-python)
-* [API Documentation](https://python.temporal.io)
-* [Application Development Guide](https://docs.temporal.io/application-development?lang=python)
+* [Application Development Guide](https://docs.temporal.io/application-development?lang=python) - Once you've tried our [Quick Start](#quick-start), check out our guide on how to use Temporal in your Python Applications, including information around Temporal core concepts.
+* [Python Code Samples](https://github.com/temporalio/samples-python)
+* [API Documentation](https://python.temporal.io) - Complete Temporal Python SDK Package reference
 
 In addition to features common across all Temporal SDKs, the Python SDK also has the following interesting features:
 
@@ -107,9 +106,11 @@ The Python SDK is under development. There are no compatibility guarantees at th
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-## Quick Start
+# Quick Start
 
-### Installation
+We will guide you through the Temporal basics to create a "hello, world!" script on your machine. It is not intended as one of the ways to use Temporal, but in reality it is very simplified and decidedly not "the only way" to use Temporal. For more information, check out the docs references in "Next Steps" below the quick start.
+
+## Installation
 
 Install the `temporalio` package from [PyPI](https://pypi.org/project/temporalio).
 
@@ -124,7 +125,7 @@ The SDK is now ready for use. To build from source, see "Building" near the end 
 
 **NOTE: This README is for the current branch and not necessarily what's released on `PyPI`.**
 
-### Implementing a Workflow
+## Implementing a Workflow
 
 Create the following script at `run_worker.py`:
 
@@ -164,7 +165,7 @@ will run the worker:
 
     python run_worker.py
 
-### Running a Workflow
+## Running a Workflow
 
 Create the following script at `run_workflow.py`:
 
@@ -196,7 +197,19 @@ The output will be:
 
     Result: Hello, my-name!
 
-## Usage
+## Next Steps
+Temporal can be implemented in your code in many different ways, to suit your applicaiton's needs. The links below will give you much more information about how Temporal works with Python:
+
+* [Code Samples](https://github.com/temporalio/samples-python) - if you want to start with some code, we have provided somepre-built samples
+* [Application Development Guide](https://docs.temporal.io/application-development?lang=python) - Our Python specific Developer's Guide will give you much more information on how to build with Temporal in your Python applications than our SDK README ever could (or should).
+* [API Documentation](https://python.temporal.io) - full Temporal Python SDK package documentation
+
+---
+
+# Usage
+
+From here, you will find reference documentation about specific pieces of the Temporal Python SDK that were built around Temporal concepts. 
+*This section is not intended as a how-to guide* -- For more how-to oriented information, check out the links in the [Next Steps](#next-steps) section above.
 
 ### Client
 
