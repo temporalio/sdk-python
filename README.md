@@ -95,7 +95,7 @@ The Python SDK is under development. There are no compatibility guarantees at th
     - [Workflow Replay](#workflow-replay)
     - [OpenTelemetry Support](#opentelemetry-support)
     - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
-  - [Development](#development)
+- [Development](#development)
     - [Building](#building)
       - [Prepare](#prepare)
       - [Build](#build)
@@ -1080,7 +1080,7 @@ versions can cause issues with the sandbox due to global state sharing. Temporal
 protobuf 4.x library unless you absolutely cannot at which point some proto libraries may have to be marked as
 [Passthrough Modules](#passthrough-modules).
 
-## Development
+# Development
 
 The Python SDK is built to work with Python 3.7 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
