@@ -10,10 +10,9 @@ execute asynchronous, long-running business logic in a scalable and resilient wa
 "Temporal Python SDK" is the framework for authoring workflows and activities using the Python programming language.
 
 Also see:
-
-* [Code Samples](https://github.com/temporalio/samples-python)
-* [API Documentation](https://python.temporal.io)
-* [Application Development Guide](https://docs.temporal.io/application-development?lang=python)
+* [Application Development Guide](https://docs.temporal.io/application-development?lang=python) - Once you've tried our [Quick Start](#quick-start), check out our guide on how to use Temporal in your Python applications, including information around Temporal core concepts.
+* [Python Code Samples](https://github.com/temporalio/samples-python)
+* [API Documentation](https://python.temporal.io) - Complete Temporal Python SDK Package reference.
 
 In addition to features common across all Temporal SDKs, the Python SDK also has the following interesting features:
 
@@ -48,68 +47,71 @@ The Python SDK is under development. There are no compatibility guarantees at th
   - [Installation](#installation)
   - [Implementing a Workflow](#implementing-a-workflow)
   - [Running a Workflow](#running-a-workflow)
+  - [Next Steps](#next-steps)
 - [Usage](#usage)
-  - [Client](#client)
-    - [Data Conversion](#data-conversion)
-  - [Workers](#workers)
-  - [Workflows](#workflows)
-    - [Definition](#definition)
-    - [Running](#running)
-    - [Invoking Activities](#invoking-activities)
-    - [Invoking Child Workflows](#invoking-child-workflows)
-    - [Timers](#timers)
-    - [Conditions](#conditions)
-    - [Asyncio and Cancellation](#asyncio-and-cancellation)
-    - [Workflow Utilities](#workflow-utilities)
-    - [Exceptions](#exceptions)
-    - [External Workflows](#external-workflows)
-    - [Testing](#testing)
-      - [Automatic Time Skipping](#automatic-time-skipping)
-      - [Manual Time Skipping](#manual-time-skipping)
-      - [Mocking Activities](#mocking-activities)
-    - [Workflow Sandbox](#workflow-sandbox)
-      - [How the Sandbox Works](#how-the-sandbox-works)
-      - [Avoiding the Sandbox](#avoiding-the-sandbox)
-      - [Customizing the Sandbox](#customizing-the-sandbox)
-        - [Passthrough Modules](#passthrough-modules)
-        - [Invalid Module Members](#invalid-module-members)
-      - [Known Sandbox Issues](#known-sandbox-issues)
-        - [Global Import/Builtins](#global-importbuiltins)
-        - [Sandbox is not Secure](#sandbox-is-not-secure)
-        - [Sandbox Performance](#sandbox-performance)
-        - [Extending Restricted Classes](#extending-restricted-classes)
-        - [Certain Standard Library Calls on Restricted Objects](#certain-standard-library-calls-on-restricted-objects)
-        - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
-        - [Compiled Pydantic Sometimes Using Wrong Types](#compiled-pydantic-sometimes-using-wrong-types)
-  - [Activities](#activities)
-    - [Definition](#definition-1)
-    - [Types of Activities](#types-of-activities)
-      - [Asynchronous Activities](#asynchronous-activities)
-      - [Synchronous Activities](#synchronous-activities)
-        - [Synchronous Multithreaded Activities](#synchronous-multithreaded-activities)
-        - [Synchronous Multiprocess/Other Activities](#synchronous-multiprocessother-activities)
-    - [Activity Context](#activity-context)
-      - [Heartbeating and Cancellation](#heartbeating-and-cancellation)
-      - [Worker Shutdown](#worker-shutdown)
-    - [Testing](#testing-1)
-  - [Workflow Replay](#workflow-replay)
-  - [OpenTelemetry Support](#opentelemetry-support)
-  - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
+    - [Client](#client)
+      - [Data Conversion](#data-conversion)
+    - [Workers](#workers)
+    - [Workflows](#workflows)
+      - [Definition](#definition)
+      - [Running](#running)
+      - [Invoking Activities](#invoking-activities)
+      - [Invoking Child Workflows](#invoking-child-workflows)
+      - [Timers](#timers)
+      - [Conditions](#conditions)
+      - [Asyncio and Cancellation](#asyncio-and-cancellation)
+      - [Workflow Utilities](#workflow-utilities)
+      - [Exceptions](#exceptions)
+      - [External Workflows](#external-workflows)
+      - [Testing](#testing)
+        - [Automatic Time Skipping](#automatic-time-skipping)
+        - [Manual Time Skipping](#manual-time-skipping)
+        - [Mocking Activities](#mocking-activities)
+      - [Workflow Sandbox](#workflow-sandbox)
+        - [How the Sandbox Works](#how-the-sandbox-works)
+        - [Avoiding the Sandbox](#avoiding-the-sandbox)
+        - [Customizing the Sandbox](#customizing-the-sandbox)
+          - [Passthrough Modules](#passthrough-modules)
+          - [Invalid Module Members](#invalid-module-members)
+        - [Known Sandbox Issues](#known-sandbox-issues)
+          - [Global Import/Builtins](#global-importbuiltins)
+          - [Sandbox is not Secure](#sandbox-is-not-secure)
+          - [Sandbox Performance](#sandbox-performance)
+          - [Extending Restricted Classes](#extending-restricted-classes)
+          - [Certain Standard Library Calls on Restricted Objects](#certain-standard-library-calls-on-restricted-objects)
+          - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
+          - [Compiled Pydantic Sometimes Using Wrong Types](#compiled-pydantic-sometimes-using-wrong-types)
+    - [Activities](#activities)
+      - [Definition](#definition-1)
+      - [Types of Activities](#types-of-activities)
+        - [Asynchronous Activities](#asynchronous-activities)
+        - [Synchronous Activities](#synchronous-activities)
+          - [Synchronous Multithreaded Activities](#synchronous-multithreaded-activities)
+          - [Synchronous Multiprocess/Other Activities](#synchronous-multiprocessother-activities)
+      - [Activity Context](#activity-context)
+        - [Heartbeating and Cancellation](#heartbeating-and-cancellation)
+        - [Worker Shutdown](#worker-shutdown)
+      - [Testing](#testing-1)
+    - [Workflow Replay](#workflow-replay)
+    - [OpenTelemetry Support](#opentelemetry-support)
+    - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
 - [Development](#development)
-  - [Building](#building)
-    - [Prepare](#prepare)
-    - [Build](#build)
-    - [Use](#use)
-  - [Local SDK development environment](#local-sdk-development-environment)
-    - [Testing](#testing-2)
-    - [Proto Generation and Testing](#proto-generation-and-testing)
-  - [Style](#style)
+    - [Building](#building)
+      - [Prepare](#prepare)
+      - [Build](#build)
+      - [Use](#use)
+    - [Local SDK development environment](#local-sdk-development-environment)
+      - [Testing](#testing-2)
+      - [Proto Generation and Testing](#proto-generation-and-testing)
+    - [Style](#style)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-## Quick Start
+# Quick Start
 
-### Installation
+We will guide you through the Temporal basics to create a "hello, world!" script on your machine. It is not intended as one of the ways to use Temporal, but in reality it is very simplified and decidedly not "the only way" to use Temporal. For more information, check out the docs references in "Next Steps" below the quick start.
+
+## Installation
 
 Install the `temporalio` package from [PyPI](https://pypi.org/project/temporalio).
 
@@ -124,7 +126,7 @@ The SDK is now ready for use. To build from source, see "Building" near the end 
 
 **NOTE: This README is for the current branch and not necessarily what's released on `PyPI`.**
 
-### Implementing a Workflow
+## Implementing a Workflow
 
 Create the following script at `run_worker.py`:
 
@@ -164,7 +166,7 @@ will run the worker:
 
     python run_worker.py
 
-### Running a Workflow
+## Running a Workflow
 
 Create the following script at `run_workflow.py`:
 
@@ -196,7 +198,19 @@ The output will be:
 
     Result: Hello, my-name!
 
-## Usage
+## Next Steps
+Temporal can be implemented in your code in many different ways, to suit your application's needs. The links below will give you much more information about how Temporal works with Python:
+
+* [Code Samples](https://github.com/temporalio/samples-python) - If you want to start with some code, we have provided some pre-built samples.
+* [Application Development Guide](https://docs.temporal.io/application-development?lang=python) Our Python specific Developer's Guide will give you much more information on how to build with Temporal in your Python applications than our SDK README ever could (or should).
+* [API Documentation](https://python.temporal.io) - Full Temporal Python SDK package documentation
+
+---
+
+# Usage
+
+From here, you will find reference documentation about specific pieces of the Temporal Python SDK that were built around Temporal concepts. 
+*This section is not intended as a how-to guide* -- For more how-to oriented information, check out the links in the [Next Steps](#next-steps) section above.
 
 ### Client
 
@@ -1066,7 +1080,7 @@ versions can cause issues with the sandbox due to global state sharing. Temporal
 protobuf 4.x library unless you absolutely cannot at which point some proto libraries may have to be marked as
 [Passthrough Modules](#passthrough-modules).
 
-## Development
+# Development
 
 The Python SDK is built to work with Python 3.7 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
