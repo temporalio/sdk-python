@@ -447,6 +447,21 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         "Completing activity as failed", exc_info=True
                     )
+                    # In some cases, like worker shutdown of an sync activity,
+                    # this results in a CancelledError, but the server will fail
+                    # if you send a cancelled error outside of a requested
+                    # cancellation. So we wrap as a retryable application error.
+                    if isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    ):
+                        new_err = temporalio.exceptions.ApplicationError(
+                            "Cancelled without request, possibly due to worker shutdown",
+                            type="CancelledError",
+                        )
+                        new_err.__traceback__ = err.__traceback__
+                        new_err.__cause__ = err.__cause__
+                        err = new_err
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
