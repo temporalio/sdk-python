@@ -222,11 +222,7 @@ def _type_hints_from_func(
     sig = inspect.signature(func)
     hints = get_type_hints(func)
     ret_hint = hints.get("return")
-    ret = (
-        ret_hint
-        if inspect.isclass(ret_hint) and ret_hint is not inspect.Signature.empty
-        else None
-    )
+    ret = ret_hint if ret_hint is not inspect.Signature.empty else None
     args: List[Type] = []
     for index, value in enumerate(sig.parameters.values()):
         # Ignore self on methods
@@ -244,7 +240,9 @@ def _type_hints_from_func(
             return (None, ret)
         # All params must have annotations or we consider none to have them
         arg_hint = hints.get(value.name)
-        if not inspect.isclass(arg_hint) or arg_hint is inspect.Parameter.empty:
+        if arg_hint is inspect.Parameter.empty:
             return (None, ret)
-        args.append(arg_hint)
+        # Ignoring type here because union/optional isn't really a type
+        # necessarily
+        args.append(arg_hint)  # type: ignore
     return args, ret

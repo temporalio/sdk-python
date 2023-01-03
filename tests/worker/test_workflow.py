@@ -2646,3 +2646,49 @@ async def test_workflow_custom_failure_converter(client: Client):
         if not failure.HasField("cause"):
             break
         failure = failure.cause
+
+
+@dataclass
+class OptionalParam:
+    some_string: str
+
+
+@workflow.defn
+class OptionalParamWorkflow:
+    @workflow.run
+    async def run(
+        self, some_param: Optional[OptionalParam] = OptionalParam(some_string="default")
+    ) -> Optional[OptionalParam]:
+        assert some_param is None or (
+            isinstance(some_param, OptionalParam)
+            and some_param.some_string in ["default", "foo"]
+        )
+        return some_param
+
+
+async def test_workflow_optional_param(client: Client):
+    async with new_worker(client, OptionalParamWorkflow) as worker:
+        # Don't send a parameter and confirm it is defaulted
+        result1 = await client.execute_workflow(
+            "OptionalParamWorkflow",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            result_type=OptionalParam,
+        )
+        assert result1 == OptionalParam(some_string="default")
+        # Send None explicitly
+        result2 = await client.execute_workflow(
+            OptionalParamWorkflow.run,
+            None,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result2 is None
+        # Send param explicitly
+        result3 = await client.execute_workflow(
+            OptionalParamWorkflow.run,
+            OptionalParam(some_string="foo"),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result3 == OptionalParam(some_string="foo")
