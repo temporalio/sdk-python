@@ -4,6 +4,7 @@ import logging
 import logging.handlers
 import multiprocessing
 import queue
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -12,13 +13,14 @@ from typing import Any, Callable, List, NoReturn, Optional, Sequence
 
 import pytest
 
-from temporalio import activity
+from temporalio import activity, workflow
 from temporalio.client import (
     AsyncActivityHandle,
     Client,
     WorkflowFailureError,
     WorkflowHandle,
 )
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -373,6 +375,67 @@ async def test_sync_activity_thread_cancel_exception_shielded(
     assert isinstance(err.value.cause.cause, CancelledError)
     # This will have every event except post1 because that's where it throws
     assert events == ["pre1", "pre2", "pre3", "post3", "post2"]
+
+
+sync_activity_waiting_cancel = threading.Event()
+
+
+@activity.defn
+def sync_activity_wait_cancel():
+    sync_activity_waiting_cancel.set()
+    while True:
+        time.sleep(1)
+        activity.heartbeat()
+
+
+# We don't sandbox because Python logging uses multiprocessing if it's present
+# which we don't want to get warnings about
+@workflow.defn(sandboxed=False)
+class CancelOnWorkerShutdownWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            sync_activity_wait_cancel,
+            start_to_close_timeout=timedelta(hours=1),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+
+# This test used to fail because we were sending a cancelled error and the
+# server doesn't allow that
+async def test_sync_activity_thread_cancel_on_worker_shutdown(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+
+    def new_worker() -> Worker:
+        return Worker(
+            client,
+            task_queue=task_queue,
+            activities=[sync_activity_wait_cancel],
+            workflows=[CancelOnWorkerShutdownWorkflow],
+            activity_executor=executor,
+            max_cached_workflows=0,
+        )
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        async with new_worker():
+            # Start the workflow
+            handle = await client.start_workflow(
+                CancelOnWorkerShutdownWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+            # Wait for activity to start
+            assert await asyncio.get_running_loop().run_in_executor(
+                executor, lambda: sync_activity_waiting_cancel.wait(20)
+            )
+            # Shut down the worker
+    # Start the worker again and wait for result
+    with pytest.raises(WorkflowFailureError) as err:
+        async with new_worker():
+            await handle.result()
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, ApplicationError)
+    assert "due to worker shutdown" in err.value.cause.cause.message
 
 
 @activity.defn
