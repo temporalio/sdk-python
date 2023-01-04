@@ -76,6 +76,7 @@ class _IndexedValueTypeEnumTypeWrapper(
     INDEXED_VALUE_TYPE_DOUBLE: _IndexedValueType.ValueType  # 4
     INDEXED_VALUE_TYPE_BOOL: _IndexedValueType.ValueType  # 5
     INDEXED_VALUE_TYPE_DATETIME: _IndexedValueType.ValueType  # 6
+    INDEXED_VALUE_TYPE_KEYWORD_LIST: _IndexedValueType.ValueType  # 7
 
 class IndexedValueType(
     _IndexedValueType, metaclass=_IndexedValueTypeEnumTypeWrapper
@@ -88,6 +89,7 @@ INDEXED_VALUE_TYPE_INT: IndexedValueType.ValueType  # 3
 INDEXED_VALUE_TYPE_DOUBLE: IndexedValueType.ValueType  # 4
 INDEXED_VALUE_TYPE_BOOL: IndexedValueType.ValueType  # 5
 INDEXED_VALUE_TYPE_DATETIME: IndexedValueType.ValueType  # 6
+INDEXED_VALUE_TYPE_KEYWORD_LIST: IndexedValueType.ValueType  # 7
 global___IndexedValueType = IndexedValueType
 
 class _Severity:

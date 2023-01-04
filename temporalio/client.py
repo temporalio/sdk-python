@@ -37,10 +37,10 @@ import temporalio.api.history.v1
 import temporalio.api.taskqueue.v1
 import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
-import temporalio.bridge.runtime
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
@@ -89,7 +89,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
         lazy: bool = False,
-        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
+        runtime: Optional[temporalio.runtime.Runtime] = None,
     ) -> Client:
         """Connect to a Temporal server.
 

@@ -36,31 +36,26 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-class _WorkflowUpdateResultAccessStyle:
+class _InteractionType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _WorkflowUpdateResultAccessStyleEnumTypeWrapper(
+class _InteractionTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
-        _WorkflowUpdateResultAccessStyle.ValueType
+        _InteractionType.ValueType
     ],
     builtins.type,
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_UNSPECIFIED: _WorkflowUpdateResultAccessStyle.ValueType  # 0
-    WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_REQUIRE_INLINE: _WorkflowUpdateResultAccessStyle.ValueType  # 1
-    """Indicates that the update response _must_ be included as part of the gRPC
-    response body
-    """
+    INTERACTION_TYPE_UNSPECIFIED: _InteractionType.ValueType  # 0
+    INTERACTION_TYPE_WORKFLOW_QUERY: _InteractionType.ValueType  # 1
+    INTERACTION_TYPE_WORKFLOW_UPDATE: _InteractionType.ValueType  # 2
+    INTERACTION_TYPE_WORKFLOW_SIGNAL: _InteractionType.ValueType  # 3
 
-class WorkflowUpdateResultAccessStyle(
-    _WorkflowUpdateResultAccessStyle,
-    metaclass=_WorkflowUpdateResultAccessStyleEnumTypeWrapper,
-): ...
+class InteractionType(_InteractionType, metaclass=_InteractionTypeEnumTypeWrapper): ...
 
-WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_UNSPECIFIED: WorkflowUpdateResultAccessStyle.ValueType  # 0
-WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_REQUIRE_INLINE: WorkflowUpdateResultAccessStyle.ValueType  # 1
-"""Indicates that the update response _must_ be included as part of the gRPC
-response body
-"""
-global___WorkflowUpdateResultAccessStyle = WorkflowUpdateResultAccessStyle
+INTERACTION_TYPE_UNSPECIFIED: InteractionType.ValueType  # 0
+INTERACTION_TYPE_WORKFLOW_QUERY: InteractionType.ValueType  # 1
+INTERACTION_TYPE_WORKFLOW_UPDATE: InteractionType.ValueType  # 2
+INTERACTION_TYPE_WORKFLOW_SIGNAL: InteractionType.ValueType  # 3
+global___InteractionType = InteractionType

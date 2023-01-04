@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n!temporal/api/enums/v1/reset.proto\x12\x15temporal.api.enums.v1*r\n\x10ResetReapplyType\x12"\n\x1eRESET_REAPPLY_TYPE_UNSPECIFIED\x10\x00\x12\x1d\n\x19RESET_REAPPLY_TYPE_SIGNAL\x10\x01\x12\x1b\n\x17RESET_REAPPLY_TYPE_NONE\x10\x02\x42~\n\x18io.temporal.api.enums.v1B\nResetProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x15Temporal.Api.Enums.V1\xea\x02\x18Temporal::Api::Enums::V1b\x06proto3'
+    b'\n!temporal/api/enums/v1/reset.proto\x12\x15temporal.api.enums.v1*r\n\x10ResetReapplyType\x12"\n\x1eRESET_REAPPLY_TYPE_UNSPECIFIED\x10\x00\x12\x1d\n\x19RESET_REAPPLY_TYPE_SIGNAL\x10\x01\x12\x1b\n\x17RESET_REAPPLY_TYPE_NONE\x10\x02\x42\x82\x01\n\x18io.temporal.api.enums.v1B\nResetProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3'
 )
 
 _RESETREAPPLYTYPE = DESCRIPTOR.enum_types_by_name["ResetReapplyType"]
@@ -28,7 +28,7 @@ RESET_REAPPLY_TYPE_NONE = 2
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
-    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\nResetProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\025Temporal.Api.Enums.V1\352\002\030Temporal::Api::Enums::V1"
+    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\nResetProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _RESETREAPPLYTYPE._serialized_start = 60
     _RESETREAPPLYTYPE._serialized_end = 174
 # @@protoc_insertion_point(module_scope)

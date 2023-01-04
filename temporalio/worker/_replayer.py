@@ -13,10 +13,10 @@ from typing_extensions import TypedDict
 
 import temporalio.api.history.v1
 import temporalio.bridge.proto.workflow_activation
-import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
+import temporalio.runtime
 import temporalio.workflow
 
 from ._interceptor import Interceptor
@@ -44,7 +44,7 @@ class Replayer:
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         debug_mode: bool = False,
-        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
+        runtime: Optional[temporalio.runtime.Runtime] = None,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -153,8 +153,9 @@ class Replayer:
         """
         # Create bridge worker
         task_queue = f"replay-{self._config['build_id']}"
+        runtime = self._config["runtime"] or temporalio.runtime.Runtime.default()
         bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
-            self._config["runtime"] or temporalio.bridge.runtime.Runtime.default(),
+            runtime._core_runtime,
             temporalio.bridge.worker.WorkerConfig(
                 namespace=self._config["namespace"],
                 task_queue=task_queue,
@@ -292,7 +293,7 @@ class ReplayerConfig(TypedDict, total=False):
     build_id: Optional[str]
     identity: Optional[str]
     debug_mode: bool
-    runtime: Optional[temporalio.bridge.runtime.Runtime]
+    runtime: Optional[temporalio.runtime.Runtime]
 
 
 @dataclass(frozen=True)

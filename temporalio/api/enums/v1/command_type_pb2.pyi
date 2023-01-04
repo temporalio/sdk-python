@@ -66,6 +66,7 @@ class _CommandTypeEnumTypeWrapper(
     failure outcome of said update.
     """
     COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES: _CommandType.ValueType  # 16
+    COMMAND_TYPE_REJECT_WORKFLOW_UPDATE: _CommandType.ValueType  # 17
 
 class CommandType(_CommandType, metaclass=_CommandTypeEnumTypeWrapper):
     """Whenever this list of command types is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering."""
@@ -91,4 +92,5 @@ COMMAND_TYPE_COMPLETE_WORKFLOW_UPDATE: CommandType.ValueType  # 15
 failure outcome of said update.
 """
 COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES: CommandType.ValueType  # 16
+COMMAND_TYPE_REJECT_WORKFLOW_UPDATE: CommandType.ValueType  # 17
 global___CommandType = CommandType
