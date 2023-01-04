@@ -22,12 +22,12 @@ from typing import (
 import google.protobuf.empty_pb2
 
 import temporalio.api.testservice.v1
-import temporalio.bridge.runtime
 import temporalio.bridge.testing
 import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.runtime
 import temporalio.service
 import temporalio.types
 import temporalio.worker
@@ -90,7 +90,7 @@ class WorkflowEnvironment:
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
         ui: bool = False,
-        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
+        runtime: Optional[temporalio.runtime.Runtime] = None,
         temporalite_existing_path: Optional[str] = None,
         temporalite_database_filename: Optional[str] = None,
         temporalite_log_format: str = "pretty",
@@ -169,9 +169,9 @@ class WorkflowEnvironment:
             else:
                 temporalite_log_level = "fatal"
         # Start Temporalite
-        runtime = runtime or temporalio.bridge.runtime.Runtime.default()
+        runtime = runtime or temporalio.runtime.Runtime.default()
         server = await temporalio.bridge.testing.EphemeralServer.start_temporalite(
-            runtime,
+            runtime._core_runtime,
             temporalio.bridge.testing.TemporaliteConfig(
                 existing_path=temporalite_existing_path,
                 sdk_name="sdk-python",
@@ -228,7 +228,7 @@ class WorkflowEnvironment:
         identity: Optional[str] = None,
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
-        runtime: Optional[temporalio.bridge.runtime.Runtime] = None,
+        runtime: Optional[temporalio.runtime.Runtime] = None,
         test_server_existing_path: Optional[str] = None,
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
@@ -288,9 +288,9 @@ class WorkflowEnvironment:
             The started workflow environment with time skipping.
         """
         # Start test server
-        runtime = runtime or temporalio.bridge.runtime.Runtime.default()
+        runtime = runtime or temporalio.runtime.Runtime.default()
         server = await temporalio.bridge.testing.EphemeralServer.start_test_server(
-            runtime,
+            runtime._core_runtime,
             temporalio.bridge.testing.TestServerConfig(
                 existing_path=test_server_existing_path,
                 sdk_name="sdk-python",

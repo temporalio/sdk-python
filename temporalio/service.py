@@ -22,8 +22,8 @@ import temporalio.api.testservice.v1
 import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto.health.v1
-import temporalio.bridge.runtime
 import temporalio.exceptions
+import temporalio.runtime
 
 __version__ = "0.1b4"
 
@@ -103,7 +103,7 @@ class ConnectConfig:
     rpc_metadata: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
-    runtime: Optional[temporalio.bridge.runtime.Runtime] = None
+    runtime: Optional[temporalio.runtime.Runtime] = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -684,8 +684,9 @@ class _BridgeServiceClient(ServiceClient):
     async def _connected_client(self) -> temporalio.bridge.client.Client:
         async with self._bridge_client_connect_lock:
             if not self._bridge_client:
+                runtime = self.config.runtime or temporalio.runtime.Runtime.default()
                 self._bridge_client = await temporalio.bridge.client.Client.connect(
-                    self.config.runtime or temporalio.bridge.runtime.Runtime.default(),
+                    runtime._core_runtime,
                     self._bridge_config,
                 )
             return self._bridge_client
