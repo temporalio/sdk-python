@@ -67,6 +67,8 @@ class Runtime:
 
 @dataclass
 class TelemetryFilter:
+    """Filter for telemetry use."""
+
     core_level: str
     """Level for Core. Can be ``ERROR``, ``WARN``, ``INFO``, ``DEBUG``, or
     ``TRACE``.
