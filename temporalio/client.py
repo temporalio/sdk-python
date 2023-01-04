@@ -320,6 +320,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
+        result_type: Optional[Type] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -343,6 +344,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
+        result_type: Optional[Type] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -365,6 +367,8 @@ class Client:
             args: Multiple arguments to the workflow. Cannot be set if arg is.
             id: Unique identifier for the workflow execution.
             task_queue: Task queue to run the workflow on.
+            result_type: For string workflows, this can set the specific result
+                type hint to deserialize into.
             execution_timeout: Total workflow execution timeout including
                 retries and continue as new.
             run_timeout: Timeout of a single workflow run.
@@ -390,13 +394,13 @@ class Client:
         """
         # Use definition if callable
         name: str
-        ret_type: Optional[Type] = None
         if isinstance(workflow, str):
             name = workflow
         elif callable(workflow):
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
             name = defn.name
-            ret_type = defn.ret_type
+            if result_type is None:
+                result_type = defn.ret_type
         else:
             raise TypeError("Workflow must be a string or callable")
 
@@ -417,7 +421,7 @@ class Client:
                 headers={},
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
-                ret_type=ret_type,
+                ret_type=result_type,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
@@ -506,6 +510,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
+        result_type: Optional[Type] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -529,6 +534,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
+        result_type: Optional[Type] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -555,6 +561,7 @@ class Client:
                 arg,
                 args=args,
                 task_queue=task_queue,
+                result_type=result_type,
                 id=id,
                 execution_timeout=execution_timeout,
                 run_timeout=run_timeout,
