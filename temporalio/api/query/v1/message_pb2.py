@@ -24,7 +24,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n#temporal/api/query/v1/message.proto\x12\x15temporal.api.query.v1\x1a!temporal/api/enums/v1/query.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a$temporal/api/common/v1/message.proto"\x89\x01\n\rWorkflowQuery\x12\x12\n\nquery_type\x18\x01 \x01(\t\x12\x34\n\nquery_args\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header"\x9b\x01\n\x13WorkflowQueryResult\x12;\n\x0bresult_type\x18\x01 \x01(\x0e\x32&.temporal.api.enums.v1.QueryResultType\x12\x30\n\x06\x61nswer\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rerror_message\x18\x03 \x01(\t"O\n\rQueryRejected\x12>\n\x06status\x18\x01 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowExecutionStatusB\x80\x01\n\x18io.temporal.api.query.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/query/v1;query\xaa\x02\x15Temporal.Api.Query.V1\xea\x02\x18Temporal::Api::Query::V1b\x06proto3'
+    b'\n#temporal/api/query/v1/message.proto\x12\x15temporal.api.query.v1\x1a!temporal/api/enums/v1/query.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a$temporal/api/common/v1/message.proto"\x89\x01\n\rWorkflowQuery\x12\x12\n\nquery_type\x18\x01 \x01(\t\x12\x34\n\nquery_args\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header"\x9b\x01\n\x13WorkflowQueryResult\x12;\n\x0bresult_type\x18\x01 \x01(\x0e\x32&.temporal.api.enums.v1.QueryResultType\x12\x30\n\x06\x61nswer\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rerror_message\x18\x03 \x01(\t"O\n\rQueryRejected\x12>\n\x06status\x18\x01 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowExecutionStatusB\x84\x01\n\x18io.temporal.api.query.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/query/v1;query\xaa\x02\x17Temporalio.Api.Query.V1\xea\x02\x1aTemporalio::Api::Query::V1b\x06proto3'
 )
 
 
@@ -67,7 +67,7 @@ _sym_db.RegisterMessage(QueryRejected)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
-    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.query.v1B\014MessageProtoP\001Z!go.temporal.io/api/query/v1;query\252\002\025Temporal.Api.Query.V1\352\002\030Temporal::Api::Query::V1"
+    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.query.v1B\014MessageProtoP\001Z!go.temporal.io/api/query/v1;query\252\002\027Temporalio.Api.Query.V1\352\002\032Temporalio::Api::Query::V1"
     _WORKFLOWQUERY._serialized_start = 174
     _WORKFLOWQUERY._serialized_end = 311
     _WORKFLOWQUERYRESULT._serialized_start = 314

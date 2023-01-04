@@ -23,7 +23,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n%temporal/api/version/v1/message.proto\x12\x17temporal.api.version.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto\x1a"temporal/api/enums/v1/common.proto"e\n\x0bReleaseInfo\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x36\n\x0crelease_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\r\n\x05notes\x18\x03 \x01(\t"K\n\x05\x41lert\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x31\n\x08severity\x18\x02 \x01(\x0e\x32\x1f.temporal.api.enums.v1.Severity"\x81\x02\n\x0bVersionInfo\x12\x35\n\x07\x63urrent\x18\x01 \x01(\x0b\x32$.temporal.api.version.v1.ReleaseInfo\x12\x39\n\x0brecommended\x18\x02 \x01(\x0b\x32$.temporal.api.version.v1.ReleaseInfo\x12\x14\n\x0cinstructions\x18\x03 \x01(\t\x12.\n\x06\x61lerts\x18\x04 \x03(\x0b\x32\x1e.temporal.api.version.v1.Alert\x12:\n\x10last_update_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x42\x8a\x01\n\x1aio.temporal.api.version.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/version/v1;version\xaa\x02\x17Temporal.Api.Version.V1\xea\x02\x1aTemporal::Api::Version::V1b\x06proto3'
+    b'\n%temporal/api/version/v1/message.proto\x12\x17temporal.api.version.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto\x1a"temporal/api/enums/v1/common.proto"e\n\x0bReleaseInfo\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x36\n\x0crelease_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\r\n\x05notes\x18\x03 \x01(\t"K\n\x05\x41lert\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x31\n\x08severity\x18\x02 \x01(\x0e\x32\x1f.temporal.api.enums.v1.Severity"\x81\x02\n\x0bVersionInfo\x12\x35\n\x07\x63urrent\x18\x01 \x01(\x0b\x32$.temporal.api.version.v1.ReleaseInfo\x12\x39\n\x0brecommended\x18\x02 \x01(\x0b\x32$.temporal.api.version.v1.ReleaseInfo\x12\x14\n\x0cinstructions\x18\x03 \x01(\t\x12.\n\x06\x61lerts\x18\x04 \x03(\x0b\x32\x1e.temporal.api.version.v1.Alert\x12:\n\x10last_update_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x42\x8e\x01\n\x1aio.temporal.api.version.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/version/v1;version\xaa\x02\x19Temporalio.Api.Version.V1\xea\x02\x1cTemporalio::Api::Version::V1b\x06proto3'
 )
 
 
@@ -66,7 +66,7 @@ _sym_db.RegisterMessage(VersionInfo)
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
-    DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.version.v1B\014MessageProtoP\001Z%go.temporal.io/api/version/v1;version\252\002\027Temporal.Api.Version.V1\352\002\032Temporal::Api::Version::V1"
+    DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.version.v1B\014MessageProtoP\001Z%go.temporal.io/api/version/v1;version\252\002\031Temporalio.Api.Version.V1\352\002\034Temporalio::Api::Version::V1"
     _RELEASEINFO.fields_by_name["release_time"]._options = None
     _RELEASEINFO.fields_by_name[
         "release_time"

@@ -1,5 +1,6 @@
 from .message_pb2 import (
     BatchOperationCancellation,
+    BatchOperationDeletion,
     BatchOperationInfo,
     BatchOperationSignal,
     BatchOperationTermination,
@@ -7,6 +8,7 @@ from .message_pb2 import (
 
 __all__ = [
     "BatchOperationCancellation",
+    "BatchOperationDeletion",
     "BatchOperationInfo",
     "BatchOperationSignal",
     "BatchOperationTermination",

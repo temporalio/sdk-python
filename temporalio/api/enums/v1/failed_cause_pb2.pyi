@@ -83,6 +83,27 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
     what the workflow code actually did.
     """
     WORKFLOW_TASK_FAILED_CAUSE_BAD_MODIFY_WORKFLOW_PROPERTIES_ATTRIBUTES: _WorkflowTaskFailedCause.ValueType  # 25
+    WORKFLOW_TASK_FAILED_CAUSE_PENDING_CHILD_WORKFLOWS_LIMIT_EXCEEDED: _WorkflowTaskFailedCause.ValueType  # 26
+    """We send the below error codes to users when their requests would violate a size constraint
+    of their workflow. We do this to ensure that the state of their workflow does not become too
+    large because that can cause severe performance degradation. You can modify the thresholds for
+    each of these errors within your dynamic config.
+
+    Spawning a new child workflow would cause this workflow to exceed its limit of pending child
+    workflows.
+    """
+    WORKFLOW_TASK_FAILED_CAUSE_PENDING_ACTIVITIES_LIMIT_EXCEEDED: _WorkflowTaskFailedCause.ValueType  # 27
+    """Starting a new activity would cause this workflow to exceed its limit of pending activities
+    that we track.
+    """
+    WORKFLOW_TASK_FAILED_CAUSE_PENDING_SIGNALS_LIMIT_EXCEEDED: _WorkflowTaskFailedCause.ValueType  # 28
+    """A workflow has a buffer of signals that have not yet reached their destination. We return this
+    error when sending a new signal would exceed the capacity of this buffer.
+    """
+    WORKFLOW_TASK_FAILED_CAUSE_PENDING_REQUEST_CANCEL_LIMIT_EXCEEDED: _WorkflowTaskFailedCause.ValueType  # 29
+    """Similarly, we have a buffer of pending requests to cancel other workflows. We return this error
+    when our capacity for pending cancel requests is already reached.
+    """
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -127,6 +148,27 @@ WORKFLOW_TASK_FAILED_CAUSE_NON_DETERMINISTIC_ERROR: WorkflowTaskFailedCause.Valu
 what the workflow code actually did.
 """
 WORKFLOW_TASK_FAILED_CAUSE_BAD_MODIFY_WORKFLOW_PROPERTIES_ATTRIBUTES: WorkflowTaskFailedCause.ValueType  # 25
+WORKFLOW_TASK_FAILED_CAUSE_PENDING_CHILD_WORKFLOWS_LIMIT_EXCEEDED: WorkflowTaskFailedCause.ValueType  # 26
+"""We send the below error codes to users when their requests would violate a size constraint
+of their workflow. We do this to ensure that the state of their workflow does not become too
+large because that can cause severe performance degradation. You can modify the thresholds for
+each of these errors within your dynamic config.
+
+Spawning a new child workflow would cause this workflow to exceed its limit of pending child
+workflows.
+"""
+WORKFLOW_TASK_FAILED_CAUSE_PENDING_ACTIVITIES_LIMIT_EXCEEDED: WorkflowTaskFailedCause.ValueType  # 27
+"""Starting a new activity would cause this workflow to exceed its limit of pending activities
+that we track.
+"""
+WORKFLOW_TASK_FAILED_CAUSE_PENDING_SIGNALS_LIMIT_EXCEEDED: WorkflowTaskFailedCause.ValueType  # 28
+"""A workflow has a buffer of signals that have not yet reached their destination. We return this
+error when sending a new signal would exceed the capacity of this buffer.
+"""
+WORKFLOW_TASK_FAILED_CAUSE_PENDING_REQUEST_CANCEL_LIMIT_EXCEEDED: WorkflowTaskFailedCause.ValueType  # 29
+"""Similarly, we have a buffer of pending requests to cancel other workflows. We return this error
+when our capacity for pending cancel requests is already reached.
+"""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:

@@ -46,7 +46,7 @@ from .message_pb2 import (
     WorkflowTaskTimedOutEventAttributes,
     WorkflowUpdateAcceptedEventAttributes,
     WorkflowUpdateCompletedEventAttributes,
-    WorkflowUpdateRequestedEventAttributes,
+    WorkflowUpdateRejectedEventAttributes,
 )
 
 __all__ = [
@@ -97,5 +97,5 @@ __all__ = [
     "WorkflowTaskTimedOutEventAttributes",
     "WorkflowUpdateAcceptedEventAttributes",
     "WorkflowUpdateCompletedEventAttributes",
-    "WorkflowUpdateRequestedEventAttributes",
+    "WorkflowUpdateRejectedEventAttributes",
 ]

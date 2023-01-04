@@ -51,6 +51,7 @@ class _BatchOperationTypeEnumTypeWrapper(
     BATCH_OPERATION_TYPE_TERMINATE: _BatchOperationType.ValueType  # 1
     BATCH_OPERATION_TYPE_CANCEL: _BatchOperationType.ValueType  # 2
     BATCH_OPERATION_TYPE_SIGNAL: _BatchOperationType.ValueType  # 3
+    BATCH_OPERATION_TYPE_DELETE: _BatchOperationType.ValueType  # 4
 
 class BatchOperationType(
     _BatchOperationType, metaclass=_BatchOperationTypeEnumTypeWrapper
@@ -60,6 +61,7 @@ BATCH_OPERATION_TYPE_UNSPECIFIED: BatchOperationType.ValueType  # 0
 BATCH_OPERATION_TYPE_TERMINATE: BatchOperationType.ValueType  # 1
 BATCH_OPERATION_TYPE_CANCEL: BatchOperationType.ValueType  # 2
 BATCH_OPERATION_TYPE_SIGNAL: BatchOperationType.ValueType  # 3
+BATCH_OPERATION_TYPE_DELETE: BatchOperationType.ValueType  # 4
 global___BatchOperationType = BatchOperationType
 
 class _BatchOperationState:

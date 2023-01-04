@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b"\n&temporal/api/enums/v1/task_queue.proto\x12\x15temporal.api.enums.v1*h\n\rTaskQueueKind\x12\x1f\n\x1bTASK_QUEUE_KIND_UNSPECIFIED\x10\x00\x12\x1a\n\x16TASK_QUEUE_KIND_NORMAL\x10\x01\x12\x1a\n\x16TASK_QUEUE_KIND_STICKY\x10\x02*l\n\rTaskQueueType\x12\x1f\n\x1bTASK_QUEUE_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n\x18TASK_QUEUE_TYPE_WORKFLOW\x10\x01\x12\x1c\n\x18TASK_QUEUE_TYPE_ACTIVITY\x10\x02\x42\x82\x01\n\x18io.temporal.api.enums.v1B\x0eTaskQueueProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x15Temporal.Api.Enums.V1\xea\x02\x18Temporal::Api::Enums::V1b\x06proto3"
+    b"\n&temporal/api/enums/v1/task_queue.proto\x12\x15temporal.api.enums.v1*h\n\rTaskQueueKind\x12\x1f\n\x1bTASK_QUEUE_KIND_UNSPECIFIED\x10\x00\x12\x1a\n\x16TASK_QUEUE_KIND_NORMAL\x10\x01\x12\x1a\n\x16TASK_QUEUE_KIND_STICKY\x10\x02*l\n\rTaskQueueType\x12\x1f\n\x1bTASK_QUEUE_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n\x18TASK_QUEUE_TYPE_WORKFLOW\x10\x01\x12\x1c\n\x18TASK_QUEUE_TYPE_ACTIVITY\x10\x02\x42\x86\x01\n\x18io.temporal.api.enums.v1B\x0eTaskQueueProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3"
 )
 
 _TASKQUEUEKIND = DESCRIPTOR.enum_types_by_name["TaskQueueKind"]
@@ -33,7 +33,7 @@ TASK_QUEUE_TYPE_ACTIVITY = 2
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
-    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\016TaskQueueProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\025Temporal.Api.Enums.V1\352\002\030Temporal::Api::Enums::V1"
+    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\016TaskQueueProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _TASKQUEUEKIND._serialized_start = 65
     _TASKQUEUEKIND._serialized_end = 169
     _TASKQUEUETYPE._serialized_start = 171

@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b"\n%temporal/api/enums/v1/namespace.proto\x12\x15temporal.api.enums.v1*\x8e\x01\n\x0eNamespaceState\x12\x1f\n\x1bNAMESPACE_STATE_UNSPECIFIED\x10\x00\x12\x1e\n\x1aNAMESPACE_STATE_REGISTERED\x10\x01\x12\x1e\n\x1aNAMESPACE_STATE_DEPRECATED\x10\x02\x12\x1b\n\x17NAMESPACE_STATE_DELETED\x10\x03*h\n\rArchivalState\x12\x1e\n\x1a\x41RCHIVAL_STATE_UNSPECIFIED\x10\x00\x12\x1b\n\x17\x41RCHIVAL_STATE_DISABLED\x10\x01\x12\x1a\n\x16\x41RCHIVAL_STATE_ENABLED\x10\x02*s\n\x10ReplicationState\x12!\n\x1dREPLICATION_STATE_UNSPECIFIED\x10\x00\x12\x1c\n\x18REPLICATION_STATE_NORMAL\x10\x01\x12\x1e\n\x1aREPLICATION_STATE_HANDOVER\x10\x02\x42\x82\x01\n\x18io.temporal.api.enums.v1B\x0eNamespaceProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x15Temporal.Api.Enums.V1\xea\x02\x18Temporal::Api::Enums::V1b\x06proto3"
+    b"\n%temporal/api/enums/v1/namespace.proto\x12\x15temporal.api.enums.v1*\x8e\x01\n\x0eNamespaceState\x12\x1f\n\x1bNAMESPACE_STATE_UNSPECIFIED\x10\x00\x12\x1e\n\x1aNAMESPACE_STATE_REGISTERED\x10\x01\x12\x1e\n\x1aNAMESPACE_STATE_DEPRECATED\x10\x02\x12\x1b\n\x17NAMESPACE_STATE_DELETED\x10\x03*h\n\rArchivalState\x12\x1e\n\x1a\x41RCHIVAL_STATE_UNSPECIFIED\x10\x00\x12\x1b\n\x17\x41RCHIVAL_STATE_DISABLED\x10\x01\x12\x1a\n\x16\x41RCHIVAL_STATE_ENABLED\x10\x02*s\n\x10ReplicationState\x12!\n\x1dREPLICATION_STATE_UNSPECIFIED\x10\x00\x12\x1c\n\x18REPLICATION_STATE_NORMAL\x10\x01\x12\x1e\n\x1aREPLICATION_STATE_HANDOVER\x10\x02\x42\x86\x01\n\x18io.temporal.api.enums.v1B\x0eNamespaceProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3"
 )
 
 _NAMESPACESTATE = DESCRIPTOR.enum_types_by_name["NamespaceState"]
@@ -39,7 +39,7 @@ REPLICATION_STATE_HANDOVER = 2
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
-    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\016NamespaceProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\025Temporal.Api.Enums.V1\352\002\030Temporal::Api::Enums::V1"
+    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\016NamespaceProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _NAMESPACESTATE._serialized_start = 65
     _NAMESPACESTATE._serialized_end = 207
     _ARCHIVALSTATE._serialized_start = 209

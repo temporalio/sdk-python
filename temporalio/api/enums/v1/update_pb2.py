@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n"temporal/api/enums/v1/update.proto\x12\x15temporal.api.enums.v1*\x8e\x01\n\x1fWorkflowUpdateResultAccessStyle\x12\x33\n/WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_UNSPECIFIED\x10\x00\x12\x36\n2WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_REQUIRE_INLINE\x10\x01*\x8d\x01\n"WorkflowUpdateDurabilityPreference\x12\x35\n1WORKFLOW_UPDATE_DURABILITY_PREFERENCE_UNSPECIFIED\x10\x00\x12\x30\n,WORKFLOW_UPDATE_DURABILITY_PREFERENCE_BYPASS\x10\x01\x42\x7f\n\x18io.temporal.api.enums.v1B\x0bUpdateProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x15Temporal.Api.Enums.V1\xea\x02\x18Temporal::Api::Enums::V1b\x06proto3'
+    b'\n"temporal/api/enums/v1/update.proto\x12\x15temporal.api.enums.v1*\x8e\x01\n\x1fWorkflowUpdateResultAccessStyle\x12\x33\n/WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_UNSPECIFIED\x10\x00\x12\x36\n2WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_REQUIRE_INLINE\x10\x01\x42\x83\x01\n\x18io.temporal.api.enums.v1B\x0bUpdateProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3'
 )
 
 _WORKFLOWUPDATERESULTACCESSSTYLE = DESCRIPTOR.enum_types_by_name[
@@ -24,24 +24,14 @@ _WORKFLOWUPDATERESULTACCESSSTYLE = DESCRIPTOR.enum_types_by_name[
 WorkflowUpdateResultAccessStyle = enum_type_wrapper.EnumTypeWrapper(
     _WORKFLOWUPDATERESULTACCESSSTYLE
 )
-_WORKFLOWUPDATEDURABILITYPREFERENCE = DESCRIPTOR.enum_types_by_name[
-    "WorkflowUpdateDurabilityPreference"
-]
-WorkflowUpdateDurabilityPreference = enum_type_wrapper.EnumTypeWrapper(
-    _WORKFLOWUPDATEDURABILITYPREFERENCE
-)
 WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_UNSPECIFIED = 0
 WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_REQUIRE_INLINE = 1
-WORKFLOW_UPDATE_DURABILITY_PREFERENCE_UNSPECIFIED = 0
-WORKFLOW_UPDATE_DURABILITY_PREFERENCE_BYPASS = 1
 
 
 if _descriptor._USE_C_DESCRIPTORS == False:
 
     DESCRIPTOR._options = None
-    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\013UpdateProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\025Temporal.Api.Enums.V1\352\002\030Temporal::Api::Enums::V1"
+    DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\013UpdateProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _WORKFLOWUPDATERESULTACCESSSTYLE._serialized_start = 62
     _WORKFLOWUPDATERESULTACCESSSTYLE._serialized_end = 204
-    _WORKFLOWUPDATEDURABILITYPREFERENCE._serialized_start = 207
-    _WORKFLOWUPDATEDURABILITYPREFERENCE._serialized_end = 348
 # @@protoc_insertion_point(module_scope)

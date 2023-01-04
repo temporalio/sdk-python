@@ -190,3 +190,24 @@ class BatchOperationCancellation(google.protobuf.message.Message):
     ) -> None: ...
 
 global___BatchOperationCancellation = BatchOperationCancellation
+
+class BatchOperationDeletion(google.protobuf.message.Message):
+    """BatchOperationDeletion sends deletion requests to batch workflows.
+    Keep the parameter in sync with temporalio.api.workflowservice.v1.DeleteWorkflowExecutionRequest.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client"""
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["identity", b"identity"]
+    ) -> None: ...
+
+global___BatchOperationDeletion = BatchOperationDeletion

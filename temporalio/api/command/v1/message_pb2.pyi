@@ -32,9 +32,9 @@ import google.protobuf.message
 import sys
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.command_type_pb2
-import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.interaction.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -858,16 +858,23 @@ global___StartChildWorkflowExecutionCommandAttributes = (
 class AcceptWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    UPDATE_ID_FIELD_NUMBER: builtins.int
-    update_id: builtins.str
-    """A unique identifier for an update within a given workflow context"""
+    META_FIELD_NUMBER: builtins.int
+    INPUT_FIELD_NUMBER: builtins.int
+    @property
+    def meta(self) -> temporalio.api.interaction.v1.message_pb2.Meta: ...
+    @property
+    def input(self) -> temporalio.api.interaction.v1.message_pb2.Input: ...
     def __init__(
         self,
         *,
-        update_id: builtins.str = ...,
+        meta: temporalio.api.interaction.v1.message_pb2.Meta | None = ...,
+        input: temporalio.api.interaction.v1.message_pb2.Input | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["input", b"input", "meta", b"meta"]
+    ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["update_id", b"update_id"]
+        self, field_name: typing_extensions.Literal["input", b"input", "meta", b"meta"]
     ) -> None: ...
 
 global___AcceptWorkflowUpdateCommandAttributes = AcceptWorkflowUpdateCommandAttributes
@@ -875,59 +882,56 @@ global___AcceptWorkflowUpdateCommandAttributes = AcceptWorkflowUpdateCommandAttr
 class CompleteWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    UPDATE_ID_FIELD_NUMBER: builtins.int
-    DURABILITY_PREFERENCE_FIELD_NUMBER: builtins.int
-    SUCCESS_FIELD_NUMBER: builtins.int
-    FAILURE_FIELD_NUMBER: builtins.int
-    update_id: builtins.str
-    """A unique identifier for an update within a given workflow context"""
-    durability_preference: temporalio.api.enums.v1.update_pb2.WorkflowUpdateDurabilityPreference.ValueType
-    """Whether the server should attempt to bypass making this update rejection
-    durable in history. This field is only consulted when the result field
-    indicates failure. Leaving this field in its default state (i.e.
-    UPDATE_WORKFLOW_REJECTION_DURABILITY_PREFERENCE_UNSPECIFIED) will result
-    in making the rejection durable.
-    """
+    META_FIELD_NUMBER: builtins.int
+    OUTPUT_FIELD_NUMBER: builtins.int
     @property
-    def success(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    def meta(self) -> temporalio.api.interaction.v1.message_pb2.Meta: ...
+    @property
+    def output(self) -> temporalio.api.interaction.v1.message_pb2.Output: ...
+    def __init__(
+        self,
+        *,
+        meta: temporalio.api.interaction.v1.message_pb2.Meta | None = ...,
+        output: temporalio.api.interaction.v1.message_pb2.Output | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["meta", b"meta", "output", b"output"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["meta", b"meta", "output", b"output"],
+    ) -> None: ...
+
+global___CompleteWorkflowUpdateCommandAttributes = (
+    CompleteWorkflowUpdateCommandAttributes
+)
+
+class RejectWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    META_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
+    @property
+    def meta(self) -> temporalio.api.interaction.v1.message_pb2.Meta: ...
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     def __init__(
         self,
         *,
-        update_id: builtins.str = ...,
-        durability_preference: temporalio.api.enums.v1.update_pb2.WorkflowUpdateDurabilityPreference.ValueType = ...,
-        success: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+        meta: temporalio.api.interaction.v1.message_pb2.Meta | None = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
-            "failure", b"failure", "result", b"result", "success", b"success"
-        ],
+        field_name: typing_extensions.Literal["failure", b"failure", "meta", b"meta"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "durability_preference",
-            b"durability_preference",
-            "failure",
-            b"failure",
-            "result",
-            b"result",
-            "success",
-            b"success",
-            "update_id",
-            b"update_id",
-        ],
+        field_name: typing_extensions.Literal["failure", b"failure", "meta", b"meta"],
     ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["result", b"result"]
-    ) -> typing_extensions.Literal["success", "failure"] | None: ...
 
-global___CompleteWorkflowUpdateCommandAttributes = (
-    CompleteWorkflowUpdateCommandAttributes
-)
+global___RejectWorkflowUpdateCommandAttributes = RejectWorkflowUpdateCommandAttributes
 
 class Command(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -949,6 +953,7 @@ class Command(google.protobuf.message.Message):
     ACCEPT_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     COMPLETE_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     MODIFY_WORKFLOW_PROPERTIES_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    REJECT_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType
     @property
     def schedule_activity_task_command_attributes(
@@ -1014,6 +1019,10 @@ class Command(google.protobuf.message.Message):
     def modify_workflow_properties_command_attributes(
         self,
     ) -> global___ModifyWorkflowPropertiesCommandAttributes: ...
+    @property
+    def reject_workflow_update_command_attributes(
+        self,
+    ) -> global___RejectWorkflowUpdateCommandAttributes: ...
     def __init__(
         self,
         *,
@@ -1050,6 +1059,8 @@ class Command(google.protobuf.message.Message):
         | None = ...,
         modify_workflow_properties_command_attributes: global___ModifyWorkflowPropertiesCommandAttributes
         | None = ...,
+        reject_workflow_update_command_attributes: global___RejectWorkflowUpdateCommandAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1074,6 +1085,8 @@ class Command(google.protobuf.message.Message):
             b"modify_workflow_properties_command_attributes",
             "record_marker_command_attributes",
             b"record_marker_command_attributes",
+            "reject_workflow_update_command_attributes",
+            b"reject_workflow_update_command_attributes",
             "request_cancel_activity_task_command_attributes",
             b"request_cancel_activity_task_command_attributes",
             "request_cancel_external_workflow_execution_command_attributes",
@@ -1115,6 +1128,8 @@ class Command(google.protobuf.message.Message):
             b"modify_workflow_properties_command_attributes",
             "record_marker_command_attributes",
             b"record_marker_command_attributes",
+            "reject_workflow_update_command_attributes",
+            b"reject_workflow_update_command_attributes",
             "request_cancel_activity_task_command_attributes",
             b"request_cancel_activity_task_command_attributes",
             "request_cancel_external_workflow_execution_command_attributes",
@@ -1150,6 +1165,7 @@ class Command(google.protobuf.message.Message):
         "accept_workflow_update_command_attributes",
         "complete_workflow_update_command_attributes",
         "modify_workflow_properties_command_attributes",
+        "reject_workflow_update_command_attributes",
     ] | None: ...
 
 global___Command = Command

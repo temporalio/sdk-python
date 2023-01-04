@@ -182,7 +182,7 @@ class _EventTypeEnumTypeWrapper(
     """Temporal Server has successfully Signaled the targeted Workflow"""
     EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: _EventType.ValueType  # 40
     """Workflow search attributes should be updated and synchronized with the visibility store"""
-    EVENT_TYPE_WORKFLOW_UPDATE_REQUESTED: _EventType.ValueType  # 41
+    EVENT_TYPE_WORKFLOW_UPDATE_REJECTED: _EventType.ValueType  # 41
     """Workflow update request has been received"""
     EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED: _EventType.ValueType  # 42
     """Workflow update request has been accepted by user workflow code"""
@@ -341,7 +341,7 @@ EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED: EventType.ValueType  # 39
 """Temporal Server has successfully Signaled the targeted Workflow"""
 EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: EventType.ValueType  # 40
 """Workflow search attributes should be updated and synchronized with the visibility store"""
-EVENT_TYPE_WORKFLOW_UPDATE_REQUESTED: EventType.ValueType  # 41
+EVENT_TYPE_WORKFLOW_UPDATE_REJECTED: EventType.ValueType  # 41
 """Workflow update request has been received"""
 EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED: EventType.ValueType  # 42
 """Workflow update request has been accepted by user workflow code"""

@@ -46,12 +46,12 @@ import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.filter.v1.message_pb2
 import temporalio.api.history.v1.message_pb2
+import temporalio.api.interaction.v1.message_pb2
 import temporalio.api.namespace.v1.message_pb2
 import temporalio.api.query.v1.message_pb2
 import temporalio.api.replication.v1.message_pb2
 import temporalio.api.schedule.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
-import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 
@@ -968,6 +968,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     SCHEDULED_TIME_FIELD_NUMBER: builtins.int
     STARTED_TIME_FIELD_NUMBER: builtins.int
     QUERIES_FIELD_NUMBER: builtins.int
+    INTERACTIONS_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     @property
@@ -1029,6 +1030,12 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
         """Queries that should be executed after applying the history in this task. Responses should be
         attached to `RespondWorkflowTaskCompletedRequest::query_results`
         """
+    @property
+    def interactions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.interaction.v1.message_pb2.Invocation
+    ]: ...
     def __init__(
         self,
         *,
@@ -1049,6 +1056,10 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
         started_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         queries: collections.abc.Mapping[
             builtins.str, temporalio.api.query.v1.message_pb2.WorkflowQuery
+        ]
+        | None = ...,
+        interactions: collections.abc.Iterable[
+            temporalio.api.interaction.v1.message_pb2.Invocation
         ]
         | None = ...,
     ) -> None: ...
@@ -1080,6 +1091,8 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
             b"backlog_count_hint",
             "history",
             b"history",
+            "interactions",
+            b"interactions",
             "next_page_token",
             b"next_page_token",
             "previous_started_event_id",
@@ -1251,6 +1264,7 @@ class RespondWorkflowTaskCompletedResponse(google.protobuf.message.Message):
 
     WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     ACTIVITY_TASKS_FIELD_NUMBER: builtins.int
+    RESET_HISTORY_EVENT_ID_FIELD_NUMBER: builtins.int
     @property
     def workflow_task(self) -> global___PollWorkflowTaskQueueResponse:
         """See `RespondWorkflowTaskCompletedResponse::return_new_workflow_task`"""
@@ -1261,12 +1275,14 @@ class RespondWorkflowTaskCompletedResponse(google.protobuf.message.Message):
         global___PollActivityTaskQueueResponse
     ]:
         """See `ScheduleActivityTaskCommandAttributes::request_start`"""
+    reset_history_event_id: builtins.int
     def __init__(
         self,
         *,
         workflow_task: global___PollWorkflowTaskQueueResponse | None = ...,
         activity_tasks: collections.abc.Iterable[global___PollActivityTaskQueueResponse]
         | None = ...,
+        reset_history_event_id: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["workflow_task", b"workflow_task"]
@@ -1274,7 +1290,12 @@ class RespondWorkflowTaskCompletedResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "activity_tasks", b"activity_tasks", "workflow_task", b"workflow_task"
+            "activity_tasks",
+            b"activity_tasks",
+            "reset_history_event_id",
+            b"reset_history_event_id",
+            "workflow_task",
+            b"workflow_task",
         ],
     ) -> None: ...
 
@@ -4482,7 +4503,8 @@ class UpdateWorkflowRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
-    UPDATE_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    INPUT_FIELD_NUMBER: builtins.int
     request_id: builtins.str
     """A unique ID for this logical request"""
     result_access_style: temporalio.api.enums.v1.update_pb2.WorkflowUpdateResultAccessStyle.ValueType
@@ -4505,8 +4527,10 @@ class UpdateWorkflowRequest(google.protobuf.message.Message):
     `workflow_execution`), or specified (if it is) workflow execution is not
     part of the same execution chain as this id.
     """
+    identity: builtins.str
+    """A string identifying the agent that requested this interaction."""
     @property
-    def update(self) -> temporalio.api.update.v1.message_pb2.WorkflowUpdate:
+    def input(self) -> temporalio.api.interaction.v1.message_pb2.Input:
         """The name under which the workflow update function is registered and the
         arguments to pass to said function.
         """
@@ -4519,12 +4543,13 @@ class UpdateWorkflowRequest(google.protobuf.message.Message):
         workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
         | None = ...,
         first_execution_run_id: builtins.str = ...,
-        update: temporalio.api.update.v1.message_pb2.WorkflowUpdate | None = ...,
+        identity: builtins.str = ...,
+        input: temporalio.api.interaction.v1.message_pb2.Input | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "update", b"update", "workflow_execution", b"workflow_execution"
+            "input", b"input", "workflow_execution", b"workflow_execution"
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -4532,14 +4557,16 @@ class UpdateWorkflowRequest(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "first_execution_run_id",
             b"first_execution_run_id",
+            "identity",
+            b"identity",
+            "input",
+            b"input",
             "namespace",
             b"namespace",
             "request_id",
             b"request_id",
             "result_access_style",
             b"result_access_style",
-            "update",
-            b"update",
             "workflow_execution",
             b"workflow_execution",
         ],
@@ -4551,45 +4578,29 @@ class UpdateWorkflowResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     UPDATE_TOKEN_FIELD_NUMBER: builtins.int
-    SUCCESS_FIELD_NUMBER: builtins.int
-    FAILURE_FIELD_NUMBER: builtins.int
+    OUTPUT_FIELD_NUMBER: builtins.int
     update_token: builtins.bytes
     """An opaque token that can be used to retrieve the update result via
     polling if it is not returned as part of the gRPC response
     """
     @property
-    def success(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
-    @property
-    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
+    def output(self) -> temporalio.api.interaction.v1.message_pb2.Output:
+        """The success or failure status of the update"""
     def __init__(
         self,
         *,
         update_token: builtins.bytes = ...,
-        success: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
-        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        output: temporalio.api.interaction.v1.message_pb2.Output | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "failure", b"failure", "result", b"result", "success", b"success"
-        ],
+        self, field_name: typing_extensions.Literal["output", b"output"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "failure",
-            b"failure",
-            "result",
-            b"result",
-            "success",
-            b"success",
-            "update_token",
-            b"update_token",
+            "output", b"output", "update_token", b"update_token"
         ],
     ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["result", b"result"]
-    ) -> typing_extensions.Literal["success", "failure"] | None: ...
 
 global___UpdateWorkflowResponse = UpdateWorkflowResponse
 
@@ -4603,6 +4614,7 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     TERMINATION_OPERATION_FIELD_NUMBER: builtins.int
     SIGNAL_OPERATION_FIELD_NUMBER: builtins.int
     CANCELLATION_OPERATION_FIELD_NUMBER: builtins.int
+    DELETION_OPERATION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace that contains the batch operation"""
     visibility_query: builtins.str
@@ -4623,6 +4635,10 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     def cancellation_operation(
         self,
     ) -> temporalio.api.batch.v1.message_pb2.BatchOperationCancellation: ...
+    @property
+    def deletion_operation(
+        self,
+    ) -> temporalio.api.batch.v1.message_pb2.BatchOperationDeletion: ...
     def __init__(
         self,
         *,
@@ -4636,12 +4652,16 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         | None = ...,
         cancellation_operation: temporalio.api.batch.v1.message_pb2.BatchOperationCancellation
         | None = ...,
+        deletion_operation: temporalio.api.batch.v1.message_pb2.BatchOperationDeletion
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "cancellation_operation",
             b"cancellation_operation",
+            "deletion_operation",
+            b"deletion_operation",
             "operation",
             b"operation",
             "signal_operation",
@@ -4655,6 +4675,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancellation_operation",
             b"cancellation_operation",
+            "deletion_operation",
+            b"deletion_operation",
             "job_id",
             b"job_id",
             "namespace",
@@ -4674,7 +4696,10 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["operation", b"operation"]
     ) -> typing_extensions.Literal[
-        "termination_operation", "signal_operation", "cancellation_operation"
+        "termination_operation",
+        "signal_operation",
+        "cancellation_operation",
+        "deletion_operation",
     ] | None: ...
 
 global___StartBatchOperationRequest = StartBatchOperationRequest
