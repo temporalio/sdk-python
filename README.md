@@ -360,7 +360,10 @@ class GreetingWorkflow:
             # Wait for salutation update or complete signal (this can be
             # cancelled)
             await asyncio.wait(
-                [self._greeting_info_update.wait(), self._complete.wait()],
+                [
+                    asyncio.create_task(self._greeting_info_update.wait()),
+                    asyncio.create_task(self._complete.wait()),
+                ],
                 return_when=asyncio.FIRST_COMPLETED,
             )
             if self._complete.is_set():
