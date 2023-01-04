@@ -278,6 +278,9 @@ The default data converter supports converting multiple types including:
 
 This notably doesn't include any `date`, `time`, or `datetime` objects as they may not work across SDKs.
 
+Classes with generics may not have the generics properly resolved. The current implementation, similar to Pydantic, does
+not have generic type resolution. Users should use concrete types.
+
 For converting from JSON, the workflow/activity type hint is taken into account to convert to the proper type. Care has
 been taken to support all common typings including `Optional`, `Union`, all forms of iterables and mappings, `NewType`,
 etc in addition to the regular JSON values mentioned before.
