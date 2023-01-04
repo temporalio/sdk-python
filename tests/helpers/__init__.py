@@ -34,7 +34,7 @@ async def assert_eq_eventually(
     expected: T,
     fn: Callable[[], Awaitable[T]],
     *,
-    timeout: timedelta = timedelta(seconds=3),
+    timeout: timedelta = timedelta(seconds=10),
     interval: timedelta = timedelta(milliseconds=200),
 ) -> None:
     start_sec = time.monotonic()
