@@ -474,12 +474,21 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
+        # Check for json callable, and invoke it
+        # This covers Pydantic models.
+        parse_obj_attr = inspect.getattr_static(value, "json", None)
+        if callable(parse_obj_attr):
+            json_data = getattr(value, "json")(
+                cls=self._encoder, separators=(",", ":"), sort_keys=True
+            ).encode()
+        else:
+            json_data = json.dumps(
+                value, cls=self._encoder, separators=(",", ":"), sort_keys=True
+            ).encode()
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self._encoding.encode()},
-            data=json.dumps(
-                value, cls=self._encoder, separators=(",", ":"), sort_keys=True
-            ).encode(),
+            data=json_data,
         )
 
     def from_payload(
