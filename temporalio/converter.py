@@ -476,10 +476,23 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         # Check for json callable, and invoke it
         # This covers Pydantic models.
-        parse_obj_attr = inspect.getattr_static(value, "json", None)
-        if callable(parse_obj_attr):
-            json_data = getattr(value, "json")(
+        json_method = getattr(value, "json", None)
+        if json_method:
+            json_data = json_method(
                 cls=self._encoder, separators=(",", ":"), sort_keys=True
+            ).encode()
+        elif isinstance(value, list):
+            json_list = value.copy()
+            for i, v in enumerate(value):
+                json_method = getattr(v, "json", None)
+                if json_method:
+                    json_list[i] = json.loads(
+                        json_method(
+                            cls=self._encoder, separators=(",", ":"), sort_keys=True
+                        )
+                    )
+            json_data = json.dumps(
+                json_list, cls=self._encoder, separators=(",", ":"), sort_keys=True
             ).encode()
         else:
             json_data = json.dumps(

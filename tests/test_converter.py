@@ -417,7 +417,7 @@ def test_json_type_hints():
         ),
     )
     # This List[MyPydanticDTClassList] wont work for now...
-    fail(
+    ok(
         List[MyPydanticDTClass],
         [
             MyPydanticDTClass(
