@@ -470,6 +470,7 @@ Some things to note about the above code:
   capabilities are needed.
 * Local activities work very similarly except the functions are `workflow.start_local_activity()` and
   `workflow.execute_local_activity()`
+  * ⚠️Local activities are currently experimental
 * Activities can be methods of a class. Invokers should use `workflow.start_activity_method()`,
   `workflow.execute_activity_method()`, `workflow.start_local_activity_method()`, and
   `workflow.execute_local_activity_method()` instead.
