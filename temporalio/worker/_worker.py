@@ -93,7 +93,9 @@ class Worker:
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async. If
                 this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
-                all non-async activities must be picklable.
+                all non-async activities must be picklable. Note, a broken
+                executor failure from this executor will cause the worker to
+                fail and shutdown.
             workflow_task_executor: Thread pool executor for workflow tasks. If
                 this is not present, a new
                 :py:class:`concurrent.futures.ThreadPoolExecutor` will be

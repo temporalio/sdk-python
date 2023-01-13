@@ -938,6 +938,9 @@ Note, all calls from an activity to functions in the `temporalio.activity` packa
 activities must `copy_context()` and then `.run()` manually to ensure `temporalio.activity` calls like `heartbeat` still
 function in the new threads.
 
+If any activity ever throws a `concurrent.futures.BrokenExecutor`, the failure is consisted unrecoverable and the worker
+will fail and shutdown.
+
 ###### Synchronous Multithreaded Activities
 
 If `activity_executor` is set to an instance of `concurrent.futures.ThreadPoolExecutor` then the synchronous activities
