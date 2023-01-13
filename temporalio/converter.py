@@ -570,6 +570,13 @@ class PayloadCodec(ABC):
         failure: temporalio.api.failure.v1.Failure,
         cb: Callable[[temporalio.api.common.v1.Payloads], Awaitable[None]],
     ) -> None:
+        if failure.HasField("encoded_attributes"):
+            # Wrap in payloads and merge back
+            payloads = temporalio.api.common.v1.Payloads(
+                payloads=[failure.encoded_attributes]
+            )
+            await cb(payloads)
+            failure.encoded_attributes.CopyFrom(payloads.payloads[0])
         if failure.HasField(
             "application_failure_info"
         ) and failure.application_failure_info.HasField("details"):
