@@ -16,7 +16,18 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    NoReturn,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
@@ -64,6 +75,7 @@ class _ActivityWorker:
         self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._data_converter = data_converter
         self._interceptors = interceptors
+        self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         # Lazily created on first activity
         self._worker_shutdown_event: Optional[
             temporalio.activity._CompositeEvent
@@ -111,11 +123,26 @@ class _ActivityWorker:
             self._activities[defn.name] = defn
 
     async def run(self) -> None:
+        # Create a task that fails when we get a failure on the queue
+        async def raise_from_queue() -> NoReturn:
+            raise await self._fail_worker_exception_queue.get()
+
+        exception_task = asyncio.create_task(raise_from_queue())
+
         # Continually poll for activity work
         while True:
             try:
                 # Poll for a task
-                task = await self._bridge_worker().poll_activity_task()
+                poll_task = asyncio.create_task(
+                    self._bridge_worker().poll_activity_task()
+                )
+                await asyncio.wait([poll_task, exception_task], return_when=asyncio.FIRST_COMPLETED)  # type: ignore
+                # If exception for failing the worker happened, raise it.
+                # Otherwise, the poll succeeded.
+                if exception_task.done():
+                    poll_task.cancel()
+                    await exception_task
+                task = await poll_task
 
                 if task.HasField("start"):
                     # Cancelled event and sync field will be updated inside
@@ -131,8 +158,10 @@ class _ActivityWorker:
                 else:
                     raise RuntimeError(f"Unrecognized activity task: {task}")
             except temporalio.bridge.worker.PollShutdownError:
+                exception_task.cancel()
                 return
             except Exception as err:
+                exception_task.cancel()
                 raise RuntimeError("Activity worker failed") from err
 
     async def shutdown(self, after_graceful_timeout: timedelta) -> None:
@@ -465,6 +494,10 @@ class _ActivityWorker:
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
+
+                    # For broken executors, we have to fail the entire worker
+                    if isinstance(err, concurrent.futures.BrokenExecutor):
+                        self._fail_worker_exception_queue.put_nowait(err)
             except Exception as inner_err:
                 temporalio.activity.logger.exception(
                     f"Exception handling failed, original error: {err}"

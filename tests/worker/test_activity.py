@@ -3,10 +3,13 @@ import concurrent.futures
 import logging
 import logging.handlers
 import multiprocessing
+import os
 import queue
+import signal
 import threading
 import time
 import uuid
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, NoReturn, Optional, Sequence
@@ -917,6 +920,56 @@ async def test_sync_activity_process_worker_shutdown_graceful(
         # Do shutdown
         await act_worker.shutdown()
     assert "Worker graceful shutdown" == await handle.result()
+
+
+@activity.defn
+def kill_my_process() -> str:
+    os.kill(os.getpid(), getattr(signal, "SIGKILL", -9))
+    return "does not get here"
+
+
+async def test_sync_activity_process_executor_crash(
+    client: Client, worker: ExternalWorker
+):
+    act_task_queue = str(uuid.uuid4())
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        act_worker = Worker(
+            client,
+            task_queue=act_task_queue,
+            activities=[kill_my_process],
+            activity_executor=executor,
+            graceful_shutdown_timeout=timedelta(seconds=2),
+            shared_state_manager=_default_shared_state_manager,
+        )
+        act_worker_task = asyncio.create_task(act_worker.run())
+
+        # Confirm workflow failure with broken pool
+        with pytest.raises(WorkflowFailureError) as workflow_err:
+            await client.execute_workflow(
+                "kitchen_sink",
+                KSWorkflowParams(
+                    actions=[
+                        KSAction(
+                            execute_activity=KSExecuteActivityAction(
+                                name="kill_my_process",
+                                task_queue=act_task_queue,
+                                heartbeat_timeout_ms=30000,
+                            )
+                        )
+                    ]
+                ),
+                id=str(uuid.uuid4()),
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(workflow_err.value.cause, ActivityError)
+        assert isinstance(workflow_err.value.cause.cause, ApplicationError)
+        assert workflow_err.value.cause.cause.type == "BrokenProcessPool"
+
+        # Also confirm that activity worker fails unrecoverably
+        with pytest.raises(RuntimeError) as worker_err:
+            await asyncio.wait_for(act_worker_task, 10)
+        assert str(worker_err.value) == "Activity worker failed"
+        assert isinstance(worker_err.value.__cause__, BrokenProcessPool)
 
 
 class AsyncActivityWrapper:
