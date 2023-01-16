@@ -303,11 +303,14 @@ def test_json_type_hints():
     ok(Optional[MyDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
     ok(Union[int, str], 5)
     ok(Union[int, str], "foo")
+    ok(Union[MyDataClass, NestedDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(Union[MyDataClass, NestedDataClass], NestedDataClass("foo"))
     if sys.version_info >= (3, 10):
         ok(int | None, None)
         ok(int | None, 5)
-    ok(Union[MyDataClass, NestedDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
-    ok(Union[MyDataClass, NestedDataClass], NestedDataClass("foo"))
+        fail(int | None, "1")
+        ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+        ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
 
     # NewType
     ok(NewIntType, 5)
