@@ -49,7 +49,6 @@ if sys.version_info < (3, 11):
 if sys.version_info >= (3, 11):
     from enum import StrEnum
 
-UnionType = None
 if sys.version_info >= (3, 10):
     from types import UnionType
 
@@ -1159,8 +1158,12 @@ def value_to_type(hint: Type, value: Any) -> Any:
             raise TypeError(f"Value {value} not in literal values {type_args}")
         return value
 
+    is_union = origin is Union
+    if sys.version_info >= (3, 10):
+        is_union = is_union or isinstance(origin, UnionType)
+
     # Union
-    if origin is Union or (UnionType and isinstance(origin, UnionType)):
+    if is_union:
         # Try each one. Note, Optional is just a union w/ none.
         for arg in type_args:
             try:
