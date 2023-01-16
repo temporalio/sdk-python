@@ -476,7 +476,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        # Check for pydantic json callable and warns
+        # Check for pydantic json callable send warning
         json_method = getattr(value, "json", None)
         if json_method:
             warnings.warn("If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support")
