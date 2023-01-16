@@ -300,11 +300,12 @@ def test_json_type_hints():
     # Optional/Union
     ok(Optional[int], 5)
     ok(Optional[int], None)
-    if sys.version_info >= (3, 10):
-        ok(int | None, None)
     ok(Optional[MyDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
     ok(Union[int, str], 5)
     ok(Union[int, str], "foo")
+    if sys.version_info >= (3, 10):
+        ok(int | None, None)
+        ok(int | None, 5)
     ok(Union[MyDataClass, NestedDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
     ok(Union[MyDataClass, NestedDataClass], NestedDataClass("foo"))
 
