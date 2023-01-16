@@ -424,9 +424,6 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Support for models with "dict" function like Pydantic
         dict_fn = getattr(o, "dict", None)
         if callable(dict_fn):
-            warnings.warn(
-                "If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
-            )
             return dict_fn()
         # Support for non-list iterables like set
         if not isinstance(o, list) and isinstance(o, collections.abc.Iterable):
@@ -1264,9 +1261,6 @@ def value_to_type(hint: Type, value: Any) -> Any:
     if isinstance(parse_obj_attr, classmethod) or isinstance(
         parse_obj_attr, staticmethod
     ):
-        warnings.warn(
-            "If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
-        )
         if not isinstance(value, dict):
             raise TypeError(
                 f"Cannot convert to {hint}, value is {type(value)} not dict"
