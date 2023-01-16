@@ -9,7 +9,6 @@ import inspect
 import json
 import sys
 import traceback
-import types
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -49,6 +48,10 @@ if sys.version_info < (3, 11):
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
     from enum import StrEnum
+
+UnionType = None
+if sys.version_info >= (3, 10):
+    from types import UnionType
 
 
 class PayloadConverter(ABC):
@@ -1157,9 +1160,7 @@ def value_to_type(hint: Type, value: Any) -> Any:
         return value
 
     # Union
-    if origin is Union or (
-        hasattr(types, "UnionType") and isinstance(origin, types.UnionType)
-    ):
+    if origin is Union or (UnionType and isinstance(origin, UnionType)):
         # Try each one. Note, Optional is just a union w/ none.
         for arg in type_args:
             try:
