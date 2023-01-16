@@ -10,6 +10,7 @@ import json
 import sys
 import traceback
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,7 +31,6 @@ from typing import (
     Union,
     get_type_hints,
 )
-import warnings
 
 import google.protobuf.json_format
 import google.protobuf.message
@@ -424,7 +424,9 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Support for models with "dict" function like Pydantic
         dict_fn = getattr(o, "dict", None)
         if callable(dict_fn):
-            warnings.warn("If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support")
+            warnings.warn(
+                "If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
+            )
             return dict_fn()
         # Support for non-list iterables like set
         if not isinstance(o, list) and isinstance(o, collections.abc.Iterable):
@@ -476,10 +478,12 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        # Check for pydantic json callable send warning
+        # Check for pydantic json callable thenpoe send warning
         json_method = getattr(value, "json", None)
         if json_method:
-            warnings.warn("If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support")
+            warnings.warn(
+                "If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
+            )
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self._encoding.encode()},
@@ -1260,7 +1264,9 @@ def value_to_type(hint: Type, value: Any) -> Any:
     if isinstance(parse_obj_attr, classmethod) or isinstance(
         parse_obj_attr, staticmethod
     ):
-        warnings.warn("If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support")
+        warnings.warn(
+            "If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
+        )
         if not isinstance(value, dict):
             raise TypeError(
                 f"Cannot convert to {hint}, value is {type(value)} not dict"
