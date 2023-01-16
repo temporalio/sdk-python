@@ -2197,6 +2197,9 @@ def start_local_activity(
     At least one of ``schedule_to_close_timeout`` or ``start_to_close_timeout``
     must be present.
 
+    .. warning::
+        Local activities are currently experimental.
+
     Args:
         activity: Activity name or function reference.
         arg: Single argument to the activity.
@@ -2365,6 +2368,9 @@ async def execute_local_activity(
     """Start a local activity and wait for completion.
 
     This is a shortcut for ``await`` :py:meth:`start_local_activity`.
+
+    .. warning::
+        Local activities are currently experimental.
     """
     # We call the runtime directly instead of top-level start_local_activity to
     # ensure we don't miss new parameters
@@ -2497,6 +2503,9 @@ def start_local_activity_class(
     """Start a local activity from a callable class.
 
     See :py:meth:`start_local_activity` for parameter and return details.
+
+    .. warning::
+        Local activities are currently experimental.
     """
     return _Runtime.current().workflow_start_local_activity(
         activity,
@@ -2627,6 +2636,9 @@ async def execute_local_activity_class(
     """Start a local activity from a callable class and wait for completion.
 
     This is a shortcut for ``await`` :py:meth:`start_local_activity_class`.
+
+    .. warning::
+        Local activities are currently experimental.
     """
     # We call the runtime directly instead of top-level start_local_activity to
     # ensure we don't miss new parameters
@@ -2759,6 +2771,9 @@ def start_local_activity_method(
     """Start a local activity from a method.
 
     See :py:meth:`start_local_activity` for parameter and return details.
+
+    .. warning::
+        Local activities are currently experimental.
     """
     return _Runtime.current().workflow_start_local_activity(
         activity,
@@ -2889,6 +2904,9 @@ async def execute_local_activity_method(
     """Start a local activity from a method and wait for completion.
 
     This is a shortcut for ``await`` :py:meth:`start_local_activity_method`.
+
+    .. warning::
+        Local activities are currently experimental.
     """
     # We call the runtime directly instead of top-level start_local_activity to
     # ensure we don't miss new parameters

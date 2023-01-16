@@ -77,20 +77,19 @@ jobs:
       - name: Deploy prod API docs
         if: ${{ github.ref == 'refs/heads/main' && matrix.docsTarget }}
         run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --name python --scope temporal --prod --yes
-        
+
       # Confirm README ToC is generated properly
       - uses: actions/setup-node@v3
       - name: Check generated README ToC
         if: ${{ matrix.docsTarget }}
         run: |
           npx doctoc README.md
-          [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)        
+          [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
 
   # Runs the sdk features repo tests with this repo's current SDK code
-  sdk-features-tests:
-    uses: temporalio/sdk-features/.github/workflows/python.yaml@main
+  features-tests:
+    uses: temporalio/features/.github/workflows/python.yaml@main
     with:
       python-repo-path: ${{github.event.pull_request.head.repo.full_name}}
       version: ${{github.event.pull_request.head.ref}}
       version-is-repo-ref: true
-
