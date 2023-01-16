@@ -30,6 +30,7 @@ from typing import (
     Union,
     get_type_hints,
 )
+import warnings
 
 import google.protobuf.json_format
 import google.protobuf.message
@@ -423,6 +424,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Support for models with "dict" function like Pydantic
         dict_fn = getattr(o, "dict", None)
         if callable(dict_fn):
+            warnings.warn("If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support")
             return dict_fn()
         # Support for non-list iterables like set
         if not isinstance(o, list) and isinstance(o, collections.abc.Iterable):
@@ -474,34 +476,16 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        # Check for json callable, and invoke it
-        # This covers Pydantic models.
+        # Check for pydantic json callable and warns
         json_method = getattr(value, "json", None)
         if json_method:
-            json_data = json_method(
-                cls=self._encoder, separators=(",", ":"), sort_keys=True
-            ).encode()
-        elif isinstance(value, list):
-            json_list = value.copy()
-            for i, v in enumerate(value):
-                json_method = getattr(v, "json", None)
-                if json_method:
-                    json_list[i] = json.loads(
-                        json_method(
-                            cls=self._encoder, separators=(",", ":"), sort_keys=True
-                        )
-                    )
-            json_data = json.dumps(
-                json_list, cls=self._encoder, separators=(",", ":"), sort_keys=True
-            ).encode()
-        else:
-            json_data = json.dumps(
-                value, cls=self._encoder, separators=(",", ":"), sort_keys=True
-            ).encode()
+            warnings.warn("If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support")
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self._encoding.encode()},
-            data=json_data,
+            data=json.dumps(
+                value, cls=self._encoder, separators=(",", ":"), sort_keys=True
+            ).encode(),
         )
 
     def from_payload(
@@ -1276,6 +1260,7 @@ def value_to_type(hint: Type, value: Any) -> Any:
     if isinstance(parse_obj_attr, classmethod) or isinstance(
         parse_obj_attr, staticmethod
     ):
+        warnings.warn("If your using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support")
         if not isinstance(value, dict):
             raise TypeError(
                 f"Cannot convert to {hint}, value is {type(value)} not dict"

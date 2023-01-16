@@ -244,26 +244,6 @@ class MyPydanticClass(pydantic.BaseModel):
     baz: Optional[UUID] = None
 
 
-class MyPydanticDTClass(pydantic.BaseModel):
-    foo: str
-    bar: int
-    foo_datetime: datetime
-    fizz: Optional[str]
-
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat(),
-        }
-
-    @pydantic.validator("foo_datetime", pre=True)
-    def parse_iso_dt(cls, v):
-        return datetime.fromisoformat(v)
-
-
-class MyPydanticDTClassList(pydantic.BaseModel):
-    foo_list: List[MyPydanticDTClass]
-
-
 def test_json_type_hints():
     converter = temporalio.converter.JSONPlainPayloadConverter()
 
@@ -397,37 +377,6 @@ def test_json_type_hints():
         ),
     )
     ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
-    ok(
-        MyPydanticDTClassList,
-        MyPydanticDTClassList(
-            foo_list=[
-                MyPydanticDTClass(
-                    foo="foo",
-                    bar=4,
-                    foo_datetime="2022-09-15T10:16:46.446447+00:00",
-                    fizz=None,
-                )
-            ]
-        ),
-    )
-    ok(
-        MyPydanticDTClass,
-        MyPydanticDTClass(
-            foo="foo", bar=4, foo_datetime="2022-09-15T10:16:46.446447+00:00", fizz=None
-        ),
-    )
-    # This List[MyPydanticDTClassList] wont work for now...
-    ok(
-        List[MyPydanticDTClass],
-        [
-            MyPydanticDTClass(
-                foo="foo",
-                bar=4,
-                foo_datetime="2022-09-15T10:16:46.446447+00:00",
-                fizz=None,
-            )
-        ],
-    )
     fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
 
 
