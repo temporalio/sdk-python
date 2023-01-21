@@ -61,6 +61,10 @@ if sys.version_info >= (3, 11):
         FOO = "foo"
 
 
+class StringSubtype(str):
+  pass
+
+
 @dataclass
 class MyDataClass:
     foo: str
