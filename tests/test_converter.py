@@ -363,6 +363,9 @@ def test_json_type_hints():
             [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
         )
 
+    # String Subtype
+    ok(StringSubtype, StringSubtype("abc"))
+
     # 3.10+ checks
     if sys.version_info >= (3, 10):
         ok(list[int], [1, 2])

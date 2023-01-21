@@ -1277,6 +1277,14 @@ def value_to_type(hint: Type, value: Any) -> Any:
                 )
             return hint(value)
 
+    # String Subtype
+    if inspect.isclass(hint) and issubclass(hint, str):
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Cannot convert to {hint}, value not a string, value is {type(value)}"
+            )
+        return hint(value)
+
     # UUID
     if inspect.isclass(hint) and issubclass(hint, uuid.UUID):
         return hint(value)
