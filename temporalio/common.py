@@ -118,6 +118,9 @@ class WorkflowIDReusePolicy(IntEnum):
     REJECT_DUPLICATE = int(
         temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE
     )
+    TERMINATE_IF_RUNNING = int(
+        temporalio.api.enums.v1.WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING
+    )
 
 
 class QueryRejectCondition(IntEnum):

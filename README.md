@@ -470,6 +470,7 @@ Some things to note about the above code:
   capabilities are needed.
 * Local activities work very similarly except the functions are `workflow.start_local_activity()` and
   `workflow.execute_local_activity()`
+  * ⚠️Local activities are currently experimental
 * Activities can be methods of a class. Invokers should use `workflow.start_activity_method()`,
   `workflow.execute_activity_method()`, `workflow.start_local_activity_method()`, and
   `workflow.execute_local_activity_method()` instead.
@@ -937,6 +938,9 @@ Note, all calls from an activity to functions in the `temporalio.activity` packa
 [contextvars](https://docs.python.org/3/library/contextvars.html). Therefore, new threads starting _inside_ of
 activities must `copy_context()` and then `.run()` manually to ensure `temporalio.activity` calls like `heartbeat` still
 function in the new threads.
+
+If any activity ever throws a `concurrent.futures.BrokenExecutor`, the failure is consisted unrecoverable and the worker
+will fail and shutdown.
 
 ###### Synchronous Multithreaded Activities
 
