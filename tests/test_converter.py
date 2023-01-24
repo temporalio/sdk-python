@@ -64,6 +64,9 @@ if sys.version_info >= (3, 11):
 class StringSubtype(str):
   pass
 
+class StringEnumOldStyle(str, Enum):
+    FOO = "foo"
+
 
 @dataclass
 class MyDataClass:
@@ -369,6 +372,7 @@ def test_json_type_hints():
 
     # String Subtype
     ok(StringSubtype, StringSubtype("abc"))
+    ok(StringEnumOldStyle, StringEnumOldStyle.FOO)
 
     # 3.10+ checks
     if sys.version_info >= (3, 10):
