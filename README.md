@@ -1230,7 +1230,12 @@ poe test
 
 This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
 server, pass `--workflow-environment time-skipping`. To run against the `default` namespace of an already-running
-server, pass the `host:port` to `--workflow-environment`.
+server, pass the `host:port` to `--workflow-environment`. Can also use regular pytest arguments. For example, here's how
+to run a single test with debug logs on the console:
+
+```bash
+poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
+```
 
 #### Proto Generation and Testing
 
