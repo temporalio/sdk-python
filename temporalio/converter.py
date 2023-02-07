@@ -50,6 +50,9 @@ if sys.version_info < (3, 11):
 if sys.version_info >= (3, 11):
     from enum import StrEnum
 
+if sys.version_info >= (3, 10):
+    from types import UnionType
+
 
 class PayloadConverter(ABC):
     """Base payload converter to/from multiple payloads/values."""
@@ -576,6 +579,13 @@ class PayloadCodec(ABC):
         failure: temporalio.api.failure.v1.Failure,
         cb: Callable[[temporalio.api.common.v1.Payloads], Awaitable[None]],
     ) -> None:
+        if failure.HasField("encoded_attributes"):
+            # Wrap in payloads and merge back
+            payloads = temporalio.api.common.v1.Payloads(
+                payloads=[failure.encoded_attributes]
+            )
+            await cb(payloads)
+            failure.encoded_attributes.CopyFrom(payloads.payloads[0])
         if failure.HasField(
             "application_failure_info"
         ) and failure.application_failure_info.HasField("details"):
@@ -1161,8 +1171,12 @@ def value_to_type(hint: Type, value: Any) -> Any:
             raise TypeError(f"Value {value} not in literal values {type_args}")
         return value
 
+    is_union = origin is Union
+    if sys.version_info >= (3, 10):
+        is_union = is_union or isinstance(origin, UnionType)
+
     # Union
-    if origin is Union:
+    if is_union:
         # Try each one. Note, Optional is just a union w/ none.
         for arg in type_args:
             try:
