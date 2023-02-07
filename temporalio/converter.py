@@ -10,6 +10,7 @@ import json
 import sys
 import traceback
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -477,6 +478,11 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
+        # Check for pydantic then send warning
+        if hasattr(value, "parse_obj"):
+            warnings.warn(
+                "If you're using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
+            )
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self._encoding.encode()},
