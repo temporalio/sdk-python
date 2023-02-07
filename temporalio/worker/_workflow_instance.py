@@ -260,7 +260,6 @@ class _WorkflowInstanceImpl(
         self._is_replaying = act.is_replaying
 
         try:
-
             # Split into job sets with patches, then signals, then non-queries, then
             # queries
             job_sets: List[
@@ -1177,7 +1176,6 @@ class _WorkflowInstanceImpl(
 
             # Run while there is anything ready
             while self._ready:
-
                 # Run and remove all ready ones
                 while self._ready:
                     handle = self._ready.popleft()

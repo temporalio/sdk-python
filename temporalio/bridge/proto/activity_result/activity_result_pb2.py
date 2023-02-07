@@ -113,7 +113,6 @@ DoBackoff = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(DoBackoff)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _ACTIVITYEXECUTIONRESULT._serialized_start = 227
     _ACTIVITYEXECUTIONRESULT._serialized_end = 504

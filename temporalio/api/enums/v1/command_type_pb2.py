@@ -41,7 +41,6 @@ COMMAND_TYPE_REJECT_WORKFLOW_UPDATE = 17
 
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\020CommandTypeProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _COMMANDTYPE._serialized_start = 68

@@ -534,7 +534,6 @@ _sym_db.RegisterMessage(FetchBufferedLogsResponse)
 _sym_db.RegisterMessage(FetchBufferedLogsResponse.LogEntry)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _INITTELEMETRYREQUEST_OTELCOLLECTOROPTIONS_HEADERSENTRY._options = None
     _INITTELEMETRYREQUEST_OTELCOLLECTOROPTIONS_HEADERSENTRY._serialized_options = (

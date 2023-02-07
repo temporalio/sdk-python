@@ -66,7 +66,6 @@ FailoverStatus = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(FailoverStatus)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\036io.temporal.api.replication.v1B\014MessageProtoP\001Z-go.temporal.io/api/replication/v1;replication\252\002\035Temporalio.Api.Replication.V1\352\002 Temporalio::Api::Replication::V1"
     _FAILOVERSTATUS.fields_by_name["failover_time"]._options = None

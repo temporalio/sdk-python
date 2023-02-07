@@ -24,7 +24,6 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
 
 _OPERATORSERVICE = DESCRIPTOR.services_by_name["OperatorService"]
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n"io.temporal.api.operatorservice.v1B\014ServiceProtoP\001Z5go.temporal.io/api/operatorservice/v1;operatorservice\252\002!Temporalio.Api.OperatorService.V1\352\002$Temporalio::Api::OperatorService::V1'
     _OPERATORSERVICE._serialized_start = 139

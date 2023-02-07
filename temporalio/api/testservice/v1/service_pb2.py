@@ -26,7 +26,6 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
 
 _TESTSERVICE = DESCRIPTOR.services_by_name["TestService"]
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\036io.temporal.api.testservice.v1B\014ServiceProtoP\001Z-go.temporal.io/api/testservice/v1;testservice\252\002\035Temporalio.Api.TestService.V1\352\002 Temporalio::Api::TestService::V1"
     _TESTSERVICE._serialized_start = 156

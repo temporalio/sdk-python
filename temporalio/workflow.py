@@ -132,7 +132,7 @@ def run(fn: CallableAsyncType) -> CallableAsyncType:
         )
     setattr(fn, "__temporal_workflow_run", True)
     # TODO(cretz): Why is MyPy unhappy with this return?
-    return fn # type: ignore[return-value]
+    return fn  # type: ignore[return-value]
 
 
 @overload
@@ -1113,7 +1113,7 @@ else:
         pass
 
 
-class ActivityHandle(_AsyncioTask[ReturnType]): # type: ignore[type-var]
+class ActivityHandle(_AsyncioTask[ReturnType]):  # type: ignore[type-var]
     """Handle returned from :py:func:`start_activity` and
     :py:func:`start_local_activity`.
 
@@ -2924,7 +2924,7 @@ async def execute_local_activity_method(
     )
 
 
-class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType]): # type: ignore[type-var]
+class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType]):  # type: ignore[type-var]
     """Handle for interacting with a child workflow.
 
     This is created via :py:func:`start_child_workflow`.

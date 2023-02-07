@@ -35,7 +35,6 @@ NamespacedWorkflowExecution = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(NamespacedWorkflowExecution)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _NAMESPACEDWORKFLOWEXECUTION._serialized_start = 89
     _NAMESPACEDWORKFLOWEXECUTION._serialized_end = 174

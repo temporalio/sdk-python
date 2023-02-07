@@ -180,11 +180,11 @@ def test_binary_proto():
 
 def test_encode_search_attribute_values():
     with pytest.raises(TypeError, match="of type tuple not one of"):
-        encode_search_attribute_values([("bad type",)]) # type: ignore[arg-type]
+        encode_search_attribute_values([("bad type",)])  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="Timezone must be present"):
         encode_search_attribute_values([datetime.utcnow()])
     with pytest.raises(TypeError, match="must have the same type"):
-        encode_search_attribute_values(["foo", 123]) # type: ignore[arg-type]
+        encode_search_attribute_values(["foo", 123])  # type: ignore[arg-type]
 
 
 def test_decode_search_attributes():

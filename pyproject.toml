@@ -35,10 +35,10 @@ types-protobuf = "~3.20"
 typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
-black = "^22.3.0"
+black = "^23.1.0"
 cibuildwheel = "^2.11.0"
 grpcio-tools = "^1.48.0"
-isort = "^5.11.3"
+isort = "^5.11.5"
 mypy = "^1.0.0"
 mypy-protobuf = "^3.3.0"
 protoc-wheel-0 = "^21.1"

@@ -83,7 +83,6 @@ Cancel = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(Cancel)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _START_HEADERFIELDSENTRY._options = None
     _START_HEADERFIELDSENTRY._serialized_options = b"8\001"

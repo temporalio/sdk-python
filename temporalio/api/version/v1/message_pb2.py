@@ -64,7 +64,6 @@ VersionInfo = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(VersionInfo)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.version.v1B\014MessageProtoP\001Z%go.temporal.io/api/version/v1;version\252\002\031Temporalio.Api.Version.V1\352\002\034Temporalio::Api::Version::V1"
     _RELEASEINFO.fields_by_name["release_time"]._options = None

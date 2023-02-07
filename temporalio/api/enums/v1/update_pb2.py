@@ -29,7 +29,6 @@ WORKFLOW_UPDATE_RESULT_ACCESS_STYLE_REQUIRE_INLINE = 1
 
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\013UpdateProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _WORKFLOWUPDATERESULTACCESSSTYLE._serialized_start = 62

@@ -134,7 +134,6 @@ NamespaceFilter = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(NamespaceFilter)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\034io.temporal.api.namespace.v1B\014MessageProtoP\001Z)go.temporal.io/api/namespace/v1;namespace\252\002\033Temporalio.Api.Namespace.V1\352\002\036Temporalio::Api::Namespace::V1"
     _NAMESPACEINFO_DATAENTRY._options = None

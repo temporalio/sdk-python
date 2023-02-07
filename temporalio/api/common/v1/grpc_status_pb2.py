@@ -33,7 +33,6 @@ GrpcStatus = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(GrpcStatus)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _GRPCSTATUS._serialized_start = 95
     _GRPCSTATUS._serialized_end = 177

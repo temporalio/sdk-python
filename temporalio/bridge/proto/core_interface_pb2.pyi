@@ -59,7 +59,9 @@ class ActivityTaskCompletion(google.protobuf.message.Message):
     @property
     def result(
         self,
-    ) -> temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityExecutionResult: ...
+    ) -> (
+        temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityExecutionResult
+    ): ...
     def __init__(
         self,
         *,

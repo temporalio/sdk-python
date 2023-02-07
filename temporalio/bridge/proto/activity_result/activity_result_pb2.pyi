@@ -77,9 +77,12 @@ class ActivityExecutionResult(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> typing_extensions.Literal[
-        "completed", "failed", "cancelled", "will_complete_async"
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal[
+            "completed", "failed", "cancelled", "will_complete_async"
+        ]
+        | None
+    ): ...
 
 global___ActivityExecutionResult = ActivityExecutionResult
 
@@ -142,9 +145,9 @@ class ActivityResolution(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> typing_extensions.Literal[
-        "completed", "failed", "cancelled", "backoff"
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal["completed", "failed", "cancelled", "backoff"] | None
+    ): ...
 
 global___ActivityResolution = ActivityResolution
 
