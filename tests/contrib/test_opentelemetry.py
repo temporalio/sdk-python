@@ -93,7 +93,7 @@ class TracingWorkflow:
                 if action.child_workflow.signal:
                     await child_handle.signal(TracingWorkflow.signal)
                 if action.child_workflow.external_signal:
-                    external_handle = workflow.get_external_workflow_handle_for(
+                    external_handle: workflow.ExternalWorkflowHandle[TracingWorkflow] = workflow.get_external_workflow_handle_for(
                         TracingWorkflow.run, workflow_id=child_handle.id
                     )
                     await external_handle.signal(TracingWorkflow.signal)

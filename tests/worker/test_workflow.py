@@ -858,7 +858,7 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
                     return await handle.query(
                         CancelChildWorkflow.ready
                     ) and await client.get_workflow_handle_for(
-                        LongSleepWorkflow.run, workflow_id=f"{handle.id}_child"
+                        LongSleepWorkflow.run, workflow_id=f"{handle.id}_child" # type: ignore[arg-type]
                     ).query(
                         LongSleepWorkflow.started
                     )
@@ -959,7 +959,7 @@ class SignalExternalWorkflowArgs:
 class SignalExternalWorkflow:
     @workflow.run
     async def run(self, args: SignalExternalWorkflowArgs) -> None:
-        handle = workflow.get_external_workflow_handle_for(
+        handle: workflow.ExternalWorkflowHandle[ReturnSignalWorkflow] = workflow.get_external_workflow_handle_for(
             ReturnSignalWorkflow.run, args.external_workflow_id
         )
         await handle.signal(ReturnSignalWorkflow.my_signal, args.signal_value)
@@ -1068,7 +1068,7 @@ class CancelUnsentWorkflow:
         timer_handle.cancel()
 
         async def wait_timer():
-            await timer_handle
+            await timer_handle # type: ignore[misc]
 
         await self.wait_and_swallow(wait_timer())
 
@@ -2403,8 +2403,8 @@ async def test_workflow_typed_handle(client: Client):
         await client.execute_workflow(
             TypedHandleWorkflow.run, id=id, task_queue=worker.task_queue
         )
-        handle_result = await client.get_workflow_handle_for(
-            TypedHandleWorkflow.run, id
+        handle_result: TypedHandleResponse = await client.get_workflow_handle_for(
+            TypedHandleWorkflow.run, id # type: ignore[arg-type]
         ).result()
         assert isinstance(handle_result, TypedHandleResponse)
 

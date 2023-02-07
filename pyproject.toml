@@ -39,7 +39,7 @@ black = "^22.3.0"
 cibuildwheel = "^2.11.0"
 grpcio-tools = "^1.48.0"
 isort = "^5.11.3"
-mypy = "^0.971"
+mypy = "^1.0.0"
 mypy-protobuf = "^3.3.0"
 protoc-wheel-0 = "^21.1"
 psutil = "^5.9.3"
@@ -76,7 +76,7 @@ lint = [
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "pydocstyle --ignore-decorators=overload"
-lint-types = "mypy --namespace-packages ."
+lint-types = "mypy --namespace-packages --check-untyped-defs ."
 run-bench = "python scripts/run_bench.py"
 test = "pytest"
 

@@ -111,8 +111,8 @@ def test_thread_local_sys_module_attrs():
 
     # Let's also test "or" and "copy"
     norm = {"foo": 123}
-    thread_local = _ThreadLocalSysModules({"foo": 123})
+    thread_local = _ThreadLocalSysModules({"foo": 123}) # type: ignore[dict-item]
     assert (norm | {"bar": 456}) == (thread_local | {"bar": 456})
     norm |= {"baz": 789}
-    thread_local |= {"baz": 789}
+    thread_local |= {"baz": 789} # type: ignore
     assert norm.copy() == thread_local.copy()

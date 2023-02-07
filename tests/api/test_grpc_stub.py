@@ -93,10 +93,10 @@ async def test_python_grpc_stub():
 
     # Start server
     server = grpc_server()
-    workflow_server = SimpleWorkflowServer()
+    workflow_server = SimpleWorkflowServer() # type: ignore[abstract]
     add_WorkflowServiceServicer_to_server(workflow_server, server)
-    add_OperatorServiceServicer_to_server(SimpleOperatorServer(), server)
-    add_TestServiceServicer_to_server(SimpleTestServer(), server)
+    add_OperatorServiceServicer_to_server(SimpleOperatorServer(), server) # type: ignore[abstract]
+    add_TestServiceServicer_to_server(SimpleTestServer(), server) # type: ignore[abstract]
     port = server.add_insecure_port("[::]:0")
     await server.start()
 

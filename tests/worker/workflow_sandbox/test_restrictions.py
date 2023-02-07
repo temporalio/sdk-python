@@ -67,8 +67,8 @@ def test_workflow_sandbox_restricted_proxy():
                 "qux": SandboxMatcher(children={"foo": SandboxMatcher(access={"foo"})}),
                 "some_dict": SandboxMatcher(
                     children={
-                        "key1": SandboxMatcher(access="subkey2"),
-                        "key.2": SandboxMatcher(access="subkey2"),
+                        "key1": SandboxMatcher(access={"subkey2"}),
+                        "key.2": SandboxMatcher(access={"subkey2"}),
                     }
                 ),
             }
