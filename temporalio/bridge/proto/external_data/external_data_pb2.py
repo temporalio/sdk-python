@@ -34,7 +34,6 @@ LocalActivityMarkerData = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(LocalActivityMarkerData)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _LOCALACTIVITYMARKERDATA._serialized_start = 144
     _LOCALACTIVITYMARKERDATA._serialized_end = 398

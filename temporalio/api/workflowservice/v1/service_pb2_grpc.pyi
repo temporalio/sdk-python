@@ -518,7 +518,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse
+    ):
         """RegisterNamespace creates a new namespace which can be used as a container for all resources.
 
         A Namespace is a top level entity within Temporal, and is used as a container for resources
@@ -531,7 +533,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse
+    ):
         """DescribeNamespace returns the information and configuration for a registered namespace."""
     @abc.abstractmethod
     def ListNamespaces(
@@ -559,7 +563,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse
+    ):
         """DeprecateNamespace is used to update the state of a registered namespace to DEPRECATED.
 
         Once the namespace is deprecated it cannot be used to start new workflow executions. Existing
@@ -571,7 +577,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse
+    ):
         """StartWorkflowExecution starts a new workflow execution.
 
         It will create the execution with a `WORKFLOW_EXECUTION_STARTED` event in its history and
@@ -583,7 +591,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse
+    ):
         """GetWorkflowExecutionHistory returns the history of specified workflow execution. Fails with
         `NotFound` if the specified workflow execution is unknown to the service.
         """
@@ -592,7 +602,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse
+    ):
         """GetWorkflowExecutionHistoryReverse returns the history of specified workflow execution in reverse
         order (starting from last event). Fails with`NotFound` if the specified workflow execution is
         unknown to the service.
@@ -602,7 +614,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse
+    ):
         """PollWorkflowTaskQueue is called by workers to make progress on workflows.
 
         A WorkflowTask is dispatched to callers for active workflow executions with pending workflow
@@ -615,7 +629,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse
+    ):
         """RespondWorkflowTaskCompleted is called by workers to successfully complete workflow tasks
         they received from `PollWorkflowTaskQueue`.
 
@@ -628,7 +644,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse
+    ):
         """RespondWorkflowTaskFailed is called by workers to indicate the processing of a workflow task
         failed.
 
@@ -644,7 +662,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse
+    ):
         """PollActivityTaskQueue is called by workers to process activity tasks from a specific task
         queue.
 
@@ -663,7 +683,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse
+    ):
         """RecordActivityTaskHeartbeat is optionally called by workers while they execute activities.
 
         If worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
@@ -676,7 +698,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse
+    ):
         """See `RecordActivityTaskHeartbeat`. This version allows clients to record heartbeats by
         namespace/workflow id/activity id instead of task token.
 
@@ -688,7 +712,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse
+    ):
         """RespondActivityTaskCompleted is called by workers when they successfully complete an activity
         task.
 
@@ -701,7 +727,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse
+    ):
         """See `RecordActivityTaskCompleted`. This version allows clients to record completions by
         namespace/workflow id/activity id instead of task token.
 
@@ -713,7 +741,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse
+    ):
         """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
         This results in a new `ACTIVITY_TASK_FAILED` event being written to the workflow history and
@@ -725,7 +755,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse
+    ):
         """See `RecordActivityTaskFailed`. This version allows clients to record failures by
         namespace/workflow id/activity id instead of task token.
 
@@ -737,7 +769,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse
+    ):
         """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
         This results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
@@ -749,7 +783,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse
+    ):
         """See `RecordActivityTaskCanceled`. This version allows clients to record failures by
         namespace/workflow id/activity id instead of task token.
 
@@ -761,7 +797,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse
+    ):
         """RequestCancelWorkflowExecution is called by workers when they want to request cancellation of
         a workflow execution.
 
@@ -774,7 +812,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse
+    ):
         """SignalWorkflowExecution is used to send a signal to a running workflow execution.
 
         This results in a `WORKFLOW_EXECUTION_SIGNALED` event recorded in the history and a workflow
@@ -785,7 +825,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse
+    ):
         """SignalWithStartWorkflowExecution is used to ensure a signal is sent to a workflow, even if
         it isn't yet started.
 
@@ -804,7 +846,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse
+    ):
         """ResetWorkflowExecution will reset an existing workflow execution to a specified
         `WORKFLOW_TASK_COMPLETED` event (exclusive). It will immediately terminate the current
         execution instance.
@@ -815,7 +859,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse
+    ):
         """TerminateWorkflowExecution terminates an existing workflow execution by recording a
         `WORKFLOW_EXECUTION_TERMINATED` event in the history and immediately terminating the
         execution instance.
@@ -825,7 +871,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse
+    ):
         """DeleteWorkflowExecution asynchronously deletes a specific Workflow Execution (when
         WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
         WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
@@ -840,56 +888,72 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse
+    ):
         """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace."""
     @abc.abstractmethod
     def ListClosedWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse
+    ):
         """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace."""
     @abc.abstractmethod
     def ListWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse
+    ):
         """ListWorkflowExecutions is a visibility API to list workflow executions in a specific namespace."""
     @abc.abstractmethod
     def ListArchivedWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse
+    ):
         """ListArchivedWorkflowExecutions is a visibility API to list archived workflow executions in a specific namespace."""
     @abc.abstractmethod
     def ScanWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse
+    ):
         """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order."""
     @abc.abstractmethod
     def CountWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse
+    ):
         """CountWorkflowExecutions is a visibility API to count of workflow executions in a specific namespace."""
     @abc.abstractmethod
     def GetSearchAttributes(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse
+    ):
         """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs"""
     @abc.abstractmethod
     def RespondQueryTaskCompleted(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse
+    ):
         """RespondQueryTaskCompleted is called by workers to complete queries which were delivered on
         the `query` (not `queries`) field of a `PollWorkflowTaskQueueResponse`.
 
@@ -901,7 +965,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse
+    ):
         """ResetStickyTaskQueue resets the sticky task queue related information in the mutable state of
         a given workflow. This is prudent for workers to perform if a workflow has been paged out of
         their cache.
@@ -922,14 +988,18 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse
+    ):
         """DescribeWorkflowExecution returns information about the specified workflow execution."""
     @abc.abstractmethod
     def DescribeTaskQueue(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse
+    ):
         """DescribeTaskQueue returns information about the target task queue."""
     @abc.abstractmethod
     def GetClusterInfo(
@@ -950,7 +1020,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse: ...
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse
+    ): ...
     @abc.abstractmethod
     def CreateSchedule(
         self,
@@ -970,7 +1042,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse
+    ):
         """Returns the schedule description and current state of an existing schedule."""
     @abc.abstractmethod
     def UpdateSchedule(
@@ -999,7 +1073,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse
+    ):
         """Lists matching times within a range."""
     @abc.abstractmethod
     def DeleteSchedule(
@@ -1025,7 +1101,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse
+    ):
         """Allows users to specify a graph of worker build id based versions on a
         per task queue basis. Versions are ordered, and may be either compatible
         with some extant version, or a new incompatible version.
@@ -1039,7 +1117,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse
+    ):
         """Fetches the worker build id versioning graph for some task queue."""
     @abc.abstractmethod
     def UpdateWorkflow(
@@ -1056,28 +1136,36 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse
+    ):
         """StartBatchOperation starts a new batch operation"""
     @abc.abstractmethod
     def StopBatchOperation(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse
+    ):
         """StopBatchOperation stops a batch operation"""
     @abc.abstractmethod
     def DescribeBatchOperation(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse
+    ):
         """DescribeBatchOperation returns the information about a batch operation"""
     @abc.abstractmethod
     def ListBatchOperations(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse
+    ):
         """ListBatchOperations returns a list of batch operations"""
 
 def add_WorkflowServiceServicer_to_server(

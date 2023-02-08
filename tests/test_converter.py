@@ -22,7 +22,6 @@ from typing import (
     Set,
     Text,
     Tuple,
-    Type,
     Union,
 )
 from uuid import UUID, uuid4
@@ -169,6 +168,7 @@ def test_binary_proto():
     conv = BinaryProtoPayloadConverter()
     proto = temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
     payload = conv.to_payload(proto)
+    assert payload
     assert payload.metadata["encoding"] == b"binary/protobuf"
     assert (
         payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
@@ -180,11 +180,11 @@ def test_binary_proto():
 
 def test_encode_search_attribute_values():
     with pytest.raises(TypeError, match="of type tuple not one of"):
-        encode_search_attribute_values([("bad type",)])
+        encode_search_attribute_values([("bad type",)])  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="Timezone must be present"):
         encode_search_attribute_values([datetime.utcnow()])
     with pytest.raises(TypeError, match="must have the same type"):
-        encode_search_attribute_values(["foo", 123])
+        encode_search_attribute_values(["foo", 123])  # type: ignore[arg-type]
 
 
 def test_decode_search_attributes():
@@ -254,18 +254,20 @@ def test_json_type_hints():
     converter = JSONPlainPayloadConverter()
 
     def ok(
-        hint: Type, value: Any, expected_result: Any = temporalio.common._arg_unset
+        hint: Any, value: Any, expected_result: Any = temporalio.common._arg_unset
     ) -> None:
         payload = converter.to_payload(value)
+        assert payload
         converted_value = converter.from_payload(payload, hint)
         if expected_result is not temporalio.common._arg_unset:
             assert expected_result == converted_value
         else:
             assert converted_value == value
 
-    def fail(hint: Type, value: Any) -> None:
+    def fail(hint: Any, value: Any) -> None:
         with pytest.raises(Exception):
             payload = converter.to_payload(value)
+            assert payload
             converter.from_payload(payload, hint)
 
     # Primitives
@@ -477,6 +479,7 @@ async def test_failure_encoded_attributes():
         failure_converter_class=DefaultFailureConverterWithEncodedAttributes,
         payload_codec=SimpleCodec(),
     )
+    assert conv.payload_codec
 
     # Check failure
     failure = Failure()

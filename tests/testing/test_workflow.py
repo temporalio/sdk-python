@@ -124,6 +124,7 @@ async def test_workflow_env_time_skipping_heartbeat_timeout():
                 )
             # Check the causes until heartbeat timeout
             assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, TimeoutError)
             assert isinstance(err.value.cause.cause.cause, TimeoutError)
             assert err.value.cause.cause.cause.type == TimeoutType.HEARTBEAT
 

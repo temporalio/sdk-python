@@ -614,7 +614,9 @@ class PollWorkflowActivationResponse(google.protobuf.message.Message):
     @property
     def activation(
         self,
-    ) -> temporalio.bridge.proto.workflow_activation.workflow_activation_pb2.WorkflowActivation: ...
+    ) -> (
+        temporalio.bridge.proto.workflow_activation.workflow_activation_pb2.WorkflowActivation
+    ): ...
     @property
     def error(self) -> global___PollWorkflowActivationResponse.Error: ...
     def __init__(
@@ -714,7 +716,9 @@ class CompleteWorkflowActivationRequest(google.protobuf.message.Message):
     @property
     def completion(
         self,
-    ) -> temporalio.bridge.proto.workflow_completion.workflow_completion_pb2.WorkflowActivationCompletion: ...
+    ) -> (
+        temporalio.bridge.proto.workflow_completion.workflow_completion_pb2.WorkflowActivationCompletion
+    ): ...
     def __init__(
         self,
         *,

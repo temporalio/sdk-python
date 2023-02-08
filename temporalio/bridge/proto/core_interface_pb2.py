@@ -72,7 +72,6 @@ ActivityTaskCompletion = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(ActivityTaskCompletion)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _ACTIVITYHEARTBEAT._serialized_start = 576
     _ACTIVITYHEARTBEAT._serialized_end = 665

@@ -103,7 +103,6 @@ Cancellation = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(Cancellation)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _PARENTCLOSEPOLICY._serialized_start = 585
     _PARENTCLOSEPOLICY._serialized_end = 749

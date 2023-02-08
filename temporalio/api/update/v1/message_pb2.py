@@ -35,7 +35,6 @@ WorkflowUpdate = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(WorkflowUpdate)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.update.v1B\014MessageProtoP\001Z#go.temporal.io/api/update/v1;update\252\002\026Temporal.Api.Update.V1\352\002\031Temporal::Api::Update::V1"
     _WORKFLOWUPDATE._serialized_start = 102

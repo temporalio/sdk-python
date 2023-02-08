@@ -24,7 +24,6 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
 
 _WORKFLOWSERVICE = DESCRIPTOR.services_by_name["WorkflowService"]
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n"io.temporal.api.workflowservice.v1B\014ServiceProtoP\001Z5go.temporal.io/api/workflowservice/v1;workflowservice\252\002!Temporalio.Api.WorkflowService.V1\352\002$Temporalio::Api::WorkflowService::V1'
     _WORKFLOWSERVICE._serialized_start = 139

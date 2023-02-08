@@ -67,7 +67,6 @@ Failure = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(Failure)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _WORKFLOWACTIVATIONCOMPLETION._serialized_start = 236
     _WORKFLOWACTIVATIONCOMPLETION._serialized_end = 408

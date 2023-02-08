@@ -38,10 +38,10 @@ async def some_hinted_func_async(foo: str) -> DefinedLater:
 
 class MyCallableClass:
     def __call__(self, foo: str) -> DefinedLater:
-        pass
+        raise NotImplementedError
 
     def some_method(self, foo: str) -> DefinedLater:
-        pass
+        raise NotImplementedError
 
 
 @dataclass

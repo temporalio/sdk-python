@@ -126,7 +126,6 @@ GetCurrentTimeResponse = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(GetCurrentTimeResponse)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\036io.temporal.api.testservice.v1B\024RequestResponseProtoP\001Z-go.temporal.io/api/testservice/v1;testservice\252\002\035Temporalio.Api.TestService.V1\352\002 Temporalio::Api::TestService::V1"
     _SLEEPUNTILREQUEST.fields_by_name["timestamp"]._options = None

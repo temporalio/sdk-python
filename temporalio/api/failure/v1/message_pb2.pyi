@@ -423,15 +423,18 @@ class Failure(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["failure_info", b"failure_info"]
-    ) -> typing_extensions.Literal[
-        "application_failure_info",
-        "timeout_failure_info",
-        "canceled_failure_info",
-        "terminated_failure_info",
-        "server_failure_info",
-        "reset_workflow_failure_info",
-        "activity_failure_info",
-        "child_workflow_execution_failure_info",
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal[
+            "application_failure_info",
+            "timeout_failure_info",
+            "canceled_failure_info",
+            "terminated_failure_info",
+            "server_failure_info",
+            "reset_workflow_failure_info",
+            "activity_failure_info",
+            "child_workflow_execution_failure_info",
+        ]
+        | None
+    ): ...
 
 global___Failure = Failure

@@ -275,7 +275,6 @@ ClusterMetadata = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(ClusterMetadata)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n"io.temporal.api.operatorservice.v1B\024RequestResponseProtoP\001Z5go.temporal.io/api/operatorservice/v1;operatorservice\252\002!Temporalio.Api.OperatorService.V1\352\002$Temporalio::Api::OperatorService::V1'
     _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._options = None

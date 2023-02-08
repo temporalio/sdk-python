@@ -229,7 +229,6 @@ ScheduleListEntry = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(ScheduleListEntry)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\033io.temporal.api.schedule.v1B\014MessageProtoP\001Z'go.temporal.io/api/schedule/v1;schedule\252\002\032Temporalio.Api.Schedule.V1\352\002\035Temporalio::Api::Schedule::V1"
     _INTERVALSPEC.fields_by_name["interval"]._options = None

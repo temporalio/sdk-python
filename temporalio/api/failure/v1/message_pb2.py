@@ -136,7 +136,6 @@ Failure = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(Failure)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.failure.v1B\014MessageProtoP\001Z%go.temporal.io/api/failure/v1;failure\252\002\031Temporalio.Api.Failure.V1\352\002\034Temporalio::Api::Failure::V1"
     _APPLICATIONFAILUREINFO._serialized_start = 142

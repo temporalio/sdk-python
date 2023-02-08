@@ -741,7 +741,6 @@ History = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(History)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.history.v1B\014MessageProtoP\001Z%go.temporal.io/api/history/v1;history\252\002\031Temporalio.Api.History.V1\352\002\034Temporalio::Api::History::V1"
     _WORKFLOWEXECUTIONSTARTEDEVENTATTRIBUTES.fields_by_name[
