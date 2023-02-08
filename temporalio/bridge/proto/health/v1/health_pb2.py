@@ -47,7 +47,6 @@ _sym_db.RegisterMessage(HealthCheckResponse)
 
 _HEALTH = DESCRIPTOR.services_by_name["Health"]
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\021io.grpc.health.v1B\013HealthProtoP\001Z,google.golang.org/grpc/health/grpc_health_v1\252\002\016Grpc.Health.V1"
     _HEALTHCHECKREQUEST._serialized_start = 42

@@ -211,7 +211,6 @@ WorkflowNotReadyFailure = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(WorkflowNotReadyFailure)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\037io.temporal.api.errordetails.v1B\014MessageProtoP\001Z/go.temporal.io/api/errordetails/v1;errordetails\252\002\036Temporalio.Api.ErrorDetails.V1\352\002!Temporalio::Api::ErrorDetails::V1"
     _NOTFOUNDFAILURE._serialized_start = 195

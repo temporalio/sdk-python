@@ -14,6 +14,8 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
+assert sys.version_info >= (3, 9)
+
 
 @workflow.defn
 class BenchWorkflow:

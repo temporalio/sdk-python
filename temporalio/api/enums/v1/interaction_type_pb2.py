@@ -27,7 +27,6 @@ INTERACTION_TYPE_WORKFLOW_SIGNAL = 3
 
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\024InteractionTypeProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _INTERACTIONTYPE._serialized_start = 72

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextvars
 import inspect
 import logging
 import multiprocessing
@@ -668,9 +669,9 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                 assert cancelled_event
                 worker_shutdown_event = self._worker._worker_shutdown_event
                 assert worker_shutdown_event
-                return await loop.run_in_executor(
-                    input.executor,
-                    _execute_sync_activity,
+                # Prepare func and args
+                func: Callable = _execute_sync_activity
+                args = [
                     info,
                     heartbeat,
                     self._running_activity.cancel_thread_raiser,
@@ -679,7 +680,16 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     worker_shutdown_event.thread_event,
                     input.fn,
                     *input.args,
-                )
+                ]
+                # If we're threaded, we want to pass the context through. We
+                # have to do this manually, see
+                # https://github.com/python/cpython/issues/78195.
+                if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
+                    current_context = contextvars.copy_context()
+                    args.insert(0, func)
+                    func = current_context.run
+                # Invoke
+                return await loop.run_in_executor(input.executor, func, *args)
             finally:
                 if shared_manager:
                     await shared_manager.unregister_heartbeater(info.task_token)

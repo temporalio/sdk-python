@@ -142,7 +142,6 @@ VersionId = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(VersionId)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\034io.temporal.api.taskqueue.v1B\014MessageProtoP\001Z)go.temporal.io/api/taskqueue/v1;taskqueue\252\002\033Temporalio.Api.TaskQueue.V1\352\002\036Temporalio::Api::TaskQueue::V1"
     _POLLERINFO.fields_by_name["last_access_time"]._options = None

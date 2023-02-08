@@ -95,7 +95,6 @@ BatchOperationDeletion = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(BatchOperationDeletion)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.batch.v1B\014MessageProtoP\001Z!go.temporal.io/api/batch/v1;batch\252\002\027Temporalio.Api.Batch.V1\352\002\032Temporalio::Api::Batch::V1"
     _BATCHOPERATIONINFO.fields_by_name["start_time"]._options = None

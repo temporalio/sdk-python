@@ -485,7 +485,7 @@ class Worker:
                 await self.run()
             except BaseException as err:
                 self._async_context_run_exception = err
-                self._async_context_inner_task.cancel()
+                self._async_context_inner_task.cancel()  # type: ignore[union-attr]
 
         self._async_context_run_task = asyncio.create_task(run())
         return self

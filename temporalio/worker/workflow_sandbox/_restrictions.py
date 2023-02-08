@@ -308,7 +308,7 @@ class SandboxMatcher:
             if child_path[0] in self.use:
                 to_replace["use"] = set(self.use)
                 to_replace["use"].remove(child_path[0])
-            if child_path in self.children:
+            if child_path[0] in self.children:
                 to_replace["children"] = dict(self.children)
                 del to_replace["children"][child_path[0]]
         elif child_path[0] in self.children:

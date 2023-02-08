@@ -2881,9 +2881,10 @@ class ListClosedWorkflowExecutionsRequest(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["filters", b"filters"]
-    ) -> typing_extensions.Literal[
-        "execution_filter", "type_filter", "status_filter"
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal["execution_filter", "type_filter", "status_filter"]
+        | None
+    ): ...
 
 global___ListClosedWorkflowExecutionsRequest = ListClosedWorkflowExecutionsRequest
 
@@ -4695,12 +4696,15 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["operation", b"operation"]
-    ) -> typing_extensions.Literal[
-        "termination_operation",
-        "signal_operation",
-        "cancellation_operation",
-        "deletion_operation",
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal[
+            "termination_operation",
+            "signal_operation",
+            "cancellation_operation",
+            "deletion_operation",
+        ]
+        | None
+    ): ...
 
 global___StartBatchOperationRequest = StartBatchOperationRequest
 

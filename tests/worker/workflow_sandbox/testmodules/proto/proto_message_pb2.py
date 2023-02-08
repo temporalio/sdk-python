@@ -33,7 +33,6 @@ SomeMessage = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(SomeMessage)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _SOMEMESSAGE._serialized_start = 140
     _SOMEMESSAGE._serialized_end = 203

@@ -1148,24 +1148,27 @@ class Command(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["attributes", b"attributes"]
-    ) -> typing_extensions.Literal[
-        "schedule_activity_task_command_attributes",
-        "start_timer_command_attributes",
-        "complete_workflow_execution_command_attributes",
-        "fail_workflow_execution_command_attributes",
-        "request_cancel_activity_task_command_attributes",
-        "cancel_timer_command_attributes",
-        "cancel_workflow_execution_command_attributes",
-        "request_cancel_external_workflow_execution_command_attributes",
-        "record_marker_command_attributes",
-        "continue_as_new_workflow_execution_command_attributes",
-        "start_child_workflow_execution_command_attributes",
-        "signal_external_workflow_execution_command_attributes",
-        "upsert_workflow_search_attributes_command_attributes",
-        "accept_workflow_update_command_attributes",
-        "complete_workflow_update_command_attributes",
-        "modify_workflow_properties_command_attributes",
-        "reject_workflow_update_command_attributes",
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal[
+            "schedule_activity_task_command_attributes",
+            "start_timer_command_attributes",
+            "complete_workflow_execution_command_attributes",
+            "fail_workflow_execution_command_attributes",
+            "request_cancel_activity_task_command_attributes",
+            "cancel_timer_command_attributes",
+            "cancel_workflow_execution_command_attributes",
+            "request_cancel_external_workflow_execution_command_attributes",
+            "record_marker_command_attributes",
+            "continue_as_new_workflow_execution_command_attributes",
+            "start_child_workflow_execution_command_attributes",
+            "signal_external_workflow_execution_command_attributes",
+            "upsert_workflow_search_attributes_command_attributes",
+            "accept_workflow_update_command_attributes",
+            "complete_workflow_update_command_attributes",
+            "modify_workflow_properties_command_attributes",
+            "reject_workflow_update_command_attributes",
+        ]
+        | None
+    ): ...
 
 global___Command = Command

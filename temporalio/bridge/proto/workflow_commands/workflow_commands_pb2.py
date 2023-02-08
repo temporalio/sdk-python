@@ -441,7 +441,6 @@ ModifyWorkflowProperties = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(ModifyWorkflowProperties)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     _SCHEDULEACTIVITY_HEADERSENTRY._options = None
     _SCHEDULEACTIVITY_HEADERSENTRY._serialized_options = b"8\001"

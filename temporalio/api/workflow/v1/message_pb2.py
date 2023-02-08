@@ -136,7 +136,6 @@ NewWorkflowExecutionInfo = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(NewWorkflowExecutionInfo)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\033io.temporal.api.workflow.v1B\014MessageProtoP\001Z'go.temporal.io/api/workflow/v1;workflow\252\002\032Temporalio.Api.Workflow.V1\352\002\035Temporalio::Api::Workflow::V1"
     _WORKFLOWEXECUTIONINFO.fields_by_name["start_time"]._options = None

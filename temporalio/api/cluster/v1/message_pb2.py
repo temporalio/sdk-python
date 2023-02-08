@@ -36,7 +36,6 @@ _builder.BuildTopDescriptorsAndMessages(
     DESCRIPTOR, "temporal.api.cluster.v1.message_pb2", globals()
 )
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.cluster.v1B\014MessageProtoP\001Z%go.temporal.io/api/cluster/v1;cluster\252\002\027Temporal.Api.Cluster.V1\352\002\032Temporal::Api::Cluster::V1"
     _CLUSTERMETADATA_INDEXSEARCHATTRIBUTESENTRY._options = None

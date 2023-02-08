@@ -194,7 +194,6 @@ RetryPolicy = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(RetryPolicy)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.common.v1B\014MessageProtoP\001Z#go.temporal.io/api/common/v1;common\252\002\030Temporalio.Api.Common.V1\352\002\033Temporalio::Api::Common::V1"
     _PAYLOAD_METADATAENTRY._options = None

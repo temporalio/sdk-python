@@ -76,7 +76,6 @@ StatusFilter = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(StatusFilter)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.filter.v1B\014MessageProtoP\001Z#go.temporal.io/api/filter/v1;filter\252\002\030Temporalio.Api.Filter.V1\352\002\033Temporalio::Api::Filter::V1"
     _STARTTIMEFILTER.fields_by_name["earliest_time"]._options = None

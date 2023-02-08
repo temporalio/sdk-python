@@ -10,6 +10,7 @@ import threading
 import time
 import uuid
 from concurrent.futures.process import BrokenProcessPool
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, NoReturn, Optional, Sequence
@@ -32,7 +33,14 @@ from temporalio.exceptions import (
     TimeoutType,
 )
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import SharedStateManager, Worker, WorkerConfig
+from temporalio.worker import (
+    ActivityInboundInterceptor,
+    ExecuteActivityInput,
+    Interceptor,
+    SharedStateManager,
+    Worker,
+    WorkerConfig,
+)
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -1070,6 +1078,40 @@ async def test_activity_async_cancel(
     assert isinstance(err.value.cause, ActivityError)
     assert isinstance(err.value.cause.cause, CancelledError)
     assert list(err.value.cause.cause.details) == ["cancel details"]
+
+
+some_context_var: ContextVar[str] = ContextVar("some_context_var", default="unset")
+
+
+class ContextVarInterceptor(Interceptor):
+    def intercept_activity(
+        self, next: ActivityInboundInterceptor
+    ) -> ActivityInboundInterceptor:
+        return super().intercept_activity(ContextVarActivityInboundInterceptor(next))
+
+
+class ContextVarActivityInboundInterceptor(ActivityInboundInterceptor):
+    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
+        some_context_var.set("some value!")
+        return await super().execute_activity(input)
+
+
+async def test_sync_activity_contextvars(client: Client, worker: ExternalWorker):
+    @activity.defn
+    def some_activity() -> str:
+        return f"context var: {some_context_var.get()}"
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            some_activity,
+            worker_config={
+                "activity_executor": executor,
+                "interceptors": [ContextVarInterceptor()],
+            },
+        )
+    assert result.result == "context var: some value!"
 
 
 @dataclass

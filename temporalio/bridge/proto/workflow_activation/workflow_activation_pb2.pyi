@@ -251,21 +251,24 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal[
-        "start_workflow",
-        "fire_timer",
-        "update_random_seed",
-        "query_workflow",
-        "cancel_workflow",
-        "signal_workflow",
-        "resolve_activity",
-        "notify_has_patch",
-        "resolve_child_workflow_execution_start",
-        "resolve_child_workflow_execution",
-        "resolve_signal_external_workflow",
-        "resolve_request_cancel_external_workflow",
-        "remove_from_cache",
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal[
+            "start_workflow",
+            "fire_timer",
+            "update_random_seed",
+            "query_workflow",
+            "cancel_workflow",
+            "signal_workflow",
+            "resolve_activity",
+            "notify_has_patch",
+            "resolve_child_workflow_execution_start",
+            "resolve_child_workflow_execution",
+            "resolve_signal_external_workflow",
+            "resolve_request_cancel_external_workflow",
+            "remove_from_cache",
+        ]
+        | None
+    ): ...
 
 global___WorkflowActivationJob = WorkflowActivationJob
 
@@ -555,7 +558,9 @@ class ResolveActivity(google.protobuf.message.Message):
     @property
     def result(
         self,
-    ) -> temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution: ...
+    ) -> (
+        temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution
+    ): ...
     def __init__(
         self,
         *,
@@ -728,7 +733,9 @@ class ResolveChildWorkflowExecution(google.protobuf.message.Message):
     @property
     def result(
         self,
-    ) -> temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowResult: ...
+    ) -> (
+        temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowResult
+    ): ...
     def __init__(
         self,
         *,

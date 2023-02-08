@@ -65,7 +65,6 @@ QueryRejected = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(QueryRejected)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.query.v1B\014MessageProtoP\001Z!go.temporal.io/api/query/v1;query\252\002\027Temporalio.Api.Query.V1\352\002\032Temporalio::Api::Query::V1"
     _WORKFLOWQUERY._serialized_start = 174

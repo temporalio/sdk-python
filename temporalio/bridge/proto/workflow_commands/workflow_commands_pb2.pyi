@@ -262,27 +262,30 @@ class WorkflowCommand(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal[
-        "start_timer",
-        "schedule_activity",
-        "respond_to_query",
-        "request_cancel_activity",
-        "cancel_timer",
-        "complete_workflow_execution",
-        "fail_workflow_execution",
-        "continue_as_new_workflow_execution",
-        "cancel_workflow_execution",
-        "set_patch_marker",
-        "start_child_workflow_execution",
-        "cancel_child_workflow_execution",
-        "request_cancel_external_workflow_execution",
-        "signal_external_workflow_execution",
-        "cancel_signal_workflow",
-        "schedule_local_activity",
-        "request_cancel_local_activity",
-        "upsert_workflow_search_attributes",
-        "modify_workflow_properties",
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal[
+            "start_timer",
+            "schedule_activity",
+            "respond_to_query",
+            "request_cancel_activity",
+            "cancel_timer",
+            "complete_workflow_execution",
+            "fail_workflow_execution",
+            "continue_as_new_workflow_execution",
+            "cancel_workflow_execution",
+            "set_patch_marker",
+            "start_child_workflow_execution",
+            "cancel_child_workflow_execution",
+            "request_cancel_external_workflow_execution",
+            "signal_external_workflow_execution",
+            "cancel_signal_workflow",
+            "schedule_local_activity",
+            "request_cancel_local_activity",
+            "upsert_workflow_search_attributes",
+            "modify_workflow_properties",
+        ]
+        | None
+    ): ...
 
 global___WorkflowCommand = WorkflowCommand
 
@@ -1348,9 +1351,9 @@ class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["target", b"target"]
-    ) -> typing_extensions.Literal[
-        "workflow_execution", "child_workflow_id"
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal["workflow_execution", "child_workflow_id"] | None
+    ): ...
 
 global___RequestCancelExternalWorkflowExecution = RequestCancelExternalWorkflowExecution
 
@@ -1459,9 +1462,9 @@ class SignalExternalWorkflowExecution(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["target", b"target"]
-    ) -> typing_extensions.Literal[
-        "workflow_execution", "child_workflow_id"
-    ] | None: ...
+    ) -> (
+        typing_extensions.Literal["workflow_execution", "child_workflow_id"] | None
+    ): ...
 
 global___SignalExternalWorkflowExecution = SignalExternalWorkflowExecution
 

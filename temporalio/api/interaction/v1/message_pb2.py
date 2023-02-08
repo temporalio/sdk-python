@@ -77,7 +77,6 @@ Invocation = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(Invocation)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\036io.temporal.api.interaction.v1B\014MessageProtoP\001Z-go.temporal.io/api/interaction/v1;interaction\252\002\035Temporalio.Api.Interaction.V1\352\002 Temporalio::Api::Interaction::V1"
     _META._serialized_start = 198

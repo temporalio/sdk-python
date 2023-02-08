@@ -308,7 +308,6 @@ Command = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(Command)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.command.v1B\014MessageProtoP\001Z%go.temporal.io/api/command/v1;command\252\002\031Temporalio.Api.Command.V1\352\002\034Temporalio::Api::Command::V1"
     _SCHEDULEACTIVITYTASKCOMMANDATTRIBUTES.fields_by_name[
