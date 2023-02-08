@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import ipaddress
 import logging
 import sys
 import traceback
@@ -22,6 +23,7 @@ from typing import (
     Set,
     Text,
     Tuple,
+    Type,
     Union,
 )
 from uuid import UUID, uuid4
@@ -37,11 +39,16 @@ from temporalio.api.common.v1 import Payload as AnotherNameForPayload
 from temporalio.api.common.v1 import Payloads
 from temporalio.api.failure.v1 import Failure
 from temporalio.converter import (
+    AdvancedJSONEncoder,
     BinaryProtoPayloadConverter,
+    CompositePayloadConverter,
     DataConverter,
     DefaultFailureConverterWithEncodedAttributes,
+    DefaultPayloadConverter,
     JSONPlainPayloadConverter,
+    JSONTypeConverter,
     PayloadCodec,
+    _JSONTypeConverterUnhandled,
     decode_search_attributes,
     encode_search_attribute_values,
 )
@@ -516,3 +523,56 @@ async def test_failure_encoded_attributes():
         not in failure.application_failure_info.details.payloads[0].metadata
     )
     assert failure == orig_failure
+
+
+class IPv4AddressPayloadConverter(CompositePayloadConverter):
+    def __init__(self) -> None:
+        # Replace default JSON plain with our own that has our type converter
+        json_converter = JSONPlainPayloadConverter(
+            encoder=IPv4AddressJSONEncoder,
+            custom_type_converters=[IPv4AddressJSONTypeConverter()],
+        )
+        super().__init__(
+            *[
+                c if not isinstance(c, JSONPlainPayloadConverter) else json_converter
+                for c in DefaultPayloadConverter.default_encoding_payload_converters
+            ]
+        )
+
+
+class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
+    def default(self, o: Any) -> Any:
+        if isinstance(o, ipaddress.IPv4Address):
+            return str(o)
+        return super().default(o)
+
+
+class IPv4AddressJSONTypeConverter(JSONTypeConverter):
+    def to_typed_value(
+        self, hint: Type, value: Any
+    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+        if issubclass(hint, ipaddress.IPv4Address):
+            return ipaddress.IPv4Address(value)
+        return JSONTypeConverter.Unhandled
+
+
+async def test_json_type_converter():
+    addr = ipaddress.IPv4Address("1.2.3.4")
+    custom_conv = dataclasses.replace(
+        DataConverter.default, payload_converter_class=IPv4AddressPayloadConverter
+    )
+
+    # Fails to encode with default
+    with pytest.raises(TypeError):
+        await DataConverter.default.encode([addr])
+
+    # But encodes with custom
+    payload = (await custom_conv.encode([addr]))[0]
+    assert '"1.2.3.4"' == payload.data.decode()
+
+    # Fails to decode with default
+    with pytest.raises(TypeError):
+        await DataConverter.default.decode([payload], [ipaddress.IPv4Address])
+
+    # But decodes with custom
+    assert addr == (await custom_conv.decode([payload], [ipaddress.IPv4Address]))[0]
