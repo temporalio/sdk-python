@@ -351,8 +351,6 @@ class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
         if isinstance(o, ipaddress.IPv4Address):
             return str(o)
         return super().default(o)
-
-
 class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
         self, hint: Type, value: Any
