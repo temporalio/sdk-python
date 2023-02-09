@@ -20,16 +20,6 @@ class TemporalError(Exception):
         return self.__cause__
 
 
-class WorkflowAlreadyStartedError(TemporalError):
-    """Thrown by a client or workflow when a workflow execution has already started."""
-
-    def __init__(self, workflow_id: str, workflow_type: str) -> None:
-        """Initialize a workflow already started error."""
-        super().__init__("Workflow execution already started")
-        self.workflow_id = workflow_id
-        self.workflow_type = workflow_type
-
-
 class FailureError(TemporalError):
     """Base for runtime failures during workflow/activity execution."""
 
@@ -56,6 +46,26 @@ class FailureError(TemporalError):
     def failure(self) -> Optional[temporalio.api.failure.v1.Failure]:
         """Underlying protobuf failure object."""
         return self._failure
+
+
+class WorkflowAlreadyStartedError(FailureError):
+    """Thrown by a client or workflow when a workflow execution has already started.
+
+    Attributes:
+        workflow_id: ID of the already-started workflow.
+        workflow_type: Workflow type name of the already-started workflow.
+        run_id: Run ID of the already-started workflow if this was raised by the
+            client.
+    """
+
+    def __init__(
+        self, workflow_id: str, workflow_type: str, *, run_id: Optional[str] = None
+    ) -> None:
+        """Initialize a workflow already started error."""
+        super().__init__("Workflow execution already started")
+        self.workflow_id = workflow_id
+        self.workflow_type = workflow_type
+        self.run_id = run_id
 
 
 class ApplicationError(FailureError):
