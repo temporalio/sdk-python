@@ -23,6 +23,7 @@ from typing import (
     Dict,
     List,
     Mapping,
+    NewType,
     Optional,
     Sequence,
     Tuple,
@@ -458,6 +459,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         encoder: Optional[Type[json.JSONEncoder]] = AdvancedJSONEncoder,
         decoder: Optional[Type[json.JSONDecoder]] = None,
         encoding: str = "json/plain",
+        custom_type_converters: Sequence[JSONTypeConverter] = [],
     ) -> None:
         """Initialize a JSON data converter.
 
@@ -465,11 +467,14 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
             encoder: Custom encoder class object to use.
             decoder: Custom decoder class object to use.
             encoding: Encoding name to use.
+            custom_type_converters: Set of custom type converters that are used
+                when converting from a payload to type-hinted values.
         """
         super().__init__()
         self._encoder = encoder
         self._decoder = decoder
         self._encoding = encoding
+        self._custom_type_converters = custom_type_converters
 
     @property
     def encoding(self) -> str:
@@ -500,10 +505,41 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         try:
             obj = json.loads(payload.data, cls=self._decoder)
             if type_hint:
-                obj = value_to_type(type_hint, obj)
+                obj = value_to_type(type_hint, obj, self._custom_type_converters)
             return obj
         except json.JSONDecodeError as err:
             raise RuntimeError("Failed parsing") from err
+
+
+_JSONTypeConverterUnhandled = NewType("_JSONTypeConverterUnhandled", object)
+
+
+class JSONTypeConverter(ABC):
+    """Converter for converting an object from Python :py:func:`json.loads`
+    result (e.g. scalar, list, or dict) to a known type.
+    """
+
+    Unhandled = _JSONTypeConverterUnhandled(object())
+    """Sentinel value that must be used as the result of
+    :py:meth:`to_typed_value` to say the given type is not handled by this
+    converter."""
+
+    @abstractmethod
+    def to_typed_value(
+        self, hint: Type, value: Any
+    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+        """Convert the given value to a type based on the given hint.
+
+        Args:
+            hint: Type hint to use to help in converting the value.
+            value: Value as returned by :py:func:`json.loads`. Usually a scalar,
+                list, or dict.
+
+        Returns:
+            The converted value or :py:attr:`Unhandled` if this converter does
+            not handle this situation.
+        """
+        raise NotImplementedError
 
 
 class PayloadCodec(ABC):
@@ -1112,7 +1148,11 @@ def decode_search_attributes(
     return ret
 
 
-def value_to_type(hint: Type, value: Any) -> Any:
+def value_to_type(
+    hint: Type,
+    value: Any,
+    custom_converters: Sequence[JSONTypeConverter] = [],
+) -> Any:
     """Convert a given value to the given type hint.
 
     This is used internally to convert a raw JSON loaded value to a specific
@@ -1121,6 +1161,10 @@ def value_to_type(hint: Type, value: Any) -> Any:
     Args:
         hint: Type hint to convert the value to.
         value: Raw value (e.g. primitive, dict, or list) to convert from.
+        custom_converters: Set of custom converters to try before doing default
+            conversion. Converters are tried in order and the first value that
+            is not :py:attr:`JSONTypeConverter.Unhandled` will be returned from
+            this function instead of doing default behavior.
 
     Returns:
         Converted value.
@@ -1128,6 +1172,12 @@ def value_to_type(hint: Type, value: Any) -> Any:
     Raises:
         TypeError: Unable to convert to the given hint.
     """
+    # Try custom converters
+    for conv in custom_converters:
+        ret = conv.to_typed_value(hint, value)
+        if ret is not JSONTypeConverter.Unhandled:
+            return ret
+
     # Any or primitives
     if hint is Any:
         return value

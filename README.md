@@ -47,6 +47,7 @@ event loop. This means task management, sleep, cancellation, etc have all been d
 - [Usage](#usage)
     - [Client](#client)
       - [Data Conversion](#data-conversion)
+        - [Custom Type Data Conversion](#custom-type-data-conversion)
     - [Workers](#workers)
     - [Workflows](#workflows)
       - [Definition](#definition)
@@ -268,21 +269,118 @@ The default data converter supports converting multiple types including:
   * Iterables including ones JSON dump may not support by default, e.g. `set`
   * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
     [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
-    * Note, this doesn't mean every Pydantic field can be converted, only fields which the data converter supports
+    * The default data converter is deprecated for Pydantic models and will warn if used since not all fields work.
+      See [this sample](https://github.com/temporalio/samples-python/tree/main/pydantic_converter) for the recommended
+      approach.
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
 
 This notably doesn't include any `date`, `time`, or `datetime` objects as they may not work across SDKs.
 
+Users are strongly encouraged to use a single `dataclass` for parameter and return types so fields with defaults can be
+easily added without breaking compatibility.
+
 Classes with generics may not have the generics properly resolved. The current implementation, similar to Pydantic, does
 not have generic type resolution. Users should use concrete types.
+
+##### Custom Type Data Conversion
 
 For converting from JSON, the workflow/activity type hint is taken into account to convert to the proper type. Care has
 been taken to support all common typings including `Optional`, `Union`, all forms of iterables and mappings, `NewType`,
 etc in addition to the regular JSON values mentioned before.
 
-Users are strongly encouraged to use a single `dataclass` for parameter and return types so fields with defaults can be
-easily added without breaking compatibility.
+Data converters contain a reference to a payload converter class that is used to convert to/from payloads/values. This
+is a class and not an instance because it is instantiated on every workflow run inside the sandbox. The payload
+converter is usually a `CompositePayloadConverter` which contains a multiple `EncodingPayloadConverter`s it uses to try
+to serialize/deserialize payloads. Upon serialization, each `EncodingPayloadConverter` is tried until one succeeds. The
+`EncodingPayloadConverter` provides an "encoding" string serialized onto the payload so that, upon deserialization, the
+specific `EncodingPayloadConverter` for the given "encoding" is used.
+
+The default data converter uses the `DefaultPayloadConverter` which is simply a `CompositePayloadConverter` with a known
+set of default `EncodingPayloadConverter`s. To implement a custom encoding for a custom type, a new
+`EncodingPayloadConverter` can be created for the new type. For example, to support `IPv4Address` types:
+
+```python
+class IPv4AddressEncodingPayloadConverter(EncodingPayloadConverter):
+    @property
+    def encoding(self) -> str:
+        return "text/ipv4-address"
+
+    def to_payload(self, value: Any) -> Optional[Payload]:
+        if isinstance(value, ipaddress.IPv4Address):
+            return Payload(
+                metadata={"encoding": self.encoding.encode()},
+                data=str(value).encode(),
+            )
+        else:
+            return None
+
+    def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
+        assert not type_hint or type_hint is ipaddress.IPv4Address
+        return ipaddress.IPv4Address(payload.data.decode())
+
+class IPv4AddressPayloadConverter(CompositePayloadConverter):
+    def __init__(self) -> None:
+        # Just add ours as first before the defaults
+        super().__init__(
+            IPv4AddressEncodingPayloadConverter(),
+            *DefaultPayloadConverter.default_encoding_payload_converters,
+        )
+
+my_data_converter = dataclasses.replace(
+    DataConverter.default,
+    payload_converter_class=IPv4AddressPayloadConverter,
+)
+```
+
+Imports are left off for brevity.
+
+This is good for many custom types. However, sometimes you want to override the behavior of the just the existing JSON
+encoding payload converter to support a new type. It is already the last encoding data converter in the list, so it's
+the fall-through behavior for any otherwise unknown type. Customizing the existing JSON converter has the benefit of
+making the type work in lists, unions, etc.
+
+The `JSONPlainPayloadConverter` uses the Python [json](https://docs.python.org/3/library/json.html) library with an
+advanced JSON encoder by default and a custom value conversion method to turn `json.load`ed values to their type hints.
+The conversion can be customized for serialization with a custom `json.JSONEncoder` and deserialization with a custom
+`JSONTypeConverter`. For example, to support `IPv4Address` types in existing JSON conversion:
+
+```python
+class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
+    def default(self, o: Any) -> Any:
+        if isinstance(o, ipaddress.IPv4Address):
+            return str(o)
+        return super().default(o)
+class IPv4AddressJSONTypeConverter(JSONTypeConverter):
+    def to_typed_value(
+        self, hint: Type, value: Any
+    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+        if issubclass(hint, ipaddress.IPv4Address):
+            return ipaddress.IPv4Address(value)
+        return JSONTypeConverter.Unhandled
+
+class IPv4AddressPayloadConverter(CompositePayloadConverter):
+    def __init__(self) -> None:
+        # Replace default JSON plain with our own that has our encoder and type
+        # converter
+        json_converter = JSONPlainPayloadConverter(
+            encoder=IPv4AddressJSONEncoder,
+            custom_type_converters=[IPv4AddressJSONTypeConverter()],
+        )
+        super().__init__(
+            *[
+                c if not isinstance(c, JSONPlainPayloadConverter) else json_converter
+                for c in DefaultPayloadConverter.default_encoding_payload_converters
+            ]
+        )
+
+my_data_converter = dataclasses.replace(
+    DataConverter.default,
+    payload_converter_class=IPv4AddressPayloadConverter,
+)
+```
+
+Now `IPv4Address` can be used in type hints including collections, optionals, etc.
 
 ### Workers
 
