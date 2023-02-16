@@ -623,13 +623,13 @@ async def test_schedule_basics(
                     # Intentionally set step 1 though 0 and 1 are the same to prove
                     # that step comes back as sent not as defaulted (other 0 values
                     # for step don't come back as 1)
-                    second=[ScheduleRange(1, step=1)],
-                    minute=[ScheduleRange(2, 3)],
-                    hour=[ScheduleRange(4, 5, 6)],
-                    day_of_month=[ScheduleRange(7)],
-                    month=[ScheduleRange(9)],
-                    year=[ScheduleRange(2080)],
-                    # Intentionally leave day of week absent
+                    second=(ScheduleRange(1, step=1),),
+                    minute=(ScheduleRange(2, 3),),
+                    hour=(ScheduleRange(4, 5, 6),),
+                    day_of_month=(ScheduleRange(7),),
+                    month=(ScheduleRange(9),),
+                    year=(ScheduleRange(2080),),
+                    # Intentionally leave day of week absent to check default
                     # day_of_week=[ScheduleRange(1)],
                     comment="spec comment 1",
                 )
@@ -641,8 +641,8 @@ async def test_schedule_basics(
                 )
             ],
             cron_expressions=["0 12 * * MON"],
-            skip=[ScheduleCalendarSpec(year=[ScheduleRange(2050)])],
-            start_at=datetime(2060, 7, 8, 9, 10, 11),
+            skip=[ScheduleCalendarSpec(year=(ScheduleRange(2050),))],
+            start_at=datetime(2060, 7, 8, 9, 10, 11, tzinfo=timezone.utc),
             jitter=timedelta(seconds=80),
         ),
         policy=SchedulePolicy(
@@ -676,12 +676,12 @@ async def test_schedule_basics(
     assert isinstance(schedule.spec.calendars, list)
     schedule.spec.calendars.append(
         ScheduleCalendarSpec(
-            second=[ScheduleRange(0)],
-            minute=[ScheduleRange(0)],
-            hour=[ScheduleRange(12)],
-            day_of_month=[ScheduleRange(1, 31)],
-            month=[ScheduleRange(1, 12)],
-            day_of_week=[ScheduleRange(1)],
+            second=(ScheduleRange(0),),
+            minute=(ScheduleRange(0),),
+            hour=(ScheduleRange(12),),
+            day_of_month=(ScheduleRange(1, 31),),
+            month=(ScheduleRange(1, 12),),
+            day_of_week=(ScheduleRange(1),),
         )
     )
 
@@ -803,6 +803,44 @@ async def test_schedule_basics(
     # Delete all of the schedules
     for id in actual_ids:
         await client.get_schedule_handle(id).delete()
+    await assert_no_schedules(client)
+
+
+async def test_schedule_calendar_spec_defaults(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+    await assert_no_schedules(client)
+
+    handle = await client.create_schedule(
+        f"schedule-{uuid.uuid4()}",
+        Schedule(
+            action=ScheduleActionStartWorkflow(
+                "kitchen_sink",
+                KSWorkflowParams(
+                    actions=[KSAction(result=KSResultAction("some result"))]
+                ),
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            ),
+            spec=ScheduleSpec(calendars=[ScheduleCalendarSpec()]),
+            state=ScheduleState(paused=True),
+        ),
+    )
+    desc = await handle.describe()
+    assert desc.schedule.spec.calendars[0] == ScheduleCalendarSpec()
+    # Make sure that every next time has all zero time portion and is one day
+    # after the previous
+    assert len(desc.info.next_action_times) == 10
+    for i, time in enumerate(desc.info.next_action_times):
+        assert time.second == 0
+        assert time.minute == 0
+        assert time.hour == 0
+        if i > 0:
+            assert time == desc.info.next_action_times[i - 1] + timedelta(days=1)
+
+    await handle.delete()
     await assert_no_schedules(client)
 
 

@@ -2368,10 +2368,12 @@ class ScheduleSpec:
                 ScheduleCalendarSpec._from_proto(c)
                 for c in spec.exclude_structured_calendar
             ],
-            start_at=spec.start_time.ToDatetime()
+            start_at=spec.start_time.ToDatetime().replace(tzinfo=timezone.utc)
             if spec.HasField("start_time")
             else None,
-            end_at=spec.end_time.ToDatetime() if spec.HasField("end_time") else None,
+            end_at=spec.end_time.ToDatetime().replace(tzinfo=timezone.utc)
+            if spec.HasField("end_time")
+            else None,
             jitter=spec.jitter.ToTimedelta() if spec.HasField("jitter") else None,
             time_zone_name=spec.timezone_name or None,
         )
@@ -2401,6 +2403,52 @@ class ScheduleSpec:
         )
 
 
+@dataclass(frozen=True)
+class ScheduleRange:
+    """Inclusive range for a schedule match value.
+
+    .. warning::
+        Schedules are an experimental feature.
+    """
+
+    start: int
+    """Inclusive start of the range."""
+
+    end: int = 0
+    """Inclusive end of the range.
+    
+    If unset or less than start, defaults to start.
+    """
+
+    step: int = 0
+    """
+    Step to take between each value.
+
+    Unset or 0 defaults as 1.
+    """
+
+    @staticmethod
+    def _from_protos(
+        ranges: Sequence[temporalio.api.schedule.v1.Range],
+    ) -> Sequence[ScheduleRange]:
+        return tuple(ScheduleRange._from_proto(r) for r in ranges)
+
+    @staticmethod
+    def _from_proto(range: temporalio.api.schedule.v1.Range) -> ScheduleRange:
+        return ScheduleRange(start=range.start, end=range.end, step=range.step)
+
+    @staticmethod
+    def _to_protos(
+        ranges: Sequence[ScheduleRange],
+    ) -> Sequence[temporalio.api.schedule.v1.Range]:
+        return tuple(r._to_proto() for r in ranges)
+
+    def _to_proto(self) -> temporalio.api.schedule.v1.Range:
+        return temporalio.api.schedule.v1.Range(
+            start=self.start, end=self.end, step=self.step
+        )
+
+
 @dataclass
 class ScheduleCalendarSpec:
     """Specification relative to calendar time when to run an action.
@@ -2413,26 +2461,27 @@ class ScheduleCalendarSpec:
         Schedules are an experimental feature.
     """
 
-    second: Sequence[ScheduleRange] = dataclasses.field(default_factory=list)
-    """Second range to match, 0-59."""
+    second: Sequence[ScheduleRange] = (ScheduleRange(0),)
+    """Second range to match, 0-59. Default matches 0."""
 
-    minute: Sequence[ScheduleRange] = dataclasses.field(default_factory=list)
-    """Minute range to match, 0-59."""
+    minute: Sequence[ScheduleRange] = (ScheduleRange(0),)
+    """Minute range to match, 0-59. Default matches 0."""
 
-    hour: Sequence[ScheduleRange] = dataclasses.field(default_factory=list)
-    """Hour range to match, 0-23."""
+    hour: Sequence[ScheduleRange] = (ScheduleRange(0),)
+    """Hour range to match, 0-23. Default matches 0."""
 
-    day_of_month: Sequence[ScheduleRange] = dataclasses.field(default_factory=list)
-    """Day of month range to match, 1-31."""
+    day_of_month: Sequence[ScheduleRange] = (ScheduleRange(1, 31),)
+    """Day of month range to match, 1-31. Default matches all days."""
 
-    month: Sequence[ScheduleRange] = dataclasses.field(default_factory=list)
-    """Month range to match, 1-12."""
+    month: Sequence[ScheduleRange] = (ScheduleRange(1, 12),)
+    """Month range to match, 1-12. Default matches all months."""
 
-    day_of_week: Sequence[ScheduleRange] = dataclasses.field(default_factory=list)
-    """Day of week range to match, 0-6, 0 is Sunday."""
+    year: Sequence[ScheduleRange] = ()
+    """Optional year range to match. Default of empty matches all years."""
 
-    year: Sequence[ScheduleRange] = dataclasses.field(default_factory=list)
-    """Optional year range to match."""
+    day_of_week: Sequence[ScheduleRange] = (ScheduleRange(0, 6),)
+    """Day of week range to match, 0-6, 0 is Sunday. Default matches all
+    days."""
 
     comment: Optional[str] = None
     """Description of this schedule."""
@@ -2447,8 +2496,8 @@ class ScheduleCalendarSpec:
             hour=ScheduleRange._from_protos(spec.hour),
             day_of_month=ScheduleRange._from_protos(spec.day_of_month),
             month=ScheduleRange._from_protos(spec.month),
-            day_of_week=ScheduleRange._from_protos(spec.day_of_week),
             year=ScheduleRange._from_protos(spec.year),
+            day_of_week=ScheduleRange._from_protos(spec.day_of_week),
             comment=spec.comment or None,
         )
 
@@ -2459,8 +2508,8 @@ class ScheduleCalendarSpec:
             hour=ScheduleRange._to_protos(self.hour),
             day_of_month=ScheduleRange._to_protos(self.day_of_month),
             month=ScheduleRange._to_protos(self.month),
-            day_of_week=ScheduleRange._to_protos(self.day_of_week),
             year=ScheduleRange._to_protos(self.year),
+            day_of_week=ScheduleRange._to_protos(self.day_of_week),
             comment=self.comment or "",
         )
 
@@ -2498,52 +2547,6 @@ class ScheduleIntervalSpec:
             phase = google.protobuf.duration_pb2.Duration()
             phase.FromTimedelta(self.offset)
         return temporalio.api.schedule.v1.IntervalSpec(interval=interval, phase=phase)
-
-
-@dataclass
-class ScheduleRange:
-    """Inclusive range for a schedule match value.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
-
-    start: int
-    """Inclusive start of the range."""
-
-    end: int = 0
-    """Inclusive end of the range.
-    
-    If unset or less than start, defaults to start.
-    """
-
-    step: int = 0
-    """
-    Step to take between each value.
-
-    Unset or 0 defaults as 1.
-    """
-
-    @staticmethod
-    def _from_protos(
-        ranges: Sequence[temporalio.api.schedule.v1.Range],
-    ) -> Sequence[ScheduleRange]:
-        return [ScheduleRange._from_proto(r) for r in ranges]
-
-    @staticmethod
-    def _from_proto(range: temporalio.api.schedule.v1.Range) -> ScheduleRange:
-        return ScheduleRange(start=range.start, end=range.end, step=range.step)
-
-    @staticmethod
-    def _to_protos(
-        ranges: Sequence[ScheduleRange],
-    ) -> Sequence[temporalio.api.schedule.v1.Range]:
-        return [r._to_proto() for r in ranges]
-
-    def _to_proto(self) -> temporalio.api.schedule.v1.Range:
-        return temporalio.api.schedule.v1.Range(
-            start=self.start, end=self.end, step=self.step
-        )
 
 
 class ScheduleAction(ABC):
@@ -3201,9 +3204,12 @@ class ScheduleInfo:
             recent_actions=[
                 ScheduleActionResult._from_proto(r) for r in info.recent_actions
             ],
-            next_action_times=[f.ToDatetime() for f in info.future_action_times],
-            created_at=info.create_time.ToDatetime(),
-            last_updated_at=info.update_time.ToDatetime()
+            next_action_times=[
+                f.ToDatetime().replace(tzinfo=timezone.utc)
+                for f in info.future_action_times
+            ],
+            created_at=info.create_time.ToDatetime().replace(tzinfo=timezone.utc),
+            last_updated_at=info.update_time.ToDatetime().replace(tzinfo=timezone.utc)
             if info.HasField("update_time")
             else None,
         )
@@ -3265,8 +3271,8 @@ class ScheduleActionResult:
         res: temporalio.api.schedule.v1.ScheduleActionResult,
     ) -> ScheduleActionResult:
         return ScheduleActionResult(
-            scheduled_at=res.schedule_time.ToDatetime(),
-            started_at=res.actual_time.ToDatetime(),
+            scheduled_at=res.schedule_time.ToDatetime().replace(tzinfo=timezone.utc),
+            started_at=res.actual_time.ToDatetime().replace(tzinfo=timezone.utc),
             action=ScheduleActionExecutionStartWorkflow._from_proto(
                 res.start_workflow_result
             ),
@@ -3308,8 +3314,6 @@ class ScheduleListDescription:
     id: str
     """ID of the schedule."""
 
-    # TODO(cretz): Document that these two below are unset when not using
-    # advanced visibility
     schedule: Optional[ScheduleListSchedule]
     """Schedule details that can be mutated.
     
@@ -3494,7 +3498,10 @@ class ScheduleListInfo:
             recent_actions=[
                 ScheduleActionResult._from_proto(r) for r in info.recent_actions
             ],
-            next_action_times=[f.ToDatetime() for f in info.future_action_times],
+            next_action_times=[
+                f.ToDatetime().replace(tzinfo=timezone.utc)
+                for f in info.future_action_times
+            ],
         )
 
 
