@@ -1708,14 +1708,14 @@ files = [
 
 [[package]]
 name = "types-protobuf"
-version = "3.20.3"
+version = "4.21.0.6"
 description = "Typing stubs for protobuf"
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-protobuf-3.20.3.tar.gz", hash = "sha256:aae6404a9c902970da33977d1bc44cebae4957a5ceeced650b9afafb36051bb2"},
-    {file = "types_protobuf-3.20.3-py3-none-any.whl", hash = "sha256:7344c65ff8ff915e5e997e0ac16b1c0ad6ee7fca11df5a64f550aedb264fdb23"},
+    {file = "types-protobuf-4.21.0.6.tar.gz", hash = "sha256:8c105b906569e9d53ba033465880d9ef17a59bf3ba8ab656d24c9eadb9d8a056"},
+    {file = "types_protobuf-4.21.0.6-py3-none-any.whl", hash = "sha256:39167012ead0bc5920b6322a1e4dc2d088f66a34b84cce39bb88500e49ac955a"},
 ]
 
 [[package]]
@@ -1925,4 +1925,4 @@ opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "1d22605247ab0e167247a48142159af642106cff14e89663934d7ffce640d844"
+content-hash = "8c0a2f562b3e904f55fe41c16722119cbfbf31f4d4fadf1aaf1c29b9127160bd"
