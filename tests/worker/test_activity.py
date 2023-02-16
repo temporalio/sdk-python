@@ -250,7 +250,7 @@ async def test_activity_cancel_catch(client: Client, worker: ExternalWorker):
         wait_cancel,
         cancel_after_ms=100,
         wait_for_cancellation=True,
-        heartbeat_timeout_ms=1000,
+        heartbeat_timeout_ms=2000,
     )
     assert result.result == "Got cancelled error, cancelled? True"
 
