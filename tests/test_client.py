@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Tuple
@@ -602,6 +603,8 @@ async def test_schedule_basics(
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server doesn't support schedules")
+    elif os.getenv("TEMPORAL_TEST_PROTO3"):
+        pytest.skip("Older proto library cannot compare repeated fields")
     await assert_no_schedules(client)
 
     # Create a schedule with a lot of stuff
