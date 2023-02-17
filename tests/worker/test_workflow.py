@@ -2265,6 +2265,15 @@ async def test_workflow_activity_callable_class(client: Client):
         assert result == MyDataClass(field1="in worker, workflow param")
 
 
+async def test_workflow_activity_callable_class_bad_register(client: Client):
+    # Try to register the class instead of the instance
+    with pytest.raises(TypeError) as err:
+        new_worker(
+            client, ActivityCallableClassWorkflow, activities=[CallableClassActivity]
+        )
+    assert "is a class instead of an instance" in str(err.value)
+
+
 class MethodActivity:
     def __init__(self, orig_field1: str) -> None:
         self.orig_field1 = orig_field1

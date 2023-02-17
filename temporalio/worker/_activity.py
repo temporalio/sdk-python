@@ -92,6 +92,12 @@ class _ActivityWorker:
             if defn.name in self._activities:
                 raise ValueError(f"More than one activity named {defn.name}")
 
+            # Do not allow classes, __call__ based activities must be instances
+            if inspect.isclass(activity):
+                raise TypeError(
+                    f"Activity named {defn.name} is a class instead of an instance"
+                )
+
             # Some extra requirements for sync functions
             if not defn.is_async:
                 if not activity_executor:
