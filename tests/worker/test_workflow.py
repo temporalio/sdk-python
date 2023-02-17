@@ -1801,7 +1801,7 @@ async def test_workflow_already_started(client: Client, env: WorkflowEnvironment
     async with new_worker(client, LongSleepWorkflow) as worker:
         id = f"workflow-{uuid.uuid4()}"
         # Try to start it twice
-        with pytest.raises(RPCError) as err:
+        with pytest.raises(WorkflowAlreadyStartedError):
             await client.start_workflow(
                 LongSleepWorkflow.run,
                 id=id,
@@ -1812,7 +1812,6 @@ async def test_workflow_already_started(client: Client, env: WorkflowEnvironment
                 id=id,
                 task_queue=worker.task_queue,
             )
-        assert err.value.status is RPCStatusCode.ALREADY_EXISTS
 
 
 @workflow.defn

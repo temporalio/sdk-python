@@ -484,13 +484,13 @@ async def test_sync_activity_process_cancel_uncaught(
 ):
     with pytest.raises(WorkflowFailureError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            result = await _execute_workflow_with_activity(
+            await _execute_workflow_with_activity(
                 client,
                 worker,
                 picklable_activity_raise_cancel,
                 cancel_after_ms=100,
                 wait_for_cancellation=True,
-                heartbeat_timeout_ms=3000,
+                heartbeat_timeout_ms=5000,
                 worker_config={"activity_executor": executor},
             )
     assert isinstance(err.value.cause, ActivityError)
