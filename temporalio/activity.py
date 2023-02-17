@@ -363,7 +363,6 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> Tuple[Any, MutableMapping[str, Any]]:
         """Override to add activity details."""
-        msg, kwargs = super().process(msg, kwargs)
         if self.activity_info_on_message or self.activity_info_on_extra:
             context = _current_context.get(None)
             if context:
