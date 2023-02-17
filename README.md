@@ -1138,9 +1138,10 @@ occurs. Synchronous activities cannot call any of the `async` functions.
 
 ##### Heartbeating and Cancellation
 
-In order for a non-local activity to be notified of cancellation requests, it must invoke
-`temporalio.activity.heartbeat()`. It is strongly recommended that all but the fastest executing activities call this
-function regularly. "Types of Activities" has specifics on cancellation for asynchronous and synchronous activities.
+In order for a non-local activity to be notified of cancellation requests, it must be given a `heartbeat_timeout` at
+invocation time and invoke `temporalio.activity.heartbeat()` inside the activity. It is strongly recommended that all
+but the fastest executing activities call this function regularly. "Types of Activities" has specifics on cancellation
+for asynchronous and synchronous activities.
 
 In addition to obtaining cancellation information, heartbeats also support detail data that is persisted on the server
 for retrieval during activity retry. If an activity calls `temporalio.activity.heartbeat(123, 456)` and then fails and
