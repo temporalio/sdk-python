@@ -790,18 +790,25 @@ async def test_schedule_basics(
         ).result()
     )
 
-    # Create 4 more schedules of the same type and list them
+    # Create 4 more schedules of the same type and confirm they are in list
+    # eventually
     expected_ids = [handle.id]
     for i in range(4):
         new_handle = await client.create_schedule(f"{handle.id}-{i + 1}", desc.schedule)
         expected_ids.append(new_handle.id)
-    actual_ids = sorted(
-        [list_desc.id async for list_desc in await client.list_schedules(page_size=2)]
-    )
-    assert actual_ids == expected_ids
+
+    async def list_ids() -> List[str]:
+        return sorted(
+            [
+                list_desc.id
+                async for list_desc in await client.list_schedules(page_size=2)
+            ]
+        )
+
+    await assert_eq_eventually(expected_ids, list_ids)
 
     # Delete all of the schedules
-    for id in actual_ids:
+    for id in await list_ids():
         await client.get_schedule_handle(id).delete()
     await assert_no_schedules(client)
 

@@ -3485,10 +3485,18 @@ class ScheduleListInfo:
     """
 
     recent_actions: Sequence[ScheduleActionResult]
-    """10 most recent actions, oldest first."""
+    """Most recent actions, oldest first.
+    
+    This may be a smaller amount than present on
+    :py:attr:`ScheduleDescription.info`.
+    """
 
     next_action_times: Sequence[datetime]
-    """Next 10 scheduled action times."""
+    """Next scheduled action times.
+    
+    This may be a smaller amount than present on
+    :py:attr:`ScheduleDescription.info`.
+    """
 
     @staticmethod
     def _from_proto(
