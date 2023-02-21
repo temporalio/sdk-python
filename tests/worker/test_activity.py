@@ -986,7 +986,7 @@ class AsyncActivityWrapper:
         self._info_set = asyncio.Event()
 
     @activity.defn
-    async def run(self) -> str:
+    async def run(self) -> Optional[str]:
         self._info = activity.info()
         self._info_set.set()
         activity.raise_complete_async()
@@ -1012,14 +1012,23 @@ class AsyncActivityWrapper:
 async def test_activity_async_success(
     client: Client, worker: ExternalWorker, use_task_token: bool
 ):
-    wrapper = AsyncActivityWrapper()
     # Start task, wait for info, complete with value, wait on workflow
+    wrapper = AsyncActivityWrapper()
     task = asyncio.create_task(
         _execute_workflow_with_activity(client, worker, wrapper.run)
     )
     await wrapper.wait_info()
     await wrapper.async_handle(client, use_task_token).complete("some value")
     assert "some value" == (await task).result
+
+    # Do again with a None value
+    wrapper = AsyncActivityWrapper()
+    task = asyncio.create_task(
+        _execute_workflow_with_activity(client, worker, wrapper.run)
+    )
+    await wrapper.wait_info()
+    await wrapper.async_handle(client, use_task_token).complete(None)
+    assert (await task).result is None
 
 
 @pytest.mark.parametrize("use_task_token", [True, False])

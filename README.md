@@ -125,18 +125,25 @@ The SDK is now ready for use. To build from source, see "Building" near the end 
 
 ## Implementing a Workflow
 
-Create the following script at `run_worker.py`:
+Create the following in `activities.py`:
 
 ```python
-import asyncio
-from datetime import datetime, timedelta
-from temporalio import workflow, activity
-from temporalio.client import Client
-from temporalio.worker import Worker
+from temporalio import activity
 
 @activity.defn
 async def say_hello(name: str) -> str:
     return f"Hello, {name}!"
+```
+
+Create the following in `workflows.py`:
+
+```python
+from datetime import timedelta
+from temporalio import workflow
+
+# Import our activity, passing it through the sandbox
+with workflow.unsafe.imports_passed_through():
+    from .activities import say_hello
 
 @workflow.defn
 class SayHello:
@@ -145,6 +152,18 @@ class SayHello:
         return await workflow.execute_activity(
             say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
         )
+```
+
+Create the following in `run_worker.py`:
+
+```python
+import asyncio
+from temporalio.client import Client
+from temporalio.worker import Worker
+
+# Import the activity and workflow from our other files
+from .activities import say_hello
+from .workflows import SayHello
 
 async def main():
     # Create client connected to server at the given address
@@ -172,7 +191,7 @@ import asyncio
 from temporalio.client import Client
 
 # Import the workflow from the previous code
-from run_worker import SayHello
+from .workflows import SayHello
 
 async def main():
     # Create client connected to server at the given address
@@ -196,11 +215,16 @@ The output will be:
     Result: Hello, my-name!
 
 ## Next Steps
-Temporal can be implemented in your code in many different ways, to suit your application's needs. The links below will give you much more information about how Temporal works with Python:
 
-* [Code Samples](https://github.com/temporalio/samples-python) - If you want to start with some code, we have provided some pre-built samples.
-* [Application Development Guide](https://docs.temporal.io/application-development?lang=python) Our Python specific Developer's Guide will give you much more information on how to build with Temporal in your Python applications than our SDK README ever could (or should).
-* [API Documentation](https://python.temporal.io) - Full Temporal Python SDK package documentation
+Temporal can be implemented in your code in many different ways, to suit your application's needs. The links below will
+give you much more information about how Temporal works with Python:
+
+* [Code Samples](https://github.com/temporalio/samples-python) - If you want to start with some code, we have provided
+  some pre-built samples.
+* [Application Development Guide](https://docs.temporal.io/application-development?lang=python) Our Python specific
+  Developer's Guide will give you much more information on how to build with Temporal in your Python applications than
+  our SDK README ever could (or should).
+* [API Documentation](https://python.temporal.io) - Full Temporal Python SDK package documentation.
 
 ---
 
@@ -420,16 +444,12 @@ respectively. Here's an example of a workflow:
 
 ```python
 import asyncio
-from dataclasses import dataclass
 from datetime import timedelta
-from temporalio import activity, workflow
-from temporalio.client import Client
-from temporalio.worker import Worker
+from temporalio import workflow
 
-@dataclass
-class GreetingInfo:
-    salutation: str = "Hello"
-    name: str = "<unknown>"
+# Pass the activities through the sandbox
+with workflow.unsafe.imports_passed_through():
+    from .my_activities import GreetingInfo, create_greeting_activity
 
 @workflow.defn
 class GreetingWorkflow:
@@ -477,16 +497,31 @@ class GreetingWorkflow:
     async def current_greeting(self) -> str:
         return self._current_greeting
 
+```
+
+This assumes there's an activity in `my_activities.py` like:
+
+```python
+from dataclasses import dataclass
+from temporalio import workflow
+
+@dataclass
+class GreetingInfo:
+    salutation: str = "Hello"
+    name: str = "<unknown>"
+
 @activity.defn
 async def create_greeting_activity(info: GreetingInfo) -> str:
     return f"{info.salutation}, {info.name}!"
 ```
 
-Some things to note about the above code:
+Some things to note about the above workflow code:
 
-* Workflows run in a sandbox by default. Users are encouraged to define workflows in files with no side effects or other
-  complicated code or unnecessary imports to other third party libraries. See the [Workflow Sandbox](#workflow-sandbox)
-  section for more details.
+* Workflows run in a sandbox by default.
+  * Users are encouraged to define workflows in files with no side effects or other complicated code or unnecessary
+    imports to other third party libraries.
+  * Non-standard-library, non-`temporalio` imports should usually be "passed through" the sandbox. See the
+    [Workflow Sandbox](#workflow-sandbox) section for more details.
 * This workflow continually updates the queryable current greeting when signalled and can complete with the greeting on
   a different signal
 * Workflows are always classes and must have a single `@workflow.run` which is an `async def` function
@@ -791,7 +826,17 @@ early. Users are encouraged to define their workflows in files with no other sid
 
 The sandbox offers a mechanism to pass through modules from outside the sandbox. By default this already includes all
 standard library modules and Temporal modules. **For performance and behavior reasons, users are encouraged to pass
-through all third party modules whose calls will be deterministic.** See "Passthrough Modules" below on how to do this.
+through all third party modules whose calls will be deterministic.** This includes modules containing the activities to
+be referenced in workflows. See "Passthrough Modules" below on how to do this.
+
+If you are getting an error like:
+
+> temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access
+> http.client.IncompleteRead.\_\_mro_entries\_\_ from inside a workflow. If this is code from a module not used in a
+> workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+Then you are either using an invalid construct from the workflow, this is a known limitation of the sandbox, or most
+commonly this is from a module that is safe to pass through (see "Passthrough Modules" section below).
 
 ##### How the Sandbox Works
 
@@ -1093,9 +1138,10 @@ occurs. Synchronous activities cannot call any of the `async` functions.
 
 ##### Heartbeating and Cancellation
 
-In order for a non-local activity to be notified of cancellation requests, it must invoke
-`temporalio.activity.heartbeat()`. It is strongly recommended that all but the fastest executing activities call this
-function regularly. "Types of Activities" has specifics on cancellation for asynchronous and synchronous activities.
+In order for a non-local activity to be notified of cancellation requests, it must be given a `heartbeat_timeout` at
+invocation time and invoke `temporalio.activity.heartbeat()` inside the activity. It is strongly recommended that all
+but the fastest executing activities call this function regularly. "Types of Activities" has specifics on cancellation
+for asynchronous and synchronous activities.
 
 In addition to obtaining cancellation information, heartbeats also support detail data that is persisted on the server
 for retrieval during activity retry. If an activity calls `temporalio.activity.heartbeat(123, 456)` and then fails and
