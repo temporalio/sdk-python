@@ -352,6 +352,10 @@ class SignalAndQueryErrorsWorkflow:
     def bad_query(self) -> NoReturn:
         raise ApplicationError("query fail", 456)
 
+    @workflow.query
+    def other_query(self) -> str:
+        raise NotImplementedError
+
 
 async def test_workflow_signal_and_query_errors(client: Client):
     async with new_worker(client, SignalAndQueryErrorsWorkflow) as worker:
@@ -374,9 +378,9 @@ async def test_workflow_signal_and_query_errors(client: Client):
         # Unrecognized query
         with pytest.raises(WorkflowQueryFailedError) as rpc_err:
             await handle.query("non-existent query")
-        assert (
-            str(rpc_err.value)
-            == "Query handler for 'non-existent query' expected but not found"
+        assert str(rpc_err.value) == (
+            "Query handler for 'non-existent query' expected but not found,"
+            " known queries: [__stack_trace bad_query other_query]"
         )
 
 
@@ -2258,6 +2262,15 @@ async def test_workflow_activity_callable_class(client: Client):
             task_queue=worker.task_queue,
         )
         assert result == MyDataClass(field1="in worker, workflow param")
+
+
+async def test_workflow_activity_callable_class_bad_register(client: Client):
+    # Try to register the class instead of the instance
+    with pytest.raises(TypeError) as err:
+        new_worker(
+            client, ActivityCallableClassWorkflow, activities=[CallableClassActivity]
+        )
+    assert "is a class instead of an instance" in str(err.value)
 
 
 class MethodActivity:

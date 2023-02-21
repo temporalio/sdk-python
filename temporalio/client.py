@@ -1544,7 +1544,7 @@ class AsyncActivityHandle:
 
     async def complete(
         self,
-        result: Optional[Any] = None,
+        result: Optional[Any] = temporalio.common._arg_unset,
         *,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1552,7 +1552,7 @@ class AsyncActivityHandle:
         """Complete the activity.
 
         Args:
-            result: Result of the activity.
+            result: Result of the activity if any.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
@@ -4421,7 +4421,7 @@ class _ClientImpl(OutboundInterceptor):
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
         result = (
             None
-            if not input.result
+            if input.result is temporalio.common._arg_unset
             else await self._client.data_converter.encode_wrapper([input.result])
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):

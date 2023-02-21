@@ -51,7 +51,12 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
 
     def __init__(self, qualified_name: str) -> None:
         """Create restricted workflow access error."""
-        super().__init__(f"Cannot access {qualified_name} from inside a workflow.")
+        super().__init__(
+            f"Cannot access {qualified_name} from inside a workflow. "
+            "If this is code from a module not used in a workflow or known to "
+            "only be used deterministically from a workflow, mark the import "
+            "as pass through."
+        )
         self.qualified_name = qualified_name
 
 

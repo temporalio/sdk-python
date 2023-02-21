@@ -1460,7 +1460,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             handler = self._instance.workflow_get_signal_handler(None)
             dynamic = True
             # Technically this is checked before the interceptor is invoked, but
-            # an # interceptor could have changed the name
+            # an interceptor could have changed the name
             if not handler:
                 raise RuntimeError(
                     f"Signal handler for {input.signal} expected but not found"
@@ -1480,10 +1480,12 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             handler = self._instance.workflow_get_query_handler(None)
             dynamic = True
             # Technically this is checked before the interceptor is invoked, but
-            # an # interceptor could have changed the name
+            # an interceptor could have changed the name
             if not handler:
+                known_queries = sorted([k for k in self._instance._queries.keys() if k])
                 raise RuntimeError(
-                    f"Query handler for '{input.query}' expected but not found"
+                    f"Query handler for '{input.query}' expected but not found, "
+                    f"known queries: [{' '.join(known_queries)}]"
                 )
         # Put name first if dynamic
         args = list(input.args) if not dynamic else [input.query] + list(input.args)
