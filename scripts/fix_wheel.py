@@ -25,19 +25,25 @@ if __name__ == "__main__":
     with open(wheel_files[0]) as f:
         wheel_lines = f.read().splitlines()
 
-    # Alter the "Tag" to use 3.7+ Python, ABI3 limited API, or if macOS ARM,
-    # manually set as 11_0 w/ 3.8+
+    # Alter the "Tag"
     found_wheel_tag = False
     for i, line in enumerate(wheel_lines):
         if line.startswith("Tag: "):
             pieces = line[len("Tag: ") :].split("-")
             if len(pieces) < 3:
                 raise RuntimeError("Expecting at least 3 wheel tag pieces")
+            # All tags need ABI3
             pieces[1] = "abi3"
             if pieces[2].startswith("macosx_") and pieces[2].endswith("_arm64"):
+                # macOS ARM needs to be set to 3.8+ on 11+
                 pieces[0] = "cp38"
                 pieces[2] = "macosx_11_0_arm64"
+            elif pieces[2].startswith("macosx_") and pieces[2].endswith("_x86_64"):
+                # macOS x86 needs to be set to 3.7+ on 10.9+
+                pieces[0] = "cp37"
+                pieces[2] = "macosx_10_9_x86_64"
             else:
+                # All others just need to be set to 3.7+
                 pieces[0] = "cp37"
             wheel_lines[i] = "Tag: " + "-".join(pieces)
             found_wheel_tag = True
