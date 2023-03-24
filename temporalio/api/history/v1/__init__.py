@@ -37,6 +37,9 @@ from .message_pb2 import (
     WorkflowExecutionStartedEventAttributes,
     WorkflowExecutionTerminatedEventAttributes,
     WorkflowExecutionTimedOutEventAttributes,
+    WorkflowExecutionUpdateAcceptedEventAttributes,
+    WorkflowExecutionUpdateCompletedEventAttributes,
+    WorkflowExecutionUpdateRejectedEventAttributes,
     WorkflowPropertiesModifiedEventAttributes,
     WorkflowPropertiesModifiedExternallyEventAttributes,
     WorkflowTaskCompletedEventAttributes,
@@ -44,9 +47,6 @@ from .message_pb2 import (
     WorkflowTaskScheduledEventAttributes,
     WorkflowTaskStartedEventAttributes,
     WorkflowTaskTimedOutEventAttributes,
-    WorkflowUpdateAcceptedEventAttributes,
-    WorkflowUpdateCompletedEventAttributes,
-    WorkflowUpdateRejectedEventAttributes,
 )
 
 __all__ = [
@@ -88,6 +88,9 @@ __all__ = [
     "WorkflowExecutionStartedEventAttributes",
     "WorkflowExecutionTerminatedEventAttributes",
     "WorkflowExecutionTimedOutEventAttributes",
+    "WorkflowExecutionUpdateAcceptedEventAttributes",
+    "WorkflowExecutionUpdateCompletedEventAttributes",
+    "WorkflowExecutionUpdateRejectedEventAttributes",
     "WorkflowPropertiesModifiedEventAttributes",
     "WorkflowPropertiesModifiedExternallyEventAttributes",
     "WorkflowTaskCompletedEventAttributes",
@@ -95,7 +98,4 @@ __all__ = [
     "WorkflowTaskScheduledEventAttributes",
     "WorkflowTaskStartedEventAttributes",
     "WorkflowTaskTimedOutEventAttributes",
-    "WorkflowUpdateAcceptedEventAttributes",
-    "WorkflowUpdateCompletedEventAttributes",
-    "WorkflowUpdateRejectedEventAttributes",
 ]

@@ -41,17 +41,18 @@ import temporalio.api.enums.v1.namespace_pb2
 import temporalio.api.enums.v1.query_pb2
 import temporalio.api.enums.v1.reset_pb2
 import temporalio.api.enums.v1.task_queue_pb2
-import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.filter.v1.message_pb2
 import temporalio.api.history.v1.message_pb2
-import temporalio.api.interaction.v1.message_pb2
 import temporalio.api.namespace.v1.message_pb2
+import temporalio.api.protocol.v1.message_pb2
 import temporalio.api.query.v1.message_pb2
 import temporalio.api.replication.v1.message_pb2
 import temporalio.api.schedule.v1.message_pb2
+import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
+import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 
@@ -547,6 +548,9 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
+    REQUEST_EAGER_EXECUTION_FIELD_NUMBER: builtins.int
+    CONTINUED_FAILURE_FIELD_NUMBER: builtins.int
+    LAST_COMPLETION_RESULT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -584,6 +588,23 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    request_eager_execution: builtins.bool
+    """Request to get the first workflow task inline in the response bypassing matching service and worker polling.
+    If set to `true` the caller is expected to have a worker available and capable of processing the task.
+    The returned task will be marked as started and is expected to be completed by the specified
+    `workflow_task_timeout`.
+    """
+    @property
+    def continued_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """These values will be available as ContinuedFailure and LastCompletionResult in the
+        WorkflowExecutionStarted event and through SDKs. The are currently only used by the
+        server itself (for the schedules feature) and are not intended to be exposed in
+        StartWorkflowExecution.
+        """
+    @property
+    def last_completion_result(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     def __init__(
         self,
         *,
@@ -604,14 +625,22 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
+        request_eager_execution: builtins.bool = ...,
+        continued_failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        last_completion_result: temporalio.api.common.v1.message_pb2.Payloads
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "continued_failure",
+            b"continued_failure",
             "header",
             b"header",
             "input",
             b"input",
+            "last_completion_result",
+            b"last_completion_result",
             "memo",
             b"memo",
             "retry_policy",
@@ -633,6 +662,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "continued_failure",
+            b"continued_failure",
             "cron_schedule",
             b"cron_schedule",
             "header",
@@ -641,10 +672,14 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"identity",
             "input",
             b"input",
+            "last_completion_result",
+            b"last_completion_result",
             "memo",
             b"memo",
             "namespace",
             b"namespace",
+            "request_eager_execution",
+            b"request_eager_execution",
             "request_id",
             b"request_id",
             "retry_policy",
@@ -674,14 +709,31 @@ class StartWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    EAGER_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     run_id: builtins.str
+    @property
+    def eager_workflow_task(self) -> global___PollWorkflowTaskQueueResponse:
+        """When `request_eager_execution` is set on the `StartWorkflowExecutionRequest`, the server - if supported - will
+        return the first workflow task to be eagerly executed.
+        The caller is expected to have a worker available to process the task.
+        """
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
+        eager_workflow_task: global___PollWorkflowTaskQueueResponse | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "eager_workflow_task", b"eager_workflow_task"
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["run_id", b"run_id"]
+        self,
+        field_name: typing_extensions.Literal[
+            "eager_workflow_task", b"eager_workflow_task", "run_id", b"run_id"
+        ],
     ) -> None: ...
 
 global___StartWorkflowExecutionResponse = StartWorkflowExecutionResponse
@@ -968,7 +1020,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     SCHEDULED_TIME_FIELD_NUMBER: builtins.int
     STARTED_TIME_FIELD_NUMBER: builtins.int
     QUERIES_FIELD_NUMBER: builtins.int
-    INTERACTIONS_FIELD_NUMBER: builtins.int
+    MESSAGES_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     @property
@@ -1031,11 +1083,12 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
         attached to `RespondWorkflowTaskCompletedRequest::query_results`
         """
     @property
-    def interactions(
+    def messages(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.interaction.v1.message_pb2.Invocation
-    ]: ...
+        temporalio.api.protocol.v1.message_pb2.Message
+    ]:
+        """Protocol messages piggybacking on a WFT as a transport"""
     def __init__(
         self,
         *,
@@ -1058,8 +1111,8 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
             builtins.str, temporalio.api.query.v1.message_pb2.WorkflowQuery
         ]
         | None = ...,
-        interactions: collections.abc.Iterable[
-            temporalio.api.interaction.v1.message_pb2.Invocation
+        messages: collections.abc.Iterable[
+            temporalio.api.protocol.v1.message_pb2.Message
         ]
         | None = ...,
     ) -> None: ...
@@ -1091,8 +1144,8 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
             b"backlog_count_hint",
             "history",
             b"history",
-            "interactions",
-            b"interactions",
+            "messages",
+            b"messages",
             "next_page_token",
             b"next_page_token",
             "previous_started_event_id",
@@ -1155,6 +1208,9 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     QUERY_RESULTS_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
     WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
+    MESSAGES_FIELD_NUMBER: builtins.int
+    SDK_METADATA_FIELD_NUMBER: builtins.int
+    METERING_METADATA_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollWorkflowTaskQueueResponse`"""
     @property
@@ -1200,6 +1256,25 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         When `worker_versioning_id` has a `worker_build_id`, and `binary_checksum` is not
         set, that value should also be considered as the `binary_checksum`.
         """
+    @property
+    def messages(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.protocol.v1.message_pb2.Message
+    ]:
+        """Protocol messages piggybacking on a WFT as a transport"""
+    @property
+    def sdk_metadata(
+        self,
+    ) -> temporalio.api.sdk.v1.task_complete_metadata_pb2.WorkflowTaskCompletedMetadata:
+        """Data the SDK wishes to record for itself, but server need not interpret, and does not
+        directly impact workflow state.
+        """
+    @property
+    def metering_metadata(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.MeteringMetadata:
+        """Local usage data collected for metering"""
     def __init__(
         self,
         *,
@@ -1221,10 +1296,22 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         namespace: builtins.str = ...,
         worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
         | None = ...,
+        messages: collections.abc.Iterable[
+            temporalio.api.protocol.v1.message_pb2.Message
+        ]
+        | None = ...,
+        sdk_metadata: temporalio.api.sdk.v1.task_complete_metadata_pb2.WorkflowTaskCompletedMetadata
+        | None = ...,
+        metering_metadata: temporalio.api.common.v1.message_pb2.MeteringMetadata
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "metering_metadata",
+            b"metering_metadata",
+            "sdk_metadata",
+            b"sdk_metadata",
             "sticky_attributes",
             b"sticky_attributes",
             "worker_versioning_id",
@@ -1242,12 +1329,18 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             b"force_create_new_workflow_task",
             "identity",
             b"identity",
+            "messages",
+            b"messages",
+            "metering_metadata",
+            b"metering_metadata",
             "namespace",
             b"namespace",
             "query_results",
             b"query_results",
             "return_new_workflow_task",
             b"return_new_workflow_task",
+            "sdk_metadata",
+            b"sdk_metadata",
             "sticky_attributes",
             b"sticky_attributes",
             "task_token",
@@ -1310,6 +1403,7 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    MESSAGES_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollWorkflowTaskQueueResponse`"""
     cause: temporalio.api.enums.v1.failed_cause_pb2.WorkflowTaskFailedCause.ValueType
@@ -1324,6 +1418,13 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
     binary_checksum: builtins.str
     """Worker process' unique binary id"""
     namespace: builtins.str
+    @property
+    def messages(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.protocol.v1.message_pb2.Message
+    ]:
+        """Protocol messages piggybacking on a WFT as a transport"""
     def __init__(
         self,
         *,
@@ -1333,6 +1434,10 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         binary_checksum: builtins.str = ...,
         namespace: builtins.str = ...,
+        messages: collections.abc.Iterable[
+            temporalio.api.protocol.v1.message_pb2.Message
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
@@ -1348,6 +1453,8 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
             b"failure",
             "identity",
             b"identity",
+            "messages",
+            b"messages",
             "namespace",
             b"namespace",
             "task_token",
@@ -3669,6 +3776,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         ENCODED_FAILURE_ATTRIBUTES_FIELD_NUMBER: builtins.int
         BUILD_ID_BASED_VERSIONING_FIELD_NUMBER: builtins.int
         UPSERT_MEMO_FIELD_NUMBER: builtins.int
+        EAGER_WORKFLOW_START_FIELD_NUMBER: builtins.int
+        SDK_METADATA_FIELD_NUMBER: builtins.int
         signal_and_query_header: builtins.bool
         """True if signal and query headers are supported."""
         internal_error_differentiation: builtins.bool
@@ -3691,6 +3800,12 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         """
         upsert_memo: builtins.bool
         """True if server supports upserting workflow memo"""
+        eager_workflow_start: builtins.bool
+        """True if server supports eager workflow task dispatching for the StartWorkflowExecution API"""
+        sdk_metadata: builtins.bool
+        """True if the server knows about the sdk metadata field on WFT completions and will record
+        it in history
+        """
         def __init__(
             self,
             *,
@@ -3701,6 +3816,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
             encoded_failure_attributes: builtins.bool = ...,
             build_id_based_versioning: builtins.bool = ...,
             upsert_memo: builtins.bool = ...,
+            eager_workflow_start: builtins.bool = ...,
+            sdk_metadata: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -3709,10 +3826,14 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
                 b"activity_failure_include_heartbeat",
                 "build_id_based_versioning",
                 b"build_id_based_versioning",
+                "eager_workflow_start",
+                b"eager_workflow_start",
                 "encoded_failure_attributes",
                 b"encoded_failure_attributes",
                 "internal_error_differentiation",
                 b"internal_error_differentiation",
+                "sdk_metadata",
+                b"sdk_metadata",
                 "signal_and_query_header",
                 b"signal_and_query_header",
                 "supports_schedules",
@@ -4492,27 +4613,18 @@ class GetWorkerBuildIdOrderingResponse(google.protobuf.message.Message):
 
 global___GetWorkerBuildIdOrderingResponse = GetWorkerBuildIdOrderingResponse
 
-class UpdateWorkflowRequest(google.protobuf.message.Message):
+class UpdateWorkflowExecutionRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0134=disabled
     aip.dev/not-precedent: Update RPCs don't follow Google API format. --)
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REQUEST_ID_FIELD_NUMBER: builtins.int
-    RESULT_ACCESS_STYLE_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
-    IDENTITY_FIELD_NUMBER: builtins.int
-    INPUT_FIELD_NUMBER: builtins.int
-    request_id: builtins.str
-    """A unique ID for this logical request"""
-    result_access_style: temporalio.api.enums.v1.update_pb2.WorkflowUpdateResultAccessStyle.ValueType
-    """The manner in which the update result will be accessed.
-    This field requires a non-default value; the default value of the enum
-    will result in an error.
-    """
+    WAIT_POLICY_FIELD_NUMBER: builtins.int
+    REQUEST_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """The namespace name of the target workflow"""
     @property
@@ -4528,29 +4640,35 @@ class UpdateWorkflowRequest(google.protobuf.message.Message):
     `workflow_execution`), or specified (if it is) workflow execution is not
     part of the same execution chain as this id.
     """
-    identity: builtins.str
-    """A string identifying the agent that requested this interaction."""
     @property
-    def input(self) -> temporalio.api.interaction.v1.message_pb2.Input:
-        """The name under which the workflow update function is registered and the
-        arguments to pass to said function.
+    def wait_policy(self) -> temporalio.api.update.v1.message_pb2.WaitPolicy:
+        """Describes when this request should return - basically whether the
+        update is synchronous, asynchronous, or somewhere in between.
+        """
+    @property
+    def request(self) -> temporalio.api.update.v1.message_pb2.Request:
+        """The request information that will be delivered all the way down to the
+        workflow execution.
         """
     def __init__(
         self,
         *,
-        request_id: builtins.str = ...,
-        result_access_style: temporalio.api.enums.v1.update_pb2.WorkflowUpdateResultAccessStyle.ValueType = ...,
         namespace: builtins.str = ...,
         workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
         | None = ...,
         first_execution_run_id: builtins.str = ...,
-        identity: builtins.str = ...,
-        input: temporalio.api.interaction.v1.message_pb2.Input | None = ...,
+        wait_policy: temporalio.api.update.v1.message_pb2.WaitPolicy | None = ...,
+        request: temporalio.api.update.v1.message_pb2.Request | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "input", b"input", "workflow_execution", b"workflow_execution"
+            "request",
+            b"request",
+            "wait_policy",
+            b"wait_policy",
+            "workflow_execution",
+            b"workflow_execution",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -4558,52 +4676,53 @@ class UpdateWorkflowRequest(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "first_execution_run_id",
             b"first_execution_run_id",
-            "identity",
-            b"identity",
-            "input",
-            b"input",
             "namespace",
             b"namespace",
-            "request_id",
-            b"request_id",
-            "result_access_style",
-            b"result_access_style",
+            "request",
+            b"request",
+            "wait_policy",
+            b"wait_policy",
             "workflow_execution",
             b"workflow_execution",
         ],
     ) -> None: ...
 
-global___UpdateWorkflowRequest = UpdateWorkflowRequest
+global___UpdateWorkflowExecutionRequest = UpdateWorkflowExecutionRequest
 
-class UpdateWorkflowResponse(google.protobuf.message.Message):
+class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    UPDATE_TOKEN_FIELD_NUMBER: builtins.int
-    OUTPUT_FIELD_NUMBER: builtins.int
-    update_token: builtins.bytes
-    """An opaque token that can be used to retrieve the update result via
-    polling if it is not returned as part of the gRPC response
-    """
+    UPDATE_REF_FIELD_NUMBER: builtins.int
+    OUTCOME_FIELD_NUMBER: builtins.int
     @property
-    def output(self) -> temporalio.api.interaction.v1.message_pb2.Output:
-        """The success or failure status of the update"""
+    def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
+        """Enough information for subsequent poll calls if needed. Never null."""
+    @property
+    def outcome(self) -> temporalio.api.update.v1.message_pb2.Outcome:
+        """The outcome of the update if and only if the workflow execution update
+        has completed. If this response is being returned before the update has
+        completed then this field will not be set.
+        """
     def __init__(
         self,
         *,
-        update_token: builtins.bytes = ...,
-        output: temporalio.api.interaction.v1.message_pb2.Output | None = ...,
+        update_ref: temporalio.api.update.v1.message_pb2.UpdateRef | None = ...,
+        outcome: temporalio.api.update.v1.message_pb2.Outcome | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["output", b"output"]
+        self,
+        field_name: typing_extensions.Literal[
+            "outcome", b"outcome", "update_ref", b"update_ref"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "output", b"output", "update_token", b"update_token"
+            "outcome", b"outcome", "update_ref", b"update_ref"
         ],
     ) -> None: ...
 
-global___UpdateWorkflowResponse = UpdateWorkflowResponse
+global___UpdateWorkflowExecutionResponse = UpdateWorkflowExecutionResponse
 
 class StartBatchOperationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -4612,6 +4731,7 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     VISIBILITY_QUERY_FIELD_NUMBER: builtins.int
     JOB_ID_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
+    EXECUTIONS_FIELD_NUMBER: builtins.int
     TERMINATION_OPERATION_FIELD_NUMBER: builtins.int
     SIGNAL_OPERATION_FIELD_NUMBER: builtins.int
     CANCELLATION_OPERATION_FIELD_NUMBER: builtins.int
@@ -4619,11 +4739,22 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     namespace: builtins.str
     """Namespace that contains the batch operation"""
     visibility_query: builtins.str
-    """Visibility query defines the the group of workflow to do batch operation"""
+    """Visibility query defines the the group of workflow to apply the batch operation
+    This field and Executions are mutually exclusive
+    """
     job_id: builtins.str
     """Job ID defines the unique ID for the batch job"""
     reason: builtins.str
     """Reason to perform the batch operation"""
+    @property
+    def executions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.WorkflowExecution
+    ]:
+        """Executions to apply the batch operation
+        This field and VisibilityQuery are mutually exclusive
+        """
     @property
     def termination_operation(
         self,
@@ -4647,6 +4778,10 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         visibility_query: builtins.str = ...,
         job_id: builtins.str = ...,
         reason: builtins.str = ...,
+        executions: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.WorkflowExecution
+        ]
+        | None = ...,
         termination_operation: temporalio.api.batch.v1.message_pb2.BatchOperationTermination
         | None = ...,
         signal_operation: temporalio.api.batch.v1.message_pb2.BatchOperationSignal
@@ -4678,6 +4813,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"cancellation_operation",
             "deletion_operation",
             b"deletion_operation",
+            "executions",
+            b"executions",
             "job_id",
             b"job_id",
             "namespace",

@@ -18,7 +18,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n6temporal/api/operatorservice/v1/request_response.proto\x12\x1ftemporal.api.operatorservice.v1\x1a"temporal/api/enums/v1/common.proto"\xec\x01\n\x1a\x41\x64\x64SearchAttributesRequest\x12l\n\x11search_attributes\x18\x01 \x03(\x0b\x32Q.temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntry\x1a`\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1d\n\x1b\x41\x64\x64SearchAttributesResponse":\n\x1dRemoveSearchAttributesRequest\x12\x19\n\x11search_attributes\x18\x01 \x03(\t" \n\x1eRemoveSearchAttributesResponse"\x1d\n\x1bListSearchAttributesRequest"\xe2\x04\n\x1cListSearchAttributesResponse\x12n\n\x11\x63ustom_attributes\x18\x01 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.CustomAttributesEntry\x12n\n\x11system_attributes\x18\x02 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.SystemAttributesEntry\x12h\n\x0estorage_schema\x18\x03 \x03(\x0b\x32P.temporal.api.operatorservice.v1.ListSearchAttributesResponse.StorageSchemaEntry\x1a`\n\x15\x43ustomAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a`\n\x15SystemAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a\x34\n\x12StorageSchemaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"+\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"4\n\x17\x44\x65leteNamespaceResponse\x12\x19\n\x11\x64\x65leted_namespace\x18\x01 \x01(\t"e\n\x1f\x41\x64\x64OrUpdateRemoteClusterRequest\x12\x18\n\x10\x66rontend_address\x18\x01 \x01(\t\x12(\n enable_remote_cluster_connection\x18\x02 \x01(\x08""\n AddOrUpdateRemoteClusterResponse"2\n\x1aRemoveRemoteClusterRequest\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\x1d\n\x1bRemoveRemoteClusterResponse"A\n\x13ListClustersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"s\n\x14ListClustersResponse\x12\x42\n\x08\x63lusters\x18\x01 \x03(\x0b\x32\x30.temporal.api.operatorservice.v1.ClusterMetadata\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"\xaa\x01\n\x0f\x43lusterMetadata\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t\x12\x12\n\ncluster_id\x18\x02 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x03 \x01(\t\x12 \n\x18initial_failover_version\x18\x04 \x01(\x03\x12\x1b\n\x13history_shard_count\x18\x05 \x01(\x05\x12\x1d\n\x15is_connection_enabled\x18\x06 \x01(\x08\x42\xbe\x01\n"io.temporal.api.operatorservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
+    b'\n6temporal/api/operatorservice/v1/request_response.proto\x12\x1ftemporal.api.operatorservice.v1\x1a"temporal/api/enums/v1/common.proto"\xff\x01\n\x1a\x41\x64\x64SearchAttributesRequest\x12l\n\x11search_attributes\x18\x01 \x03(\x0b\x32Q.temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntry\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a`\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1d\n\x1b\x41\x64\x64SearchAttributesResponse"M\n\x1dRemoveSearchAttributesRequest\x12\x19\n\x11search_attributes\x18\x01 \x03(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t" \n\x1eRemoveSearchAttributesResponse"0\n\x1bListSearchAttributesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"\xe2\x04\n\x1cListSearchAttributesResponse\x12n\n\x11\x63ustom_attributes\x18\x01 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.CustomAttributesEntry\x12n\n\x11system_attributes\x18\x02 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.SystemAttributesEntry\x12h\n\x0estorage_schema\x18\x03 \x03(\x0b\x32P.temporal.api.operatorservice.v1.ListSearchAttributesResponse.StorageSchemaEntry\x1a`\n\x15\x43ustomAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a`\n\x15SystemAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a\x34\n\x12StorageSchemaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"+\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"4\n\x17\x44\x65leteNamespaceResponse\x12\x19\n\x11\x64\x65leted_namespace\x18\x01 \x01(\t"e\n\x1f\x41\x64\x64OrUpdateRemoteClusterRequest\x12\x18\n\x10\x66rontend_address\x18\x01 \x01(\t\x12(\n enable_remote_cluster_connection\x18\x02 \x01(\x08""\n AddOrUpdateRemoteClusterResponse"2\n\x1aRemoveRemoteClusterRequest\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\x1d\n\x1bRemoveRemoteClusterResponse"A\n\x13ListClustersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"s\n\x14ListClustersResponse\x12\x42\n\x08\x63lusters\x18\x01 \x03(\x0b\x32\x30.temporal.api.operatorservice.v1.ClusterMetadata\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"\xaa\x01\n\x0f\x43lusterMetadata\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t\x12\x12\n\ncluster_id\x18\x02 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x03 \x01(\t\x12 \n\x18initial_failover_version\x18\x04 \x01(\x03\x12\x1b\n\x13history_shard_count\x18\x05 \x01(\x05\x12\x1d\n\x15is_connection_enabled\x18\x06 \x01(\x08\x42\xbe\x01\n"io.temporal.api.operatorservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
 )
 
 
@@ -286,41 +286,41 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._options = None
     _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_options = b"8\001"
     _ADDSEARCHATTRIBUTESREQUEST._serialized_start = 128
-    _ADDSEARCHATTRIBUTESREQUEST._serialized_end = 364
-    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_start = 268
-    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_end = 364
-    _ADDSEARCHATTRIBUTESRESPONSE._serialized_start = 366
-    _ADDSEARCHATTRIBUTESRESPONSE._serialized_end = 395
-    _REMOVESEARCHATTRIBUTESREQUEST._serialized_start = 397
-    _REMOVESEARCHATTRIBUTESREQUEST._serialized_end = 455
-    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_start = 457
-    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_end = 489
-    _LISTSEARCHATTRIBUTESREQUEST._serialized_start = 491
-    _LISTSEARCHATTRIBUTESREQUEST._serialized_end = 520
-    _LISTSEARCHATTRIBUTESRESPONSE._serialized_start = 523
-    _LISTSEARCHATTRIBUTESRESPONSE._serialized_end = 1133
-    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_start = 885
-    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_end = 981
-    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_start = 983
-    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_end = 1079
-    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_start = 1081
-    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_end = 1133
-    _DELETENAMESPACEREQUEST._serialized_start = 1135
-    _DELETENAMESPACEREQUEST._serialized_end = 1178
-    _DELETENAMESPACERESPONSE._serialized_start = 1180
-    _DELETENAMESPACERESPONSE._serialized_end = 1232
-    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_start = 1234
-    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_end = 1335
-    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_start = 1337
-    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_end = 1371
-    _REMOVEREMOTECLUSTERREQUEST._serialized_start = 1373
-    _REMOVEREMOTECLUSTERREQUEST._serialized_end = 1423
-    _REMOVEREMOTECLUSTERRESPONSE._serialized_start = 1425
-    _REMOVEREMOTECLUSTERRESPONSE._serialized_end = 1454
-    _LISTCLUSTERSREQUEST._serialized_start = 1456
-    _LISTCLUSTERSREQUEST._serialized_end = 1521
-    _LISTCLUSTERSRESPONSE._serialized_start = 1523
-    _LISTCLUSTERSRESPONSE._serialized_end = 1638
-    _CLUSTERMETADATA._serialized_start = 1641
-    _CLUSTERMETADATA._serialized_end = 1811
+    _ADDSEARCHATTRIBUTESREQUEST._serialized_end = 383
+    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_start = 287
+    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_end = 383
+    _ADDSEARCHATTRIBUTESRESPONSE._serialized_start = 385
+    _ADDSEARCHATTRIBUTESRESPONSE._serialized_end = 414
+    _REMOVESEARCHATTRIBUTESREQUEST._serialized_start = 416
+    _REMOVESEARCHATTRIBUTESREQUEST._serialized_end = 493
+    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_start = 495
+    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_end = 527
+    _LISTSEARCHATTRIBUTESREQUEST._serialized_start = 529
+    _LISTSEARCHATTRIBUTESREQUEST._serialized_end = 577
+    _LISTSEARCHATTRIBUTESRESPONSE._serialized_start = 580
+    _LISTSEARCHATTRIBUTESRESPONSE._serialized_end = 1190
+    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_start = 942
+    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_end = 1038
+    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_start = 1040
+    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_end = 1136
+    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_start = 1138
+    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_end = 1190
+    _DELETENAMESPACEREQUEST._serialized_start = 1192
+    _DELETENAMESPACEREQUEST._serialized_end = 1235
+    _DELETENAMESPACERESPONSE._serialized_start = 1237
+    _DELETENAMESPACERESPONSE._serialized_end = 1289
+    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_start = 1291
+    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_end = 1392
+    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_start = 1394
+    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_end = 1428
+    _REMOVEREMOTECLUSTERREQUEST._serialized_start = 1430
+    _REMOVEREMOTECLUSTERREQUEST._serialized_end = 1480
+    _REMOVEREMOTECLUSTERRESPONSE._serialized_start = 1482
+    _REMOVEREMOTECLUSTERRESPONSE._serialized_end = 1511
+    _LISTCLUSTERSREQUEST._serialized_start = 1513
+    _LISTCLUSTERSREQUEST._serialized_end = 1578
+    _LISTCLUSTERSRESPONSE._serialized_start = 1580
+    _LISTCLUSTERSRESPONSE._serialized_end = 1695
+    _CLUSTERMETADATA._serialized_start = 1698
+    _CLUSTERMETADATA._serialized_end = 1868
 # @@protoc_insertion_point(module_scope)

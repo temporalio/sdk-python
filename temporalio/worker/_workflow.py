@@ -263,7 +263,7 @@ class _WorkflowWorker:
                 except Exception as e:
                     self._throw_after_activation = e
                     logger.debug("Shutting down worker on eviction")
-                    asyncio.create_task(self._bridge_worker().shutdown())
+                    self._bridge_worker().initiate_shutdown()
 
     def _create_workflow_instance(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation

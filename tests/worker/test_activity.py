@@ -446,7 +446,7 @@ async def test_sync_activity_thread_cancel_on_worker_shutdown(client: Client):
             await handle.result()
     assert isinstance(err.value.cause, ActivityError)
     assert isinstance(err.value.cause.cause, ApplicationError)
-    assert "due to worker shutdown" in err.value.cause.cause.message
+    assert "activity did not complete in time" in err.value.cause.cause.message
 
 
 @activity.defn

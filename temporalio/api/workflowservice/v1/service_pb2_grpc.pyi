@@ -470,13 +470,13 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse,
     ]
     """Fetches the worker build id versioning graph for some task queue."""
-    UpdateWorkflow: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowResponse,
+    UpdateWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
     ]
     """Invokes the specified update function on user workflow code.
     (-- api-linter: core::0134=disabled
-        aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
+        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
     """
     StartBatchOperation: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
@@ -1122,14 +1122,16 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ):
         """Fetches the worker build id versioning graph for some task queue."""
     @abc.abstractmethod
-    def UpdateWorkflow(
+    def UpdateWorkflowExecution(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowRequest,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse
+    ):
         """Invokes the specified update function on user workflow code.
         (-- api-linter: core::0134=disabled
-            aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
+            aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
         """
     @abc.abstractmethod
     def StartBatchOperation(

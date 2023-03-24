@@ -19,9 +19,7 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class ActivityExecutionResult(google.protobuf.message.Message):
-    """*
-    Used to report activity completions to core
-    """
+    """Used to report activity completions to core"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -152,7 +150,7 @@ class ActivityResolution(google.protobuf.message.Message):
 global___ActivityResolution = ActivityResolution
 
 class Success(google.protobuf.message.Message):
-    """* Used to report successful completion either when executing or resolving"""
+    """Used to report successful completion either when executing or resolving"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -174,7 +172,7 @@ class Success(google.protobuf.message.Message):
 global___Success = Success
 
 class Failure(google.protobuf.message.Message):
-    """* Used to report activity failure either when executing or resolving"""
+    """Used to report activity failure either when executing or resolving"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -196,7 +194,7 @@ class Failure(google.protobuf.message.Message):
 global___Failure = Failure
 
 class Cancellation(google.protobuf.message.Message):
-    """*
+    """
     Used to report cancellation from both Core and Lang.
     When Lang reports a cancelled activity, it must put a CancelledFailure in the failure field.
     When Core reports a cancelled activity, it must put an ActivityFailure with CancelledFailure
@@ -223,7 +221,7 @@ class Cancellation(google.protobuf.message.Message):
 global___Cancellation = Cancellation
 
 class WillCompleteAsync(google.protobuf.message.Message):
-    """*
+    """
     Used in ActivityExecutionResult to notify Core that this Activity will complete asynchronously.
     Core will forget about this Activity and free up resources used to track this Activity.
     """
@@ -237,7 +235,7 @@ class WillCompleteAsync(google.protobuf.message.Message):
 global___WillCompleteAsync = WillCompleteAsync
 
 class DoBackoff(google.protobuf.message.Message):
-    """*
+    """
     Issued when a local activity needs to retry but also wants to back off more than would be
     reasonable to WFT heartbeat for. Lang is expected to schedule a timer for the duration
     and then start a local activity of the same type & same inputs with the provided attempt number

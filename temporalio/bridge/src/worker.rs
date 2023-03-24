@@ -43,6 +43,7 @@ pub struct WorkerConfig {
     default_heartbeat_throttle_interval_millis: u64,
     max_activities_per_second: Option<f64>,
     max_task_queue_activities_per_second: Option<f64>,
+    graceful_shutdown_period_millis: u64,
 }
 
 macro_rules! enter_sync {
@@ -177,12 +178,10 @@ impl WorkerRef {
         Ok(())
     }
 
-    fn shutdown<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn initiate_shutdown(&self) -> PyResult<()> {
         let worker = self.worker.as_ref().unwrap().clone();
-        self.runtime.future_into_py(py, async move {
-            worker.shutdown().await;
-            Ok(())
-        })
+        worker.initiate_shutdown();
+        Ok(())
     }
 
     fn finalize_shutdown<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
@@ -229,6 +228,10 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             ))
             .max_worker_activities_per_second(conf.max_activities_per_second)
             .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
+            // Even though grace period is optional, if it is not set then the
+            // auto-cancel-activity behavior of shutdown will not occur, so we
+            // always set it even if 0.
+            .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
     }

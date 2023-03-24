@@ -182,12 +182,12 @@ class _EventTypeEnumTypeWrapper(
     """Temporal Server has successfully Signaled the targeted Workflow"""
     EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: _EventType.ValueType  # 40
     """Workflow search attributes should be updated and synchronized with the visibility store"""
-    EVENT_TYPE_WORKFLOW_UPDATE_REJECTED: _EventType.ValueType  # 41
-    """Workflow update request has been received"""
-    EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED: _EventType.ValueType  # 42
-    """Workflow update request has been accepted by user workflow code"""
-    EVENT_TYPE_WORKFLOW_UPDATE_COMPLETED: _EventType.ValueType  # 43
-    """Workflow update has been completed"""
+    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED: _EventType.ValueType  # 41
+    """An update was accepted (i.e. validated)"""
+    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REJECTED: _EventType.ValueType  # 42
+    """An update was rejected (i.e. failed validation)"""
+    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_COMPLETED: _EventType.ValueType  # 43
+    """An update completed"""
     EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY: _EventType.ValueType  # 44
     """Some property or properties of the workflow as a whole have changed by non-workflow code.
     The distinction of external vs. command-based modification is important so the SDK can
@@ -341,12 +341,12 @@ EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED: EventType.ValueType  # 39
 """Temporal Server has successfully Signaled the targeted Workflow"""
 EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: EventType.ValueType  # 40
 """Workflow search attributes should be updated and synchronized with the visibility store"""
-EVENT_TYPE_WORKFLOW_UPDATE_REJECTED: EventType.ValueType  # 41
-"""Workflow update request has been received"""
-EVENT_TYPE_WORKFLOW_UPDATE_ACCEPTED: EventType.ValueType  # 42
-"""Workflow update request has been accepted by user workflow code"""
-EVENT_TYPE_WORKFLOW_UPDATE_COMPLETED: EventType.ValueType  # 43
-"""Workflow update has been completed"""
+EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED: EventType.ValueType  # 41
+"""An update was accepted (i.e. validated)"""
+EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REJECTED: EventType.ValueType  # 42
+"""An update was rejected (i.e. failed validation)"""
+EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_COMPLETED: EventType.ValueType  # 43
+"""An update completed"""
 EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY: EventType.ValueType  # 44
 """Some property or properties of the workflow as a whole have changed by non-workflow code.
 The distinction of external vs. command-based modification is important so the SDK can
