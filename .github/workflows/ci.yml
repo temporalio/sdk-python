@@ -45,7 +45,9 @@ jobs:
         uses: deadsnakes/action@v2.1.1
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install --upgrade wheel poetry poethepoet
+      # Using fixed Poetry version until
+      # https://github.com/python-poetry/poetry/pull/7694 is fixed
+      - run: python -m pip install --upgrade wheel "poetry==1.4.0" poethepoet
       - run: poetry install --no-root -E opentelemetry
       - run: poe lint
       - run: poe build-develop
