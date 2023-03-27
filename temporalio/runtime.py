@@ -5,7 +5,7 @@ This module is currently experimental. The API may change.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import ClassVar, Mapping, Optional, Union
 
@@ -175,6 +175,8 @@ class TelemetryConfig:
     metrics: Optional[Union[OpenTelemetryConfig, PrometheusConfig]] = None
     """Metrics configuration."""
 
+    global_tags: Mapping[str, str] = field(default_factory=dict)
+
     def _to_bridge_config(self) -> temporalio.bridge.runtime.TelemetryConfig:
         return temporalio.bridge.runtime.TelemetryConfig(
             tracing=None if not self.tracing else self.tracing._to_bridge_config(),
@@ -189,4 +191,5 @@ class TelemetryConfig:
                 if not isinstance(self.metrics, PrometheusConfig)
                 else self.metrics._to_bridge_config(),
             ),
+            global_tags=self.global_tags,
         )

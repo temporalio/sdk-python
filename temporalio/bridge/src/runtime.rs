@@ -30,6 +30,7 @@ pub struct TelemetryConfig {
     tracing: Option<TracingConfig>,
     logging: Option<LoggingConfig>,
     metrics: Option<MetricsConfig>,
+    global_tags: Option<HashMap<String, String>>
 }
 
 #[derive(FromPyObject)]
@@ -128,6 +129,9 @@ impl TryFrom<TelemetryConfig> for TelemetryOptions {
                     "Either OpenTelemetry or Prometheus config must be provided",
                 ));
             });
+        }
+        if let Some(v) = conf.global_tags {
+            build.global_tags(v);
         }
         build
             .build()
