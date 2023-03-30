@@ -107,8 +107,8 @@ from .request_response_pb2 import (
     UpdateScheduleResponse,
     UpdateWorkerBuildIdOrderingRequest,
     UpdateWorkerBuildIdOrderingResponse,
-    UpdateWorkflowRequest,
-    UpdateWorkflowResponse,
+    UpdateWorkflowExecutionRequest,
+    UpdateWorkflowExecutionResponse,
 )
 
 __all__ = [
@@ -220,8 +220,8 @@ __all__ = [
     "UpdateScheduleResponse",
     "UpdateWorkerBuildIdOrderingRequest",
     "UpdateWorkerBuildIdOrderingResponse",
-    "UpdateWorkflowRequest",
-    "UpdateWorkflowResponse",
+    "UpdateWorkflowExecutionRequest",
+    "UpdateWorkflowExecutionResponse",
 ]
 
 # gRPC is optional

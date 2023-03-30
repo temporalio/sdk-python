@@ -144,6 +144,20 @@ class _WorkflowWorker:
         if self._throw_after_activation:
             raise self._throw_after_activation
 
+    # Only call this if run() raised an error
+    async def drain_poll_queue(self) -> None:
+        while True:
+            try:
+                # Just take all tasks and say we can't handle them
+                act = await self._bridge_worker().poll_workflow_activation()
+                completion = temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
+                    run_id=act.run_id
+                )
+                completion.failed.failure.message = "Worker shutting down"
+                await self._bridge_worker().complete_workflow_activation(completion)
+            except temporalio.bridge.worker.PollShutdownError:
+                return
+
     async def _handle_activation(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> None:
@@ -263,7 +277,7 @@ class _WorkflowWorker:
                 except Exception as e:
                     self._throw_after_activation = e
                     logger.debug("Shutting down worker on eviction")
-                    asyncio.create_task(self._bridge_worker().shutdown())
+                    self._bridge_worker().initiate_shutdown()
 
     def _create_workflow_instance(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation

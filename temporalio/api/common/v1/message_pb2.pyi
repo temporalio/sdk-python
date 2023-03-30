@@ -408,3 +408,32 @@ class RetryPolicy(google.protobuf.message.Message):
     ) -> None: ...
 
 global___RetryPolicy = RetryPolicy
+
+class MeteringMetadata(google.protobuf.message.Message):
+    """Metadata relevant for metering purposes"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NONFIRST_LOCAL_ACTIVITY_EXECUTION_ATTEMPTS_FIELD_NUMBER: builtins.int
+    nonfirst_local_activity_execution_attempts: builtins.int
+    """Count of local activities which have begun an execution attempt during this workflow task,
+    and whose first attempt occurred in some previous task. This is used for metering
+    purposes, and does not affect workflow state.
+
+    (-- api-linter: core::0141::forbidden-types=disabled
+        aip.dev/not-precedent: Negative values make no sense to represent. --)
+    """
+    def __init__(
+        self,
+        *,
+        nonfirst_local_activity_execution_attempts: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "nonfirst_local_activity_execution_attempts",
+            b"nonfirst_local_activity_execution_attempts",
+        ],
+    ) -> None: ...
+
+global___MeteringMetadata = MeteringMetadata

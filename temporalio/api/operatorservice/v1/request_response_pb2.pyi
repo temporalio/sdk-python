@@ -62,6 +62,7 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
         ) -> None: ...
 
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
     @property
     def search_attributes(
         self,
@@ -69,6 +70,7 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
         builtins.str, temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType
     ]:
         """Mapping between search attribute name and its IndexedValueType."""
+    namespace: builtins.str
     def __init__(
         self,
         *,
@@ -76,11 +78,12 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
             builtins.str, temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType
         ]
         | None = ...,
+        namespace: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "search_attributes", b"search_attributes"
+            "namespace", b"namespace", "search_attributes", b"search_attributes"
         ],
     ) -> None: ...
 
@@ -99,20 +102,23 @@ class RemoveSearchAttributesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
     @property
     def search_attributes(
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Search attribute names to delete."""
+    namespace: builtins.str
     def __init__(
         self,
         *,
         search_attributes: collections.abc.Iterable[builtins.str] | None = ...,
+        namespace: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "search_attributes", b"search_attributes"
+            "namespace", b"namespace", "search_attributes", b"search_attributes"
         ],
     ) -> None: ...
 
@@ -130,8 +136,15 @@ global___RemoveSearchAttributesResponse = RemoveSearchAttributesResponse
 class ListSearchAttributesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
     def __init__(
         self,
+        *,
+        namespace: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["namespace", b"namespace"]
     ) -> None: ...
 
 global___ListSearchAttributesRequest = ListSearchAttributesRequest

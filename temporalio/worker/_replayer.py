@@ -175,6 +175,7 @@ class Replayer:
                 default_heartbeat_throttle_interval_millis=1000,
                 max_activities_per_second=None,
                 max_task_queue_activities_per_second=None,
+                graceful_shutdown_period_millis=0,
             ),
         )
 
@@ -273,8 +274,9 @@ class Replayer:
             except Exception:
                 logger.warning("Failed to shutdown worker", exc_info=True)
             finally:
-                # We must finalize shutdown here
+                # We must shutdown here
                 try:
+                    bridge_worker.initiate_shutdown()
                     await bridge_worker.finalize_shutdown()
                 except Exception:
                     logger.warning("Failed to finalize shutdown", exc_info=True)

@@ -171,44 +171,23 @@ class _ActivityWorker:
                 exception_task.cancel()
                 raise RuntimeError("Activity worker failed") from err
 
-    async def shutdown(self, after_graceful_timeout: timedelta) -> None:
-        # Set event that we're shutting down (updates all activity tasks)
+    def notify_shutdown(self) -> None:
         if self._worker_shutdown_event:
             self._worker_shutdown_event.set()
-        # Collect all still running activity tasks or exit if none
-        activity_tasks = [
-            activity.task
-            for activity in self._running_activities.values()
-            if activity.task
-        ]
-        if not activity_tasks:
-            return
-        # Wait for any still running after graceful timeout and exit if none
-        _, still_running = await asyncio.wait(
-            activity_tasks, timeout=after_graceful_timeout.total_seconds()
-        )
-        if not still_running:
-            return
-        # Cancel all still running
-        if len(still_running) == 1:
-            logger.info(f"Cancelling 1 activity that is still running")
-        else:
-            logger.info(
-                f"Cancelling {len(still_running)} activities that are still running"
-            )
-        for task in still_running:
-            # We have to find the running activity that's associated with
-            # the task so that we can cancel through that. It's ok if the
-            # activity is already gone.
-            for activity in self._running_activities.values():
-                if activity.info and activity.task is task:
-                    logger.info(
-                        f"Cancelling still-running activity: {activity.info._logger_details()}"
-                    )
-                    activity.cancel()
-                    break
-        # Now we have to wait on them to complete
-        await asyncio.wait(still_running)
+
+    # Only call this if run() raised an error
+    async def drain_poll_queue(self) -> None:
+        while True:
+            try:
+                # Just take all tasks and say we can't handle them
+                task = await self._bridge_worker().poll_activity_task()
+                completion = temporalio.bridge.proto.ActivityTaskCompletion(
+                    task_token=task.task_token
+                )
+                completion.result.failed.failure.message = "Worker shutting down"
+                await self._bridge_worker().complete_activity_task(completion)
+            except temporalio.bridge.worker.PollShutdownError:
+                return
 
     def _cancel(
         self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
@@ -483,21 +462,6 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         "Completing activity as failed", exc_info=True
                     )
-                    # In some cases, like worker shutdown of an sync activity,
-                    # this results in a CancelledError, but the server will fail
-                    # if you send a cancelled error outside of a requested
-                    # cancellation. So we wrap as a retryable application error.
-                    if isinstance(
-                        err,
-                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
-                    ):
-                        new_err = temporalio.exceptions.ApplicationError(
-                            "Cancelled without request, possibly due to worker shutdown",
-                            type="CancelledError",
-                        )
-                        new_err.__traceback__ = err.__traceback__
-                        new_err.__cause__ = err.__cause__
-                        err = new_err
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )

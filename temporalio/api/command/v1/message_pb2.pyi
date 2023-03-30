@@ -34,7 +34,6 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.command_type_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
-import temporalio.api.interaction.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -855,83 +854,22 @@ global___StartChildWorkflowExecutionCommandAttributes = (
     StartChildWorkflowExecutionCommandAttributes
 )
 
-class AcceptWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
+class ProtocolMessageCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    META_FIELD_NUMBER: builtins.int
-    INPUT_FIELD_NUMBER: builtins.int
-    @property
-    def meta(self) -> temporalio.api.interaction.v1.message_pb2.Meta: ...
-    @property
-    def input(self) -> temporalio.api.interaction.v1.message_pb2.Input: ...
+    MESSAGE_ID_FIELD_NUMBER: builtins.int
+    message_id: builtins.str
+    """The message ID of the message to which this command is a pointer."""
     def __init__(
         self,
         *,
-        meta: temporalio.api.interaction.v1.message_pb2.Meta | None = ...,
-        input: temporalio.api.interaction.v1.message_pb2.Input | None = ...,
+        message_id: builtins.str = ...,
     ) -> None: ...
-    def HasField(
-        self, field_name: typing_extensions.Literal["input", b"input", "meta", b"meta"]
-    ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["input", b"input", "meta", b"meta"]
+        self, field_name: typing_extensions.Literal["message_id", b"message_id"]
     ) -> None: ...
 
-global___AcceptWorkflowUpdateCommandAttributes = AcceptWorkflowUpdateCommandAttributes
-
-class CompleteWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    META_FIELD_NUMBER: builtins.int
-    OUTPUT_FIELD_NUMBER: builtins.int
-    @property
-    def meta(self) -> temporalio.api.interaction.v1.message_pb2.Meta: ...
-    @property
-    def output(self) -> temporalio.api.interaction.v1.message_pb2.Output: ...
-    def __init__(
-        self,
-        *,
-        meta: temporalio.api.interaction.v1.message_pb2.Meta | None = ...,
-        output: temporalio.api.interaction.v1.message_pb2.Output | None = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal["meta", b"meta", "output", b"output"],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal["meta", b"meta", "output", b"output"],
-    ) -> None: ...
-
-global___CompleteWorkflowUpdateCommandAttributes = (
-    CompleteWorkflowUpdateCommandAttributes
-)
-
-class RejectWorkflowUpdateCommandAttributes(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    META_FIELD_NUMBER: builtins.int
-    FAILURE_FIELD_NUMBER: builtins.int
-    @property
-    def meta(self) -> temporalio.api.interaction.v1.message_pb2.Meta: ...
-    @property
-    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
-    def __init__(
-        self,
-        *,
-        meta: temporalio.api.interaction.v1.message_pb2.Meta | None = ...,
-        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal["failure", b"failure", "meta", b"meta"],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal["failure", b"failure", "meta", b"meta"],
-    ) -> None: ...
-
-global___RejectWorkflowUpdateCommandAttributes = RejectWorkflowUpdateCommandAttributes
+global___ProtocolMessageCommandAttributes = ProtocolMessageCommandAttributes
 
 class Command(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -950,10 +888,8 @@ class Command(google.protobuf.message.Message):
     START_CHILD_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    ACCEPT_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    COMPLETE_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    PROTOCOL_MESSAGE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     MODIFY_WORKFLOW_PROPERTIES_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    REJECT_WORKFLOW_UPDATE_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType
     @property
     def schedule_activity_task_command_attributes(
@@ -1008,21 +944,14 @@ class Command(google.protobuf.message.Message):
         self,
     ) -> global___UpsertWorkflowSearchAttributesCommandAttributes: ...
     @property
-    def accept_workflow_update_command_attributes(
+    def protocol_message_command_attributes(
         self,
-    ) -> global___AcceptWorkflowUpdateCommandAttributes: ...
-    @property
-    def complete_workflow_update_command_attributes(
-        self,
-    ) -> global___CompleteWorkflowUpdateCommandAttributes: ...
+    ) -> global___ProtocolMessageCommandAttributes: ...
     @property
     def modify_workflow_properties_command_attributes(
         self,
-    ) -> global___ModifyWorkflowPropertiesCommandAttributes: ...
-    @property
-    def reject_workflow_update_command_attributes(
-        self,
-    ) -> global___RejectWorkflowUpdateCommandAttributes: ...
+    ) -> global___ModifyWorkflowPropertiesCommandAttributes:
+        """16 is available for use - it was used as part of a prototype that never made it into a release"""
     def __init__(
         self,
         *,
@@ -1053,20 +982,14 @@ class Command(google.protobuf.message.Message):
         | None = ...,
         upsert_workflow_search_attributes_command_attributes: global___UpsertWorkflowSearchAttributesCommandAttributes
         | None = ...,
-        accept_workflow_update_command_attributes: global___AcceptWorkflowUpdateCommandAttributes
-        | None = ...,
-        complete_workflow_update_command_attributes: global___CompleteWorkflowUpdateCommandAttributes
+        protocol_message_command_attributes: global___ProtocolMessageCommandAttributes
         | None = ...,
         modify_workflow_properties_command_attributes: global___ModifyWorkflowPropertiesCommandAttributes
-        | None = ...,
-        reject_workflow_update_command_attributes: global___RejectWorkflowUpdateCommandAttributes
         | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "accept_workflow_update_command_attributes",
-            b"accept_workflow_update_command_attributes",
             "attributes",
             b"attributes",
             "cancel_timer_command_attributes",
@@ -1075,18 +998,16 @@ class Command(google.protobuf.message.Message):
             b"cancel_workflow_execution_command_attributes",
             "complete_workflow_execution_command_attributes",
             b"complete_workflow_execution_command_attributes",
-            "complete_workflow_update_command_attributes",
-            b"complete_workflow_update_command_attributes",
             "continue_as_new_workflow_execution_command_attributes",
             b"continue_as_new_workflow_execution_command_attributes",
             "fail_workflow_execution_command_attributes",
             b"fail_workflow_execution_command_attributes",
             "modify_workflow_properties_command_attributes",
             b"modify_workflow_properties_command_attributes",
+            "protocol_message_command_attributes",
+            b"protocol_message_command_attributes",
             "record_marker_command_attributes",
             b"record_marker_command_attributes",
-            "reject_workflow_update_command_attributes",
-            b"reject_workflow_update_command_attributes",
             "request_cancel_activity_task_command_attributes",
             b"request_cancel_activity_task_command_attributes",
             "request_cancel_external_workflow_execution_command_attributes",
@@ -1106,8 +1027,6 @@ class Command(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "accept_workflow_update_command_attributes",
-            b"accept_workflow_update_command_attributes",
             "attributes",
             b"attributes",
             "cancel_timer_command_attributes",
@@ -1118,18 +1037,16 @@ class Command(google.protobuf.message.Message):
             b"command_type",
             "complete_workflow_execution_command_attributes",
             b"complete_workflow_execution_command_attributes",
-            "complete_workflow_update_command_attributes",
-            b"complete_workflow_update_command_attributes",
             "continue_as_new_workflow_execution_command_attributes",
             b"continue_as_new_workflow_execution_command_attributes",
             "fail_workflow_execution_command_attributes",
             b"fail_workflow_execution_command_attributes",
             "modify_workflow_properties_command_attributes",
             b"modify_workflow_properties_command_attributes",
+            "protocol_message_command_attributes",
+            b"protocol_message_command_attributes",
             "record_marker_command_attributes",
             b"record_marker_command_attributes",
-            "reject_workflow_update_command_attributes",
-            b"reject_workflow_update_command_attributes",
             "request_cancel_activity_task_command_attributes",
             b"request_cancel_activity_task_command_attributes",
             "request_cancel_external_workflow_execution_command_attributes",
@@ -1163,10 +1080,8 @@ class Command(google.protobuf.message.Message):
             "start_child_workflow_execution_command_attributes",
             "signal_external_workflow_execution_command_attributes",
             "upsert_workflow_search_attributes_command_attributes",
-            "accept_workflow_update_command_attributes",
-            "complete_workflow_update_command_attributes",
+            "protocol_message_command_attributes",
             "modify_workflow_properties_command_attributes",
-            "reject_workflow_update_command_attributes",
         ]
         | None
     ): ...

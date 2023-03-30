@@ -98,3 +98,25 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
     ) -> None: ...
 
 global___LocalActivityMarkerData = LocalActivityMarkerData
+
+class PatchedMarkerData(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    DEPRECATED_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The patch id"""
+    deprecated: builtins.bool
+    """Whether or not the patch is marked deprecated."""
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        deprecated: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["deprecated", b"deprecated", "id", b"id"],
+    ) -> None: ...
+
+global___PatchedMarkerData = PatchedMarkerData

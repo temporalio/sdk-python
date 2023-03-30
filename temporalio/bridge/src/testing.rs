@@ -117,7 +117,7 @@ impl TryFrom<TemporaliteConfig> for ephemeral_server::TemporaliteConfig {
                     version: if conf.download_version != "default" {
                         ephemeral_server::EphemeralExeVersion::Fixed(conf.download_version)
                     } else {
-                        ephemeral_server::EphemeralExeVersion::Default {
+                        ephemeral_server::EphemeralExeVersion::SDKDefault {
                             sdk_name: conf.sdk_name,
                             sdk_version: conf.sdk_version,
                         }
@@ -149,7 +149,7 @@ impl TryFrom<TestServerConfig> for ephemeral_server::TestServerConfig {
                     version: if conf.download_version != "default" {
                         ephemeral_server::EphemeralExeVersion::Fixed(conf.download_version)
                     } else {
-                        ephemeral_server::EphemeralExeVersion::Default {
+                        ephemeral_server::EphemeralExeVersion::SDKDefault {
                             sdk_name: conf.sdk_name,
                             sdk_version: conf.sdk_version,
                         }

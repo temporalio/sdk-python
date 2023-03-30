@@ -508,10 +508,10 @@ class WorkflowService:
             wsv1.UpdateScheduleRequest,
             wsv1.UpdateScheduleResponse,
         )
-        self.update_workflow = client._new_call(
-            "update_workflow",
-            wsv1.UpdateWorkflowRequest,
-            wsv1.UpdateWorkflowResponse,
+        self.update_workflow_execution = client._new_call(
+            "update_workflow_execution",
+            wsv1.UpdateWorkflowExecutionRequest,
+            wsv1.UpdateWorkflowExecutionResponse,
         )
         self.update_worker_build_id_ordering = client._new_call(
             "update_worker_build_id_ordering",

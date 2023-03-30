@@ -104,6 +104,12 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
     """Similarly, we have a buffer of pending requests to cancel other workflows. We return this error
     when our capacity for pending cancel requests is already reached.
     """
+    WORKFLOW_TASK_FAILED_CAUSE_BAD_UPDATE_WORKFLOW_EXECUTION_MESSAGE: _WorkflowTaskFailedCause.ValueType  # 30
+    """Workflow execution update message (update.Acceptance, update.Rejection, or update.Response)
+    has wrong format, or missing required fields.
+    """
+    WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_UPDATE: _WorkflowTaskFailedCause.ValueType  # 31
+    """Similar to WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_COMMAND, but for updates."""
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -169,6 +175,12 @@ WORKFLOW_TASK_FAILED_CAUSE_PENDING_REQUEST_CANCEL_LIMIT_EXCEEDED: WorkflowTaskFa
 """Similarly, we have a buffer of pending requests to cancel other workflows. We return this error
 when our capacity for pending cancel requests is already reached.
 """
+WORKFLOW_TASK_FAILED_CAUSE_BAD_UPDATE_WORKFLOW_EXECUTION_MESSAGE: WorkflowTaskFailedCause.ValueType  # 30
+"""Workflow execution update message (update.Acceptance, update.Rejection, or update.Response)
+has wrong format, or missing required fields.
+"""
+WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_UPDATE: WorkflowTaskFailedCause.ValueType  # 31
+"""Similar to WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_COMMAND, but for updates."""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:

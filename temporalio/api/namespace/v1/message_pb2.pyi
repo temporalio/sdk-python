@@ -118,12 +118,31 @@ global___NamespaceInfo = NamespaceInfo
 class NamespaceConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class CustomSearchAttributeAliasesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
     WORKFLOW_EXECUTION_RETENTION_TTL_FIELD_NUMBER: builtins.int
     BAD_BINARIES_FIELD_NUMBER: builtins.int
     HISTORY_ARCHIVAL_STATE_FIELD_NUMBER: builtins.int
     HISTORY_ARCHIVAL_URI_FIELD_NUMBER: builtins.int
     VISIBILITY_ARCHIVAL_STATE_FIELD_NUMBER: builtins.int
     VISIBILITY_ARCHIVAL_URI_FIELD_NUMBER: builtins.int
+    CUSTOM_SEARCH_ATTRIBUTE_ALIASES_FIELD_NUMBER: builtins.int
     @property
     def workflow_execution_retention_ttl(
         self,
@@ -136,6 +155,11 @@ class NamespaceConfig(google.protobuf.message.Message):
     visibility_archival_state: temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
     """If unspecified (ARCHIVAL_STATE_UNSPECIFIED) then default server configuration is used."""
     visibility_archival_uri: builtins.str
+    @property
+    def custom_search_attribute_aliases(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
+        """Map from field name to alias."""
     def __init__(
         self,
         *,
@@ -146,6 +170,10 @@ class NamespaceConfig(google.protobuf.message.Message):
         history_archival_uri: builtins.str = ...,
         visibility_archival_state: temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType = ...,
         visibility_archival_uri: builtins.str = ...,
+        custom_search_attribute_aliases: collections.abc.Mapping[
+            builtins.str, builtins.str
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -161,6 +189,8 @@ class NamespaceConfig(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "bad_binaries",
             b"bad_binaries",
+            "custom_search_attribute_aliases",
+            b"custom_search_attribute_aliases",
             "history_archival_state",
             b"history_archival_state",
             "history_archival_uri",
