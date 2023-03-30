@@ -1209,7 +1209,7 @@ def value_to_type(
     # of a supertype.
     supertype = getattr(hint, "__supertype__", None)
     if supertype:
-        return value_to_type(supertype, value)
+        return value_to_type(supertype, value, custom_converters)
 
     # Load origin for other checks
     origin = getattr(hint, "__origin__", hint)
@@ -1230,7 +1230,7 @@ def value_to_type(
         # Try each one. Note, Optional is just a union w/ none.
         for arg in type_args:
             try:
-                return value_to_type(arg, value)
+                return value_to_type(arg, value, custom_converters)
             except Exception:
                 pass
         raise TypeError(f"Failed converting to {hint} from {value}")
@@ -1265,7 +1265,7 @@ def value_to_type(
         for key, value in value.items():
             if key_type:
                 try:
-                    key = value_to_type(key_type, key)
+                    key = value_to_type(key_type, key, custom_converters)
                 except Exception as err:
                     raise TypeError(f"Failed converting key {key} on {hint}") from err
             # If there are per-key types, use it instead of single type
@@ -1275,7 +1275,7 @@ def value_to_type(
                 this_value_type = per_key_types.get(key)
             if this_value_type:
                 try:
-                    value = value_to_type(this_value_type, value)
+                    value = value_to_type(this_value_type, value, custom_converters)
                 except Exception as err:
                     raise TypeError(
                         f"Failed converting value for key {key} on {hint}"
@@ -1307,7 +1307,7 @@ def value_to_type(
             if field_value is not dataclasses.MISSING:
                 try:
                     field_values[field.name] = value_to_type(
-                        field_hints[field.name], field_value
+                        field_hints[field.name], field_value, custom_converters
                     )
                 except Exception as err:
                     raise TypeError(
@@ -1379,7 +1379,7 @@ def value_to_type(
                         f"Type {hint} only expecting {len(type_args)} values, got at least {i + 1}"
                     )
                 try:
-                    ret_list.append(value_to_type(arg_type, item))
+                    ret_list.append(value_to_type(arg_type, item, custom_converters))
                 except Exception as err:
                     raise TypeError(f"Failed converting {hint} index {i}") from err
         # If tuple, set, or deque convert back to that type

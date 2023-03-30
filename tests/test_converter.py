@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import ipaddress
 import logging
 import sys
@@ -551,7 +552,7 @@ class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
         self, hint: Type, value: Any
     ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
-        if issubclass(hint, ipaddress.IPv4Address):
+        if inspect.isclass(hint) and issubclass(hint, ipaddress.IPv4Address):
             return ipaddress.IPv4Address(value)
         return JSONTypeConverter.Unhandled
 
@@ -565,14 +566,25 @@ async def test_json_type_converter():
     # Fails to encode with default
     with pytest.raises(TypeError):
         await DataConverter.default.encode([addr])
+    with pytest.raises(TypeError):
+        await DataConverter.default.encode([[addr, addr]])
 
     # But encodes with custom
     payload = (await custom_conv.encode([addr]))[0]
     assert '"1.2.3.4"' == payload.data.decode()
+    list_payload = (await custom_conv.encode([[addr, addr]]))[0]
+    assert '["1.2.3.4","1.2.3.4"]' == list_payload.data.decode()
 
     # Fails to decode with default
     with pytest.raises(TypeError):
         await DataConverter.default.decode([payload], [ipaddress.IPv4Address])
+    with pytest.raises(TypeError):
+        await DataConverter.default.decode(
+            [list_payload], [List[ipaddress.IPv4Address]]
+        )
 
     # But decodes with custom
     assert addr == (await custom_conv.decode([payload], [ipaddress.IPv4Address]))[0]
+    assert [addr, addr] == (
+        await custom_conv.decode([list_payload], [List[ipaddress.IPv4Address]])
+    )[0]
