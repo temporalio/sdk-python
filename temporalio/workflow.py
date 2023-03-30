@@ -445,7 +445,6 @@ class _Runtime(ABC):
         self,
         activity: Any,
         *args: Any,
-        activity_id: Optional[str],
         task_queue: Optional[str],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
@@ -453,6 +452,7 @@ class _Runtime(ABC):
         heartbeat_timeout: Optional[timedelta],
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cancellation_type: ActivityCancellationType,
+        activity_id: Optional[str],
     ) -> ActivityHandle[Any]:
         ...
 
@@ -481,13 +481,13 @@ class _Runtime(ABC):
         self,
         activity: Any,
         *args: Any,
-        activity_id: Optional[str],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
         start_to_close_timeout: Optional[timedelta],
         retry_policy: Optional[temporalio.common.RetryPolicy],
         local_retry_threshold: Optional[timedelta],
         cancellation_type: ActivityCancellationType,
+        activity_id: Optional[str],
     ) -> ActivityHandle[Any]:
         ...
 
@@ -1141,7 +1141,6 @@ class ActivityConfig(TypedDict, total=False):
     :py:func:`execute_activity`.
     """
 
-    activity_id: Optional[str]
     task_queue: Optional[str]
     schedule_to_close_timeout: Optional[timedelta]
     schedule_to_start_timeout: Optional[timedelta]
@@ -1149,6 +1148,7 @@ class ActivityConfig(TypedDict, total=False):
     heartbeat_timeout: Optional[timedelta]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cancellation_type: ActivityCancellationType
+    activity_id: Optional[str]
 
 
 # Overload for async no-param activity
@@ -1156,7 +1156,6 @@ class ActivityConfig(TypedDict, total=False):
 def start_activity(
     activity: CallableAsyncNoParam[ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1164,6 +1163,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1173,7 +1173,6 @@ def start_activity(
 def start_activity(
     activity: CallableSyncNoParam[ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1181,6 +1180,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1191,7 +1191,6 @@ def start_activity(
     activity: CallableAsyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1199,6 +1198,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1209,7 +1209,6 @@ def start_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1217,6 +1216,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1227,7 +1227,6 @@ def start_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1235,6 +1234,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1245,7 +1245,6 @@ def start_activity(
     activity: Callable[..., ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1253,6 +1252,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1264,7 +1264,6 @@ def start_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1272,6 +1271,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     ...
 
@@ -1281,7 +1281,6 @@ def start_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1289,6 +1288,7 @@ def start_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity and return its handle.
 
@@ -1299,7 +1299,6 @@ def start_activity(
         activity: Activity name or function reference.
         arg: Single argument to the activity.
         args: Multiple arguments to the activity. Cannot be set if arg is.
-        activity_id: Optional unique identifier for the activity.
         task_queue: Task queue to run the activity on. Defaults to the current
             workflow's task queue.
         schedule_to_close_timeout: Max amount of time the activity can take from
@@ -1316,6 +1315,9 @@ def start_activity(
             retries.
         cancellation_type: How the activity is treated when it is cancelled from
             the workflow.
+        activity_id: Optional unique identifier for the activity. This is an
+            advanced setting that should not be set unless users are sure they
+            need to. Contact Temporal before setting this value.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -1323,7 +1325,6 @@ def start_activity(
     return _Runtime.current().workflow_start_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1331,6 +1332,7 @@ def start_activity(
         heartbeat_timeout=heartbeat_timeout,
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -1339,7 +1341,6 @@ def start_activity(
 async def execute_activity(
     activity: CallableAsyncNoParam[ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1347,6 +1348,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1356,7 +1358,6 @@ async def execute_activity(
 async def execute_activity(
     activity: CallableSyncNoParam[ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1364,6 +1365,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1374,7 +1376,6 @@ async def execute_activity(
     activity: CallableAsyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1382,6 +1383,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1392,7 +1394,6 @@ async def execute_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1400,6 +1401,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1410,7 +1412,6 @@ async def execute_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1418,6 +1419,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1428,7 +1430,6 @@ async def execute_activity(
     activity: Callable[..., ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1436,6 +1437,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1447,7 +1449,6 @@ async def execute_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1455,6 +1456,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     ...
 
@@ -1464,7 +1466,6 @@ async def execute_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1472,6 +1473,7 @@ async def execute_activity(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     """Start an activity and wait for completion.
 
@@ -1482,7 +1484,6 @@ async def execute_activity(
     return await _Runtime.current().workflow_start_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1490,6 +1491,7 @@ async def execute_activity(
         heartbeat_timeout=heartbeat_timeout,
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -1498,7 +1500,6 @@ async def execute_activity(
 def start_activity_class(
     activity: Type[CallableAsyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1506,6 +1507,7 @@ def start_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1515,7 +1517,6 @@ def start_activity_class(
 def start_activity_class(
     activity: Type[CallableSyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1523,6 +1524,7 @@ def start_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1533,7 +1535,6 @@ def start_activity_class(
     activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1541,6 +1542,7 @@ def start_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1551,7 +1553,6 @@ def start_activity_class(
     activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1559,6 +1560,7 @@ def start_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1569,7 +1571,6 @@ def start_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1577,6 +1578,7 @@ def start_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1587,7 +1589,6 @@ def start_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1595,6 +1596,7 @@ def start_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1604,7 +1606,6 @@ def start_activity_class(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1612,6 +1613,7 @@ def start_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
 
@@ -1620,7 +1622,6 @@ def start_activity_class(
     return _Runtime.current().workflow_start_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1628,6 +1629,7 @@ def start_activity_class(
         heartbeat_timeout=heartbeat_timeout,
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -1636,7 +1638,6 @@ def start_activity_class(
 async def execute_activity_class(
     activity: Type[CallableAsyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1644,6 +1645,7 @@ async def execute_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1653,7 +1655,6 @@ async def execute_activity_class(
 async def execute_activity_class(
     activity: Type[CallableSyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1661,6 +1662,7 @@ async def execute_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1671,7 +1673,6 @@ async def execute_activity_class(
     activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1679,6 +1680,7 @@ async def execute_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1689,7 +1691,6 @@ async def execute_activity_class(
     activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1697,6 +1698,7 @@ async def execute_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1707,7 +1709,6 @@ async def execute_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1715,6 +1716,7 @@ async def execute_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1725,7 +1727,6 @@ async def execute_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1733,6 +1734,7 @@ async def execute_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1742,7 +1744,6 @@ async def execute_activity_class(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1750,6 +1751,7 @@ async def execute_activity_class(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
 
@@ -1758,7 +1760,6 @@ async def execute_activity_class(
     return await _Runtime.current().workflow_start_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1766,6 +1767,7 @@ async def execute_activity_class(
         heartbeat_timeout=heartbeat_timeout,
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -1774,7 +1776,6 @@ async def execute_activity_class(
 def start_activity_method(
     activity: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1782,6 +1783,7 @@ def start_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1791,7 +1793,6 @@ def start_activity_method(
 def start_activity_method(
     activity: MethodSyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1799,6 +1800,7 @@ def start_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1809,7 +1811,6 @@ def start_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1817,6 +1818,7 @@ def start_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1827,7 +1829,6 @@ def start_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1835,6 +1836,7 @@ def start_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1845,7 +1847,6 @@ def start_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1853,6 +1854,7 @@ def start_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1863,7 +1865,6 @@ def start_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1871,6 +1872,7 @@ def start_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1880,7 +1882,6 @@ def start_activity_method(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1888,6 +1889,7 @@ def start_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
 
@@ -1896,7 +1898,6 @@ def start_activity_method(
     return _Runtime.current().workflow_start_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1904,6 +1905,7 @@ def start_activity_method(
         heartbeat_timeout=heartbeat_timeout,
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -1912,7 +1914,6 @@ def start_activity_method(
 async def execute_activity_method(
     activity: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1920,6 +1921,7 @@ async def execute_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1929,7 +1931,6 @@ async def execute_activity_method(
 async def execute_activity_method(
     activity: MethodSyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1937,6 +1938,7 @@ async def execute_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1947,7 +1949,6 @@ async def execute_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1955,6 +1956,7 @@ async def execute_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1965,7 +1967,6 @@ async def execute_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1973,6 +1974,7 @@ async def execute_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -1983,7 +1985,6 @@ async def execute_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -1991,6 +1992,7 @@ async def execute_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2001,7 +2003,6 @@ async def execute_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2009,6 +2010,7 @@ async def execute_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2018,7 +2020,6 @@ async def execute_activity_method(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     task_queue: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -2026,6 +2027,7 @@ async def execute_activity_method(
     heartbeat_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     """Start an activity from a method and wait for completion.
 
@@ -2036,7 +2038,6 @@ async def execute_activity_method(
     return await _Runtime.current().workflow_start_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         task_queue=task_queue,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
@@ -2044,6 +2045,7 @@ async def execute_activity_method(
         heartbeat_timeout=heartbeat_timeout,
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -2052,13 +2054,13 @@ class LocalActivityConfig(TypedDict, total=False):
     and :py:func:`execute_local_activity`.
     """
 
-    activity_id: Optional[str]
     schedule_to_close_timeout: Optional[timedelta]
     schedule_to_start_timeout: Optional[timedelta]
     start_to_close_timeout: Optional[timedelta]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     local_retry_threshold: Optional[timedelta]
     cancellation_type: ActivityCancellationType
+    activity_id: Optional[str]
 
 
 # Overload for async no-param activity
@@ -2066,13 +2068,13 @@ class LocalActivityConfig(TypedDict, total=False):
 def start_local_activity(
     activity: CallableAsyncNoParam[ReturnType],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2099,13 +2101,13 @@ def start_local_activity(
     activity: CallableAsyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2116,13 +2118,13 @@ def start_local_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2133,13 +2135,13 @@ def start_local_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2150,13 +2152,13 @@ def start_local_activity(
     activity: Callable[..., ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2168,13 +2170,13 @@ def start_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     ...
 
@@ -2184,13 +2186,13 @@ def start_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity and return its handle.
 
@@ -2217,6 +2219,9 @@ def start_local_activity(
             retries.
         cancellation_type: How the activity is treated when it is cancelled from
             the workflow.
+        activity_id: Optional unique identifier for the activity. This is an
+            advanced setting that should not be set unless users are sure they
+            need to. Contact Temporal before setting this value.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -2224,13 +2229,13 @@ def start_local_activity(
     return _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
         retry_policy=retry_policy,
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -2239,13 +2244,13 @@ def start_local_activity(
 async def execute_local_activity(
     activity: CallableAsyncNoParam[ReturnType],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2255,13 +2260,13 @@ async def execute_local_activity(
 async def execute_local_activity(
     activity: CallableSyncNoParam[ReturnType],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2272,13 +2277,13 @@ async def execute_local_activity(
     activity: CallableAsyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2289,13 +2294,13 @@ async def execute_local_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2306,13 +2311,13 @@ async def execute_local_activity(
     activity: Callable[..., Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2323,13 +2328,13 @@ async def execute_local_activity(
     activity: Callable[..., ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2341,13 +2346,13 @@ async def execute_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     ...
 
@@ -2357,13 +2362,13 @@ async def execute_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     """Start a local activity and wait for completion.
 
@@ -2377,13 +2382,13 @@ async def execute_local_activity(
     return await _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
         retry_policy=retry_policy,
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -2392,13 +2397,13 @@ async def execute_local_activity(
 def start_local_activity_class(
     activity: Type[CallableAsyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2408,13 +2413,13 @@ def start_local_activity_class(
 def start_local_activity_class(
     activity: Type[CallableSyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2425,13 +2430,13 @@ def start_local_activity_class(
     activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2442,13 +2447,13 @@ def start_local_activity_class(
     activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2459,13 +2464,13 @@ def start_local_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2476,13 +2481,13 @@ def start_local_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2492,13 +2497,13 @@ def start_local_activity_class(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a callable class.
 
@@ -2510,13 +2515,13 @@ def start_local_activity_class(
     return _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
         retry_policy=retry_policy,
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -2525,13 +2530,13 @@ def start_local_activity_class(
 async def execute_local_activity_class(
     activity: Type[CallableAsyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2541,13 +2546,13 @@ async def execute_local_activity_class(
 async def execute_local_activity_class(
     activity: Type[CallableSyncNoParam[ReturnType]],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2558,13 +2563,13 @@ async def execute_local_activity_class(
     activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2575,13 +2580,13 @@ async def execute_local_activity_class(
     activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2592,13 +2597,13 @@ async def execute_local_activity_class(
     activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2609,13 +2614,13 @@ async def execute_local_activity_class(
     activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2625,13 +2630,13 @@ async def execute_local_activity_class(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     """Start a local activity from a callable class and wait for completion.
 
@@ -2645,13 +2650,13 @@ async def execute_local_activity_class(
     return await _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
         retry_policy=retry_policy,
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -2660,13 +2665,13 @@ async def execute_local_activity_class(
 def start_local_activity_method(
     activity: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2676,13 +2681,13 @@ def start_local_activity_method(
 def start_local_activity_method(
     activity: MethodSyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2693,13 +2698,13 @@ def start_local_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2710,13 +2715,13 @@ def start_local_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2727,13 +2732,13 @@ def start_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2744,13 +2749,13 @@ def start_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -2760,13 +2765,13 @@ def start_local_activity_method(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a method.
 
@@ -2778,13 +2783,13 @@ def start_local_activity_method(
     return _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
         retry_policy=retry_policy,
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
@@ -2793,13 +2798,13 @@ def start_local_activity_method(
 async def execute_local_activity_method(
     activity: MethodAsyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2809,13 +2814,13 @@ async def execute_local_activity_method(
 async def execute_local_activity_method(
     activity: MethodSyncNoParam[SelfType, ReturnType],
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2826,13 +2831,13 @@ async def execute_local_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2843,13 +2848,13 @@ async def execute_local_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
     arg: ParamType,
     *,
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2860,13 +2865,13 @@ async def execute_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2877,13 +2882,13 @@ async def execute_local_activity_method(
     activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
     *,
     args: Sequence[Any],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> ReturnType:
     ...
 
@@ -2893,13 +2898,13 @@ async def execute_local_activity_method(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
-    activity_id: Optional[str] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
 ) -> Any:
     """Start a local activity from a method and wait for completion.
 
@@ -2913,13 +2918,13 @@ async def execute_local_activity_method(
     return await _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
-        activity_id=activity_id,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
         retry_policy=retry_policy,
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
+        activity_id=activity_id,
     )
 
 
