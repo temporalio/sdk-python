@@ -429,6 +429,19 @@ class Worker:
         # Initiate core worker shutdown
         self._bridge_worker.initiate_shutdown()
 
+        # If any worker task had an exception, replace that task with a queue
+        # drain (task at index 1 can be activity or workflow worker, task at
+        # index 2 must be workflow worker if present)
+        if tasks[1].done() and tasks[1].exception():
+            if self._activity_worker:
+                tasks[1] = asyncio.create_task(self._activity_worker.drain_poll_queue())
+            else:
+                assert self._workflow_worker
+                tasks[1] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
+        if len(tasks) > 2 and tasks[2].done() and tasks[2].exception():
+            assert self._workflow_worker
+            tasks[2] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
+
         # Set worker-shutdown event
         if self._activity_worker:
             self._activity_worker.notify_shutdown()

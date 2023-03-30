@@ -175,6 +175,20 @@ class _ActivityWorker:
         if self._worker_shutdown_event:
             self._worker_shutdown_event.set()
 
+    # Only call this if run() raised an error
+    async def drain_poll_queue(self) -> None:
+        while True:
+            try:
+                # Just take all tasks and say we can't handle them
+                task = await self._bridge_worker().poll_activity_task()
+                completion = temporalio.bridge.proto.ActivityTaskCompletion(
+                    task_token=task.task_token
+                )
+                completion.result.failed.failure.message = "Worker shutting down"
+                await self._bridge_worker().complete_activity_task(completion)
+            except temporalio.bridge.worker.PollShutdownError:
+                return
+
     def _cancel(
         self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
     ) -> None:
