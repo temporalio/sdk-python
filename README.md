@@ -1,4 +1,4 @@
-![Temporal Python SDK](scripts/_img/banner.svg)
+![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
 
 [![Python 3.7+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
