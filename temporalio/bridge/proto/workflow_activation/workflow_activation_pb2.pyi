@@ -30,8 +30,8 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class WorkflowActivation(google.protobuf.message.Message):
-    """/ An instruction to the lang sdk to run some workflow code, whether for the first time or from
-    / a cached state.
+    """An instruction to the lang sdk to run some workflow code, whether for the first time or from
+    a cached state.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -41,18 +41,19 @@ class WorkflowActivation(google.protobuf.message.Message):
     IS_REPLAYING_FIELD_NUMBER: builtins.int
     HISTORY_LENGTH_FIELD_NUMBER: builtins.int
     JOBS_FIELD_NUMBER: builtins.int
+    AVAILABLE_INTERNAL_FLAGS_FIELD_NUMBER: builtins.int
     run_id: builtins.str
-    """/ The id of the currently active run of the workflow. Also used as a cache key. There may
-    / only ever be one active workflow task (and hence activation) of a run at one time.
+    """The id of the currently active run of the workflow. Also used as a cache key. There may
+    only ever be one active workflow task (and hence activation) of a run at one time.
     """
     @property
     def timestamp(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """/ The current time as understood by the workflow, which is set by workflow task started events"""
+        """The current time as understood by the workflow, which is set by workflow task started events"""
     is_replaying: builtins.bool
-    """/ Whether or not the activation is replaying past events"""
+    """Whether or not the activation is replaying past events"""
     history_length: builtins.int
-    """/ Current history length as determined by the event id of the most recently processed event.
-    / This ensures that the number is always deterministic
+    """Current history length as determined by the event id of the most recently processed event.
+    This ensures that the number is always deterministic
     """
     @property
     def jobs(
@@ -60,7 +61,15 @@ class WorkflowActivation(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___WorkflowActivationJob
     ]:
-        """/ The things to do upon activating the workflow"""
+        """The things to do upon activating the workflow"""
+    @property
+    def available_internal_flags(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """Internal flags which are available for use by lang. If `is_replaying` is false, all
+        internal flags may be used. This is not a delta - all previously used flags always
+        appear since this representation is cheap.
+        """
     def __init__(
         self,
         *,
@@ -69,6 +78,7 @@ class WorkflowActivation(google.protobuf.message.Message):
         is_replaying: builtins.bool = ...,
         history_length: builtins.int = ...,
         jobs: collections.abc.Iterable[global___WorkflowActivationJob] | None = ...,
+        available_internal_flags: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
@@ -76,6 +86,8 @@ class WorkflowActivation(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "available_internal_flags",
+            b"available_internal_flags",
             "history_length",
             b"history_length",
             "is_replaying",
@@ -109,58 +121,58 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     REMOVE_FROM_CACHE_FIELD_NUMBER: builtins.int
     @property
     def start_workflow(self) -> global___StartWorkflow:
-        """/ Begin a workflow for the first time"""
+        """Begin a workflow for the first time"""
     @property
     def fire_timer(self) -> global___FireTimer:
-        """/ A timer has fired, allowing whatever was waiting on it (if anything) to proceed"""
+        """A timer has fired, allowing whatever was waiting on it (if anything) to proceed"""
     @property
     def update_random_seed(self) -> global___UpdateRandomSeed:
-        """/ Workflow was reset. The randomness seed must be updated."""
+        """Workflow was reset. The randomness seed must be updated."""
     @property
     def query_workflow(self) -> global___QueryWorkflow:
-        """/ A request to query the workflow was received."""
+        """A request to query the workflow was received."""
     @property
     def cancel_workflow(self) -> global___CancelWorkflow:
-        """/ A request to cancel the workflow was received."""
+        """A request to cancel the workflow was received."""
     @property
     def signal_workflow(self) -> global___SignalWorkflow:
-        """/ A request to signal the workflow was received."""
+        """A request to signal the workflow was received."""
     @property
     def resolve_activity(self) -> global___ResolveActivity:
-        """/ An activity was resolved, result could be completed, failed or cancelled"""
+        """An activity was resolved, result could be completed, failed or cancelled"""
     @property
     def notify_has_patch(self) -> global___NotifyHasPatch:
-        """/ A patch marker has been detected and lang is being told that change exists. This
-        / job is strange in that it is sent pre-emptively to lang without any corresponding
-        / command being sent first.
+        """A patch marker has been detected and lang is being told that change exists. This
+        job is strange in that it is sent pre-emptively to lang without any corresponding
+        command being sent first.
         """
     @property
     def resolve_child_workflow_execution_start(
         self,
     ) -> global___ResolveChildWorkflowExecutionStart:
-        """/ A child workflow execution has started or failed to start"""
+        """A child workflow execution has started or failed to start"""
     @property
     def resolve_child_workflow_execution(
         self,
     ) -> global___ResolveChildWorkflowExecution:
-        """/ A child workflow was resolved, result could be completed or failed"""
+        """A child workflow was resolved, result could be completed or failed"""
     @property
     def resolve_signal_external_workflow(
         self,
     ) -> global___ResolveSignalExternalWorkflow:
-        """/ An attempt to signal an external workflow resolved"""
+        """An attempt to signal an external workflow resolved"""
     @property
     def resolve_request_cancel_external_workflow(
         self,
     ) -> global___ResolveRequestCancelExternalWorkflow:
-        """/ An attempt to cancel an external workflow resolved"""
+        """An attempt to cancel an external workflow resolved"""
     @property
     def remove_from_cache(self) -> global___RemoveFromCache:
-        """/ Remove the workflow identified by the [WorkflowActivation] containing this job from the cache
-        / after performing the activation.
-        /
-        / If other job variant are present in the list, this variant will be the last job in the
-        / job list. The string value is a reason for eviction.
+        """Remove the workflow identified by the [WorkflowActivation] containing this job from the cache
+        after performing the activation.
+
+        If other job variant are present in the list, this variant will be the last job in the
+        job list. The string value is a reason for eviction.
         """
     def __init__(
         self,
@@ -528,13 +540,13 @@ class StartWorkflow(google.protobuf.message.Message):
 global___StartWorkflow = StartWorkflow
 
 class FireTimer(google.protobuf.message.Message):
-    """/ Notify a workflow that a timer has fired"""
+    """Notify a workflow that a timer has fired"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEQ_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """/ Sequence number as provided by lang in the corresponding StartTimer command"""
+    """Sequence number as provided by lang in the corresponding StartTimer command"""
     def __init__(
         self,
         *,
@@ -547,14 +559,14 @@ class FireTimer(google.protobuf.message.Message):
 global___FireTimer = FireTimer
 
 class ResolveActivity(google.protobuf.message.Message):
-    """/ Notify a workflow that an activity has been resolved"""
+    """Notify a workflow that an activity has been resolved"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEQ_FIELD_NUMBER: builtins.int
     RESULT_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """/ Sequence number as provided by lang in the corresponding ScheduleActivity command"""
+    """Sequence number as provided by lang in the corresponding ScheduleActivity command"""
     @property
     def result(
         self,
@@ -578,8 +590,8 @@ class ResolveActivity(google.protobuf.message.Message):
 global___ResolveActivity = ResolveActivity
 
 class ResolveChildWorkflowExecutionStart(google.protobuf.message.Message):
-    """/ Notify a workflow that a start child workflow execution request has succeeded, failed or was
-    / cancelled.
+    """Notify a workflow that a start child workflow execution request has succeeded, failed or was
+    cancelled.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -589,7 +601,7 @@ class ResolveChildWorkflowExecutionStart(google.protobuf.message.Message):
     FAILED_FIELD_NUMBER: builtins.int
     CANCELLED_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """/ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command"""
+    """Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command"""
     @property
     def succeeded(self) -> global___ResolveChildWorkflowExecutionStartSuccess: ...
     @property
@@ -639,7 +651,7 @@ class ResolveChildWorkflowExecutionStart(google.protobuf.message.Message):
 global___ResolveChildWorkflowExecutionStart = ResolveChildWorkflowExecutionStart
 
 class ResolveChildWorkflowExecutionStartSuccess(google.protobuf.message.Message):
-    """/ Simply pass the run_id to lang"""
+    """Simply pass the run_id to lang"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -659,7 +671,7 @@ global___ResolveChildWorkflowExecutionStartSuccess = (
 )
 
 class ResolveChildWorkflowExecutionStartFailure(google.protobuf.message.Message):
-    """/ Provide lang the cause of failure"""
+    """Provide lang the cause of failure"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -667,8 +679,8 @@ class ResolveChildWorkflowExecutionStartFailure(google.protobuf.message.Message)
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     CAUSE_FIELD_NUMBER: builtins.int
     workflow_id: builtins.str
-    """/ Lang should have this information but it's more convenient to pass it back
-    / for error construction on the lang side.
+    """Lang should have this information but it's more convenient to pass it back
+    for error construction on the lang side.
     """
     workflow_type: builtins.str
     cause: temporalio.bridge.proto.child_workflow.child_workflow_pb2.StartChildWorkflowExecutionFailedCause.ValueType
@@ -696,8 +708,8 @@ global___ResolveChildWorkflowExecutionStartFailure = (
 )
 
 class ResolveChildWorkflowExecutionStartCancelled(google.protobuf.message.Message):
-    """/ `failure` should be ChildWorkflowFailure with cause set to CancelledFailure.
-    / The failure is constructed in core for lang's convenience.
+    """`failure` should be ChildWorkflowFailure with cause set to CancelledFailure.
+    The failure is constructed in core for lang's convenience.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -722,14 +734,14 @@ global___ResolveChildWorkflowExecutionStartCancelled = (
 )
 
 class ResolveChildWorkflowExecution(google.protobuf.message.Message):
-    """/ Notify a workflow that a child workflow execution has been resolved"""
+    """Notify a workflow that a child workflow execution has been resolved"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEQ_FIELD_NUMBER: builtins.int
     RESULT_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """/ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command"""
+    """Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command"""
     @property
     def result(
         self,
@@ -753,7 +765,7 @@ class ResolveChildWorkflowExecution(google.protobuf.message.Message):
 global___ResolveChildWorkflowExecution = ResolveChildWorkflowExecution
 
 class UpdateRandomSeed(google.protobuf.message.Message):
-    """/ Update the workflow's random seed"""
+    """Update the workflow's random seed"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -772,7 +784,7 @@ class UpdateRandomSeed(google.protobuf.message.Message):
 global___UpdateRandomSeed = UpdateRandomSeed
 
 class QueryWorkflow(google.protobuf.message.Message):
-    """/ Query a workflow"""
+    """Query a workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -803,12 +815,12 @@ class QueryWorkflow(google.protobuf.message.Message):
     ARGUMENTS_FIELD_NUMBER: builtins.int
     HEADERS_FIELD_NUMBER: builtins.int
     query_id: builtins.str
-    """/ For PollWFTResp `query` field, this will be set to the special value `legacy`. For the
-    / `queries` field, the server provides a unique identifier. If it is a `legacy` query,
-    / lang cannot issue any commands in response other than to answer the query.
+    """For PollWFTResp `query` field, this will be set to the special value `legacy`. For the
+    `queries` field, the server provides a unique identifier. If it is a `legacy` query,
+    lang cannot issue any commands in response other than to answer the query.
     """
     query_type: builtins.str
-    """/ The query's function/method/etc name"""
+    """The query's function/method/etc name"""
     @property
     def arguments(
         self,
@@ -821,7 +833,7 @@ class QueryWorkflow(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.MessageMap[
         builtins.str, temporalio.api.common.v1.message_pb2.Payload
     ]:
-        """/ Headers attached to the query"""
+        """Headers attached to the query"""
     def __init__(
         self,
         *,
@@ -853,7 +865,7 @@ class QueryWorkflow(google.protobuf.message.Message):
 global___QueryWorkflow = QueryWorkflow
 
 class CancelWorkflow(google.protobuf.message.Message):
-    """/ Cancel a running workflow"""
+    """Cancel a running workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -864,7 +876,7 @@ class CancelWorkflow(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.common.v1.message_pb2.Payload
     ]:
-        """/ Information from the cancellation request"""
+        """Information from the cancellation request"""
     def __init__(
         self,
         *,
@@ -978,13 +990,13 @@ class ResolveSignalExternalWorkflow(google.protobuf.message.Message):
     SEQ_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """/ Sequence number as provided by lang in the corresponding SignalExternalWorkflowExecution
-    / command
+    """Sequence number as provided by lang in the corresponding SignalExternalWorkflowExecution
+    command
     """
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """/ If populated, this signal either failed to be sent or was cancelled depending on failure
-        / type / info.
+        """If populated, this signal either failed to be sent or was cancelled depending on failure
+        type / info.
         """
     def __init__(
         self,
@@ -1008,13 +1020,13 @@ class ResolveRequestCancelExternalWorkflow(google.protobuf.message.Message):
     SEQ_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """/ Sequence number as provided by lang in the corresponding
-    / RequestCancelExternalWorkflowExecution command
+    """Sequence number as provided by lang in the corresponding
+    RequestCancelExternalWorkflowExecution command
     """
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """/ If populated, this signal either failed to be sent or was cancelled depending on failure
-        / type / info.
+        """If populated, this signal either failed to be sent or was cancelled depending on failure
+        type / info.
         """
     def __init__(
         self,
@@ -1071,6 +1083,8 @@ class RemoveFromCache(google.protobuf.message.Message):
         """There was some fatal error processing the workflow, typically an internal error, but
         can also happen if then network drops out while paginating. Check message string.
         """
+        PAGINATION_OR_HISTORY_FETCH: RemoveFromCache._EvictionReason.ValueType  # 9
+        """Something went wrong attempting to fetch more history events."""
 
     class EvictionReason(_EvictionReason, metaclass=_EvictionReasonEnumTypeWrapper): ...
     UNSPECIFIED: RemoveFromCache.EvictionReason.ValueType  # 0
@@ -1098,6 +1112,8 @@ class RemoveFromCache(google.protobuf.message.Message):
     """There was some fatal error processing the workflow, typically an internal error, but
     can also happen if then network drops out while paginating. Check message string.
     """
+    PAGINATION_OR_HISTORY_FETCH: RemoveFromCache.EvictionReason.ValueType  # 9
+    """Something went wrong attempting to fetch more history events."""
 
     MESSAGE_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int

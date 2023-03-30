@@ -46,6 +46,7 @@ class WorkerConfig:
     default_heartbeat_throttle_interval_millis: int
     max_activities_per_second: Optional[float]
     max_task_queue_activities_per_second: Optional[float]
+    graceful_shutdown_period_millis: int
 
 
 class Worker:
@@ -119,9 +120,9 @@ class Worker:
         """Request a workflow be evicted."""
         self._ref.request_workflow_eviction(run_id)
 
-    async def shutdown(self) -> None:
-        """Shutdown the worker, waiting for completion."""
-        await self._ref.shutdown()
+    def initiate_shutdown(self) -> None:
+        """Start shutdown of the worker."""
+        self._ref.initiate_shutdown()
 
     async def finalize_shutdown(self) -> None:
         """Finalize the worker.

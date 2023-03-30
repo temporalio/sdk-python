@@ -1,5 +1,23 @@
-from .message_pb2 import WorkflowUpdate
+from .message_pb2 import (
+    Acceptance,
+    Input,
+    Meta,
+    Outcome,
+    Rejection,
+    Request,
+    Response,
+    UpdateRef,
+    WaitPolicy,
+)
 
 __all__ = [
-    "WorkflowUpdate",
+    "Acceptance",
+    "Input",
+    "Meta",
+    "Outcome",
+    "Rejection",
+    "Request",
+    "Response",
+    "UpdateRef",
+    "WaitPolicy",
 ]

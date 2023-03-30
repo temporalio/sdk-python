@@ -78,7 +78,7 @@ pub fn connect_client<'a>(
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(ClientRef {
             retry_client: opts
-                .connect_no_namespace(runtime.core.metric_meter(), headers)
+                .connect_no_namespace(runtime.core.metric_meter().as_deref(), headers)
                 .await
                 .map_err(|err| {
                     PyRuntimeError::new_err(format!("Failed client connect: {}", err))
@@ -230,7 +230,9 @@ impl ClientRef {
                 }
                 "update_namespace" => rpc_call!(retry_client, call, update_namespace),
                 "update_schedule" => rpc_call!(retry_client, call, update_schedule),
-                "update_workflow" => rpc_call!(retry_client, call, update_workflow),
+                "update_workflow_execution" => {
+                    rpc_call!(retry_client, call, update_workflow_execution)
+                }
                 "update_worker_build_id_ordering" => {
                     rpc_call!(retry_client, call, update_worker_build_id_ordering)
                 }

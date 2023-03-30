@@ -306,7 +306,10 @@ class Worker:
                 max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
                 nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
                 max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
-                no_remote_activities=no_remote_activities,
+                # We have to disable remote activities if a user asks _or_ if we
+                # are not running an activity worker at all. Otherwise shutdown
+                # will not proceed properly.
+                no_remote_activities=no_remote_activities or not activities,
                 sticky_queue_schedule_to_start_timeout_millis=int(
                     1000 * sticky_queue_schedule_to_start_timeout.total_seconds()
                 ),
@@ -318,6 +321,9 @@ class Worker:
                 ),
                 max_activities_per_second=max_activities_per_second,
                 max_task_queue_activities_per_second=max_task_queue_activities_per_second,
+                graceful_shutdown_period_millis=int(
+                    1000 * graceful_shutdown_timeout.total_seconds()
+                ),
             ),
         )
 
@@ -419,8 +425,26 @@ class Worker:
         logger.info(
             f"Beginning worker shutdown, will wait {graceful_timeout} before cancelling activities"
         )
-        # Start shutdown of the bridge
-        bridge_shutdown_task = asyncio.create_task(self._bridge_worker.shutdown())
+
+        # Initiate core worker shutdown
+        self._bridge_worker.initiate_shutdown()
+
+        # If any worker task had an exception, replace that task with a queue
+        # drain (task at index 1 can be activity or workflow worker, task at
+        # index 2 must be workflow worker if present)
+        if tasks[1].done() and tasks[1].exception():
+            if self._activity_worker:
+                tasks[1] = asyncio.create_task(self._activity_worker.drain_poll_queue())
+            else:
+                assert self._workflow_worker
+                tasks[1] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
+        if len(tasks) > 2 and tasks[2].done() and tasks[2].exception():
+            assert self._workflow_worker
+            tasks[2] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
+
+        # Set worker-shutdown event
+        if self._activity_worker:
+            self._activity_worker.notify_shutdown()
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks)
@@ -431,11 +455,6 @@ class Worker:
         for task in tasks:
             task.cancel()
 
-        # Shutdown the activity worker (there is no workflow worker shutdown)
-        if self._activity_worker:
-            await self._activity_worker.shutdown(graceful_timeout)
-        # Wait for the bridge to report everything is completed
-        await bridge_shutdown_task
         # Do final shutdown
         try:
             await self._bridge_worker.finalize_shutdown()

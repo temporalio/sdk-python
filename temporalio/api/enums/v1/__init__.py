@@ -9,13 +9,12 @@ from .failed_cause_pb2 import (
     StartChildWorkflowExecutionFailedCause,
     WorkflowTaskFailedCause,
 )
-from .interaction_type_pb2 import InteractionType
 from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
 from .query_pb2 import QueryRejectCondition, QueryResultType
 from .reset_pb2 import ResetReapplyType
 from .schedule_pb2 import ScheduleOverlapPolicy
 from .task_queue_pb2 import TaskQueueKind, TaskQueueType
-from .update_pb2 import WorkflowUpdateResultAccessStyle
+from .update_pb2 import UpdateWorkflowExecutionLifecycleStage
 from .workflow_pb2 import (
     ContinueAsNewInitiator,
     HistoryEventFilterType,
@@ -39,7 +38,6 @@ __all__ = [
     "EventType",
     "HistoryEventFilterType",
     "IndexedValueType",
-    "InteractionType",
     "NamespaceState",
     "ParentClosePolicy",
     "PendingActivityState",
@@ -57,8 +55,8 @@ __all__ = [
     "TaskQueueKind",
     "TaskQueueType",
     "TimeoutType",
+    "UpdateWorkflowExecutionLifecycleStage",
     "WorkflowExecutionStatus",
     "WorkflowIdReusePolicy",
     "WorkflowTaskFailedCause",
-    "WorkflowUpdateResultAccessStyle",
 ]

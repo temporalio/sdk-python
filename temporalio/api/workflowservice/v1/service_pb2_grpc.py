@@ -277,10 +277,10 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.FromString,
         )
-        self.UpdateWorkflow = channel.unary_unary(
-            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflow",
-            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.SerializeToString,
-            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.FromString,
+        self.UpdateWorkflowExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionResponse.FromString,
         )
         self.StartBatchOperation = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/StartBatchOperation",
@@ -797,10 +797,10 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
-    def UpdateWorkflow(self, request, context):
+    def UpdateWorkflowExecution(self, request, context):
         """Invokes the specified update function on user workflow code.
         (-- api-linter: core::0134=disabled
-        aip.dev/not-precedent: UpdateWorkflow doesn't follow Google API format --)
+        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1083,10 +1083,10 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.SerializeToString,
         ),
-        "UpdateWorkflow": grpc.unary_unary_rpc_method_handler(
-            servicer.UpdateWorkflow,
-            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.FromString,
-            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.SerializeToString,
+        "UpdateWorkflowExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkflowExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionResponse.SerializeToString,
         ),
         "StartBatchOperation": grpc.unary_unary_rpc_method_handler(
             servicer.StartBatchOperation,
@@ -2581,7 +2581,7 @@ class WorkflowService(object):
         )
 
     @staticmethod
-    def UpdateWorkflow(
+    def UpdateWorkflowExecution(
         request,
         target,
         options=(),
@@ -2596,9 +2596,9 @@ class WorkflowService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflow",
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowRequest.SerializeToString,
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowResponse.FromString,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionResponse.FromString,
             options,
             channel_credentials,
             insecure,

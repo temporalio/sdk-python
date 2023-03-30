@@ -35,22 +35,26 @@ class _ActivityCancelReasonEnumTypeWrapper(
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NOT_FOUND: _ActivityCancelReason.ValueType  # 0
-    """/ The activity no longer exists according to server (may be already completed)"""
+    """The activity no longer exists according to server (may be already completed)"""
     CANCELLED: _ActivityCancelReason.ValueType  # 1
-    """/ Activity was explicitly cancelled"""
+    """Activity was explicitly cancelled"""
     TIMED_OUT: _ActivityCancelReason.ValueType  # 2
-    """/ Activity timed out"""
+    """Activity timed out"""
+    WORKER_SHUTDOWN: _ActivityCancelReason.ValueType  # 3
+    """Core is shutting down and the graceful timeout has elapsed"""
 
 class ActivityCancelReason(
     _ActivityCancelReason, metaclass=_ActivityCancelReasonEnumTypeWrapper
 ): ...
 
 NOT_FOUND: ActivityCancelReason.ValueType  # 0
-"""/ The activity no longer exists according to server (may be already completed)"""
+"""The activity no longer exists according to server (may be already completed)"""
 CANCELLED: ActivityCancelReason.ValueType  # 1
-"""/ Activity was explicitly cancelled"""
+"""Activity was explicitly cancelled"""
 TIMED_OUT: ActivityCancelReason.ValueType  # 2
-"""/ Activity timed out"""
+"""Activity timed out"""
+WORKER_SHUTDOWN: ActivityCancelReason.ValueType  # 3
+"""Core is shutting down and the graceful timeout has elapsed"""
 global___ActivityCancelReason = ActivityCancelReason
 
 class ActivityTask(google.protobuf.message.Message):
@@ -60,13 +64,13 @@ class ActivityTask(google.protobuf.message.Message):
     START_FIELD_NUMBER: builtins.int
     CANCEL_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
-    """/ A unique identifier for this task"""
+    """A unique identifier for this task"""
     @property
     def start(self) -> global___Start:
-        """/ Start activity execution."""
+        """Start activity execution."""
     @property
     def cancel(self) -> global___Cancel:
-        """/ Attempt to cancel activity execution."""
+        """Attempt to cancel activity execution."""
     def __init__(
         self,
         *,
@@ -299,7 +303,7 @@ class Start(google.protobuf.message.Message):
 global___Start = Start
 
 class Cancel(google.protobuf.message.Message):
-    """/ Attempt to cancel a running activity"""
+    """Attempt to cancel a running activity"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

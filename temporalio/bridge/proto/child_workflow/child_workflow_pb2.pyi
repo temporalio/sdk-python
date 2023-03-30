@@ -30,30 +30,29 @@ class _ParentClosePolicyEnumTypeWrapper(
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PARENT_CLOSE_POLICY_UNSPECIFIED: _ParentClosePolicy.ValueType  # 0
-    """* Let's the server set the default."""
+    """Let's the server set the default."""
     PARENT_CLOSE_POLICY_TERMINATE: _ParentClosePolicy.ValueType  # 1
-    """* Terminate means terminating the child workflow."""
+    """Terminate means terminating the child workflow."""
     PARENT_CLOSE_POLICY_ABANDON: _ParentClosePolicy.ValueType  # 2
-    """* Abandon means not doing anything on the child workflow."""
+    """Abandon means not doing anything on the child workflow."""
     PARENT_CLOSE_POLICY_REQUEST_CANCEL: _ParentClosePolicy.ValueType  # 3
-    """* Cancel means requesting cancellation on the child workflow."""
+    """Cancel means requesting cancellation on the child workflow."""
 
 class ParentClosePolicy(
     _ParentClosePolicy, metaclass=_ParentClosePolicyEnumTypeWrapper
 ):
-    """*
-    Used by the service to determine the fate of a child workflow
+    """Used by the service to determine the fate of a child workflow
     in case its parent is closed.
     """
 
 PARENT_CLOSE_POLICY_UNSPECIFIED: ParentClosePolicy.ValueType  # 0
-"""* Let's the server set the default."""
+"""Let's the server set the default."""
 PARENT_CLOSE_POLICY_TERMINATE: ParentClosePolicy.ValueType  # 1
-"""* Terminate means terminating the child workflow."""
+"""Terminate means terminating the child workflow."""
 PARENT_CLOSE_POLICY_ABANDON: ParentClosePolicy.ValueType  # 2
-"""* Abandon means not doing anything on the child workflow."""
+"""Abandon means not doing anything on the child workflow."""
 PARENT_CLOSE_POLICY_REQUEST_CANCEL: ParentClosePolicy.ValueType  # 3
-"""* Cancel means requesting cancellation on the child workflow."""
+"""Cancel means requesting cancellation on the child workflow."""
 global___ParentClosePolicy = ParentClosePolicy
 
 class _StartChildWorkflowExecutionFailedCause:
@@ -74,7 +73,7 @@ class StartChildWorkflowExecutionFailedCause(
     _StartChildWorkflowExecutionFailedCause,
     metaclass=_StartChildWorkflowExecutionFailedCauseEnumTypeWrapper,
 ):
-    """* Possible causes of failure to start a child workflow"""
+    """Possible causes of failure to start a child workflow"""
 
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: StartChildWorkflowExecutionFailedCause.ValueType  # 0
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: StartChildWorkflowExecutionFailedCause.ValueType  # 1
@@ -92,36 +91,32 @@ class _ChildWorkflowCancellationTypeEnumTypeWrapper(
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ABANDON: _ChildWorkflowCancellationType.ValueType  # 0
-    """* Do not request cancellation of the child workflow if already scheduled"""
+    """Do not request cancellation of the child workflow if already scheduled"""
     TRY_CANCEL: _ChildWorkflowCancellationType.ValueType  # 1
-    """* Initiate a cancellation request and immediately report cancellation to the parent."""
+    """Initiate a cancellation request and immediately report cancellation to the parent."""
     WAIT_CANCELLATION_COMPLETED: _ChildWorkflowCancellationType.ValueType  # 2
-    """* Wait for child cancellation completion."""
+    """Wait for child cancellation completion."""
     WAIT_CANCELLATION_REQUESTED: _ChildWorkflowCancellationType.ValueType  # 3
-    """* Request cancellation of the child and wait for confirmation that the request was received."""
+    """Request cancellation of the child and wait for confirmation that the request was received."""
 
 class ChildWorkflowCancellationType(
     _ChildWorkflowCancellationType,
     metaclass=_ChildWorkflowCancellationTypeEnumTypeWrapper,
 ):
-    """*
-    Controls at which point to report back to lang when a child workflow is cancelled
-    """
+    """Controls at which point to report back to lang when a child workflow is cancelled"""
 
 ABANDON: ChildWorkflowCancellationType.ValueType  # 0
-"""* Do not request cancellation of the child workflow if already scheduled"""
+"""Do not request cancellation of the child workflow if already scheduled"""
 TRY_CANCEL: ChildWorkflowCancellationType.ValueType  # 1
-"""* Initiate a cancellation request and immediately report cancellation to the parent."""
+"""Initiate a cancellation request and immediately report cancellation to the parent."""
 WAIT_CANCELLATION_COMPLETED: ChildWorkflowCancellationType.ValueType  # 2
-"""* Wait for child cancellation completion."""
+"""Wait for child cancellation completion."""
 WAIT_CANCELLATION_REQUESTED: ChildWorkflowCancellationType.ValueType  # 3
-"""* Request cancellation of the child and wait for confirmation that the request was received."""
+"""Request cancellation of the child and wait for confirmation that the request was received."""
 global___ChildWorkflowCancellationType = ChildWorkflowCancellationType
 
 class ChildWorkflowResult(google.protobuf.message.Message):
-    """*
-    Used by core to resolve child workflow executions.
-    """
+    """Used by core to resolve child workflow executions."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -174,9 +169,7 @@ class ChildWorkflowResult(google.protobuf.message.Message):
 global___ChildWorkflowResult = ChildWorkflowResult
 
 class Success(google.protobuf.message.Message):
-    """*
-    Used in ChildWorkflowResult to report successful completion.
-    """
+    """Used in ChildWorkflowResult to report successful completion."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -198,8 +191,7 @@ class Success(google.protobuf.message.Message):
 global___Success = Success
 
 class Failure(google.protobuf.message.Message):
-    """*
-    Used in ChildWorkflowResult to report non successful outcomes such as
+    """Used in ChildWorkflowResult to report non successful outcomes such as
     application failures, timeouts, terminations, and cancellations.
     """
 
@@ -223,8 +215,7 @@ class Failure(google.protobuf.message.Message):
 global___Failure = Failure
 
 class Cancellation(google.protobuf.message.Message):
-    """*
-    Used in ChildWorkflowResult to report cancellation.
+    """Used in ChildWorkflowResult to report cancellation.
     Failure should be ChildWorkflowFailure with a CanceledFailure cause.
     """
 
