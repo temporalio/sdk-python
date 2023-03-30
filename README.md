@@ -92,6 +92,8 @@ event loop. This means task management, sleep, cancellation, etc have all been d
     - [Workflow Replay](#workflow-replay)
     - [OpenTelemetry Support](#opentelemetry-support)
     - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
+    - [Known Compatibility Issues](#known-compatibility-issues)
+      - [gevent Patching](#gevent-patching)
 - [Development](#development)
     - [Building](#building)
       - [Prepare](#prepare)
@@ -1229,6 +1231,16 @@ To support these, Temporal Python SDK allows any protobuf library >= 3.19. Howev
 versions can cause issues with the sandbox due to global state sharing. Temporal strongly recommends using the latest
 protobuf 4.x library unless you absolutely cannot at which point some proto libraries may have to be marked as
 [Passthrough Modules](#passthrough-modules).
+
+### Known Compatibility Issues
+
+Below are known compatibility issues with the Python SDK.
+
+#### gevent Patching
+
+When using `gevent.monkey.patch_all()`, asyncio event loops can get messed up, especially those using custom event loops
+like Temporal. See [this gevent issue](https://github.com/gevent/gevent/issues/982) and
+[this Python SDK issue](https://github.com/temporalio/sdk-python/issues/59) for more details.
 
 # Development
 

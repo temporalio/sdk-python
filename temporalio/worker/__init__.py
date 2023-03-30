@@ -19,7 +19,12 @@ from ._interceptor import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
-from ._replayer import Replayer, ReplayerConfig
+from ._replayer import (
+    Replayer,
+    ReplayerConfig,
+    WorkflowReplayResult,
+    WorkflowReplayResults,
+)
 from ._worker import Worker, WorkerConfig
 from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
@@ -34,6 +39,8 @@ __all__ = [
     "WorkerConfig",
     "Replayer",
     "ReplayerConfig",
+    "WorkflowReplayResult",
+    "WorkflowReplayResults",
     # Interceptor base classes
     "Interceptor",
     "ActivityInboundInterceptor",

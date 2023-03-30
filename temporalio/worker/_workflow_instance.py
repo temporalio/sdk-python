@@ -800,7 +800,6 @@ class _WorkflowInstanceImpl(
         self,
         activity: Any,
         *args: Any,
-        activity_id: Optional[str],
         task_queue: Optional[str],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
@@ -808,6 +807,7 @@ class _WorkflowInstanceImpl(
         heartbeat_timeout: Optional[timedelta],
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cancellation_type: temporalio.workflow.ActivityCancellationType,
+        activity_id: Optional[str],
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
@@ -899,13 +899,13 @@ class _WorkflowInstanceImpl(
         self,
         activity: Any,
         *args: Any,
-        activity_id: Optional[str],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
         start_to_close_timeout: Optional[timedelta],
         retry_policy: Optional[temporalio.common.RetryPolicy],
         local_retry_threshold: Optional[timedelta],
         cancellation_type: temporalio.workflow.ActivityCancellationType,
+        activity_id: Optional[str],
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
