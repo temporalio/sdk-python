@@ -176,6 +176,7 @@ class TelemetryConfig:
     """Metrics configuration."""
 
     global_tags: Mapping[str, str] = field(default_factory=dict)
+    """OTel resource tags to be applied to all metrics and traces"""
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.TelemetryConfig:
         return temporalio.bridge.runtime.TelemetryConfig(
