@@ -73,3 +73,4 @@ class TelemetryConfig:
     tracing: Optional[TracingConfig]
     logging: Optional[LoggingConfig]
     metrics: Optional[MetricsConfig]
+    global_tags: Mapping[str, str]
