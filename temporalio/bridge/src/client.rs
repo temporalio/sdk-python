@@ -129,8 +129,8 @@ impl ClientRef {
                     rpc_call!(retry_client, call, get_search_attributes)
                 }
                 "get_system_info" => rpc_call!(retry_client, call, get_system_info),
-                "get_worker_build_id_ordering" => {
-                    rpc_call!(retry_client, call, get_worker_build_id_ordering)
+                "get_worker_build_id_compatibility" => {
+                    rpc_call!(retry_client, call, get_worker_build_id_compatibility)
                 }
                 "get_workflow_execution_history" => {
                     rpc_call!(retry_client, call, get_workflow_execution_history)
@@ -165,6 +165,9 @@ impl ClientRef {
                 }
                 "poll_activity_task_queue" => {
                     rpc_call!(retry_client, call, poll_activity_task_queue)
+                }
+                "poll_workflow_execution_update" => {
+                    rpc_call!(retry_client, call, poll_workflow_execution_update)
                 }
                 "poll_workflow_task_queue" => {
                     rpc_call!(retry_client, call, poll_workflow_task_queue)
@@ -233,8 +236,8 @@ impl ClientRef {
                 "update_workflow_execution" => {
                     rpc_call!(retry_client, call, update_workflow_execution)
                 }
-                "update_worker_build_id_ordering" => {
-                    rpc_call!(retry_client, call, update_worker_build_id_ordering)
+                "update_worker_build_id_compatibility" => {
+                    rpc_call!(retry_client, call, update_worker_build_id_compatibility)
                 }
                 _ => {
                     return Err(PyValueError::new_err(format!(

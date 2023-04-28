@@ -9,6 +9,8 @@ from .message_pb2 import (
     Payloads,
     RetryPolicy,
     SearchAttributes,
+    WorkerVersionCapabilities,
+    WorkerVersionStamp,
     WorkflowExecution,
     WorkflowType,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "Payloads",
     "RetryPolicy",
     "SearchAttributes",
+    "WorkerVersionCapabilities",
+    "WorkerVersionStamp",
     "WorkflowExecution",
     "WorkflowType",
 ]

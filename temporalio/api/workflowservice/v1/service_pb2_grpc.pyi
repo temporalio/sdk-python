@@ -453,28 +453,41 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
     ]
     """List all schedules in a namespace."""
-    UpdateWorkerBuildIdOrdering: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse,
+    UpdateWorkerBuildIdCompatibility: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
     ]
-    """Allows users to specify a graph of worker build id based versions on a
-    per task queue basis. Versions are ordered, and may be either compatible
-    with some extant version, or a new incompatible version.
+    """Allows users to specify sets of worker build id versions on a per task queue basis. Versions
+    are ordered, and may be either compatible with some extant version, or a new incompatible
+    version, forming sets of ids which are incompatible with each other, but whose contained
+    members are compatible with one another.
+
     (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
     (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
     """
-    GetWorkerBuildIdOrdering: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse,
+    GetWorkerBuildIdCompatibility: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
     ]
-    """Fetches the worker build id versioning graph for some task queue."""
+    """Fetches the worker build id versioning sets for some task queue and related metadata."""
     UpdateWorkflowExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
     ]
     """Invokes the specified update function on user workflow code.
+    (-- api-linter: core::0134=disabled
+        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
+    """
+    PollWorkflowExecutionUpdate: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
+    ]
+    """Polls a workflow execution for the outcome of a workflow execution update
+    previously issued through the UpdateWorkflowExecution RPC. The effective
+    timeout on this call will be shorter of the the caller-supplied gRPC
+    timeout and the server's configured long-poll timeout.
     (-- api-linter: core::0134=disabled
         aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
     """
@@ -1097,30 +1110,32 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse:
         """List all schedules in a namespace."""
     @abc.abstractmethod
-    def UpdateWorkerBuildIdOrdering(
+    def UpdateWorkerBuildIdCompatibility(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingRequest,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
         context: grpc.ServicerContext,
     ) -> (
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdOrderingResponse
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse
     ):
-        """Allows users to specify a graph of worker build id based versions on a
-        per task queue basis. Versions are ordered, and may be either compatible
-        with some extant version, or a new incompatible version.
+        """Allows users to specify sets of worker build id versions on a per task queue basis. Versions
+        are ordered, and may be either compatible with some extant version, or a new incompatible
+        version, forming sets of ids which are incompatible with each other, but whose contained
+        members are compatible with one another.
+
         (-- api-linter: core::0134::response-message-name=disabled
-            aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+            aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
         (-- api-linter: core::0134::method-signature=disabled
-            aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+            aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
         """
     @abc.abstractmethod
-    def GetWorkerBuildIdOrdering(
+    def GetWorkerBuildIdCompatibility(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingRequest,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
         context: grpc.ServicerContext,
     ) -> (
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdOrderingResponse
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse
     ):
-        """Fetches the worker build id versioning graph for some task queue."""
+        """Fetches the worker build id versioning sets for some task queue and related metadata."""
     @abc.abstractmethod
     def UpdateWorkflowExecution(
         self,
@@ -1130,6 +1145,21 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse
     ):
         """Invokes the specified update function on user workflow code.
+        (-- api-linter: core::0134=disabled
+            aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
+        """
+    @abc.abstractmethod
+    def PollWorkflowExecutionUpdate(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse
+    ):
+        """Polls a workflow execution for the outcome of a workflow execution update
+        previously issued through the UpdateWorkflowExecution RPC. The effective
+        timeout on this call will be shorter of the the caller-supplied gRPC
+        timeout and the server's configured long-poll timeout.
         (-- api-linter: core::0134=disabled
             aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
         """

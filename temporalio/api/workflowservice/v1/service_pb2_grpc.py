@@ -267,20 +267,25 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.FromString,
         )
-        self.UpdateWorkerBuildIdOrdering = channel.unary_unary(
-            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerBuildIdOrdering",
-            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingRequest.SerializeToString,
-            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingResponse.FromString,
+        self.UpdateWorkerBuildIdCompatibility = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerBuildIdCompatibility",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdCompatibilityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdCompatibilityResponse.FromString,
         )
-        self.GetWorkerBuildIdOrdering = channel.unary_unary(
-            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerBuildIdOrdering",
-            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.SerializeToString,
-            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.FromString,
+        self.GetWorkerBuildIdCompatibility = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerBuildIdCompatibility",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityResponse.FromString,
         )
         self.UpdateWorkflowExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionResponse.FromString,
+        )
+        self.PollWorkflowExecutionUpdate = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/PollWorkflowExecutionUpdate",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollWorkflowExecutionUpdateRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollWorkflowExecutionUpdateResponse.FromString,
         )
         self.StartBatchOperation = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/StartBatchOperation",
@@ -778,27 +783,41 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
-    def UpdateWorkerBuildIdOrdering(self, request, context):
-        """Allows users to specify a graph of worker build id based versions on a
-        per task queue basis. Versions are ordered, and may be either compatible
-        with some extant version, or a new incompatible version.
+    def UpdateWorkerBuildIdCompatibility(self, request, context):
+        """Allows users to specify sets of worker build id versions on a per task queue basis. Versions
+        are ordered, and may be either compatible with some extant version, or a new incompatible
+        version, forming sets of ids which are incompatible with each other, but whose contained
+        members are compatible with one another.
+
         (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
         (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdOrdering RPC doesn't follow Google API format. --)
+        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
-    def GetWorkerBuildIdOrdering(self, request, context):
-        """Fetches the worker build id versioning graph for some task queue."""
+    def GetWorkerBuildIdCompatibility(self, request, context):
+        """Fetches the worker build id versioning sets for some task queue and related metadata."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
     def UpdateWorkflowExecution(self, request, context):
         """Invokes the specified update function on user workflow code.
+        (-- api-linter: core::0134=disabled
+        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def PollWorkflowExecutionUpdate(self, request, context):
+        """Polls a workflow execution for the outcome of a workflow execution update
+        previously issued through the UpdateWorkflowExecution RPC. The effective
+        timeout on this call will be shorter of the the caller-supplied gRPC
+        timeout and the server's configured long-poll timeout.
         (-- api-linter: core::0134=disabled
         aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
         """
@@ -1073,20 +1092,25 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.SerializeToString,
         ),
-        "UpdateWorkerBuildIdOrdering": grpc.unary_unary_rpc_method_handler(
-            servicer.UpdateWorkerBuildIdOrdering,
-            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingRequest.FromString,
-            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingResponse.SerializeToString,
+        "UpdateWorkerBuildIdCompatibility": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkerBuildIdCompatibility,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdCompatibilityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdCompatibilityResponse.SerializeToString,
         ),
-        "GetWorkerBuildIdOrdering": grpc.unary_unary_rpc_method_handler(
-            servicer.GetWorkerBuildIdOrdering,
-            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.FromString,
-            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.SerializeToString,
+        "GetWorkerBuildIdCompatibility": grpc.unary_unary_rpc_method_handler(
+            servicer.GetWorkerBuildIdCompatibility,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityResponse.SerializeToString,
         ),
         "UpdateWorkflowExecution": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateWorkflowExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionResponse.SerializeToString,
+        ),
+        "PollWorkflowExecutionUpdate": grpc.unary_unary_rpc_method_handler(
+            servicer.PollWorkflowExecutionUpdate,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollWorkflowExecutionUpdateRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollWorkflowExecutionUpdateResponse.SerializeToString,
         ),
         "StartBatchOperation": grpc.unary_unary_rpc_method_handler(
             servicer.StartBatchOperation,
@@ -2523,7 +2547,7 @@ class WorkflowService(object):
         )
 
     @staticmethod
-    def UpdateWorkerBuildIdOrdering(
+    def UpdateWorkerBuildIdCompatibility(
         request,
         target,
         options=(),
@@ -2538,9 +2562,9 @@ class WorkflowService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerBuildIdOrdering",
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingRequest.SerializeToString,
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdOrderingResponse.FromString,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerBuildIdCompatibility",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdCompatibilityRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdCompatibilityResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2552,7 +2576,7 @@ class WorkflowService(object):
         )
 
     @staticmethod
-    def GetWorkerBuildIdOrdering(
+    def GetWorkerBuildIdCompatibility(
         request,
         target,
         options=(),
@@ -2567,9 +2591,9 @@ class WorkflowService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerBuildIdOrdering",
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingRequest.SerializeToString,
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdOrderingResponse.FromString,
+            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerBuildIdCompatibility",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2599,6 +2623,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecution",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def PollWorkflowExecutionUpdate(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/PollWorkflowExecutionUpdate",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollWorkflowExecutionUpdateRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollWorkflowExecutionUpdateResponse.FromString,
             options,
             channel_credentials,
             insecure,

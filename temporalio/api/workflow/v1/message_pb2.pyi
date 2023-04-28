@@ -61,6 +61,7 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    MOST_RECENT_WORKER_VERSION_STAMP_FIELD_NUMBER: builtins.int
     @property
     def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     @property
@@ -89,6 +90,11 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     task_queue: builtins.str
     state_transition_count: builtins.int
     history_size_bytes: builtins.int
+    @property
+    def most_recent_worker_version_stamp(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
+        """If set, the most recent worker version stamp that appeared in a workflow task completion"""
     def __init__(
         self,
         *,
@@ -109,6 +115,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
         task_queue: builtins.str = ...,
         state_transition_count: builtins.int = ...,
         history_size_bytes: builtins.int = ...,
+        most_recent_worker_version_stamp: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -123,6 +131,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"execution_time",
             "memo",
             b"memo",
+            "most_recent_worker_version_stamp",
+            b"most_recent_worker_version_stamp",
             "parent_execution",
             b"parent_execution",
             "search_attributes",
@@ -150,6 +160,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"history_size_bytes",
             "memo",
             b"memo",
+            "most_recent_worker_version_stamp",
+            b"most_recent_worker_version_stamp",
             "parent_execution",
             b"parent_execution",
             "parent_namespace_id",

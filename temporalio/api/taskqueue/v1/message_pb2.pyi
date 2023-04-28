@@ -24,12 +24,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 import builtins
+import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import google.protobuf.wrappers_pb2
 import sys
+import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 
 if sys.version_info >= (3, 8):
@@ -184,16 +187,17 @@ class PollerInfo(google.protobuf.message.Message):
     LAST_ACCESS_TIME_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     RATE_PER_SECOND_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     @property
-    def last_access_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Unix Nano"""
+    def last_access_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     identity: builtins.str
     rate_per_second: builtins.float
     @property
-    def worker_versioning_id(self) -> global___VersionId:
-        """If a worker has specified an ID for use with the worker versioning feature while polling,
-        that id must appear here.
+    def worker_version_capabilities(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities:
+        """If a worker has opted into the worker versioning feature while polling, its capabilities will
+        appear here.
         """
     def __init__(
         self,
@@ -201,15 +205,16 @@ class PollerInfo(google.protobuf.message.Message):
         last_access_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         identity: builtins.str = ...,
         rate_per_second: builtins.float = ...,
-        worker_versioning_id: global___VersionId | None = ...,
+        worker_version_capabilities: temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "last_access_time",
             b"last_access_time",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version_capabilities",
+            b"worker_version_capabilities",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -221,8 +226,8 @@ class PollerInfo(google.protobuf.message.Message):
             b"last_access_time",
             "rate_per_second",
             b"rate_per_second",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version_capabilities",
+            b"worker_version_capabilities",
         ],
     ) -> None: ...
 
@@ -267,76 +272,35 @@ class StickyExecutionAttributes(google.protobuf.message.Message):
 
 global___StickyExecutionAttributes = StickyExecutionAttributes
 
-class VersionIdNode(google.protobuf.message.Message):
-    """Used by the worker versioning APIs, represents a node in the version graph for a particular
-    task queue
+class CompatibleVersionSet(google.protobuf.message.Message):
+    """Used by the worker versioning APIs, represents an ordering of one or more versions which are
+    considered to be compatible with each other. Currently the versions are always worker build ids.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    VERSION_FIELD_NUMBER: builtins.int
-    PREVIOUS_COMPATIBLE_FIELD_NUMBER: builtins.int
-    PREVIOUS_INCOMPATIBLE_FIELD_NUMBER: builtins.int
-    @property
-    def version(self) -> global___VersionId: ...
-    @property
-    def previous_compatible(self) -> global___VersionIdNode:
-        """A pointer to the previous version this version is considered to be compatible with"""
-    @property
-    def previous_incompatible(self) -> global___VersionIdNode:
-        """A pointer to the last incompatible version (previous major version)"""
-    def __init__(
-        self,
-        *,
-        version: global___VersionId | None = ...,
-        previous_compatible: global___VersionIdNode | None = ...,
-        previous_incompatible: global___VersionIdNode | None = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "previous_compatible",
-            b"previous_compatible",
-            "previous_incompatible",
-            b"previous_incompatible",
-            "version",
-            b"version",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "previous_compatible",
-            b"previous_compatible",
-            "previous_incompatible",
-            b"previous_incompatible",
-            "version",
-            b"version",
-        ],
-    ) -> None: ...
-
-global___VersionIdNode = VersionIdNode
-
-class VersionId(google.protobuf.message.Message):
-    """Used by the worker versioning APIs, represents a specific version of something
-    Currently, that's just a whole-worker id. In the future, if we support
-    WASM workflow bundle based versioning, for example, then the inside of this
-    message may become a oneof of different version types.
+    VERSION_SET_ID_FIELD_NUMBER: builtins.int
+    BUILD_IDS_FIELD_NUMBER: builtins.int
+    version_set_id: builtins.str
+    """A unique identifier for this version set. Users don't need to understand or care about this
+    value, but it has value for debugging purposes.
     """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    WORKER_BUILD_ID_FIELD_NUMBER: builtins.int
-    worker_build_id: builtins.str
-    """An opaque whole-worker identifier"""
+    @property
+    def build_ids(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """All the compatible versions, ordered from oldest to newest"""
     def __init__(
         self,
         *,
-        worker_build_id: builtins.str = ...,
+        version_set_id: builtins.str = ...,
+        build_ids: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["worker_build_id", b"worker_build_id"],
+        field_name: typing_extensions.Literal[
+            "build_ids", b"build_ids", "version_set_id", b"version_set_id"
+        ],
     ) -> None: ...
 
-global___VersionId = VersionId
+global___CompatibleVersionSet = CompatibleVersionSet

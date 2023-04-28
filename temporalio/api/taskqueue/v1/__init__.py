@@ -1,4 +1,5 @@
 from .message_pb2 import (
+    CompatibleVersionSet,
     PollerInfo,
     StickyExecutionAttributes,
     TaskIdBlock,
@@ -6,11 +7,10 @@ from .message_pb2 import (
     TaskQueueMetadata,
     TaskQueuePartitionMetadata,
     TaskQueueStatus,
-    VersionId,
-    VersionIdNode,
 )
 
 __all__ = [
+    "CompatibleVersionSet",
     "PollerInfo",
     "StickyExecutionAttributes",
     "TaskIdBlock",
@@ -18,6 +18,4 @@ __all__ = [
     "TaskQueueMetadata",
     "TaskQueuePartitionMetadata",
     "TaskQueueStatus",
-    "VersionId",
-    "VersionIdNode",
 ]
