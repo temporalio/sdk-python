@@ -657,7 +657,7 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
     STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSION_FIELD_NUMBER: builtins.int
     SDK_METADATA_FIELD_NUMBER: builtins.int
     METERING_METADATA_FIELD_NUMBER: builtins.int
     scheduled_event_id: builtins.int
@@ -669,9 +669,10 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
     binary_checksum: builtins.str
     """Binary ID of the worker who completed this task"""
     @property
-    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
-        """ID of the worker who picked up this workflow task, or missing if worker
-        is not using versioning.
+    def worker_version(self) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
+        """Version info of the worker who processed this workflow task, or missing if worker is not
+        using versioning. If present, the `build_id` field within is also used as `binary_checksum`,
+        which may be omitted in that case (it may also be populated to preserve compatibility).
         """
     @property
     def sdk_metadata(
@@ -692,7 +693,7 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
         started_event_id: builtins.int = ...,
         identity: builtins.str = ...,
         binary_checksum: builtins.str = ...,
-        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
         sdk_metadata: temporalio.api.sdk.v1.task_complete_metadata_pb2.WorkflowTaskCompletedMetadata
         | None = ...,
@@ -706,8 +707,8 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
             b"metering_metadata",
             "sdk_metadata",
             b"sdk_metadata",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version",
+            b"worker_version",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -725,8 +726,8 @@ class WorkflowTaskCompletedEventAttributes(google.protobuf.message.Message):
             b"sdk_metadata",
             "started_event_id",
             b"started_event_id",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version",
+            b"worker_version",
         ],
     ) -> None: ...
 
@@ -1512,6 +1513,7 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
     INPUT_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
+    SKIP_GENERATE_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     signal_name: builtins.str
     """The name/type of the signal to fire"""
     @property
@@ -1524,6 +1526,8 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
         """Headers that were passed by the sender of the signal and copied by temporal
         server into the workflow task.
         """
+    skip_generate_workflow_task: builtins.bool
+    """Indicates the signal did not generate a new workflow task when received."""
     def __init__(
         self,
         *,
@@ -1531,6 +1535,7 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
         input: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
+        skip_generate_workflow_task: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1547,6 +1552,8 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
             b"input",
             "signal_name",
             b"signal_name",
+            "skip_generate_workflow_task",
+            b"skip_generate_workflow_task",
         ],
     ) -> None: ...
 

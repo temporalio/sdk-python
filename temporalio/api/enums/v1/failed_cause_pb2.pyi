@@ -249,6 +249,8 @@ class _SignalExternalWorkflowExecutionFailedCauseEnumTypeWrapper(
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: _SignalExternalWorkflowExecutionFailedCause.ValueType  # 0
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND: _SignalExternalWorkflowExecutionFailedCause.ValueType  # 1
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: _SignalExternalWorkflowExecutionFailedCause.ValueType  # 2
+    SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_SIGNAL_COUNT_LIMIT_EXCEEDED: _SignalExternalWorkflowExecutionFailedCause.ValueType  # 3
+    """Signal count limit is per workflow and controlled by server dynamic config "history.maximumSignalsPerExecution" """
 
 class SignalExternalWorkflowExecutionFailedCause(
     _SignalExternalWorkflowExecutionFailedCause,
@@ -258,6 +260,8 @@ class SignalExternalWorkflowExecutionFailedCause(
 SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: SignalExternalWorkflowExecutionFailedCause.ValueType  # 0
 SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND: SignalExternalWorkflowExecutionFailedCause.ValueType  # 1
 SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: SignalExternalWorkflowExecutionFailedCause.ValueType  # 2
+SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_SIGNAL_COUNT_LIMIT_EXCEEDED: SignalExternalWorkflowExecutionFailedCause.ValueType  # 3
+"""Signal count limit is per workflow and controlled by server dynamic config "history.maximumSignalsPerExecution" """
 global___SignalExternalWorkflowExecutionFailedCause = (
     SignalExternalWorkflowExecutionFailedCause
 )

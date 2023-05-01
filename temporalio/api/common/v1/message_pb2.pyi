@@ -437,3 +437,50 @@ class MeteringMetadata(google.protobuf.message.Message):
     ) -> None: ...
 
 global___MeteringMetadata = MeteringMetadata
+
+class WorkerVersionStamp(google.protobuf.message.Message):
+    """Identifies the version(s) of a worker that processed a task"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BUILD_ID_FIELD_NUMBER: builtins.int
+    BUNDLE_ID_FIELD_NUMBER: builtins.int
+    build_id: builtins.str
+    """An opaque whole-worker identifier"""
+    bundle_id: builtins.str
+    """Set if the worker used a dynamically loadable bundle to process
+    the task. The bundle could be a WASM blob, JS bundle, etc.
+    """
+    def __init__(
+        self,
+        *,
+        build_id: builtins.str = ...,
+        bundle_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "build_id", b"build_id", "bundle_id", b"bundle_id"
+        ],
+    ) -> None: ...
+
+global___WorkerVersionStamp = WorkerVersionStamp
+
+class WorkerVersionCapabilities(google.protobuf.message.Message):
+    """Identifies the version(s) that a worker is compatible with when polling or identifying itself"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BUILD_ID_FIELD_NUMBER: builtins.int
+    build_id: builtins.str
+    """An opaque whole-worker identifier"""
+    def __init__(
+        self,
+        *,
+        build_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["build_id", b"build_id"]
+    ) -> None: ...
+
+global___WorkerVersionCapabilities = WorkerVersionCapabilities

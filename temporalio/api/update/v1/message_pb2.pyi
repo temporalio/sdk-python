@@ -39,8 +39,8 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class WaitPolicy(google.protobuf.message.Message):
-    """Sepcifies to the gRPC server how the client wants the UpdateWorkflowExecution
-    call to wait before returning control to the caller.
+    """Specifies to the gRPC server how long the client wants the an update-related
+    RPC call to wait before returning control to the caller.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

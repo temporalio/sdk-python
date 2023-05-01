@@ -551,6 +551,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     REQUEST_EAGER_EXECUTION_FIELD_NUMBER: builtins.int
     CONTINUED_FAILURE_FIELD_NUMBER: builtins.int
     LAST_COMPLETION_RESULT_FIELD_NUMBER: builtins.int
+    WORKFLOW_START_DELAY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -605,6 +606,12 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     def last_completion_result(
         self,
     ) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    @property
+    def workflow_start_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """Time to wait before dispatching the first workflow task. Cannot be used with `cron_schedule`.
+        If the workflow gets a signal before the delay, a workflow task will be dispatched and the rest
+        of the delay will be ignored.
+        """
     def __init__(
         self,
         *,
@@ -629,6 +636,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         continued_failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
         last_completion_result: temporalio.api.common.v1.message_pb2.Payloads
         | None = ...,
+        workflow_start_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -653,6 +661,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"workflow_execution_timeout",
             "workflow_run_timeout",
             b"workflow_run_timeout",
+            "workflow_start_delay",
+            b"workflow_start_delay",
             "workflow_task_timeout",
             b"workflow_task_timeout",
             "workflow_type",
@@ -696,6 +706,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"workflow_id_reuse_policy",
             "workflow_run_timeout",
             b"workflow_run_timeout",
+            "workflow_start_delay",
+            b"workflow_start_delay",
             "workflow_task_timeout",
             b"workflow_task_timeout",
             "workflow_type",
@@ -929,7 +941,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -940,11 +952,13 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     "checksum" in this field name isn't very accurate, it should be though of as an id.
     """
     @property
-    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
-        """If set, the worker is opting in to build-id based versioning and wishes to only
-        receive tasks that are considered compatible with the version provided.
-        Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdOrdering` API.
-        When `worker_versioning_id` has a `worker_build_id`, and `binary_checksum` is not
+    def worker_version_capabilities(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities:
+        """If set, the worker is opting in to versioning and wishes to only
+        receive tasks that are considered compatible with the version capabilities provided.
+        Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdCompatibility` API.
+        When this field has a `worker_build_id`, and `binary_checksum` is not
         set, that value should also be considered as the `binary_checksum`.
         """
     def __init__(
@@ -954,13 +968,16 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
         identity: builtins.str = ...,
         binary_checksum: builtins.str = ...,
-        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        worker_version_capabilities: temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities
         | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "task_queue", b"task_queue", "worker_versioning_id", b"worker_versioning_id"
+            "task_queue",
+            b"task_queue",
+            "worker_version_capabilities",
+            b"worker_version_capabilities",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -974,8 +991,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "task_queue",
             b"task_queue",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version_capabilities",
+            b"worker_version_capabilities",
         ],
     ) -> None: ...
 
@@ -1207,7 +1224,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     QUERY_RESULTS_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSION_STAMP_FIELD_NUMBER: builtins.int
     MESSAGES_FIELD_NUMBER: builtins.int
     SDK_METADATA_FIELD_NUMBER: builtins.int
     METERING_METADATA_FIELD_NUMBER: builtins.int
@@ -1250,11 +1267,14 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         """Responses to the `queries` field in the task being responded to"""
     namespace: builtins.str
     @property
-    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
-        """If using versioning, worker should send the same id here that it used to
-        poll for the workflow task.
-        When `worker_versioning_id` has a `worker_build_id`, and `binary_checksum` is not
-        set, that value should also be considered as the `binary_checksum`.
+    def worker_version_stamp(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
+        """If using versioning, the worker uses this field to indicate what version(s) it used to
+        process the task. When this field has a `worker_build_id`, and `binary_checksum` is not set,
+        that value should also be considered as the `binary_checksum`. Leaving this field empty when
+        replying to a task has had this field previously populated in history in an error, and such
+        a completion will be rejected.
         """
     @property
     def messages(
@@ -1294,7 +1314,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         ]
         | None = ...,
         namespace: builtins.str = ...,
-        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        worker_version_stamp: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
         messages: collections.abc.Iterable[
             temporalio.api.protocol.v1.message_pb2.Message
@@ -1314,8 +1334,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             b"sdk_metadata",
             "sticky_attributes",
             b"sticky_attributes",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version_stamp",
+            b"worker_version_stamp",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -1345,8 +1365,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             b"sticky_attributes",
             "task_token",
             b"task_token",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version_stamp",
+            b"worker_version_stamp",
         ],
     ) -> None: ...
 
@@ -1480,7 +1500,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
-    WORKER_VERSIONING_ID_FIELD_NUMBER: builtins.int
+    WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -1491,10 +1511,12 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueMetadata: ...
     @property
-    def worker_versioning_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
-        """If set, the worker is opting in to build-id based versioning and wishes to only
-        receive tasks that are considered compatible with the version provided.
-        Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdOrdering` API.
+    def worker_version_capabilities(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities:
+        """If set, the worker is opting in to versioning and wishes to only
+        receive tasks that are considered compatible with the capabilities provided.
+        Doing so only makes sense in conjunction with the `UpdateWorkerBuildIdCompatibility` API.
         """
     def __init__(
         self,
@@ -1504,7 +1526,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         task_queue_metadata: temporalio.api.taskqueue.v1.message_pb2.TaskQueueMetadata
         | None = ...,
-        worker_versioning_id: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        worker_version_capabilities: temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -1514,8 +1536,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version_capabilities",
+            b"worker_version_capabilities",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -1529,8 +1551,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
-            "worker_versioning_id",
-            b"worker_versioning_id",
+            "worker_version_capabilities",
+            b"worker_version_capabilities",
         ],
     ) -> None: ...
 
@@ -2348,6 +2370,7 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
     REQUEST_ID_FIELD_NUMBER: builtins.int
     CONTROL_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
+    SKIP_GENERATE_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def workflow_execution(
@@ -2369,6 +2392,8 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
         """Headers that are passed with the signal to the processing workflow.
         These can include things like auth or tracing tokens.
         """
+    skip_generate_workflow_task: builtins.bool
+    """Indicates that a new workflow task should not be generated when this signal is received."""
     def __init__(
         self,
         *,
@@ -2381,6 +2406,7 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
         request_id: builtins.str = ...,
         control: builtins.str = ...,
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
+        skip_generate_workflow_task: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2410,6 +2436,8 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
             b"request_id",
             "signal_name",
             b"signal_name",
+            "skip_generate_workflow_task",
+            b"skip_generate_workflow_task",
             "workflow_execution",
             b"workflow_execution",
         ],
@@ -2448,6 +2476,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
+    WORKFLOW_START_DELAY_FIELD_NUMBER: builtins.int
+    SKIP_GENERATE_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -2492,6 +2522,17 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    @property
+    def workflow_start_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """Time to wait before dispatching the first workflow task. Cannot be used with `cron_schedule`.
+        Note that the signal will be delivered with the first workflow task. If the workflow gets
+        another SignalWithStartWorkflow before the delay and `skip_generate_workflow_task` is false
+        or not set, a workflow task will be dispatched immediately and the rest of the delay period
+        will be ignored, even if that request also had a delay. Signal via SignalWorkflowExecution
+        will not unblock the workflow.
+        """
+    skip_generate_workflow_task: builtins.bool
+    """Indicates that a new workflow task should not be generated when this signal is received."""
     def __init__(
         self,
         *,
@@ -2515,6 +2556,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
+        workflow_start_delay: google.protobuf.duration_pb2.Duration | None = ...,
+        skip_generate_workflow_task: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2537,6 +2580,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"workflow_execution_timeout",
             "workflow_run_timeout",
             b"workflow_run_timeout",
+            "workflow_start_delay",
+            b"workflow_start_delay",
             "workflow_task_timeout",
             b"workflow_task_timeout",
             "workflow_type",
@@ -2570,6 +2615,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"signal_input",
             "signal_name",
             b"signal_name",
+            "skip_generate_workflow_task",
+            b"skip_generate_workflow_task",
             "task_queue",
             b"task_queue",
             "workflow_execution_timeout",
@@ -2580,6 +2627,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"workflow_id_reuse_policy",
             "workflow_run_timeout",
             b"workflow_run_timeout",
+            "workflow_start_delay",
+            b"workflow_start_delay",
             "workflow_task_timeout",
             b"workflow_task_timeout",
             "workflow_type",
@@ -4452,114 +4501,217 @@ class ListSchedulesResponse(google.protobuf.message.Message):
 
 global___ListSchedulesResponse = ListSchedulesResponse
 
-class UpdateWorkerBuildIdOrderingRequest(google.protobuf.message.Message):
+class UpdateWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0134::request-mask-required=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdOrderingRequest doesn't follow Google API format --)
+        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibilityRequest doesn't follow Google API format --)
     (-- api-linter: core::0134::request-resource-required=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdOrderingRequest RPC doesn't follow Google API format. --)
+        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibilityRequest RPC doesn't follow Google API format. --)
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class AddNewCompatibleVersion(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NEW_BUILD_ID_FIELD_NUMBER: builtins.int
+        EXISTING_COMPATIBLE_BUILD_ID_FIELD_NUMBER: builtins.int
+        MAKE_SET_DEFAULT_FIELD_NUMBER: builtins.int
+        new_build_id: builtins.str
+        """A new id to be added to an existing compatible set."""
+        existing_compatible_build_id: builtins.str
+        """A build id which must already exist in the version sets known by the task queue. The new
+        id will be stored in the set containing this id, marking it as compatible with
+        the versions within.
+        """
+        make_set_default: builtins.bool
+        """When set, establishes the compatible set being targeted as the overall default for the
+        queue. If a different set was the current default, the targeted set will replace it as
+        the new default.
+        """
+        def __init__(
+            self,
+            *,
+            new_build_id: builtins.str = ...,
+            existing_compatible_build_id: builtins.str = ...,
+            make_set_default: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "existing_compatible_build_id",
+                b"existing_compatible_build_id",
+                "make_set_default",
+                b"make_set_default",
+                "new_build_id",
+                b"new_build_id",
+            ],
+        ) -> None: ...
+
     NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
-    VERSION_ID_FIELD_NUMBER: builtins.int
-    PREVIOUS_COMPATIBLE_FIELD_NUMBER: builtins.int
-    BECOME_DEFAULT_FIELD_NUMBER: builtins.int
+    ADD_NEW_BUILD_ID_IN_NEW_DEFAULT_SET_FIELD_NUMBER: builtins.int
+    ADD_NEW_COMPATIBLE_BUILD_ID_FIELD_NUMBER: builtins.int
+    PROMOTE_SET_BY_BUILD_ID_FIELD_NUMBER: builtins.int
+    PROMOTE_BUILD_ID_WITHIN_SET_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     task_queue: builtins.str
-    """Must be set, the task queue to apply changes to. Because all workers on
-    a given task queue must have the same set of workflow & activity
-    implementations, there is no reason to specify a task queue type here.
+    """Must be set, the task queue to apply changes to. Because all workers on a given task queue
+    must have the same set of workflow & activity implementations, there is no reason to specify
+    a task queue type here.
+    """
+    add_new_build_id_in_new_default_set: builtins.str
+    """A new build id. This operation will create a new set which will be the new overall
+    default version for the queue, with this id as its only member. This new set is
+    incompatible with all previous sets/versions.
+
+    (-- api-linter: core::0140::prepositions=disabled
+        aip.dev/not-precedent: In makes perfect sense here. --)
     """
     @property
-    def version_id(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
-        """The version id we are targeting."""
-    @property
-    def previous_compatible(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionId:
-        """When set, indicates that the `version_id` in this message is compatible
-        with the one specified in this field. Because compatability should form
-        a DAG, any build id can only be the "next compatible" version for one
-        other ID of a certain type at a time, and any setting which would create a cycle is invalid.
-        """
-    become_default: builtins.bool
-    """When set, establishes the specified `version_id` as the default of it's type
-    for the queue. Workers matching it will begin processing new workflow executions.
-    The existing default will be marked as a previous incompatible version
-    to this one, assuming it is not also in `is_compatible_with`.
+    def add_new_compatible_build_id(
+        self,
+    ) -> global___UpdateWorkerBuildIdCompatibilityRequest.AddNewCompatibleVersion:
+        """Adds a new id to an existing compatible set, see sub-message definition for more."""
+    promote_set_by_build_id: builtins.str
+    """Promote an existing set to be the current default (if it isn't already) by targeting
+    an existing build id within it. This field's value is the extant build id.
+
+    (-- api-linter: core::0140::prepositions=disabled
+        aip.dev/not-precedent: Names are hard. --)
+    """
+    promote_build_id_within_set: builtins.str
+    """Promote an existing build id within some set to be the current default for that set.
+
+    (-- api-linter: core::0140::prepositions=disabled
+        aip.dev/not-precedent: Within makes perfect sense here. --)
     """
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         task_queue: builtins.str = ...,
-        version_id: temporalio.api.taskqueue.v1.message_pb2.VersionId | None = ...,
-        previous_compatible: temporalio.api.taskqueue.v1.message_pb2.VersionId
+        add_new_build_id_in_new_default_set: builtins.str = ...,
+        add_new_compatible_build_id: global___UpdateWorkerBuildIdCompatibilityRequest.AddNewCompatibleVersion
         | None = ...,
-        become_default: builtins.bool = ...,
+        promote_set_by_build_id: builtins.str = ...,
+        promote_build_id_within_set: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "previous_compatible", b"previous_compatible", "version_id", b"version_id"
+            "add_new_build_id_in_new_default_set",
+            b"add_new_build_id_in_new_default_set",
+            "add_new_compatible_build_id",
+            b"add_new_compatible_build_id",
+            "operation",
+            b"operation",
+            "promote_build_id_within_set",
+            b"promote_build_id_within_set",
+            "promote_set_by_build_id",
+            b"promote_set_by_build_id",
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "become_default",
-            b"become_default",
+            "add_new_build_id_in_new_default_set",
+            b"add_new_build_id_in_new_default_set",
+            "add_new_compatible_build_id",
+            b"add_new_compatible_build_id",
             "namespace",
             b"namespace",
-            "previous_compatible",
-            b"previous_compatible",
+            "operation",
+            b"operation",
+            "promote_build_id_within_set",
+            b"promote_build_id_within_set",
+            "promote_set_by_build_id",
+            b"promote_set_by_build_id",
             "task_queue",
             b"task_queue",
-            "version_id",
-            b"version_id",
         ],
     ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["operation", b"operation"]
+    ) -> (
+        typing_extensions.Literal[
+            "add_new_build_id_in_new_default_set",
+            "add_new_compatible_build_id",
+            "promote_set_by_build_id",
+            "promote_build_id_within_set",
+        ]
+        | None
+    ): ...
 
-global___UpdateWorkerBuildIdOrderingRequest = UpdateWorkerBuildIdOrderingRequest
+global___UpdateWorkerBuildIdCompatibilityRequest = (
+    UpdateWorkerBuildIdCompatibilityRequest
+)
 
-class UpdateWorkerBuildIdOrderingResponse(google.protobuf.message.Message):
+class UpdateWorkerBuildIdCompatibilityResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    VERSION_SET_ID_FIELD_NUMBER: builtins.int
+    version_set_id: builtins.str
+    """The id of the compatible set that the updated version was added to, or exists in. Users don't
+    need to understand or care about this value, but it has value for debugging purposes.
+    """
     def __init__(
         self,
+        *,
+        version_set_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["version_set_id", b"version_set_id"]
     ) -> None: ...
 
-global___UpdateWorkerBuildIdOrderingResponse = UpdateWorkerBuildIdOrderingResponse
+global___UpdateWorkerBuildIdCompatibilityResponse = (
+    UpdateWorkerBuildIdCompatibilityResponse
+)
 
-class GetWorkerBuildIdOrderingRequest(google.protobuf.message.Message):
+class GetWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0134::request-resource-required=disabled
-    aip.dev/not-precedent: GetWorkerBuildIdOrderingRequest RPC doesn't follow Google API format. --)
+    aip.dev/not-precedent: GetWorkerBuildIdCompatibilityRequest RPC doesn't follow Google API format. --)
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
-    MAX_DEPTH_FIELD_NUMBER: builtins.int
+    MAX_SETS_FIELD_NUMBER: builtins.int
+    INCLUDE_RETIREMENT_CANDIDATES_FIELD_NUMBER: builtins.int
+    INCLUDE_POLLER_COMPATIBILITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     task_queue: builtins.str
-    """Must be set, the task queue to interrogate about worker id ordering"""
-    max_depth: builtins.int
-    """Limits how deep the returned DAG will go. 1 will return only the
-    default build id. A default/0 value will return the entire graph.
+    """Must be set, the task queue to interrogate about worker id compatibility."""
+    max_sets: builtins.int
+    """Limits how many compatible sets will be returned. Specify 1 to only return the current
+    default major version set. 0 returns all sets.
+    """
+    include_retirement_candidates: builtins.bool
+    """If set, the response will include information about worker versions which are ready to be
+    retired.
+    """
+    include_poller_compatibility: builtins.bool
+    """If set, the response will include information about which versions have open workflows, and
+    whether or not there are currently polling workers who are compatible with those versions.
     """
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         task_queue: builtins.str = ...,
-        max_depth: builtins.int = ...,
+        max_sets: builtins.int = ...,
+        include_retirement_candidates: builtins.bool = ...,
+        include_poller_compatibility: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "max_depth",
-            b"max_depth",
+            "include_poller_compatibility",
+            b"include_poller_compatibility",
+            "include_retirement_candidates",
+            b"include_retirement_candidates",
+            "max_sets",
+            b"max_sets",
             "namespace",
             b"namespace",
             "task_queue",
@@ -4567,51 +4719,145 @@ class GetWorkerBuildIdOrderingRequest(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___GetWorkerBuildIdOrderingRequest = GetWorkerBuildIdOrderingRequest
+global___GetWorkerBuildIdCompatibilityRequest = GetWorkerBuildIdCompatibilityRequest
 
-class GetWorkerBuildIdOrderingResponse(google.protobuf.message.Message):
+class GetWorkerBuildIdCompatibilityResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CURRENT_DEFAULT_FIELD_NUMBER: builtins.int
-    COMPATIBLE_LEAVES_FIELD_NUMBER: builtins.int
+    class RetirementCandidate(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        BUILD_ID_FIELD_NUMBER: builtins.int
+        ALL_WORKFLOWS_ARE_ARCHIVED_FIELD_NUMBER: builtins.int
+        POLLERS_FIELD_NUMBER: builtins.int
+        build_id: builtins.str
+        """The worker build id which is ready for retirement"""
+        all_workflows_are_archived: builtins.bool
+        """If true, there are no open *or* closed workflows, meaning there is no reason at all
+        to keep the worker alive, not even to service queries on closed workflows. If not true,
+        then there are no open workflows, but some closed ones.
+        """
+        @property
+        def pollers(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            temporalio.api.taskqueue.v1.message_pb2.PollerInfo
+        ]:
+            """Currently polling workers who match the build id ready for retirement"""
+        def __init__(
+            self,
+            *,
+            build_id: builtins.str = ...,
+            all_workflows_are_archived: builtins.bool = ...,
+            pollers: collections.abc.Iterable[
+                temporalio.api.taskqueue.v1.message_pb2.PollerInfo
+            ]
+            | None = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "all_workflows_are_archived",
+                b"all_workflows_are_archived",
+                "build_id",
+                b"build_id",
+                "pollers",
+                b"pollers",
+            ],
+        ) -> None: ...
+
+    class VersionsWithCompatiblePollers(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        MOST_RECENT_BUILD_ID_FIELD_NUMBER: builtins.int
+        POLLERS_FIELD_NUMBER: builtins.int
+        most_recent_build_id: builtins.str
+        """The latest build id which completed a workflow task on some open workflow"""
+        @property
+        def pollers(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            temporalio.api.taskqueue.v1.message_pb2.PollerInfo
+        ]:
+            """Currently polling workers who are compatible with `most_recent_build_id`."""
+        def __init__(
+            self,
+            *,
+            most_recent_build_id: builtins.str = ...,
+            pollers: collections.abc.Iterable[
+                temporalio.api.taskqueue.v1.message_pb2.PollerInfo
+            ]
+            | None = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "most_recent_build_id", b"most_recent_build_id", "pollers", b"pollers"
+            ],
+        ) -> None: ...
+
+    MAJOR_VERSION_SETS_FIELD_NUMBER: builtins.int
+    RETIREMENT_CANDIDATES_FIELD_NUMBER: builtins.int
+    ACTIVE_VERSIONS_AND_POLLERS_FIELD_NUMBER: builtins.int
     @property
-    def current_default(self) -> temporalio.api.taskqueue.v1.message_pb2.VersionIdNode:
-        """The currently established default version"""
-    @property
-    def compatible_leaves(
+    def major_version_sets(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.taskqueue.v1.message_pb2.VersionIdNode
+        temporalio.api.taskqueue.v1.message_pb2.CompatibleVersionSet
     ]:
-        """Other current latest-compatible versions who are not the overall default. These are the
-        versions that will be used when generating new tasks by following the graph from the
-        version of the last task out to a leaf.
+        """Major version sets, in order from oldest to newest. The last element of the list will always
+        be the current default major version. IE: New workflows will target the most recent version
+        in that version set.
+
+        There may be fewer sets returned than exist, if the request chose to limit this response.
+        """
+    @property
+    def retirement_candidates(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___GetWorkerBuildIdCompatibilityResponse.RetirementCandidate
+    ]:
+        """A list of workers who are still live and polling the task queue, but may no longer be needed
+        to make progress on open workflows.
+        """
+    @property
+    def active_versions_and_pollers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___GetWorkerBuildIdCompatibilityResponse.VersionsWithCompatiblePollers
+    ]:
+        """A list of versions and pollers who are capable of processing tasks at that version (if any)
+        for which there are currently open workflows.
         """
     def __init__(
         self,
         *,
-        current_default: temporalio.api.taskqueue.v1.message_pb2.VersionIdNode
+        major_version_sets: collections.abc.Iterable[
+            temporalio.api.taskqueue.v1.message_pb2.CompatibleVersionSet
+        ]
         | None = ...,
-        compatible_leaves: collections.abc.Iterable[
-            temporalio.api.taskqueue.v1.message_pb2.VersionIdNode
+        retirement_candidates: collections.abc.Iterable[
+            global___GetWorkerBuildIdCompatibilityResponse.RetirementCandidate
+        ]
+        | None = ...,
+        active_versions_and_pollers: collections.abc.Iterable[
+            global___GetWorkerBuildIdCompatibilityResponse.VersionsWithCompatiblePollers
         ]
         | None = ...,
     ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal["current_default", b"current_default"],
-    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "compatible_leaves",
-            b"compatible_leaves",
-            "current_default",
-            b"current_default",
+            "active_versions_and_pollers",
+            b"active_versions_and_pollers",
+            "major_version_sets",
+            b"major_version_sets",
+            "retirement_candidates",
+            b"retirement_candidates",
         ],
     ) -> None: ...
 
-global___GetWorkerBuildIdOrderingResponse = GetWorkerBuildIdOrderingResponse
+global___GetWorkerBuildIdCompatibilityResponse = GetWorkerBuildIdCompatibilityResponse
 
 class UpdateWorkflowExecutionRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0134=disabled
@@ -5072,3 +5318,80 @@ class ListBatchOperationsResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ListBatchOperationsResponse = ListBatchOperationsResponse
+
+class PollWorkflowExecutionUpdateRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    UPDATE_REF_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    WAIT_POLICY_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """The namespace of the workflow execution to which the update was
+    originally issued.
+    """
+    @property
+    def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
+        """The update reference returned in the initial
+        UpdateWorkflowExecutionResponse
+        """
+    identity: builtins.str
+    """The identity of the worker/client who is polling this update outcome"""
+    @property
+    def wait_policy(self) -> temporalio.api.update.v1.message_pb2.WaitPolicy:
+        """Describes when this poll request should return a response"""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        update_ref: temporalio.api.update.v1.message_pb2.UpdateRef | None = ...,
+        identity: builtins.str = ...,
+        wait_policy: temporalio.api.update.v1.message_pb2.WaitPolicy | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "update_ref", b"update_ref", "wait_policy", b"wait_policy"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "update_ref",
+            b"update_ref",
+            "wait_policy",
+            b"wait_policy",
+        ],
+    ) -> None: ...
+
+global___PollWorkflowExecutionUpdateRequest = PollWorkflowExecutionUpdateRequest
+
+class PollWorkflowExecutionUpdateResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OUTCOME_FIELD_NUMBER: builtins.int
+    @property
+    def outcome(self) -> temporalio.api.update.v1.message_pb2.Outcome:
+        """The outcome of the update if and only if the update has completed. If
+        this response is being returned before the update has completed (e.g. due
+        to the specification of a wait policy that only waits on
+        UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED) then this field will
+        not be set.
+        """
+    def __init__(
+        self,
+        *,
+        outcome: temporalio.api.update.v1.message_pb2.Outcome | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["outcome", b"outcome"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["outcome", b"outcome"]
+    ) -> None: ...
+
+global___PollWorkflowExecutionUpdateResponse = PollWorkflowExecutionUpdateResponse

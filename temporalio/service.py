@@ -25,7 +25,7 @@ import temporalio.bridge.proto.health.v1
 import temporalio.exceptions
 import temporalio.runtime
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
@@ -308,10 +308,10 @@ class WorkflowService:
             wsv1.GetSystemInfoRequest,
             wsv1.GetSystemInfoResponse,
         )
-        self.get_worker_build_id_ordering = client._new_call(
-            "get_worker_build_id_ordering",
-            wsv1.GetWorkerBuildIdOrderingRequest,
-            wsv1.GetWorkerBuildIdOrderingResponse,
+        self.get_worker_build_id_compatibility = client._new_call(
+            "get_worker_build_id_compatibility",
+            wsv1.GetWorkerBuildIdCompatibilityRequest,
+            wsv1.GetWorkerBuildIdCompatibilityResponse,
         )
         self.get_workflow_execution_history = client._new_call(
             "get_workflow_execution_history",
@@ -377,6 +377,11 @@ class WorkflowService:
             "poll_activity_task_queue",
             wsv1.PollActivityTaskQueueRequest,
             wsv1.PollActivityTaskQueueResponse,
+        )
+        self.poll_workflow_execution_update = client._new_call(
+            "poll_workflow_execution_update",
+            wsv1.PollWorkflowExecutionUpdateRequest,
+            wsv1.PollWorkflowExecutionUpdateResponse,
         )
         self.poll_workflow_task_queue = client._new_call(
             "poll_workflow_task_queue",
@@ -513,10 +518,10 @@ class WorkflowService:
             wsv1.UpdateWorkflowExecutionRequest,
             wsv1.UpdateWorkflowExecutionResponse,
         )
-        self.update_worker_build_id_ordering = client._new_call(
-            "update_worker_build_id_ordering",
-            wsv1.UpdateWorkerBuildIdOrderingRequest,
-            wsv1.UpdateWorkerBuildIdOrderingResponse,
+        self.update_worker_build_id_compatibility = client._new_call(
+            "update_worker_build_id_compatibility",
+            wsv1.UpdateWorkerBuildIdCompatibilityRequest,
+            wsv1.UpdateWorkerBuildIdCompatibilityResponse,
         )
 
 
