@@ -2,7 +2,7 @@
 # the repo. Unless a later match takes precedence,
 # @temporalio/sdk will be requested for review when
 # someone opens a pull request.
-*       @temporalio/sdk
+* @temporalio/sdk
 
 # Security team must approve exceptions to static analysis
 # scans, and any custom rules.
