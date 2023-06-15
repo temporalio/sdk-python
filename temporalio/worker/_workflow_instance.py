@@ -259,6 +259,7 @@ class _WorkflowInstanceImpl(
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
 
+        activation_err: Optional[Exception] = None
         try:
             # Split into job sets with patches, then signals, then non-queries, then
             # queries
@@ -287,7 +288,17 @@ class _WorkflowInstanceImpl(
                 # be checked in patch jobs (first index) or query jobs (last
                 # index).
                 self._run_once(check_conditions=index == 1 or index == 2)
+        except temporalio.exceptions.FailureError as err:
+            # We want failure errors during activation, like those that can
+            # happen during payload conversion, to fail the workflow not the
+            # task
+            try:
+                self._set_workflow_failure(err)
+            except Exception as inner_err:
+                activation_err = inner_err
         except Exception as err:
+            activation_err = err
+        if activation_err:
             logger.warning(
                 f"Failed activation on workflow {self._info.workflow_type} with ID {self._info.workflow_id} and run ID {self._info.run_id}",
                 exc_info=True,
@@ -296,7 +307,7 @@ class _WorkflowInstanceImpl(
             self._current_completion.failed.failure.SetInParent()
             try:
                 self._failure_converter.to_failure(
-                    err,
+                    activation_err,
                     self._payload_converter,
                     self._current_completion.failed.failure,
                 )
@@ -1134,6 +1145,9 @@ class _WorkflowInstanceImpl(
                 payloads,
                 type_hints=types,
             )
+        except temporalio.exceptions.FailureError:
+            # Don't wrap payload conversion errors that would fail the workflow
+            raise
         except Exception as err:
             raise RuntimeError("Failed decoding arguments") from err
 
@@ -1227,32 +1241,25 @@ class _WorkflowInstanceImpl(
             # cancel later on will show the workflow as cancelled. But this is
             # a Temporal limitation in that cancellation is a state not an
             # event.
-            if self._cancel_requested and (
-                isinstance(err, temporalio.exceptions.CancelledError)
-                or (
-                    (
-                        isinstance(err, temporalio.exceptions.ActivityError)
-                        or isinstance(err, temporalio.exceptions.ChildWorkflowError)
-                    )
-                    and isinstance(err.cause, temporalio.exceptions.CancelledError)
-                )
+            if self._cancel_requested and temporalio.exceptions.is_cancelled_exception(
+                err
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
             elif isinstance(err, temporalio.exceptions.FailureError):
                 # All other failure errors fail the workflow
-                failure = self._add_command().fail_workflow_execution.failure
-                failure.SetInParent()
-                try:
-                    self._failure_converter.to_failure(
-                        err, self._payload_converter, failure
-                    )
-                except Exception as inner_err:
-                    raise ValueError(
-                        "Failed converting workflow exception"
-                    ) from inner_err
+                self._set_workflow_failure(err)
             else:
                 # All other exceptions fail the task
                 self._current_activation_error = err
+
+    def _set_workflow_failure(self, err: temporalio.exceptions.FailureError) -> None:
+        # All other failure errors fail the workflow
+        failure = self._add_command().fail_workflow_execution.failure
+        failure.SetInParent()
+        try:
+            self._failure_converter.to_failure(err, self._payload_converter, failure)
+        except Exception as inner_err:
+            raise ValueError("Failed converting workflow exception") from inner_err
 
     async def _signal_external_workflow(
         self,

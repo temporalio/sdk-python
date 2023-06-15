@@ -51,9 +51,7 @@ protoc-wheel-0 = "^21.1"
 psutil = "^5.9.3"
 pydantic = "^1.9.1"
 pydocstyle = "^6.1.1"
-# TODO(cretz): Update when https://github.com/twisted/pydoctor/pull/595 released
-# pydoctor = "^22.5.1"
-pydoctor = { git = "https://github.com/cretz/pydoctor.git", branch = "overloads" }
+pydoctor = "^23.4.1"
 pytest = "^7.1.2"
 pytest-asyncio = "^0.18.3"
 pytest-timeout = "^2.1.0"
