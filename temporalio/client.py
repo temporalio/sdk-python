@@ -754,9 +754,6 @@ class Client:
     ) -> ScheduleHandle:
         """Create a schedule and return its handle.
 
-        .. warning::
-            Schedules are an experimental feature.
-
         Args:
             id: Unique identifier of the schedule.
             schedule: Schedule to create.
@@ -794,11 +791,7 @@ class Client:
         )
 
     def get_schedule_handle(self, id: str) -> ScheduleHandle:
-        """Get a schedule handle for the given ID.
-
-        .. warning::
-            Schedules are an experimental feature.
-        """
+        """Get a schedule handle for the given ID."""
         return ScheduleHandle(self, id)
 
     async def list_schedules(
@@ -816,9 +809,6 @@ class Client:
 
         Note, this list is eventually consistent. Therefore if a schedule is
         added or deleted, it may not be available in the list immediately.
-
-        .. warning::
-            Schedules are an experimental feature.
 
         Args:
             page_size: Maximum number of results for each page.
@@ -2101,9 +2091,6 @@ class ScheduleHandle:
     This is usually created via :py:meth:`Client.get_schedule_handle` or
     returned from :py:meth:`Client.create_schedule`.
 
-    .. warning::
-        Schedules are an experimental feature.
-
     Attributes:
         id: ID of the schedule.
     """
@@ -2317,9 +2304,6 @@ class ScheduleSpec:
 
     The times are the union of :py:attr:`calendars`, :py:attr:`intervals`, and
     :py:attr:`cron_expressions` excluding anything in :py:attr:`skip`.
-
-    .. warning::
-        Schedules are an experimental feature.
     """
 
     calendars: Sequence[ScheduleCalendarSpec] = dataclasses.field(default_factory=list)
@@ -2405,11 +2389,7 @@ class ScheduleSpec:
 
 @dataclass(frozen=True)
 class ScheduleRange:
-    """Inclusive range for a schedule match value.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Inclusive range for a schedule match value."""
 
     start: int
     """Inclusive start of the range."""
@@ -2456,9 +2436,6 @@ class ScheduleCalendarSpec:
     A timestamp matches if at least one range of each field matches except for
     year. If year is missing, that means all years match. For all fields besides
     year, at least one range must be present to match anything.
-
-    .. warning::
-        Schedules are an experimental feature.
     """
 
     second: Sequence[ScheduleRange] = (ScheduleRange(0),)
@@ -2519,9 +2496,6 @@ class ScheduleIntervalSpec:
     """Specification for scheduling on an interval.
 
     Matches times expressed as epoch + (n * every) + offset.
-
-    .. warning::
-        Schedules are an experimental feature.
     """
 
     every: timedelta
@@ -2554,9 +2528,6 @@ class ScheduleAction(ABC):
 
     See :py:class:`ScheduleActionStartWorkflow` for the most commonly used
     implementation.
-
-    .. warning::
-        Schedules are an experimental feature.
     """
 
     @staticmethod
@@ -2577,11 +2548,7 @@ class ScheduleAction(ABC):
 
 @dataclass
 class ScheduleActionStartWorkflow(ScheduleAction):
-    """Schedule action to start a workflow.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Schedule action to start a workflow."""
 
     workflow: str
     args: Union[Sequence[Any], Sequence[temporalio.api.common.v1.Payload]]
@@ -2826,9 +2793,6 @@ class ScheduleActionStartWorkflow(ScheduleAction):
 class ScheduleOverlapPolicy(IntEnum):
     """Controls what happens when a workflow would be started by a schedule but
     one is already running.
-
-    .. warning::
-        Schedules are an experimental feature.
     """
 
     SKIP = int(
@@ -2882,9 +2846,6 @@ class ScheduleOverlapPolicy(IntEnum):
 class ScheduleBackfill:
     """Time period and policy for actions taken as if the time passed right
     now.
-
-    .. warning::
-        Schedules are an experimental feature.
     """
 
     start_at: datetime
@@ -2916,11 +2877,7 @@ class ScheduleBackfill:
 
 @dataclass
 class SchedulePolicy:
-    """Policies of a schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Policies of a schedule."""
 
     overlap: ScheduleOverlapPolicy = dataclasses.field(
         default_factory=lambda: ScheduleOverlapPolicy.SKIP
@@ -2961,11 +2918,7 @@ class SchedulePolicy:
 
 @dataclass
 class ScheduleState:
-    """State of a schedule
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """State of a schedule."""
 
     note: Optional[str] = None
     """Human readable message for the schedule.
@@ -2982,7 +2935,9 @@ class ScheduleState:
     """
     If true, remaining actions will be decremented for each action taken.
 
-    Cannot be set on create.
+    On schedule create, this must be set to true on if
+    :py:attr:`remaining_actions` is non-zero and left false if
+    :py:attr:`remaining_actions` is zero.
     """
 
     remaining_actions: int = 0
@@ -3011,11 +2966,7 @@ class ScheduleState:
 
 @dataclass
 class Schedule:
-    """A schedule for periodically running an action.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """A schedule for periodically running an action."""
 
     action: ScheduleAction
     """Action taken when scheduled."""
@@ -3051,11 +3002,7 @@ class Schedule:
 
 @dataclass
 class ScheduleDescription:
-    """Description of a schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Description of a schedule."""
 
     id: str
     """ID of the schedule."""
@@ -3160,11 +3107,7 @@ class ScheduleDescription:
 
 @dataclass
 class ScheduleInfo:
-    """Information about a schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Information about a schedule."""
 
     num_actions: int
     """Number of actions taken by this schedule."""
@@ -3216,22 +3159,14 @@ class ScheduleInfo:
 
 
 class ScheduleActionExecution(ABC):
-    """Base class for an action execution.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Base class for an action execution."""
 
     pass
 
 
 @dataclass
 class ScheduleActionExecutionStartWorkflow(ScheduleActionExecution):
-    """Execution of a scheduled workflow start.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Execution of a scheduled workflow start."""
 
     workflow_id: str
     """Workflow ID."""
@@ -3251,11 +3186,7 @@ class ScheduleActionExecutionStartWorkflow(ScheduleActionExecution):
 
 @dataclass
 class ScheduleActionResult:
-    """Information about when an action took place.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Information about when an action took place."""
 
     scheduled_at: datetime
     """Scheduled time of the action including jitter."""
@@ -3281,11 +3212,7 @@ class ScheduleActionResult:
 
 @dataclass
 class ScheduleUpdateInput:
-    """Parameter for an update callback for :py:meth:`ScheduleHandle.update`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Parameter for an update callback for :py:meth:`ScheduleHandle.update`."""
 
     description: ScheduleDescription
     """Current description of the schedule."""
@@ -3293,11 +3220,7 @@ class ScheduleUpdateInput:
 
 @dataclass
 class ScheduleUpdate:
-    """Result of an update callback for :py:meth:`ScheduleHandle.update`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Result of an update callback for :py:meth:`ScheduleHandle.update`."""
 
     schedule: Schedule
     """Schedule to update."""
@@ -3305,11 +3228,7 @@ class ScheduleUpdate:
 
 @dataclass
 class ScheduleListDescription:
-    """Description of a listed schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Description of a listed schedule."""
 
     id: str
     """ID of the schedule."""
@@ -3425,11 +3344,7 @@ class ScheduleListDescription:
 
 @dataclass
 class ScheduleListSchedule:
-    """Details for a listed schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Details for a listed schedule."""
 
     action: ScheduleListAction
     """Action taken when scheduled."""
@@ -3455,22 +3370,14 @@ class ScheduleListSchedule:
 
 
 class ScheduleListAction(ABC):
-    """Base class for an action a listed schedule can take.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Base class for an action a listed schedule can take."""
 
     pass
 
 
 @dataclass
 class ScheduleListActionStartWorkflow(ScheduleListAction):
-    """Action to start a workflow on a listed schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Action to start a workflow on a listed schedule."""
 
     workflow: str
     """Workflow type name."""
@@ -3478,11 +3385,7 @@ class ScheduleListActionStartWorkflow(ScheduleListAction):
 
 @dataclass
 class ScheduleListInfo:
-    """Information about a listed schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Information about a listed schedule."""
 
     recent_actions: Sequence[ScheduleActionResult]
     """Most recent actions, oldest first.
@@ -3515,11 +3418,7 @@ class ScheduleListInfo:
 
 @dataclass
 class ScheduleListState:
-    """State of a listed schedule.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """State of a listed schedule."""
 
     note: Optional[str]
     """Human readable message for the schedule.
@@ -3699,11 +3598,7 @@ class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
 
 
 class ScheduleAlreadyRunningError(temporalio.exceptions.TemporalError):
-    """Error when a schedule is already running.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Error when a schedule is already running."""
 
     def __init__(self) -> None:
         """Create schedule already running error."""
@@ -3867,11 +3762,7 @@ class ReportCancellationAsyncActivityInput:
 
 @dataclass
 class CreateScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.create_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.create_schedule`."""
 
     id: str
     schedule: Schedule
@@ -3885,11 +3776,7 @@ class CreateScheduleInput:
 
 @dataclass
 class ListSchedulesInput:
-    """Input for :py:meth:`OutboundInterceptor.list_schedules`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.list_schedules`."""
 
     page_size: int
     next_page_token: Optional[bytes]
@@ -3899,11 +3786,7 @@ class ListSchedulesInput:
 
 @dataclass
 class BackfillScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.backfill_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.backfill_schedule`."""
 
     id: str
     backfills: Sequence[ScheduleBackfill]
@@ -3913,11 +3796,7 @@ class BackfillScheduleInput:
 
 @dataclass
 class DeleteScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.delete_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.delete_schedule`."""
 
     id: str
     rpc_metadata: Mapping[str, str]
@@ -3926,11 +3805,7 @@ class DeleteScheduleInput:
 
 @dataclass
 class DescribeScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.describe_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.describe_schedule`."""
 
     id: str
     rpc_metadata: Mapping[str, str]
@@ -3939,11 +3814,7 @@ class DescribeScheduleInput:
 
 @dataclass
 class PauseScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.pause_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.pause_schedule`."""
 
     id: str
     note: Optional[str]
@@ -3953,11 +3824,7 @@ class PauseScheduleInput:
 
 @dataclass
 class TriggerScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.trigger_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.trigger_schedule`."""
 
     id: str
     overlap: Optional[ScheduleOverlapPolicy]
@@ -3967,11 +3834,7 @@ class TriggerScheduleInput:
 
 @dataclass
 class UnpauseScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.unpause_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.unpause_schedule`."""
 
     id: str
     note: Optional[str]
@@ -3981,11 +3844,7 @@ class UnpauseScheduleInput:
 
 @dataclass
 class UpdateScheduleInput:
-    """Input for :py:meth:`OutboundInterceptor.update_schedule`.
-
-    .. warning::
-        Schedules are an experimental feature.
-    """
+    """Input for :py:meth:`OutboundInterceptor.update_schedule`."""
 
     id: str
     updater: Callable[
@@ -4528,6 +4387,23 @@ class _ClientImpl(OutboundInterceptor):
     ### Schedule calls
 
     async def create_schedule(self, input: CreateScheduleInput) -> ScheduleHandle:
+        # Limited actions must be false if remaining actions is 0 and must be
+        # true if remaining actions is non-zero
+        if (
+            input.schedule.state.limited_actions
+            and not input.schedule.state.remaining_actions
+        ):
+            raise ValueError(
+                "Must set limited actions to false if there are no remaining actions set"
+            )
+        if (
+            not input.schedule.state.limited_actions
+            and input.schedule.state.remaining_actions
+        ):
+            raise ValueError(
+                "Must set limited actions to true if there are remaining actions set"
+            )
+
         initial_patch: Optional[temporalio.api.schedule.v1.SchedulePatch] = None
         if input.trigger_immediately or input.backfill:
             initial_patch = temporalio.api.schedule.v1.SchedulePatch(

@@ -653,7 +653,9 @@ async def test_schedule_basics(
             catchup_window=timedelta(minutes=5),
             pause_on_failure=True,
         ),
-        state=ScheduleState(note="sched note 1", paused=True, remaining_actions=30),
+        state=ScheduleState(
+            note="sched note 1", paused=True, limited_actions=True, remaining_actions=30
+        ),
     )
     handle = await client.create_schedule(
         f"schedule-{uuid.uuid4()}",
@@ -951,6 +953,29 @@ async def test_schedule_backfill(
 
     await handle.delete()
     await assert_no_schedules(client)
+
+
+async def test_schedule_create_limited_actions_validation(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    sched = Schedule(
+        action=ScheduleActionStartWorkflow(
+            "some workflow",
+            [],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        ),
+        spec=ScheduleSpec(),
+    )
+    with pytest.raises(ValueError) as err:
+        sched.state.limited_actions = True
+        await client.create_schedule(f"schedule-{uuid.uuid4()}", sched)
+    assert "are no remaining actions set" in str(err.value)
+    with pytest.raises(ValueError) as err:
+        sched.state.limited_actions = False
+        sched.state.remaining_actions = 10
+        await client.create_schedule(f"schedule-{uuid.uuid4()}", sched)
+    assert "are remaining actions set" in str(err.value)
 
 
 async def assert_no_schedules(client: Client) -> None:
