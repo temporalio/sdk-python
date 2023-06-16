@@ -2935,9 +2935,8 @@ class ScheduleState:
     """
     If true, remaining actions will be decremented for each action taken.
 
-    On schedule create, this must be set to true on if
-    :py:attr:`remaining_actions` is non-zero and left false if
-    :py:attr:`remaining_actions` is zero.
+    On schedule create, this must be set to true if :py:attr:`remaining_actions`
+    is non-zero and left false if :py:attr:`remaining_actions` is zero.
     """
 
     remaining_actions: int = 0
