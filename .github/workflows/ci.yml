@@ -26,7 +26,7 @@ jobs:
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
       - name: Print build information
-        run: "echo head_ref: ${{ github.head_ref }}, ref: ${{ github.ref }}, os: ${{ matrix.os }}, python: ${{ matrix.python }}"
+        run: "echo os: ${{ matrix.os }}, python: ${{ matrix.python }}"
       - uses: actions/checkout@v2
         with:
           submodules: recursive
