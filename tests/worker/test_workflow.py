@@ -20,6 +20,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     cast,
 )
 
@@ -51,6 +52,7 @@ from temporalio.common import RetryPolicy, SearchAttributes
 from temporalio.converter import (
     DataConverter,
     DefaultFailureConverterWithEncodedAttributes,
+    DefaultPayloadConverter,
     PayloadCodec,
     PayloadConverter,
 )
@@ -2719,3 +2721,45 @@ async def test_workflow_optional_param(client: Client):
             task_queue=worker.task_queue,
         )
         assert result3 == OptionalParam(some_string="foo")
+
+
+class ExceptionRaisingPayloadConverter(DefaultPayloadConverter):
+    bad_str = "bad-payload-str"
+
+    def from_payloads(
+        self, payloads: Sequence[Payload], type_hints: Optional[List] = None
+    ) -> List[Any]:
+        # Check if any payloads contain the bad data
+        for payload in payloads:
+            if ExceptionRaisingPayloadConverter.bad_str.encode() in payload.data:
+                raise ApplicationError("Intentional converter failure")
+        return super().from_payloads(payloads, type_hints)
+
+
+@workflow.defn
+class ExceptionRaisingConverterWorkflow:
+    @workflow.run
+    async def run(self, some_param: str) -> str:
+        return some_param
+
+
+async def test_exception_raising_converter_param(client: Client):
+    # Clone the client but change the data converter to use our converter
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        config["data_converter"],
+        payload_converter_class=ExceptionRaisingPayloadConverter,
+    )
+    client = Client(**config)
+
+    # Run workflow and confirm error
+    async with new_worker(client, ExceptionRaisingConverterWorkflow) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                ExceptionRaisingConverterWorkflow.run,
+                ExceptionRaisingPayloadConverter.bad_str,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Intentional converter failure" in str(err.value.cause)

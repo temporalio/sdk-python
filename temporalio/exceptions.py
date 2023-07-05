@@ -1,5 +1,6 @@
 """Common Temporal exceptions."""
 
+import asyncio
 from enum import IntEnum
 from typing import Any, Optional, Sequence, Tuple
 
@@ -322,3 +323,32 @@ class ChildWorkflowError(FailureError):
     def retry_state(self) -> Optional[RetryState]:
         """Retry state for this error."""
         return self._retry_state
+
+
+def is_cancelled_exception(exception: BaseException) -> bool:
+    """Check whether the given exception is considered a cancellation exception
+    according to Temporal.
+
+    This is often used in a conditional of a catch clause to check whether a
+    cancel occurred inside of a workflow. This can occur from
+    :py:class:`asyncio.CancelledError` or :py:class:`CancelledError` or either
+    :py:class:`ActivityError` or :py:class:`ChildWorkflowError` if either of
+    those latter two have a :py:class:`CancelledError` cause.
+
+    Args:
+        exception: Exception to check.
+
+    Returns:
+        True if a cancelled exception, false if not.
+    """
+    return (
+        isinstance(exception, asyncio.CancelledError)
+        or isinstance(exception, CancelledError)
+        or (
+            (
+                isinstance(exception, ActivityError)
+                or isinstance(exception, ChildWorkflowError)
+            )
+            and isinstance(exception.cause, CancelledError)
+        )
+    )
