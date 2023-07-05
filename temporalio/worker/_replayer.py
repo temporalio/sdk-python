@@ -162,8 +162,8 @@ class Replayer:
                 build_id=self._config["build_id"] or load_default_build_id(),
                 identity_override=self._config["identity"],
                 # All values below are ignored but required by Core
-                max_cached_workflows=1,
-                max_outstanding_workflow_tasks=1,
+                max_cached_workflows=2,
+                max_outstanding_workflow_tasks=2,
                 max_outstanding_activities=1,
                 max_outstanding_local_activities=1,
                 max_concurrent_workflow_task_polls=1,

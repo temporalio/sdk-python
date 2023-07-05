@@ -16,7 +16,7 @@ prost-types = "0.11"
 pyo3 = { version = "0.18", features = ["extension-module", "abi3-py37"] }
 pyo3-asyncio = { version = "0.18", features = ["tokio-runtime"] }
 temporal-client = { version = "0.1.0", path = "./sdk-core/client" }
-temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core" }
+temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core", features = ["ephemeral-server"] }
 temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api" }
 temporal-sdk-core-protos = { version = "0.1.0", path = "./sdk-core/sdk-core-protos" }
 tokio = "1.26"
