@@ -15,19 +15,26 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b"\n&temporal/api/enums/v1/task_queue.proto\x12\x15temporal.api.enums.v1*h\n\rTaskQueueKind\x12\x1f\n\x1bTASK_QUEUE_KIND_UNSPECIFIED\x10\x00\x12\x1a\n\x16TASK_QUEUE_KIND_NORMAL\x10\x01\x12\x1a\n\x16TASK_QUEUE_KIND_STICKY\x10\x02*l\n\rTaskQueueType\x12\x1f\n\x1bTASK_QUEUE_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n\x18TASK_QUEUE_TYPE_WORKFLOW\x10\x01\x12\x1c\n\x18TASK_QUEUE_TYPE_ACTIVITY\x10\x02\x42\x86\x01\n\x18io.temporal.api.enums.v1B\x0eTaskQueueProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3"
+    b'\n&temporal/api/enums/v1/task_queue.proto\x12\x15temporal.api.enums.v1*h\n\rTaskQueueKind\x12\x1f\n\x1bTASK_QUEUE_KIND_UNSPECIFIED\x10\x00\x12\x1a\n\x16TASK_QUEUE_KIND_NORMAL\x10\x01\x12\x1a\n\x16TASK_QUEUE_KIND_STICKY\x10\x02*l\n\rTaskQueueType\x12\x1f\n\x1bTASK_QUEUE_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n\x18TASK_QUEUE_TYPE_WORKFLOW\x10\x01\x12\x1c\n\x18TASK_QUEUE_TYPE_ACTIVITY\x10\x02*\xd2\x01\n\x10TaskReachability\x12!\n\x1dTASK_REACHABILITY_UNSPECIFIED\x10\x00\x12#\n\x1fTASK_REACHABILITY_NEW_WORKFLOWS\x10\x01\x12(\n$TASK_REACHABILITY_EXISTING_WORKFLOWS\x10\x02\x12$\n TASK_REACHABILITY_OPEN_WORKFLOWS\x10\x03\x12&\n"TASK_REACHABILITY_CLOSED_WORKFLOWS\x10\x04\x42\x86\x01\n\x18io.temporal.api.enums.v1B\x0eTaskQueueProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3'
 )
 
 _TASKQUEUEKIND = DESCRIPTOR.enum_types_by_name["TaskQueueKind"]
 TaskQueueKind = enum_type_wrapper.EnumTypeWrapper(_TASKQUEUEKIND)
 _TASKQUEUETYPE = DESCRIPTOR.enum_types_by_name["TaskQueueType"]
 TaskQueueType = enum_type_wrapper.EnumTypeWrapper(_TASKQUEUETYPE)
+_TASKREACHABILITY = DESCRIPTOR.enum_types_by_name["TaskReachability"]
+TaskReachability = enum_type_wrapper.EnumTypeWrapper(_TASKREACHABILITY)
 TASK_QUEUE_KIND_UNSPECIFIED = 0
 TASK_QUEUE_KIND_NORMAL = 1
 TASK_QUEUE_KIND_STICKY = 2
 TASK_QUEUE_TYPE_UNSPECIFIED = 0
 TASK_QUEUE_TYPE_WORKFLOW = 1
 TASK_QUEUE_TYPE_ACTIVITY = 2
+TASK_REACHABILITY_UNSPECIFIED = 0
+TASK_REACHABILITY_NEW_WORKFLOWS = 1
+TASK_REACHABILITY_EXISTING_WORKFLOWS = 2
+TASK_REACHABILITY_OPEN_WORKFLOWS = 3
+TASK_REACHABILITY_CLOSED_WORKFLOWS = 4
 
 
 if _descriptor._USE_C_DESCRIPTORS == False:
@@ -37,4 +44,6 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _TASKQUEUEKIND._serialized_end = 169
     _TASKQUEUETYPE._serialized_start = 171
     _TASKQUEUETYPE._serialized_end = 279
+    _TASKREACHABILITY._serialized_start = 282
+    _TASKREACHABILITY._serialized_end = 492
 # @@protoc_insertion_point(module_scope)

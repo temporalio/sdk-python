@@ -30,6 +30,7 @@ import google.protobuf.timestamp_pb2
 import sys
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.batch_operation_pb2
+import temporalio.api.enums.v1.reset_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -211,3 +212,40 @@ class BatchOperationDeletion(google.protobuf.message.Message):
     ) -> None: ...
 
 global___BatchOperationDeletion = BatchOperationDeletion
+
+class BatchOperationReset(google.protobuf.message.Message):
+    """BatchOperationReset sends reset requests to batch workflows.
+    Keep the parameter in sync with temporalio.api.workflowservice.v1.ResetWorkflowExecutionRequest.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RESET_TYPE_FIELD_NUMBER: builtins.int
+    RESET_REAPPLY_TYPE_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    reset_type: temporalio.api.enums.v1.reset_pb2.ResetType.ValueType
+    """Reset type."""
+    reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
+    """History event reapply options."""
+    identity: builtins.str
+    """The identity of the worker/client."""
+    def __init__(
+        self,
+        *,
+        reset_type: temporalio.api.enums.v1.reset_pb2.ResetType.ValueType = ...,
+        reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType = ...,
+        identity: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "reset_reapply_type",
+            b"reset_reapply_type",
+            "reset_type",
+            b"reset_type",
+        ],
+    ) -> None: ...
+
+global___BatchOperationReset = BatchOperationReset

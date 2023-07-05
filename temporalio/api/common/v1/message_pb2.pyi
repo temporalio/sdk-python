@@ -445,42 +445,67 @@ class WorkerVersionStamp(google.protobuf.message.Message):
 
     BUILD_ID_FIELD_NUMBER: builtins.int
     BUNDLE_ID_FIELD_NUMBER: builtins.int
+    USE_VERSIONING_FIELD_NUMBER: builtins.int
     build_id: builtins.str
-    """An opaque whole-worker identifier"""
+    """An opaque whole-worker identifier. Replaces the deprecated `binary_checksum` field when this
+    message is included in requests which previously used that.
+    """
     bundle_id: builtins.str
     """Set if the worker used a dynamically loadable bundle to process
     the task. The bundle could be a WASM blob, JS bundle, etc.
+    """
+    use_versioning: builtins.bool
+    """If set, the worker is opting in to worker versioning. Otherwise, this is used only as a
+    marker for workflow reset points and the BuildIDs search attribute.
     """
     def __init__(
         self,
         *,
         build_id: builtins.str = ...,
         bundle_id: builtins.str = ...,
+        use_versioning: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "build_id", b"build_id", "bundle_id", b"bundle_id"
+            "build_id",
+            b"build_id",
+            "bundle_id",
+            b"bundle_id",
+            "use_versioning",
+            b"use_versioning",
         ],
     ) -> None: ...
 
 global___WorkerVersionStamp = WorkerVersionStamp
 
 class WorkerVersionCapabilities(google.protobuf.message.Message):
-    """Identifies the version(s) that a worker is compatible with when polling or identifying itself"""
+    """Identifies the version(s) that a worker is compatible with when polling or identifying itself,
+    and whether or not this worker is opting into the build-id based versioning feature. This is
+    used by matching to determine which workers ought to receive what tasks.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BUILD_ID_FIELD_NUMBER: builtins.int
+    USE_VERSIONING_FIELD_NUMBER: builtins.int
     build_id: builtins.str
     """An opaque whole-worker identifier"""
+    use_versioning: builtins.bool
+    """If set, the worker is opting in to worker versioning, and wishes to only receive appropriate
+    tasks.
+    """
     def __init__(
         self,
         *,
         build_id: builtins.str = ...,
+        use_versioning: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["build_id", b"build_id"]
+        self,
+        field_name: typing_extensions.Literal[
+            "build_id", b"build_id", "use_versioning", b"use_versioning"
+        ],
     ) -> None: ...
 
 global___WorkerVersionCapabilities = WorkerVersionCapabilities

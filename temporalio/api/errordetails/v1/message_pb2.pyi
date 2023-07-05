@@ -314,3 +314,21 @@ class WorkflowNotReadyFailure(google.protobuf.message.Message):
     ) -> None: ...
 
 global___WorkflowNotReadyFailure = WorkflowNotReadyFailure
+
+class NewerBuildExistsFailure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DEFAULT_BUILD_ID_FIELD_NUMBER: builtins.int
+    default_build_id: builtins.str
+    """The current default compatible build ID which will receive tasks"""
+    def __init__(
+        self,
+        *,
+        default_build_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["default_build_id", b"default_build_id"],
+    ) -> None: ...
+
+global___NewerBuildExistsFailure = NewerBuildExistsFailure

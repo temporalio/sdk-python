@@ -113,3 +113,54 @@ TASK_QUEUE_TYPE_WORKFLOW: TaskQueueType.ValueType  # 1
 TASK_QUEUE_TYPE_ACTIVITY: TaskQueueType.ValueType  # 2
 """Activity type of task queue."""
 global___TaskQueueType = TaskQueueType
+
+class _TaskReachability:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _TaskReachabilityEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _TaskReachability.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    TASK_REACHABILITY_UNSPECIFIED: _TaskReachability.ValueType  # 0
+    TASK_REACHABILITY_NEW_WORKFLOWS: _TaskReachability.ValueType  # 1
+    """There's a possiblity for a worker to receive new workflow tasks. Workers should *not* be retired."""
+    TASK_REACHABILITY_EXISTING_WORKFLOWS: _TaskReachability.ValueType  # 2
+    """There's a possiblity for a worker to receive existing workflow and activity tasks from existing workflows. Workers
+    should *not* be retired.
+    This enum value does not distinguish between open and closed workflows.
+    """
+    TASK_REACHABILITY_OPEN_WORKFLOWS: _TaskReachability.ValueType  # 3
+    """There's a possiblity for a worker to receive existing workflow and activity tasks from open workflows. Workers
+    should *not* be retired.
+    """
+    TASK_REACHABILITY_CLOSED_WORKFLOWS: _TaskReachability.ValueType  # 4
+    """There's a possiblity for a worker to receive existing workflow tasks from closed workflows. Workers may be
+    retired dependending on application requirements. For example, if there's no need to query closed workflows.
+    """
+
+class TaskReachability(_TaskReachability, metaclass=_TaskReachabilityEnumTypeWrapper):
+    """Specifies which category of tasks may reach a worker on a versioned task queue.
+    Used both in a reachability query and its response.
+    """
+
+TASK_REACHABILITY_UNSPECIFIED: TaskReachability.ValueType  # 0
+TASK_REACHABILITY_NEW_WORKFLOWS: TaskReachability.ValueType  # 1
+"""There's a possiblity for a worker to receive new workflow tasks. Workers should *not* be retired."""
+TASK_REACHABILITY_EXISTING_WORKFLOWS: TaskReachability.ValueType  # 2
+"""There's a possiblity for a worker to receive existing workflow and activity tasks from existing workflows. Workers
+should *not* be retired.
+This enum value does not distinguish between open and closed workflows.
+"""
+TASK_REACHABILITY_OPEN_WORKFLOWS: TaskReachability.ValueType  # 3
+"""There's a possiblity for a worker to receive existing workflow and activity tasks from open workflows. Workers
+should *not* be retired.
+"""
+TASK_REACHABILITY_CLOSED_WORKFLOWS: TaskReachability.ValueType  # 4
+"""There's a possiblity for a worker to receive existing workflow tasks from closed workflows. Workers may be
+retired dependending on application requirements. For example, if there's no need to query closed workflows.
+"""
+global___TaskReachability = TaskReachability

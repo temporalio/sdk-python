@@ -24,7 +24,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n*temporal/api/errordetails/v1/message.proto\x12\x1ctemporal.api.errordetails.v1\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a%temporal/api/enums/v1/namespace.proto"B\n\x0fNotFoundFailure\x12\x17\n\x0f\x63urrent_cluster\x18\x01 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x02 \x01(\t"R\n&WorkflowExecutionAlreadyStartedFailure\x12\x18\n\x10start_request_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"_\n\x19NamespaceNotActiveFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x63urrent_cluster\x18\x02 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x03 \x01(\t"\xa6\x01\n\x1cNamespaceInvalidStateFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12=\n\x0e\x61llowed_states\x18\x03 \x03(\x0e\x32%.temporal.api.enums.v1.NamespaceState"-\n\x18NamespaceNotFoundFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t"\x1f\n\x1dNamespaceAlreadyExistsFailure"k\n ClientVersionNotSupportedFailure\x12\x16\n\x0e\x63lient_version\x18\x01 \x01(\t\x12\x13\n\x0b\x63lient_name\x18\x02 \x01(\t\x12\x1a\n\x12supported_versions\x18\x03 \x01(\t"d\n ServerVersionNotSupportedFailure\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12(\n client_supported_server_versions\x18\x02 \x01(\t"%\n#CancellationAlreadyRequestedFailure"\x14\n\x12QueryFailedFailure")\n\x17PermissionDeniedFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t"X\n\x18ResourceExhaustedFailure\x12<\n\x05\x63\x61use\x18\x01 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedCause"v\n\x15SystemWorkflowFailure\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x16\n\x0eworkflow_error\x18\x02 \x01(\t"\x19\n\x17WorkflowNotReadyFailureB\xa7\x01\n\x1fio.temporal.api.errordetails.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/errordetails/v1;errordetails\xaa\x02\x1eTemporalio.Api.ErrorDetails.V1\xea\x02!Temporalio::Api::ErrorDetails::V1b\x06proto3'
+    b'\n*temporal/api/errordetails/v1/message.proto\x12\x1ctemporal.api.errordetails.v1\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a%temporal/api/enums/v1/namespace.proto"B\n\x0fNotFoundFailure\x12\x17\n\x0f\x63urrent_cluster\x18\x01 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x02 \x01(\t"R\n&WorkflowExecutionAlreadyStartedFailure\x12\x18\n\x10start_request_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"_\n\x19NamespaceNotActiveFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x63urrent_cluster\x18\x02 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x03 \x01(\t"\xa6\x01\n\x1cNamespaceInvalidStateFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12=\n\x0e\x61llowed_states\x18\x03 \x03(\x0e\x32%.temporal.api.enums.v1.NamespaceState"-\n\x18NamespaceNotFoundFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t"\x1f\n\x1dNamespaceAlreadyExistsFailure"k\n ClientVersionNotSupportedFailure\x12\x16\n\x0e\x63lient_version\x18\x01 \x01(\t\x12\x13\n\x0b\x63lient_name\x18\x02 \x01(\t\x12\x1a\n\x12supported_versions\x18\x03 \x01(\t"d\n ServerVersionNotSupportedFailure\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12(\n client_supported_server_versions\x18\x02 \x01(\t"%\n#CancellationAlreadyRequestedFailure"\x14\n\x12QueryFailedFailure")\n\x17PermissionDeniedFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t"X\n\x18ResourceExhaustedFailure\x12<\n\x05\x63\x61use\x18\x01 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedCause"v\n\x15SystemWorkflowFailure\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x16\n\x0eworkflow_error\x18\x02 \x01(\t"\x19\n\x17WorkflowNotReadyFailure"3\n\x17NewerBuildExistsFailure\x12\x18\n\x10\x64\x65\x66\x61ult_build_id\x18\x01 \x01(\tB\xa7\x01\n\x1fio.temporal.api.errordetails.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/errordetails/v1;errordetails\xaa\x02\x1eTemporalio.Api.ErrorDetails.V1\xea\x02!Temporalio::Api::ErrorDetails::V1b\x06proto3'
 )
 
 
@@ -56,6 +56,7 @@ _PERMISSIONDENIEDFAILURE = DESCRIPTOR.message_types_by_name["PermissionDeniedFai
 _RESOURCEEXHAUSTEDFAILURE = DESCRIPTOR.message_types_by_name["ResourceExhaustedFailure"]
 _SYSTEMWORKFLOWFAILURE = DESCRIPTOR.message_types_by_name["SystemWorkflowFailure"]
 _WORKFLOWNOTREADYFAILURE = DESCRIPTOR.message_types_by_name["WorkflowNotReadyFailure"]
+_NEWERBUILDEXISTSFAILURE = DESCRIPTOR.message_types_by_name["NewerBuildExistsFailure"]
 NotFoundFailure = _reflection.GeneratedProtocolMessageType(
     "NotFoundFailure",
     (_message.Message,),
@@ -210,6 +211,17 @@ WorkflowNotReadyFailure = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(WorkflowNotReadyFailure)
 
+NewerBuildExistsFailure = _reflection.GeneratedProtocolMessageType(
+    "NewerBuildExistsFailure",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _NEWERBUILDEXISTSFAILURE,
+        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NewerBuildExistsFailure)
+    },
+)
+_sym_db.RegisterMessage(NewerBuildExistsFailure)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\037io.temporal.api.errordetails.v1B\014MessageProtoP\001Z/go.temporal.io/api/errordetails/v1;errordetails\252\002\036Temporalio.Api.ErrorDetails.V1\352\002!Temporalio::Api::ErrorDetails::V1"
@@ -241,4 +253,6 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _SYSTEMWORKFLOWFAILURE._serialized_end = 1216
     _WORKFLOWNOTREADYFAILURE._serialized_start = 1218
     _WORKFLOWNOTREADYFAILURE._serialized_end = 1243
+    _NEWERBUILDEXISTSFAILURE._serialized_start = 1245
+    _NEWERBUILDEXISTSFAILURE._serialized_end = 1296
 # @@protoc_insertion_point(module_scope)

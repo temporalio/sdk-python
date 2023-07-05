@@ -374,6 +374,7 @@ class ScheduleActivity(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
     DO_NOT_EAGERLY_EXECUTE_FIELD_NUMBER: builtins.int
+    VERSIONING_INTENT_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     activity_id: builtins.str
@@ -426,6 +427,8 @@ class ScheduleActivity(google.protobuf.message.Message):
     activity. When unset/default, workers will always attempt to do so if activity execution
     slots are available.
     """
+    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    """Whether this activity should run on a worker with a compatible build id or not."""
     def __init__(
         self,
         *,
@@ -448,6 +451,7 @@ class ScheduleActivity(google.protobuf.message.Message):
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         cancellation_type: global___ActivityCancellationType.ValueType = ...,
         do_not_eagerly_execute: builtins.bool = ...,
+        versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -493,6 +497,8 @@ class ScheduleActivity(google.protobuf.message.Message):
             b"start_to_close_timeout",
             "task_queue",
             b"task_queue",
+            "versioning_intent",
+            b"versioning_intent",
         ],
     ) -> None: ...
 
@@ -896,6 +902,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
     HEADERS_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     RETRY_POLICY_FIELD_NUMBER: builtins.int
+    VERSIONING_INTENT_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     task_queue: builtins.str
@@ -945,6 +952,8 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         """If set, the new workflow will have this retry policy. If unset, re-uses the current
         workflow's retry policy.
         """
+    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    """Whether the continued workflow should run on a worker with a compatible build id or not."""
     def __init__(
         self,
         *,
@@ -969,6 +978,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         ]
         | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
+        versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -996,6 +1006,8 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "versioning_intent",
+            b"versioning_intent",
             "workflow_run_timeout",
             b"workflow_run_timeout",
             "workflow_task_timeout",
@@ -1139,6 +1151,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
+    VERSIONING_INTENT_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     namespace: builtins.str
@@ -1192,6 +1205,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         """Search attributes"""
     cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType
     """Defines behaviour of the underlying workflow when child workflow cancellation has been requested."""
+    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    """Whether this child should run on a worker with a compatible build id or not."""
     def __init__(
         self,
         *,
@@ -1222,6 +1237,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         ]
         | None = ...,
         cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType = ...,
+        versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1261,6 +1277,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             b"seq",
             "task_queue",
             b"task_queue",
+            "versioning_intent",
+            b"versioning_intent",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",

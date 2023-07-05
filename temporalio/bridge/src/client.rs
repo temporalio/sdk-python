@@ -132,6 +132,9 @@ impl ClientRef {
                 "get_worker_build_id_compatibility" => {
                     rpc_call!(retry_client, call, get_worker_build_id_compatibility)
                 }
+                "get_worker_task_reachability" => {
+                    rpc_call!(retry_client, call, get_worker_task_reachability)
+                }
                 "get_workflow_execution_history" => {
                     rpc_call!(retry_client, call, get_workflow_execution_history)
                 }
