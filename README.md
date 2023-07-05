@@ -306,7 +306,7 @@ This notably doesn't include any `date`, `time`, or `datetime` objects as they m
 Users are strongly encouraged to use a single `dataclass` for parameter and return types so fields with defaults can be
 easily added without breaking compatibility.
 
-Classes with generics may not have the generics properly resolved. The current implementation, does not have generic
+Classes with generics may not have the generics properly resolved. The current implementation does not have generic
 type resolution. Users should use concrete types.
 
 ##### Custom Type Data Conversion
