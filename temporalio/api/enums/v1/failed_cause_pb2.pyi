@@ -286,6 +286,8 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
     """System overloaded."""
     RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_LIMIT: _ResourceExhaustedCause.ValueType  # 4
     """Namespace exceeds persistence rate limit."""
+    RESOURCE_EXHAUSTED_CAUSE_BUSY_WORKFLOW: _ResourceExhaustedCause.ValueType  # 5
+    """Workflow is busy"""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -300,4 +302,6 @@ RESOURCE_EXHAUSTED_CAUSE_SYSTEM_OVERLOADED: ResourceExhaustedCause.ValueType  # 
 """System overloaded."""
 RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_LIMIT: ResourceExhaustedCause.ValueType  # 4
 """Namespace exceeds persistence rate limit."""
+RESOURCE_EXHAUSTED_CAUSE_BUSY_WORKFLOW: ResourceExhaustedCause.ValueType  # 5
+"""Workflow is busy"""
 global___ResourceExhaustedCause = ResourceExhaustedCause

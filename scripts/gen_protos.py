@@ -23,6 +23,7 @@ proto_paths = [
     for v in proto_dir.glob("**/*.proto")
     if not str(v).startswith(str(testsrv_proto_dir / "dependencies"))
     and not "health" in str(v)
+    and not "google" in str(v)
 ]
 proto_paths.extend(test_proto_dir.glob("**/*.proto"))
 proto_paths.extend(additional_proto_dir.glob("**/*.proto"))

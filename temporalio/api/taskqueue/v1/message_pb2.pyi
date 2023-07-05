@@ -49,17 +49,26 @@ class TaskQueue(google.protobuf.message.Message):
 
     NAME_FIELD_NUMBER: builtins.int
     KIND_FIELD_NUMBER: builtins.int
+    NORMAL_NAME_FIELD_NUMBER: builtins.int
     name: builtins.str
     kind: temporalio.api.enums.v1.task_queue_pb2.TaskQueueKind.ValueType
     """Default: TASK_QUEUE_KIND_NORMAL."""
+    normal_name: builtins.str
+    """Iff kind == TASK_QUEUE_KIND_STICKY, then this field contains the name of
+    the normal task queue that the sticky worker is running on.
+    """
     def __init__(
         self,
         *,
         name: builtins.str = ...,
         kind: temporalio.api.enums.v1.task_queue_pb2.TaskQueueKind.ValueType = ...,
+        normal_name: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["kind", b"kind", "name", b"name"]
+        self,
+        field_name: typing_extensions.Literal[
+            "kind", b"kind", "name", b"name", "normal_name", b"normal_name"
+        ],
     ) -> None: ...
 
 global___TaskQueue = TaskQueue
@@ -273,34 +282,98 @@ class StickyExecutionAttributes(google.protobuf.message.Message):
 global___StickyExecutionAttributes = StickyExecutionAttributes
 
 class CompatibleVersionSet(google.protobuf.message.Message):
-    """Used by the worker versioning APIs, represents an ordering of one or more versions which are
-    considered to be compatible with each other. Currently the versions are always worker build ids.
+    """Used by the worker versioning APIs, represents an unordered set of one or more versions which are
+    considered to be compatible with each other. Currently the versions are always worker build IDs.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    VERSION_SET_ID_FIELD_NUMBER: builtins.int
     BUILD_IDS_FIELD_NUMBER: builtins.int
-    version_set_id: builtins.str
-    """A unique identifier for this version set. Users don't need to understand or care about this
-    value, but it has value for debugging purposes.
-    """
     @property
     def build_ids(
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """All the compatible versions, ordered from oldest to newest"""
+        """All the compatible versions, unordered, except for the last element, which is considered the set "default"."""
     def __init__(
         self,
         *,
-        version_set_id: builtins.str = ...,
         build_ids: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["build_ids", b"build_ids"]
+    ) -> None: ...
+
+global___CompatibleVersionSet = CompatibleVersionSet
+
+class TaskQueueReachability(google.protobuf.message.Message):
+    """Reachability of tasks for a worker on a single task queue."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    REACHABILITY_FIELD_NUMBER: builtins.int
+    task_queue: builtins.str
+    @property
+    def reachability(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        temporalio.api.enums.v1.task_queue_pb2.TaskReachability.ValueType
+    ]:
+        """Task reachability for a worker in a single task queue.
+        See the TaskReachability docstring for information about each enum variant.
+        If reachability is empty, this worker is considered unreachable in this task queue.
+        """
+    def __init__(
+        self,
+        *,
+        task_queue: builtins.str = ...,
+        reachability: collections.abc.Iterable[
+            temporalio.api.enums.v1.task_queue_pb2.TaskReachability.ValueType
+        ]
+        | None = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "build_ids", b"build_ids", "version_set_id", b"version_set_id"
+            "reachability", b"reachability", "task_queue", b"task_queue"
         ],
     ) -> None: ...
 
-global___CompatibleVersionSet = CompatibleVersionSet
+global___TaskQueueReachability = TaskQueueReachability
+
+class BuildIdReachability(google.protobuf.message.Message):
+    """Reachability of tasks for a worker by build id, in one or more task queues."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BUILD_ID_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_REACHABILITY_FIELD_NUMBER: builtins.int
+    build_id: builtins.str
+    """A build id or empty if unversioned."""
+    @property
+    def task_queue_reachability(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___TaskQueueReachability
+    ]:
+        """Reachability per task queue."""
+    def __init__(
+        self,
+        *,
+        build_id: builtins.str = ...,
+        task_queue_reachability: collections.abc.Iterable[
+            global___TaskQueueReachability
+        ]
+        | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "build_id",
+            b"build_id",
+            "task_queue_reachability",
+            b"task_queue_reachability",
+        ],
+    ) -> None: ...
+
+global___BuildIdReachability = BuildIdReachability

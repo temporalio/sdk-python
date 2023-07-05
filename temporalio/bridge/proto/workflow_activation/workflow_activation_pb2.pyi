@@ -42,6 +42,8 @@ class WorkflowActivation(google.protobuf.message.Message):
     HISTORY_LENGTH_FIELD_NUMBER: builtins.int
     JOBS_FIELD_NUMBER: builtins.int
     AVAILABLE_INTERNAL_FLAGS_FIELD_NUMBER: builtins.int
+    HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    CONTINUE_AS_NEW_SUGGESTED_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The id of the currently active run of the workflow. Also used as a cache key. There may
     only ever be one active workflow task (and hence activation) of a run at one time.
@@ -70,6 +72,10 @@ class WorkflowActivation(google.protobuf.message.Message):
         internal flags may be used. This is not a delta - all previously used flags always
         appear since this representation is cheap.
         """
+    history_size_bytes: builtins.int
+    """The history size in bytes as of the last WFT started event"""
+    continue_as_new_suggested: builtins.bool
+    """Set true if the most recent WFT started event had this suggestion"""
     def __init__(
         self,
         *,
@@ -79,6 +85,8 @@ class WorkflowActivation(google.protobuf.message.Message):
         history_length: builtins.int = ...,
         jobs: collections.abc.Iterable[global___WorkflowActivationJob] | None = ...,
         available_internal_flags: collections.abc.Iterable[builtins.int] | None = ...,
+        history_size_bytes: builtins.int = ...,
+        continue_as_new_suggested: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
@@ -88,8 +96,12 @@ class WorkflowActivation(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "available_internal_flags",
             b"available_internal_flags",
+            "continue_as_new_suggested",
+            b"continue_as_new_suggested",
             "history_length",
             b"history_length",
+            "history_size_bytes",
+            b"history_size_bytes",
             "is_replaying",
             b"is_replaying",
             "jobs",

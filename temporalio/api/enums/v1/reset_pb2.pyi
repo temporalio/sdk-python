@@ -61,3 +61,28 @@ RESET_REAPPLY_TYPE_UNSPECIFIED: ResetReapplyType.ValueType  # 0
 RESET_REAPPLY_TYPE_SIGNAL: ResetReapplyType.ValueType  # 1
 RESET_REAPPLY_TYPE_NONE: ResetReapplyType.ValueType  # 2
 global___ResetReapplyType = ResetReapplyType
+
+class _ResetType:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ResetTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ResetType.ValueType],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    RESET_TYPE_UNSPECIFIED: _ResetType.ValueType  # 0
+    RESET_TYPE_FIRST_WORKFLOW_TASK: _ResetType.ValueType  # 1
+    """Resets to event of the first workflow task completed, or if it does not exist, the event after task scheduled."""
+    RESET_TYPE_LAST_WORKFLOW_TASK: _ResetType.ValueType  # 2
+    """Resets to event of the last workflow task completed, or if it does not exist, the event after task scheduled."""
+
+class ResetType(_ResetType, metaclass=_ResetTypeEnumTypeWrapper):
+    """Reset type options"""
+
+RESET_TYPE_UNSPECIFIED: ResetType.ValueType  # 0
+RESET_TYPE_FIRST_WORKFLOW_TASK: ResetType.ValueType  # 1
+"""Resets to event of the first workflow task completed, or if it does not exist, the event after task scheduled."""
+RESET_TYPE_LAST_WORKFLOW_TASK: ResetType.ValueType  # 2
+"""Resets to event of the last workflow task completed, or if it does not exist, the event after task scheduled."""
+global___ResetType = ResetType

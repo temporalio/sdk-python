@@ -313,6 +313,11 @@ class WorkflowService:
             wsv1.GetWorkerBuildIdCompatibilityRequest,
             wsv1.GetWorkerBuildIdCompatibilityResponse,
         )
+        self.get_worker_task_reachability = client._new_call(
+            "get_worker_task_reachability",
+            wsv1.GetWorkerTaskReachabilityRequest,
+            wsv1.GetWorkerTaskReachabilityResponse,
+        )
         self.get_workflow_execution_history = client._new_call(
             "get_workflow_execution_history",
             wsv1.GetWorkflowExecutionHistoryRequest,

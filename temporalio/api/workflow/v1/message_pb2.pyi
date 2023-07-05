@@ -470,8 +470,13 @@ class ResetPointInfo(google.protobuf.message.Message):
     EXPIRE_TIME_FIELD_NUMBER: builtins.int
     RESETTABLE_FIELD_NUMBER: builtins.int
     binary_checksum: builtins.str
+    """A worker binary version identifier, will be deprecated and superseded by a newer concept of
+    build_id.
+    """
     run_id: builtins.str
+    """The first run ID in the execution chain that was touched by this worker build."""
     first_workflow_task_completed_id: builtins.int
+    """Event ID of the first WorkflowTaskCompleted event processed by this worker build."""
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
