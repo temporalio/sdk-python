@@ -812,6 +812,7 @@ class _WorkflowInstanceImpl(
         activity: Any,
         *args: Any,
         task_queue: Optional[str],
+        result_type: Optional[Type],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
         start_to_close_timeout: Optional[timedelta],
@@ -823,7 +824,7 @@ class _WorkflowInstanceImpl(
         # Get activity definition if it's callable
         name: str
         arg_types: Optional[List[Type]] = None
-        ret_type: Optional[Type] = None
+        ret_type = result_type
         if isinstance(activity, str):
             name = activity
         elif callable(activity):
@@ -859,6 +860,7 @@ class _WorkflowInstanceImpl(
         *args: Any,
         id: str,
         task_queue: Optional[str],
+        result_type: Optional[Type],
         cancellation_type: temporalio.workflow.ChildWorkflowCancellationType,
         parent_close_policy: temporalio.workflow.ParentClosePolicy,
         execution_timeout: Optional[timedelta],
@@ -873,7 +875,7 @@ class _WorkflowInstanceImpl(
         # Use definition if callable
         name: str
         arg_types: Optional[List[Type]] = None
-        ret_type: Optional[Type] = None
+        ret_type = result_type
         if isinstance(workflow, str):
             name = workflow
         elif callable(workflow):
@@ -910,6 +912,7 @@ class _WorkflowInstanceImpl(
         self,
         activity: Any,
         *args: Any,
+        result_type: Optional[Type],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
         start_to_close_timeout: Optional[timedelta],
@@ -921,7 +924,7 @@ class _WorkflowInstanceImpl(
         # Get activity definition if it's callable
         name: str
         arg_types: Optional[List[Type]] = None
-        ret_type: Optional[Type] = None
+        ret_type = result_type
         if isinstance(activity, str):
             name = activity
         elif callable(activity):

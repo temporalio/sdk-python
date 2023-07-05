@@ -1277,6 +1277,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
+        result_type: Optional[Type] = None,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1289,6 +1290,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
+        result_type: Optional[Type] = None,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1308,6 +1310,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             query: Query function or name on the workflow.
             arg: Single argument to the query.
             args: Multiple arguments to the query. Cannot be set if arg is.
+            result_type: For string queries, this can set the specific result
+                type hint to deserialize into.
             reject_condition: Condition for rejecting the query. If unset/None,
                 defaults to the client's default (which is defaulted to None).
             rpc_metadata: Headers used on the RPC call. Keys here override
@@ -1322,7 +1326,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             RPCError: Workflow details could not be fetched.
         """
         query_name: str
-        ret_type: Optional[Type] = None
+        ret_type = result_type
         if callable(query):
             defn = temporalio.workflow._QueryDefinition.from_fn(query)
             if not defn:

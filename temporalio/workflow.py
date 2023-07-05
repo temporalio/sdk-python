@@ -446,6 +446,7 @@ class _Runtime(ABC):
         activity: Any,
         *args: Any,
         task_queue: Optional[str],
+        result_type: Optional[Type],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
         start_to_close_timeout: Optional[timedelta],
@@ -463,6 +464,7 @@ class _Runtime(ABC):
         *args: Any,
         id: str,
         task_queue: Optional[str],
+        result_type: Optional[Type],
         cancellation_type: ChildWorkflowCancellationType,
         parent_close_policy: ParentClosePolicy,
         execution_timeout: Optional[timedelta],
@@ -481,6 +483,7 @@ class _Runtime(ABC):
         self,
         activity: Any,
         *args: Any,
+        result_type: Optional[Type],
         schedule_to_close_timeout: Optional[timedelta],
         schedule_to_start_timeout: Optional[timedelta],
         start_to_close_timeout: Optional[timedelta],
@@ -1265,6 +1268,7 @@ def start_activity(
     *,
     args: Sequence[Any] = [],
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -1282,6 +1286,7 @@ def start_activity(
     *,
     args: Sequence[Any] = [],
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -1301,6 +1306,8 @@ def start_activity(
         args: Multiple arguments to the activity. Cannot be set if arg is.
         task_queue: Task queue to run the activity on. Defaults to the current
             workflow's task queue.
+        result_type: For string activities, this can set the specific result
+            type hint to deserialize into.
         schedule_to_close_timeout: Max amount of time the activity can take from
             first being scheduled to being completed before it times out. This
             is inclusive of all retries.
@@ -1326,6 +1333,7 @@ def start_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
+        result_type=result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -1450,6 +1458,7 @@ async def execute_activity(
     *,
     args: Sequence[Any] = [],
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -1467,6 +1476,7 @@ async def execute_activity(
     *,
     args: Sequence[Any] = [],
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -1485,6 +1495,7 @@ async def execute_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
+        result_type=result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -1623,6 +1634,7 @@ def start_activity_class(
         activity,
         *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -1761,6 +1773,7 @@ async def execute_activity_class(
         activity,
         *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -1899,6 +1912,7 @@ def start_activity_method(
         activity,
         *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -2039,6 +2053,7 @@ async def execute_activity_method(
         activity,
         *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -2170,6 +2185,7 @@ def start_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -2186,6 +2202,7 @@ def start_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -2206,6 +2223,8 @@ def start_local_activity(
         activity: Activity name or function reference.
         arg: Single argument to the activity.
         args: Multiple arguments to the activity. Cannot be set if arg is.
+        result_type: For string activities, this can set the specific result
+            type hint to deserialize into.
         activity_id: Optional unique identifier for the activity.
         schedule_to_close_timeout: Max amount of time the activity can take from
             first being scheduled to being completed before it times out. This
@@ -2229,6 +2248,7 @@ def start_local_activity(
     return _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
+        result_type=result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -2346,6 +2366,7 @@ async def execute_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -2362,6 +2383,7 @@ async def execute_local_activity(
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
+    result_type: Optional[Type] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
     start_to_close_timeout: Optional[timedelta] = None,
@@ -2382,6 +2404,7 @@ async def execute_local_activity(
     return await _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
+        result_type=result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -2515,6 +2538,7 @@ def start_local_activity_class(
     return _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -2650,6 +2674,7 @@ async def execute_local_activity_class(
     return await _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -2783,6 +2808,7 @@ def start_local_activity_method(
     return _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -2918,6 +2944,7 @@ async def execute_local_activity_method(
     return await _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
+        result_type=None,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -3127,6 +3154,7 @@ async def start_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3148,6 +3176,7 @@ async def start_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3170,6 +3199,8 @@ async def start_child_workflow(
             defaults to :py:func:`uuid4`.
         task_queue: Task queue to run the workflow on. Defaults to the current
             workflow's task queue.
+        result_type: For string workflows, this can set the specific result type
+            hint to deserialize into.
         cancellation_type: How the child workflow will react to cancellation.
         parent_close_policy: How to handle the child workflow when the parent
             workflow closes.
@@ -3191,6 +3222,7 @@ async def start_child_workflow(
         *temporalio.common._arg_or_args(arg, args),
         id=id or str(uuid4()),
         task_queue=task_queue,
+        result_type=result_type,
         cancellation_type=cancellation_type,
         parent_close_policy=parent_close_policy,
         execution_timeout=execution_timeout,
@@ -3278,6 +3310,7 @@ async def execute_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3299,6 +3332,7 @@ async def execute_child_workflow(
     args: Sequence[Any] = [],
     id: Optional[str] = None,
     task_queue: Optional[str] = None,
+    result_type: Optional[Type] = None,
     cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
     parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
     execution_timeout: Optional[timedelta] = None,
@@ -3321,6 +3355,7 @@ async def execute_child_workflow(
         *temporalio.common._arg_or_args(arg, args),
         id=id or str(uuid4()),
         task_queue=task_queue,
+        result_type=result_type,
         cancellation_type=cancellation_type,
         parent_close_policy=parent_close_policy,
         execution_timeout=execution_timeout,

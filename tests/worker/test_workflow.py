@@ -2763,3 +2763,74 @@ async def test_exception_raising_converter_param(client: Client):
             )
         assert isinstance(err.value.cause, ApplicationError)
         assert "Intentional converter failure" in str(err.value.cause)
+
+
+@dataclass
+class ManualResultType:
+    some_string: str
+
+
+@activity.defn
+async def manual_result_type_activity() -> ManualResultType:
+    return ManualResultType(some_string="from-activity")
+
+
+@workflow.defn
+class ManualResultTypeWorkflow:
+    @workflow.run
+    async def run(self) -> ManualResultType:
+        # Only check activity and child if not a child ourselves
+        if not workflow.info().parent:
+            # Activity without result type and with
+            res1 = await workflow.execute_activity(
+                "manual_result_type_activity",
+                schedule_to_close_timeout=timedelta(minutes=2),
+            )
+            assert res1 == {"some_string": "from-activity"}
+            res2 = await workflow.execute_activity(
+                "manual_result_type_activity",
+                result_type=ManualResultType,
+                schedule_to_close_timeout=timedelta(minutes=2),
+            )
+            assert res2 == ManualResultType(some_string="from-activity")
+            # Child without result type and with
+            res3 = await workflow.execute_child_workflow(
+                "ManualResultTypeWorkflow",
+            )
+            assert res3 == {"some_string": "from-workflow"}
+            res4 = await workflow.execute_child_workflow(
+                "ManualResultTypeWorkflow",
+                result_type=ManualResultType,
+            )
+            assert res4 == ManualResultType(some_string="from-workflow")
+        return ManualResultType(some_string="from-workflow")
+
+    @workflow.query
+    def some_query(self) -> ManualResultType:
+        return ManualResultType(some_string="from-query")
+
+
+async def test_manual_result_type(client: Client):
+    async with new_worker(
+        client, ManualResultTypeWorkflow, activities=[manual_result_type_activity]
+    ) as worker:
+        # Workflow without result type and with
+        res1 = await client.execute_workflow(
+            "ManualResultTypeWorkflow",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert res1 == {"some_string": "from-workflow"}
+        handle = await client.start_workflow(
+            "ManualResultTypeWorkflow",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            result_type=ManualResultType,
+        )
+        res2 = await handle.result()
+        assert res2 == ManualResultType(some_string="from-workflow")
+        # Query without result type and with
+        res3 = await handle.query("some_query")
+        assert res3 == {"some_string": "from-query"}
+        res4 = await handle.query("some_query", result_type=ManualResultType)
+        assert res4 == ManualResultType(some_string="from-query")
