@@ -277,6 +277,11 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityResponse.FromString,
         )
+        self.GetWorkerTaskReachability = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerTaskReachability",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityResponse.FromString,
+        )
         self.UpdateWorkflowExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.SerializeToString,
@@ -789,6 +794,14 @@ class WorkflowServiceServicer(object):
         version, forming sets of ids which are incompatible with each other, but whose contained
         members are compatible with one another.
 
+        A single build id may be mapped to multiple task queues using this API for cases where a single process hosts
+        multiple workers.
+
+        To query which workers can be retired, use the `GetWorkerTaskReachability` API.
+
+        NOTE: The number of task queues mapped to a single build id is limited by the `limit.taskQueuesPerBuildId`
+        (default is 20), if this limit is exceeded this API will error with a FailedPrecondition.
+
         (-- api-linter: core::0134::response-message-name=disabled
         aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
         (-- api-linter: core::0134::method-signature=disabled
@@ -799,7 +812,25 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def GetWorkerBuildIdCompatibility(self, request, context):
-        """Fetches the worker build id versioning sets for some task queue and related metadata."""
+        """Fetches the worker build id versioning sets for a task queue."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetWorkerTaskReachability(self, request, context):
+        """Fetches task reachability to determine whether a worker may be retired.
+        The request may specify task queues to query for or let the server fetch all task queues mapped to the given
+        build IDs.
+
+        When requesting a large number of task queues or all task queues associated with the given build ids in a
+        namespace, all task queues will be listed in the response but some of them may not contain reachability
+        information due to a server enforced limit. When reaching the limit, task queues that reachability information
+        could not be retrieved for will be marked with a single TASK_REACHABILITY_UNSPECIFIED entry. The caller may issue
+        another call to get the reachability for those task queues.
+
+        Open source users can adjust this limit by setting the server's dynamic config value for
+        `limit.reachabilityTaskQueueScan` with the caveat that this call can strain the visibility store.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1101,6 +1132,11 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.GetWorkerBuildIdCompatibility,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityResponse.SerializeToString,
+        ),
+        "GetWorkerTaskReachability": grpc.unary_unary_rpc_method_handler(
+            servicer.GetWorkerTaskReachability,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityResponse.SerializeToString,
         ),
         "UpdateWorkflowExecution": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateWorkflowExecution,
@@ -2594,6 +2630,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerBuildIdCompatibility",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerBuildIdCompatibilityResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetWorkerTaskReachability(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/GetWorkerTaskReachability",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -11,9 +11,9 @@ from .failed_cause_pb2 import (
 )
 from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
 from .query_pb2 import QueryRejectCondition, QueryResultType
-from .reset_pb2 import ResetReapplyType
+from .reset_pb2 import ResetReapplyType, ResetType
 from .schedule_pb2 import ScheduleOverlapPolicy
-from .task_queue_pb2 import TaskQueueKind, TaskQueueType
+from .task_queue_pb2 import TaskQueueKind, TaskQueueType, TaskReachability
 from .update_pb2 import UpdateWorkflowExecutionLifecycleStage
 from .workflow_pb2 import (
     ContinueAsNewInitiator,
@@ -46,6 +46,7 @@ __all__ = [
     "QueryResultType",
     "ReplicationState",
     "ResetReapplyType",
+    "ResetType",
     "ResourceExhaustedCause",
     "RetryState",
     "ScheduleOverlapPolicy",
@@ -54,6 +55,7 @@ __all__ = [
     "StartChildWorkflowExecutionFailedCause",
     "TaskQueueKind",
     "TaskQueueType",
+    "TaskReachability",
     "TimeoutType",
     "UpdateWorkflowExecutionLifecycleStage",
     "WorkflowExecutionStatus",

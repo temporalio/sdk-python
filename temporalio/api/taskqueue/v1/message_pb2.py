@@ -28,7 +28,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\'temporal/api/taskqueue/v1/message.proto\x12\x19temporal.api.taskqueue.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a!dependencies/gogoproto/gogo.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a$temporal/api/common/v1/message.proto"M\n\tTaskQueue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04kind\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueKind"O\n\x11TaskQueueMetadata\x12:\n\x14max_tasks_per_second\x18\x01 \x01(\x0b\x32\x1c.google.protobuf.DoubleValue"\xac\x01\n\x0fTaskQueueStatus\x12\x1a\n\x12\x62\x61\x63klog_count_hint\x18\x01 \x01(\x03\x12\x12\n\nread_level\x18\x02 \x01(\x03\x12\x11\n\tack_level\x18\x03 \x01(\x03\x12\x17\n\x0frate_per_second\x18\x04 \x01(\x01\x12=\n\rtask_id_block\x18\x05 \x01(\x0b\x32&.temporal.api.taskqueue.v1.TaskIdBlock"/\n\x0bTaskIdBlock\x12\x10\n\x08start_id\x18\x01 \x01(\x03\x12\x0e\n\x06\x65nd_id\x18\x02 \x01(\x03"B\n\x1aTaskQueuePartitionMetadata\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x17\n\x0fowner_host_name\x18\x02 \x01(\t"\xcb\x01\n\nPollerInfo\x12:\n\x10last_access_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x17\n\x0frate_per_second\x18\x03 \x01(\x01\x12V\n\x1bworker_version_capabilities\x18\x04 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilities"\xa0\x01\n\x19StickyExecutionAttributes\x12?\n\x11worker_task_queue\x18\x01 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x42\n\x19schedule_to_start_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01"A\n\x14\x43ompatibleVersionSet\x12\x16\n\x0eversion_set_id\x18\x01 \x01(\t\x12\x11\n\tbuild_ids\x18\x02 \x03(\tB\x98\x01\n\x1cio.temporal.api.taskqueue.v1B\x0cMessageProtoP\x01Z)go.temporal.io/api/taskqueue/v1;taskqueue\xaa\x02\x1bTemporalio.Api.TaskQueue.V1\xea\x02\x1eTemporalio::Api::TaskQueue::V1b\x06proto3'
+    b'\n\'temporal/api/taskqueue/v1/message.proto\x12\x19temporal.api.taskqueue.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a!dependencies/gogoproto/gogo.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a$temporal/api/common/v1/message.proto"b\n\tTaskQueue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04kind\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueKind\x12\x13\n\x0bnormal_name\x18\x03 \x01(\t"O\n\x11TaskQueueMetadata\x12:\n\x14max_tasks_per_second\x18\x01 \x01(\x0b\x32\x1c.google.protobuf.DoubleValue"\xac\x01\n\x0fTaskQueueStatus\x12\x1a\n\x12\x62\x61\x63klog_count_hint\x18\x01 \x01(\x03\x12\x12\n\nread_level\x18\x02 \x01(\x03\x12\x11\n\tack_level\x18\x03 \x01(\x03\x12\x17\n\x0frate_per_second\x18\x04 \x01(\x01\x12=\n\rtask_id_block\x18\x05 \x01(\x0b\x32&.temporal.api.taskqueue.v1.TaskIdBlock"/\n\x0bTaskIdBlock\x12\x10\n\x08start_id\x18\x01 \x01(\x03\x12\x0e\n\x06\x65nd_id\x18\x02 \x01(\x03"B\n\x1aTaskQueuePartitionMetadata\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x17\n\x0fowner_host_name\x18\x02 \x01(\t"\xcb\x01\n\nPollerInfo\x12:\n\x10last_access_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x17\n\x0frate_per_second\x18\x03 \x01(\x01\x12V\n\x1bworker_version_capabilities\x18\x04 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilities"\xa0\x01\n\x19StickyExecutionAttributes\x12?\n\x11worker_task_queue\x18\x01 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x42\n\x19schedule_to_start_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01")\n\x14\x43ompatibleVersionSet\x12\x11\n\tbuild_ids\x18\x01 \x03(\t"j\n\x15TaskQueueReachability\x12\x12\n\ntask_queue\x18\x01 \x01(\t\x12=\n\x0creachability\x18\x02 \x03(\x0e\x32\'.temporal.api.enums.v1.TaskReachability"z\n\x13\x42uildIdReachability\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12Q\n\x17task_queue_reachability\x18\x02 \x03(\x0b\x32\x30.temporal.api.taskqueue.v1.TaskQueueReachabilityB\x98\x01\n\x1cio.temporal.api.taskqueue.v1B\x0cMessageProtoP\x01Z)go.temporal.io/api/taskqueue/v1;taskqueue\xaa\x02\x1bTemporalio.Api.TaskQueue.V1\xea\x02\x1eTemporalio::Api::TaskQueue::V1b\x06proto3'
 )
 
 
@@ -44,6 +44,8 @@ _STICKYEXECUTIONATTRIBUTES = DESCRIPTOR.message_types_by_name[
     "StickyExecutionAttributes"
 ]
 _COMPATIBLEVERSIONSET = DESCRIPTOR.message_types_by_name["CompatibleVersionSet"]
+_TASKQUEUEREACHABILITY = DESCRIPTOR.message_types_by_name["TaskQueueReachability"]
+_BUILDIDREACHABILITY = DESCRIPTOR.message_types_by_name["BuildIdReachability"]
 TaskQueue = _reflection.GeneratedProtocolMessageType(
     "TaskQueue",
     (_message.Message,),
@@ -132,6 +134,28 @@ CompatibleVersionSet = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(CompatibleVersionSet)
 
+TaskQueueReachability = _reflection.GeneratedProtocolMessageType(
+    "TaskQueueReachability",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _TASKQUEUEREACHABILITY,
+        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskQueueReachability)
+    },
+)
+_sym_db.RegisterMessage(TaskQueueReachability)
+
+BuildIdReachability = _reflection.GeneratedProtocolMessageType(
+    "BuildIdReachability",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _BUILDIDREACHABILITY,
+        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.BuildIdReachability)
+    },
+)
+_sym_db.RegisterMessage(BuildIdReachability)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\034io.temporal.api.taskqueue.v1B\014MessageProtoP\001Z)go.temporal.io/api/taskqueue/v1;taskqueue\252\002\033Temporalio.Api.TaskQueue.V1\352\002\036Temporalio::Api::TaskQueue::V1"
@@ -146,19 +170,23 @@ if _descriptor._USE_C_DESCRIPTORS == False:
         "schedule_to_start_timeout"
     ]._serialized_options = b"\230\337\037\001"
     _TASKQUEUE._serialized_start = 280
-    _TASKQUEUE._serialized_end = 357
-    _TASKQUEUEMETADATA._serialized_start = 359
-    _TASKQUEUEMETADATA._serialized_end = 438
-    _TASKQUEUESTATUS._serialized_start = 441
-    _TASKQUEUESTATUS._serialized_end = 613
-    _TASKIDBLOCK._serialized_start = 615
-    _TASKIDBLOCK._serialized_end = 662
-    _TASKQUEUEPARTITIONMETADATA._serialized_start = 664
-    _TASKQUEUEPARTITIONMETADATA._serialized_end = 730
-    _POLLERINFO._serialized_start = 733
-    _POLLERINFO._serialized_end = 936
-    _STICKYEXECUTIONATTRIBUTES._serialized_start = 939
-    _STICKYEXECUTIONATTRIBUTES._serialized_end = 1099
-    _COMPATIBLEVERSIONSET._serialized_start = 1101
-    _COMPATIBLEVERSIONSET._serialized_end = 1166
+    _TASKQUEUE._serialized_end = 378
+    _TASKQUEUEMETADATA._serialized_start = 380
+    _TASKQUEUEMETADATA._serialized_end = 459
+    _TASKQUEUESTATUS._serialized_start = 462
+    _TASKQUEUESTATUS._serialized_end = 634
+    _TASKIDBLOCK._serialized_start = 636
+    _TASKIDBLOCK._serialized_end = 683
+    _TASKQUEUEPARTITIONMETADATA._serialized_start = 685
+    _TASKQUEUEPARTITIONMETADATA._serialized_end = 751
+    _POLLERINFO._serialized_start = 754
+    _POLLERINFO._serialized_end = 957
+    _STICKYEXECUTIONATTRIBUTES._serialized_start = 960
+    _STICKYEXECUTIONATTRIBUTES._serialized_end = 1120
+    _COMPATIBLEVERSIONSET._serialized_start = 1122
+    _COMPATIBLEVERSIONSET._serialized_end = 1163
+    _TASKQUEUEREACHABILITY._serialized_start = 1165
+    _TASKQUEUEREACHABILITY._serialized_end = 1271
+    _BUILDIDREACHABILITY._serialized_start = 1273
+    _BUILDIDREACHABILITY._serialized_end = 1395
 # @@protoc_insertion_point(module_scope)

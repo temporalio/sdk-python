@@ -1123,6 +1123,38 @@ async def test_sync_activity_contextvars(client: Client, worker: ExternalWorker)
     assert result.result == "context var: some value!"
 
 
+@activity.defn
+async def local_without_schedule_to_close_activity() -> str:
+    return "some-activity"
+
+
+@workflow.defn(sandboxed=False)
+class LocalActivityWithoutScheduleToCloseWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_local_activity(
+            local_without_schedule_to_close_activity,
+            start_to_close_timeout=timedelta(minutes=2),
+        )
+
+
+async def test_activity_local_without_schedule_to_close(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[local_without_schedule_to_close_activity],
+        workflows=[LocalActivityWithoutScheduleToCloseWorkflow],
+    ):
+        await client.execute_workflow(
+            LocalActivityWithoutScheduleToCloseWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+            # This emulates what Go SDK would do
+            execution_timeout=timedelta(seconds=0),
+        )
+
+
 @dataclass
 class _ActivityResult:
     act_task_queue: str

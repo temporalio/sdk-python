@@ -57,6 +57,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     HEARTBEAT_TIMEOUT_FIELD_NUMBER: builtins.int
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     REQUEST_EAGER_EXECUTION_FIELD_NUMBER: builtins.int
+    USE_COMPATIBLE_VERSION_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
@@ -110,6 +111,11 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     """Request to start the activity directly bypassing matching service and worker polling
     The slot for executing the activity should be reserved when setting this field to true.
     """
+    use_compatible_version: builtins.bool
+    """If this is set, the workflow executing this command wishes to start the activity using
+    a version compatible with the version that this workflow most recently ran on, if such
+    behavior is possible.
+    """
     def __init__(
         self,
         *,
@@ -124,6 +130,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         heartbeat_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         request_eager_execution: builtins.bool = ...,
+        use_compatible_version: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -173,6 +180,8 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
             b"start_to_close_timeout",
             "task_queue",
             b"task_queue",
+            "use_compatible_version",
+            b"use_compatible_version",
         ],
     ) -> None: ...
 
@@ -591,6 +600,7 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     HEADER_FIELD_NUMBER: builtins.int
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    USE_COMPATIBLE_VERSION_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     @property
@@ -626,6 +636,10 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     def search_attributes(
         self,
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    use_compatible_version: builtins.bool
+    """If this is set, the workflow executing this command wishes to continue as new using a version
+    compatible with the version that this workflow most recently ran on.
+    """
     def __init__(
         self,
         *,
@@ -645,6 +659,7 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
         memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
+        use_compatible_version: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -700,6 +715,8 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "use_compatible_version",
+            b"use_compatible_version",
             "workflow_run_timeout",
             b"workflow_run_timeout",
             "workflow_task_timeout",
@@ -732,6 +749,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     HEADER_FIELD_NUMBER: builtins.int
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    USE_COMPATIBLE_VERSION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -766,6 +784,11 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     def search_attributes(
         self,
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    use_compatible_version: builtins.bool
+    """If this is set, the workflow executing this command wishes to start the child workflow using
+    a version compatible with the version that this workflow most recently ran on, if such
+    behavior is possible.
+    """
     def __init__(
         self,
         *,
@@ -786,6 +809,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
         memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
+        use_compatible_version: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -835,6 +859,8 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "use_compatible_version",
+            b"use_compatible_version",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",
