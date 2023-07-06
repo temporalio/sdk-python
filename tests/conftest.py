@@ -76,7 +76,7 @@ def env_type(request: pytest.FixtureRequest) -> str:
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
         env = await WorkflowEnvironment.start_local(
-            temporalite_extra_args=[
+            dev_server_extra_args=[
                 "--dynamic-config-value",
                 "system.forceSearchAttributesCacheRefreshOnRead=true",
             ]

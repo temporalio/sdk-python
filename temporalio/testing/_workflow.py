@@ -91,12 +91,12 @@ class WorkflowEnvironment:
         download_dest_dir: Optional[str] = None,
         ui: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
-        temporalite_existing_path: Optional[str] = None,
-        temporalite_database_filename: Optional[str] = None,
-        temporalite_log_format: str = "pretty",
-        temporalite_log_level: Optional[str] = "warn",
-        temporalite_download_version: str = "default",
-        temporalite_extra_args: Sequence[str] = [],
+        dev_server_existing_path: Optional[str] = None,
+        dev_server_database_filename: Optional[str] = None,
+        dev_server_log_format: str = "pretty",
+        dev_server_log_level: Optional[str] = "warn",
+        dev_server_download_version: str = "default",
+        dev_server_extra_args: Sequence[str] = [],
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
@@ -106,16 +106,15 @@ class WorkflowEnvironment:
         environment. :py:meth:`sleep` will sleep the actual amount of time and
         :py:meth:`get_current_time` will return the current time.
 
-        Internally, this uses
-        `Temporalite <https://github.com/temporalio/temporalite>`_. Which is a
-        self-contained binary for Temporal using Sqlite persistence. This will
-        download Temporalite to a temporary directory by default if it has not
-        already been downloaded before and ``temporalite_existing_path`` is not
-        set.
+        Internally, this uses the Temporal CLI dev server from
+        https://github.com/temporalio/cli. This is a self-contained binary for
+        Temporal using Sqlite persistence. This call will download the CLI to a
+        temporary directory by default if it has not already been downloaded
+        before and ``dev_server_existing_path`` is not set.
 
-        In the future, the Temporalite implementation may be changed to another
-        implementation. Therefore, all ``temporalite_`` prefixed parameters are
-        Temporalite specific and may not apply to newer versions.
+        In the future, the dev server implementation may be changed to another
+        implementation. Therefore, all ``dev_server_`` prefixed parameters are
+        dev-server specific and may not apply to newer versions.
 
         Args:
             namespace: Namespace name to use for this environment.
@@ -137,55 +136,55 @@ class WorkflowEnvironment:
             port: Port number to bind to, or an OS-provided port by default.
             download_dest_dir: Directory to download binary to if a download is
                 needed. If unset, this is the system's temporary directory.
-            ui: If ``True``, will start a UI in Temporalite.
+            ui: If ``True``, will start a UI in the dev server.
             runtime: Specific runtime to use or default if unset.
-            temporalite_existing_path: Existing path to the Temporalite binary.
+            dev_server_existing_path: Existing path to the CLI binary.
                 If present, no download will be attempted to fetch the binary.
-            temporalite_database_filename: Path to the Sqlite database to use
-                for Temporalite. Unset default means only in-memory Sqlite will
-                be used.
-            temporalite_log_format: Log format for Temporalite.
-            temporalite_log_level: Log level to use for Temporalite. Default is
-                ``warn``, but if set to ``None`` this will translate the Python
-                logger's level to a Temporalite level.
-            temporalite_download_version: Specific Temporalite version to
-                download. Defaults to ``default`` which downloads the version
-                known to work best with this SDK.
-            temporalite_extra_args: Extra arguments for the Temporalite binary.
+            dev_server_database_filename: Path to the Sqlite database to use
+                for the dev server. Unset default means only in-memory Sqlite
+                will be used.
+            dev_server_log_format: Log format for the dev server.
+            dev_server_log_level: Log level to use for the dev server. Default
+                is ``warn``, but if set to ``None`` this will translate the
+                Python logger's level to a dev server log level.
+            dev_server_download_version: Specific CLI version to download.
+                Defaults to ``default`` which downloads the version known to
+                work best with this SDK.
+            dev_server_extra_args: Extra arguments for the CLI binary.
 
         Returns:
-            The started Temporalite workflow environment.
+            The started CLI dev server workflow environment.
         """
         # Use the logger's configured level if none given
-        if not temporalite_log_level:
+        if not dev_server_log_level:
             if logger.isEnabledFor(logging.DEBUG):
-                temporalite_log_level = "debug"
+                dev_server_log_level = "debug"
             elif logger.isEnabledFor(logging.INFO):
-                temporalite_log_level = "info"
+                dev_server_log_level = "info"
             elif logger.isEnabledFor(logging.WARNING):
-                temporalite_log_level = "warn"
+                dev_server_log_level = "warn"
             elif logger.isEnabledFor(logging.ERROR):
-                temporalite_log_level = "error"
+                dev_server_log_level = "error"
             else:
-                temporalite_log_level = "fatal"
-        # Start Temporalite
+                dev_server_log_level = "fatal"
+        # Start CLI dev server
         runtime = runtime or temporalio.runtime.Runtime.default()
-        server = await temporalio.bridge.testing.EphemeralServer.start_temporalite(
+        server = await temporalio.bridge.testing.EphemeralServer.start_dev_server(
             runtime._core_runtime,
-            temporalio.bridge.testing.TemporaliteConfig(
-                existing_path=temporalite_existing_path,
+            temporalio.bridge.testing.DevServerConfig(
+                existing_path=dev_server_existing_path,
                 sdk_name="sdk-python",
                 sdk_version=temporalio.service.__version__,
-                download_version=temporalite_download_version,
+                download_version=dev_server_download_version,
                 download_dest_dir=download_dest_dir,
                 namespace=namespace,
                 ip=ip,
                 port=port,
-                database_filename=temporalite_database_filename,
+                database_filename=dev_server_database_filename,
                 ui=ui,
-                log_format=temporalite_log_format,
-                log_level=temporalite_log_level,
-                extra_args=temporalite_extra_args,
+                log_format=dev_server_log_format,
+                log_level=dev_server_log_level,
+                extra_args=dev_server_extra_args,
             ),
         )
         # If we can't connect to the server, we should shut it down

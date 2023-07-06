@@ -13,8 +13,8 @@ import temporalio.bridge.temporal_sdk_bridge
 
 
 @dataclass
-class TemporaliteConfig:
-    """Python representation of the Rust struct for configuring Temporalite."""
+class DevServerConfig:
+    """Python representation of the Rust struct for configuring dev server."""
 
     existing_path: Optional[str]
     sdk_name: str
@@ -48,12 +48,12 @@ class EphemeralServer:
     """Python representation of a Rust ephemeral server."""
 
     @staticmethod
-    async def start_temporalite(
-        runtime: temporalio.bridge.runtime.Runtime, config: TemporaliteConfig
+    async def start_dev_server(
+        runtime: temporalio.bridge.runtime.Runtime, config: DevServerConfig
     ) -> EphemeralServer:
-        """Start a Temporalite instance."""
+        """Start a dev server instance."""
         return EphemeralServer(
-            await temporalio.bridge.temporal_sdk_bridge.start_temporalite(
+            await temporalio.bridge.temporal_sdk_bridge.start_dev_server(
                 runtime._ref, config
             )
         )
