@@ -20,7 +20,7 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Testing stuff
     m.add_class::<testing::EphemeralServerRef>()?;
-    m.add_function(wrap_pyfunction!(start_temporalite, m)?)?;
+    m.add_function(wrap_pyfunction!(start_dev_server, m)?)?;
     m.add_function(wrap_pyfunction!(start_test_server, m)?)?;
 
     // Worker stuff
@@ -55,12 +55,12 @@ fn raise_in_thread<'a>(py: Python<'a>, thread_id: std::os::raw::c_long, exc: &Py
 }
 
 #[pyfunction]
-fn start_temporalite<'a>(
+fn start_dev_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
-    config: testing::TemporaliteConfig,
+    config: testing::DevServerConfig,
 ) -> PyResult<&'a PyAny> {
-    testing::start_temporalite(py, &runtime_ref, config)
+    testing::start_dev_server(py, &runtime_ref, config)
 }
 
 #[pyfunction]

@@ -11,7 +11,7 @@ pub struct EphemeralServerRef {
 }
 
 #[derive(FromPyObject)]
-pub struct TemporaliteConfig {
+pub struct DevServerConfig {
     existing_path: Option<String>,
     sdk_name: String,
     sdk_version: String,
@@ -38,17 +38,17 @@ pub struct TestServerConfig {
     extra_args: Vec<String>,
 }
 
-pub fn start_temporalite<'a>(
+pub fn start_dev_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
-    config: TemporaliteConfig,
+    config: DevServerConfig,
 ) -> PyResult<&'a PyAny> {
-    let opts: ephemeral_server::TemporaliteConfig = config.try_into()?;
+    let opts: ephemeral_server::TemporalDevServerConfig = config.try_into()?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(EphemeralServerRef {
             server: Some(opts.start_server().await.map_err(|err| {
-                PyRuntimeError::new_err(format!("Failed starting Temporalite: {}", err))
+                PyRuntimeError::new_err(format!("Failed starting Temporal dev server: {}", err))
             })?),
             runtime,
         })
@@ -105,11 +105,11 @@ impl EphemeralServerRef {
     }
 }
 
-impl TryFrom<TemporaliteConfig> for ephemeral_server::TemporaliteConfig {
+impl TryFrom<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
     type Error = PyErr;
 
-    fn try_from(conf: TemporaliteConfig) -> PyResult<Self> {
-        ephemeral_server::TemporaliteConfigBuilder::default()
+    fn try_from(conf: DevServerConfig) -> PyResult<Self> {
+        ephemeral_server::TemporalDevServerConfigBuilder::default()
             .exe(if let Some(existing_path) = conf.existing_path {
                 ephemeral_server::EphemeralExe::ExistingPath(existing_path.to_owned())
             } else {

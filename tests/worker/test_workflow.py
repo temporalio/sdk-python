@@ -20,7 +20,6 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    Type,
     cast,
 )
 
@@ -32,11 +31,11 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType, IndexedValueType
 from temporalio.api.failure.v1 import Failure
-from temporalio.api.operatorservice.v1 import AddSearchAttributesRequest
-from temporalio.api.workflowservice.v1 import (
-    GetSearchAttributesRequest,
-    GetWorkflowExecutionHistoryRequest,
+from temporalio.api.operatorservice.v1 import (
+    AddSearchAttributesRequest,
+    ListSearchAttributesRequest,
 )
+from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import (
@@ -1356,9 +1355,11 @@ class SearchAttributeWorkflow:
         empty_float_list: List[float] = []
         workflow.upsert_search_attributes(
             {
-                f"{sa_prefix}text": ["text3"],
-                # We intentionally leave keyword off to confirm it still comes back
-                f"{sa_prefix}int": [123, 456],
+                f"{sa_prefix}text": ["text2"],
+                # We intentionally leave keyword off to confirm it still comes
+                # back but replace keyword list
+                f"{sa_prefix}keyword_list": ["keywordlist3", "keywordlist4"],
+                f"{sa_prefix}int": [456],
                 # Empty list to confirm removed
                 f"{sa_prefix}double": empty_float_list,
                 f"{sa_prefix}bool": [False],
@@ -1374,18 +1375,20 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
         pytest.skip("Only testing search attributes on local which disables cache")
 
     async def search_attributes_present() -> bool:
-        resp = await client.workflow_service.get_search_attributes(
-            GetSearchAttributesRequest()
+        resp = await client.operator_service.list_search_attributes(
+            ListSearchAttributesRequest(namespace=client.namespace)
         )
-        return any(k for k in resp.keys.keys() if k.startswith(sa_prefix))
+        return any(k for k in resp.custom_attributes.keys() if k.startswith(sa_prefix))
 
     # Add search attributes if not already present
     if not await search_attributes_present():
         await client.operator_service.add_search_attributes(
             AddSearchAttributesRequest(
+                namespace=client.namespace,
                 search_attributes={
                     f"{sa_prefix}text": IndexedValueType.INDEXED_VALUE_TYPE_TEXT,
                     f"{sa_prefix}keyword": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
+                    f"{sa_prefix}keyword_list": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD_LIST,
                     f"{sa_prefix}int": IndexedValueType.INDEXED_VALUE_TYPE_INT,
                     f"{sa_prefix}double": IndexedValueType.INDEXED_VALUE_TYPE_DOUBLE,
                     f"{sa_prefix}bool": IndexedValueType.INDEXED_VALUE_TYPE_BOOL,
@@ -1402,29 +1405,31 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             search_attributes={
-                f"{sa_prefix}text": ["text1", "text2", "text0"],
+                f"{sa_prefix}text": ["text1"],
                 f"{sa_prefix}keyword": ["keyword1"],
+                f"{sa_prefix}keyword_list": ["keywordlist1", "keywordlist2"],
                 f"{sa_prefix}int": [123],
                 f"{sa_prefix}double": [456.78],
                 f"{sa_prefix}bool": [True],
                 f"{sa_prefix}datetime": [
-                    # With UTC
-                    datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc),
-                    # With other offset
-                    datetime(2002, 3, 4, 5, 6, 7, tzinfo=timezone(timedelta(hours=8))),
+                    datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc)
                 ],
             },
         )
         # Make sure it started with the right attributes
         expected = {
-            f"{sa_prefix}text": {"type": "str", "values": ["text1", "text2", "text0"]},
+            f"{sa_prefix}text": {"type": "str", "values": ["text1"]},
             f"{sa_prefix}keyword": {"type": "str", "values": ["keyword1"]},
+            f"{sa_prefix}keyword_list": {
+                "type": "str",
+                "values": ["keywordlist1", "keywordlist2"],
+            },
             f"{sa_prefix}int": {"type": "int", "values": [123]},
             f"{sa_prefix}double": {"type": "float", "values": [456.78]},
             f"{sa_prefix}bool": {"type": "bool", "values": [True]},
             f"{sa_prefix}datetime": {
                 "type": "datetime",
-                "values": ["2001-02-03 04:05:06+00:00", "2002-03-04 05:06:07+08:00"],
+                "values": ["2001-02-03 04:05:06+00:00"],
             },
         }
         assert expected == await handle.query(
@@ -1434,9 +1439,13 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
         # Do an attribute update and check query
         await handle.signal(SearchAttributeWorkflow.do_search_attribute_update)
         expected = {
-            f"{sa_prefix}text": {"type": "str", "values": ["text3"]},
+            f"{sa_prefix}text": {"type": "str", "values": ["text2"]},
             f"{sa_prefix}keyword": {"type": "str", "values": ["keyword1"]},
-            f"{sa_prefix}int": {"type": "int", "values": [123, 456]},
+            f"{sa_prefix}keyword_list": {
+                "type": "str",
+                "values": ["keywordlist3", "keywordlist4"],
+            },
+            f"{sa_prefix}int": {"type": "int", "values": [456]},
             f"{sa_prefix}double": {"type": "<unknown>", "values": []},
             f"{sa_prefix}bool": {"type": "bool", "values": [False]},
             f"{sa_prefix}datetime": {

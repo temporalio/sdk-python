@@ -2411,6 +2411,14 @@ class ScheduleRange:
     Unset or 0 defaults as 1.
     """
 
+    def __post_init__(self):
+        """Set field defaults."""
+        # Class is frozen, so we must setattr bypassing dataclass setattr
+        if self.end < self.start:
+            object.__setattr__(self, "end", self.start)
+        if self.step == 0:
+            object.__setattr__(self, "step", 1)
+
     @staticmethod
     def _from_protos(
         ranges: Sequence[temporalio.api.schedule.v1.Range],
