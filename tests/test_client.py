@@ -58,6 +58,12 @@ from temporalio.client import (
     WorkflowQueryFailedError,
     WorkflowQueryRejectedError,
     _history_from_json,
+    BuildIdOpAddNewDefault,
+    BuildIdOpAddNewCompatible,
+    BuildIdOpPromoteBuildIdWithinSet,
+    BuildIdOpPromoteSetByBuildId,
+    BuildIdOpMergeSets,
+    ReachabilityType,
 )
 from temporalio.common import RetryPolicy
 from temporalio.converter import DataConverter
@@ -984,3 +990,49 @@ async def assert_no_schedules(client: Client) -> None:
         return len([d async for d in await client.list_schedules()])
 
     await assert_eq_eventually(0, schedule_count)
+
+
+async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support worker versioning")
+
+    tq = "test-build-id-interactions_" + str(uuid.uuid4())
+
+    await client.update_worker_build_id_compatability(tq, BuildIdOpAddNewDefault("1.0"))
+    await client.update_worker_build_id_compatability(
+        tq, BuildIdOpAddNewCompatible("1.1", "1.0")
+    )
+    sets = await client.get_worker_build_id_compatability(tq)
+    assert sets.default_build_id() == "1.1"
+    assert sets.default_set().build_ids[0] == "1.0"
+
+    await client.update_worker_build_id_compatability(
+        tq, BuildIdOpPromoteBuildIdWithinSet("1.0")
+    )
+    sets = await client.get_worker_build_id_compatability(tq)
+    assert sets.default_build_id() == "1.0"
+
+    await client.update_worker_build_id_compatability(tq, BuildIdOpAddNewDefault("2.0"))
+    sets = await client.get_worker_build_id_compatability(tq)
+    assert sets.default_build_id() == "2.0"
+
+    await client.update_worker_build_id_compatability(
+        tq, BuildIdOpPromoteSetByBuildId("1.0")
+    )
+    sets = await client.get_worker_build_id_compatability(tq)
+    assert sets.default_build_id() == "1.0"
+
+    await client.update_worker_build_id_compatability(
+        tq, BuildIdOpMergeSets(primary_build_id="2.0", secondary_build_id="1.0")
+    )
+    sets = await client.get_worker_build_id_compatability(tq)
+    assert sets.default_build_id() == "2.0"
+
+    reachability = await client.get_worker_task_reachability(
+        build_ids=["2.0", "1.0", "1.1"]
+    )
+    assert reachability.build_id_reachability["2.0"].task_queue_reachability[tq] == [
+        ReachabilityType.NEW_WORKFLOWS
+    ]
+    assert reachability.build_id_reachability["1.0"].task_queue_reachability[tq] == []
+    assert reachability.build_id_reachability["1.1"].task_queue_reachability[tq] == []
