@@ -16,6 +16,7 @@ def new_worker(
     task_queue: Optional[str] = None,
     workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
     max_cached_workflows: int = 1000,
+    **kwargs,
 ) -> Worker:
     return Worker(
         client,
@@ -24,6 +25,7 @@ def new_worker(
         activities=activities,
         workflow_runner=workflow_runner,
         max_cached_workflows=max_cached_workflows,
+        **kwargs,
     )
 
 

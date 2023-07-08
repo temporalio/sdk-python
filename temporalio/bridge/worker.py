@@ -47,6 +47,7 @@ class WorkerConfig:
     max_activities_per_second: Optional[float]
     max_task_queue_activities_per_second: Optional[float]
     graceful_shutdown_period_millis: int
+    use_worker_versioning: bool
 
 
 class Worker:

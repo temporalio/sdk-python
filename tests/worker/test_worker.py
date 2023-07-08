@@ -8,8 +8,10 @@ import pytest
 
 import temporalio.worker._worker
 from temporalio import activity, workflow
-from temporalio.client import Client
+from temporalio.client import Client, BuildIdOpAddNewDefault
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+from tests.helpers import new_worker
 
 
 def test_load_default_worker_binary_id():
@@ -124,6 +126,65 @@ async def test_worker_cancel_run(client: Client):
     with pytest.raises(asyncio.CancelledError):
         await run_task
     assert not worker.is_running and worker.is_shutdown
+
+
+@workflow.defn
+class WaitOnSignalWorkflow:
+    def __init__(self) -> None:
+        self._last_signal = "<none>"
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._last_signal == "finish")
+
+    @workflow.signal
+    def my_signal(self, value: str) -> None:
+        self._last_signal = value
+        workflow.logger.info(f"Signal: {value}")
+
+
+async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support worker versioning")
+
+    task_queue = f"worker-versioning-{uuid.uuid4()}"
+    await client.update_worker_build_id_compatability(
+        task_queue, BuildIdOpAddNewDefault("1.0")
+    )
+
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        task_queue=task_queue,
+        build_id="1.0",
+        use_worker_versioning=True,
+    ):
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"worker-versioning-1-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        # Sleep for a beat, otherwise it's possible for new workflow to start on 2.0
+        await asyncio.sleep(0.1)
+        await client.update_worker_build_id_compatability(
+            task_queue, BuildIdOpAddNewDefault("2.0")
+        )
+        wf2 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"worker-versioning-2-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        async with new_worker(
+            client,
+            WaitOnSignalWorkflow,
+            task_queue=task_queue,
+            build_id="2.0",
+            use_worker_versioning=True,
+        ):
+            await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+            await wf2.signal(WaitOnSignalWorkflow.my_signal, "finish")
+            await wf1.result()
+            await wf2.result()
 
 
 def create_worker(

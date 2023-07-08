@@ -844,6 +844,9 @@ class Client:
 
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
+        .. warning::
+           This API is experimental
+
         Args:
             task_queue: The task queue to target.
             operation: The operation to perform.
@@ -870,6 +873,9 @@ class Client:
         """Get the Build ID compatability sets for a specific task queue.
 
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
+
+        .. warning::
+           This API is experimental
 
         Args:
             task_queue: The task queue to target.
@@ -899,6 +905,9 @@ class Client:
         """Determine if some Build IDs for certain Task Queues could have tasks dispatched to them.
 
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
+
+        .. warning::
+           This API is experimental
 
         Args:
             build_ids: The Build IDs to query the reachability of. At least one must be specified.
@@ -4141,7 +4150,6 @@ class OutboundInterceptor:
     ) -> WorkerBuildIdVersionSets:
         """Called for every :py:meth:`Client.get_worker_build_id_compatability` call."""
         return await self.next.get_worker_build_id_compatability(input)
-        P
 
     async def get_worker_task_reachability(
         self, input: GetWorkerTaskReachabilityInput
@@ -5157,4 +5165,4 @@ class ReachabilityType(IntEnum):
         ):
             return ReachabilityType.CLOSED_WORKFLOWS
         else:
-            raise ValueError("Cannot convert reachability type: " + str(reachability))
+            raise ValueError(f"Cannot convert reachability type: {reachability}")
