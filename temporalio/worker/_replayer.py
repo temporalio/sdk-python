@@ -176,6 +176,7 @@ class Replayer:
                 max_activities_per_second=None,
                 max_task_queue_activities_per_second=None,
                 graceful_shutdown_period_millis=0,
+                use_worker_versioning=False,
             ),
         )
 
