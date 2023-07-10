@@ -49,6 +49,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
 
+from ..workflow import VersioningIntent
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -669,6 +670,7 @@ class _WorkflowInstanceImpl(
         retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
+        versioning_intent: Optional[VersioningIntent],
     ) -> NoReturn:
         # Use definition if callable
         name: Optional[str] = None
@@ -694,6 +696,7 @@ class _WorkflowInstanceImpl(
                 search_attributes=search_attributes,
                 headers={},
                 arg_types=arg_types,
+                versioning_intent=versioning_intent,
             )
         )
         # TODO(cretz): Why can't MyPy infer the above never returns?
@@ -820,6 +823,7 @@ class _WorkflowInstanceImpl(
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
+        versioning_intent: Optional[VersioningIntent],
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
@@ -851,6 +855,7 @@ class _WorkflowInstanceImpl(
                 disable_eager_execution=self._disable_eager_activity_execution,
                 arg_types=arg_types,
                 ret_type=ret_type,
+                versioning_intent=versioning_intent,
             )
         )
 
@@ -871,6 +876,7 @@ class _WorkflowInstanceImpl(
         cron_schedule: str,
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
+        versioning_intent: Optional[VersioningIntent],
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
         name: str
@@ -905,6 +911,7 @@ class _WorkflowInstanceImpl(
                 headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
+                versioning_intent=versioning_intent,
             )
         )
 
@@ -1679,6 +1686,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             command.schedule_activity.do_not_eagerly_execute = (
                 self._input.disable_eager_execution
             )
+            if self._input.versioning_intent:
+                command.schedule_activity.versioning_intent = (
+                    self._input.versioning_intent._to_proto()
+                )
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:
                 command.schedule_local_activity.local_retry_threshold.FromTimedelta(
@@ -1810,6 +1821,8 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             "temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType",
             int(self._input.cancellation_type),
         )
+        if self._input.versioning_intent:
+            v.versioning_intent = self._input.versioning_intent._to_proto()
 
     # If request cancel external, result does _not_ have seq
     def _apply_cancel_command(
@@ -1907,6 +1920,8 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             _encode_search_attributes(
                 self._input.search_attributes, v.search_attributes
             )
+        if self._input.versioning_intent:
+            v.versioning_intent = self._input.versioning_intent._to_proto()
 
 
 def _encode_search_attributes(

@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import IntEnum
+from enum import Enum, IntEnum
 from functools import partial
 from random import Random
 from typing import (
@@ -377,6 +377,7 @@ class _Runtime(ABC):
         retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
+        versioning_intent: Optional[VersioningIntent],
     ) -> NoReturn:
         ...
 
@@ -454,6 +455,7 @@ class _Runtime(ABC):
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
+        versioning_intent: Optional[VersioningIntent],
     ) -> ActivityHandle[Any]:
         ...
 
@@ -475,6 +477,7 @@ class _Runtime(ABC):
         cron_schedule: str,
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
+        versioning_intent: Optional[VersioningIntent],
     ) -> ChildWorkflowHandle[Any, Any]:
         ...
 
@@ -1152,6 +1155,7 @@ class ActivityConfig(TypedDict, total=False):
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cancellation_type: ActivityCancellationType
     activity_id: Optional[str]
+    versioning_intent: Optional[VersioningIntent]
 
 
 # Overload for async no-param activity
@@ -1167,6 +1171,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1184,6 +1189,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1202,6 +1208,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1220,6 +1227,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1238,6 +1246,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1256,6 +1265,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1276,6 +1286,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[Any]:
     ...
 
@@ -1294,6 +1305,7 @@ def start_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity and return its handle.
 
@@ -1325,6 +1337,8 @@ def start_activity(
         activity_id: Optional unique identifier for the activity. This is an
             advanced setting that should not be set unless users are sure they
             need to. Contact Temporal before setting this value.
+        versioning_intent: When using the Worker Versioning feature, specifies whether this Activity
+            should run on a worker with a compatible Build Id or not.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -1341,6 +1355,7 @@ def start_activity(
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -1357,6 +1372,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1374,6 +1390,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1392,6 +1409,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1410,6 +1428,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1428,6 +1447,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1446,6 +1466,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1466,6 +1487,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     ...
 
@@ -1484,6 +1506,7 @@ async def execute_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     """Start an activity and wait for completion.
 
@@ -1503,6 +1526,7 @@ async def execute_activity(
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -1519,6 +1543,7 @@ def start_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1536,6 +1561,7 @@ def start_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1554,6 +1580,7 @@ def start_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1572,6 +1599,7 @@ def start_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1590,6 +1618,7 @@ def start_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1608,6 +1637,7 @@ def start_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1625,6 +1655,7 @@ def start_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
 
@@ -1642,6 +1673,7 @@ def start_activity_class(
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -1658,6 +1690,7 @@ async def execute_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1675,6 +1708,7 @@ async def execute_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1693,6 +1727,7 @@ async def execute_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1711,6 +1746,7 @@ async def execute_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1729,6 +1765,7 @@ async def execute_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1747,6 +1784,7 @@ async def execute_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1764,6 +1802,7 @@ async def execute_activity_class(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
 
@@ -1781,6 +1820,7 @@ async def execute_activity_class(
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -1797,6 +1837,7 @@ def start_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1814,6 +1855,7 @@ def start_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1832,6 +1874,7 @@ def start_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1850,6 +1893,7 @@ def start_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1868,6 +1912,7 @@ def start_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1886,6 +1931,7 @@ def start_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[ReturnType]:
     ...
 
@@ -1903,6 +1949,7 @@ def start_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
 
@@ -1920,6 +1967,7 @@ def start_activity_method(
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -1936,6 +1984,7 @@ async def execute_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1953,6 +2002,7 @@ async def execute_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1971,6 +2021,7 @@ async def execute_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -1989,6 +2040,7 @@ async def execute_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -2007,6 +2059,7 @@ async def execute_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -2025,6 +2078,7 @@ async def execute_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -2042,6 +2096,7 @@ async def execute_activity_method(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     """Start an activity from a method and wait for completion.
 
@@ -2061,6 +2116,7 @@ async def execute_activity_method(
         retry_policy=retry_policy,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -3097,6 +3153,7 @@ async def start_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]:
     ...
 
@@ -3119,6 +3176,7 @@ async def start_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]:
     ...
 
@@ -3141,6 +3199,7 @@ async def start_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]:
     ...
 
@@ -3165,6 +3224,7 @@ async def start_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     ...
 
@@ -3187,6 +3247,7 @@ async def start_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
 
@@ -3213,6 +3274,8 @@ async def start_child_workflow(
         cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
         memo: Memo for the workflow.
         search_attributes: Search attributes for the workflow.
+        versioning_intent:  When using the Worker Versioning feature, specifies whether this Child
+            Workflow should run on a worker with a compatible Build Id or not.
 
     Returns:
         A workflow handle to the started/existing workflow.
@@ -3233,6 +3296,7 @@ async def start_child_workflow(
         cron_schedule=cron_schedule,
         memo=memo,
         search_attributes=search_attributes,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -3253,6 +3317,7 @@ async def execute_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -3275,6 +3340,7 @@ async def execute_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -3297,6 +3363,7 @@ async def execute_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
 
@@ -3321,6 +3388,7 @@ async def execute_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     ...
 
@@ -3343,6 +3411,7 @@ async def execute_child_workflow(
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     """Start a child workflow and wait for completion.
 
@@ -3366,6 +3435,7 @@ async def execute_child_workflow(
         cron_schedule=cron_schedule,
         memo=memo,
         search_attributes=search_attributes,
+        versioning_intent=versioning_intent,
     )
     return await handle
 
@@ -3508,6 +3578,7 @@ def continue_as_new(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
 
@@ -3523,6 +3594,7 @@ def continue_as_new(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
 
@@ -3539,6 +3611,7 @@ def continue_as_new(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
 
@@ -3555,6 +3628,7 @@ def continue_as_new(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
 
@@ -3571,6 +3645,7 @@ def continue_as_new(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
 
@@ -3586,6 +3661,7 @@ def continue_as_new(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
     search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
 
@@ -3604,6 +3680,8 @@ def continue_as_new(
         memo: Memo for the workflow. Defaults to the current workflow's memo.
         search_attributes: Search attributes for the workflow. Defaults to the
             current workflow's search attributes.
+        versioning_intent: When using the Worker Versioning feature, specifies whether this Workflow
+            should Continue-as-New onto a worker with a compatible Build Id or not.
 
     Returns:
         Never returns, always raises a :py:class:`ContinueAsNewError`.
@@ -3621,6 +3699,7 @@ def continue_as_new(
         retry_policy=retry_policy,
         memo=memo,
         search_attributes=search_attributes,
+        versioning_intent=versioning_intent,
     )
 
 
@@ -3762,3 +3841,30 @@ class NondeterminismError(temporalio.exceptions.TemporalError):
         """Initialize a nondeterminism error."""
         super().__init__(message)
         self.message = message
+
+
+class VersioningIntent(Enum):
+    """Indicates whether the user intends certain commands to be run on a compatible worker Build
+    Id version or not.
+
+    `COMPATIBLE` indicates that the command should run on a worker with compatible version if
+    possible. It may not be possible if the target task queue does not also have knowledge of the
+    current worker's Build Id.
+
+    `DEFAULT` indicates that the command should run on the target task queue's current
+    overall-default Build Id.
+
+    Where this type is accepted optionally, an unset value indicates that the SDK should choose the
+    most sensible default behavior for the type of command, accounting for whether the command will
+    be run on the same task queue as the current worker.
+    """
+
+    COMPATIBLE = 1
+    DEFAULT = 2
+
+    def _to_proto(self) -> temporalio.bridge.proto.common.VersioningIntent.ValueType:
+        if self == VersioningIntent.COMPATIBLE:
+            return temporalio.bridge.proto.common.VersioningIntent.COMPATIBLE
+        elif self == VersioningIntent.DEFAULT:
+            return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
+        return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
