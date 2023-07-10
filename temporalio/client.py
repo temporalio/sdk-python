@@ -12,7 +12,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import (
     Any,
     AsyncIterator,
@@ -835,7 +835,7 @@ class Client:
     async def update_worker_build_id_compatability(
         self,
         task_queue: str,
-        operation: BuildIdOperation,
+        operation: BuildIdOp,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
@@ -3974,7 +3974,7 @@ class UpdateWorkerBuildIdCompatabilityInput:
     """Input for :py:meth:`OutboundInterceptor.update_worker_build_id_compatability`."""
 
     task_queue: str
-    operation: BuildIdOperation
+    operation: BuildIdOp
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -4964,7 +4964,7 @@ class BuildIdVersionSet:
         return self.build_ids[-1]
 
 
-class BuildIdOperation(ABC):
+class BuildIdOp(ABC):
     """Base class for Build ID operations as used by
     :py:meth:`Client.update_worker_build_id_compatability`.
     """
@@ -4981,7 +4981,7 @@ class BuildIdOperation(ABC):
 
 
 @dataclass(frozen=True)
-class BuildIdOpAddNewDefault(BuildIdOperation):
+class BuildIdOpAddNewDefault(BuildIdOp):
     """Adds a new Build Id into a new set, which will be used as the default set for
     the queue. This means all new workflows will start on this Build Id.
     """
@@ -4999,7 +4999,7 @@ class BuildIdOpAddNewDefault(BuildIdOperation):
 
 
 @dataclass(frozen=True)
-class BuildIdOpAddNewCompatible(BuildIdOperation):
+class BuildIdOpAddNewCompatible(BuildIdOp):
     """Adds a new Build Id into an existing compatible set. The newly added ID becomes
     the default for that compatible set, and thus new workflow tasks for workflows which have been
     executing on workers in that set will now start on this new Build Id.
@@ -5030,7 +5030,7 @@ class BuildIdOpAddNewCompatible(BuildIdOperation):
 
 
 @dataclass(frozen=True)
-class BuildIdOpPromoteSetByBuildId(BuildIdOperation):
+class BuildIdOpPromoteSetByBuildId(BuildIdOp):
     """Promotes a set of compatible Build Ids to become the current default set for the task queue.
     Any Build Id in the set may be used to target it.
     """
@@ -5050,7 +5050,7 @@ class BuildIdOpPromoteSetByBuildId(BuildIdOperation):
 
 
 @dataclass(frozen=True)
-class BuildIdOpPromoteBuildIdWithinSet(BuildIdOperation):
+class BuildIdOpPromoteBuildIdWithinSet(BuildIdOp):
     """Promotes a Build Id within an existing set to become the default ID for that set."""
 
     build_id: str
@@ -5066,7 +5066,7 @@ class BuildIdOpPromoteBuildIdWithinSet(BuildIdOperation):
 
 
 @dataclass(frozen=True)
-class BuildIdOpMergeSets(BuildIdOperation):
+class BuildIdOpMergeSets(BuildIdOp):
     """Merges two sets into one set, thus declaring all the Build Ids in both as compatible with one
     another. The default of the primary set is maintained as the merged set's overall default.
     """
@@ -5136,7 +5136,7 @@ class BuildIdReachability:
     """
 
 
-class TaskReachabilityType(IntEnum):
+class TaskReachabilityType(Enum):
     """Enumerates how a task might reach certain kinds of workflows"""
 
     NEW_WORKFLOWS = 1

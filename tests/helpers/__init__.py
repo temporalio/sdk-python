@@ -4,7 +4,8 @@ import uuid
 from datetime import timedelta
 from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
-from temporalio.client import Client
+from temporalio.client import BuildIdOpAddNewDefault, Client
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
@@ -49,3 +50,16 @@ async def assert_eq_eventually(
     assert (
         expected == last_value
     ), "timed out waiting for equal, asserted against last value"
+
+
+async def worker_versioning_enabled(client: Client) -> bool:
+    tq = f"worker-versioning-init-test-{uuid.uuid4()}"
+    try:
+        await client.update_worker_build_id_compatability(
+            tq, BuildIdOpAddNewDefault("testver")
+        )
+        return True
+    except RPCError as e:
+        if e.status in [RPCStatusCode.PERMISSION_DENIED, RPCStatusCode.UNIMPLEMENTED]:
+            return False
+        raise

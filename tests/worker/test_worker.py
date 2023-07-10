@@ -11,7 +11,7 @@ from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import new_worker
+from tests.helpers import new_worker, worker_versioning_enabled
 
 
 def test_load_default_worker_binary_id():
@@ -146,6 +146,8 @@ class WaitOnSignalWorkflow:
 async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Java test server does not support worker versioning")
+    if not await worker_versioning_enabled(client):
+        pytest.skip("This server does not have worker versioning enabled")
 
     task_queue = f"worker-versioning-{uuid.uuid4()}"
     await client.update_worker_build_id_compatability(

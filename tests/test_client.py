@@ -69,7 +69,7 @@ from temporalio.common import RetryPolicy
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.testing import WorkflowEnvironment
-from tests.helpers import assert_eq_eventually, new_worker
+from tests.helpers import assert_eq_eventually, new_worker, worker_versioning_enabled
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -995,6 +995,8 @@ async def assert_no_schedules(client: Client) -> None:
 async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Java test server does not support worker versioning")
+    if not await worker_versioning_enabled(client):
+        pytest.skip("This server does not have worker versioning enabled")
 
     tq = "test-build-id-interactions_" + str(uuid.uuid4())
 
