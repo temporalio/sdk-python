@@ -150,7 +150,7 @@ async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
         pytest.skip("This server does not have worker versioning enabled")
 
     task_queue = f"worker-versioning-{uuid.uuid4()}"
-    await client.update_worker_build_id_compatability(
+    await client.update_worker_build_id_compatibility(
         task_queue, BuildIdOpAddNewDefault("1.0")
     )
 
@@ -168,7 +168,7 @@ async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
         )
         # Sleep for a beat, otherwise it's possible for new workflow to start on 2.0
         await asyncio.sleep(0.1)
-        await client.update_worker_build_id_compatability(
+        await client.update_worker_build_id_compatibility(
             task_queue, BuildIdOpAddNewDefault("2.0")
         )
         wf2 = await client.start_workflow(

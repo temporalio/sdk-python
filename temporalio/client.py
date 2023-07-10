@@ -832,7 +832,7 @@ class Client:
             )
         )
 
-    async def update_worker_build_id_compatability(
+    async def update_worker_build_id_compatibility(
         self,
         task_queue: str,
         operation: BuildIdOp,
@@ -854,8 +854,8 @@ class Client:
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call.
         """
-        return await self._impl.update_worker_build_id_compatability(
-            UpdateWorkerBuildIdCompatabilityInput(
+        return await self._impl.update_worker_build_id_compatibility(
+            UpdateWorkerBuildIdCompatibilityInput(
                 task_queue,
                 operation,
                 rpc_metadata=rpc_metadata,
@@ -863,14 +863,14 @@ class Client:
             )
         )
 
-    async def get_worker_build_id_compatability(
+    async def get_worker_build_id_compatibility(
         self,
         task_queue: str,
         max_sets: Optional[int] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkerBuildIdVersionSets:
-        """Get the Build ID compatability sets for a specific task queue.
+        """Get the Build ID compatibility sets for a specific task queue.
 
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
@@ -885,8 +885,8 @@ class Client:
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call.
         """
-        return await self._impl.get_worker_build_id_compatability(
-            GetWorkerBuildIdCompatabilityInput(
+        return await self._impl.get_worker_build_id_compatibility(
+            GetWorkerBuildIdCompatibilityInput(
                 task_queue,
                 max_sets,
                 rpc_metadata=rpc_metadata,
@@ -3970,8 +3970,8 @@ class UpdateScheduleInput:
 
 
 @dataclass
-class UpdateWorkerBuildIdCompatabilityInput:
-    """Input for :py:meth:`OutboundInterceptor.update_worker_build_id_compatability`."""
+class UpdateWorkerBuildIdCompatibilityInput:
+    """Input for :py:meth:`OutboundInterceptor.update_worker_build_id_compatibility`."""
 
     task_queue: str
     operation: BuildIdOp
@@ -3980,8 +3980,8 @@ class UpdateWorkerBuildIdCompatabilityInput:
 
 
 @dataclass
-class GetWorkerBuildIdCompatabilityInput:
-    """Input for :py:meth:`OutboundInterceptor.get_worker_build_id_compatability`."""
+class GetWorkerBuildIdCompatibilityInput:
+    """Input for :py:meth:`OutboundInterceptor.get_worker_build_id_compatibility`."""
 
     task_queue: str
     max_sets: Optional[int]
@@ -4139,17 +4139,17 @@ class OutboundInterceptor:
         """Called for every :py:meth:`ScheduleHandle.update` call."""
         await self.next.update_schedule(input)
 
-    async def update_worker_build_id_compatability(
-        self, input: UpdateWorkerBuildIdCompatabilityInput
+    async def update_worker_build_id_compatibility(
+        self, input: UpdateWorkerBuildIdCompatibilityInput
     ) -> None:
-        """Called for every :py:meth:`Client.update_worker_build_id_compatability` call."""
-        await self.next.update_worker_build_id_compatability(input)
+        """Called for every :py:meth:`Client.update_worker_build_id_compatibility` call."""
+        await self.next.update_worker_build_id_compatibility(input)
 
-    async def get_worker_build_id_compatability(
-        self, input: GetWorkerBuildIdCompatabilityInput
+    async def get_worker_build_id_compatibility(
+        self, input: GetWorkerBuildIdCompatibilityInput
     ) -> WorkerBuildIdVersionSets:
-        """Called for every :py:meth:`Client.get_worker_build_id_compatability` call."""
-        return await self.next.get_worker_build_id_compatability(input)
+        """Called for every :py:meth:`Client.get_worker_build_id_compatibility` call."""
+        return await self.next.get_worker_build_id_compatibility(input)
 
     async def get_worker_task_reachability(
         self, input: GetWorkerTaskReachabilityInput
@@ -4764,8 +4764,8 @@ class _ClientImpl(OutboundInterceptor):
             timeout=input.rpc_timeout,
         )
 
-    async def update_worker_build_id_compatability(
-        self, input: UpdateWorkerBuildIdCompatabilityInput
+    async def update_worker_build_id_compatibility(
+        self, input: UpdateWorkerBuildIdCompatibilityInput
     ) -> None:
         req = input.operation._as_partial_proto()
         req.namespace = self._client.namespace
@@ -4774,8 +4774,8 @@ class _ClientImpl(OutboundInterceptor):
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
 
-    async def get_worker_build_id_compatability(
-        self, input: GetWorkerBuildIdCompatabilityInput
+    async def get_worker_build_id_compatibility(
+        self, input: GetWorkerBuildIdCompatibilityInput
     ) -> WorkerBuildIdVersionSets:
         req = temporalio.api.workflowservice.v1.GetWorkerBuildIdCompatibilityRequest(
             namespace=self._client.namespace,
@@ -4927,7 +4927,7 @@ def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
 @dataclass(frozen=True)
 class WorkerBuildIdVersionSets:
     """Represents the sets of compatible Build ID versions associated with some Task Queue, as
-    fetched by :py:meth:`Client.get_worker_build_id_compatability`.
+    fetched by :py:meth:`Client.get_worker_build_id_compatibility`.
     """
 
     version_sets: Sequence[BuildIdVersionSet]
@@ -4966,7 +4966,7 @@ class BuildIdVersionSet:
 
 class BuildIdOp(ABC):
     """Base class for Build ID operations as used by
-    :py:meth:`Client.update_worker_build_id_compatability`.
+    :py:meth:`Client.update_worker_build_id_compatibility`.
     """
 
     @abstractmethod

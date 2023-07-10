@@ -55,7 +55,7 @@ async def assert_eq_eventually(
 async def worker_versioning_enabled(client: Client) -> bool:
     tq = f"worker-versioning-init-test-{uuid.uuid4()}"
     try:
-        await client.update_worker_build_id_compatability(
+        await client.update_worker_build_id_compatibility(
             tq, BuildIdOpAddNewDefault("testver")
         )
         return True
