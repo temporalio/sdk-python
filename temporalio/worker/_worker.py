@@ -191,8 +191,6 @@ class Worker:
                 "build_id must be specified when use_worker_versioning is True"
             )
 
-        print(f"Using worker versioning: {use_worker_versioning}, build_id: {build_id}")
-
         # Prepend applicable client interceptors to the given ones
         client_config = client.config()
         interceptors_from_client = cast(

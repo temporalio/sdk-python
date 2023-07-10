@@ -19,6 +19,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    FrozenSet,
     Generic,
     Iterable,
     Mapping,
@@ -28,7 +29,6 @@ from typing import (
     Union,
     cast,
     overload,
-    FrozenSet,
 )
 
 import google.protobuf.duration_pb2
@@ -897,8 +897,8 @@ class Client:
     async def get_worker_task_reachability(
         self,
         build_ids: Sequence[str],
-        task_queues: Sequence[int] = [],
-        reachability_type: Optional[ReachabilityType] = None,
+        task_queues: Sequence[str] = [],
+        reachability_type: Optional[TaskReachabilityType] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkerTaskReachability:
@@ -3994,8 +3994,8 @@ class GetWorkerTaskReachabilityInput:
     """Input for :py:meth:`OutboundInterceptor.get_worker_build_id_reachability`."""
 
     build_ids: Sequence[str]
-    task_queues: Sequence[int]
-    reachability: Optional[ReachabilityType]
+    task_queues: Sequence[str]
+    reachability: Optional[TaskReachabilityType]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -4767,7 +4767,7 @@ class _ClientImpl(OutboundInterceptor):
     async def update_worker_build_id_compatability(
         self, input: UpdateWorkerBuildIdCompatabilityInput
     ) -> None:
-        req = input.operation.as_partial_proto()
+        req = input.operation._as_partial_proto()
         req.namespace = self._client.namespace
         req.task_queue = input.task_queue
         await self._client.workflow_service.update_worker_build_id_compatibility(
@@ -4793,7 +4793,7 @@ class _ClientImpl(OutboundInterceptor):
         req = temporalio.api.workflowservice.v1.GetWorkerTaskReachabilityRequest(
             namespace=self._client.namespace,
             build_ids=input.build_ids,
-            task_queues=input.task_queues or [],
+            task_queues=input.task_queues,
         )
         resp = await self._client.workflow_service.get_worker_task_reachability(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
@@ -4924,7 +4924,7 @@ def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
                     _fix_history_enum(prefix, child_item, *attrs[1:])
 
 
-@dataclass
+@dataclass(frozen=True)
 class WorkerBuildIdVersionSets:
     """Represents the sets of compatible Build ID versions associated with some Task Queue, as
     fetched by :py:meth:`Client.get_worker_build_id_compatability`.
@@ -4952,8 +4952,10 @@ class WorkerBuildIdVersionSets:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildIdVersionSet:
+    """A set of Build IDs which are compatible with each other."""
+
     build_ids: Sequence[str]
     """All Build IDs contained in the set."""
 
@@ -4968,7 +4970,7 @@ class BuildIdOperation(ABC):
     """
 
     @abstractmethod
-    def as_partial_proto(
+    def _as_partial_proto(
         self,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest:
         """Returns a partial request with the operation populated. Caller must populate
@@ -4978,7 +4980,7 @@ class BuildIdOperation(ABC):
         ...
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildIdOpAddNewDefault(BuildIdOperation):
     """Adds a new Build Id into a new set, which will be used as the default set for
     the queue. This means all new workflows will start on this Build Id.
@@ -4986,7 +4988,7 @@ class BuildIdOpAddNewDefault(BuildIdOperation):
 
     build_id: str
 
-    def as_partial_proto(
+    def _as_partial_proto(
         self,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest:
         return (
@@ -4996,7 +4998,7 @@ class BuildIdOpAddNewDefault(BuildIdOperation):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildIdOpAddNewCompatible(BuildIdOperation):
     """Adds a new Build Id into an existing compatible set. The newly added ID becomes
     the default for that compatible set, and thus new workflow tasks for workflows which have been
@@ -5015,7 +5017,7 @@ class BuildIdOpAddNewCompatible(BuildIdOperation):
     """If set to true, the targeted set will also be promoted to become the overall default set for
     the queue."""
 
-    def as_partial_proto(
+    def _as_partial_proto(
         self,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest:
         return temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest(
@@ -5027,7 +5029,7 @@ class BuildIdOpAddNewCompatible(BuildIdOperation):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildIdOpPromoteSetByBuildId(BuildIdOperation):
     """Promotes a set of compatible Build Ids to become the current default set for the task queue.
     Any Build Id in the set may be used to target it.
@@ -5037,7 +5039,7 @@ class BuildIdOpPromoteSetByBuildId(BuildIdOperation):
     """A Build Id which must already be defined on the task queue, and is used to find the 
     compatible set to promote."""
 
-    def as_partial_proto(
+    def _as_partial_proto(
         self,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest:
         return (
@@ -5047,13 +5049,13 @@ class BuildIdOpPromoteSetByBuildId(BuildIdOperation):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildIdOpPromoteBuildIdWithinSet(BuildIdOperation):
     """Promotes a Build Id within an existing set to become the default ID for that set."""
 
     build_id: str
 
-    def as_partial_proto(
+    def _as_partial_proto(
         self,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest:
         return (
@@ -5063,7 +5065,7 @@ class BuildIdOpPromoteBuildIdWithinSet(BuildIdOperation):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildIdOpMergeSets(BuildIdOperation):
     """Merges two sets into one set, thus declaring all the Build Ids in both as compatible with one
     another. The default of the primary set is maintained as the merged set's overall default.
@@ -5075,7 +5077,7 @@ class BuildIdOpMergeSets(BuildIdOperation):
     secondary_build_id: str
     """A Build Id which and is used to find the secondary set to be merged."""
 
-    def as_partial_proto(
+    def _as_partial_proto(
         self,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest:
         return temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest(
@@ -5086,7 +5088,7 @@ class BuildIdOpMergeSets(BuildIdOperation):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class WorkerTaskReachability:
     """Contains information about the reachability of some Build IDs"""
 
@@ -5108,7 +5110,7 @@ class WorkerTaskReachability:
                     unretrieved.add(tq_reach.task_queue)
                     continue
                 tq_mapping[tq_reach.task_queue] = [
-                    ReachabilityType._from_proto(r) for r in tq_reach.reachability
+                    TaskReachabilityType._from_proto(r) for r in tq_reach.reachability
                 ]
 
             mapping[bid_reach.build_id] = BuildIdReachability(
@@ -5119,11 +5121,11 @@ class WorkerTaskReachability:
         return WorkerTaskReachability(build_id_reachability=mapping)
 
 
-@dataclass
+@dataclass(frozen=True)
 class BuildIdReachability:
     """Contains information about the reachability of a specific Build ID"""
 
-    task_queue_reachability: Mapping[str, Sequence[ReachabilityType]]
+    task_queue_reachability: Mapping[str, Sequence[TaskReachabilityType]]
     """Maps Task Queue names to the reachability status of the Build ID on that queue. If the value
     is an empty list, the Build ID is not reachable on that queue.
     """
@@ -5134,7 +5136,9 @@ class BuildIdReachability:
     """
 
 
-class ReachabilityType(IntEnum):
+class TaskReachabilityType(IntEnum):
+    """Enumerates how a task might reach certain kinds of workflows"""
+
     NEW_WORKFLOWS = 1
     EXISTING_WORKFLOWS = 2
     OPEN_WORKFLOWS = 3
@@ -5142,27 +5146,27 @@ class ReachabilityType(IntEnum):
 
     @staticmethod
     def _from_proto(
-        reachability: temporalio.api.enums.v1.TaskReachability,
-    ) -> ReachabilityType:
+        reachability: temporalio.api.enums.v1.TaskReachability.ValueType,
+    ) -> TaskReachabilityType:
         if (
             reachability
             == temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_NEW_WORKFLOWS
         ):
-            return ReachabilityType.NEW_WORKFLOWS
+            return TaskReachabilityType.NEW_WORKFLOWS
         elif (
             reachability
             == temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_EXISTING_WORKFLOWS
         ):
-            return ReachabilityType.EXISTING_WORKFLOWS
+            return TaskReachabilityType.EXISTING_WORKFLOWS
         elif (
             reachability
             == temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_OPEN_WORKFLOWS
         ):
-            return ReachabilityType.OPEN_WORKFLOWS
+            return TaskReachabilityType.OPEN_WORKFLOWS
         elif (
             reachability
             == temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_CLOSED_WORKFLOWS
         ):
-            return ReachabilityType.CLOSED_WORKFLOWS
+            return TaskReachabilityType.CLOSED_WORKFLOWS
         else:
             raise ValueError(f"Cannot convert reachability type: {reachability}")

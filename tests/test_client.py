@@ -27,6 +27,11 @@ from temporalio.api.enums.v1 import (
 from temporalio.api.history.v1 import History
 from temporalio.api.workflowservice.v1 import GetSystemInfoRequest
 from temporalio.client import (
+    BuildIdOpAddNewCompatible,
+    BuildIdOpAddNewDefault,
+    BuildIdOpMergeSets,
+    BuildIdOpPromoteBuildIdWithinSet,
+    BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
     Interceptor,
@@ -50,6 +55,7 @@ from temporalio.client import (
     ScheduleUpdateInput,
     SignalWorkflowInput,
     StartWorkflowInput,
+    TaskReachabilityType,
     TerminateWorkflowInput,
     WorkflowContinuedAsNewError,
     WorkflowExecutionStatus,
@@ -58,12 +64,6 @@ from temporalio.client import (
     WorkflowQueryFailedError,
     WorkflowQueryRejectedError,
     _history_from_json,
-    BuildIdOpAddNewDefault,
-    BuildIdOpAddNewCompatible,
-    BuildIdOpPromoteBuildIdWithinSet,
-    BuildIdOpPromoteSetByBuildId,
-    BuildIdOpMergeSets,
-    ReachabilityType,
 )
 from temporalio.common import RetryPolicy
 from temporalio.converter import DataConverter
@@ -1032,7 +1032,7 @@ async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
         build_ids=["2.0", "1.0", "1.1"]
     )
     assert reachability.build_id_reachability["2.0"].task_queue_reachability[tq] == [
-        ReachabilityType.NEW_WORKFLOWS
+        TaskReachabilityType.NEW_WORKFLOWS
     ]
     assert reachability.build_id_reachability["1.0"].task_queue_reachability[tq] == []
     assert reachability.build_id_reachability["1.1"].task_queue_reachability[tq] == []
