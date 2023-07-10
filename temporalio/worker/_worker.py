@@ -75,6 +75,7 @@ class Worker:
         debug_mode: bool = False,
         disable_eager_activity_execution: bool = False,
         on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,
+        use_worker_versioning: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -177,9 +178,18 @@ class Worker:
             on_fatal_error: An async function that can handle a failure before
                 the worker shutdown commences. This cannot stop the shutdown and
                 any exception raised is logged and ignored.
+            use_worker_versioning: If true, the `build_id` argument must be specified, and this
+                worker opts into the worker versioning feature. This ensures it only receives
+                workflow tasks for workflows which it claims to be compatible with.
+
+                For more information, see https://docs.temporal.io/workers#worker-versioning
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
+        if use_worker_versioning and not build_id:
+            raise ValueError(
+                "build_id must be specified when use_worker_versioning is True"
+            )
 
         # Prepend applicable client interceptors to the given ones
         client_config = client.config()
@@ -238,6 +248,7 @@ class Worker:
             debug_mode=debug_mode,
             disable_eager_activity_execution=disable_eager_activity_execution,
             on_fatal_error=on_fatal_error,
+            use_worker_versioning=use_worker_versioning,
         )
         self._started = False
         self._shutdown_event = asyncio.Event()
@@ -324,6 +335,7 @@ class Worker:
                 graceful_shutdown_period_millis=int(
                     1000 * graceful_shutdown_timeout.total_seconds()
                 ),
+                use_worker_versioning=use_worker_versioning,
             ),
         )
 
@@ -558,6 +570,7 @@ class WorkerConfig(TypedDict, total=False):
     debug_mode: bool
     disable_eager_activity_execution: bool
     on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]]
+    use_worker_versioning: bool
 
 
 _default_build_id: Optional[str] = None

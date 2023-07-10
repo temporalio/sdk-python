@@ -44,6 +44,7 @@ pub struct WorkerConfig {
     max_activities_per_second: Option<f64>,
     max_task_queue_activities_per_second: Option<f64>,
     graceful_shutdown_period_millis: u64,
+    use_worker_versioning: bool,
 }
 
 macro_rules! enter_sync {
@@ -232,6 +233,7 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             // auto-cancel-activity behavior of shutdown will not occur, so we
             // always set it even if 0.
             .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
+            .use_worker_versioning(conf.use_worker_versioning)
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
     }
