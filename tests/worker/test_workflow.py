@@ -5,6 +5,7 @@ import logging
 import logging.handlers
 import pickle
 import queue
+import sys
 import threading
 import uuid
 from abc import ABC, abstractmethod
@@ -2843,3 +2844,71 @@ async def test_manual_result_type(client: Client):
         assert res3 == {"some_string": "from-query"}
         res4 = await handle.query("some_query", result_type=ManualResultType)
         assert res4 == ManualResultType(some_string="from-query")
+
+
+@workflow.defn
+class SwallowGeneratorExitWorkflow:
+    def __init__(self) -> None:
+        self._signal_count = 0
+
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            # Wait for signal count to reach 2
+            await workflow.wait_condition(lambda: self._signal_count > 1)
+        finally:
+            # This finally, on eviction, is actually called because the above
+            # await raises GeneratorExit. Then this will raise a
+            # _NotInWorkflowEventLoopError swallowing that.
+            await workflow.wait_condition(lambda: self._signal_count > 2)
+
+    @workflow.signal
+    async def signal(self) -> None:
+        self._signal_count += 1
+
+    @workflow.query
+    async def signal_count(self) -> int:
+        return self._signal_count
+
+
+async def test_swallow_generator_exit(client: Client):
+    if sys.version_info < (3, 8):
+        pytest.skip("sys.unraisablehook not in 3.7")
+    # This test simulates GeneratorExit and GC issues by forcing eviction on
+    # each step
+    async with new_worker(
+        client, SwallowGeneratorExitWorkflow, max_cached_workflows=0
+    ) as worker:
+        # Put a hook to catch unraisable exceptions
+        old_hook = sys.unraisablehook
+        hook_calls: List[Any] = []
+        sys.unraisablehook = hook_calls.append
+        try:
+            handle = await client.start_workflow(
+                SwallowGeneratorExitWorkflow.run,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            async def signal_count() -> int:
+                return await handle.query(SwallowGeneratorExitWorkflow.signal_count)
+
+            # Confirm signal count as 0
+            await assert_eq_eventually(0, signal_count)
+
+            # Send signal and confirm it's at 1
+            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await assert_eq_eventually(1, signal_count)
+
+            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await assert_eq_eventually(2, signal_count)
+
+            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await assert_eq_eventually(3, signal_count)
+
+            await handle.result()
+        finally:
+            sys.unraisablehook = old_hook
+
+        # Confirm no unraisable exceptions
+        assert not hook_calls
