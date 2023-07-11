@@ -22,6 +22,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.workflow
+from temporalio.workflow import VersioningIntent
 
 
 class Interceptor:
@@ -154,6 +155,7 @@ class ContinueAsNewInput:
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    versioning_intent: Optional[VersioningIntent]
     # The types may be absent
     arg_types: Optional[List[Type]]
 
@@ -226,6 +228,7 @@ class StartActivityInput:
     cancellation_type: temporalio.workflow.ActivityCancellationType
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     disable_eager_execution: bool
+    versioning_intent: Optional[VersioningIntent]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
@@ -250,6 +253,7 @@ class StartChildWorkflowInput:
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    versioning_intent: Optional[VersioningIntent]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
