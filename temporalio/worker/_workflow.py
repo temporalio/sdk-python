@@ -96,6 +96,7 @@ class _WorkflowWorker:
 
         # Validate and build workflow dict
         self._workflows: Dict[str, temporalio.workflow._Definition] = {}
+        self._dynamic_workflow: Optional[temporalio.workflow._Definition] = None
         for workflow in workflows:
             defn = temporalio.workflow._Definition.must_from_class(workflow)
             # Confirm name unique
@@ -110,7 +111,12 @@ class _WorkflowWorker:
                     unsandboxed_workflow_runner.prepare_workflow(defn)
             except Exception as err:
                 raise RuntimeError(f"Failed validating workflow {defn.name}") from err
-            self._workflows[defn.name] = defn
+            if defn.name:
+                self._workflows[defn.name] = defn
+            elif self._dynamic_workflow:
+                raise TypeError("More than one dynamic workflow")
+            else:
+                self._dynamic_workflow = defn
 
     async def run(self) -> None:
         # Continually poll for workflow work
@@ -290,7 +296,9 @@ class _WorkflowWorker:
             )
 
         # Get the definition
-        defn = self._workflows.get(start_job.start_workflow.workflow_type)
+        defn = self._workflows.get(
+            start_job.start_workflow.workflow_type, self._dynamic_workflow
+        )
         if not defn:
             workflow_names = ", ".join(sorted(self._workflows.keys()))
             raise temporalio.exceptions.ApplicationError(
