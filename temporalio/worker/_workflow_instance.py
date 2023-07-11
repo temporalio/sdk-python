@@ -242,6 +242,16 @@ class _WorkflowInstanceImpl(
         # Set ourselves on our own loop
         temporalio.workflow._Runtime.set_on_loop(self, self)
 
+        # After GC, Python raises GeneratorExit calls from all awaiting tasks.
+        # Then in a finally of such an await, another exception can swallow
+        # these causing even more issues. We will set ourselves as deleted so we
+        # can check in some places to swallow these errors on tear down.
+        self._deleting = False
+
+    def __del__(self) -> None:
+        # We have confirmed there are no super() versions of __del__
+        self._deleting = True
+
     #### Activation functions ####
     # These are in alphabetical order and besides "activate", all other calls
     # are "_apply_" + the job field name.
@@ -629,14 +639,26 @@ class _WorkflowInstanceImpl(
         # Async call to run on the scheduler thread. This will be wrapped in
         # another function which applies exception handling.
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
-            result = await self._inbound.execute_workflow(input)
-            result_payloads = self._payload_converter.to_payloads([result])
-            if len(result_payloads) != 1:
-                raise ValueError(
-                    f"Expected 1 result payload, got {len(result_payloads)}"
-                )
-            command = self._add_command()
-            command.complete_workflow_execution.result.CopyFrom(result_payloads[0])
+            try:
+                result = await self._inbound.execute_workflow(input)
+                result_payloads = self._payload_converter.to_payloads([result])
+                if len(result_payloads) != 1:
+                    raise ValueError(
+                        f"Expected 1 result payload, got {len(result_payloads)}"
+                    )
+                command = self._add_command()
+                command.complete_workflow_execution.result.CopyFrom(result_payloads[0])
+            except BaseException as err:
+                # During tear down, generator exit and event loop exceptions can occur
+                if not self._deleting:
+                    raise
+                if not isinstance(
+                    err,
+                    (GeneratorExit, temporalio.workflow._NotInWorkflowEventLoopError),
+                ):
+                    logger.debug(
+                        "Ignoring exception while deleting workflow", exc_info=True
+                    )
 
         # Schedule it
         input = ExecuteWorkflowInput(
@@ -1260,6 +1282,16 @@ class _WorkflowInstanceImpl(
             else:
                 # All other exceptions fail the task
                 self._current_activation_error = err
+        except BaseException as err:
+            # During tear down, generator exit and no-runtime exceptions can appear
+            if not self._deleting:
+                raise
+            if not isinstance(
+                err, (GeneratorExit, temporalio.workflow._NotInWorkflowEventLoopError)
+            ):
+                logger.debug(
+                    "Ignoring exception while deleting workflow", exc_info=True
+                )
 
     def _set_workflow_failure(self, err: temporalio.exceptions.FailureError) -> None:
         # All other failure errors fail the workflow

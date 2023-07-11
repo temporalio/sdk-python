@@ -340,7 +340,7 @@ class _Runtime(ABC):
     def current() -> _Runtime:
         loop = _Runtime.maybe_current()
         if not loop:
-            raise RuntimeError("Not in workflow event loop")
+            raise _NotInWorkflowEventLoopError("Not in workflow event loop")
         return loop
 
     @staticmethod
@@ -3841,6 +3841,12 @@ class NondeterminismError(temporalio.exceptions.TemporalError):
         """Initialize a nondeterminism error."""
         super().__init__(message)
         self.message = message
+
+
+class _NotInWorkflowEventLoopError(temporalio.exceptions.TemporalError):
+    def __init__(self, *args: object) -> None:
+        super().__init__("Not in workflow event loop")
+        self.message = "Not in workflow event loop"
 
 
 class VersioningIntent(Enum):
