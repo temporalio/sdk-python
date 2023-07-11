@@ -49,7 +49,6 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
 
-from ..workflow import VersioningIntent
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -670,7 +669,7 @@ class _WorkflowInstanceImpl(
         retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
-        versioning_intent: Optional[VersioningIntent],
+        versioning_intent: Optional[temporalio.workflow.VersioningIntent],
     ) -> NoReturn:
         # Use definition if callable
         name: Optional[str] = None
@@ -823,7 +822,7 @@ class _WorkflowInstanceImpl(
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
-        versioning_intent: Optional[VersioningIntent],
+        versioning_intent: Optional[temporalio.workflow.VersioningIntent],
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
@@ -876,7 +875,7 @@ class _WorkflowInstanceImpl(
         cron_schedule: str,
         memo: Optional[Mapping[str, Any]],
         search_attributes: Optional[temporalio.common.SearchAttributes],
-        versioning_intent: Optional[VersioningIntent],
+        versioning_intent: Optional[temporalio.workflow.VersioningIntent],
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
         name: str
