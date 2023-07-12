@@ -9,7 +9,7 @@ import pytest
 
 import temporalio.worker._worker
 from temporalio import activity, workflow
-from temporalio.client import BuildIdOpAddNewDefault, Client
+from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from temporalio.workflow import VersioningIntent
@@ -198,6 +198,16 @@ async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
             build_id="2.0",
             use_worker_versioning=True,
         ):
+            # Confirm reachability type parameter is respected. If it wasn't, list would have
+            # `OPEN_WORKFLOWS` in it.
+            reachability = await client.get_worker_task_reachability(
+                build_ids=["2.0"],
+                reachability_type=TaskReachabilityType.CLOSED_WORKFLOWS,
+            )
+            assert reachability.build_id_reachability["2.0"].task_queue_reachability[
+                task_queue
+            ] == [TaskReachabilityType.NEW_WORKFLOWS]
+
             await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
             await wf2.signal(WaitOnSignalWorkflow.my_signal, "finish")
             await wf1.result()
