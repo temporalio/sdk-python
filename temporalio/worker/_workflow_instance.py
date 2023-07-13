@@ -864,7 +864,7 @@ class _WorkflowInstanceImpl(
         elif callable(activity):
             defn = temporalio.activity._Definition.must_from_callable(activity)
             if not defn.name:
-                raise TypeError("Cannot invoke dynamic activity explicitly")
+                raise ValueError("Cannot invoke dynamic activity explicitly")
             name = defn.name
             arg_types = defn.arg_types
             ret_type = defn.ret_type
@@ -971,7 +971,7 @@ class _WorkflowInstanceImpl(
         elif callable(activity):
             defn = temporalio.activity._Definition.must_from_callable(activity)
             if not defn.name:
-                raise TypeError("Cannot invoke dynamic activity explicitly")
+                raise ValueError("Cannot invoke dynamic activity explicitly")
             name = defn.name
             arg_types = defn.arg_types
             ret_type = defn.ret_type

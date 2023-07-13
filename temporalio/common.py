@@ -160,7 +160,7 @@ class RawValue:
         if not isinstance(state, bytes):
             raise TypeError(f"Expected bytes state, got {type(state)}")
         if not state[:1] == b"1":
-            raise TypeError("Bad version prefix")
+            raise ValueError("Bad version prefix")
         object.__setattr__(
             self, "payload", temporalio.api.common.v1.Payload.FromString(state[1:])
         )

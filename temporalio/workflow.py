@@ -75,7 +75,14 @@ def defn(cls: ClassType) -> ClassType:
 
 @overload
 def defn(
-    *, name: Optional[str] = None, sandboxed: bool = True, dynamic: bool = False
+    *, name: Optional[str] = None, sandboxed: bool = True
+) -> Callable[[ClassType], ClassType]:
+    ...
+
+
+@overload
+def defn(
+    *, sandboxed: bool = True, dynamic: bool = False
 ) -> Callable[[ClassType], ClassType]:
     ...
 

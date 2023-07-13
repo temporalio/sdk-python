@@ -293,7 +293,7 @@ class CompositePayloadConverter(PayloadConverter):
         values = []
         for index, payload in enumerate(payloads):
             type_hint = None
-            if type_hints is not None:
+            if type_hints and len(type_hints) > index:
                 type_hint = type_hints[index]
             # Raw value should just wrap
             if type_hint == temporalio.common.RawValue:

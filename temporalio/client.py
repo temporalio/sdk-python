@@ -409,7 +409,7 @@ class Client:
         elif callable(workflow):
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
             if not defn.name:
-                raise TypeError("Cannot invoke dynamic workflow explicitly")
+                raise ValueError("Cannot invoke dynamic workflow explicitly")
             name = defn.name
             if result_type is None:
                 result_type = defn.ret_type
@@ -2830,7 +2830,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             if callable(workflow):
                 defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
                 if not defn.name:
-                    raise TypeError("Cannot schedule dynamic workflow explicitly")
+                    raise ValueError("Cannot schedule dynamic workflow explicitly")
                 workflow = defn.name
             elif not isinstance(workflow, str):
                 raise TypeError("Workflow must be a string or callable")
