@@ -35,6 +35,7 @@ from typing import (
 )
 
 import temporalio.common
+import temporalio.converter
 
 from .types import CallableType
 
@@ -51,11 +52,19 @@ def defn(
     ...
 
 
+@overload
+def defn(
+    *, no_thread_cancel_exception: bool = False, dynamic: bool = False
+) -> Callable[[CallableType], CallableType]:
+    ...
+
+
 def defn(
     fn: Optional[CallableType] = None,
     *,
     name: Optional[str] = None,
     no_thread_cancel_exception: bool = False,
+    dynamic: bool = False,
 ):
     """Decorator for activity functions.
 
@@ -64,15 +73,19 @@ def defn(
     Args:
         fn: The function to decorate.
         name: Name to use for the activity. Defaults to function ``__name__``.
+            This cannot be set if dynamic is set.
         no_thread_cancel_exception: If set to true, an exception will not be
             raised in synchronous, threaded activities upon cancellation.
+        dynamic: If true, this activity will be dynamic. Dynamic activities have
+            to accept a single 'Sequence[RawValue]' parameter. This cannot be
+            set to true if name is present.
     """
 
     def decorator(fn: CallableType) -> CallableType:
         # This performs validation
         _Definition._apply_to_callable(
             fn,
-            activity_name=name or fn.__name__,
+            activity_name=name or fn.__name__ if not dynamic else None,
             no_thread_cancel_exception=no_thread_cancel_exception,
         )
         return fn
@@ -132,7 +145,12 @@ class _Context:
     cancelled_event: _CompositeEvent
     worker_shutdown_event: _CompositeEvent
     shield_thread_cancel_exception: Optional[Callable[[], AbstractContextManager]]
+    payload_converter_class_or_instance: Union[
+        Type[temporalio.converter.PayloadConverter],
+        temporalio.converter.PayloadConverter,
+    ]
     _logger_details: Optional[Mapping[str, Any]] = None
+    _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
 
     @staticmethod
     def current() -> _Context:
@@ -154,6 +172,18 @@ class _Context:
         if self._logger_details is None:
             self._logger_details = self.info()._logger_details()
         return self._logger_details
+
+    @property
+    def payload_converter(self) -> temporalio.converter.PayloadConverter:
+        if not self._payload_converter:
+            if isinstance(
+                self.payload_converter_class_or_instance,
+                temporalio.converter.PayloadConverter,
+            ):
+                self._payload_converter = self.payload_converter_class_or_instance
+            else:
+                self._payload_converter = self.payload_converter_class_or_instance()
+        return self._payload_converter
 
 
 @dataclass
@@ -339,6 +369,14 @@ class _CompleteAsyncError(BaseException):
     pass
 
 
+def payload_converter() -> temporalio.converter.PayloadConverter:
+    """Get the payload converter for the current activity.
+
+    This is often used for dynamic activities to convert payloads.
+    """
+    return _Context.current().payload_converter
+
+
 class LoggerAdapter(logging.LoggerAdapter):
     """Adapter that adds details to the log about the running activity.
 
@@ -387,9 +425,9 @@ logger = LoggerAdapter(logging.getLogger(__name__), None)
 """Logger that will have contextual activity details embedded."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class _Definition:
-    name: str
+    name: Optional[str]
     fn: Callable
     is_async: bool
     no_thread_cancel_exception: bool
@@ -420,7 +458,10 @@ class _Definition:
 
     @staticmethod
     def _apply_to_callable(
-        fn: Callable, *, activity_name: str, no_thread_cancel_exception: bool = False
+        fn: Callable,
+        *,
+        activity_name: Optional[str],
+        no_thread_cancel_exception: bool = False,
     ) -> None:
         # Validate the activity
         if hasattr(fn, "__temporal_activity_definition"):
@@ -447,6 +488,16 @@ class _Definition:
 
     def __post_init__(self) -> None:
         if self.arg_types is None and self.ret_type is None:
+            dynamic = self.name is None
             arg_types, ret_type = temporalio.common._type_hints_from_func(self.fn)
+            # If dynamic, must be a sequence of raw values
+            if dynamic and (
+                not arg_types
+                or len(arg_types) != 1
+                or arg_types[0] != Sequence[temporalio.common.RawValue]
+            ):
+                raise TypeError(
+                    "Dynamic activity must accept a single Sequence[temporalio.common.RawValue]"
+                )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)

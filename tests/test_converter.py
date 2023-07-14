@@ -39,6 +39,7 @@ from temporalio.api.common.v1 import Payload
 from temporalio.api.common.v1 import Payload as AnotherNameForPayload
 from temporalio.api.common.v1 import Payloads
 from temporalio.api.failure.v1 import Failure
+from temporalio.common import RawValue
 from temporalio.converter import (
     AdvancedJSONEncoder,
     BinaryProtoPayloadConverter,
@@ -167,6 +168,14 @@ async def test_converter_default():
         "json/plain",
         '{"bar":123,"baz":1,"foo":"somestr"}',
         type_hint=MyDataClass,
+    )
+
+    # Raw value
+    await assert_payload(
+        RawValue(Payload(metadata={"encoding": b"my-encoding"}, data=b"blah blah")),
+        "my-encoding",
+        "blah blah",
+        type_hint=RawValue,
     )
 
 

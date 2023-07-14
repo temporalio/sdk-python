@@ -138,6 +138,34 @@ class QueryRejectCondition(IntEnum):
     )
 
 
+@dataclass(frozen=True)
+class RawValue:
+    """Representation of an unconverted, raw payload.
+
+    This type can be used as a parameter or return type in workflows,
+    activities, signals, and queries to pass through a raw payload.
+    Encoding/decoding of the payload is still done by the system.
+    """
+
+    payload: temporalio.api.common.v1.Payload
+
+    def __getstate__(self) -> object:
+        """Pickle support."""
+        # We'll convert payload to bytes and prepend a version number just in
+        # case we want to extend in the future
+        return b"1" + self.payload.SerializeToString()
+
+    def __setstate__(self, state: object) -> None:
+        """Pickle support."""
+        if not isinstance(state, bytes):
+            raise TypeError(f"Expected bytes state, got {type(state)}")
+        if not state[:1] == b"1":
+            raise ValueError("Bad version prefix")
+        object.__setattr__(
+            self, "payload", temporalio.api.common.v1.Payload.FromString(state[1:])
+        )
+
+
 # We choose to make this a list instead of an sequence so we can catch if people
 # are not sending lists each time but maybe accidentally sending a string (which
 # is a sequence)
