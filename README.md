@@ -33,6 +33,9 @@ The workflow implementation basically turns `async def` functions into workflows
 event loop. This means task management, sleep, cancellation, etc have all been developed to seamlessly integrate with
 `asyncio` concepts.
 
+See the [blog post](https://temporal.io/blog/durable-distributed-asyncio-event-loop) introducing the Python SDK for an
+informal introduction to the features and their implementation.
+
 ---
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
