@@ -493,6 +493,46 @@ async def test_workflow_signal_qnd_query_handlers_old_dynamic_style(client: Clie
         )
 
 
+@dataclass
+class BadSignalParam:
+    some_str: str
+
+
+@workflow.defn
+class BadSignalParamWorkflow:
+    def __init__(self) -> None:
+        self._signals: List[BadSignalParam] = []
+
+    @workflow.run
+    async def run(self) -> List[BadSignalParam]:
+        await workflow.wait_condition(
+            lambda: bool(self._signals) and self._signals[-1].some_str == "finish"
+        )
+        return self._signals
+
+    @workflow.signal
+    async def some_signal(self, param: BadSignalParam) -> None:
+        self._signals.append(param)
+
+
+async def test_workflow_bad_signal_param(client: Client):
+    async with new_worker(client, BadSignalParamWorkflow) as worker:
+        handle = await client.start_workflow(
+            BadSignalParamWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Send 4 signals, first and third are bad
+        await handle.signal("some_signal", "bad")
+        await handle.signal("some_signal", BadSignalParam(some_str="good"))
+        await handle.signal("some_signal", 123)
+        await handle.signal("some_signal", BadSignalParam(some_str="finish"))
+        assert [
+            BadSignalParam(some_str="good"),
+            BadSignalParam(some_str="finish"),
+        ] == await handle.result()
+
+
 @workflow.defn
 class AsyncUtilWorkflow:
     def __init__(self) -> None:
