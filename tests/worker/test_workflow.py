@@ -7,8 +7,8 @@ import pickle
 import queue
 import sys
 import threading
+import typing
 import uuid
-import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -3055,3 +3055,27 @@ async def test_workflow_dynamic(client: Client):
         )
         assert isinstance(result, DynamicWorkflowValue)
         assert result == DynamicWorkflowValue("some-workflow - val1 - val2")
+
+
+# typing.Self only in 3.11+
+if sys.version_info >= (3, 11):
+
+    @dataclass
+    class AnnotatedWithSelfParam:
+        some_str: str
+
+    @workflow.defn
+    class WorkflowAnnotatedWithSelf:
+        @workflow.run
+        async def run(self: typing.Self, some_arg: AnnotatedWithSelfParam) -> str:
+            assert isinstance(some_arg, AnnotatedWithSelfParam)
+            return some_arg.some_str
+
+    async def test_workflow_annotated_with_self(client: Client):
+        async with new_worker(client, WorkflowAnnotatedWithSelf) as worker:
+            assert "foo" == await client.execute_workflow(
+                WorkflowAnnotatedWithSelf.run,
+                AnnotatedWithSelfParam(some_str="foo"),
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
