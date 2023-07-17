@@ -408,6 +408,8 @@ class Client:
             name = workflow
         elif callable(workflow):
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
+            if not defn.name:
+                raise ValueError("Cannot invoke dynamic workflow explicitly")
             name = defn.name
             if result_type is None:
                 result_type = defn.ret_type
@@ -2827,6 +2829,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             # Use definition if callable
             if callable(workflow):
                 defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
+                if not defn.name:
+                    raise ValueError("Cannot schedule dynamic workflow explicitly")
                 workflow = defn.name
             elif not isinstance(workflow, str):
                 raise TypeError("Workflow must be a string or callable")
@@ -4794,6 +4798,9 @@ class _ClientImpl(OutboundInterceptor):
             namespace=self._client.namespace,
             build_ids=input.build_ids,
             task_queues=input.task_queues,
+            reachability=input.reachability._to_proto()
+            if input.reachability
+            else temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_UNSPECIFIED,
         )
         resp = await self._client.workflow_service.get_worker_task_reachability(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
@@ -5170,3 +5177,25 @@ class TaskReachabilityType(Enum):
             return TaskReachabilityType.CLOSED_WORKFLOWS
         else:
             raise ValueError(f"Cannot convert reachability type: {reachability}")
+
+    def _to_proto(self) -> temporalio.api.enums.v1.TaskReachability.ValueType:
+        if self == TaskReachabilityType.NEW_WORKFLOWS:
+            return (
+                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_NEW_WORKFLOWS
+            )
+        elif self == TaskReachabilityType.EXISTING_WORKFLOWS:
+            return (
+                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_EXISTING_WORKFLOWS
+            )
+        elif self == TaskReachabilityType.OPEN_WORKFLOWS:
+            return (
+                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_OPEN_WORKFLOWS
+            )
+        elif self == TaskReachabilityType.CLOSED_WORKFLOWS:
+            return (
+                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_CLOSED_WORKFLOWS
+            )
+        else:
+            return (
+                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_UNSPECIFIED
+            )

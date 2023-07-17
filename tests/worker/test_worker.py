@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional
 
 import pytest
 
 import temporalio.worker._worker
 from temporalio import activity, workflow
-from temporalio.client import BuildIdOpAddNewDefault, Client
+from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+from temporalio.workflow import VersioningIntent
 from tests.helpers import new_worker, worker_versioning_enabled
 
 
@@ -128,6 +130,11 @@ async def test_worker_cancel_run(client: Client):
     assert not worker.is_running and worker.is_shutdown
 
 
+@activity.defn
+async def say_hello(name: str) -> str:
+    return f"Hello, {name}!"
+
+
 @workflow.defn
 class WaitOnSignalWorkflow:
     def __init__(self) -> None:
@@ -136,6 +143,12 @@ class WaitOnSignalWorkflow:
     @workflow.run
     async def run(self) -> None:
         await workflow.wait_condition(lambda: self._last_signal == "finish")
+        await workflow.execute_activity(
+            say_hello,
+            "hi",
+            versioning_intent=VersioningIntent.DEFAULT,
+            start_to_close_timeout=timedelta(seconds=5),
+        )
 
     @workflow.signal
     def my_signal(self, value: str) -> None:
@@ -157,6 +170,7 @@ async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
     async with new_worker(
         client,
         WaitOnSignalWorkflow,
+        activities=[say_hello],
         task_queue=task_queue,
         build_id="1.0",
         use_worker_versioning=True,
@@ -179,10 +193,21 @@ async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
         async with new_worker(
             client,
             WaitOnSignalWorkflow,
+            activities=[say_hello],
             task_queue=task_queue,
             build_id="2.0",
             use_worker_versioning=True,
         ):
+            # Confirm reachability type parameter is respected. If it wasn't, list would have
+            # `OPEN_WORKFLOWS` in it.
+            reachability = await client.get_worker_task_reachability(
+                build_ids=["2.0"],
+                reachability_type=TaskReachabilityType.CLOSED_WORKFLOWS,
+            )
+            assert reachability.build_id_reachability["2.0"].task_queue_reachability[
+                task_queue
+            ] == [TaskReachabilityType.NEW_WORKFLOWS]
+
             await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
             await wf2.signal(WaitOnSignalWorkflow.my_signal, "finish")
             await wf1.result()

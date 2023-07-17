@@ -12,6 +12,7 @@ from typing import Any, Callable, Optional, Set, TypeVar
 from typing_extensions import ParamSpec
 
 import temporalio.activity
+import temporalio.converter
 import temporalio.exceptions
 import temporalio.worker._activity
 
@@ -52,12 +53,18 @@ class ActivityEnvironment:
             function.
         on_heartbeat: Function called on each heartbeat invocation by the
             activity.
+        payload_converter: Payload converter set on the activity context. This
+            must be set before :py:meth:`run`. Changes after the activity has
+            started do not take effect.
     """
 
     def __init__(self) -> None:
         """Create an ActivityEnvironment for running activity code."""
         self.info = _default_info
         self.on_heartbeat: Callable[..., None] = lambda *args: None
+        self.payload_converter = (
+            temporalio.converter.DataConverter.default.payload_converter
+        )
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
@@ -139,6 +146,7 @@ class _Activity:
             shield_thread_cancel_exception=None
             if not self.cancel_thread_raiser
             else self.cancel_thread_raiser.shielded,
+            payload_converter_class_or_instance=env.payload_converter,
         )
         self.task: Optional[asyncio.Task] = None
 

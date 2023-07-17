@@ -24,6 +24,12 @@ jobs:
           - os: ubuntu-arm
             runsOn: buildjet-4vcpu-ubuntu-2204-arm
     runs-on: ${{ matrix.runsOn || matrix.os }}
+    # For Windows there is currently a bug with Windows + pytest + warnings +
+    # importlib + Python < 3.12. Based on others' investigations, disabling
+    # bytecode fixes it.
+    # See https://github.com/temporalio/sdk-python/pull/346#issuecomment-1636108747
+    env:
+      PYTHONDONTWRITEBYTECODE: "${{ matrix.os == 'windows-latest' && '1' || '' }}"
     steps:
       - uses: actions/checkout@v2
         with:

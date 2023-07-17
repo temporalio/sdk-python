@@ -1,8 +1,9 @@
-from typing import Any
+from typing import Any, Sequence
 
 import pytest
 
 from temporalio import workflow
+from temporalio.common import RawValue
 
 
 class GoodDefnBase:
@@ -34,7 +35,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal3(self, name: str, *args: Any):
+    def signal3(self, name: str, args: Sequence[RawValue]):
         pass
 
     @workflow.query
@@ -46,7 +47,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.query(dynamic=True)
-    def query3(self, name: str, *args: Any):
+    def query3(self, name: str, args: Sequence[RawValue]):
         pass
 
 
@@ -112,11 +113,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal3(self, name: str, *args: Any):
+    def signal3(self, name: str, args: Sequence[RawValue]):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal4(self, name: str, *args: Any):
+    def signal4(self, name: str, args: Sequence[RawValue]):
         pass
 
     # Intentionally missing decorator
@@ -132,11 +133,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.query(dynamic=True)
-    def query3(self, name: str, *args: Any):
+    def query3(self, name: str, args: Sequence[RawValue]):
         pass
 
     @workflow.query(dynamic=True)
-    def query4(self, name: str, *args: Any):
+    def query4(self, name: str, args: Sequence[RawValue]):
         pass
 
     # Intentionally missing decorator
@@ -259,6 +260,9 @@ class BadDynamic:
     def some_dynamic2(self, no_vararg):
         pass
 
+    def old_dynamic(self, name, *args):
+        pass
+
 
 def test_workflow_defn_bad_dynamic():
     with pytest.raises(RuntimeError) as err:
@@ -273,3 +277,13 @@ def test_workflow_defn_bad_dynamic():
     with pytest.raises(RuntimeError) as err:
         workflow.query(dynamic=True)(BadDynamic.some_dynamic2)
     assert "must have 3 arguments" in str(err.value)
+
+
+def test_workflow_defn_dynamic_handler_warnings():
+    with pytest.deprecated_call() as warnings:
+        workflow.signal(dynamic=True)(BadDynamic.old_dynamic)
+        workflow.query(dynamic=True)(BadDynamic.old_dynamic)
+    assert len(warnings) == 2
+    # We want to make sure they are reporting the right stacklevel
+    warnings[0].filename.endswith("test_workflow.py")
+    warnings[1].filename.endswith("test_workflow.py")

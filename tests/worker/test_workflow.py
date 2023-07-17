@@ -5,8 +5,10 @@ import logging
 import logging.handlers
 import pickle
 import queue
+import sys
 import threading
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -47,7 +49,7 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowQueryFailedError,
 )
-from temporalio.common import RetryPolicy, SearchAttributes
+from temporalio.common import RawValue, RetryPolicy, SearchAttributes
 from temporalio.converter import (
     DataConverter,
     DefaultFailureConverterWithEncodedAttributes,
@@ -186,8 +188,9 @@ class SignalAndQueryWorkflow:
         self._last_event = f"signal1: {arg}"
 
     @workflow.signal(dynamic=True)
-    def signal_dynamic(self, name: str, *args: Any) -> None:
-        self._last_event = f"signal_dynamic {name}: {args[0]}"
+    def signal_dynamic(self, name: str, args: Sequence[RawValue]) -> None:
+        arg = workflow.payload_converter().from_payload(args[0].payload, str)
+        self._last_event = f"signal_dynamic {name}: {arg}"
 
     @workflow.signal(name="Custom Name")
     def signal_custom(self, arg: str) -> None:
@@ -198,8 +201,9 @@ class SignalAndQueryWorkflow:
         return self._last_event or "<no event>"
 
     @workflow.query(dynamic=True)
-    def query_dynamic(self, name: str, *args: Any) -> str:
-        return f"query_dynamic {name}: {args[0]}"
+    def query_dynamic(self, name: str, args: Sequence[RawValue]) -> str:
+        arg = workflow.payload_converter().from_payload(args[0].payload, str)
+        return f"query_dynamic {name}: {arg}"
 
     @workflow.query(name="Custom Name")
     def query_custom(self, arg: str) -> str:
@@ -220,7 +224,7 @@ async def test_workflow_signal_and_query(client: Client):
             SignalAndQueryWorkflow.last_event
         )
 
-        # Dynamic signals and queries
+        # Dynamic signals and queries (old form)
         await handle.signal("signal2", "dyn arg")
         assert "signal_dynamic signal2: dyn arg" == await handle.query(
             SignalAndQueryWorkflow.last_event
@@ -276,15 +280,17 @@ class SignalAndQueryHandlersWorkflow:
 
     @workflow.signal
     def set_dynamic_signal_handler(self) -> None:
-        def new_handler(name: str, *args: Any) -> None:
-            self._last_event = f"signal dynamic {name}: {args[0]}"
+        def new_handler(name: str, args: Sequence[RawValue]) -> None:
+            arg = workflow.payload_converter().from_payload(args[0].payload, str)
+            self._last_event = f"signal dynamic {name}: {arg}"
 
         workflow.set_dynamic_signal_handler(new_handler)
 
     @workflow.signal
     def set_dynamic_query_handler(self) -> None:
-        def new_handler(name: str, *args: Any) -> str:
-            return f"query dynamic {name}: {args[0]}"
+        def new_handler(name: str, args: Sequence[RawValue]) -> str:
+            arg = workflow.payload_converter().from_payload(args[0].payload, str)
+            return f"query dynamic {name}: {arg}"
 
         workflow.set_dynamic_query_handler(new_handler)
 
@@ -382,6 +388,108 @@ async def test_workflow_signal_and_query_errors(client: Client):
         assert str(rpc_err.value) == (
             "Query handler for 'non-existent query' expected but not found,"
             " known queries: [__stack_trace bad_query other_query]"
+        )
+
+
+@workflow.defn
+class SignalAndQueryOldDynamicStyleWorkflow:
+    def __init__(self) -> None:
+        self._last_event: Optional[str] = None
+
+    @workflow.run
+    async def run(self) -> None:
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.signal(dynamic=True)
+    def signal_dynamic(self, name: str, *args: Any) -> None:
+        self._last_event = f"signal_dynamic {name}: {args[0]}"
+
+    @workflow.query
+    def last_event(self) -> str:
+        return self._last_event or "<no event>"
+
+    @workflow.query(dynamic=True)
+    def query_dynamic(self, name: str, *args: Any) -> str:
+        return f"query_dynamic {name}: {args[0]}"
+
+
+async def test_workflow_signal_and_query_old_dynamic_style(client: Client):
+    async with new_worker(client, SignalAndQueryOldDynamicStyleWorkflow) as worker:
+        handle = await client.start_workflow(
+            SignalAndQueryOldDynamicStyleWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Dynamic signals and queries
+        await handle.signal("signal1", "dyn arg")
+        assert "signal_dynamic signal1: dyn arg" == await handle.query(
+            SignalAndQueryOldDynamicStyleWorkflow.last_event
+        )
+        assert "query_dynamic query1: dyn arg" == await handle.query(
+            "query1", "dyn arg"
+        )
+
+
+@workflow.defn
+class SignalAndQueryHandlersOldDynamicStyleWorkflow:
+    def __init__(self) -> None:
+        self._last_event: Optional[str] = None
+
+    @workflow.run
+    async def run(self) -> None:
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.query
+    def last_event(self) -> str:
+        return self._last_event or "<no event>"
+
+    @workflow.signal
+    def set_dynamic_signal_handler(self) -> None:
+        def new_handler(name: str, *args: Any) -> None:
+            self._last_event = f"signal dynamic {name}: {args[0]}"
+
+        workflow.set_dynamic_signal_handler(new_handler)
+
+    @workflow.signal
+    def set_dynamic_query_handler(self) -> None:
+        def new_handler(name: str, *args: Any) -> str:
+            return f"query dynamic {name}: {args[0]}"
+
+        workflow.set_dynamic_query_handler(new_handler)
+
+
+async def test_workflow_signal_qnd_query_handlers_old_dynamic_style(client: Client):
+    async with new_worker(
+        client, SignalAndQueryHandlersOldDynamicStyleWorkflow
+    ) as worker:
+        handle = await client.start_workflow(
+            SignalAndQueryHandlersOldDynamicStyleWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Dynamic signal handling buffered and new
+        await handle.signal("unknown_signal1", "val1")
+        await handle.signal(
+            SignalAndQueryHandlersOldDynamicStyleWorkflow.set_dynamic_signal_handler
+        )
+        assert "signal dynamic unknown_signal1: val1" == await handle.query(
+            SignalAndQueryHandlersOldDynamicStyleWorkflow.last_event
+        )
+        await handle.signal("unknown_signal2", "val2")
+        assert "signal dynamic unknown_signal2: val2" == await handle.query(
+            SignalAndQueryHandlersOldDynamicStyleWorkflow.last_event
+        )
+
+        # Dynamic query handling
+        await handle.signal(
+            SignalAndQueryHandlersOldDynamicStyleWorkflow.set_dynamic_query_handler
+        )
+        assert "query dynamic unknown_query1: val3" == await handle.query(
+            "unknown_query1", "val3"
         )
 
 
@@ -2843,3 +2951,107 @@ async def test_manual_result_type(client: Client):
         assert res3 == {"some_string": "from-query"}
         res4 = await handle.query("some_query", result_type=ManualResultType)
         assert res4 == ManualResultType(some_string="from-query")
+
+
+@workflow.defn
+class SwallowGeneratorExitWorkflow:
+    def __init__(self) -> None:
+        self._signal_count = 0
+
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            # Wait for signal count to reach 2
+            await workflow.wait_condition(lambda: self._signal_count > 1)
+        finally:
+            # This finally, on eviction, is actually called because the above
+            # await raises GeneratorExit. Then this will raise a
+            # _NotInWorkflowEventLoopError swallowing that.
+            await workflow.wait_condition(lambda: self._signal_count > 2)
+
+    @workflow.signal
+    async def signal(self) -> None:
+        self._signal_count += 1
+
+    @workflow.query
+    async def signal_count(self) -> int:
+        return self._signal_count
+
+
+async def test_swallow_generator_exit(client: Client):
+    if sys.version_info < (3, 8):
+        pytest.skip("sys.unraisablehook not in 3.7")
+    # This test simulates GeneratorExit and GC issues by forcing eviction on
+    # each step
+    async with new_worker(
+        client, SwallowGeneratorExitWorkflow, max_cached_workflows=0
+    ) as worker:
+        # Put a hook to catch unraisable exceptions
+        old_hook = sys.unraisablehook
+        hook_calls: List[Any] = []
+        sys.unraisablehook = hook_calls.append
+        try:
+            handle = await client.start_workflow(
+                SwallowGeneratorExitWorkflow.run,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            async def signal_count() -> int:
+                return await handle.query(SwallowGeneratorExitWorkflow.signal_count)
+
+            # Confirm signal count as 0
+            await assert_eq_eventually(0, signal_count)
+
+            # Send signal and confirm it's at 1
+            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await assert_eq_eventually(1, signal_count)
+
+            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await assert_eq_eventually(2, signal_count)
+
+            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await assert_eq_eventually(3, signal_count)
+
+            await handle.result()
+        finally:
+            sys.unraisablehook = old_hook
+
+        # Confirm no unraisable exceptions
+        assert not hook_calls
+
+
+@dataclass
+class DynamicWorkflowValue:
+    some_string: str
+
+
+@workflow.defn(dynamic=True)
+class DynamicWorkflow:
+    @workflow.run
+    async def run(self, args: Sequence[RawValue]) -> DynamicWorkflowValue:
+        assert len(args) == 2
+        arg1 = workflow.payload_converter().from_payload(
+            args[0].payload, DynamicWorkflowValue
+        )
+        assert isinstance(arg1, DynamicWorkflowValue)
+        arg2 = workflow.payload_converter().from_payload(
+            args[1].payload, DynamicWorkflowValue
+        )
+        assert isinstance(arg1, DynamicWorkflowValue)
+        return DynamicWorkflowValue(
+            f"{workflow.info().workflow_type} - {arg1.some_string} - {arg2.some_string}"
+        )
+
+
+async def test_workflow_dynamic(client: Client):
+    async with new_worker(client, DynamicWorkflow) as worker:
+        result = await client.execute_workflow(
+            "some-workflow",
+            args=[DynamicWorkflowValue("val1"), DynamicWorkflowValue("val2")],
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            result_type=DynamicWorkflowValue,
+        )
+        assert isinstance(result, DynamicWorkflowValue)
+        assert result == DynamicWorkflowValue("some-workflow - val1 - val2")

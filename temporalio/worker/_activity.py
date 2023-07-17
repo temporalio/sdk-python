@@ -85,6 +85,7 @@ class _ActivityWorker:
 
         # Validate and build activity dict
         self._activities: Dict[str, temporalio.activity._Definition] = {}
+        self._dynamic_activity: Optional[temporalio.activity._Definition] = None
         for activity in activities:
             # Get definition
             defn = temporalio.activity._Definition.must_from_callable(activity)
@@ -127,7 +128,12 @@ class _ActivityWorker:
                         raise TypeError(
                             f"Activity {defn.name} must be picklable when using a process executor"
                         ) from err
-            self._activities[defn.name] = defn
+            if defn.name:
+                self._activities[defn.name] = defn
+            elif self._dynamic_activity:
+                raise TypeError("More than one dynamic activity")
+            else:
+                self._dynamic_activity = defn
 
     async def run(self) -> None:
         # Create a task that fails when we get a failure on the queue
@@ -265,7 +271,9 @@ class _ActivityWorker:
         )
         try:
             # Find activity or fail
-            activity_def = self._activities.get(start.activity_type)
+            activity_def = self._activities.get(
+                start.activity_type, self._dynamic_activity
+            )
             if not activity_def:
                 activity_names = ", ".join(sorted(self._activities.keys()))
                 raise temporalio.exceptions.ApplicationError(
@@ -317,10 +325,13 @@ class _ActivityWorker:
                     async_event=asyncio.Event(),
                 )
 
-            # Convert arguments. We only use arg type hints if they match the
-            # input count.
+            # Convert arguments. We use raw value for dynamic. Otherwise, we
+            # only use arg type hints if they match the input count.
             arg_types = activity_def.arg_types
-            if arg_types is not None and len(arg_types) != len(start.input):
+            if not activity_def.name:
+                # Dynamic is just the raw value for each input value
+                arg_types = [temporalio.common.RawValue] * len(start.input)
+            elif arg_types is not None and len(arg_types) != len(start.input):
                 arg_types = None
             try:
                 args = (
@@ -334,6 +345,9 @@ class _ActivityWorker:
                 raise temporalio.exceptions.ApplicationError(
                     "Failed decoding arguments"
                 ) from err
+            # Put the args inside a list if dynamic
+            if not activity_def.name:
+                args = [args]
 
             # Convert heartbeat details
             # TODO(cretz): Allow some way to configure heartbeat type hinting?
@@ -399,6 +413,7 @@ class _ActivityWorker:
                     shield_thread_cancel_exception=None
                     if not running_activity.cancel_thread_raiser
                     else running_activity.cancel_thread_raiser.shielded,
+                    payload_converter_class_or_instance=self._data_converter.payload_converter,
                 )
             )
             temporalio.activity.logger.debug("Starting activity")
@@ -633,6 +648,14 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     info.task_token, ctx.heartbeat
                 )
 
+            # The payload converter is the already instantiated one for thread
+            # or the picklable class for non-thread
+            payload_converter_class_or_instance = (
+                self._worker._data_converter.payload_converter
+                if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor)
+                else self._worker._data_converter.payload_converter_class
+            )
+
             try:
                 # Cancel and shutdown event always present here
                 cancelled_event = self._running_activity.cancelled_event
@@ -648,6 +671,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     # Only thread event, this may cross a process boundary
                     cancelled_event.thread_event,
                     worker_shutdown_event.thread_event,
+                    payload_converter_class_or_instance,
                     input.fn,
                     *input.args,
                 ]
@@ -690,6 +714,10 @@ def _execute_sync_activity(
     cancel_thread_raiser: Optional[_ThreadExceptionRaiser],
     cancelled_event: threading.Event,
     worker_shutdown_event: threading.Event,
+    payload_converter_class_or_instance: Union[
+        Type[temporalio.converter.PayloadConverter],
+        temporalio.converter.PayloadConverter,
+    ],
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -719,6 +747,7 @@ def _execute_sync_activity(
             shield_thread_cancel_exception=None
             if not cancel_thread_raiser
             else cancel_thread_raiser.shielded,
+            payload_converter_class_or_instance=payload_converter_class_or_instance,
         )
     )
     return fn(*args)

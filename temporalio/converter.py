@@ -31,6 +31,7 @@ from typing import (
     TypeVar,
     Union,
     get_type_hints,
+    overload,
 )
 
 import google.protobuf.json_format
@@ -43,6 +44,7 @@ import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 import temporalio.common
 import temporalio.exceptions
+import temporalio.types
 
 if sys.version_info < (3, 11):
     # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
@@ -67,6 +69,9 @@ class PayloadConverter(ABC):
     ) -> List[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
+        Implementers are expected to just return the payload for
+        :py:class:`temporalio.common.RawValue`.
+
         Args:
             values: Values to be converted.
 
@@ -87,6 +92,9 @@ class PayloadConverter(ABC):
         type_hints: Optional[List[Type]] = None,
     ) -> List[Any]:
         """Decode payloads into values.
+
+        Implementers are expected to treat a type hint of
+        :py:class:`temporalio.common.RawValue` as just the raw value.
 
         Args:
             payloads: Payloads to convert to Python values.
@@ -121,6 +129,51 @@ class PayloadConverter(ABC):
         if not payloads or not payloads.payloads:
             return []
         return self.from_payloads(payloads.payloads)
+
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload:
+        """Convert a single value to a payload.
+
+        This is a shortcut for :py:meth:`to_payloads` with a single-item list
+        and result.
+
+        Args:
+            value: Value to convert to a single payload.
+
+        Returns:
+            Single converted payload.
+        """
+        return self.to_payloads([value])[0]
+
+    @overload
+    def from_payload(self, payload: temporalio.api.common.v1.Payload) -> Any:
+        ...
+
+    @overload
+    def from_payload(
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Type[temporalio.types.AnyType],
+    ) -> temporalio.types.AnyType:
+        ...
+
+    def from_payload(
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
+    ) -> Any:
+        """Convert a single payload to a value.
+
+        This is a shortcut for :py:meth:`from_payloads` with a single-item list
+        and result.
+
+        Args:
+            payload: Payload to convert to value.
+            type_hint: Optional type hint to say which type to convert to.
+
+        Returns:
+            Single converted value.
+        """
+        return self.from_payloads([payload], [type_hint] if type_hint else None)[0]
 
 
 class EncodingPayloadConverter(ABC):
@@ -209,10 +262,14 @@ class CompositePayloadConverter(PayloadConverter):
             # We intentionally attempt these serially just in case a stateful
             # converter may rely on the previous values
             payload = None
-            for converter in self.converters.values():
-                payload = converter.to_payload(value)
-                if payload is not None:
-                    break
+            # RawValue should just pass through
+            if isinstance(value, temporalio.common.RawValue):
+                payload = value.payload
+            else:
+                for converter in self.converters.values():
+                    payload = converter.to_payload(value)
+                    if payload is not None:
+                        break
             if payload is None:
                 raise RuntimeError(
                     f"Value at index {index} of type {type(value)} has no known converter"
@@ -235,13 +292,17 @@ class CompositePayloadConverter(PayloadConverter):
         """
         values = []
         for index, payload in enumerate(payloads):
+            type_hint = None
+            if type_hints and len(type_hints) > index:
+                type_hint = type_hints[index]
+            # Raw value should just wrap
+            if type_hint == temporalio.common.RawValue:
+                values.append(temporalio.common.RawValue(payload))
+                continue
             encoding = payload.metadata.get("encoding", b"<unknown>")
             converter = self.converters.get(encoding)
             if converter is None:
                 raise KeyError(f"Unknown payload encoding {encoding.decode()}")
-            type_hint = None
-            if type_hints is not None:
-                type_hint = type_hints[index]
             try:
                 values.append(converter.from_payload(payload, type_hint))
             except RuntimeError as err:

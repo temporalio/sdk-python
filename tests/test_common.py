@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import pickle
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
 import pytest
 
-from temporalio.common import RetryPolicy, _type_hints_from_func
+from temporalio.api.common.v1 import Payload
+from temporalio.common import RawValue, RetryPolicy, _type_hints_from_func
 
 
 def test_retry_policy_validate():
@@ -61,3 +63,14 @@ def test_type_hints_from_func():
     assert_hints(MyCallableClass)
     assert_hints(MyCallableClass.some_method)
     assert_hints(MyCallableClass().some_method)
+
+
+def test_raw_value_pickle():
+    pickled = pickle.dumps(
+        RawValue(Payload(metadata={"meta-key": b"meta-val"}, data=b"data-val"))
+    )
+    unpickled = pickle.loads(pickled)
+    assert isinstance(unpickled, RawValue)
+    assert isinstance(unpickled.payload, Payload)
+    assert unpickled.payload.metadata == {"meta-key": b"meta-val"}
+    assert unpickled.payload.data == b"data-val"

@@ -542,6 +542,9 @@ Here are the decorators that can be applied:
 * `@workflow.defn` - Defines a workflow class
   * Must be defined on the class given to the worker (ignored if present on a base class)
   * Can have a `name` param to customize the workflow name, otherwise it defaults to the unqualified class name
+  * Can have `dynamic=True` which means all otherwise unhandled workflows fall through to this. If present, cannot have
+    `name` argument, and run method must accept a single parameter of `Sequence[temporalio.common.RawValue]` type. The
+    payload of the raw value can be converted via `workflow.payload_converter().from_payload`.
 * `@workflow.run` - Defines the primary workflow run method
   * Must be defined on the same class as `@workflow.defn`, not a base class (but can _also_ be defined on the same
     method of a base class)
@@ -556,7 +559,8 @@ Here are the decorators that can be applied:
   * The method's arguments are the signal's arguments
   * Can have a `name` param to customize the signal name, otherwise it defaults to the unqualified method name
   * Can have `dynamic=True` which means all otherwise unhandled signals fall through to this. If present, cannot have
-    `name` argument, and method parameters must be `self`, a string signal name, and a `*args` varargs param.
+    `name` argument, and method parameters must be `self`, a string signal name, and a
+    `Sequence[temporalio.common.RawValue]`.
   * Non-dynamic method can only have positional arguments. Best practice is to only take a single argument that is an
     object/dataclass of fields that can be added to as needed.
   * Return value is ignored
@@ -1054,6 +1058,10 @@ Some things to note about activity definitions:
   activity may need (e.g. a DB connection). The instance method should be what is registered with the worker.
 * Activities can also be defined on callable classes (i.e. classes with `__call__`). An instance of the class should be
   what is registered with the worker.
+* The `@activity.defn` can have `dynamic=True` set which means all otherwise unhandled activities fall through to this.
+  If present, cannot have `name` argument, and the activity function must accept a single parameter of
+  `Sequence[temporalio.common.RawValue]`. The payload of the raw value can be converted via
+  `activity.payload_converter().from_payload`.
 
 #### Types of Activities
 

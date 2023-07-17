@@ -13,7 +13,7 @@ from concurrent.futures.process import BrokenProcessPool
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, List, NoReturn, Optional, Sequence
+from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
 import pytest
 
@@ -24,7 +24,7 @@ from temporalio.client import (
     WorkflowFailureError,
     WorkflowHandle,
 )
-from temporalio.common import RetryPolicy
+from temporalio.common import RawValue, RetryPolicy
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -1156,6 +1156,87 @@ async def test_activity_local_without_schedule_to_close(client: Client):
 
 
 @dataclass
+class DynActivityValue:
+    some_string: str
+
+
+# External so it is picklable
+@activity.defn(dynamic=True)
+def sync_dyn_activity(args: Sequence[RawValue]) -> DynActivityValue:
+    assert len(args) == 2
+    arg1 = activity.payload_converter().from_payload(args[0].payload, DynActivityValue)
+    assert isinstance(arg1, DynActivityValue)
+    arg2 = activity.payload_converter().from_payload(args[1].payload, DynActivityValue)
+    assert isinstance(arg1, DynActivityValue)
+    return DynActivityValue(
+        f"{activity.info().activity_type} - {arg1.some_string} - {arg2.some_string}"
+    )
+
+
+async def test_activity_dynamic(client: Client, worker: ExternalWorker):
+    @activity.defn(dynamic=True)
+    async def async_dyn_activity(args: Sequence[RawValue]) -> DynActivityValue:
+        return sync_dyn_activity(args)
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        async_dyn_activity,
+        DynActivityValue("val1"),
+        DynActivityValue("val2"),
+        activity_name_override="some-activity-name",
+        result_type_override=DynActivityValue,
+    )
+    assert result.result == DynActivityValue("some-activity-name - val1 - val2")
+
+
+async def test_sync_activity_dynamic_thread(client: Client, worker: ExternalWorker):
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            sync_dyn_activity,
+            DynActivityValue("val1"),
+            DynActivityValue("val2"),
+            worker_config={"activity_executor": executor},
+            activity_name_override="some-activity-name",
+            result_type_override=DynActivityValue,
+        )
+        assert result.result == DynActivityValue("some-activity-name - val1 - val2")
+
+
+async def test_sync_activity_dynamic_process(client: Client, worker: ExternalWorker):
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            sync_dyn_activity,
+            DynActivityValue("val1"),
+            DynActivityValue("val2"),
+            worker_config={"activity_executor": executor},
+            activity_name_override="some-activity-name",
+            result_type_override=DynActivityValue,
+        )
+        assert result.result == DynActivityValue("some-activity-name - val1 - val2")
+
+
+async def test_activity_dynamic_duplicate(client: Client, worker: ExternalWorker):
+    @activity.defn(dynamic=True)
+    async def dyn_activity_1(args: Sequence[RawValue]) -> None:
+        pass
+
+    @activity.defn(dynamic=True)
+    async def dyn_activity_2(args: Sequence[RawValue]) -> None:
+        pass
+
+    with pytest.raises(TypeError) as err:
+        await _execute_workflow_with_activity(
+            client, worker, dyn_activity_1, additional_activities=[dyn_activity_2]
+        )
+    assert "More than one dynamic activity" in str(err.value)
+
+
+@dataclass
 class _ActivityResult:
     act_task_queue: str
     result: Any
@@ -1180,10 +1261,12 @@ async def _execute_workflow_with_activity(
     worker_config: WorkerConfig = {},
     on_complete: Optional[Callable[[], None]] = None,
     activity_name_override: Optional[str] = None,
+    result_type_override: Optional[Type] = None,
+    additional_activities: List[Callable] = [],
 ) -> _ActivityResult:
     worker_config["client"] = client
     worker_config["task_queue"] = str(uuid.uuid4())
-    worker_config["activities"] = [fn]
+    worker_config["activities"] = [fn] + additional_activities
     worker_config["shared_state_manager"] = _default_shared_state_manager
     async with Worker(**worker_config):
         try:
@@ -1212,6 +1295,7 @@ async def _execute_workflow_with_activity(
                 ),
                 id=str(uuid.uuid4()),
                 task_queue=worker.task_queue,
+                result_type=result_type_override,
             )
             return _ActivityResult(
                 act_task_queue=worker_config["task_queue"],
