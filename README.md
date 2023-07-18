@@ -496,7 +496,7 @@ class GreetingWorkflow:
         self._complete.set()
 
     @workflow.query
-    async def current_greeting(self) -> str:
+    def current_greeting(self) -> str:
         return self._current_greeting
 
 ```
@@ -563,7 +563,8 @@ Here are the decorators that can be applied:
   * Return value is ignored
 * `@workflow.query` - Defines a method as a query
   * All the same constraints as `@workflow.signal` but should return a value
-  * Temporal queries should never mutate anything in the workflow
+  * Should not be `async`
+  * Temporal queries should never mutate anything in the workflow or call any calls that would mutate the workflow
 
 #### Running
 

@@ -2974,7 +2974,7 @@ class SwallowGeneratorExitWorkflow:
         self._signal_count += 1
 
     @workflow.query
-    async def signal_count(self) -> int:
+    def signal_count(self) -> int:
         return self._signal_count
 
 
@@ -3055,3 +3055,60 @@ async def test_workflow_dynamic(client: Client):
         )
         assert isinstance(result, DynamicWorkflowValue)
         assert result == DynamicWorkflowValue("some-workflow - val1 - val2")
+
+
+@workflow.defn
+class QueriesDoingBadThingsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.query
+    async def bad_query(self, bad_thing: str) -> str:
+        if bad_thing == "wait_condition":
+            await workflow.wait_condition(lambda: True)
+        elif bad_thing == "continue_as_new":
+            workflow.continue_as_new()
+        elif bad_thing == "upsert_search_attribute":
+            workflow.upsert_search_attributes({"foo": ["bar"]})
+        elif bad_thing == "start_activity":
+            workflow.start_activity(
+                "some-activity", start_to_close_timeout=timedelta(minutes=10)
+            )
+        elif bad_thing == "start_child_workflow":
+            await workflow.start_child_workflow("some-workflow")
+        elif bad_thing == "random":
+            workflow.random().random()
+        elif bad_thing == "set_query_handler":
+            workflow.set_query_handler("some-handler", lambda: "whatever")
+        elif bad_thing == "patch":
+            workflow.patched("some-patch")
+        elif bad_thing == "signal_external_handle":
+            await workflow.get_external_workflow_handle("some-id").signal("some-signal")
+        return "should never get here"
+
+
+async def test_workflow_queries_doing_bad_things(client: Client):
+    async with new_worker(client, QueriesDoingBadThingsWorkflow) as worker:
+        handle = await client.start_workflow(
+            QueriesDoingBadThingsWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def assert_bad_query(bad_thing: str) -> None:
+            with pytest.raises(WorkflowQueryFailedError) as err:
+                _ = await handle.query(
+                    QueriesDoingBadThingsWorkflow.bad_query, bad_thing
+                )
+            assert "While in read-only function, action attempted" in str(err)
+
+        await assert_bad_query("wait_condition")
+        await assert_bad_query("continue_as_new")
+        await assert_bad_query("upsert_search_attribute")
+        await assert_bad_query("start_activity")
+        await assert_bad_query("start_child_workflow")
+        await assert_bad_query("random")
+        await assert_bad_query("set_query_handler")
+        await assert_bad_query("patch")
+        await assert_bad_query("signal_external_handle")

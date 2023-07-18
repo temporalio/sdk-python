@@ -242,9 +242,8 @@ def query(
 ):
     """Decorator for a workflow query method.
 
-    This is set on any async or non-async method that expects to handle a
-    query. If a function overrides one with this decorator, it too must be
-    decorated.
+    This is set on any non-async method that expects to handle a query. If a
+    function overrides one with this decorator, it too must be decorated.
 
     Query methods can only have positional parameters. Best practice for
     non-dynamic query methods is to only take a single object/dataclass
@@ -262,7 +261,15 @@ def query(
             present.
     """
 
-    def with_name(name: Optional[str], fn: CallableType) -> CallableType:
+    def with_name(
+        name: Optional[str], fn: CallableType, *, bypass_async_check: bool = False
+    ) -> CallableType:
+        if not bypass_async_check and inspect.iscoroutinefunction(fn):
+            warnings.warn(
+                "Queries as async def functions are deprecated",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         defn = _QueryDefinition(name=name, fn=fn, is_method=True)
         setattr(fn, "__temporal_query_definition", defn)
         if defn.dynamic_vararg:
@@ -279,7 +286,13 @@ def query(
         return partial(with_name, name)
     if fn is None:
         raise RuntimeError("Cannot create query without function or name or dynamic")
-    return with_name(fn.__name__, fn)
+    if inspect.iscoroutinefunction(fn):
+        warnings.warn(
+            "Queries as async def functions are deprecated",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    return with_name(fn.__name__, fn, bypass_async_check=True)
 
 
 @dataclass(frozen=True)
@@ -3915,6 +3928,17 @@ class NondeterminismError(temporalio.exceptions.TemporalError):
 
     def __init__(self, message: str) -> None:
         """Initialize a nondeterminism error."""
+        super().__init__(message)
+        self.message = message
+
+
+class ReadOnlyContextError(temporalio.exceptions.TemporalError):
+    """Error thrown when trying to do mutable workflow calls in a read-only
+    context like a query or update validator.
+    """
+
+    def __init__(self, message: str) -> None:
+        """Initialize a read-only context error."""
         super().__init__(message)
         self.message = message
 
