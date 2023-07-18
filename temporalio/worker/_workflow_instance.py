@@ -1265,9 +1265,19 @@ class _WorkflowInstanceImpl(
         defn: temporalio.workflow._SignalDefinition,
         job: temporalio.bridge.proto.workflow_activation.SignalWorkflow,
     ) -> None:
-        args = self._process_handler_args(
-            job.signal_name, job.input, defn.name, defn.arg_types, defn.dynamic_vararg
-        )
+        try:
+            args = self._process_handler_args(
+                job.signal_name,
+                job.input,
+                defn.name,
+                defn.arg_types,
+                defn.dynamic_vararg,
+            )
+        except Exception:
+            logger.exception(
+                f"Failed deserializing signal input for {job.signal_name}, dropping the signal"
+            )
+            return
         input = HandleSignalInput(
             signal=job.signal_name, args=args, headers=job.headers
         )

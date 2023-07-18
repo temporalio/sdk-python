@@ -7,8 +7,8 @@ import pickle
 import queue
 import sys
 import threading
+import typing
 import uuid
-import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -491,6 +491,46 @@ async def test_workflow_signal_qnd_query_handlers_old_dynamic_style(client: Clie
         assert "query dynamic unknown_query1: val3" == await handle.query(
             "unknown_query1", "val3"
         )
+
+
+@dataclass
+class BadSignalParam:
+    some_str: str
+
+
+@workflow.defn
+class BadSignalParamWorkflow:
+    def __init__(self) -> None:
+        self._signals: List[BadSignalParam] = []
+
+    @workflow.run
+    async def run(self) -> List[BadSignalParam]:
+        await workflow.wait_condition(
+            lambda: bool(self._signals) and self._signals[-1].some_str == "finish"
+        )
+        return self._signals
+
+    @workflow.signal
+    async def some_signal(self, param: BadSignalParam) -> None:
+        self._signals.append(param)
+
+
+async def test_workflow_bad_signal_param(client: Client):
+    async with new_worker(client, BadSignalParamWorkflow) as worker:
+        handle = await client.start_workflow(
+            BadSignalParamWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Send 4 signals, first and third are bad
+        await handle.signal("some_signal", "bad")
+        await handle.signal("some_signal", BadSignalParam(some_str="good"))
+        await handle.signal("some_signal", 123)
+        await handle.signal("some_signal", BadSignalParam(some_str="finish"))
+        assert [
+            BadSignalParam(some_str="good"),
+            BadSignalParam(some_str="finish"),
+        ] == await handle.result()
 
 
 @workflow.defn
@@ -3112,3 +3152,27 @@ async def test_workflow_queries_doing_bad_things(client: Client):
         await assert_bad_query("set_query_handler")
         await assert_bad_query("patch")
         await assert_bad_query("signal_external_handle")
+
+
+# typing.Self only in 3.11+
+if sys.version_info >= (3, 11):
+
+    @dataclass
+    class AnnotatedWithSelfParam:
+        some_str: str
+
+    @workflow.defn
+    class WorkflowAnnotatedWithSelf:
+        @workflow.run
+        async def run(self: typing.Self, some_arg: AnnotatedWithSelfParam) -> str:
+            assert isinstance(some_arg, AnnotatedWithSelfParam)
+            return some_arg.some_str
+
+    async def test_workflow_annotated_with_self(client: Client):
+        async with new_worker(client, WorkflowAnnotatedWithSelf) as worker:
+            assert "foo" == await client.execute_workflow(
+                WorkflowAnnotatedWithSelf.run,
+                AnnotatedWithSelfParam(some_str="foo"),
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )

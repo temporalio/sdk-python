@@ -260,7 +260,10 @@ def _type_hints_from_func(
         if (
             index == 0
             and value.name == "self"
-            and value.annotation is inspect.Parameter.empty
+            and (
+                value.annotation is inspect.Parameter.empty
+                or str(value.annotation) == "typing.Self"
+            )
         ):
             continue
         # Stop if non-positional or not a class

@@ -436,12 +436,7 @@ class _ActivityWorker:
             completion.result.completed.result.CopyFrom(
                 (await self._data_converter.encode([result]))[0]
             )
-        except (
-            Exception,
-            asyncio.CancelledError,
-            temporalio.exceptions.CancelledError,
-            temporalio.activity._CompleteAsyncError,
-        ) as err:
+        except BaseException as err:
             try:
                 if isinstance(err, temporalio.activity._CompleteAsyncError):
                     temporalio.activity.logger.debug("Completing asynchronously")
