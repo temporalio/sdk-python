@@ -28,7 +28,7 @@ class ReallySlowWorkflow:
         return "all done"
 
     @workflow.query
-    async def current_time(self) -> float:
+    def current_time(self) -> float:
         return workflow.now().timestamp()
 
     @workflow.signal

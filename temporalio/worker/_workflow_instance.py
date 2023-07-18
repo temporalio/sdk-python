@@ -12,6 +12,7 @@ import sys
 import traceback
 import warnings
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
@@ -21,6 +22,7 @@ from typing import (
     Deque,
     Dict,
     Generator,
+    Iterator,
     List,
     Mapping,
     MutableMapping,
@@ -193,6 +195,7 @@ class _WorkflowInstanceImpl(
         self._object: Any = None
         self._is_replaying: bool = False
         self._random = random.Random(det.randomness_seed)
+        self._read_only = False
 
         # Patches we have been notified of and memoized patch responses
         self._patches_notified: Set[str] = set()
@@ -421,36 +424,39 @@ class _WorkflowInstanceImpl(
             command = self._add_command()
             command.respond_to_query.query_id = job.query_id
             try:
-                # Named query or dynamic
-                defn = self._queries.get(job.query_type) or self._queries.get(None)
-                if not defn:
-                    known_queries = sorted([k for k in self._queries.keys() if k])
-                    raise RuntimeError(
-                        f"Query handler for '{job.query_type}' expected but not found, "
-                        f"known queries: [{' '.join(known_queries)}]"
-                    )
+                with self._as_read_only():
+                    # Named query or dynamic
+                    defn = self._queries.get(job.query_type) or self._queries.get(None)
+                    if not defn:
+                        known_queries = sorted([k for k in self._queries.keys() if k])
+                        raise RuntimeError(
+                            f"Query handler for '{job.query_type}' expected but not found, "
+                            f"known queries: [{' '.join(known_queries)}]"
+                        )
 
-                # Create input
-                args = self._process_handler_args(
-                    job.query_type,
-                    job.arguments,
-                    defn.name,
-                    defn.arg_types,
-                    defn.dynamic_vararg,
-                )
-                input = HandleQueryInput(
-                    id=job.query_id,
-                    query=job.query_type,
-                    args=args,
-                    headers=job.headers,
-                )
-                success = await self._inbound.handle_query(input)
-                result_payloads = self._payload_converter.to_payloads([success])
-                if len(result_payloads) != 1:
-                    raise ValueError(
-                        f"Expected 1 result payload, got {len(result_payloads)}"
+                    # Create input
+                    args = self._process_handler_args(
+                        job.query_type,
+                        job.arguments,
+                        defn.name,
+                        defn.arg_types,
+                        defn.dynamic_vararg,
                     )
-                command.respond_to_query.succeeded.response.CopyFrom(result_payloads[0])
+                    input = HandleQueryInput(
+                        id=job.query_id,
+                        query=job.query_type,
+                        args=args,
+                        headers=job.headers,
+                    )
+                    success = await self._inbound.handle_query(input)
+                    result_payloads = self._payload_converter.to_payloads([success])
+                    if len(result_payloads) != 1:
+                        raise ValueError(
+                            f"Expected 1 result payload, got {len(result_payloads)}"
+                        )
+                    command.respond_to_query.succeeded.response.CopyFrom(
+                        result_payloads[0]
+                    )
             except Exception as err:
                 try:
                     self._failure_converter.to_failure(
@@ -695,6 +701,7 @@ class _WorkflowInstanceImpl(
         search_attributes: Optional[temporalio.common.SearchAttributes],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
     ) -> NoReturn:
+        self._assert_not_read_only("continue as new")
         # Use definition if callable
         name: Optional[str] = None
         arg_types: Optional[List[Type]] = None
@@ -795,12 +802,20 @@ class _WorkflowInstanceImpl(
         return self._payload_converter
 
     def workflow_random(self) -> random.Random:
+        self._assert_not_read_only("random")
         return self._random
 
     def workflow_set_query_handler(
         self, name: Optional[str], handler: Optional[Callable]
     ) -> None:
+        self._assert_not_read_only("set query handler")
         if handler:
+            if inspect.iscoroutinefunction(handler):
+                warnings.warn(
+                    "Queries as async def functions are deprecated",
+                    DeprecationWarning,
+                    stacklevel=3,
+                )
             defn = temporalio.workflow._QueryDefinition(
                 name=name, fn=handler, is_method=False
             )
@@ -817,6 +832,7 @@ class _WorkflowInstanceImpl(
     def workflow_set_signal_handler(
         self, name: Optional[str], handler: Optional[Callable]
     ) -> None:
+        self._assert_not_read_only("set signal handler")
         if handler:
             defn = temporalio.workflow._SignalDefinition(
                 name=name, fn=handler, is_method=False
@@ -855,6 +871,7 @@ class _WorkflowInstanceImpl(
         activity_id: Optional[str],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
     ) -> temporalio.workflow.ActivityHandle[Any]:
+        self._assert_not_read_only("start activity")
         # Get activity definition if it's callable
         name: str
         arg_types: Optional[List[Type]] = None
@@ -1012,6 +1029,7 @@ class _WorkflowInstanceImpl(
     async def workflow_wait_condition(
         self, fn: Callable[[], bool], *, timeout: Optional[float] = None
     ) -> None:
+        self._assert_not_read_only("wait condition")
         fut = self.create_future()
         self._conditions.append((fn, fut))
         await asyncio.wait_for(fut, timeout)
@@ -1153,7 +1171,23 @@ class _WorkflowInstanceImpl(
     # These are in alphabetical order.
 
     def _add_command(self) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
+        self._assert_not_read_only("add command")
         return self._current_completion.successful.commands.add()
+
+    @contextmanager
+    def _as_read_only(self) -> Iterator[None]:
+        prev_val = self._read_only
+        self._read_only = True
+        try:
+            yield None
+        finally:
+            self._read_only = prev_val
+
+    def _assert_not_read_only(self, action_attempted: str) -> None:
+        if self._read_only:
+            raise temporalio.workflow.ReadOnlyContextError(
+                f"While in read-only function, action attempted: {action_attempted}"
+            )
 
     async def _cancel_external_workflow(
         self,
@@ -1258,6 +1292,7 @@ class _WorkflowInstanceImpl(
         *,
         name: Optional[str],
     ) -> None:
+        self._assert_not_read_only("create task")
         # Name not supported on older Python versions
         if sys.version_info >= (3, 8):
             # Put the workflow info at the end of the task name
@@ -1423,6 +1458,7 @@ class _WorkflowInstanceImpl(
         *args: Any,
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.Handle:
+        self._assert_not_read_only("schedule task")
         handle = asyncio.Handle(callback, args, self, context)
         self._ready.append(handle)
         return handle
@@ -1434,6 +1470,7 @@ class _WorkflowInstanceImpl(
         *args: Any,
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.TimerHandle:
+        self._assert_not_read_only("schedule timer")
         # Delay must be positive
         if delay < 0:
             raise RuntimeError("Attempting to schedule timer with negative delay")
@@ -1675,6 +1712,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         instance._register_task(self, name=f"activity: {input.activity}")
 
     def cancel(self, msg: Optional[Any] = None) -> bool:
+        self._instance._assert_not_read_only("cancel activity handle")
         # We override this because if it's not yet started and not done, we need
         # to send a cancel command because the async function won't run to trap
         # the cancel (i.e. cancelled before started)
@@ -1821,6 +1859,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         *,
         args: Sequence[Any] = [],
     ) -> None:
+        self._instance._assert_not_read_only("signal child handle")
         await self._instance._outbound.signal_child_workflow(
             SignalChildWorkflowInput(
                 signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
@@ -1935,6 +1974,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         *,
         args: Sequence[Any] = [],
     ) -> None:
+        self._instance._assert_not_read_only("signal external handle")
         await self._instance._outbound.signal_external_workflow(
             SignalExternalWorkflowInput(
                 signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
@@ -1949,6 +1989,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         )
 
     async def cancel(self) -> None:
+        self._instance._assert_not_read_only("cancel external handle")
         command = self._instance._add_command()
         v = command.request_cancel_external_workflow_execution
         v.workflow_execution.namespace = self._instance._info.namespace
