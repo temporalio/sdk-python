@@ -336,10 +336,33 @@ class Info:
     def get_current_history_length(self) -> int:
         """Get the current number of events in history.
 
+        Note, this value may not be up to date if accessed inside a query.
+
         Returns:
             Current number of events in history (up until the current task).
         """
         return _Runtime.current().workflow_get_current_history_length()
+
+    def get_current_history_size(self) -> int:
+        """Get the current byte size of history.
+
+        Note, this value may not be up to date if accessed inside a query.
+
+        Returns:
+            Current byte-size of history (up until the current task).
+        """
+        return _Runtime.current().workflow_get_current_history_size()
+
+    def is_continue_as_new_suggested(self) -> bool:
+        """Get whether or not continue as new is suggested.
+
+        Note, this value may not be up to date if accessed inside a query.
+
+        Returns:
+            True if the server is configured to suggest continue as new and it
+            is suggested.
+        """
+        return _Runtime.current().workflow_is_continue_as_new_suggested()
 
 
 @dataclass(frozen=True)
@@ -406,6 +429,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_get_current_history_size(self) -> int:
+        ...
+
+    @abstractmethod
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
     ) -> ExternalWorkflowHandle[Any]:
@@ -421,6 +448,10 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_info(self) -> Info:
+        ...
+
+    @abstractmethod
+    def workflow_is_continue_as_new_suggested(self) -> bool:
         ...
 
     @abstractmethod
