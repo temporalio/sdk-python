@@ -132,7 +132,6 @@ class InfoWorkflow:
     async def run(self) -> Dict:
         # Convert to JSON and back so it'll stringify un-JSON-able pieces
         ret = dataclasses.asdict(workflow.info())
-        ret["current_history_length"] = workflow.info().get_current_history_length()
         return json.loads(json.dumps(ret, default=str))
 
 
@@ -158,7 +157,6 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         )
         assert info["attempt"] == 1
         assert info["cron_schedule"] is None
-        assert info["current_history_length"] == 3
         assert info["execution_timeout"] is None
         assert info["namespace"] == client.namespace
         assert info["retry_policy"] == json.loads(
@@ -171,6 +169,68 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         assert info["task_timeout"] == "0:00:10"
         assert info["workflow_id"] == workflow_id
         assert info["workflow_type"] == "InfoWorkflow"
+
+
+@dataclass
+class HistoryInfo:
+    history_length: int
+    history_size: int
+    continue_as_new_suggested: bool
+
+
+@workflow.defn
+class HistoryInfoWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Just wait forever
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.signal
+    async def bunch_of_events(self, count: int) -> None:
+        # Create a lot of one-day timers
+        for _ in range(count):
+            asyncio.create_task(asyncio.sleep(60 * 60 * 24))
+
+    @workflow.query
+    def get_history_info(self) -> HistoryInfo:
+        return HistoryInfo(
+            history_length=workflow.info().get_current_history_length(),
+            history_size=workflow.info().get_current_history_size(),
+            continue_as_new_suggested=workflow.info().is_continue_as_new_suggested(),
+        )
+
+
+async def test_workflow_history_info(
+    client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support should continue as new")
+    async with new_worker(client, HistoryInfoWorkflow) as worker:
+        handle = await client.start_workflow(
+            HistoryInfoWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Issue query before anything else, which should mean only a history
+        # size of 3, at least 100 bytes of history, and no continue as new
+        # suggestion
+        orig_info = await handle.query(HistoryInfoWorkflow.get_history_info)
+        assert orig_info.history_length == 3
+        assert orig_info.history_size > 100
+        assert not orig_info.continue_as_new_suggested
+
+        # Now send a lot of events
+        await handle.signal(
+            HistoryInfoWorkflow.bunch_of_events, continue_as_new_suggest_history_count
+        )
+        # Send one more event to trigger the WFT update. We have to do this
+        # because just a query will have a stale representation of history
+        # counts, but signal forces a new WFT.
+        await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
+        new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
+        assert new_info.history_length > continue_as_new_suggest_history_count
+        assert new_info.history_size > orig_info.history_size
+        assert new_info.continue_as_new_suggested
 
 
 @workflow.defn

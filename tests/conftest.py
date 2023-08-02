@@ -79,6 +79,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
             dev_server_extra_args=[
                 "--dynamic-config-value",
                 "system.forceSearchAttributesCacheRefreshOnRead=true",
+                "--dynamic-config-value",
+                f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
             ]
         )
     elif env_type == "time-skipping":
@@ -101,3 +103,11 @@ async def worker(
     worker = ExternalPythonWorker(env)
     yield worker
     await worker.close()
+
+
+CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
+
+
+@pytest.fixture
+def continue_as_new_suggest_history_count() -> int:
+    return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT

@@ -175,6 +175,8 @@ class _WorkflowInstanceImpl(
         self._time_ns = 0
         self._cancel_requested = False
         self._current_history_length = 0
+        self._current_history_size = 0
+        self._continue_as_new_suggested = False
         # Lazily loaded
         self._memo: Optional[Mapping[str, Any]] = None
         # Handles which are ready to run on the next event loop iteration
@@ -272,6 +274,8 @@ class _WorkflowInstanceImpl(
         self._current_completion.successful.SetInParent()
         self._current_activation_error: Optional[Exception] = None
         self._current_history_length = act.history_length
+        self._current_history_size = act.history_size_bytes
+        self._continue_as_new_suggested = act.continue_as_new_suggested
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
 
@@ -738,6 +742,9 @@ class _WorkflowInstanceImpl(
     def workflow_get_current_history_length(self) -> int:
         return self._current_history_length
 
+    def workflow_get_current_history_size(self) -> int:
+        return self._current_history_size
+
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
@@ -759,6 +766,9 @@ class _WorkflowInstanceImpl(
 
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
+
+    def workflow_is_continue_as_new_suggested(self) -> bool:
+        return self._continue_as_new_suggested
 
     def workflow_is_replaying(self) -> bool:
         return self._is_replaying
