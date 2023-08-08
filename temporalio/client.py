@@ -260,7 +260,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -284,7 +289,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -310,7 +320,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -336,7 +351,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -360,11 +380,17 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -385,7 +411,9 @@ class Client:
             retry_policy: Retry policy for the workflow.
             cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
             memo: Memo for the workflow.
-            search_attributes: Search attributes for the workflow.
+            search_attributes: Search attributes for the workflow. The
+                dictionary form of this is deprecated, use
+                :py:class:`temporalio.common.TypedSearchAttributes`.
             start_signal: If present, this signal is sent as signal-with-start
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
@@ -415,6 +443,9 @@ class Client:
                 result_type = defn.ret_type
         else:
             raise TypeError("Workflow must be a string or callable")
+        temporalio.common._warn_on_deprecated_search_attributes(
+            search_attributes, stack_level=stack_level
+        )
 
         return await self._impl.start_workflow(
             StartWorkflowInput(
@@ -454,7 +485,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -478,7 +514,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -504,7 +545,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -530,7 +576,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -554,7 +605,12 @@ class Client:
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -587,6 +643,7 @@ class Client:
                 start_signal_args=start_signal_args,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                stack_level=3,
             )
         ).result()
 
@@ -751,7 +808,12 @@ class Client:
         trigger_immediately: bool = False,
         backfill: Sequence[ScheduleBackfill] = [],
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ScheduleHandle:
@@ -768,7 +830,8 @@ class Client:
                 of the schedule action.
             search_attributes: Search attributes for the schedule. Search
                 attributes for a scheduled workflow are part of the scheduled
-                action.
+                action. The dictionary form of this is DEPRECATED, use
+                :py:class:`temporalio.common.TypedSearchAttributes`.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
@@ -780,6 +843,7 @@ class Client:
             ScheduleAlreadyRunningError: If a schedule with this ID is already
                 running.
         """
+        temporalio.common._warn_on_deprecated_search_attributes(search_attributes)
         return await self._impl.create_schedule(
             CreateScheduleInput(
                 id=id,
@@ -918,7 +982,7 @@ class Client:
                 associated with the given Build IDs in a namespace, all Task Queues will be listed
                 in the response but some of them may not contain reachability information due to a
                 server enforced limit. When reaching the limit, task queues that reachability
-                information could not be retrieved for will be marked with a `NotFetched` entry in
+                information could not be retrieved for will be marked with a ``NotFetched`` entry in
                 {@link BuildIdReachability.taskQueueReachability}. The caller may issue another call
                 to get the reachability for those task queues.
             reachability_type: The kind of reachability this request is concerned with.
@@ -1748,7 +1812,11 @@ class WorkflowExecution:
     """Run ID for this workflow run."""
 
     search_attributes: temporalio.common.SearchAttributes
-    """Current set of search attributes if any."""
+    """Current set of search attributes if any.
+
+    .. deprecated::
+        Use :py:attr:`typed_search_attributes` instead.
+    """
 
     start_time: datetime
     """When the workflow was created."""
@@ -1758,6 +1826,9 @@ class WorkflowExecution:
 
     task_queue: str
     """Task queue for the workflow."""
+
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
+    """Current set of search attributes if any."""
 
     workflow_type: str
     """Type name for the workflow."""
@@ -1793,6 +1864,9 @@ class WorkflowExecution:
             start_time=info.start_time.ToDatetime().replace(tzinfo=timezone.utc),
             status=WorkflowExecutionStatus(info.status) if info.status else None,
             task_queue=info.task_queue,
+            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
+                info.search_attributes
+            ),
             workflow_type=info.type.name,
             **additional_fields,
         )
@@ -2678,7 +2752,17 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     memo: Optional[
         Union[Mapping[str, Any], Mapping[str, temporalio.api.common.v1.Payload]]
     ]
+
     search_attributes: temporalio.common.SearchAttributes
+    """Search attributes for the schedule.
+    
+    .. deprecated::
+        Use :py:attr:`typed_search_attributes` instead.
+    """
+
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
+    """Search attributes for the schedule."""
+
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None
 
     @staticmethod
@@ -2698,7 +2782,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
+        search_attributes: Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ] = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
 
@@ -2716,7 +2802,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
+        search_attributes: Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ] = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
 
@@ -2736,7 +2824,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
+        search_attributes: Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ] = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
 
@@ -2755,7 +2845,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
+        search_attributes: Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ] = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
 
@@ -2782,7 +2874,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
+        search_attributes: Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ] = temporalio.common.TypedSearchAttributes.empty,
         raw_info: Optional[temporalio.api.workflow.v1.NewWorkflowExecutionInfo] = None,
     ) -> None:
         """Create a start-workflow action.
@@ -2821,6 +2915,11 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             self.search_attributes = temporalio.converter.decode_search_attributes(
                 raw_info.search_attributes
             )
+            self.typed_search_attributes = (
+                temporalio.converter.decode_typed_search_attributes(
+                    raw_info.search_attributes
+                )
+            )
         else:
             if not id:
                 raise ValueError("ID required")
@@ -2843,7 +2942,15 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             self.task_timeout = task_timeout
             self.retry_policy = retry_policy
             self.memo = memo
-            self.search_attributes = search_attributes
+            temporalio.common._warn_on_deprecated_search_attributes(search_attributes)
+            if isinstance(search_attributes, temporalio.common.TypedSearchAttributes):
+                self.search_attributes = {}
+                self.typed_search_attributes = search_attributes
+            else:
+                self.search_attributes = search_attributes
+                self.typed_search_attributes = (
+                    temporalio.common.TypedSearchAttributes.empty
+                )
 
     async def _to_proto(
         self, client: Client
@@ -2864,7 +2971,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         if self.retry_policy:
             retry_policy = temporalio.api.common.v1.RetryPolicy()
             self.retry_policy.apply_to_proto(retry_policy)
-        return temporalio.api.schedule.v1.ScheduleAction(
+        action = temporalio.api.schedule.v1.ScheduleAction(
             start_workflow=temporalio.api.workflow.v1.NewWorkflowExecutionInfo(
                 workflow_id=self.id,
                 workflow_type=temporalio.api.common.v1.WorkflowType(name=self.workflow),
@@ -2893,19 +3000,17 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                         for k, v in self.memo.items()
                     },
                 ),
-                search_attributes=None
-                if not self.search_attributes
-                else temporalio.api.common.v1.SearchAttributes(
-                    indexed_fields={
-                        k: temporalio.converter.encode_search_attribute_values(v)
-                        for k, v in self.search_attributes.items()
-                    },
-                ),
                 header=None
                 if not self.headers
                 else temporalio.api.common.v1.Header(fields=self.headers),
             ),
         )
+        temporalio.converter._encode_maybe_typed_search_attributes(
+            self.search_attributes,
+            self.typed_search_attributes,
+            action.start_workflow.search_attributes,
+        )
+        return action
 
 
 @dataclass
@@ -3131,8 +3236,15 @@ class ScheduleDescription:
     info: ScheduleInfo
     """Information about the schedule."""
 
-    search_attributes: temporalio.common.SearchAttributes
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
     """Search attributes on the schedule."""
+
+    search_attributes: temporalio.common.SearchAttributes
+    """Search attributes on the schedule.
+    
+    .. deprecated::
+        Use :py:attr:`typed_search_attributes` instead.
+    """
 
     data_converter: temporalio.converter.DataConverter
     """Data converter used for memo decoding."""
@@ -3150,6 +3262,9 @@ class ScheduleDescription:
             id=id,
             schedule=Schedule._from_proto(desc.schedule),
             info=ScheduleInfo._from_proto(desc.info),
+            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
+                desc.search_attributes
+            ),
             search_attributes=temporalio.converter.decode_search_attributes(
                 desc.search_attributes
             ),
@@ -3365,8 +3480,15 @@ class ScheduleListDescription:
     visibility.
     """
 
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
+    """Search attributes on the schedule."""
+
     search_attributes: temporalio.common.SearchAttributes
-    """Search attribytes on the schedule."""
+    """Search attributes on the schedule.
+    
+    .. deprecated::
+        Use :py:attr:`typed_search_attributes` instead.
+    """
 
     data_converter: temporalio.converter.DataConverter
     """Data converter used for memo decoding."""
@@ -3387,6 +3509,9 @@ class ScheduleListDescription:
             info=ScheduleListInfo._from_proto(entry.info)
             if entry.HasField("info")
             else None,
+            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
+                entry.search_attributes
+            ),
             search_attributes=temporalio.converter.decode_search_attributes(
                 entry.search_attributes
             ),
@@ -3738,7 +3863,11 @@ class StartWorkflowInput:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[temporalio.common.SearchAttributes]
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
     start_signal_args: Sequence[Any]
@@ -3887,7 +4016,11 @@ class CreateScheduleInput:
     trigger_immediately: bool
     backfill: Sequence[ScheduleBackfill]
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[temporalio.common.SearchAttributes]
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -3995,7 +4128,7 @@ class GetWorkerBuildIdCompatibilityInput:
 
 @dataclass
 class GetWorkerTaskReachabilityInput:
-    """Input for :py:meth:`OutboundInterceptor.get_worker_build_id_reachability`."""
+    """Input for :py:meth:`OutboundInterceptor.get_worker_task_reachability`."""
 
     build_ids: Sequence[str]
     task_queues: Sequence[str]
@@ -4158,7 +4291,7 @@ class OutboundInterceptor:
     async def get_worker_task_reachability(
         self, input: GetWorkerTaskReachabilityInput
     ) -> WorkerTaskReachability:
-        """Called for every :py:meth:`Client.get_worker_build_id_reachability` call."""
+        """Called for every :py:meth:`Client.get_worker_task_reachability` call."""
         return await self.next.get_worker_task_reachability(input)
 
 
@@ -4582,31 +4715,28 @@ class _ClientImpl(OutboundInterceptor):
                 backfill_request=[b._to_proto() for b in input.backfill],
             )
         try:
-            await self._client.workflow_service.create_schedule(
-                temporalio.api.workflowservice.v1.CreateScheduleRequest(
-                    namespace=self._client.namespace,
-                    schedule_id=input.id,
-                    schedule=await input.schedule._to_proto(self._client),
-                    initial_patch=initial_patch,
-                    identity=self._client.identity,
-                    request_id=str(uuid.uuid4()),
-                    memo=None
-                    if not input.memo
-                    else temporalio.api.common.v1.Memo(
-                        fields={
-                            k: (await self._client.data_converter.encode([v]))[0]
-                            for k, v in input.memo.items()
-                        },
-                    ),
-                    search_attributes=None
-                    if not input.search_attributes
-                    else temporalio.api.common.v1.SearchAttributes(
-                        indexed_fields={
-                            k: temporalio.converter.encode_search_attribute_values(v)
-                            for k, v in input.search_attributes.items()
-                        },
-                    ),
+            request = temporalio.api.workflowservice.v1.CreateScheduleRequest(
+                namespace=self._client.namespace,
+                schedule_id=input.id,
+                schedule=await input.schedule._to_proto(self._client),
+                initial_patch=initial_patch,
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                memo=None
+                if not input.memo
+                else temporalio.api.common.v1.Memo(
+                    fields={
+                        k: (await self._client.data_converter.encode([v]))[0]
+                        for k, v in input.memo.items()
+                    },
                 ),
+            )
+            if input.search_attributes:
+                temporalio.converter.encode_search_attributes(
+                    input.search_attributes, request.search_attributes
+                )
+            await self._client.workflow_service.create_schedule(
+                request,
                 retry=True,
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,

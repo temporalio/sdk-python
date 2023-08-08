@@ -16,6 +16,7 @@ from typing import (
     Optional,
     Sequence,
     Type,
+    Union,
 )
 
 import temporalio.activity
@@ -153,7 +154,11 @@ class ContinueAsNewInput:
     task_timeout: Optional[timedelta]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[temporalio.common.SearchAttributes]
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: Optional[VersioningIntent]
     # The types may be absent
@@ -251,7 +256,11 @@ class StartChildWorkflowInput:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[temporalio.common.SearchAttributes]
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: Optional[VersioningIntent]
     # The types may be absent

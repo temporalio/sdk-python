@@ -22,6 +22,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Union,
     cast,
 )
 
@@ -49,7 +50,15 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowQueryFailedError,
 )
-from temporalio.common import RawValue, RetryPolicy, SearchAttributes
+from temporalio.common import (
+    RawValue,
+    RetryPolicy,
+    SearchAttributeKey,
+    SearchAttributePair,
+    SearchAttributes,
+    SearchAttributeValues,
+    TypedSearchAttributes,
+)
 from temporalio.converter import (
     DataConverter,
     DefaultFailureConverterWithEncodedAttributes,
@@ -1537,51 +1546,90 @@ async def test_workflow_continue_as_new(client: Client, env: WorkflowEnvironment
 sa_prefix = "python_test_"
 
 
-def search_attrs_to_dict_with_type(attrs: SearchAttributes) -> Mapping[str, Any]:
-    return {
-        k: {
-            "type": vals[0].__class__.__name__ if vals else "<unknown>",
-            "values": [str(v) if isinstance(v, datetime) else v for v in vals],
+def search_attributes_to_serializable(
+    attrs: Union[SearchAttributes, TypedSearchAttributes]
+) -> Mapping[str, Any]:
+    if isinstance(attrs, TypedSearchAttributes):
+        return {
+            p.key.name: str(p.value) for p in attrs if p.key.name.startswith(sa_prefix)
         }
+    return {
+        # Ignore ones without our prefix
+        k: [str(v) if isinstance(v, datetime) else v for v in vals]
         for k, vals in attrs.items()
+        if k.startswith(sa_prefix)
     }
 
 
 @workflow.defn
 class SearchAttributeWorkflow:
+    text_attribute = SearchAttributeKey.for_text(f"{sa_prefix}text")
+    keyword_attribute = SearchAttributeKey.for_keyword(f"{sa_prefix}keyword")
+    keyword_list_attribute = SearchAttributeKey.for_keyword_list(
+        f"{sa_prefix}keyword_list"
+    )
+    int_attribute = SearchAttributeKey.for_int(f"{sa_prefix}int")
+    float_attribute = SearchAttributeKey.for_float(f"{sa_prefix}double")
+    bool_attribute = SearchAttributeKey.for_bool(f"{sa_prefix}bool")
+    datetime_attribute = SearchAttributeKey.for_datetime(f"{sa_prefix}datetime")
+
     @workflow.run
     async def run(self) -> None:
         # Wait forever
         await asyncio.Future()
 
     @workflow.query
-    def get_search_attributes(self) -> Mapping[str, Mapping[str, Any]]:
-        return search_attrs_to_dict_with_type(workflow.info().search_attributes or {})
+    def get_search_attributes_untyped(self) -> Mapping[str, Any]:
+        return search_attributes_to_serializable(workflow.info().search_attributes)
+
+    @workflow.query
+    def get_search_attributes_typed(self) -> Mapping[str, Any]:
+        return search_attributes_to_serializable(
+            workflow.info().typed_search_attributes
+        )
 
     @workflow.signal
-    def do_search_attribute_update(self) -> None:
+    def do_search_attribute_update_untyped(self) -> None:
         empty_float_list: List[float] = []
         workflow.upsert_search_attributes(
             {
-                f"{sa_prefix}text": ["text2"],
+                SearchAttributeWorkflow.text_attribute.name: ["text2"],
                 # We intentionally leave keyword off to confirm it still comes
                 # back but replace keyword list
-                f"{sa_prefix}keyword_list": ["keywordlist3", "keywordlist4"],
-                f"{sa_prefix}int": [456],
+                SearchAttributeWorkflow.keyword_list_attribute.name: [
+                    "keywordlist3",
+                    "keywordlist4",
+                ],
+                SearchAttributeWorkflow.int_attribute.name: [456],
                 # Empty list to confirm removed
-                f"{sa_prefix}double": empty_float_list,
-                f"{sa_prefix}bool": [False],
-                f"{sa_prefix}datetime": [
+                SearchAttributeWorkflow.float_attribute.name: empty_float_list,
+                SearchAttributeWorkflow.bool_attribute.name: [False],
+                SearchAttributeWorkflow.datetime_attribute.name: [
                     datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9)))
                 ],
             }
         )
 
+    @workflow.signal
+    def do_search_attribute_update_typed(self) -> None:
+        # Matches do_search_attribute_update_untyped
+        workflow.upsert_search_attributes(
+            [
+                SearchAttributeWorkflow.text_attribute.value_set("text2"),
+                SearchAttributeWorkflow.keyword_list_attribute.value_set(
+                    ["keywordlist3", "keywordlist4"]
+                ),
+                SearchAttributeWorkflow.int_attribute.value_set(456),
+                SearchAttributeWorkflow.float_attribute.value_unset(),
+                SearchAttributeWorkflow.bool_attribute.value_set(False),
+                SearchAttributeWorkflow.datetime_attribute.value_set(
+                    datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9)))
+                ),
+            ]
+        )
 
-async def test_workflow_search_attributes(client: Client, env_type: str):
-    if env_type != "local":
-        pytest.skip("Only testing search attributes on local which disables cache")
 
+async def ensure_search_attributes_on_server(client: Client) -> None:
     async def search_attributes_present() -> bool:
         resp = await client.operator_service.list_search_attributes(
             ListSearchAttributesRequest(namespace=client.namespace)
@@ -1590,91 +1638,190 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
 
     # Add search attributes if not already present
     if not await search_attributes_present():
+        attrs: List[SearchAttributeKey] = [
+            SearchAttributeWorkflow.text_attribute,
+            SearchAttributeWorkflow.keyword_attribute,
+            SearchAttributeWorkflow.keyword_list_attribute,
+            SearchAttributeWorkflow.int_attribute,
+            SearchAttributeWorkflow.float_attribute,
+            SearchAttributeWorkflow.bool_attribute,
+            SearchAttributeWorkflow.datetime_attribute,
+        ]
         await client.operator_service.add_search_attributes(
             AddSearchAttributesRequest(
                 namespace=client.namespace,
                 search_attributes={
-                    f"{sa_prefix}text": IndexedValueType.INDEXED_VALUE_TYPE_TEXT,
-                    f"{sa_prefix}keyword": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD,
-                    f"{sa_prefix}keyword_list": IndexedValueType.INDEXED_VALUE_TYPE_KEYWORD_LIST,
-                    f"{sa_prefix}int": IndexedValueType.INDEXED_VALUE_TYPE_INT,
-                    f"{sa_prefix}double": IndexedValueType.INDEXED_VALUE_TYPE_DOUBLE,
-                    f"{sa_prefix}bool": IndexedValueType.INDEXED_VALUE_TYPE_BOOL,
-                    f"{sa_prefix}datetime": IndexedValueType.INDEXED_VALUE_TYPE_DATETIME,
+                    attr.name: IndexedValueType.ValueType(attr.indexed_value_type)
+                    for attr in attrs
                 },
             ),
         )
     # Confirm now present
     assert await search_attributes_present()
 
+
+async def test_workflow_search_attributes(client: Client, env_type: str):
+    if env_type != "local":
+        pytest.skip("Only testing search attributes on local which disables cache")
+    await ensure_search_attributes_on_server(client)
+
+    initial_attrs_untyped: SearchAttributes = {
+        SearchAttributeWorkflow.text_attribute.name: ["text1"],
+        SearchAttributeWorkflow.keyword_attribute.name: ["keyword1"],
+        SearchAttributeWorkflow.keyword_list_attribute.name: [
+            "keywordlist1",
+            "keywordlist2",
+        ],
+        SearchAttributeWorkflow.int_attribute.name: [123],
+        SearchAttributeWorkflow.float_attribute.name: [456.78],
+        SearchAttributeWorkflow.bool_attribute.name: [True],
+        SearchAttributeWorkflow.datetime_attribute.name: [
+            datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc)
+        ],
+    }
+    initial_attrs_typed = TypedSearchAttributes(
+        [
+            SearchAttributePair(SearchAttributeWorkflow.text_attribute, "text1"),
+            SearchAttributePair(SearchAttributeWorkflow.keyword_attribute, "keyword1"),
+            SearchAttributePair(
+                SearchAttributeWorkflow.keyword_list_attribute,
+                ["keywordlist1", "keywordlist2"],
+            ),
+            SearchAttributePair(SearchAttributeWorkflow.int_attribute, 123),
+            SearchAttributePair(SearchAttributeWorkflow.float_attribute, 456.78),
+            SearchAttributePair(SearchAttributeWorkflow.bool_attribute, True),
+            SearchAttributePair(
+                SearchAttributeWorkflow.datetime_attribute,
+                datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    updated_attrs_untyped: Dict[str, SearchAttributeValues] = {
+        SearchAttributeWorkflow.text_attribute.name: ["text2"],
+        SearchAttributeWorkflow.keyword_attribute.name: ["keyword1"],
+        SearchAttributeWorkflow.keyword_list_attribute.name: [
+            "keywordlist3",
+            "keywordlist4",
+        ],
+        SearchAttributeWorkflow.int_attribute.name: [456],
+        SearchAttributeWorkflow.float_attribute.name: cast(List[float], []),
+        SearchAttributeWorkflow.bool_attribute.name: [False],
+        SearchAttributeWorkflow.datetime_attribute.name: [
+            datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9)))
+        ],
+    }
+    updated_attrs_untyped_from_server: Dict[str, SearchAttributeValues] = {
+        SearchAttributeWorkflow.text_attribute.name: ["text2"],
+        SearchAttributeWorkflow.keyword_attribute.name: ["keyword1"],
+        SearchAttributeWorkflow.keyword_list_attribute.name: [
+            "keywordlist3",
+            "keywordlist4",
+        ],
+        SearchAttributeWorkflow.int_attribute.name: [456],
+        # No float value
+        SearchAttributeWorkflow.bool_attribute.name: [False],
+        SearchAttributeWorkflow.datetime_attribute.name: [
+            datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9)))
+        ],
+    }
+    updated_attrs_typed = TypedSearchAttributes(
+        [
+            SearchAttributePair(SearchAttributeWorkflow.text_attribute, "text2"),
+            SearchAttributePair(SearchAttributeWorkflow.keyword_attribute, "keyword1"),
+            SearchAttributePair(
+                SearchAttributeWorkflow.keyword_list_attribute,
+                ["keywordlist3", "keywordlist4"],
+            ),
+            SearchAttributePair(SearchAttributeWorkflow.int_attribute, 456),
+            SearchAttributePair(SearchAttributeWorkflow.bool_attribute, False),
+            SearchAttributePair(
+                SearchAttributeWorkflow.datetime_attribute,
+                datetime(2003, 4, 5, 6, 7, 8, tzinfo=timezone(timedelta(hours=9))),
+            ),
+        ]
+    )
+
+    async def describe_attributes_untyped(handle: WorkflowHandle) -> SearchAttributes:
+        # Remove any not our prefix
+        return {
+            k: v
+            for k, v in (await handle.describe()).search_attributes.items()
+            if k.startswith(sa_prefix)
+        }
+
+    async def describe_attributes_typed(
+        handle: WorkflowHandle,
+    ) -> TypedSearchAttributes:
+        # Remove any not our prefix
+        attrs = (await handle.describe()).typed_search_attributes
+        return dataclasses.replace(
+            attrs,
+            search_attributes=[p for p in attrs if p.key.name.startswith(sa_prefix)],
+        )
+
+    # Mutate with untyped mutators (but check untyped/typed)
     async with new_worker(client, SearchAttributeWorkflow) as worker:
         handle = await client.start_workflow(
             SearchAttributeWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            search_attributes={
-                f"{sa_prefix}text": ["text1"],
-                f"{sa_prefix}keyword": ["keyword1"],
-                f"{sa_prefix}keyword_list": ["keywordlist1", "keywordlist2"],
-                f"{sa_prefix}int": [123],
-                f"{sa_prefix}double": [456.78],
-                f"{sa_prefix}bool": [True],
-                f"{sa_prefix}datetime": [
-                    datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc)
-                ],
-            },
-        )
-        # Make sure it started with the right attributes
-        expected = {
-            f"{sa_prefix}text": {"type": "str", "values": ["text1"]},
-            f"{sa_prefix}keyword": {"type": "str", "values": ["keyword1"]},
-            f"{sa_prefix}keyword_list": {
-                "type": "str",
-                "values": ["keywordlist1", "keywordlist2"],
-            },
-            f"{sa_prefix}int": {"type": "int", "values": [123]},
-            f"{sa_prefix}double": {"type": "float", "values": [456.78]},
-            f"{sa_prefix}bool": {"type": "bool", "values": [True]},
-            f"{sa_prefix}datetime": {
-                "type": "datetime",
-                "values": ["2001-02-03 04:05:06+00:00"],
-            },
-        }
-        assert expected == await handle.query(
-            SearchAttributeWorkflow.get_search_attributes
+            search_attributes=initial_attrs_untyped,
         )
 
-        # Do an attribute update and check query
-        await handle.signal(SearchAttributeWorkflow.do_search_attribute_update)
-        expected = {
-            f"{sa_prefix}text": {"type": "str", "values": ["text2"]},
-            f"{sa_prefix}keyword": {"type": "str", "values": ["keyword1"]},
-            f"{sa_prefix}keyword_list": {
-                "type": "str",
-                "values": ["keywordlist3", "keywordlist4"],
-            },
-            f"{sa_prefix}int": {"type": "int", "values": [456]},
-            f"{sa_prefix}double": {"type": "<unknown>", "values": []},
-            f"{sa_prefix}bool": {"type": "bool", "values": [False]},
-            f"{sa_prefix}datetime": {
-                "type": "datetime",
-                "values": ["2003-04-05 06:07:08+09:00"],
-            },
-        }
-        assert expected == await handle.query(
-            SearchAttributeWorkflow.get_search_attributes
+        # Check query/describe
+        assert search_attributes_to_serializable(
+            initial_attrs_untyped
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_untyped)
+        assert initial_attrs_untyped == await describe_attributes_untyped(handle)
+        assert search_attributes_to_serializable(
+            initial_attrs_typed
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_typed)
+        assert initial_attrs_typed == await describe_attributes_typed(handle)
+
+        # Update and check query/describe
+        await handle.signal(SearchAttributeWorkflow.do_search_attribute_update_untyped)
+        assert search_attributes_to_serializable(
+            updated_attrs_untyped
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_untyped)
+        assert updated_attrs_untyped_from_server == await describe_attributes_untyped(
+            handle
+        )
+        assert search_attributes_to_serializable(
+            updated_attrs_typed
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_typed)
+        assert updated_attrs_typed == await describe_attributes_typed(handle)
+
+    # Mutate with typed mutators (but check untyped/typed)
+    async with new_worker(client, SearchAttributeWorkflow) as worker:
+        handle = await client.start_workflow(
+            SearchAttributeWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            search_attributes=initial_attrs_typed,
         )
 
-        # Also confirm it matches describe from the server
-        desc = await handle.describe()
-        # Remove attrs without our prefix
-        attrs = {
-            k: v for k, v in desc.search_attributes.items() if k.startswith(sa_prefix)
-        }
-        # Check against expected, but remove double from expected since it is
-        # no longer present
-        del expected[f"{sa_prefix}double"]
-        assert expected == search_attrs_to_dict_with_type(attrs)
+        # Check query/describe
+        assert search_attributes_to_serializable(
+            initial_attrs_untyped
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_untyped)
+        assert initial_attrs_untyped == await describe_attributes_untyped(handle)
+        assert search_attributes_to_serializable(
+            initial_attrs_typed
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_typed)
+        assert initial_attrs_typed == await describe_attributes_typed(handle)
+
+        # Update and check query/describe
+        await handle.signal(SearchAttributeWorkflow.do_search_attribute_update_typed)
+        assert search_attributes_to_serializable(
+            updated_attrs_untyped
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_untyped)
+        assert updated_attrs_untyped_from_server == await describe_attributes_untyped(
+            handle
+        )
+        assert search_attributes_to_serializable(
+            updated_attrs_typed
+        ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_typed)
+        assert updated_attrs_typed == await describe_attributes_typed(handle)
 
 
 @workflow.defn
