@@ -562,5 +562,5 @@ def _client_with_interceptors(
     config = client.config()
     config_interceptors = list(config["interceptors"])
     config_interceptors.extend(interceptors)
-    config["interceptors"] = interceptors
+    config["interceptors"] = config_interceptors
     return temporalio.client.Client(**config)
