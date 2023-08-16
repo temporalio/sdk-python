@@ -388,6 +388,16 @@ _sym_db = google.protobuf.symbol_database.Default()
 class JSONProtoPayloadConverter(EncodingPayloadConverter):
     """Converter for 'json/protobuf' payloads supporting protobuf Message values."""
 
+    def __init__(self, ignore_unknown_fields: bool = False):
+        """Initialize a JSON proto converter.
+
+        Args:
+            ignore_unknown_fields: Determines whether converter should error if
+                unknown fields are detected
+        """
+        super().__init__()
+        self._ignore_unknown_fields = ignore_unknown_fields
+
     @property
     def encoding(self) -> str:
         """See base class."""
@@ -424,7 +434,11 @@ class JSONProtoPayloadConverter(EncodingPayloadConverter):
         message_type = payload.metadata.get("messageType", b"<unknown>").decode()
         try:
             value = _sym_db.GetSymbol(message_type)()
-            return google.protobuf.json_format.Parse(payload.data, value)
+            return google.protobuf.json_format.Parse(
+                payload.data,
+                value,
+                ignore_unknown_fields=self._ignore_unknown_fields,
+            )
         except KeyError as err:
             raise RuntimeError(f"Unknown Protobuf type {message_type}") from err
         except google.protobuf.json_format.ParseError as err:
