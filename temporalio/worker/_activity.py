@@ -195,6 +195,13 @@ class _ActivityWorker:
             except temporalio.bridge.worker.PollShutdownError:
                 return
 
+    # Only call this after run()/drain_poll_queue() have returned. This will not
+    # raise an exception.
+    async def wait_all_completed(self) -> None:
+        running_tasks = [v.task for v in self._running_activities.values() if v.task]
+        if running_tasks:
+            await asyncio.gather(*running_tasks, return_exceptions=False)
+
     def _cancel(
         self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
     ) -> None:
