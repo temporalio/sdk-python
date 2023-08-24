@@ -269,7 +269,7 @@ class MyPydanticClass(pydantic.v1.BaseModel):
 
 class MyPydanticV2Class(pydantic.BaseModel):
     foo: str
-    bar: List[MyPydanticClass]
+    bar: List[MyPydanticV2Class]
     baz: Optional[UUID] = None
 
 def test_json_type_hints():
