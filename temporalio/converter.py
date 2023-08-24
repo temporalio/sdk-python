@@ -500,7 +500,11 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Dataclass support
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
-        # Support for models with "dict" function like Pydantic
+        # Support for models with "model_dump" function like Pydantic v2
+        model_dump_fn = getattr(o, "model_dump", None)
+        if callable(model_dump_fn):
+            return model_dump_fn()
+        # Support for models with "dict" function like Pydantic v1
         dict_fn = getattr(o, "dict", None)
         if callable(dict_fn):
             return dict_fn()

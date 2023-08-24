@@ -296,7 +296,7 @@ The default data converter supports converting multiple types including:
   * Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports natively
   * [dataclasses](https://docs.python.org/3/library/dataclasses.html)
   * Iterables including ones JSON dump may not support by default, e.g. `set`
-  * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
+  * Any class with a `dict()` method and a static `parse_obj()` or `model_validate()` method, e.g.
     [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
     * The default data converter is deprecated for Pydantic models and will warn if used since not all fields work.
       See [this sample](https://github.com/temporalio/samples-python/tree/main/pydantic_converter) for the recommended
