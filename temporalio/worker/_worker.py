@@ -467,6 +467,13 @@ class Worker:
         for task in tasks:
             task.cancel()
 
+        # If there's an activity worker, we have to let all activity completions
+        # finish. We cannot guarantee that because poll shutdown completed
+        # (which means activities completed) that they got flushed to the
+        # server.
+        if self._activity_worker:
+            await self._activity_worker.wait_all_completed()
+
         # Do final shutdown
         try:
             await self._bridge_worker.finalize_shutdown()
