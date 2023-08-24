@@ -272,6 +272,7 @@ class MyPydanticV2Class(pydantic.BaseModel):
     bar: List[MyPydanticV2Class]
     baz: Optional[UUID] = None
 
+
 def test_json_type_hints():
     converter = JSONPlainPayloadConverter()
 
