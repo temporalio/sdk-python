@@ -29,7 +29,7 @@ from typing import (
 )
 from uuid import UUID, uuid4
 
-import pydantic
+import pydantic.v1
 import pytest
 from typing_extensions import Literal, TypedDict
 
@@ -261,11 +261,16 @@ class MyTypedDictNotTotal(TypedDict, total=False):
     bar: MyDataClass
 
 
-class MyPydanticClass(pydantic.BaseModel):
+class MyPydanticClass(pydantic.v1.BaseModel):
     foo: str
     bar: List[MyPydanticClass]
     baz: Optional[UUID] = None
 
+
+class MyPydanticV2Class(pydantic.BaseModel):
+    foo: str
+    bar: List[MyPydanticClass]
+    baz: Optional[UUID] = None
 
 def test_json_type_hints():
     converter = JSONPlainPayloadConverter()
@@ -409,6 +414,15 @@ def test_json_type_hints():
     )
     ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
     fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
+    # Pydantic v2
+    ok(
+        MyPydanticV2Class,
+        MyPydanticV2Class(
+            foo="foo", bar=[MyPydanticV2Class(foo="baz", bar=[])], baz=uuid4()
+        ),
+    )
+    ok(List[MyPydanticV2Class], [MyPydanticV2Class(foo="foo", bar=[])])
+    fail(List[MyPydanticV2Class], [MyPydanticV2Class(foo="foo", bar=[]), 5])
 
 
 # This is an example of appending the stack to every Temporal failure error
