@@ -1262,7 +1262,7 @@ def decode_search_attributes(
         api: API message with search attribute values to convert.
 
     Returns:
-        Converted search attribute values.
+        Converted search attribute values (new mapping every time).
     """
     conv = default().payload_converter
     ret = {}
@@ -1288,38 +1288,42 @@ def decode_typed_search_attributes(
         api: API message with search attribute values to convert.
 
     Returns:
-        Typed search attribute collection.
+        Typed search attribute collection (new object every time).
     """
     conv = default().payload_converter
     pairs: List[temporalio.common.SearchAttributePair] = []
     for k, v in api.indexed_fields.items():
         # We want the "type" metadata, but if it is not present or an unknown
         # type, we will just ignore
+        metadata_type = v.metadata.get("type")
+        if not metadata_type:
+            continue
         key = temporalio.common.SearchAttributeKey._from_metadata_type(
             k, v.metadata.get("type").decode()
         )
-        if key:
-            val = conv.from_payload(v)
-            # If the value is a list but the type is not keyword list, pull out
-            # single item or consider this an invalid value and ignore
-            if (
-                key.indexed_value_type
-                != temporalio.common.SearchAttributeIndexedValueType.KEYWORD_LIST
-                and isinstance(val, list)
-            ):
-                if len(val) != 1:
-                    continue
-                val = val[0]
-            if (
-                key.indexed_value_type
-                == temporalio.common.SearchAttributeIndexedValueType.DATETIME
-            ):
-                parser = _get_iso_datetime_parser()
-                # We will let this throw
-                val = parser(val)
-            # If the value isn't the right type, we need to ignore
-            if isinstance(val, key.origin_value_type):
-                pairs.append(temporalio.common.SearchAttributePair(key, val))
+        if not key:
+            continue
+        val = conv.from_payload(v)
+        # If the value is a list but the type is not keyword list, pull out
+        # single item or consider this an invalid value and ignore
+        if (
+            key.indexed_value_type
+            != temporalio.common.SearchAttributeIndexedValueType.KEYWORD_LIST
+            and isinstance(val, list)
+        ):
+            if len(val) != 1:
+                continue
+            val = val[0]
+        if (
+            key.indexed_value_type
+            == temporalio.common.SearchAttributeIndexedValueType.DATETIME
+        ):
+            parser = _get_iso_datetime_parser()
+            # We will let this throw
+            val = parser(val)
+        # If the value isn't the right type, we need to ignore
+        if isinstance(val, key.origin_value_type):
+            pairs.append(temporalio.common.SearchAttributePair(key, val))
     return temporalio.common.TypedSearchAttributes(pairs)
 
 

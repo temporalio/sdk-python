@@ -345,17 +345,17 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
             return None
         elif len(vals) > 1:
             if isinstance(vals[0], str):
-                return temporalio.common.SearchAttributeKey.for_keyword_list(name)
+                return SearchAttributeKey.for_keyword_list(name)
         elif isinstance(vals[0], str):
-            return temporalio.common.SearchAttributeKey.for_keyword(name)
+            return SearchAttributeKey.for_keyword(name)
         elif isinstance(vals[0], int):
-            return temporalio.common.SearchAttributeKey.for_int(name)
+            return SearchAttributeKey.for_int(name)
         elif isinstance(vals[0], float):
-            return temporalio.common.SearchAttributeKey.for_float(name)
+            return SearchAttributeKey.for_float(name)
         elif isinstance(vals[0], bool):
-            return temporalio.common.SearchAttributeKey.for_bool(name)
+            return SearchAttributeKey.for_bool(name)
         elif isinstance(vals[0], datetime):
-            return temporalio.common.SearchAttributeKey.for_datetime(name)
+            return SearchAttributeKey.for_datetime(name)
         return None
 
 
@@ -496,6 +496,20 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
             return self.__getitem__(key)
         except KeyError:
             return default
+        
+    def updated(self, *search_attributes: SearchAttributePair) -> TypedSearchAttributes:
+        """Copy this collection, replacing attributes with matching key names or
+        adding if key name not present.
+        """
+        attrs = list(self.search_attributes)
+        # Go over each update, replacing matching keys by index or adding
+        for attr in search_attributes:
+            existing_index = next((i for i, attr in enumerate(attrs) if attr.key.name == attr.key.name), None)
+            if existing_index is None:
+                attrs.append(attr)
+            else:
+                attrs[existing_index] = attr
+        return TypedSearchAttributes(attrs)
 
 
 TypedSearchAttributes.empty = TypedSearchAttributes(search_attributes=[])

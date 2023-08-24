@@ -83,7 +83,7 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from tests.helpers import assert_eq_eventually, new_worker
+from tests.helpers import assert_eq_eventually, new_worker, ensure_search_attributes_present
 
 
 @workflow.defn
@@ -1629,41 +1629,19 @@ class SearchAttributeWorkflow:
         )
 
 
-async def ensure_search_attributes_on_server(client: Client) -> None:
-    async def search_attributes_present() -> bool:
-        resp = await client.operator_service.list_search_attributes(
-            ListSearchAttributesRequest(namespace=client.namespace)
-        )
-        return any(k for k in resp.custom_attributes.keys() if k.startswith(sa_prefix))
-
-    # Add search attributes if not already present
-    if not await search_attributes_present():
-        attrs: List[SearchAttributeKey] = [
-            SearchAttributeWorkflow.text_attribute,
-            SearchAttributeWorkflow.keyword_attribute,
-            SearchAttributeWorkflow.keyword_list_attribute,
-            SearchAttributeWorkflow.int_attribute,
-            SearchAttributeWorkflow.float_attribute,
-            SearchAttributeWorkflow.bool_attribute,
-            SearchAttributeWorkflow.datetime_attribute,
-        ]
-        await client.operator_service.add_search_attributes(
-            AddSearchAttributesRequest(
-                namespace=client.namespace,
-                search_attributes={
-                    attr.name: IndexedValueType.ValueType(attr.indexed_value_type)
-                    for attr in attrs
-                },
-            ),
-        )
-    # Confirm now present
-    assert await search_attributes_present()
-
-
 async def test_workflow_search_attributes(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
-    await ensure_search_attributes_on_server(client)
+    await ensure_search_attributes_present(
+        client,
+        SearchAttributeWorkflow.text_attribute,
+        SearchAttributeWorkflow.keyword_attribute,
+        SearchAttributeWorkflow.keyword_list_attribute,
+        SearchAttributeWorkflow.int_attribute,
+        SearchAttributeWorkflow.float_attribute,
+        SearchAttributeWorkflow.bool_attribute,
+        SearchAttributeWorkflow.datetime_attribute,
+    )
 
     initial_attrs_untyped: SearchAttributes = {
         SearchAttributeWorkflow.text_attribute.name: ["text1"],
