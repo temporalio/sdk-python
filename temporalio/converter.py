@@ -559,7 +559,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
         # Check for pydantic then send warning
-        if hasattr(value, "parse_obj"):
+        if hasattr(value, "parse_obj") or hasattr(value, "model_validate"):
             warnings.warn(
                 "If you're using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
             )
