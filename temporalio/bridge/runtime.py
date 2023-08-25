@@ -27,14 +27,6 @@ class Runtime:
 
 
 @dataclass(frozen=True)
-class TracingConfig:
-    """Python representation of the Rust struct for tracing config."""
-
-    filter: str
-    opentelemetry: OpenTelemetryConfig
-
-
-@dataclass(frozen=True)
 class LoggingConfig:
     """Python representation of the Rust struct for logging config."""
 
@@ -48,6 +40,9 @@ class MetricsConfig:
 
     opentelemetry: Optional[OpenTelemetryConfig]
     prometheus: Optional[PrometheusConfig]
+    attach_service_name: bool
+    global_tags: Optional[Mapping[str, str]]
+    metric_prefix: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -57,6 +52,7 @@ class OpenTelemetryConfig:
     url: str
     headers: Mapping[str, str]
     metric_periodicity_millis: Optional[int]
+    metric_temporality_delta: bool
 
 
 @dataclass(frozen=True)
@@ -64,13 +60,13 @@ class PrometheusConfig:
     """Python representation of the Rust struct for Prometheus config."""
 
     bind_address: str
+    counters_total_suffix: bool
+    unit_suffix: bool
 
 
 @dataclass(frozen=True)
 class TelemetryConfig:
     """Python representation of the Rust struct for telemetry config."""
 
-    tracing: Optional[TracingConfig]
     logging: Optional[LoggingConfig]
     metrics: Optional[MetricsConfig]
-    global_tags: Mapping[str, str]

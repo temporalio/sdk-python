@@ -794,6 +794,7 @@ class _WorkflowInstanceImpl(
         )[0]
 
     def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
+        self._assert_not_read_only("patch")
         # We use a previous memoized result of this if present. If this is being
         # deprecated, we can still use memoized result and skip the command.
         use_patch = self._patches_memoized.get(id)
