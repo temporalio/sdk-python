@@ -178,7 +178,7 @@ class TelemetryConfig:
 
     metric_prefix: Optional[str] = None
     """Prefix to put on every Temporal metric. If unset, defaults to
-    'temporal_'."""
+    ``temporal_``."""
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.TelemetryConfig:
         return temporalio.bridge.runtime.TelemetryConfig(
