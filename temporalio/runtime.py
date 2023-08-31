@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import timedelta
+from enum import Enum
 from typing import ClassVar, Mapping, Optional, Union
 
 import temporalio.bridge.runtime
@@ -87,25 +88,6 @@ class TelemetryFilter:
 
 
 @dataclass(frozen=True)
-class TracingConfig:
-    """Configuration for runtime tracing."""
-
-    filter: Union[TelemetryFilter, str]
-    """Filter for tracing. Can use :py:class:`TelemetryFilter` or raw string."""
-
-    opentelemetry: OpenTelemetryConfig
-    """Configuration for OpenTelemetry tracing collector."""
-
-    def _to_bridge_config(self) -> temporalio.bridge.runtime.TracingConfig:
-        return temporalio.bridge.runtime.TracingConfig(
-            filter=self.filter
-            if isinstance(self.filter, str)
-            else self.filter.formatted(),
-            opentelemetry=self.opentelemetry._to_bridge_config(),
-        )
-
-
-@dataclass(frozen=True)
 class LoggingConfig:
     """Configuration for runtime logging."""
 
@@ -132,6 +114,13 @@ LoggingConfig.default = LoggingConfig(
 )
 
 
+class OpenTelemetryMetricTemporality(Enum):
+    """Temporality for OpenTelemetry metrics."""
+
+    CUMULATIVE = 1
+    DELTA = 2
+
+
 @dataclass(frozen=True)
 class OpenTelemetryConfig:
     """Configuration for OpenTelemetry collector."""
@@ -139,6 +128,9 @@ class OpenTelemetryConfig:
     url: str
     headers: Optional[Mapping[str, str]] = None
     metric_periodicity: Optional[timedelta] = None
+    metric_temporality: OpenTelemetryMetricTemporality = (
+        OpenTelemetryMetricTemporality.CUMULATIVE
+    )
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.OpenTelemetryConfig:
         return temporalio.bridge.runtime.OpenTelemetryConfig(
@@ -147,6 +139,8 @@ class OpenTelemetryConfig:
             metric_periodicity_millis=None
             if not self.metric_periodicity
             else round(self.metric_periodicity.total_seconds() * 1000),
+            metric_temporality_delta=self.metric_temporality
+            == OpenTelemetryMetricTemporality.DELTA,
         )
 
 
@@ -155,19 +149,20 @@ class PrometheusConfig:
     """Configuration for Prometheus metrics endpoint."""
 
     bind_address: str
+    counters_total_suffix: bool = False
+    unit_suffix: bool = False
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.PrometheusConfig:
         return temporalio.bridge.runtime.PrometheusConfig(
-            bind_address=self.bind_address
+            bind_address=self.bind_address,
+            counters_total_suffix=self.counters_total_suffix,
+            unit_suffix=self.unit_suffix,
         )
 
 
 @dataclass(frozen=True)
 class TelemetryConfig:
     """Configuration for Core telemetry."""
-
-    tracing: Optional[TracingConfig] = None
-    """Tracing configuration."""
 
     logging: Optional[LoggingConfig] = LoggingConfig.default
     """Logging configuration."""
@@ -176,11 +171,17 @@ class TelemetryConfig:
     """Metrics configuration."""
 
     global_tags: Mapping[str, str] = field(default_factory=dict)
-    """OTel resource tags to be applied to all metrics and traces"""
+    """OTel resource tags to be applied to all metrics."""
+
+    attach_service_name: bool = True
+    """Whether to put the service_name on every metric."""
+
+    metric_prefix: Optional[str] = None
+    """Prefix to put on every Temporal metric. If unset, defaults to
+    ``temporal_``."""
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.TelemetryConfig:
         return temporalio.bridge.runtime.TelemetryConfig(
-            tracing=None if not self.tracing else self.tracing._to_bridge_config(),
             logging=None if not self.logging else self.logging._to_bridge_config(),
             metrics=None
             if not self.metrics
@@ -191,6 +192,8 @@ class TelemetryConfig:
                 prometheus=None
                 if not isinstance(self.metrics, PrometheusConfig)
                 else self.metrics._to_bridge_config(),
+                attach_service_name=self.attach_service_name,
+                global_tags=self.global_tags or None,
+                metric_prefix=self.metric_prefix,
             ),
-            global_tags=self.global_tags,
         )
