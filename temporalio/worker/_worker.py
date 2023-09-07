@@ -23,6 +23,7 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.runtime
 import temporalio.service
 
 from ._activity import SharedStateManager, _ActivityWorker
@@ -259,6 +260,7 @@ class Worker:
 
         # Create activity and workflow worker
         self._activity_worker: Optional[_ActivityWorker] = None
+        runtime = bridge_client.config.runtime or temporalio.runtime.Runtime.default()
         if activities:
             self._activity_worker = _ActivityWorker(
                 bridge_worker=lambda: self._bridge_worker,
@@ -268,6 +270,7 @@ class Worker:
                 shared_state_manager=shared_state_manager,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
+                metric_meter=runtime.metric_meter,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
@@ -283,6 +286,7 @@ class Worker:
                 interceptors=interceptors,
                 debug_mode=debug_mode,
                 disable_eager_activity_execution=disable_eager_activity_execution,
+                metric_meter=runtime.metric_meter,
                 on_eviction_hook=None,
             )
 

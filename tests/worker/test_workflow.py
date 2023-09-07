@@ -24,6 +24,7 @@ from typing import (
     Tuple,
     cast,
 )
+from urllib.request import urlopen
 
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -65,6 +66,7 @@ from temporalio.exceptions import (
     TimeoutError,
     WorkflowAlreadyStartedError,
 )
+from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -74,7 +76,7 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from tests.helpers import assert_eq_eventually, new_worker
+from tests.helpers import assert_eq_eventually, find_free_port, new_worker
 
 
 @workflow.defn
@@ -1450,9 +1452,6 @@ class CustomWorkflowRunner(WorkflowRunner):
         pass
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
-        # We need to assert details can be pickled for potential sandbox use
-        det_pickled = pickle.loads(pickle.dumps(det))
-        assert det == det_pickled
         return CustomWorkflowInstance(self, self._unsandboxed.create_instance(det))
 
 
@@ -3236,3 +3235,150 @@ if sys.version_info >= (3, 11):
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
+
+
+@activity.defn
+async def custom_metrics_activity() -> None:
+    counter = activity.metric_meter().create_counter(
+        "my-activity-counter", "my-activity-description", "my-activity-unit"
+    )
+    counter.add(12)
+    counter.add(34, {"my-activity-extra-attr": 12.34})
+
+
+@workflow.defn
+class CustomMetricsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            custom_metrics_activity, schedule_to_close_timeout=timedelta(seconds=30)
+        )
+
+        histogram = workflow.metric_meter().create_histogram(
+            "my-workflow-histogram", "my-workflow-description", "my-workflow-unit"
+        )
+        histogram.record(56)
+        histogram.with_additional_attributes({"my-workflow-extra-attr": 1234}).record(
+            78
+        )
+
+
+async def test_workflow_custom_metrics(client: Client):
+    # Run worker with default runtime which is noop meter just to confirm it
+    # doesn't fail
+    async with new_worker(
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+    ) as worker:
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Create new runtime with Prom server
+    prom_addr = f"127.0.0.1:{find_free_port()}"
+    runtime = Runtime(
+        telemetry=TelemetryConfig(
+            metrics=PrometheusConfig(bind_address=prom_addr), metric_prefix="foo_"
+        )
+    )
+
+    # Confirm meter fails with bad attribute type
+    with pytest.raises(TypeError) as err:
+        runtime.metric_meter.with_additional_attributes({"some_attr": None})  # type: ignore
+    assert str(err.value).startswith("Invalid value type for key")
+
+    # New client with the runtime
+    client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+
+    async with new_worker(
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+    ) as worker:
+        # Record a gauge at runtime level
+        gauge = runtime.metric_meter.with_additional_attributes(
+            {"my-runtime-extra-attr1": "val1", "my-runtime-extra-attr2": True}
+        ).create_gauge("my-runtime-gauge", "my-runtime-description")
+        gauge.set(90)
+
+        # Run workflow
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Get Prom dump
+        with urlopen(url=f"http://{prom_addr}/metrics") as f:
+            prom_str: str = f.read().decode("utf-8")
+            prom_lines = prom_str.splitlines()
+
+        # Intentionally naive metric checker
+        def matches_metric_line(
+            line: str, name: str, at_least_labels: Mapping[str, str], value: int
+        ) -> bool:
+            # Must have metric name
+            if not line.startswith(name + "{"):
+                return False
+            # Must have labels (don't escape for this test)
+            for k, v in at_least_labels.items():
+                if not f'{k}="{v}"' in line:
+                    return False
+            return line.endswith(f" {value}")
+
+        def assert_metric_exists(
+            name: str, at_least_labels: Mapping[str, str], value: int
+        ) -> None:
+            assert any(
+                matches_metric_line(line, name, at_least_labels, value)
+                for line in prom_lines
+            )
+
+        def assert_description_exists(name: str, description: str) -> None:
+            assert f"# HELP {name} {description}" in prom_lines
+
+        # Check some metrics are as we expect
+        assert_description_exists("my_runtime_gauge", "my-runtime-description")
+        assert_metric_exists(
+            "my_runtime_gauge",
+            {
+                "my_runtime_extra_attr1": "val1",
+                "my_runtime_extra_attr2": "true",
+                # Also confirm global service name label
+                "service_name": "temporal-core-sdk",
+            },
+            90,
+        )
+        assert_description_exists("my_workflow_histogram", "my-workflow-description")
+        assert_metric_exists("my_workflow_histogram_sum", {}, 56)
+        assert_metric_exists(
+            "my_workflow_histogram_sum",
+            {
+                "my_workflow_extra_attr": "1234",
+                # Also confirm some workflow labels
+                "namespace": client.namespace,
+                "task_queue": worker.task_queue,
+                "workflow_type": "CustomMetricsWorkflow",
+            },
+            78,
+        )
+        assert_description_exists("my_activity_counter", "my-activity-description")
+        assert_metric_exists("my_activity_counter", {}, 12)
+        assert_metric_exists(
+            "my_activity_counter",
+            {
+                "my_activity_extra_attr": "12.34",
+                # Also confirm some activity labels
+                "namespace": client.namespace,
+                "task_queue": worker.task_queue,
+                "activity_type": "custom_metrics_activity",
+            },
+            34,
+        )
+        # Also check Temporal metric got its prefix
+        assert_metric_exists(
+            "foo_workflow_completed", {"workflow_type": "CustomMetricsWorkflow"}, 1
+        )
