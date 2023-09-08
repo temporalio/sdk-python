@@ -32,13 +32,12 @@ from typing import (
     Set,
     Tuple,
     Type,
-    TypedDict,
     TypeVar,
     Union,
     cast,
 )
 
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.activity
 import temporalio.api.common.v1
