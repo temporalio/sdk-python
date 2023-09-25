@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
 mod client;
+mod metric;
 mod runtime;
 mod testing;
 mod worker;
@@ -12,6 +13,14 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("RPCError", py.get_type::<client::RPCError>())?;
     m.add_class::<client::ClientRef>()?;
     m.add_function(wrap_pyfunction!(connect_client, m)?)?;
+
+    // Metric stuff
+    m.add_class::<metric::MetricMeterRef>()?;
+    m.add_class::<metric::MetricAttributesRef>()?;
+    m.add_class::<metric::MetricCounterRef>()?;
+    m.add_class::<metric::MetricHistogramRef>()?;
+    m.add_class::<metric::MetricGaugeRef>()?;
+    m.add_function(wrap_pyfunction!(new_metric_meter, m)?)?;
 
     // Runtime stuff
     m.add_class::<runtime::RuntimeRef>()?;
@@ -42,6 +51,11 @@ fn connect_client<'a>(
     config: client::ClientConfig,
 ) -> PyResult<&'a PyAny> {
     client::connect_client(py, &runtime_ref, config)
+}
+
+#[pyfunction]
+fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<metric::MetricMeterRef> {
+    metric::new_metric_meter(&runtime_ref)
 }
 
 #[pyfunction]

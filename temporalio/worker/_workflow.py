@@ -30,6 +30,7 @@ from ._workflow_instance import (
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
+    _WorkflowExternFunctions,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class _WorkflowWorker:
         interceptors: Sequence[Interceptor],
         debug_mode: bool,
         disable_eager_activity_execution: bool,
+        metric_meter: temporalio.common.MetricMeter,
         on_eviction_hook: Optional[
             Callable[
                 [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
@@ -83,6 +85,9 @@ class _WorkflowWorker:
             interceptor_class = i.workflow_interceptor_class(interceptor_class_input)
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
+        self._extern_functions.update(
+            **_WorkflowExternFunctions(__temporal_get_metric_meter=lambda: metric_meter)
+        )
         self._running_workflows: Dict[str, WorkflowInstance] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook

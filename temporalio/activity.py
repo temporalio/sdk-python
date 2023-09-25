@@ -149,8 +149,10 @@ class _Context:
         Type[temporalio.converter.PayloadConverter],
         temporalio.converter.PayloadConverter,
     ]
+    runtime_metric_meter: Optional[temporalio.common.MetricMeter]
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
+    _metric_meter: Optional[temporalio.common.MetricMeter] = None
 
     @staticmethod
     def current() -> _Context:
@@ -184,6 +186,29 @@ class _Context:
             else:
                 self._payload_converter = self.payload_converter_class_or_instance()
         return self._payload_converter
+
+    @property
+    def metric_meter(self) -> temporalio.common.MetricMeter:
+        # If there isn't a runtime metric meter, then we're in a non-threaded
+        # sync function and we don't support cross-process metrics
+        if not self.runtime_metric_meter:
+            raise RuntimeError(
+                "Metrics meter not available in non-threaded sync activities like mulitprocess"
+            )
+        # Create the meter lazily if not already created. We are ok creating
+        # multiple in the rare race where a user calls this property on
+        # different threads inside the same activity. The meter is immutable and
+        # it's better than a lock.
+        if not self._metric_meter:
+            info = self.info()
+            self._metric_meter = self.runtime_metric_meter.with_additional_attributes(
+                {
+                    "namespace": info.workflow_namespace,
+                    "task_queue": info.task_queue,
+                    "activity_type": info.activity_type,
+                }
+            )
+        return self._metric_meter
 
 
 @dataclass
@@ -375,6 +400,24 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     This is often used for dynamic activities to convert payloads.
     """
     return _Context.current().payload_converter
+
+
+def metric_meter() -> temporalio.common.MetricMeter:
+    """Get the metric meter for the current activity.
+
+    .. warning::
+        This is only available in async or synchronous threaded activities. An
+        error is raised on non-thread-based sync activities when trying to
+        access this.
+
+    Returns:
+        Current metric meter for this activity for recording metrics.
+
+    Raises:
+        RuntimeError: When not in an activity or in a non-thread-based
+            synchronous activity.
+    """
+    return _Context.current().metric_meter
 
 
 class LoggerAdapter(logging.LoggerAdapter):

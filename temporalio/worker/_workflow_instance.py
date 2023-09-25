@@ -37,7 +37,7 @@ from typing import (
     cast,
 )
 
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -94,7 +94,7 @@ class WorkflowRunner(ABC):
         """Create a workflow instance that can handle activations.
 
         Args:
-            det: Serializable details that can be used to create the instance.
+            det: Details that can be used to create the instance.
 
         Returns:
             Workflow instance that can handle activations.
@@ -104,7 +104,7 @@ class WorkflowRunner(ABC):
 
 @dataclass(frozen=True)
 class WorkflowInstanceDetails:
-    """Immutable, serializable details for creating a workflow instance."""
+    """Immutable details for creating a workflow instance."""
 
     payload_converter_class: Type[temporalio.converter.PayloadConverter]
     failure_converter_class: Type[temporalio.converter.FailureConverter]
@@ -255,6 +255,9 @@ class _WorkflowInstanceImpl(
         # these causing even more issues. We will set ourselves as deleted so we
         # can check in some places to swallow these errors on tear down.
         self._deleting = False
+
+        # We only create the metric meter lazily
+        self._metric_meter: Optional[_ReplaySafeMetricMeter] = None
 
     def __del__(self) -> None:
         # We have confirmed there are no super() versions of __del__
@@ -792,6 +795,22 @@ class _WorkflowInstanceImpl(
         return self._payload_converter.from_payloads(
             [payload], [type_hint] if type_hint else None
         )[0]
+
+    def workflow_metric_meter(self) -> temporalio.common.MetricMeter:
+        # Create if not present, which means using an extern function
+        if not self._metric_meter:
+            metric_meter = cast(_WorkflowExternFunctions, self._extern_functions)[
+                "__temporal_get_metric_meter"
+            ]()
+            metric_meter = metric_meter.with_additional_attributes(
+                {
+                    "namespace": self._info.namespace,
+                    "task_queue": self._info.task_queue,
+                    "workflow_type": self._info.workflow_type,
+                }
+            )
+            self._metric_meter = _ReplaySafeMetricMeter(metric_meter)
+        return self._metric_meter
 
     def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
         self._assert_not_read_only("patch")
@@ -2059,3 +2078,136 @@ def _encode_search_attributes(
     """Encode search attributes as bridge payloads."""
     for k, vals in attributes.items():
         payloads[k].CopyFrom(temporalio.converter.encode_search_attribute_values(vals))
+
+
+class _WorkflowExternFunctions(TypedDict):
+    __temporal_get_metric_meter: Callable[[], temporalio.common.MetricMeter]
+
+
+class _ReplaySafeMetricMeter(temporalio.common.MetricMeter):
+    def __init__(self, underlying: temporalio.common.MetricMeter) -> None:
+        self._underlying = underlying
+
+    def create_counter(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricCounter:
+        return _ReplaySafeMetricCounter(
+            self._underlying.create_counter(name, description, unit)
+        )
+
+    def create_histogram(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricHistogram:
+        return _ReplaySafeMetricHistogram(
+            self._underlying.create_histogram(name, description, unit)
+        )
+
+    def create_gauge(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricGauge:
+        return _ReplaySafeMetricGauge(
+            self._underlying.create_gauge(name, description, unit)
+        )
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricMeter:
+        return _ReplaySafeMetricMeter(
+            self._underlying.with_additional_attributes(additional_attributes)
+        )
+
+
+class _ReplaySafeMetricCounter(temporalio.common.MetricCounter):
+    def __init__(self, underlying: temporalio.common.MetricCounter) -> None:
+        self._underlying = underlying
+
+    @property
+    def name(self) -> str:
+        return self._underlying.name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._underlying.description
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._underlying.unit
+
+    def add(
+        self,
+        value: int,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if not temporalio.workflow.unsafe.is_replaying():
+            self._underlying.add(value, additional_attributes)
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricCounter:
+        return _ReplaySafeMetricCounter(
+            self._underlying.with_additional_attributes(additional_attributes)
+        )
+
+
+class _ReplaySafeMetricHistogram(temporalio.common.MetricHistogram):
+    def __init__(self, underlying: temporalio.common.MetricHistogram) -> None:
+        self._underlying = underlying
+
+    @property
+    def name(self) -> str:
+        return self._underlying.name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._underlying.description
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._underlying.unit
+
+    def record(
+        self,
+        value: int,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if not temporalio.workflow.unsafe.is_replaying():
+            self._underlying.record(value, additional_attributes)
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricHistogram:
+        return _ReplaySafeMetricHistogram(
+            self._underlying.with_additional_attributes(additional_attributes)
+        )
+
+
+class _ReplaySafeMetricGauge(temporalio.common.MetricGauge):
+    def __init__(self, underlying: temporalio.common.MetricGauge) -> None:
+        self._underlying = underlying
+
+    @property
+    def name(self) -> str:
+        return self._underlying.name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._underlying.description
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._underlying.unit
+
+    def set(
+        self,
+        value: int,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if not temporalio.workflow.unsafe.is_replaying():
+            self._underlying.set(value, additional_attributes)
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricGauge:
+        return _ReplaySafeMetricGauge(
+            self._underlying.with_additional_attributes(additional_attributes)
+        )
