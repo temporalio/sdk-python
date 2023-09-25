@@ -21,6 +21,8 @@ class Runtime:
     Users are encouraged to use :py:meth:`default`. It can be set with
     :py:meth:`set_default`. Every time a new runtime is created, a new internal
     thread pool is created.
+
+    Runtimes do not work across forks.
     """
 
     @staticmethod

@@ -7,6 +7,7 @@ import concurrent.futures
 import hashlib
 import logging
 import sys
+import warnings
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, List, Optional, Sequence, Type, cast
 
@@ -92,11 +93,14 @@ class Worker:
             workflows: Set of workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
-                activities. This is required if any activities are non-async. If
-                this is a :py:class:`concurrent.futures.ProcessPoolExecutor`,
-                all non-async activities must be picklable. Note, a broken
-                executor failure from this executor will cause the worker to
-                fail and shutdown.
+                activities. This is required if any activities are non-async.
+                :py:class:`concurrent.futures.ThreadPoolExecutor` is
+                recommended. If this is a
+                :py:class:`concurrent.futures.ProcessPoolExecutor`, all
+                non-async activities must be picklable. ``max_workers`` on the
+                executor should at least be ``max_concurrent_activities`` or a
+                warning is issued. Note, a broken-executor failure from this
+                executor will cause the worker to fail and shutdown.
             workflow_task_executor: Thread pool executor for workflow tasks. If
                 this is not present, a new
                 :py:class:`concurrent.futures.ThreadPoolExecutor` will be
@@ -260,6 +264,17 @@ class Worker:
         # Create activity and workflow worker
         self._activity_worker: Optional[_ActivityWorker] = None
         if activities:
+            # Issue warning here if executor max_workers is lower than max
+            # concurrent activities. We do this here instead of in
+            # _ActivityWorker so the stack level is predictable.
+            max_workers = getattr(activity_executor, "_max_workers", None)
+            if isinstance(max_workers, int) and max_workers < max_concurrent_activities:
+                warnings.warn(
+                    f"Worker max_concurrent_activities is {max_concurrent_activities} "
+                    + f"but activity_executor's max_workers is only {max_workers}",
+                    stacklevel=2,
+                )
+
             self._activity_worker = _ActivityWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 task_queue=task_queue,
