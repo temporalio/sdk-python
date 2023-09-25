@@ -189,9 +189,7 @@ async def test_sync_activity_process_non_picklable(
         return f"activity name: {activity.info().activity_type}"
 
     with pytest.raises(TypeError) as err:
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=default_max_concurrent_activities
-        ) as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             await _execute_workflow_with_activity(
                 client,
                 worker,
@@ -218,9 +216,7 @@ def picklable_activity_failure():
 
 async def test_sync_activity_process_failure(client: Client, worker: ExternalWorker):
     with pytest.raises(WorkflowFailureError) as err:
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=default_max_concurrent_activities
-        ) as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             await _execute_workflow_with_activity(
                 client,
                 worker,
@@ -487,9 +483,7 @@ def picklable_activity_wait_cancel() -> str:
 
 
 async def test_sync_activity_process_cancel(client: Client, worker: ExternalWorker):
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=default_max_concurrent_activities
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -514,9 +508,7 @@ async def test_sync_activity_process_cancel_uncaught(
     client: Client, worker: ExternalWorker
 ):
     with pytest.raises(WorkflowFailureError) as err:
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=default_max_concurrent_activities
-        ) as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             await _execute_workflow_with_activity(
                 client,
                 worker,
@@ -727,9 +719,7 @@ async def test_sync_activity_thread_heartbeat_details(
 async def test_sync_activity_process_heartbeat_details(
     client: Client, worker: ExternalWorker
 ):
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=default_max_concurrent_activities
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -750,9 +740,7 @@ async def test_sync_activity_process_non_picklable_heartbeat_details(
     client: Client, worker: ExternalWorker
 ):
     with pytest.raises(WorkflowFailureError) as err:
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=default_max_concurrent_activities
-        ) as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             await _execute_workflow_with_activity(
                 client,
                 worker,
@@ -923,9 +911,7 @@ async def test_sync_activity_process_worker_shutdown_graceful(
     client: Client, worker: ExternalWorker
 ):
     act_task_queue = str(uuid.uuid4())
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=default_max_concurrent_activities
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         act_worker = Worker(
             client,
             task_queue=act_task_queue,
@@ -982,9 +968,7 @@ async def test_sync_activity_process_executor_crash(
     client: Client, worker: ExternalWorker
 ):
     act_task_queue = str(uuid.uuid4())
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=default_max_concurrent_activities
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         act_worker = Worker(
             client,
             task_queue=act_task_queue,
@@ -1255,9 +1239,7 @@ async def test_sync_activity_dynamic_thread(client: Client, worker: ExternalWork
 
 
 async def test_sync_activity_dynamic_process(client: Client, worker: ExternalWorker):
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=default_max_concurrent_activities
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
