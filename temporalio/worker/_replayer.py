@@ -225,6 +225,7 @@ class Replayer:
                     data_converter=self._config["data_converter"],
                     interceptors=self._config["interceptors"],
                     debug_mode=self._config["debug_mode"],
+                    metric_meter=runtime.metric_meter,
                     on_eviction_hook=on_eviction_hook,
                     disable_eager_activity_execution=False,
                 ).run()

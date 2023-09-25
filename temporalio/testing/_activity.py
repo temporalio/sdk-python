@@ -12,6 +12,7 @@ from typing import Any, Callable, Optional, Set, TypeVar
 from typing_extensions import ParamSpec
 
 import temporalio.activity
+import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.worker._activity
@@ -56,6 +57,9 @@ class ActivityEnvironment:
         payload_converter: Payload converter set on the activity context. This
             must be set before :py:meth:`run`. Changes after the activity has
             started do not take effect.
+        metric_meter: Metric meter set on the activity context. This must be set
+            before :py:meth:`run`. Changes after the activity has started do not
+            take effect. Default is noop.
     """
 
     def __init__(self) -> None:
@@ -65,6 +69,7 @@ class ActivityEnvironment:
         self.payload_converter = (
             temporalio.converter.DataConverter.default.payload_converter
         )
+        self.metric_meter = temporalio.common.MetricMeter.noop
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
@@ -147,6 +152,7 @@ class _Activity:
             if not self.cancel_thread_raiser
             else self.cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=env.payload_converter,
+            runtime_metric_meter=env.metric_meter,
         )
         self.task: Optional[asyncio.Task] = None
 

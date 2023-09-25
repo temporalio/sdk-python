@@ -469,6 +469,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_metric_meter(self) -> temporalio.common.MetricMeter:
+        ...
+
+    @abstractmethod
     def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
         ...
 
@@ -651,6 +655,18 @@ def memo_value(
         KeyError: Key not present and default not set.
     """
     return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
+
+
+def metric_meter() -> temporalio.common.MetricMeter:
+    """Get the metric meter for the current workflow.
+
+    This meter is replay safe which means that metrics will not be recorded
+    during replay.
+
+    Returns:
+        Current metric meter for this workflow for recording metrics.
+    """
+    return _Runtime.current().workflow_metric_meter()
 
 
 def now() -> datetime:

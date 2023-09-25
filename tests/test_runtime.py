@@ -1,19 +1,11 @@
-import socket
 import uuid
-from contextlib import closing
 from urllib.request import urlopen
 
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.worker import Worker
-
-
-def find_free_port() -> int:
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("", 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return s.getsockname()[1]
+from tests.helpers import find_free_port
 
 
 @workflow.defn
