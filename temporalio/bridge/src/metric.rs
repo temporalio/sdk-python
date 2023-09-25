@@ -1,8 +1,11 @@
+use std::any::Any;
 use std::{collections::HashMap, sync::Arc};
 
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use temporal_sdk_core_api::telemetry::metrics;
+use pyo3::{exceptions::PyTypeError, types::PyDict};
+use temporal_sdk_core_api::telemetry::metrics::{
+    self, BufferInstrumentRef, CustomMetricAttributes, MetricEvent, NewAttributes,
+};
 
 use crate::runtime;
 
@@ -139,14 +142,17 @@ impl MetricAttributesRef {
     fn with_additional_attributes<'p>(
         &self,
         py: Python<'p>,
+        meter: &MetricMeterRef,
         new_attrs: HashMap<String, PyObject>,
     ) -> PyResult<Self> {
-        let mut attrs = self.attrs.clone();
-        attrs.add_new_attrs(
-            new_attrs
-                .into_iter()
-                .map(|(k, obj)| metric_key_value_from_py(py, k, obj))
-                .collect::<PyResult<Vec<metrics::MetricKeyValue>>>()?,
+        let attrs = meter.meter.inner.extend_attributes(
+            self.attrs.clone(),
+            NewAttributes {
+                attributes: new_attrs
+                    .into_iter()
+                    .map(|(k, obj)| metric_key_value_from_py(py, k, obj))
+                    .collect::<PyResult<Vec<metrics::MetricKeyValue>>>()?,
+            },
         );
         Ok(MetricAttributesRef { attrs })
     }
@@ -172,4 +178,147 @@ fn metric_key_value_from_py<'p>(
         )));
     };
     Ok(metrics::MetricKeyValue::new(k, val))
+}
+
+// WARNING: This must match temporalio.runtime.BufferedMetricUpdate protocol
+#[pyclass]
+pub struct BufferedMetricUpdate {
+    #[pyo3(get)]
+    pub metric: Py<BufferedMetric>,
+    #[pyo3(get)]
+    pub value: u64,
+    #[pyo3(get)]
+    pub attributes: Py<PyDict>,
+}
+
+// WARNING: This must match temporalio.runtime.BufferedMetric protocol
+#[pyclass]
+pub struct BufferedMetric {
+    #[pyo3(get)]
+    pub name: String,
+    #[pyo3(get)]
+    pub description: Option<String>,
+    #[pyo3(get)]
+    pub unit: Option<String>,
+    #[pyo3(get)]
+    pub kind: u8, // 0 - counter, 1 - gauge, 2 - histogram
+}
+
+#[derive(Debug)]
+struct BufferedMetricAttributes(Py<PyDict>);
+
+#[derive(Clone, Debug)]
+pub struct BufferedMetricRef(Py<BufferedMetric>);
+
+impl BufferInstrumentRef for BufferedMetricRef {}
+
+impl CustomMetricAttributes for BufferedMetricAttributes {
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any + Send + Sync> {
+        self as Arc<dyn Any + Send + Sync>
+    }
+}
+
+pub fn convert_metric_events<'p>(
+    py: Python<'p>,
+    events: Vec<MetricEvent<BufferedMetricRef>>,
+) -> Vec<BufferedMetricUpdate> {
+    events
+        .into_iter()
+        .filter_map(|e| convert_metric_event(py, e))
+        .collect()
+}
+
+fn convert_metric_event<'p>(
+    py: Python<'p>,
+    event: MetricEvent<BufferedMetricRef>,
+) -> Option<BufferedMetricUpdate> {
+    match event {
+        // Create the metric and put it on the lazy ref
+        MetricEvent::Create {
+            params,
+            populate_into,
+            kind,
+        } => {
+            let buffered_ref = BufferedMetricRef(
+                Py::new(
+                    py,
+                    BufferedMetric {
+                        name: params.name.to_string(),
+                        description: Some(params.description)
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string()),
+                        unit: Some(params.unit)
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string()),
+                        kind: match kind {
+                            metrics::MetricKind::Counter => 0,
+                            metrics::MetricKind::Gauge => 1,
+                            metrics::MetricKind::Histogram => 2,
+                        },
+                    },
+                )
+                .unwrap(),
+            );
+            populate_into.set(Arc::new(buffered_ref)).unwrap();
+            None
+        }
+        // Create the attributes and put it on the lazy ref
+        MetricEvent::CreateAttributes {
+            populate_into,
+            append_from,
+            attributes,
+        } => {
+            // Create the dictionary (as copy from existing if needed)
+            let new_attrs_ref: Py<PyDict> = match append_from {
+                Some(existing) => existing
+                    .get()
+                    .clone()
+                    .as_any()
+                    .downcast::<BufferedMetricAttributes>()
+                    .unwrap()
+                    .0
+                    .as_ref(py)
+                    .copy()
+                    .unwrap()
+                    .into(),
+                None => PyDict::new(py).into(),
+            };
+            // Add attributes
+            let new_attrs = new_attrs_ref.as_ref(py);
+            for kv in attributes.into_iter() {
+                match kv.value {
+                    metrics::MetricValue::String(v) => new_attrs.set_item(kv.key, v),
+                    metrics::MetricValue::Int(v) => new_attrs.set_item(kv.key, v),
+                    metrics::MetricValue::Float(v) => new_attrs.set_item(kv.key, v),
+                    metrics::MetricValue::Bool(v) => new_attrs.set_item(kv.key, v),
+                }
+                .unwrap();
+            }
+            // Put on lazy ref
+            populate_into
+                .set(Arc::new(BufferedMetricAttributes(new_attrs_ref)))
+                .unwrap();
+            None
+        }
+        // Convert to Python metric event
+        MetricEvent::Update {
+            instrument,
+            attributes,
+            update,
+        } => Some(BufferedMetricUpdate {
+            metric: instrument.get().clone().0.clone(),
+            value: match update {
+                metrics::MetricUpdateVal::Delta(v) => v,
+                metrics::MetricUpdateVal::Value(v) => v,
+            },
+            attributes: attributes
+                .get()
+                .clone()
+                .as_any()
+                .downcast::<BufferedMetricAttributes>()
+                .unwrap()
+                .0
+                .clone(),
+        }),
+    }
 }
