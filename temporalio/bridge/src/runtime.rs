@@ -134,7 +134,7 @@ impl RuntimeRef {
             self.runtime
                 .metrics_call_buffer
                 .as_ref()
-                .unwrap()
+                .expect("Attempting to retrieve buffered metrics without buffer")
                 .retrieve(),
         )
     }

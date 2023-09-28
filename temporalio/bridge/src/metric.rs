@@ -257,7 +257,7 @@ fn convert_metric_event<'p>(
                         },
                     },
                 )
-                .unwrap(),
+                .expect("Unable to create buffered metric"),
             );
             populate_into.set(Arc::new(buffered_ref)).unwrap();
             None
@@ -275,11 +275,11 @@ fn convert_metric_event<'p>(
                     .clone()
                     .as_any()
                     .downcast::<BufferedMetricAttributes>()
-                    .unwrap()
+                    .expect("Unable to downcast to expected buffered metric attributes")
                     .0
                     .as_ref(py)
                     .copy()
-                    .unwrap()
+                    .expect("Failed to copy metric attribute dictionary")
                     .into(),
                 None => PyDict::new(py).into(),
             };
@@ -292,12 +292,12 @@ fn convert_metric_event<'p>(
                     metrics::MetricValue::Float(v) => new_attrs.set_item(kv.key, v),
                     metrics::MetricValue::Bool(v) => new_attrs.set_item(kv.key, v),
                 }
-                .unwrap();
+                .expect("Unable to set metric key/value on dictionary");
             }
             // Put on lazy ref
             populate_into
                 .set(Arc::new(BufferedMetricAttributes(new_attrs_ref)))
-                .unwrap();
+                .expect("Unable to set buffered metric attributes on reference");
             None
         }
         // Convert to Python metric event
@@ -316,7 +316,7 @@ fn convert_metric_event<'p>(
                 .clone()
                 .as_any()
                 .downcast::<BufferedMetricAttributes>()
-                .unwrap()
+                .expect("Unable to downcast to expected buffered metric attributes")
                 .0
                 .clone(),
         }),

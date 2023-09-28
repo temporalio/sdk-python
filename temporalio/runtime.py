@@ -197,7 +197,8 @@ class MetricBuffer:
             and is drained regularly. See :py:class:`MetricBuffer` warning.
 
         Args:
-            buffer_size: Size of the buffer. Set this to a large value.
+            buffer_size: Size of the buffer. Set this to a large value. A value
+                in the tens of thousands or higher is plenty reasonable.
         """
         self._buffer_size = buffer_size
         self._runtime: Optional[Runtime] = None
