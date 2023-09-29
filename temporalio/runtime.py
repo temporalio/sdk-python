@@ -183,18 +183,18 @@ class MetricBuffer:
     metrics instead of ignoring/exporting them.
 
     .. warning::
-        It is very important that the buffer size is set to a high number and
-        that :py:meth:`retrieve_updates` is called regularly. Metric updates
-        will not be lost, so they can cause the system to halt if there is not
-        enough room in the buffer.
+        It is important that the buffer size is set to a high number and that
+        :py:meth:`retrieve_updates` is called regularly to drain the buffer. If
+        the buffer is full, metric updates will be dropped and an error will be
+        logged.
     """
 
     def __init__(self, buffer_size: int) -> None:
         """Create a buffer with the given size.
 
         .. warning::
-            It is very important that the buffer size is set to a high number
-            and is drained regularly. See :py:class:`MetricBuffer` warning.
+            It is important that the buffer size is set to a high number and is
+            drained regularly. See :py:class:`MetricBuffer` warning.
 
         Args:
             buffer_size: Size of the buffer. Set this to a large value. A value
@@ -207,7 +207,7 @@ class MetricBuffer:
         """Drain the buffer and return all metric updates.
 
         .. warning::
-            It is very important that this is called regularly. See
+            It is important that this is called regularly. See
             :py:class:`MetricBuffer` warning.
 
         Returns:
