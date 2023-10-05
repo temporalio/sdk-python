@@ -8,14 +8,18 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use temporal_sdk_core::telemetry::{build_otlp_metric_exporter, start_prometheus_metric_exporter};
+use temporal_sdk_core::telemetry::{
+    build_otlp_metric_exporter, start_prometheus_metric_exporter, MetricsCallBuffer,
+};
 use temporal_sdk_core::CoreRuntime;
-use temporal_sdk_core_api::telemetry::metrics::CoreMeter;
+use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
 use temporal_sdk_core_api::telemetry::{
     Logger, MetricTemporality, OtelCollectorOptionsBuilder, PrometheusExporterOptionsBuilder,
     TelemetryOptions, TelemetryOptionsBuilder,
 };
 use url::Url;
+
+use crate::metric::{convert_metric_events, BufferedMetricRef, BufferedMetricUpdate};
 
 #[pyclass]
 pub struct RuntimeRef {
@@ -25,6 +29,7 @@ pub struct RuntimeRef {
 #[derive(Clone)]
 pub(crate) struct Runtime {
     pub(crate) core: Arc<CoreRuntime>,
+    metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
 }
 
 #[derive(FromPyObject)]
@@ -41,8 +46,11 @@ pub struct LoggingConfig {
 
 #[derive(FromPyObject)]
 pub struct MetricsConfig {
+    // These fields are mutually exclusive
     opentelemetry: Option<OpenTelemetryConfig>,
     prometheus: Option<PrometheusConfig>,
+    buffered_with_size: usize,
+
     attach_service_name: bool,
     global_tags: Option<HashMap<String, String>>,
     metric_prefix: Option<String>,
@@ -71,16 +79,34 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
         tokio::runtime::Builder::new_multi_thread(),
     )
     .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err)))?;
+
     // We late-bind the metrics after core runtime is created since it needs
     // the Tokio handle
+    let mut maybe_metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>> = None;
     if let Some(metrics_conf) = telemetry_config.metrics {
         let _guard = core.tokio_handle().enter();
-        core.telemetry_mut()
-            .attach_late_init_metrics(metrics_conf.try_into()?);
+        // If they want buffered, cannot have Prom/OTel and we make buffered
+        if metrics_conf.buffered_with_size > 0 {
+            if metrics_conf.opentelemetry.is_some() || metrics_conf.prometheus.is_some() {
+                return Err(PyValueError::new_err(
+                    "Cannot have buffer size with OpenTelemetry or Prometheus metric config",
+                ));
+            }
+            let metrics_call_buffer =
+                Arc::new(MetricsCallBuffer::new(metrics_conf.buffered_with_size));
+            core.telemetry_mut()
+                .attach_late_init_metrics(metrics_call_buffer.clone());
+            maybe_metrics_call_buffer = Some(metrics_call_buffer);
+        } else {
+            core.telemetry_mut()
+                .attach_late_init_metrics(metrics_conf.try_into()?);
+        }
     }
+
     Ok(RuntimeRef {
         runtime: Runtime {
             core: Arc::new(core),
+            metrics_call_buffer: maybe_metrics_call_buffer,
         },
     })
 }
@@ -97,6 +123,20 @@ impl Runtime {
     {
         let _guard = self.core.tokio_handle().enter();
         pyo3_asyncio::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
+    }
+}
+
+#[pymethods]
+impl RuntimeRef {
+    fn retrieve_buffered_metrics<'p>(&self, py: Python<'p>) -> Vec<BufferedMetricUpdate> {
+        convert_metric_events(
+            py,
+            self.runtime
+                .metrics_call_buffer
+                .as_ref()
+                .expect("Attempting to retrieve buffered metrics without buffer")
+                .retrieve(),
+        )
     }
 }
 

@@ -6,7 +6,7 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional, Type
+from typing import Any, Mapping, Optional, Sequence, Type
 
 import temporalio.bridge.temporal_sdk_bridge
 
@@ -25,6 +25,10 @@ class Runtime:
         """Create SDK Core runtime."""
         self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(telemetry)
 
+    def retrieve_buffered_metrics(self) -> Sequence[Any]:
+        """Get buffered metrics."""
+        return self._ref.retrieve_buffered_metrics()
+
 
 @dataclass(frozen=True)
 class LoggingConfig:
@@ -40,6 +44,7 @@ class MetricsConfig:
 
     opentelemetry: Optional[OpenTelemetryConfig]
     prometheus: Optional[PrometheusConfig]
+    buffered_with_size: int
     attach_service_name: bool
     global_tags: Optional[Mapping[str, str]]
     metric_prefix: Optional[str]

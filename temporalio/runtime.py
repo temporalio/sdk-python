@@ -8,7 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import ClassVar, Mapping, Optional, Union
+from typing import ClassVar, Mapping, NewType, Optional, Sequence, Union
+
+from typing_extensions import Literal, Protocol
 
 import temporalio.bridge.metric
 import temporalio.bridge.runtime
@@ -66,6 +68,8 @@ class Runtime:
         self._core_runtime = temporalio.bridge.runtime.Runtime(
             telemetry=telemetry._to_bridge_config()
         )
+        if isinstance(telemetry.metrics, MetricBuffer):
+            telemetry.metrics._runtime = self
         core_meter = temporalio.bridge.metric.MetricMeter.create(self._core_runtime)
         if not core_meter:
             self._metric_meter = temporalio.common.MetricMeter.noop
@@ -174,6 +178,46 @@ class PrometheusConfig:
         )
 
 
+class MetricBuffer:
+    """A buffer that can be set on :py:class:`TelemetryConfig` to record
+    metrics instead of ignoring/exporting them.
+
+    .. warning::
+        It is important that the buffer size is set to a high number and that
+        :py:meth:`retrieve_updates` is called regularly to drain the buffer. If
+        the buffer is full, metric updates will be dropped and an error will be
+        logged.
+    """
+
+    def __init__(self, buffer_size: int) -> None:
+        """Create a buffer with the given size.
+
+        .. warning::
+            It is important that the buffer size is set to a high number and is
+            drained regularly. See :py:class:`MetricBuffer` warning.
+
+        Args:
+            buffer_size: Size of the buffer. Set this to a large value. A value
+                in the tens of thousands or higher is plenty reasonable.
+        """
+        self._buffer_size = buffer_size
+        self._runtime: Optional[Runtime] = None
+
+    def retrieve_updates(self) -> Sequence[BufferedMetricUpdate]:
+        """Drain the buffer and return all metric updates.
+
+        .. warning::
+            It is important that this is called regularly. See
+            :py:class:`MetricBuffer` warning.
+
+        Returns:
+            A sequence of metric updates.
+        """
+        if not self._runtime:
+            raise RuntimeError("Attempting to retrieve updates before runtime created")
+        return self._runtime._core_runtime.retrieve_buffered_metrics()
+
+
 @dataclass(frozen=True)
 class TelemetryConfig:
     """Configuration for Core telemetry."""
@@ -181,8 +225,8 @@ class TelemetryConfig:
     logging: Optional[LoggingConfig] = LoggingConfig.default
     """Logging configuration."""
 
-    metrics: Optional[Union[OpenTelemetryConfig, PrometheusConfig]] = None
-    """Metrics configuration."""
+    metrics: Optional[Union[OpenTelemetryConfig, PrometheusConfig, MetricBuffer]] = None
+    """Metrics configuration or buffer."""
 
     global_tags: Mapping[str, str] = field(default_factory=dict)
     """OTel resource tags to be applied to all metrics."""
@@ -206,11 +250,100 @@ class TelemetryConfig:
                 prometheus=None
                 if not isinstance(self.metrics, PrometheusConfig)
                 else self.metrics._to_bridge_config(),
+                buffered_with_size=0
+                if not isinstance(self.metrics, MetricBuffer)
+                else self.metrics._buffer_size,
                 attach_service_name=self.attach_service_name,
                 global_tags=self.global_tags or None,
                 metric_prefix=self.metric_prefix,
             ),
         )
+
+
+BufferedMetricKind = NewType("BufferedMetricKind", int)
+"""Representation of a buffered metric kind."""
+
+BUFFERED_METRIC_KIND_COUNTER = BufferedMetricKind(0)
+"""Buffered metric is a counter which means values are deltas."""
+
+BUFFERED_METRIC_KIND_GAUGE = BufferedMetricKind(1)
+"""Buffered metric is a gauge."""
+
+BUFFERED_METRIC_KIND_HISTOGRAM = BufferedMetricKind(2)
+"""Buffered metric is a histogram."""
+
+
+# WARNING: This must match Rust metric::BufferedMetric
+class BufferedMetric(Protocol):
+    """A metric for a buffered update.
+
+    The same metric for the same name and runtime is guaranteed to be the exact
+    same object for performance reasons. This means py:func:`id` will be the
+    same for the same metric across updates.
+    """
+
+    @property
+    def name(self) -> str:
+        """Get the name of the metric."""
+        ...
+
+    @property
+    def description(self) -> Optional[str]:
+        """Get the description of the metric if any."""
+        ...
+
+    @property
+    def unit(self) -> Optional[str]:
+        """Get the unit of the metric if any."""
+        ...
+
+    @property
+    def kind(self) -> BufferedMetricKind:
+        """Get the metric kind.
+
+        This is one of :py:const:`BUFFERED_METRIC_KIND_COUNTER`,
+        :py:const:`BUFFERED_METRIC_KIND_GAUGE`, or
+        :py:const:`BUFFERED_METRIC_KIND_HISTOGRAM`.
+        """
+        ...
+
+
+# WARNING: This must match Rust metric::BufferedMetricUpdate
+class BufferedMetricUpdate(Protocol):
+    """A single metric value update."""
+
+    @property
+    def metric(self) -> BufferedMetric:
+        """Metric being updated.
+
+        For performance reasons, this is the same object across updates for the
+        same metric. This means py:func:`id` will be the same for the same
+        metric across updates.
+        """
+        ...
+
+    @property
+    def value(self) -> Union[int, float]:
+        """Value for the update.
+
+        For counters this is a delta, for gauges and histograms this is just the
+        value.
+        """
+        ...
+
+    @property
+    def attributes(self) -> temporalio.common.MetricAttributes:
+        """Attributes for the update.
+
+        For performance reasons, this is the same object across updates for the
+        same attribute set. This means py:func:`id` will be the same for the
+        same attribute set across updates. Note this is for same "attribute set"
+        as created by the metric creator, but different attribute sets may have
+        the same values.
+
+        Do not mutate this.
+        """
+        ...
 
 
 class _MetricMeter(temporalio.common.MetricMeter):
