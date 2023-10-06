@@ -27,7 +27,7 @@ class MetricMeter:
     ) -> None:
         """Initialize metric meter."""
         self._ref = ref
-        self._default_attributes = MetricAttributes(ref.default_attributes)
+        self._default_attributes = MetricAttributes(self, ref.default_attributes)
 
     @property
     def default_attributes(self) -> MetricAttributes:
@@ -99,13 +99,19 @@ class MetricAttributes:
     """Metric attributes using SDK Core."""
 
     def __init__(
-        self, ref: temporalio.bridge.temporal_sdk_bridge.MetricAttributesRef
+        self,
+        meter: MetricMeter,
+        ref: temporalio.bridge.temporal_sdk_bridge.MetricAttributesRef,
     ) -> None:
         """Initialize attributes."""
+        self._meter = meter
         self._ref = ref
 
     def with_additional_attributes(
         self, new_attrs: Mapping[str, Union[str, int, float, bool]]
     ) -> MetricAttributes:
         """Create new attributes with new attributes appended."""
-        return MetricAttributes(self._ref.with_additional_attributes(new_attrs))
+        return MetricAttributes(
+            self._meter,
+            self._ref.with_additional_attributes(self._meter._ref, new_attrs),
+        )

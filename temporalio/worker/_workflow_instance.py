@@ -324,7 +324,7 @@ class _WorkflowInstanceImpl(
         if activation_err:
             logger.warning(
                 f"Failed activation on workflow {self._info.workflow_type} with ID {self._info.workflow_id} and run ID {self._info.run_id}",
-                exc_info=True,
+                exc_info=activation_err,
             )
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()
