@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum
-from typing import Generic, Mapping, Optional, Type, TypeVar, Union
+from typing import ClassVar, Generic, Mapping, Optional, Type, TypeVar, Union
 
 import google.protobuf.empty_pb2
 import google.protobuf.message
@@ -93,6 +93,28 @@ class RetryConfig:
         )
 
 
+@dataclass(frozen=True)
+class KeepAliveConfig:
+    """Keep-alive configuration for client connections."""
+
+    interval_millis: int = 30000
+    """Interval to send HTTP2 keep alive pings."""
+    timeout_millis: int = 15000
+    """Timeout that the keep alive must be responded to within or the connection
+    will be closed."""
+    default: ClassVar[KeepAliveConfig]
+    """Default keep alive config."""
+
+    def _to_bridge_config(self) -> temporalio.bridge.client.ClientKeepAliveConfig:
+        return temporalio.bridge.client.ClientKeepAliveConfig(
+            interval_millis=self.interval_millis,
+            timeout_millis=self.timeout_millis,
+        )
+
+
+KeepAliveConfig.default = KeepAliveConfig()
+
+
 @dataclass
 class ConnectConfig:
     """Config for connecting to the server."""
@@ -100,6 +122,7 @@ class ConnectConfig:
     target_host: str
     tls: Union[bool, TLSConfig] = False
     retry_config: Optional[RetryConfig] = None
+    keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
     rpc_metadata: Mapping[str, str] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
@@ -141,6 +164,9 @@ class ConnectConfig:
             tls_config=tls_config,
             retry_config=self.retry_config._to_bridge_config()
             if self.retry_config
+            else None,
+            keep_alive_config=self.keep_alive_config._to_bridge_config()
+            if self.keep_alive_config
             else None,
             metadata=self.rpc_metadata,
             identity=self.identity,
