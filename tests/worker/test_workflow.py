@@ -2267,11 +2267,6 @@ class PostPatchWorkflow(PatchWorkflowBase):
 
 
 async def test_workflow_patch(client: Client):
-    # TODO(cretz): Patches have issues on older servers since core needs patch
-    # metadata support for some fixes. Unskip for local server only once we
-    # upgrade to https://github.com/temporalio/sdk-python/issues/272.
-    pytest.skip("Needs SDK metadata support")
-
     workflow_run = PrePatchWorkflow.run
     task_queue = str(uuid.uuid4())
 
@@ -2360,11 +2355,6 @@ class PatchMemoizedWorkflowPatched(PatchMemoizedWorkflowUnpatched):
 
 
 async def test_workflow_patch_memoized(client: Client):
-    # TODO(cretz): Patches have issues on older servers since core needs patch
-    # metadata support for some fixes. Unskip for local server only once we
-    # upgrade to https://github.com/temporalio/sdk-python/issues/272.
-    pytest.skip("Needs SDK metadata support")
-
     # Start a worker with the workflow unpatched and wait until halfway through.
     # Need to disable workflow cache since we restart the worker and don't want
     # to pay the sticky queue penalty.

@@ -80,6 +80,8 @@ class Client:
     than where it was created, make sure the event loop where it was created is
     captured, and then call :py:func:`asyncio.run_coroutine_threadsafe` with the
     client call and that event loop.
+
+    Clients do not work across forks since runtimes do not work across forks.
     """
 
     @staticmethod
