@@ -6,9 +6,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_client::{
-    ClientOptions, ClientOptionsBuilder, ConfiguredClient, HealthService, OperatorService,
-    RetryClient, RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig,
-    WorkflowService,
+    ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
+    ConfiguredClient, HealthService, OperatorService, RetryClient, RetryConfig,
+    TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
 };
 use tonic::metadata::MetadataKey;
 use url::Url;
@@ -34,6 +34,7 @@ pub struct ClientConfig {
     identity: String,
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
+    keep_alive_config: Option<ClientKeepAliveConfig>,
 }
 
 #[derive(FromPyObject)]
@@ -52,6 +53,12 @@ struct ClientRetryConfig {
     pub max_interval_millis: u64,
     pub max_elapsed_time_millis: Option<u64>,
     pub max_retries: usize,
+}
+
+#[derive(FromPyObject)]
+struct ClientKeepAliveConfig {
+    pub interval_millis: u64,
+    pub timeout_millis: u64,
 }
 
 #[derive(FromPyObject)]
@@ -388,7 +395,8 @@ impl TryFrom<ClientConfig> for ClientOptions {
             .retry_config(
                 opts.retry_config
                     .map_or(RetryConfig::default(), |c| c.into()),
-            );
+            )
+            .keep_alive(opts.keep_alive_config.map(Into::into));
         // Builder does not allow us to set option here, so we have to make
         // a conditional to even call it
         if let Some(tls_config) = opts.tls_config {
@@ -434,6 +442,15 @@ impl From<ClientRetryConfig> for RetryConfig {
             max_interval: Duration::from_millis(conf.max_interval_millis),
             max_elapsed_time: conf.max_elapsed_time_millis.map(Duration::from_millis),
             max_retries: conf.max_retries,
+        }
+    }
+}
+
+impl From<ClientKeepAliveConfig> for CoreClientKeepAliveConfig {
+    fn from(conf: ClientKeepAliveConfig) -> Self {
+        CoreClientKeepAliveConfig {
+            interval: Duration::from_millis(conf.interval_millis),
+            timeout: Duration::from_millis(conf.timeout_millis),
         }
     }
 }

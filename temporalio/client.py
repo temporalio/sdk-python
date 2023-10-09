@@ -51,7 +51,13 @@ import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
-from temporalio.service import RetryConfig, RPCError, RPCStatusCode, TLSConfig
+from temporalio.service import (
+    KeepAliveConfig,
+    RetryConfig,
+    RPCError,
+    RPCStatusCode,
+    TLSConfig,
+)
 
 from .types import (
     AnyType,
@@ -96,6 +102,7 @@ class Client:
         ] = None,
         tls: Union[bool, TLSConfig] = False,
         retry_config: Optional[RetryConfig] = None,
+        keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default,
         rpc_metadata: Mapping[str, str] = {},
         identity: Optional[str] = None,
         lazy: bool = False,
@@ -128,6 +135,10 @@ class Client:
                 opted in) or all high-level calls made by this client (which all
                 opt-in to retries by default). If unset, a default retry
                 configuration is used.
+            keep_alive_config: Keep-alive configuration for the client
+                connection. Default is to check every 30s and kill the
+                connection if a response doesn't come back in 15s. Can be set to
+                ``None`` to disable.
             rpc_metadata: Headers to use for all calls to the server. Keys here
                 can be overriden by per-call RPC metadata keys.
             identity: Identity for this client. If unset, a default is created
@@ -141,6 +152,7 @@ class Client:
             target_host=target_host,
             tls=tls,
             retry_config=retry_config,
+            keep_alive_config=keep_alive_config,
             rpc_metadata=rpc_metadata,
             identity=identity or "",
             lazy=lazy,
