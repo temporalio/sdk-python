@@ -1436,6 +1436,13 @@ to `1` prior to running tests.
 Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore `pyproject.toml` and
 run `poetry update protobuf grpcio-tools`.
 
+For a less system-intrusive approach, you can:
+```shell
+docker build -f scripts/Dockerfile .
+docker run -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
+poe format
+```
+
 ### Style
 
 * Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:

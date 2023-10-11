@@ -17,6 +17,7 @@ import sys
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.update.v1.message_pb2
 import temporalio.bridge.proto.activity_result.activity_result_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -130,6 +131,7 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     RESOLVE_CHILD_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     RESOLVE_SIGNAL_EXTERNAL_WORKFLOW_FIELD_NUMBER: builtins.int
     RESOLVE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_FIELD_NUMBER: builtins.int
+    DO_UPDATE_FIELD_NUMBER: builtins.int
     REMOVE_FROM_CACHE_FIELD_NUMBER: builtins.int
     @property
     def start_workflow(self) -> global___StartWorkflow:
@@ -179,6 +181,9 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     ) -> global___ResolveRequestCancelExternalWorkflow:
         """An attempt to cancel an external workflow resolved"""
     @property
+    def do_update(self) -> global___DoUpdate:
+        """A request to handle a workflow update."""
+    @property
     def remove_from_cache(self) -> global___RemoveFromCache:
         """Remove the workflow identified by the [WorkflowActivation] containing this job from the cache
         after performing the activation.
@@ -205,6 +210,7 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         | None = ...,
         resolve_request_cancel_external_workflow: global___ResolveRequestCancelExternalWorkflow
         | None = ...,
+        do_update: global___DoUpdate | None = ...,
         remove_from_cache: global___RemoveFromCache | None = ...,
     ) -> None: ...
     def HasField(
@@ -212,6 +218,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancel_workflow",
             b"cancel_workflow",
+            "do_update",
+            b"do_update",
             "fire_timer",
             b"fire_timer",
             "notify_has_patch",
@@ -245,6 +253,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancel_workflow",
             b"cancel_workflow",
+            "do_update",
+            b"do_update",
             "fire_timer",
             b"fire_timer",
             "notify_has_patch",
@@ -289,6 +299,7 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             "resolve_child_workflow_execution",
             "resolve_signal_external_workflow",
             "resolve_request_cancel_external_workflow",
+            "do_update",
             "remove_from_cache",
         ]
         | None
@@ -1055,6 +1066,114 @@ class ResolveRequestCancelExternalWorkflow(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ResolveRequestCancelExternalWorkflow = ResolveRequestCancelExternalWorkflow
+
+class DoUpdate(google.protobuf.message.Message):
+    """Lang is requested to invoke an update handler on the workflow. Lang should invoke the update
+    validator first (if requested). If it accepts the update, immediately invoke the update handler.
+    Lang must reply to the activation containing this job with an `UpdateResponse`.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class HeadersEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
+    ID_FIELD_NUMBER: builtins.int
+    PROTOCOL_INSTANCE_ID_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    INPUT_FIELD_NUMBER: builtins.int
+    HEADERS_FIELD_NUMBER: builtins.int
+    META_FIELD_NUMBER: builtins.int
+    RUN_VALIDATOR_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """A workflow-unique identifier for this update"""
+    protocol_instance_id: builtins.str
+    """The protocol message instance ID - this is used to uniquely track the ID server side and
+    internally.
+    """
+    name: builtins.str
+    """The name of the update handler"""
+    @property
+    def input(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Payload
+    ]:
+        """The input to the update"""
+    @property
+    def headers(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, temporalio.api.common.v1.message_pb2.Payload
+    ]:
+        """Headers attached to the update"""
+    @property
+    def meta(self) -> temporalio.api.update.v1.message_pb2.Meta:
+        """Remaining metadata associated with the update. The `update_id` field is stripped from here
+        and moved to `id`, since it is guaranteed to be present.
+        """
+    run_validator: builtins.bool
+    """If set true, lang must run the update's validator before running the handler. This will be
+    set false during replay, since validation is not re-run during replay.
+    """
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        protocol_instance_id: builtins.str = ...,
+        name: builtins.str = ...,
+        input: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
+        | None = ...,
+        headers: collections.abc.Mapping[
+            builtins.str, temporalio.api.common.v1.message_pb2.Payload
+        ]
+        | None = ...,
+        meta: temporalio.api.update.v1.message_pb2.Meta | None = ...,
+        run_validator: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["meta", b"meta"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "headers",
+            b"headers",
+            "id",
+            b"id",
+            "input",
+            b"input",
+            "meta",
+            b"meta",
+            "name",
+            b"name",
+            "protocol_instance_id",
+            b"protocol_instance_id",
+            "run_validator",
+            b"run_validator",
+        ],
+    ) -> None: ...
+
+global___DoUpdate = DoUpdate
 
 class RemoveFromCache(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
