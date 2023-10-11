@@ -5,7 +5,7 @@ use pyo3::types::{PyBytes, PyTuple};
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
-use temporal_sdk_core::replay::HistoryForReplay;
+use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
@@ -85,9 +85,9 @@ pub fn new_replay_worker<'a>(
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
     let worker = WorkerRef {
         worker: Some(Arc::new(
-            temporal_sdk_core::init_replay_worker(config, stream).map_err(|err| {
-                PyValueError::new_err(format!("Failed creating replay worker: {}", err))
-            })?,
+            temporal_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream)).map_err(
+                |err| PyValueError::new_err(format!("Failed creating replay worker: {}", err)),
+            )?,
         )),
         runtime: runtime_ref.runtime.clone(),
     };
