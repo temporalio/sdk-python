@@ -37,6 +37,7 @@ from typing import (
     cast,
 )
 
+import google.protobuf.empty_pb2
 from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.activity
@@ -57,6 +58,7 @@ from ._interceptor import (
     ExecuteWorkflowInput,
     HandleQueryInput,
     HandleSignalInput,
+    HandleUpdateInput,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
     StartActivityInput,
@@ -209,10 +211,11 @@ class _WorkflowInstanceImpl(
         # See https://bugs.python.org/issue21163 and others.
         self._tasks: Set[asyncio.Task] = set()
 
-        # We maintain signals and queries on this class since handlers can be
+        # We maintain signals, queries, and updates on this class since handlers can be
         # added during workflow execution
         self._signals = dict(self._defn.signals)
         self._queries = dict(self._defn.queries)
+        self._updates = dict(self._defn.updates)
 
         # Add stack trace handler
         # TODO(cretz): Is it ok that this can be forcefully overridden by the
@@ -367,6 +370,8 @@ class _WorkflowInstanceImpl(
     ) -> None:
         if job.HasField("cancel_workflow"):
             self._apply_cancel_workflow(job.cancel_workflow)
+        elif job.HasField("do_update"):
+            self._apply_do_update(job.do_update)
         elif job.HasField("fire_timer"):
             self._apply_fire_timer(job.fire_timer)
         elif job.HasField("query_workflow"):
@@ -413,6 +418,117 @@ class _WorkflowInstanceImpl(
             # workflow the ability to receive the cancellation, so we must defer
             # this cancellation to the next iteration of the event loop.
             self.call_soon(self._primary_task.cancel)
+
+    def _apply_do_update(
+        self, job: temporalio.bridge.proto.workflow_activation.DoUpdate
+    ):
+        # self._buffered_updates.setdefault(job.signal_name, []).append(job)
+        # return
+
+        # Either the command to accept/reject, or the command to respond to the update
+        current_command = self._add_command()
+        current_command.update_response.protocol_instance_id = job.protocol_instance_id
+        try:
+            defn = self._updates.get(job.name) or self._updates.get(None)
+            if not defn:
+                raise RuntimeError(
+                    f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler"
+                )
+            # TODO Actually run validator
+            current_command.update_response.accepted.SetInParent()
+            current_command = None
+
+            # Run the handler
+            args = self._process_handler_args(
+                job.name,
+                job.input,
+                defn.name,
+                defn.arg_types,
+                defn.dynamic_vararg,
+            )
+            input = HandleUpdateInput(
+                # TODO: update id vs proto instance id
+                id=job.protocol_instance_id,
+                update=job.name,
+                args=args,
+                headers=job.headers,
+            )
+
+            async def run_update() -> None:
+                try:
+                    success = await self._inbound.handle_update_handler(input)
+                    result_payloads = self._payload_converter.to_payloads([success])
+                    if len(result_payloads) != 1:
+                        raise ValueError(
+                            f"Expected 1 result payload, got {len(result_payloads)}"
+                        )
+                    command = self._add_command()
+                    command.update_response.protocol_instance_id = (
+                        job.protocol_instance_id
+                    )
+                    command.update_response.completed.CopyFrom(result_payloads[0])
+                # TODO: Dedupe exception handling if it makes sense
+                except (Exception, asyncio.CancelledError) as err:
+                    logger.debug(
+                        f"Workflow raised failure with run ID {self._info.run_id}",
+                        exc_info=True,
+                    )
+
+                    # All asyncio cancelled errors become Temporal cancelled errors
+                    if isinstance(err, asyncio.CancelledError):
+                        err = temporalio.exceptions.CancelledError(str(err))
+
+                    if isinstance(err, temporalio.exceptions.FailureError):
+                        # All other failure errors fail the update
+                        command = self._add_command()
+                        command.update_response.protocol_instance_id = (
+                            job.protocol_instance_id
+                        )
+                        self._failure_converter.to_failure(
+                            err,
+                            self._payload_converter,
+                            command.update_response.rejected.cause,
+                        )
+                    else:
+                        # All other exceptions fail the task
+                        self._current_activation_error = err
+                except BaseException as err:
+                    # During tear down, generator exit and no-runtime exceptions can appear
+                    if not self._deleting:
+                        raise
+                    if not isinstance(
+                        err,
+                        (
+                            GeneratorExit,
+                            temporalio.workflow._NotInWorkflowEventLoopError,
+                        ),
+                    ):
+                        logger.debug(
+                            "Ignoring exception while deleting workflow", exc_info=True
+                        )
+
+            self.create_task(
+                run_update(),
+                name=f"update: {job.name}",
+            )
+
+        except Exception as err:
+            logger.error(f"Ahhhh problem {err}")
+            if current_command is None:
+                # We have already finished the validator, but haven't started the handler. If we have an exception here
+                # we need to add a command to reject the update.
+                current_command = self._add_command()
+                current_command.update_response.protocol_instance_id = (
+                    job.protocol_instance_id
+                )
+            try:
+                self._failure_converter.to_failure(
+                    err,
+                    self._payload_converter,
+                    current_command.update_response.rejected.cause,
+                )
+            except Exception as inner_err:
+                raise ValueError("Failed converting application error") from inner_err
 
     def _apply_fire_timer(
         self, job: temporalio.bridge.proto.workflow_activation.FireTimer
@@ -767,6 +883,13 @@ class _WorkflowInstanceImpl(
         # Bind if a method
         return defn.bind_fn(self._object) if defn.is_method else defn.fn
 
+    def workflow_get_update_handler(self, name: Optional[str]) -> Optional[Callable]:
+        defn = self._updates.get(name)
+        if not defn:
+            return None
+        # Bind if a method
+        return defn.bind_fn(self._object) if defn.is_method else defn.fn
+
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
 
@@ -885,6 +1008,8 @@ class _WorkflowInstanceImpl(
                 self._buffered_signals.clear()
         else:
             self._signals.pop(name, None)
+
+    # TODO: Set update handler?
 
     def workflow_start_activity(
         self,
@@ -1647,6 +1772,28 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         handler = self._instance.workflow_get_query_handler(
             input.query
         ) or self._instance.workflow_get_query_handler(None)
+        # Handler should always be present at this point
+        assert handler
+        if inspect.iscoroutinefunction(handler):
+            return await handler(*input.args)
+        else:
+            return handler(*input.args)
+
+    async def handle_update_validator(self, input: HandleUpdateInput) -> Any:
+        handler = self._instance.workflow_get_update_handler(
+            input.update
+        ) or self._instance.workflow_get_update_handler(None)
+        # Handler should always be present at this point
+        assert handler
+        if inspect.iscoroutinefunction(handler):
+            return await handler(*input.args)
+        else:
+            return handler(*input.args)
+
+    async def handle_update_handler(self, input: HandleUpdateInput) -> Any:
+        handler = self._instance.workflow_get_update_handler(
+            input.update
+        ) or self._instance.workflow_get_update_handler(None)
         # Handler should always be present at this point
         assert handler
         if inspect.iscoroutinefunction(handler):

@@ -52,6 +52,7 @@ from .types import (
     CallableAsyncType,
     CallableSyncNoParam,
     CallableSyncOrAsyncReturnNoneType,
+    CallableSyncOrAsyncType,
     CallableSyncSingleParam,
     CallableType,
     ClassType,
@@ -447,6 +448,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_get_update_handler(self, name: Optional[str]) -> Optional[Callable]:
+        ...
+
+    @abstractmethod
     def workflow_info(self) -> Info:
         ...
 
@@ -746,6 +751,57 @@ def time_ns() -> int:
     return _Runtime.current().workflow_time_ns()
 
 
+def update(
+    fn: Optional[CallableSyncOrAsyncType] = None,
+    *,
+    name: Optional[str] = None,
+    dynamic: Optional[bool] = False,
+):
+    """Decorator for a workflow update handler method.
+
+    This is set on any async or non-async method that you wish to be called upon
+    receiving an update. If a function overrides one with this decorator, it too
+    must be decorated.
+
+    You may also optionally define a validator method that will be called before
+    this handler you have applied this decorator to. You can specify the validator
+    with ``@update_handler_function_name.validator``.
+
+    Update methods can only have positional parameters. Best practice for
+    non-dynamic update methods is to only take a single object/dataclass
+    argument that can accept more fields later if needed. The handler may return
+    a serializable value which will be sent back to the caller of the update.
+
+    Args:
+        fn: The function to decorate.
+        name: Update name. Defaults to method ``__name__``. Cannot be present
+            when ``dynamic`` is present.
+        dynamic: If true, this handles all updates not otherwise handled. The
+            parameters of the method must be self, a string name, and a
+            ``*args`` positional varargs. Cannot be present when ``name`` is
+            present.
+    """
+
+    def with_name(
+        name: Optional[str], fn: CallableSyncOrAsyncType
+    ) -> CallableSyncOrAsyncType:
+        defn = _UpdateDefinition(name=name, fn=fn, is_method=True)
+        setattr(fn, "__temporal_update_definition", defn)
+        if defn.dynamic_vararg:
+            raise RuntimeError(
+                "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
+            )
+        return fn
+
+    if name is not None or dynamic:
+        if name is not None and dynamic:
+            raise RuntimeError("Cannot provide name and dynamic boolean")
+        return partial(with_name, name)
+    if fn is None:
+        raise RuntimeError("Cannot create update without function or name or dynamic")
+    return with_name(fn.__name__, fn)
+
+
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
     """Upsert search attributes for this workflow.
 
@@ -952,6 +1008,7 @@ class _Definition:
     run_fn: Callable[..., Awaitable]
     signals: Mapping[Optional[str], _SignalDefinition]
     queries: Mapping[Optional[str], _QueryDefinition]
+    updates: Mapping[Optional[str], _UpdateDefinition]
     sandboxed: bool
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
@@ -1004,6 +1061,7 @@ class _Definition:
         seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
         queries: Dict[Optional[str], _QueryDefinition] = {}
+        updates: Dict[Optional[str], _UpdateDefinition] = {}
         for name, member in members:
             if hasattr(member, "__temporal_workflow_run"):
                 seen_run_attr = True
@@ -1045,6 +1103,18 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
+            elif hasattr(member, "__temporal_update_definition"):
+                update_defn = cast(
+                    _UpdateDefinition, getattr(member, "__temporal_update_definition")
+                )
+                if update_defn.name in updates:
+                    defn_name = update_defn.name or "<dynamic>"
+                    issues.append(
+                        f"Multiple update methods found for {defn_name} "
+                        f"(at least on {name} and {updates[update_defn.name].fn.__name__})"
+                    )
+                else:
+                    updates[update_defn.name] = update_defn
 
         # Check base classes haven't defined things with different decorators
         for base_cls in inspect.getmro(cls)[1:]:
@@ -1095,6 +1165,7 @@ class _Definition:
             run_fn=run_fn,
             signals=signals,
             queries=queries,
+            updates=updates,
             sandboxed=sandboxed,
         )
         setattr(cls, "__temporal_workflow_definition", defn)
@@ -1225,6 +1296,55 @@ class _QueryDefinition:
 
     def __post_init__(self) -> None:
         if self.arg_types is None and self.ret_type is None:
+            arg_types, ret_type = temporalio.common._type_hints_from_func(self.fn)
+            # If dynamic, assert it
+            if not self.name:
+                object.__setattr__(
+                    self,
+                    "dynamic_vararg",
+                    not _assert_dynamic_handler_args(
+                        self.fn, arg_types, self.is_method
+                    ),
+                )
+            object.__setattr__(self, "arg_types", arg_types)
+            object.__setattr__(self, "ret_type", ret_type)
+
+    def bind_fn(self, obj: Any) -> Callable[..., Any]:
+        return _bind_method(obj, self.fn)
+
+
+@dataclass(frozen=True)
+class _UpdateDefinition:
+    # None if dynamic
+    name: Optional[str]
+    fn: Callable[..., Union[Any, Awaitable[Any]]]
+    is_method: bool
+    # Types loaded on post init if None
+    arg_types: Optional[List[Type]] = None
+    ret_type: Optional[Type] = None
+    dynamic_vararg: bool = False
+
+    @staticmethod
+    def from_fn(fn: Callable) -> Optional[_UpdateDefinition]:
+        return getattr(fn, "__temporal_update_definition", None)
+
+    @staticmethod
+    def must_name_from_fn_or_str(update: Union[str, Callable]) -> str:
+        if callable(update):
+            defn = _UpdateDefinition.from_fn(update)
+            if not defn:
+                raise RuntimeError(
+                    f"Update definition not found on {update.__qualname__}, "
+                    "is it decorated with @workflow.update?"
+                )
+            elif not defn.name:
+                raise RuntimeError("Cannot invoke dynamic update definition")
+            # TODO(cretz): Check count/type of args at runtime?
+            return defn.name
+        return str(update)
+
+    def __post_init__(self) -> None:
+        if self.arg_types is None:
             arg_types, ret_type = temporalio.common._type_hints_from_func(self.fn)
             # If dynamic, assert it
             if not self.name:

@@ -244,6 +244,17 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         ):
             return await super().signal_workflow(input)
 
+    async def update_workflow(
+        self, input: temporalio.client.UpdateWorkflowInput
+    ) -> Any:
+        with self.root._start_as_current_span(
+            f"UpdateWorkflow:{input.update}",
+            attributes={"temporalWorkflowID": input.id},
+            input=input,
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            return await super().update_workflow(input)
+
 
 class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterceptor):
     def __init__(

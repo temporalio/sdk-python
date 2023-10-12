@@ -57,6 +57,7 @@ from temporalio.client import (
     StartWorkflowInput,
     TaskReachabilityType,
     TerminateWorkflowInput,
+    UpdateWorkflowInput,
     WorkflowContinuedAsNewError,
     WorkflowExecutionStatus,
     WorkflowFailureError,
@@ -399,6 +400,10 @@ class TracingClientOutboundInterceptor(OutboundInterceptor):
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
         self._parent.traces.append(("terminate_workflow", input))
         return await super().terminate_workflow(input)
+
+    async def update_workflow(self, input: UpdateWorkflowInput) -> Any:
+        self._parent.traces.append(("update_workflow", input))
+        return await super().update_workflow(input)
 
 
 async def test_interceptor(client: Client, worker: ExternalWorker):

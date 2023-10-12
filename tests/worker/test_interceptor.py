@@ -16,6 +16,7 @@ from temporalio.worker import (
     ExecuteWorkflowInput,
     HandleQueryInput,
     HandleSignalInput,
+    HandleUpdateInput,
     Interceptor,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
@@ -77,6 +78,14 @@ class TracingWorkflowInboundInterceptor(WorkflowInboundInterceptor):
     async def handle_query(self, input: HandleQueryInput) -> Any:
         interceptor_traces.append(("workflow.query", input))
         return await super().handle_query(input)
+
+    async def handle_update_validator(self, input: HandleUpdateInput) -> Any:
+        interceptor_traces.append(("workflow.update.validator", input))
+        return await super().handle_update_validator(input)
+
+    async def handle_update_handler(self, input: HandleUpdateInput) -> Any:
+        interceptor_traces.append(("workflow.update.handler", input))
+        return await super().handle_update_handler(input)
 
 
 class TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):

@@ -3503,3 +3503,97 @@ async def test_workflow_buffered_metrics(client: Client):
         and update.value == 1
         for update in updates
     )
+
+
+@workflow.defn
+class UpdateHandlersWorkflow:
+    def __init__(self) -> None:
+        self._last_event: Optional[str] = None
+
+    @workflow.run
+    async def run(self) -> None:
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.update
+    def last_event(self, an_arg: str) -> str:
+        workflow.logger.info("Running sync")
+        le = self._last_event or "<no event>"
+        self._last_event = an_arg
+        return le
+
+    @workflow.update
+    async def last_event_async(self, an_arg: str) -> str:
+        workflow.logger.info("Running async")
+        le = self._last_event or "<no event>"
+        self._last_event = an_arg
+        await asyncio.sleep(1)
+        return le
+
+    # @workflow.signal
+    # def set_signal_handler(self, signal_name: str) -> None:
+    #     def new_handler(arg: str) -> None:
+    #         self._last_event = f"signal {signal_name}: {arg}"
+    #
+    #     workflow.set_signal_handler(signal_name, new_handler)
+    #
+    # @workflow.signal
+    # def set_dynamic_signal_handler(self) -> None:
+    #     def new_handler(name: str, args: Sequence[RawValue]) -> None:
+    #         arg = workflow.payload_converter().from_payload(args[0].payload, str)
+    #         self._last_event = f"signal dynamic {name}: {arg}"
+    #
+    #     workflow.set_dynamic_signal_handler(new_handler)
+
+
+async def test_workflow_update_handlers(client: Client):
+    async with new_worker(client, UpdateHandlersWorkflow) as worker:
+        handle = await client.start_workflow(
+            UpdateHandlersWorkflow.run,
+            id=f"update-handlers-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Confirm signals buffered when not found
+        # await handle.signal("unknown_signal1", "val1")
+        # await handle.signal(
+        #     UpdateHandlersWorkflow.set_signal_handler, "unknown_signal1"
+        # )
+        # assert "signal unknown_signal1: val1" == await handle.query(
+        #     UpdateHandlersWorkflow.last_event
+        # )
+
+        # Normal handling
+        last_event = await handle.update(UpdateHandlersWorkflow.last_event, "val2")
+        assert "<no event>" == last_event
+
+        # Async handler
+        last_event = await handle.update(
+            UpdateHandlersWorkflow.last_event_async, "val3"
+        )
+        assert "val2" == last_event
+
+        # # Dynamic signal handling buffered and new
+        # await handle.signal("unknown_signal2", "val3")
+        # await handle.signal(UpdateHandlersWorkflow.set_dynamic_signal_handler)
+        # assert "signal dynamic unknown_signal2: val3" == await handle.query(
+        #     UpdateHandlersWorkflow.last_event
+        # )
+        # await handle.signal("unknown_signal3", "val4")
+        # assert "signal dynamic unknown_signal3: val4" == await handle.query(
+        #     UpdateHandlersWorkflow.last_event
+        # )
+        #
+        # # Normal query handling
+        # await handle.signal(
+        #     UpdateHandlersWorkflow.set_query_handler, "unknown_query1"
+        # )
+        # assert "query unknown_query1: val5" == await handle.query(
+        #     "unknown_query1", "val5"
+        # )
+        #
+        # # Dynamic query handling
+        # await handle.signal(UpdateHandlersWorkflow.set_dynamic_query_handler)
+        # assert "query dynamic unknown_query2: val6" == await handle.query(
+        #     "unknown_query2", "val6"
+        # )

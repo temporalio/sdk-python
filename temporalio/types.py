@@ -12,6 +12,10 @@ ReturnType = TypeVar("ReturnType", covariant=True)
 LocalReturnType = TypeVar("LocalReturnType", covariant=True)
 CallableType = TypeVar("CallableType", bound=Callable[..., Any])
 CallableAsyncType = TypeVar("CallableAsyncType", bound=Callable[..., Awaitable[Any]])
+CallableSyncOrAsyncType = TypeVar(
+    "CallableSyncOrAsyncType",
+    bound=Callable[..., Union[Any, Awaitable[Any]]],
+)
 CallableSyncOrAsyncReturnNoneType = TypeVar(
     "CallableSyncOrAsyncReturnNoneType",
     bound=Callable[..., Union[None, Awaitable[None]]],
