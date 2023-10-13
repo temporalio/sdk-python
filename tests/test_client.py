@@ -64,6 +64,7 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowQueryFailedError,
     WorkflowQueryRejectedError,
+    WorkflowUpdateHandle,
     _history_from_json,
 )
 from temporalio.common import RetryPolicy
@@ -401,9 +402,11 @@ class TracingClientOutboundInterceptor(OutboundInterceptor):
         self._parent.traces.append(("terminate_workflow", input))
         return await super().terminate_workflow(input)
 
-    async def update_workflow(self, input: UpdateWorkflowInput) -> Any:
-        self._parent.traces.append(("update_workflow", input))
-        return await super().update_workflow(input)
+    async def start_workflow_update(
+        self, input: UpdateWorkflowInput
+    ) -> WorkflowUpdateHandle:
+        self._parent.traces.append(("start_workflow_update", input))
+        return await super().start_workflow_update(input)
 
 
 async def test_interceptor(client: Client, worker: ExternalWorker):
