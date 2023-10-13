@@ -325,7 +325,7 @@ class WorkflowInboundInterceptor:
         """Called to handle a query."""
         return await self.next.handle_query(input)
 
-    async def handle_update_validator(self, input: HandleUpdateInput) -> Any:
+    async def handle_update_validator(self, input: HandleUpdateInput) -> None:
         """Called to handle an update's validation stage."""
         return await self.next.handle_update_validator(input)
 

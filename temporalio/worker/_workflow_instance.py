@@ -422,23 +422,16 @@ class _WorkflowInstanceImpl(
     def _apply_do_update(
         self, job: temporalio.bridge.proto.workflow_activation.DoUpdate
     ):
-        # self._buffered_updates.setdefault(job.signal_name, []).append(job)
-        # return
-
-        # Either the command to accept/reject, or the command to respond to the update
-        current_command = self._add_command()
-        current_command.update_response.protocol_instance_id = job.protocol_instance_id
+        acceptance_command = self._add_command()
+        acceptance_command.update_response.protocol_instance_id = (
+            job.protocol_instance_id
+        )
         try:
             defn = self._updates.get(job.name) or self._updates.get(None)
             if not defn:
                 raise RuntimeError(
                     f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler"
                 )
-            # TODO Actually run validator
-            current_command.update_response.accepted.SetInParent()
-            current_command = None
-
-            # Run the handler
             args = self._process_handler_args(
                 job.name,
                 job.input,
@@ -446,7 +439,7 @@ class _WorkflowInstanceImpl(
                 defn.arg_types,
                 defn.dynamic_vararg,
             )
-            input = HandleUpdateInput(
+            handler_input = HandleUpdateInput(
                 # TODO: update id vs proto instance id
                 id=job.protocol_instance_id,
                 update=job.name,
@@ -454,9 +447,22 @@ class _WorkflowInstanceImpl(
                 headers=job.headers,
             )
 
-            async def run_update() -> None:
+            # Run the validator & handler in a task. Validator needs to be in here since the interceptor might be async.
+            async def run_update(
+                accpetance_command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+            ) -> None:
+                command = accpetance_command
                 try:
-                    success = await self._inbound.handle_update_handler(input)
+                    if defn.validator is not None:
+                        # Run the validator
+                        await self._inbound.handle_update_validator(handler_input)
+
+                    # Accept the update
+                    command.update_response.accepted.SetInParent()
+                    command = None
+
+                    # Run the handler
+                    success = await self._inbound.handle_update_handler(handler_input)
                     result_payloads = self._payload_converter.to_payloads([success])
                     if len(result_payloads) != 1:
                         raise ValueError(
@@ -470,20 +476,21 @@ class _WorkflowInstanceImpl(
                 # TODO: Dedupe exception handling if it makes sense
                 except (Exception, asyncio.CancelledError) as err:
                     logger.debug(
-                        f"Workflow raised failure with run ID {self._info.run_id}",
+                        f"Update raised failure with run ID {self._info.run_id}",
                         exc_info=True,
                     )
-
                     # All asyncio cancelled errors become Temporal cancelled errors
                     if isinstance(err, asyncio.CancelledError):
-                        err = temporalio.exceptions.CancelledError(str(err))
-
+                        err = temporalio.exceptions.CancelledError(
+                            f"Cancellation raised within update {err}"
+                        )
                     if isinstance(err, temporalio.exceptions.FailureError):
                         # All other failure errors fail the update
-                        command = self._add_command()
-                        command.update_response.protocol_instance_id = (
-                            job.protocol_instance_id
-                        )
+                        if command is None:
+                            command = self._add_command()
+                            command.update_response.protocol_instance_id = (
+                                job.protocol_instance_id
+                            )
                         self._failure_converter.to_failure(
                             err,
                             self._payload_converter,
@@ -508,24 +515,17 @@ class _WorkflowInstanceImpl(
                         )
 
             self.create_task(
-                run_update(),
+                run_update(acceptance_command),
                 name=f"update: {job.name}",
             )
 
         except Exception as err:
-            logger.error(f"Ahhhh problem {err}")
-            if current_command is None:
-                # We have already finished the validator, but haven't started the handler. If we have an exception here
-                # we need to add a command to reject the update.
-                current_command = self._add_command()
-                current_command.update_response.protocol_instance_id = (
-                    job.protocol_instance_id
-                )
+            # If we failed here we had some issue deserializing or finding the update handlers, so reject it.
             try:
                 self._failure_converter.to_failure(
                     err,
                     self._payload_converter,
-                    current_command.update_response.rejected.cause,
+                    acceptance_command.update_response.rejected.cause,
                 )
             except Exception as inner_err:
                 raise ValueError("Failed converting application error") from inner_err
@@ -889,6 +889,13 @@ class _WorkflowInstanceImpl(
             return None
         # Bind if a method
         return defn.bind_fn(self._object) if defn.is_method else defn.fn
+
+    def workflow_get_update_validator(self, name: Optional[str]) -> Optional[Callable]:
+        defn = self._updates.get(name)
+        if not defn or not defn.validator:
+            return None
+        # Bind if a method
+        return defn.bind_validator(self._object) if defn.is_method else defn.validator
 
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
@@ -1779,16 +1786,13 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         else:
             return handler(*input.args)
 
-    async def handle_update_validator(self, input: HandleUpdateInput) -> Any:
-        handler = self._instance.workflow_get_update_handler(
+    async def handle_update_validator(self, input: HandleUpdateInput) -> None:
+        handler = self._instance.workflow_get_update_validator(
             input.update
-        ) or self._instance.workflow_get_update_handler(None)
+        ) or self._instance.workflow_get_update_validator(None)
         # Handler should always be present at this point
         assert handler
-        if inspect.iscoroutinefunction(handler):
-            return await handler(*input.args)
-        else:
-            return handler(*input.args)
+        handler(*input.args)
 
     async def handle_update_handler(self, input: HandleUpdateInput) -> Any:
         handler = self._instance.workflow_get_update_handler(

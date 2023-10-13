@@ -3791,17 +3791,18 @@ class WorkflowQueryFailedError(temporalio.exceptions.TemporalError):
 class WorkflowUpdateFailedError(temporalio.exceptions.TemporalError):
     """Error that occurs when an update fails."""
 
-    def __init__(self, update_id: str, update_name: str, message: str) -> None:
+    def __init__(self, update_id: str, update_name: str, cause: BaseException) -> None:
         """Create workflow update failed error."""
-        super().__init__(message)
+        super().__init__("Workflow update failed")
         self._update_id = update_id
         self._update_name = update_name
-        self._message = message
+        self.__cause__ = cause
 
     @property
-    def message(self) -> str:
-        """Get update failed message."""
-        return self._message
+    def cause(self) -> BaseException:
+        """Cause of the update failure."""
+        assert self.__cause__
+        return self.__cause__
 
 
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
@@ -4551,19 +4552,20 @@ class _ClientImpl(OutboundInterceptor):
             resp = await self._client.workflow_service.update_workflow_execution(
                 req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
             )
-            print("resp", resp)
         except RPCError as err:
             # If the status is INVALID_ARGUMENT, we can assume it's an update
             # failed error
             if err.status == RPCStatusCode.INVALID_ARGUMENT:
-                raise WorkflowUpdateFailedError(input.id, input.update, err.message)
+                raise WorkflowUpdateFailedError(input.id, input.update, err.cause)
             else:
                 raise
         if resp.outcome.HasField("failure"):
             raise WorkflowUpdateFailedError(
                 input.id,
                 input.update,
-                resp.outcome.failure.message,
+                await self._client.data_converter.decode_failure(
+                    resp.outcome.failure.cause
+                ),
             )
         if not resp.outcome.success.payloads:
             return None

@@ -452,6 +452,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_get_update_validator(self, name: Optional[str]) -> Optional[Callable]:
+        ...
+
+    @abstractmethod
     def workflow_info(self) -> Info:
         ...
 
@@ -786,11 +790,12 @@ def update(
         name: Optional[str], fn: CallableSyncOrAsyncType
     ) -> CallableSyncOrAsyncType:
         defn = _UpdateDefinition(name=name, fn=fn, is_method=True)
-        setattr(fn, "__temporal_update_definition", defn)
         if defn.dynamic_vararg:
             raise RuntimeError(
                 "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
             )
+        setattr(fn, "__temporal_update_definition", defn)
+        setattr(fn, "validator", partial(_update_validator, defn))
         return fn
 
     if name is not None or dynamic:
@@ -800,6 +805,13 @@ def update(
     if fn is None:
         raise RuntimeError("Cannot create update without function or name or dynamic")
     return with_name(fn.__name__, fn)
+
+
+def _update_validator(
+    update_def: _UpdateDefinition, fn: Optional[Callable[..., None]] = None
+):
+    """Decorator for a workflow update validator method."""
+    update_def.set_validator(fn)
 
 
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
@@ -1322,6 +1334,7 @@ class _UpdateDefinition:
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
+    validator: Optional[Callable[..., None]] = None
     dynamic_vararg: bool = False
 
     @staticmethod
@@ -1360,6 +1373,15 @@ class _UpdateDefinition:
 
     def bind_fn(self, obj: Any) -> Callable[..., Any]:
         return _bind_method(obj, self.fn)
+
+    def bind_validator(self, obj: Any) -> Callable[..., Any]:
+        return _bind_method(obj, self.validator)
+
+    def set_validator(self, validator: Callable[..., None]) -> None:
+        # TODO: Verify arg types are the same
+        if self.validator:
+            raise RuntimeError(f"Validator already set for update {self.name}")
+        object.__setattr__(self, "validator", validator)
 
 
 # See https://mypy.readthedocs.io/en/latest/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime

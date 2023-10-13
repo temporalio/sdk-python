@@ -49,6 +49,7 @@ from temporalio.client import (
     WorkflowFailureError,
     WorkflowHandle,
     WorkflowQueryFailedError,
+    WorkflowUpdateFailedError,
 )
 from temporalio.common import RawValue, RetryPolicy, SearchAttributes
 from temporalio.converter import (
@@ -3517,18 +3518,35 @@ class UpdateHandlersWorkflow:
 
     @workflow.update
     def last_event(self, an_arg: str) -> str:
-        workflow.logger.info("Running sync")
+        if an_arg == "fail":
+            raise ApplicationError("SyncFail")
+        le = self._last_event or "<no event>"
+        self._last_event = an_arg
+        return le
+
+    @last_event.validator
+    def last_event_validator(self, an_arg: str) -> None:
+        workflow.logger.info("Running validator with arg %s", an_arg)
+        if an_arg == "reject_me":
+            raise ApplicationError("Rejected")
+
+    @workflow.update
+    async def last_event_async(self, an_arg: str) -> str:
+        await asyncio.sleep(1)
+        if an_arg == "fail":
+            raise ApplicationError("AsyncFail")
         le = self._last_event or "<no event>"
         self._last_event = an_arg
         return le
 
     @workflow.update
-    async def last_event_async(self, an_arg: str) -> str:
-        workflow.logger.info("Running async")
-        le = self._last_event or "<no event>"
-        self._last_event = an_arg
-        await asyncio.sleep(1)
-        return le
+    async def runs_activity(self, name: str) -> str:
+        act = workflow.start_activity_method(
+            say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
+        )
+        act.cancel()
+        await act
+        return "done"
 
     # @workflow.signal
     # def set_signal_handler(self, signal_name: str) -> None:
@@ -3554,15 +3572,6 @@ async def test_workflow_update_handlers(client: Client):
             task_queue=worker.task_queue,
         )
 
-        # Confirm signals buffered when not found
-        # await handle.signal("unknown_signal1", "val1")
-        # await handle.signal(
-        #     UpdateHandlersWorkflow.set_signal_handler, "unknown_signal1"
-        # )
-        # assert "signal unknown_signal1: val1" == await handle.query(
-        #     UpdateHandlersWorkflow.last_event
-        # )
-
         # Normal handling
         last_event = await handle.update(UpdateHandlersWorkflow.last_event, "val2")
         assert "<no event>" == last_event
@@ -3572,7 +3581,6 @@ async def test_workflow_update_handlers(client: Client):
             UpdateHandlersWorkflow.last_event_async, "val3"
         )
         assert "val2" == last_event
-
         # # Dynamic signal handling buffered and new
         # await handle.signal("unknown_signal2", "val3")
         # await handle.signal(UpdateHandlersWorkflow.set_dynamic_signal_handler)
@@ -3597,3 +3605,40 @@ async def test_workflow_update_handlers(client: Client):
         # assert "query dynamic unknown_query2: val6" == await handle.query(
         #     "unknown_query2", "val6"
         # )
+
+
+async def test_workflow_update_handlers_unhappy(client: Client):
+    async with new_worker(client, UpdateHandlersWorkflow) as worker:
+        handle = await client.start_workflow(
+            UpdateHandlersWorkflow.run,
+            id=f"update-handlers-workflow-unhappy-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Undefined handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update("whargarbl", "whatever")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "'whargarbl' expected but not found" in err.value.cause.message
+
+        # Rejection by validator
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update(UpdateHandlersWorkflow.last_event, "reject_me")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Rejected" == err.value.cause.message
+
+        # Failure during update handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update(UpdateHandlersWorkflow.last_event, "fail")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "SyncFail" == err.value.cause.message
+
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update(UpdateHandlersWorkflow.last_event_async, "fail")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "AsyncFail" == err.value.cause.message
+
+        # Cancel inside handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update(UpdateHandlersWorkflow.runs_activity, "foo")
+        assert isinstance(err.value.cause, CancelledError)
