@@ -249,7 +249,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
     ) -> Any:
         with self.root._start_as_current_span(
             f"UpdateWorkflow:{input.update}",
-            attributes={"temporalWorkflowID": input.id},
+            attributes={"temporalWorkflowID": input.workflow_id},
             input=input,
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
