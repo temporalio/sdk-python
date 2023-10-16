@@ -87,6 +87,8 @@ def test_workflow_defn_good():
                 name="base_query", fn=GoodDefnBase.base_query, is_method=True
             ),
         },
+        # TODO: Add
+        updates={},
         sandboxed=True,
     )
 

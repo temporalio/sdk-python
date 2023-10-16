@@ -8,6 +8,7 @@ import dataclasses
 import inspect
 import json
 import re
+import sys
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -1668,7 +1669,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
-        wait_for_stage: temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage = temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED,
+        wait_for_stage: temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType = temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED,
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2815,8 +2816,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
 
     @staticmethod
     def _from_proto(
-        info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo,
-    ) -> ScheduleActionStartWorkflow:  # type: ignore[override]
+        info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo,  # type: ignore[override]
+    ) -> ScheduleActionStartWorkflow:
         return ScheduleActionStartWorkflow("<unset>", raw_info=info)
 
     # Overload for no-param workflow
@@ -3797,13 +3798,18 @@ class WorkflowUpdateHandle:
         run_id: Optional[str] = None,
         result_type: Optional[Type] = None,
     ):
+        """Create a workflow update handle.
+
+        Users should not create this directly, but rather use
+        :py:meth:`Client.start_workflow_update`.
+        """
         self._client = client
         self._id = id
         self._name = name
         self._workflow_id = workflow_id
         self._run_id = run_id
         self._result_type = result_type
-        self._known_result = None
+        self._known_result: Optional[temporalio.api.update.v1.Outcome] = None
 
     @property
     def id(self) -> str:
@@ -3829,7 +3835,7 @@ class WorkflowUpdateHandle:
         self,
         *,
         timeout: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, str] = None,
+        rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         """Wait for and return the result of the update. The result may already be known in which case no call is made.
@@ -3840,6 +3846,10 @@ class WorkflowUpdateHandle:
             rpc_metadata: Headers used on the RPC call. Keys here override client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call. If this elapses, the poll is retried until the
                 overall timeout has been reached.
+
+        Raises:
+            TimeoutError: The specified timeout was reached when waiting for the update result.
+            RPCError: Update result could not be fetched for some other reason.
         """
         outcome: temporalio.api.update.v1.Outcome
         if self._known_result is not None:
@@ -4084,7 +4094,7 @@ class UpdateWorkflowInput:
     update: str
     args: Sequence[Any]
     wait_for_stage: Optional[
-        temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage
+        temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType
     ]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: Optional[Type]
@@ -4724,9 +4734,7 @@ class _ClientImpl(OutboundInterceptor):
             # If the status is INVALID_ARGUMENT, we can assume it's an update
             # failed error
             if err.status == RPCStatusCode.INVALID_ARGUMENT:
-                raise WorkflowUpdateFailedError(
-                    input.workflow_id, input.update, err.cause
-                )
+                raise WorkflowUpdateFailedError(input.workflow_id, input.update, err)
             else:
                 raise
 
@@ -4758,31 +4766,34 @@ class _ClientImpl(OutboundInterceptor):
                 lifecycle_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED
             ),
         )
-        try:
-            # Wait for at most the *overall* timeout
-            async with asyncio.timeout(input.timeout.total_seconds()):
-                # Continue polling as long as we have either an empty response, or an *rpc* timeout
-                while True:
-                    try:
-                        res = await self._client.workflow_service.poll_workflow_execution_update(
-                            req,
-                            retry=True,
-                            metadata=input.rpc_metadata,
-                            timeout=input.rpc_timeout,
+
+        async def poll_loop():
+            # Continue polling as long as we have either an empty response, or an *rpc* timeout
+            while True:
+                try:
+                    res = await self._client.workflow_service.poll_workflow_execution_update(
+                        req,
+                        retry=True,
+                        metadata=input.rpc_metadata,
+                        timeout=input.rpc_timeout,
+                    )
+                    if res.HasField("outcome"):
+                        return await _update_outcome_to_result(
+                            res.outcome,
+                            input.update_id,
+                            input.update,
+                            self._client.data_converter,
+                            input.ret_type,
                         )
-                        if res.HasField("outcome"):
-                            return await _update_outcome_to_result(
-                                res.outcome,
-                                input.update_id,
-                                input.update,
-                                self._client.data_converter,
-                                input.ret_type,
-                            )
-                    except RPCError as err:
-                        if err.status == RPCStatusCode.DEADLINE_EXCEEDED:
-                            continue
-        except TimeoutError:
-            pass
+                except RPCError as err:
+                    if err.status == RPCStatusCode.DEADLINE_EXCEEDED:
+                        continue
+
+        # Wait for at most the *overall* timeout
+        return await asyncio.wait_for(
+            poll_loop(),
+            input.timeout.total_seconds() if input.timeout else sys.float_info.max,
+        )
 
     ### Async activity calls
 

@@ -811,7 +811,8 @@ def _update_validator(
     update_def: _UpdateDefinition, fn: Optional[Callable[..., None]] = None
 ):
     """Decorator for a workflow update validator method."""
-    update_def.set_validator(fn)
+    if fn is not None:
+        update_def.set_validator(fn)
 
 
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
@@ -1375,7 +1376,9 @@ class _UpdateDefinition:
         return _bind_method(obj, self.fn)
 
     def bind_validator(self, obj: Any) -> Callable[..., Any]:
-        return _bind_method(obj, self.validator)
+        if self.validator is not None:
+            return _bind_method(obj, self.validator)
+        return lambda *args, **kwargs: None
 
     def set_validator(self, validator: Callable[..., None]) -> None:
         # TODO: Verify arg types are the same

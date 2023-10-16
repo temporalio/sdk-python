@@ -193,7 +193,8 @@ class HandleQueryInput:
 @dataclass
 class HandleUpdateInput:
     """Input for :py:meth:`WorkflowInboundInterceptor.handle_update_validator`
-    and :py:meth:`WorkflowInboundInterceptor.handle_update_handler`."""
+    and :py:meth:`WorkflowInboundInterceptor.handle_update_handler`.
+    """
 
     id: str
     update: str

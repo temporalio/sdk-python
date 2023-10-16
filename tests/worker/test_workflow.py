@@ -3541,7 +3541,7 @@ class UpdateHandlersWorkflow:
 
     @workflow.update
     async def runs_activity(self, name: str) -> str:
-        act = workflow.start_activity_method(
+        act = workflow.start_activity(
             say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
         )
         act.cancel()
@@ -3565,7 +3565,9 @@ class UpdateHandlersWorkflow:
 
 
 async def test_workflow_update_handlers(client: Client):
-    async with new_worker(client, UpdateHandlersWorkflow) as worker:
+    async with new_worker(
+        client, UpdateHandlersWorkflow, activities=[say_hello]
+    ) as worker:
         handle = await client.start_workflow(
             UpdateHandlersWorkflow.run,
             id=f"update-handlers-workflow-{uuid.uuid4()}",

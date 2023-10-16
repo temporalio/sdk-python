@@ -244,16 +244,27 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         ):
             return await super().signal_workflow(input)
 
-    async def update_workflow(
+    async def start_workflow_update(
         self, input: temporalio.client.UpdateWorkflowInput
-    ) -> Any:
+    ) -> temporalio.client.WorkflowUpdateHandle:
         with self.root._start_as_current_span(
-            f"UpdateWorkflow:{input.update}",
+            f"StartWorkflowUpdate:{input.update}",
             attributes={"temporalWorkflowID": input.workflow_id},
             input=input,
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
-            return await super().update_workflow(input)
+            return await super().start_workflow_update(input)
+
+    async def poll_workflow_update(
+        self, input: temporalio.client.PollUpdateWorkflowInput
+    ) -> Any:
+        with self.root._start_as_current_span(
+            f"PollWorkflowUpdate:{input.update}",
+            attributes={"temporalWorkflowID": input.workflow_id},
+            input=input,
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            return await super().poll_workflow_update(input)
 
 
 class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterceptor):

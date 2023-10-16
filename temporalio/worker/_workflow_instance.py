@@ -452,6 +452,7 @@ class _WorkflowInstanceImpl(
                 accpetance_command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
             ) -> None:
                 command = accpetance_command
+                assert defn is not None
                 try:
                     if defn.validator is not None:
                         # Run the validator
@@ -459,7 +460,7 @@ class _WorkflowInstanceImpl(
 
                     # Accept the update
                     command.update_response.accepted.SetInParent()
-                    command = None
+                    command = None  # type: ignore
 
                     # Run the handler
                     success = await self._inbound.handle_update_handler(handler_input)
