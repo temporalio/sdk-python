@@ -422,114 +422,96 @@ class _WorkflowInstanceImpl(
     def _apply_do_update(
         self, job: temporalio.bridge.proto.workflow_activation.DoUpdate
     ):
-        acceptance_command = self._add_command()
-        acceptance_command.update_response.protocol_instance_id = (
-            job.protocol_instance_id
-        )
-        try:
-            defn = self._updates.get(job.name) or self._updates.get(None)
-            if not defn:
-                raise RuntimeError(
-                    f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler"
+        # Run the validator & handler in a task. Everything, including looking up the update definition, needs to be
+        # inside the task, since the update may not be defined until after we have started the workflow - for example
+        # if an update is in the first WFT & is also registered dynamically at the top of workflow code.
+        async def run_update() -> None:
+            command = self._add_command()
+            command.update_response.protocol_instance_id = job.protocol_instance_id
+            try:
+                defn = self._updates.get(job.name) or self._updates.get(None)
+                if not defn:
+                    raise RuntimeError(
+                        f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler"
+                    )
+                args = self._process_handler_args(
+                    job.name,
+                    job.input,
+                    defn.name,
+                    defn.arg_types,
+                    defn.dynamic_vararg,
                 )
-            args = self._process_handler_args(
-                job.name,
-                job.input,
-                defn.name,
-                defn.arg_types,
-                defn.dynamic_vararg,
-            )
-            handler_input = HandleUpdateInput(
-                # TODO: update id vs proto instance id
-                id=job.protocol_instance_id,
-                update=job.name,
-                args=args,
-                headers=job.headers,
-            )
+                handler_input = HandleUpdateInput(
+                    # TODO: update id vs proto instance id
+                    id=job.protocol_instance_id,
+                    update=job.name,
+                    args=args,
+                    headers=job.headers,
+                )
 
-            # Run the validator & handler in a task. Validator needs to be in here since the interceptor might be async.
-            async def run_update(
-                accpetance_command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
-            ) -> None:
-                command = accpetance_command
-                assert defn is not None
-                try:
-                    if defn.validator is not None:
-                        # Run the validator
-                        with self._as_read_only():
-                            await self._inbound.handle_update_validator(handler_input)
+                if defn.validator is not None:
+                    # Run the validator
+                    with self._as_read_only():
+                        await self._inbound.handle_update_validator(handler_input)
 
-                    # Accept the update
-                    command.update_response.accepted.SetInParent()
-                    command = None  # type: ignore
+                # Accept the update
+                command.update_response.accepted.SetInParent()
+                command = None  # type: ignore
 
-                    # Run the handler
-                    success = await self._inbound.handle_update_handler(handler_input)
-                    result_payloads = self._payload_converter.to_payloads([success])
-                    if len(result_payloads) != 1:
-                        raise ValueError(
-                            f"Expected 1 result payload, got {len(result_payloads)}"
-                        )
+                # Run the handler
+                success = await self._inbound.handle_update_handler(handler_input)
+                result_payloads = self._payload_converter.to_payloads([success])
+                if len(result_payloads) != 1:
+                    raise ValueError(
+                        f"Expected 1 result payload, got {len(result_payloads)}"
+                    )
+                command = self._add_command()
+                command.update_response.protocol_instance_id = job.protocol_instance_id
+                command.update_response.completed.CopyFrom(result_payloads[0])
+            except (Exception, asyncio.CancelledError) as err:
+                logger.debug(
+                    f"Update raised failure with run ID {self._info.run_id}",
+                    exc_info=True,
+                )
+                # All asyncio cancelled errors become Temporal cancelled errors
+                if isinstance(err, asyncio.CancelledError):
+                    err = temporalio.exceptions.CancelledError(
+                        f"Cancellation raised within update {err}"
+                    )
+                # Read-only issues during validation should fail the task
+                if isinstance(err, temporalio.workflow.ReadOnlyContextError):
+                    self._current_activation_error = err
+                    return
+                # All other errors fail the update
+                if command is None:
                     command = self._add_command()
                     command.update_response.protocol_instance_id = (
                         job.protocol_instance_id
                     )
-                    command.update_response.completed.CopyFrom(result_payloads[0])
-                except (Exception, asyncio.CancelledError) as err:
-                    logger.debug(
-                        f"Update raised failure with run ID {self._info.run_id}",
-                        exc_info=True,
-                    )
-                    # All asyncio cancelled errors become Temporal cancelled errors
-                    if isinstance(err, asyncio.CancelledError):
-                        err = temporalio.exceptions.CancelledError(
-                            f"Cancellation raised within update {err}"
-                        )
-                    # Read-only issues during validation should fail the task
-                    if isinstance(err, temporalio.workflow.ReadOnlyContextError):
-                        self._current_activation_error = err
-                        return
-                    # All other errors fail the update
-                    if command is None:
-                        command = self._add_command()
-                        command.update_response.protocol_instance_id = (
-                            job.protocol_instance_id
-                        )
-                    self._failure_converter.to_failure(
-                        err,
-                        self._payload_converter,
-                        command.update_response.rejected.cause,
-                    )
-                except BaseException as err:
-                    # During tear down, generator exit and no-runtime exceptions can appear
-                    if not self._deleting:
-                        raise
-                    if not isinstance(
-                        err,
-                        (
-                            GeneratorExit,
-                            temporalio.workflow._NotInWorkflowEventLoopError,
-                        ),
-                    ):
-                        logger.debug(
-                            "Ignoring exception while deleting workflow", exc_info=True
-                        )
-
-            self.create_task(
-                run_update(acceptance_command),
-                name=f"update: {job.name}",
-            )
-
-        except Exception as err:
-            # If we failed here we had some issue deserializing or finding the update handlers, so reject it.
-            try:
                 self._failure_converter.to_failure(
                     err,
                     self._payload_converter,
-                    acceptance_command.update_response.rejected.cause,
+                    command.update_response.rejected.cause,
                 )
-            except Exception as inner_err:
-                raise ValueError("Failed converting application error") from inner_err
+            except BaseException as err:
+                # During tear down, generator exit and no-runtime exceptions can appear
+                if not self._deleting:
+                    raise
+                if not isinstance(
+                    err,
+                    (
+                        GeneratorExit,
+                        temporalio.workflow._NotInWorkflowEventLoopError,
+                    ),
+                ):
+                    logger.debug(
+                        "Ignoring exception while deleting workflow", exc_info=True
+                    )
+
+        self.create_task(
+            run_update(),
+            name=f"update: {job.name}",
+        )
 
     def _apply_fire_timer(
         self, job: temporalio.bridge.proto.workflow_activation.FireTimer
@@ -1017,7 +999,26 @@ class _WorkflowInstanceImpl(
         else:
             self._signals.pop(name, None)
 
-    # TODO: Set update handler?
+    def workflow_set_update_handler(
+        self,
+        name: Optional[str],
+        handler: Optional[Callable],
+        validator: Optional[Callable],
+    ) -> None:
+        self._assert_not_read_only("set update handler")
+        if handler:
+            defn = temporalio.workflow._UpdateDefinition(
+                name=name, fn=handler, is_method=False
+            )
+            if validator is not None:
+                defn.set_validator(validator)
+            self._updates[name] = defn
+            if defn.dynamic_vararg:
+                raise RuntimeError(
+                    "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
+                )
+        else:
+            self._updates.pop(name, None)
 
     def workflow_start_activity(
         self,

@@ -3516,6 +3516,8 @@ class UpdateHandlersWorkflow:
 
     @workflow.run
     async def run(self) -> None:
+        workflow.set_update_handler("first_task_update", lambda: "worked")
+
         # Wait forever
         await asyncio.Future()
 
@@ -3565,23 +3567,20 @@ class UpdateHandlersWorkflow:
                 say_hello, "boo", schedule_to_close_timeout=timedelta(seconds=5)
             )
 
-    # @workflow.signal
-    # def set_signal_handler(self, signal_name: str) -> None:
-    #     def new_handler(arg: str) -> None:
-    #         self._last_event = f"signal {signal_name}: {arg}"
-    #
-    #     workflow.set_signal_handler(signal_name, new_handler)
-    #
-    # @workflow.signal
-    # def set_dynamic_signal_handler(self) -> None:
-    #     def new_handler(name: str, args: Sequence[RawValue]) -> None:
-    #         arg = workflow.payload_converter().from_payload(args[0].payload, str)
-    #         self._last_event = f"signal dynamic {name}: {arg}"
-    #
-    #     workflow.set_dynamic_signal_handler(new_handler)
+    @workflow.update
+    async def set_dynamic(self) -> str:
+        def dynahandler(name: str, _args: Sequence[RawValue]) -> str:
+            return "dynahandler - " + name
+
+        def dynavalidator(name: str, _args: Sequence[RawValue]) -> None:
+            if name == "reject_me":
+                raise ApplicationError("Rejected")
+
+        workflow.set_dynamic_update_handler(dynahandler, validator=dynavalidator)
+        return "set"
 
 
-async def test_workflow_update_handlers(client: Client):
+async def test_workflow_update_handlers_happy(client: Client):
     async with new_worker(
         client, UpdateHandlersWorkflow, activities=[say_hello]
     ) as worker:
@@ -3590,6 +3589,9 @@ async def test_workflow_update_handlers(client: Client):
             id=f"update-handlers-workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
+        # Dynamically registered and used in first task
+        assert "worked" == await handle.update("first_task_update")
 
         # Normal handling
         last_event = await handle.update(UpdateHandlersWorkflow.last_event, "val2")
@@ -3600,30 +3602,10 @@ async def test_workflow_update_handlers(client: Client):
             UpdateHandlersWorkflow.last_event_async, "val3"
         )
         assert "val2" == last_event
-        # # Dynamic signal handling buffered and new
-        # await handle.signal("unknown_signal2", "val3")
-        # await handle.signal(UpdateHandlersWorkflow.set_dynamic_signal_handler)
-        # assert "signal dynamic unknown_signal2: val3" == await handle.query(
-        #     UpdateHandlersWorkflow.last_event
-        # )
-        # await handle.signal("unknown_signal3", "val4")
-        # assert "signal dynamic unknown_signal3: val4" == await handle.query(
-        #     UpdateHandlersWorkflow.last_event
-        # )
-        #
-        # # Normal query handling
-        # await handle.signal(
-        #     UpdateHandlersWorkflow.set_query_handler, "unknown_query1"
-        # )
-        # assert "query unknown_query1: val5" == await handle.query(
-        #     "unknown_query1", "val5"
-        # )
-        #
-        # # Dynamic query handling
-        # await handle.signal(UpdateHandlersWorkflow.set_dynamic_query_handler)
-        # assert "query dynamic unknown_query2: val6" == await handle.query(
-        #     "unknown_query2", "val6"
-        # )
+
+        # Dynamic handler
+        await handle.update(UpdateHandlersWorkflow.set_dynamic)
+        assert "dynahandler - made_up" == await handle.update("made_up")
 
 
 async def test_workflow_update_handlers_unhappy(client: Client):
@@ -3683,6 +3665,15 @@ async def test_workflow_update_handlers_unhappy(client: Client):
             )
         assert isinstance(err.value.cause, ApplicationError)
         assert "Failed decoding arguments" == err.value.cause.message
+
+        # Dynamic handler
+        await handle.update(UpdateHandlersWorkflow.set_dynamic)
+
+        # Rejection by dynamic handler validator
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update("reject_me")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Rejected" == err.value.cause.message
 
 
 async def test_workflow_update_command_in_validator(client: Client):

@@ -506,6 +506,15 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_set_update_handler(
+        self,
+        name: Optional[str],
+        handler: Optional[Callable],
+        validator: Optional[Callable],
+    ) -> None:
+        ...
+
+    @abstractmethod
     def workflow_start_activity(
         self,
         activity: Any,
@@ -4091,6 +4100,64 @@ def set_dynamic_query_handler(handler: Optional[Callable]) -> None:
         handler: Callable to set or None to unset.
     """
     _Runtime.current().workflow_set_query_handler(None, handler)
+
+
+def get_update_handler(name: str) -> Optional[Callable]:
+    """Get the update handler for the given name if any.
+
+    This includes handlers created via the ``@workflow.update`` decorator.
+
+    Args:
+        name: Name of the update.
+
+    Returns:
+        Callable for the update if any. If a handler is not found for the name,
+        this will not return the dynamic handler even if there is one.
+    """
+    return _Runtime.current().workflow_get_update_handler(name)
+
+
+def set_update_handler(
+    name: str, handler: Optional[Callable], *, validator: Optional[Callable] = None
+) -> None:
+    """Set or unset the update handler for the given name.
+
+    This overrides any existing handlers for the given name, including handlers
+    created via the ``@workflow.update`` decorator.
+
+    Args:
+        name: Name of the update.
+        handler: Callable to set or None to unset.
+        validator: Callable to set or None to unset as the update validator.
+    """
+    _Runtime.current().workflow_set_update_handler(name, handler, validator)
+
+
+def get_dynamic_update_handler() -> Optional[Callable]:
+    """Get the dynamic update handler if any.
+
+    This includes dynamic handlers created via the ``@workflow.update``
+    decorator.
+
+    Returns:
+        Callable for the dynamic update handler if any.
+    """
+    return _Runtime.current().workflow_get_update_handler(None)
+
+
+def set_dynamic_update_handler(
+    handler: Optional[Callable], *, validator: Optional[Callable] = None
+) -> None:
+    """Set or unset the dynamic update handler.
+
+    This overrides the existing dynamic handler even if it was created via the
+    ``@workflow.update`` decorator.
+
+    Args:
+        handler: Callable to set or None to unset.
+        validator: Callable to set or None to unset as the update validator.
+    """
+    _Runtime.current().workflow_set_update_handler(None, handler, validator)
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:
