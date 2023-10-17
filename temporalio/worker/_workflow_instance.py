@@ -456,7 +456,8 @@ class _WorkflowInstanceImpl(
                 try:
                     if defn.validator is not None:
                         # Run the validator
-                        await self._inbound.handle_update_validator(handler_input)
+                        with self._as_read_only():
+                            await self._inbound.handle_update_validator(handler_input)
 
                     # Accept the update
                     command.update_response.accepted.SetInParent()
@@ -474,7 +475,6 @@ class _WorkflowInstanceImpl(
                         job.protocol_instance_id
                     )
                     command.update_response.completed.CopyFrom(result_payloads[0])
-                # TODO: Dedupe exception handling if it makes sense
                 except (Exception, asyncio.CancelledError) as err:
                     logger.debug(
                         f"Update raised failure with run ID {self._info.run_id}",
@@ -485,21 +485,21 @@ class _WorkflowInstanceImpl(
                         err = temporalio.exceptions.CancelledError(
                             f"Cancellation raised within update {err}"
                         )
-                    if isinstance(err, temporalio.exceptions.FailureError):
-                        # All other failure errors fail the update
-                        if command is None:
-                            command = self._add_command()
-                            command.update_response.protocol_instance_id = (
-                                job.protocol_instance_id
-                            )
-                        self._failure_converter.to_failure(
-                            err,
-                            self._payload_converter,
-                            command.update_response.rejected.cause,
-                        )
-                    else:
-                        # All other exceptions fail the task
+                    # Read-only issues during validation should fail the task
+                    if isinstance(err, temporalio.workflow.ReadOnlyContextError):
                         self._current_activation_error = err
+                        return
+                    # All other errors fail the update
+                    if command is None:
+                        command = self._add_command()
+                        command.update_response.protocol_instance_id = (
+                            job.protocol_instance_id
+                        )
+                    self._failure_converter.to_failure(
+                        err,
+                        self._payload_converter,
+                        command.update_response.rejected.cause,
+                    )
                 except BaseException as err:
                     # During tear down, generator exit and no-runtime exceptions can appear
                     if not self._deleting:

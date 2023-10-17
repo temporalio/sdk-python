@@ -1068,7 +1068,7 @@ class _Definition:
             raise ValueError("Class already contains workflow definition")
         issues: List[str] = []
 
-        # Collect run fn and all signal/query fns
+        # Collect run fn and all signal/query/update fns
         members = inspect.getmembers(cls)
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
         seen_run_attr = False

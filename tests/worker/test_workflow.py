@@ -3506,6 +3506,9 @@ async def test_workflow_buffered_metrics(client: Client):
     )
 
 
+bad_validator_fail_ct = 0
+
+
 @workflow.defn
 class UpdateHandlersWorkflow:
     def __init__(self) -> None:
@@ -3547,6 +3550,20 @@ class UpdateHandlersWorkflow:
         act.cancel()
         await act
         return "done"
+
+    @workflow.update
+    async def bad_validator(self) -> str:
+        return "done"
+
+    @bad_validator.validator
+    def bad_validator_validator(self) -> None:
+        global bad_validator_fail_ct
+        # Run a command which should not be allowed the first few tries, then "fix" it as if new code was deployed
+        if bad_validator_fail_ct < 2:
+            bad_validator_fail_ct += 1
+            workflow.start_activity(
+                say_hello, "boo", schedule_to_close_timeout=timedelta(seconds=5)
+            )
 
     # @workflow.signal
     # def set_signal_handler(self, signal_name: str) -> None:
@@ -3644,3 +3661,43 @@ async def test_workflow_update_handlers_unhappy(client: Client):
         with pytest.raises(WorkflowUpdateFailedError) as err:
             await handle.update(UpdateHandlersWorkflow.runs_activity, "foo")
         assert isinstance(err.value.cause, CancelledError)
+
+        # Incorrect args for handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update("last_event", args=[121, "badarg"])
+        assert isinstance(err.value.cause, ApplicationError)
+        assert (
+            "UpdateHandlersWorkflow.last_event_validator() takes 2 positional arguments but 3 were given"
+            == err.value.cause.message
+        )
+
+        # Un-deserializeable nonsense
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.update(
+                "last_event",
+                arg=RawValue(
+                    payload=Payload(
+                        metadata={"encoding": b"u-dont-know-me"}, data=b"enchi-cat"
+                    )
+                ),
+            )
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Failed decoding arguments" == err.value.cause.message
+
+
+async def test_workflow_update_command_in_validator(client: Client):
+    # Need to not sandbox so behavior of validator can change based on global
+    async with new_worker(
+        client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
+    ) as worker:
+        handle = await client.start_workflow(
+            UpdateHandlersWorkflow.run,
+            id=f"update-handlers-command-in-validator-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=timedelta(seconds=1),
+        )
+
+        # This will produce a WFT failure which will eventually resolve and then this
+        # update will return
+        res = await handle.update(UpdateHandlersWorkflow.bad_validator)
+        assert res == "done"
