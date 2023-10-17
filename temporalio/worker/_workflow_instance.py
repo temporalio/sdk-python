@@ -439,7 +439,7 @@ class _WorkflowInstanceImpl(
                     job.input,
                     defn.name,
                     defn.arg_types,
-                    defn.dynamic_vararg,
+                    False,
                 )
                 handler_input = HandleUpdateInput(
                     # TODO: update id vs proto instance id
@@ -1013,10 +1013,6 @@ class _WorkflowInstanceImpl(
             if validator is not None:
                 defn.set_validator(validator)
             self._updates[name] = defn
-            if defn.dynamic_vararg:
-                raise RuntimeError(
-                    "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
-                )
         else:
             self._updates.pop(name, None)
 

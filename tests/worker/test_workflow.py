@@ -3579,6 +3579,10 @@ class UpdateHandlersWorkflow:
         workflow.set_dynamic_update_handler(dynahandler, validator=dynavalidator)
         return "set"
 
+    @workflow.update(name="name_override")
+    async def not_the_name(self) -> str:
+        return "name_overridden"
+
 
 async def test_workflow_update_handlers_happy(client: Client):
     async with new_worker(
@@ -3606,6 +3610,10 @@ async def test_workflow_update_handlers_happy(client: Client):
         # Dynamic handler
         await handle.update(UpdateHandlersWorkflow.set_dynamic)
         assert "dynahandler - made_up" == await handle.update("made_up")
+
+        assert "name_overridden" == await handle.update(
+            UpdateHandlersWorkflow.not_the_name
+        )
 
 
 async def test_workflow_update_handlers_unhappy(client: Client):

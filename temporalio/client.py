@@ -1702,15 +1702,14 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update_name: str
         ret_type = result_type
         if callable(update):
-            defn = temporalio.workflow._UpdateDefinition.from_fn(update)
-            if not defn:
+            if not isinstance(update, temporalio.workflow.update):
                 raise RuntimeError(
                     f"Update definition not found on {update.__qualname__}, "
                     "is it decorated with @workflow.update?"
                 )
-            elif not defn.name:
+            defn = update._defn
+            if not defn.name:
                 raise RuntimeError("Cannot invoke dynamic update definition")
-            # TODO(cretz): Check count/type of args at runtime?
             update_name = defn.name
             ret_type = defn.ret_type
         else:
