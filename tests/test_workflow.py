@@ -19,6 +19,10 @@ class GoodDefnBase:
     def base_query(self):
         pass
 
+    @workflow.update
+    def base_update(self):
+        pass
+
 
 @workflow.defn(name="workflow-custom")
 class GoodDefn(GoodDefnBase):
@@ -48,6 +52,18 @@ class GoodDefn(GoodDefnBase):
 
     @workflow.query(dynamic=True)
     def query3(self, name: str, args: Sequence[RawValue]):
+        pass
+
+    @workflow.update
+    def update1(self):
+        pass
+
+    @workflow.update(name="update-custom")
+    def update2(self):
+        pass
+
+    @workflow.update(dynamic=True)
+    def update3(self, name: str, args: Sequence[RawValue]):
         pass
 
 
@@ -87,8 +103,21 @@ def test_workflow_defn_good():
                 name="base_query", fn=GoodDefnBase.base_query, is_method=True
             ),
         },
-        # TODO: Add
-        updates={},
+        # Since updates use class-based decorators we need to pass the inner _fn for the fn param
+        updates={
+            "update1": workflow._UpdateDefinition(
+                name="update1", fn=GoodDefn.update1._fn, is_method=True
+            ),
+            "update-custom": workflow._UpdateDefinition(
+                name="update-custom", fn=GoodDefn.update2._fn, is_method=True
+            ),
+            None: workflow._UpdateDefinition(
+                name=None, fn=GoodDefn.update3._fn, is_method=True
+            ),
+            "base_update": workflow._UpdateDefinition(
+                name="base_update", fn=GoodDefnBase.base_update._fn, is_method=True
+            ),
+        },
         sandboxed=True,
     )
 

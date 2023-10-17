@@ -803,7 +803,9 @@ class update(object):
             if name is not None and dynamic:
                 raise RuntimeError("Cannot provide name and dynamic boolean")
         self._fn = fn
-        self._name = name
+        self._name = (
+            name if name is not None else self._fn.__name__ if self._fn else None
+        )
         self._dynamic = dynamic
         if self._fn is not None:
             # Only bother to assign the definition if we are given a function. The function is not provided when
@@ -817,15 +819,8 @@ class update(object):
         return self
 
     def _assign_defn(self) -> None:
-        chosen_name = (
-            self._name
-            if self._name is not None
-            else self._fn.__name__
-            if self._fn
-            else None
-        )
         assert self._fn is not None
-        self._defn = _UpdateDefinition(name=chosen_name, fn=self._fn, is_method=True)
+        self._defn = _UpdateDefinition(name=self._name, fn=self._fn, is_method=True)
 
     def validator(self, fn: Callable[..., None]):
         """Decorator for a workflow update validator method. Apply this decorator to a function to have it run before
@@ -1240,9 +1235,9 @@ def _bind_method(obj: Any, fn: Callable[..., Any]) -> Callable[..., Any]:
 def _assert_dynamic_handler_args(
     fn: Callable, arg_types: Optional[List[Type]], is_method: bool
 ) -> bool:
-    # Dynamic query/signal must have three args: self, name, and
-    # Sequence[RawValue]. An older form accepted varargs for the third param so
-    # we will too (but will warn in the signal/query code)
+    # Dynamic query/signal/update must have three args: self, name, and
+    # Sequence[RawValue]. An older form accepted varargs for the third param for signals/queries so
+    # we will too (but will warn in the signal/query code).
     params = list(inspect.signature(fn).parameters.values())
     total_expected_params = 3 if is_method else 2
     if (
