@@ -1617,7 +1617,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     # Overload for no-param update
     @overload
-    async def update(
+    async def execute_update(
         self,
         update: temporalio.workflow.UpdateMethodMultiArg[[SelfType], LocalReturnType],
         *,
@@ -1629,7 +1629,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     # Overload for single-param update
     @overload
-    async def update(
+    async def execute_update(
         self,
         update: temporalio.workflow.UpdateMethodMultiArg[
             [SelfType, ParamType], LocalReturnType
@@ -1643,7 +1643,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ...
 
     @overload
-    async def update(
+    async def execute_update(
         self,
         update: temporalio.workflow.UpdateMethodMultiArg[
             MultiParamSpec, LocalReturnType
@@ -1658,7 +1658,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     # Overload for string-name update
     @overload
-    async def update(
+    async def execute_update(
         self,
         update: str,
         arg: Any = temporalio.common._arg_unset,
@@ -1671,7 +1671,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     ) -> Any:
         ...
 
-    async def update(
+    async def execute_update(
         self,
         update: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
@@ -1686,6 +1686,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
         This will target the workflow with :py:attr:`run_id` if present. To use a
         different run ID, create a new handle with via :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+           This API is experimental
 
         .. warning::
             WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
@@ -1706,7 +1709,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Raises:
             RPCError: There was some issue sending the update to the workflow.
         """
-        handle = await self.start_update(
+        handle = await self._start_update(
             update,
             arg,
             args=args,
@@ -1725,7 +1728,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
-        wait_for_stage: temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType = temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED,
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1734,6 +1736,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
         This will target the workflow with :py:attr:`run_id` if present. To use a
         different run ID, create a new handle with via :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+           This API is experimental
 
         .. warning::
             WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
@@ -1745,7 +1750,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             arg: Single argument to the update.
             args: Multiple arguments to the update. Cannot be set if arg is.
             id: ID of the update. If not set, the server will set a UUID as the ID.
-            wait_for_stage: Specifies at what point in the update request life cycle this request should return.
             result_type: For string updates, this can set the specific result
                 type hint to deserialize into.
             rpc_metadata: Headers used on the RPC call. Keys here override
@@ -1755,6 +1759,29 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Raises:
             RPCError: There was some issue sending the update to the workflow.
         """
+        return await self._start_update(
+            update,
+            arg,
+            args=args,
+            id=id,
+            wait_for_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED,
+            result_type=result_type,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+    async def _start_update(
+        self,
+        update: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        wait_for_stage: temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType = temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle:
         update_name: str
         ret_type = result_type
         if isinstance(update, temporalio.workflow.UpdateMethodMultiArg):

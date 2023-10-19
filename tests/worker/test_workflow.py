@@ -3595,24 +3595,28 @@ async def test_workflow_update_handlers_happy(client: Client):
         )
 
         # Dynamically registered and used in first task
-        assert "worked" == await handle.update("first_task_update")
+        assert "worked" == await handle.execute_update("first_task_update")
 
         # Normal handling
-        last_event = await handle.update(UpdateHandlersWorkflow.last_event, "val2")
+        last_event = await handle.execute_update(
+            UpdateHandlersWorkflow.last_event, "val2"
+        )
         assert "<no event>" == last_event
 
         # Async handler
-        last_event = await handle.update(
+        last_event = await handle.execute_update(
             UpdateHandlersWorkflow.last_event_async, "val3"
         )
         assert "val2" == last_event
 
         # Dynamic handler
-        await handle.update(UpdateHandlersWorkflow.set_dynamic)
-        assert "dynahandler - made_up" == await handle.update("made_up")
+        await handle.execute_update(UpdateHandlersWorkflow.set_dynamic)
+        assert "dynahandler - made_up" == await handle.execute_update("made_up")
 
         # Name overload
-        assert "named" == await handle.update(UpdateHandlersWorkflow.async_named)
+        assert "named" == await handle.execute_update(
+            UpdateHandlersWorkflow.async_named
+        )
 
 
 async def test_workflow_update_handlers_unhappy(client: Client):
@@ -3625,35 +3629,35 @@ async def test_workflow_update_handlers_unhappy(client: Client):
 
         # Undefined handler
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update("whargarbl", "whatever")
+            await handle.execute_update("whargarbl", "whatever")
         assert isinstance(err.value.cause, ApplicationError)
         assert "'whargarbl' expected but not found" in err.value.cause.message
 
         # Rejection by validator
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update(UpdateHandlersWorkflow.last_event, "reject_me")
+            await handle.execute_update(UpdateHandlersWorkflow.last_event, "reject_me")
         assert isinstance(err.value.cause, ApplicationError)
         assert "Rejected" == err.value.cause.message
 
         # Failure during update handler
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update(UpdateHandlersWorkflow.last_event, "fail")
+            await handle.execute_update(UpdateHandlersWorkflow.last_event, "fail")
         assert isinstance(err.value.cause, ApplicationError)
         assert "SyncFail" == err.value.cause.message
 
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update(UpdateHandlersWorkflow.last_event_async, "fail")
+            await handle.execute_update(UpdateHandlersWorkflow.last_event_async, "fail")
         assert isinstance(err.value.cause, ApplicationError)
         assert "AsyncFail" == err.value.cause.message
 
         # Cancel inside handler
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update(UpdateHandlersWorkflow.runs_activity, "foo")
+            await handle.execute_update(UpdateHandlersWorkflow.runs_activity, "foo")
         assert isinstance(err.value.cause, CancelledError)
 
         # Incorrect args for handler
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update("last_event", args=[121, "badarg"])
+            await handle.execute_update("last_event", args=[121, "badarg"])
         assert isinstance(err.value.cause, ApplicationError)
         assert (
             "UpdateHandlersWorkflow.last_event_validator() takes 2 positional arguments but 3 were given"
@@ -3662,7 +3666,7 @@ async def test_workflow_update_handlers_unhappy(client: Client):
 
         # Un-deserializeable nonsense
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update(
+            await handle.execute_update(
                 "last_event",
                 arg=RawValue(
                     payload=Payload(
@@ -3674,11 +3678,11 @@ async def test_workflow_update_handlers_unhappy(client: Client):
         assert "Failed decoding arguments" == err.value.cause.message
 
         # Dynamic handler
-        await handle.update(UpdateHandlersWorkflow.set_dynamic)
+        await handle.execute_update(UpdateHandlersWorkflow.set_dynamic)
 
         # Rejection by dynamic handler validator
         with pytest.raises(WorkflowUpdateFailedError) as err:
-            await handle.update("reject_me")
+            await handle.execute_update("reject_me")
         assert isinstance(err.value.cause, ApplicationError)
         assert "Rejected" == err.value.cause.message
 
@@ -3697,5 +3701,5 @@ async def test_workflow_update_command_in_validator(client: Client):
 
         # This will produce a WFT failure which will eventually resolve and then this
         # update will return
-        res = await handle.update(UpdateHandlersWorkflow.bad_validator)
+        res = await handle.execute_update(UpdateHandlersWorkflow.bad_validator)
         assert res == "done"

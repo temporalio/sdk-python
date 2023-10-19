@@ -844,6 +844,9 @@ def update(
     argument that can accept more fields later if needed. The handler may return
     a serializable value which will be sent back to the caller of the update.
 
+    .. warning::
+       This API is experimental
+
     Args:
         fn: The function to decorate.
         name: Update name. Defaults to method ``__name__``. Cannot be present
