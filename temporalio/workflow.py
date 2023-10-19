@@ -36,7 +36,13 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Concatenate, Literal, TypedDict
+from typing_extensions import (
+    Concatenate,
+    Literal,
+    Protocol,
+    TypedDict,
+    runtime_checkable,
+)
 
 import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
@@ -64,6 +70,7 @@ from .types import (
     MethodSyncSingleParam,
     MultiParamSpec,
     ParamType,
+    ProtocolReturnType,
     ReturnType,
     SelfType,
 )
@@ -764,8 +771,64 @@ def time_ns() -> int:
     return _Runtime.current().workflow_time_ns()
 
 
-# noinspection PyPep8Naming
-class update(object):
+# Needs to be defined here to avoid a circular import
+@runtime_checkable
+class UpdateMethodMultiArg(Protocol[MultiParamSpec, ProtocolReturnType]):
+    """Decorated workflow update functions implement this."""
+
+    _defn: temporalio.workflow._UpdateDefinition
+
+    def __call__(
+        self, *args: MultiParamSpec.args, **kwargs: MultiParamSpec.kwargs
+    ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
+        """Generic callable type callback."""
+        ...
+
+    def validator(self, vfunc: Callable[MultiParamSpec, None]) -> None:
+        """Use to decorate a function to validate the arguments passed to the update handler."""
+        ...
+
+
+@overload
+def update(
+    fn: Callable[MultiParamSpec, Awaitable[ReturnType]]
+) -> UpdateMethodMultiArg[MultiParamSpec, ReturnType]:
+    ...
+
+
+@overload
+def update(
+    fn: Callable[MultiParamSpec, ReturnType]
+) -> UpdateMethodMultiArg[MultiParamSpec, ReturnType]:
+    ...
+
+
+@overload
+def update(
+    *, name: str
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiArg[MultiParamSpec, ReturnType],
+]:
+    ...
+
+
+@overload
+def update(
+    *, dynamic: Literal[True]
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiArg[MultiParamSpec, ReturnType],
+]:
+    ...
+
+
+def update(
+    fn: Optional[CallableSyncOrAsyncType] = None,
+    *,
+    name: Optional[str] = None,
+    dynamic: Optional[bool] = False,
+):
     """Decorator for a workflow update handler method.
 
     This is set on any async or non-async method that you wish to be called upon
@@ -791,44 +854,33 @@ class update(object):
             present.
     """
 
-    def __init__(
-        self,
-        fn: Optional[CallableSyncOrAsyncType] = None,
-        *,
-        name: Optional[str] = None,
-        dynamic: Optional[bool] = False,
-    ):
-        """See :py:class:`update`."""
-        if name is not None or dynamic:
-            if name is not None and dynamic:
-                raise RuntimeError("Cannot provide name and dynamic boolean")
-        self._fn = fn
-        self._name = (
-            name if name is not None else self._fn.__name__ if self._fn else None
-        )
-        self._dynamic = dynamic
-        if self._fn is not None:
-            # Only bother to assign the definition if we are given a function. The function is not provided when
-            # extra arguments are specified - in that case, the __call__ method is invoked instead.
-            self._assign_defn()
+    def with_name(
+        name: Optional[str], fn: CallableSyncOrAsyncType
+    ) -> CallableSyncOrAsyncType:
+        defn = _UpdateDefinition(name=name, fn=fn, is_method=True)
+        if defn.dynamic_vararg:
+            raise RuntimeError(
+                "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
+            )
+        setattr(fn, "_defn", defn)
+        setattr(fn, "validator", partial(_update_validator, defn))
+        return fn
 
-    def __call__(self, fn: CallableSyncOrAsyncType):
-        """Call the update decorator (as when passing optional arguments)."""
-        self._fn = fn
-        self._assign_defn()
-        return self
+    if name is not None or dynamic:
+        if name is not None and dynamic:
+            raise RuntimeError("Cannot provide name and dynamic boolean")
+        return partial(with_name, name)
+    if fn is None:
+        raise RuntimeError("Cannot create update without function or name or dynamic")
+    return with_name(fn.__name__, fn)
 
-    def _assign_defn(self) -> None:
-        assert self._fn is not None
-        self._defn = _UpdateDefinition(name=self._name, fn=self._fn, is_method=True)
 
-    def validator(self, fn: Callable[..., None]):
-        """Decorator for a workflow update validator method. Apply this decorator to a function to have it run before
-        the update handler. If it throws an error, the update will be rejected. The validator must not mutate workflow
-        state at all, and cannot call workflow functions which would schedule new commands (ex: starting an
-        activity).
-        """
-        self._defn.set_validator(fn)
+def _update_validator(
+    update_def: _UpdateDefinition, fn: Optional[Callable[..., None]] = None
+):
+    """Decorator for a workflow update validator method."""
+    if fn is not None:
+        update_def.set_validator(fn)
 
 
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
@@ -1132,7 +1184,7 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
-            elif isinstance(member, update):
+            elif isinstance(member, UpdateMethodMultiArg):
                 update_defn = member._defn
                 if update_defn.name in updates:
                     defn_name = update_defn.name or "<dynamic>"
@@ -1350,6 +1402,7 @@ class _UpdateDefinition:
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
     validator: Optional[Callable[..., None]] = None
+    dynamic_vararg: bool = False
 
     def __post_init__(self) -> None:
         if self.arg_types is None:

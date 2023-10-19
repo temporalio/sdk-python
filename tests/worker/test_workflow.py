@@ -3553,6 +3553,10 @@ class UpdateHandlersWorkflow:
         await act
         return "done"
 
+    @workflow.update(name="renamed")
+    async def async_named(self) -> str:
+        return "named"
+
     @workflow.update
     async def bad_validator(self) -> str:
         return "done"
@@ -3578,10 +3582,6 @@ class UpdateHandlersWorkflow:
 
         workflow.set_dynamic_update_handler(dynahandler, validator=dynavalidator)
         return "set"
-
-    @workflow.update(name="name_override")
-    async def not_the_name(self) -> str:
-        return "name_overridden"
 
 
 async def test_workflow_update_handlers_happy(client: Client):
@@ -3611,9 +3611,8 @@ async def test_workflow_update_handlers_happy(client: Client):
         await handle.update(UpdateHandlersWorkflow.set_dynamic)
         assert "dynahandler - made_up" == await handle.update("made_up")
 
-        assert "name_overridden" == await handle.update(
-            UpdateHandlersWorkflow.not_the_name
-        )
+        # Name overload
+        assert "named" == await handle.update(UpdateHandlersWorkflow.async_named)
 
 
 async def test_workflow_update_handlers_unhappy(client: Client):

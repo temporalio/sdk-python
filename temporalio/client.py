@@ -1615,6 +1615,62 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             )
         )
 
+    # Overload for no-param update
+    @overload
+    async def update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiArg[[SelfType], LocalReturnType],
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> LocalReturnType:
+        ...
+
+    # Overload for single-param update
+    @overload
+    async def update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiArg[
+            [SelfType, ParamType], LocalReturnType
+        ],
+        arg: ParamType,
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> LocalReturnType:
+        ...
+
+    @overload
+    async def update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiArg[
+            MultiParamSpec, LocalReturnType
+        ],
+        *,
+        args: MultiParamSpec.args,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> LocalReturnType:
+        ...
+
+    # Overload for string-name update
+    @overload
+    async def update(
+        self,
+        update: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> Any:
+        ...
+
     async def update(
         self,
         update: Union[str, Callable],
@@ -1701,15 +1757,16 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         """
         update_name: str
         ret_type = result_type
-        if callable(update):
-            if not isinstance(update, temporalio.workflow.update):
+        if isinstance(update, temporalio.workflow.UpdateMethodMultiArg):
+            defn = update._defn
+            if not defn:
                 raise RuntimeError(
                     f"Update definition not found on {update.__qualname__}, "
                     "is it decorated with @workflow.update?"
                 )
-            defn = update._defn
-            if not defn.name:
+            elif not defn.name:
                 raise RuntimeError("Cannot invoke dynamic update definition")
+            # TODO(cretz): Check count/type of args at runtime?
             update_name = defn.name
             ret_type = defn.ret_type
         else:
