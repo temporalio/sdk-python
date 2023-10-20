@@ -3632,6 +3632,10 @@ async def test_workflow_update_handlers_unhappy(client: Client):
             await handle.execute_update("whargarbl", "whatever")
         assert isinstance(err.value.cause, ApplicationError)
         assert "'whargarbl' expected but not found" in err.value.cause.message
+        assert (
+            "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic]"
+            in err.value.cause.message
+        )
 
         # Rejection by validator
         with pytest.raises(WorkflowUpdateFailedError) as err:

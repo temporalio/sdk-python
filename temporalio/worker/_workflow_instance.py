@@ -431,8 +431,10 @@ class _WorkflowInstanceImpl(
             try:
                 defn = self._updates.get(job.name) or self._updates.get(None)
                 if not defn:
+                    known_updates = sorted([k for k in self._updates.keys() if k])
                     raise RuntimeError(
-                        f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler"
+                        f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler. "
+                        f"known updates: [{' '.join(known_updates)}]"
                     )
                 args = self._process_handler_args(
                     job.name,
@@ -442,8 +444,7 @@ class _WorkflowInstanceImpl(
                     defn.dynamic_vararg,
                 )
                 handler_input = HandleUpdateInput(
-                    # TODO: update id vs proto instance id
-                    id=job.protocol_instance_id,
+                    id=job.id,
                     update=job.name,
                     args=args,
                     headers=job.headers,

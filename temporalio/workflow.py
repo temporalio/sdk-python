@@ -1230,6 +1230,12 @@ class _Definition:
                         issues.append(
                             f"@workflow.query defined on {base_member.__qualname__} but not on the override"
                         )
+                elif isinstance(base_member, UpdateMethodMultiArg):
+                    update_defn = base_member._defn
+                    if update_defn.name not in updates:
+                        issues.append(
+                            f"@workflow.update defined on {base_member.__qualname__} but not on the override"
+                        )
 
         if not seen_run_attr:
             issues.append("Missing @workflow.run method")
@@ -1429,7 +1435,6 @@ class _UpdateDefinition:
         return lambda *args, **kwargs: None
 
     def set_validator(self, validator: Callable[..., None]) -> None:
-        # TODO: Verify arg types are the same
         if self.validator:
             raise RuntimeError(f"Validator already set for update {self.name}")
         object.__setattr__(self, "validator", validator)
