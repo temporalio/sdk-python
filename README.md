@@ -282,7 +282,7 @@ Some things to note about the above code:
   does the same thing
 * Clients can have many more options not shown here (e.g. data converters and interceptors)
 * A string can be used instead of the method reference to call a workflow by name (e.g. if defined in another language)
-* Clients to not work across forks
+* Clients do not work across forks
 
 Clients also provide a shallow copy of their config for use in making slightly different clients backed by the same
 connection. For instance, given the `client` above, this is how to have a client in another namespace:
@@ -731,6 +731,10 @@ timeouts and other long time-based code. Using the time-skipping workflow test e
 The time-skipping `temporalio.testing.WorkflowEnvironment` can be created via the static async `start_time_skipping()`.
 This internally downloads the Temporal time-skipping test server to a temporary directory if it doesn't already exist,
 then starts the test server which has special APIs for skipping time.
+
+**NOTE:** The time-skipping test environment does not work on ARM. The SDK will try to download the x64 binary on macOS
+for use with the Intel emulator, but for Linux or Windows ARM there will be no proper time-skipping test server at this
+time.
 
 ##### Automatic Time Skipping
 
@@ -1272,8 +1276,9 @@ Below are known compatibility issues with the Python SDK.
 #### gevent Patching
 
 When using `gevent.monkey.patch_all()`, asyncio event loops can get messed up, especially those using custom event loops
-like Temporal. See [this gevent issue](https://github.com/gevent/gevent/issues/982) and
-[this Python SDK issue](https://github.com/temporalio/sdk-python/issues/59) for more details.
+like Temporal. See [this gevent issue](https://github.com/gevent/gevent/issues/982). This is a known incompatibility and
+users are encouraged to not use gevent in asyncio applications (including Temporal). But if you must, there is
+[a sample](https://github.com/temporalio/samples-python/tree/main/gevent_async) showing how it is possible.
 
 # Development
 
