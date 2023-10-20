@@ -449,10 +449,9 @@ class _WorkflowInstanceImpl(
                     headers=job.headers,
                 )
 
-                if defn.validator is not None:
-                    # Run the validator
-                    with self._as_read_only():
-                        await self._inbound.handle_update_validator(handler_input)
+                # Always run the validator interceptor, which will only actually run a validator if one is defined.
+                with self._as_read_only():
+                    await self._inbound.handle_update_validator(handler_input)
 
                 # Accept the update
                 command.update_response.accepted.SetInParent()
@@ -874,7 +873,7 @@ class _WorkflowInstanceImpl(
         return defn.bind_fn(self._object) if defn.is_method else defn.fn
 
     def workflow_get_update_validator(self, name: Optional[str]) -> Optional[Callable]:
-        defn = self._updates.get(name)
+        defn = self._updates.get(name) or self._updates.get(None)
         if not defn or not defn.validator:
             return None
         # Bind if a method
@@ -1789,12 +1788,13 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             return handler(*input.args)
 
     async def handle_update_validator(self, input: HandleUpdateInput) -> None:
-        handler = self._instance.workflow_get_update_validator(
-            input.update
-        ) or self._instance.workflow_get_update_validator(None)
-        # Handler should always be present at this point
-        assert handler
-        handler(*input.args)
+        # Do not "or None" the validator, since we only want to use the validator for
+        # the specific named update - we shouldn't fall back to the dynamic validator
+        # for some defined, named update which doesn't have a defined validator.
+        handler = self._instance.workflow_get_update_validator(input.update)
+        # Validator may not be defined
+        if handler is not None:
+            handler(*input.args)
 
     async def handle_update_handler(self, input: HandleUpdateInput) -> Any:
         handler = self._instance.workflow_get_update_handler(

@@ -6,7 +6,8 @@ from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
 import pytest
 
 from temporalio import activity, workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowUpdateFailedError
+from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ActivityInboundInterceptor,
@@ -176,6 +177,19 @@ class InterceptedWorkflow:
     def signal(self, param: str) -> None:
         self.finish.set()
 
+    @workflow.update
+    def update(self, param: str) -> str:
+        return f"update: {param}"
+
+    @workflow.update
+    def update_validated(self, param: str) -> str:
+        return f"update: {param}"
+
+    @update_validated.validator
+    def update_validated_validator(self, param: str) -> None:
+        if param == "reject-me":
+            raise ApplicationError("Invalid update")
+
 
 async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
@@ -202,6 +216,13 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
             InterceptedWorkflow.query, "query-val"
         )
         await handle.signal(InterceptedWorkflow.signal, "signal-val")
+        assert "update: update-val" == await handle.execute_update(
+            InterceptedWorkflow.update, "update-val"
+        )
+        with pytest.raises(WorkflowUpdateFailedError) as _err:
+            await handle.execute_update(
+                InterceptedWorkflow.update_validated, "reject-me"
+            )
         await handle.result()
 
         # Check traces
@@ -255,5 +276,13 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
         assert pop_trace(
             "workflow.signal", lambda v: v.args[0] == "external-signal-val"
         )
+        assert pop_trace(
+            "workflow.update.validator", lambda v: v.args[0] == "update-val"
+        )
+        assert pop_trace("workflow.update.handler", lambda v: v.args[0] == "update-val")
+        assert pop_trace(
+            "workflow.update.validator", lambda v: v.args[0] == "reject-me"
+        )
+
         # Confirm no unexpected traces
         assert not interceptor_traces
