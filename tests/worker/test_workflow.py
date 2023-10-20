@@ -3664,8 +3664,8 @@ async def test_workflow_update_handlers_unhappy(client: Client):
             await handle.execute_update("last_event", args=[121, "badarg"])
         assert isinstance(err.value.cause, ApplicationError)
         assert (
-            "UpdateHandlersWorkflow.last_event_validator() takes 2 positional arguments but 3 were given"
-            == err.value.cause.message
+            "last_event_validator() takes 2 positional arguments but 3 were given"
+            in err.value.cause.message
         )
 
         # Un-deserializeable nonsense
