@@ -3584,7 +3584,11 @@ class UpdateHandlersWorkflow:
         return "set"
 
 
-async def test_workflow_update_handlers_happy(client: Client):
+async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     async with new_worker(
         client, UpdateHandlersWorkflow, activities=[say_hello]
     ) as worker:
@@ -3619,7 +3623,13 @@ async def test_workflow_update_handlers_happy(client: Client):
         )
 
 
-async def test_workflow_update_handlers_unhappy(client: Client):
+async def test_workflow_update_handlers_unhappy(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     async with new_worker(client, UpdateHandlersWorkflow) as worker:
         handle = await client.start_workflow(
             UpdateHandlersWorkflow.run,
@@ -3691,7 +3701,13 @@ async def test_workflow_update_handlers_unhappy(client: Client):
         assert "Rejected" == err.value.cause.message
 
 
-async def test_workflow_update_command_in_validator(client: Client):
+async def test_workflow_update_command_in_validator(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     # Need to not sandbox so behavior of validator can change based on global
     async with new_worker(
         client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
