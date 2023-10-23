@@ -733,8 +733,7 @@ This internally downloads the Temporal time-skipping test server to a temporary 
 then starts the test server which has special APIs for skipping time.
 
 **NOTE:** The time-skipping test environment does not work on ARM. The SDK will try to download the x64 binary on macOS
-for use with the Intel emulator, but for Linux or Windows ARM there will be no proper time-skipping test server at this
-time.
+for use with the Intel emulator, but for Linux or Windows ARM there is no proper time-skipping test server at this time.
 
 ##### Automatic Time Skipping
 
