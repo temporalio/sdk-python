@@ -1619,7 +1619,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     @overload
     async def execute_update(
         self,
-        update: temporalio.workflow.UpdateMethodMultiArg[[SelfType], LocalReturnType],
+        update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
@@ -1631,7 +1631,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     @overload
     async def execute_update(
         self,
-        update: temporalio.workflow.UpdateMethodMultiArg[
+        update: temporalio.workflow.UpdateMethodMultiParam[
             [SelfType, ParamType], LocalReturnType
         ],
         arg: ParamType,
@@ -1645,7 +1645,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     @overload
     async def execute_update(
         self,
-        update: temporalio.workflow.UpdateMethodMultiArg[
+        update: temporalio.workflow.UpdateMethodMultiParam[
             MultiParamSpec, LocalReturnType
         ],
         *,
@@ -1784,14 +1784,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     ) -> WorkflowUpdateHandle:
         update_name: str
         ret_type = result_type
-        if isinstance(update, temporalio.workflow.UpdateMethodMultiArg):
+        if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
             defn = update._defn
-            if not defn:
-                raise RuntimeError(
-                    f"Update definition not found on {update.__qualname__}, "
-                    "is it decorated with @workflow.update?"
-                )
-            elif not defn.name:
+            if not defn.name:
                 raise RuntimeError("Cannot invoke dynamic update definition")
             # TODO(cretz): Check count/type of args at runtime?
             update_name = defn.name
@@ -1801,9 +1796,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
         return await self._client._impl.start_workflow_update(
             UpdateWorkflowInput(
-                workflow_id=self._id,
+                id=self._id,
                 run_id=self._run_id,
-                update_id=id or "",
+                update_id=id,
                 update=update_name,
                 args=temporalio.common._arg_or_args(arg, args),
                 headers={},
@@ -3878,7 +3873,7 @@ class WorkflowUpdateHandle:
         name: str,
         workflow_id: str,
         *,
-        run_id: Optional[str] = None,
+        workflow_run_id: Optional[str] = None,
         result_type: Optional[Type] = None,
     ):
         """Create a workflow update handle.
@@ -3890,29 +3885,29 @@ class WorkflowUpdateHandle:
         self._id = id
         self._name = name
         self._workflow_id = workflow_id
-        self._run_id = run_id
+        self._workflow_run_id = workflow_run_id
         self._result_type = result_type
         self._known_result: Optional[temporalio.api.update.v1.Outcome] = None
 
     @property
     def id(self) -> str:
-        """ID of this Update request"""
+        """ID of this Update request."""
         return self._id
 
     @property
     def name(self) -> str:
-        """The name of the Update being invoked"""
+        """The name of the Update being invoked."""
         return self._name
 
     @property
     def workflow_id(self) -> str:
-        """The ID of the Workflow targeted by this Update"""
+        """The ID of the Workflow targeted by this Update."""
         return self._workflow_id
 
     @property
-    def run_id(self) -> Optional[str]:
-        """If specified, the specific run of the Workflow targeted by this Update"""
-        return self._run_id
+    def workflow_run_id(self) -> Optional[str]:
+        """If specified, the specific run of the Workflow targeted by this Update."""
+        return self._workflow_run_id
 
     async def result(
         self,
@@ -3934,7 +3929,6 @@ class WorkflowUpdateHandle:
             TimeoutError: The specified timeout was reached when waiting for the update result.
             RPCError: Update result could not be fetched for some other reason.
         """
-        outcome: temporalio.api.update.v1.Outcome
         if self._known_result is not None:
             outcome = self._known_result
             return await _update_outcome_to_result(
@@ -3944,23 +3938,20 @@ class WorkflowUpdateHandle:
                 self._client.data_converter,
                 self._result_type,
             )
-        else:
-            return await self._client._impl.poll_workflow_update(
-                PollUpdateWorkflowInput(
-                    self.workflow_id,
-                    self.run_id,
-                    self.id,
-                    self.name,
-                    timeout,
-                    {},
-                    self._result_type,
-                    rpc_metadata,
-                    rpc_timeout,
-                )
-            )
 
-    def _set_known_result(self, result: temporalio.api.update.v1.Outcome) -> None:
-        self._known_result = result
+        return await self._client._impl.poll_workflow_update(
+            PollUpdateWorkflowInput(
+                self.workflow_id,
+                self.workflow_run_id,
+                self.id,
+                self.name,
+                timeout,
+                {},
+                self._result_type,
+                rpc_metadata,
+                rpc_timeout,
+            )
+        )
 
 
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
@@ -4023,11 +4014,9 @@ class WorkflowQueryFailedError(temporalio.exceptions.TemporalError):
 class WorkflowUpdateFailedError(temporalio.exceptions.TemporalError):
     """Error that occurs when an update fails."""
 
-    def __init__(self, update_id: str, update_name: str, cause: BaseException) -> None:
+    def __init__(self, cause: BaseException) -> None:
         """Create workflow update failed error."""
         super().__init__("Workflow update failed")
-        self._update_id = update_id
-        self._update_name = update_name
         self.__cause__ = cause
 
     @property
@@ -4171,9 +4160,9 @@ class TerminateWorkflowInput:
 class UpdateWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow_update`."""
 
-    workflow_id: str
+    id: str
     run_id: Optional[str]
-    update_id: str
+    update_id: Optional[str]
     update: str
     args: Sequence[Any]
     wait_for_stage: Optional[
@@ -4787,12 +4776,12 @@ class _ClientImpl(OutboundInterceptor):
         req = temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest(
             namespace=self._client.namespace,
             workflow_execution=temporalio.api.common.v1.WorkflowExecution(
-                workflow_id=input.workflow_id,
+                workflow_id=input.id,
                 run_id=input.run_id or "",
             ),
             request=temporalio.api.update.v1.Request(
                 meta=temporalio.api.update.v1.Meta(
-                    update_id=input.update_id,
+                    update_id=input.update_id or "",
                     identity=self._client.identity,
                 ),
                 input=temporalio.api.update.v1.Input(
@@ -4814,23 +4803,19 @@ class _ClientImpl(OutboundInterceptor):
                 req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
             )
         except RPCError as err:
-            # If the status is INVALID_ARGUMENT, we can assume it's an update
-            # failed error
-            if err.status == RPCStatusCode.INVALID_ARGUMENT:
-                raise WorkflowUpdateFailedError(input.workflow_id, input.update, err)
-            else:
-                raise
+            raise
 
+        determined_id = resp.update_ref.update_id
         update_handle = WorkflowUpdateHandle(
             client=self._client,
-            id=input.update_id,
+            id=determined_id,
             name=input.update,
-            workflow_id=input.workflow_id,
-            run_id=input.run_id,
+            workflow_id=input.id,
+            workflow_run_id=input.run_id,
             result_type=input.ret_type,
         )
         if resp.HasField("outcome"):
-            update_handle._set_known_result(resp.outcome)
+            update_handle._known_result = resp.outcome
 
         return update_handle
 
@@ -4869,8 +4854,8 @@ class _ClientImpl(OutboundInterceptor):
                             input.ret_type,
                         )
                 except RPCError as err:
-                    if err.status == RPCStatusCode.DEADLINE_EXCEEDED:
-                        continue
+                    if err.status != RPCStatusCode.DEADLINE_EXCEEDED:
+                        raise
 
         # Wait for at most the *overall* timeout
         return await asyncio.wait_for(
@@ -5415,8 +5400,6 @@ async def _update_outcome_to_result(
 ) -> Any:
     if outcome.HasField("failure"):
         raise WorkflowUpdateFailedError(
-            id,
-            name,
             await converter.decode_failure(outcome.failure.cause),
         )
     if not outcome.success.payloads:

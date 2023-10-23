@@ -3592,9 +3592,10 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
     async with new_worker(
         client, UpdateHandlersWorkflow, activities=[say_hello]
     ) as worker:
+        wf_id = f"update-handlers-workflow-{uuid.uuid4()}"
         handle = await client.start_workflow(
             UpdateHandlersWorkflow.run,
-            id=f"update-handlers-workflow-{uuid.uuid4()}",
+            id=wf_id,
             task_queue=worker.task_queue,
         )
 
@@ -3620,6 +3621,11 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
         # Name overload
         assert "named" == await handle.execute_update(
             UpdateHandlersWorkflow.async_named
+        )
+
+        # Get untyped handle
+        assert "val3" == await client.get_workflow_handle(wf_id).execute_update(
+            UpdateHandlersWorkflow.last_event, "val4"
         )
 
 

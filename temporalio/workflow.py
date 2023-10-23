@@ -773,7 +773,7 @@ def time_ns() -> int:
 
 # Needs to be defined here to avoid a circular import
 @runtime_checkable
-class UpdateMethodMultiArg(Protocol[MultiParamSpec, ProtocolReturnType]):
+class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
     """Decorated workflow update functions implement this."""
 
     _defn: temporalio.workflow._UpdateDefinition
@@ -784,7 +784,9 @@ class UpdateMethodMultiArg(Protocol[MultiParamSpec, ProtocolReturnType]):
         """Generic callable type callback."""
         ...
 
-    def validator(self, vfunc: Callable[MultiParamSpec, None]) -> None:
+    def validator(
+        self, vfunc: Callable[MultiParamSpec, None]
+    ) -> Callable[MultiParamSpec, None]:
         """Use to decorate a function to validate the arguments passed to the update handler."""
         ...
 
@@ -792,14 +794,14 @@ class UpdateMethodMultiArg(Protocol[MultiParamSpec, ProtocolReturnType]):
 @overload
 def update(
     fn: Callable[MultiParamSpec, Awaitable[ReturnType]]
-) -> UpdateMethodMultiArg[MultiParamSpec, ReturnType]:
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
     ...
 
 
 @overload
 def update(
     fn: Callable[MultiParamSpec, ReturnType]
-) -> UpdateMethodMultiArg[MultiParamSpec, ReturnType]:
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
     ...
 
 
@@ -808,7 +810,7 @@ def update(
     *, name: str
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
-    UpdateMethodMultiArg[MultiParamSpec, ReturnType],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
 ]:
     ...
 
@@ -818,7 +820,7 @@ def update(
     *, dynamic: Literal[True]
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
-    UpdateMethodMultiArg[MultiParamSpec, ReturnType],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
 ]:
     ...
 
@@ -880,10 +882,11 @@ def update(
 
 def _update_validator(
     update_def: _UpdateDefinition, fn: Optional[Callable[..., None]] = None
-):
+) -> Optional[Callable[..., None]]:
     """Decorator for a workflow update validator method."""
     if fn is not None:
         update_def.set_validator(fn)
+    return fn
 
 
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
@@ -1187,7 +1190,7 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
-            elif isinstance(member, UpdateMethodMultiArg):
+            elif isinstance(member, UpdateMethodMultiParam):
                 update_defn = member._defn
                 if update_defn.name in updates:
                     defn_name = update_defn.name or "<dynamic>"
@@ -1230,7 +1233,7 @@ class _Definition:
                         issues.append(
                             f"@workflow.query defined on {base_member.__qualname__} but not on the override"
                         )
-                elif isinstance(base_member, UpdateMethodMultiArg):
+                elif isinstance(base_member, UpdateMethodMultiParam):
                     update_defn = base_member._defn
                     if update_defn.name not in updates:
                         issues.append(
