@@ -452,7 +452,7 @@ class _WorkflowInstanceImpl(
 
                 # Always run the validator interceptor, which will only actually run a validator if one is defined.
                 with self._as_read_only():
-                    await self._inbound.handle_update_validator(handler_input)
+                    self._inbound.handle_update_validator(handler_input)
 
                 # Accept the update
                 command.update_response.accepted.SetInParent()
@@ -1788,7 +1788,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         else:
             return handler(*input.args)
 
-    async def handle_update_validator(self, input: HandleUpdateInput) -> None:
+    def handle_update_validator(self, input: HandleUpdateInput) -> None:
         # Do not "or None" the validator, since we only want to use the validator for
         # the specific named update - we shouldn't fall back to the dynamic validator
         # for some defined, named update which doesn't have a defined validator.

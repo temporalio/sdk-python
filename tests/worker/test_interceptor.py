@@ -80,9 +80,9 @@ class TracingWorkflowInboundInterceptor(WorkflowInboundInterceptor):
         interceptor_traces.append(("workflow.query", input))
         return await super().handle_query(input)
 
-    async def handle_update_validator(self, input: HandleUpdateInput) -> None:
+    def handle_update_validator(self, input: HandleUpdateInput) -> None:
         interceptor_traces.append(("workflow.update.validator", input))
-        return await super().handle_update_validator(input)
+        return super().handle_update_validator(input)
 
     async def handle_update_handler(self, input: HandleUpdateInput) -> Any:
         interceptor_traces.append(("workflow.update.handler", input))
