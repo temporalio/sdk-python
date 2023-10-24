@@ -1642,6 +1642,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     ) -> LocalReturnType:
         ...
 
+    # Overload for multi-param update
     @overload
     async def execute_update(
         self,
@@ -1721,6 +1722,63 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         )
         return await handle.result()
 
+    # Overload for no-param start update
+    @overload
+    async def start_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]:
+        ...
+
+    # Overload for single-param start update
+    @overload
+    async def start_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            [SelfType, ParamType], LocalReturnType
+        ],
+        arg: ParamType,
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]:
+        ...
+
+    # Overload for multi-param start update
+    @overload
+    async def start_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            MultiParamSpec, LocalReturnType
+        ],
+        *,
+        args: MultiParamSpec.args,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]:
+        ...
+
+    # Overload for string-name start update
+    @overload
+    async def start_update(
+        self,
+        update: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[Any]:
+        ...
+
     async def start_update(
         self,
         update: Union[str, Callable],
@@ -1731,7 +1789,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> WorkflowUpdateHandle:
+    ) -> WorkflowUpdateHandle[Any]:
         """Send an update request to the workflow and return a handle to it.
 
         This will target the workflow with :py:attr:`run_id` if present. To use a
@@ -1781,7 +1839,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> WorkflowUpdateHandle:
+    ) -> WorkflowUpdateHandle[Any]:
         update_name: str
         ret_type = result_type
         if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
@@ -3863,7 +3921,7 @@ class ScheduleAsyncIterator:
             return ret
 
 
-class WorkflowUpdateHandle:
+class WorkflowUpdateHandle(Generic[LocalReturnType]):
     """Handle for a workflow update execution request."""
 
     def __init__(
@@ -3915,7 +3973,7 @@ class WorkflowUpdateHandle:
         timeout: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> Any:
+    ) -> LocalReturnType:
         """Wait for and return the result of the update. The result may already be known in which case no call is made.
         Otherwise the result will be polled for until returned, or until the provided timeout is reached, if specified.
 
@@ -4804,7 +4862,7 @@ class _ClientImpl(OutboundInterceptor):
             raise
 
         determined_id = resp.update_ref.update_id
-        update_handle = WorkflowUpdateHandle(
+        update_handle: WorkflowUpdateHandle[Any] = WorkflowUpdateHandle(
             client=self._client,
             id=determined_id,
             name=input.update,
