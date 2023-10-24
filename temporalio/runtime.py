@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import ClassVar, Mapping, NewType, Optional, Sequence, Union
+from typing import Any, ClassVar, Dict, Mapping, NewType, Optional, Sequence, Union
 
-from typing_extensions import Literal, Protocol
+from typing_extensions import Protocol
 
 import temporalio.bridge.metric
 import temporalio.bridge.runtime
@@ -70,6 +70,8 @@ class Runtime:
         self._core_runtime = temporalio.bridge.runtime.Runtime(
             telemetry=telemetry._to_bridge_config()
         )
+        if telemetry.logging and isinstance(telemetry.logging.buffer, LogBuffer):
+            telemetry.logging.buffer._runtime = self
         if isinstance(telemetry.metrics, MetricBuffer):
             telemetry.metrics._runtime = self
         core_meter = temporalio.bridge.metric.MetricMeter.create(self._core_runtime)
@@ -114,6 +116,10 @@ class LoggingConfig:
     filter: Union[TelemetryFilter, str]
     """Filter for logging. Can use :py:class:`TelemetryFilter` or raw string."""
 
+    buffer: Optional[LogBuffer] = None
+    """Buffer to send logs too. If set, logs are sent to this buffer instead of
+    console."""
+
     default: ClassVar[LoggingConfig]
     """Default logging configuration of Core WARN level and other ERROR
     level.
@@ -124,8 +130,7 @@ class LoggingConfig:
             filter=self.filter
             if isinstance(self.filter, str)
             else self.filter.formatted(),
-            # Log forwarding not currently supported in Python
-            forward=False,
+            forward=self.buffer is not None,
         )
 
 
@@ -218,6 +223,93 @@ class MetricBuffer:
         if not self._runtime:
             raise RuntimeError("Attempting to retrieve updates before runtime created")
         return self._runtime._core_runtime.retrieve_buffered_metrics()
+
+
+class LogBuffer:
+    """A buffer that can be set on :py:class:`LoggnigConfig` to record logs
+    instead of having them sent to console.
+
+    .. warning::
+        It is important that :py:meth:`retrieve_logs` is called regularly to
+        drain the buffer or log entries may be lost.
+    """
+
+    def __init__(self) -> None:
+        """Create a log buffer."""
+        self._runtime: Optional[Runtime] = None
+
+    def retrieve_logs(self) -> Sequence[BufferedLogEntry]:
+        """Drain the buffer and return all log entries.
+
+        .. warning::
+            It is important that this is called regularly. See
+            :py:class:`LogBuffer` warning.
+
+        Returns:
+            A sequence of log entries.
+        """
+        if not self._runtime:
+            raise RuntimeError("Attempting to retrieve logs before runtime created")
+        return self._runtime._core_runtime.retrieve_buffered_logs()
+
+
+BufferedLogLevel = NewType("BufferedLogLevel", str)
+"""Representation of a log level for a buffered log entry."""
+
+BUFFERED_LOG_LEVEL_TRACE = BufferedLogLevel("TRACE")
+"""Trace log level."""
+
+BUFFERED_LOG_LEVEL_DEBUG = BufferedLogLevel("DEBUG")
+"""Debug log level."""
+
+BUFFERED_LOG_LEVEL_INFO = BufferedLogLevel("INFO")
+"""Info log level."""
+
+BUFFERED_LOG_LEVEL_WARN = BufferedLogLevel("WARN")
+"""Warn log level."""
+
+BUFFERED_LOG_LEVEL_ERROR = BufferedLogLevel("ERROR")
+"""Error log level."""
+
+
+# WARNING: This must match Rust runtime::BufferedLogEntry
+class BufferedLogEntry(Protocol):
+    """A buffered log entry."""
+
+    @property
+    def target(self) -> str:
+        """Target category for the log entry."""
+        ...
+
+    @property
+    def message(self) -> str:
+        """Log message."""
+        ...
+
+    @property
+    def timestamp_millis(self) -> int:
+        """Milliseconds since Unix epoch."""
+        ...
+
+    @property
+    def level(self) -> BufferedLogLevel:
+        """Log level."""
+        ...
+
+    @property
+    def fields(self) -> Dict[str, Any]:
+        """Additional log entry fields.
+
+        Requesting this property performs a conversion from the internal
+        representation to the Python representation on every request. Therefore
+        callers should store the result instead of repeatedly calling.
+
+        Raises:
+            Exception: If the internal representation cannot be converted. This
+                should not happen and if it does it is considered a bug in the
+                SDK and should be reported.
+        """
+        ...
 
 
 @dataclass(frozen=True)

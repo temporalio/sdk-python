@@ -3,7 +3,6 @@ import dataclasses
 import json
 import logging
 import logging.handlers
-import pickle
 import queue
 import sys
 import threading
@@ -67,8 +66,11 @@ from temporalio.exceptions import (
     WorkflowAlreadyStartedError,
 )
 from temporalio.runtime import (
+    BUFFERED_LOG_LEVEL_WARN,
     BUFFERED_METRIC_KIND_COUNTER,
     BUFFERED_METRIC_KIND_HISTOGRAM,
+    LogBuffer,
+    LoggingConfig,
     MetricBuffer,
     PrometheusConfig,
     Runtime,
@@ -3503,3 +3505,62 @@ async def test_workflow_buffered_metrics(client: Client):
         and update.value == 1
         for update in updates
     )
+
+
+buffered_log_workflow_first_run = True
+
+
+@workflow.defn(sandboxed=False)
+class BufferedLogWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # We will fail the task only once to generate a log
+        global buffered_log_workflow_first_run
+        if buffered_log_workflow_first_run:
+            buffered_log_workflow_first_run = False
+            raise RuntimeError("Intentional task failure")
+
+
+async def test_workflow_buffered_logs(client: Client):
+    # Create client with log buffer runtime
+    buffer = LogBuffer()
+    runtime = Runtime(
+        telemetry=TelemetryConfig(
+            logging=dataclasses.replace(LoggingConfig.default, buffer=buffer)
+        )
+    )
+    client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+
+    # Run workflow which will issue one failing task log
+    async with new_worker(client, BufferedLogWorkflow) as worker:
+        handle = await client.start_workflow(
+            BufferedLogWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+
+    # Check the log
+    # XXX: We accept that we're coding this test to internal core expectations
+    # of log format. Developers will have to update these assertions if/when
+    # that logic changes.
+    logs = buffer.retrieve_logs()
+    assert len(logs) == 1
+    assert logs[0].target == "temporal_sdk_core::worker::workflow"
+    assert logs[0].message == "Failing workflow task"
+    # Confirm we're within 5m of accurate time
+    timestamp = datetime.fromtimestamp(
+        logs[0].timestamp_millis / 1000.0, tz=timezone.utc
+    )
+    assert abs(datetime.now(tz=timezone.utc) - timestamp).total_seconds() < 300
+    assert logs[0].level == BUFFERED_LOG_LEVEL_WARN
+    fields = logs[0].fields
+    assert (
+        isinstance(fields["failure"], str)
+        and "Intentional task failure" in fields["failure"]
+    )
+    assert fields["run_id"] == handle.result_run_id

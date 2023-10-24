@@ -26,6 +26,7 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Runtime stuff
     m.add_class::<runtime::RuntimeRef>()?;
+    m.add_class::<runtime::BufferedLogEntry>()?;
     m.add_function(wrap_pyfunction!(init_runtime, m)?)?;
     m.add_function(wrap_pyfunction!(raise_in_thread, m)?)?;
 

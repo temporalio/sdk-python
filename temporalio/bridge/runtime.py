@@ -29,6 +29,10 @@ class Runtime:
         """Get buffered metrics."""
         return self._ref.retrieve_buffered_metrics()
 
+    def retrieve_buffered_logs(self) -> Sequence[Any]:
+        """Get buffered logs."""
+        return self._ref.retrieve_buffered_logs()
+
 
 @dataclass(frozen=True)
 class LoggingConfig:

@@ -1,6 +1,7 @@
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::AsPyPointer;
+use pythonize::pythonize;
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
@@ -14,8 +15,8 @@ use temporal_sdk_core::telemetry::{
 use temporal_sdk_core::CoreRuntime;
 use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
 use temporal_sdk_core_api::telemetry::{
-    Logger, MetricTemporality, OtelCollectorOptionsBuilder, PrometheusExporterOptionsBuilder,
-    TelemetryOptions, TelemetryOptionsBuilder,
+    CoreLog, CoreTelemetry, Logger, MetricTemporality, OtelCollectorOptionsBuilder,
+    PrometheusExporterOptionsBuilder, TelemetryOptions, TelemetryOptionsBuilder,
 };
 use url::Url;
 
@@ -30,6 +31,12 @@ pub struct RuntimeRef {
 pub(crate) struct Runtime {
     pub(crate) core: Arc<CoreRuntime>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
+}
+
+// WARNING: This must match temporalio.runtime.BufferedLogEntry protocol
+#[pyclass]
+pub struct BufferedLogEntry {
+    core_log: CoreLog,
 }
 
 #[derive(FromPyObject)]
@@ -137,6 +144,52 @@ impl RuntimeRef {
                 .expect("Attempting to retrieve buffered metrics without buffer")
                 .retrieve(),
         )
+    }
+
+    fn retrieve_buffered_logs(&self) -> Vec<BufferedLogEntry> {
+        self.runtime
+            .core
+            .telemetry()
+            .fetch_buffered_logs()
+            .into_iter()
+            .map(|core_log| BufferedLogEntry { core_log })
+            .collect()
+    }
+}
+
+// WARNING: This must match temporalio.runtime.BufferedLogEntry protocol
+#[pymethods]
+impl BufferedLogEntry {
+    #[getter]
+    fn target(&self) -> &str {
+        &self.core_log.target
+    }
+
+    #[getter]
+    fn message(&self) -> &str {
+        &self.core_log.message
+    }
+
+    #[getter]
+    fn timestamp_millis(&self) -> u128 {
+        self.core_log.millis_since_epoch()
+    }
+
+    #[getter]
+    fn level(&self) -> &str {
+        self.core_log.level.as_str()
+    }
+
+    #[getter]
+    fn fields(&self, py: Python<'_>) -> PyResult<HashMap<&str, PyObject>> {
+        self.core_log
+            .fields
+            .iter()
+            .map(|(key, value)| match pythonize(py, value) {
+                Ok(value) => Ok((key.as_str(), value)),
+                Err(err) => Err(err.into()),
+            })
+            .collect()
     }
 }
 
