@@ -36,7 +36,7 @@ from temporalio.client import (
     Client,
     Interceptor,
     OutboundInterceptor,
-    PollUpdateWorkflowInput,
+    PollWorkflowUpdateInput,
     QueryWorkflowInput,
     RPCError,
     RPCStatusCode,
@@ -56,9 +56,9 @@ from temporalio.client import (
     ScheduleUpdateInput,
     SignalWorkflowInput,
     StartWorkflowInput,
+    StartWorkflowUpdateInput,
     TaskReachabilityType,
     TerminateWorkflowInput,
-    UpdateWorkflowInput,
     WorkflowContinuedAsNewError,
     WorkflowExecutionStatus,
     WorkflowFailureError,
@@ -404,13 +404,13 @@ class TracingClientOutboundInterceptor(OutboundInterceptor):
         return await super().terminate_workflow(input)
 
     async def start_workflow_update(
-        self, input: UpdateWorkflowInput
+        self, input: StartWorkflowUpdateInput
     ) -> WorkflowUpdateHandle:
         self._parent.traces.append(("start_workflow_update", input))
         return await super().start_workflow_update(input)
 
     async def poll_workflow_update(
-        self, input: PollUpdateWorkflowInput
+        self, input: PollWorkflowUpdateInput
     ) -> WorkflowUpdateHandle:
         self._parent.traces.append(("poll_workflow_update", input))
         return await super().poll_workflow_update(input)

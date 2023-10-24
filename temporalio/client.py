@@ -1795,7 +1795,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             update_name = str(update)
 
         return await self._client._impl.start_workflow_update(
-            UpdateWorkflowInput(
+            StartWorkflowUpdateInput(
                 id=self._id,
                 run_id=self._run_id,
                 update_id=id,
@@ -3940,13 +3940,12 @@ class WorkflowUpdateHandle:
             )
 
         return await self._client._impl.poll_workflow_update(
-            PollUpdateWorkflowInput(
+            PollWorkflowUpdateInput(
                 self.workflow_id,
                 self.workflow_run_id,
                 self.id,
                 self.name,
                 timeout,
-                {},
                 self._result_type,
                 rpc_metadata,
                 rpc_timeout,
@@ -4157,7 +4156,7 @@ class TerminateWorkflowInput:
 
 
 @dataclass
-class UpdateWorkflowInput:
+class StartWorkflowUpdateInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow_update`."""
 
     id: str
@@ -4175,7 +4174,7 @@ class UpdateWorkflowInput:
 
 
 @dataclass
-class PollUpdateWorkflowInput:
+class PollWorkflowUpdateInput:
     """Input for :py:meth:`OutboundInterceptor.poll_workflow_update`."""
 
     workflow_id: str
@@ -4183,7 +4182,6 @@ class PollUpdateWorkflowInput:
     update_id: str
     update: str
     timeout: Optional[timedelta]
-    headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
@@ -4434,12 +4432,12 @@ class OutboundInterceptor:
         await self.next.terminate_workflow(input)
 
     async def start_workflow_update(
-        self, input: UpdateWorkflowInput
+        self, input: StartWorkflowUpdateInput
     ) -> WorkflowUpdateHandle:
         """Called for every :py:meth:`WorkflowHandle.update` and :py:meth:`WorkflowHandle.start_update` call."""
         return await self.next.start_workflow_update(input)
 
-    async def poll_workflow_update(self, input: PollUpdateWorkflowInput) -> Any:
+    async def poll_workflow_update(self, input: PollWorkflowUpdateInput) -> Any:
         """May be called when calling :py:meth:`WorkflowUpdateHandle.result`."""
         return await self.next.poll_workflow_update(input)
 
@@ -4766,7 +4764,7 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def start_workflow_update(
-        self, input: UpdateWorkflowInput
+        self, input: StartWorkflowUpdateInput
     ) -> WorkflowUpdateHandle:
         wait_policy = (
             temporalio.api.update.v1.WaitPolicy(lifecycle_stage=input.wait_for_stage)
@@ -4819,7 +4817,7 @@ class _ClientImpl(OutboundInterceptor):
 
         return update_handle
 
-    async def poll_workflow_update(self, input: PollUpdateWorkflowInput) -> Any:
+    async def poll_workflow_update(self, input: PollWorkflowUpdateInput) -> Any:
         req = temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest(
             namespace=self._client.namespace,
             update_ref=temporalio.api.update.v1.UpdateRef(
@@ -4859,8 +4857,7 @@ class _ClientImpl(OutboundInterceptor):
 
         # Wait for at most the *overall* timeout
         return await asyncio.wait_for(
-            poll_loop(),
-            input.timeout.total_seconds() if input.timeout else sys.float_info.max,
+            poll_loop(), input.timeout.total_seconds() if input.timeout else None
         )
 
     ### Async activity calls

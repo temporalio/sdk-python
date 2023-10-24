@@ -245,7 +245,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
             return await super().signal_workflow(input)
 
     async def start_workflow_update(
-        self, input: temporalio.client.UpdateWorkflowInput
+        self, input: temporalio.client.StartWorkflowUpdateInput
     ) -> temporalio.client.WorkflowUpdateHandle:
         with self.root._start_as_current_span(
             f"StartWorkflowUpdate:{input.update}",
@@ -254,17 +254,6 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
             return await super().start_workflow_update(input)
-
-    async def poll_workflow_update(
-        self, input: temporalio.client.PollUpdateWorkflowInput
-    ) -> Any:
-        with self.root._start_as_current_span(
-            f"PollWorkflowUpdate:{input.update}",
-            attributes={"temporalWorkflowID": input.workflow_id},
-            input=input,
-            kind=opentelemetry.trace.SpanKind.CLIENT,
-        ):
-            return await super().poll_workflow_update(input)
 
 
 class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterceptor):
@@ -440,7 +429,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             )[0]
         with self._top_level_workflow_context(success_is_complete=False):
             self._completed_span(
-                f"HandleUpdateValidator:{input.update}",
+                f"ValidateUpdate:{input.update}",
                 link_context_carrier=link_context_carrier,
                 kind=opentelemetry.trace.SpanKind.SERVER,
             )
@@ -460,7 +449,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             )[0]
         with self._top_level_workflow_context(success_is_complete=False):
             self._completed_span(
-                f"HandleUpdateHandler:{input.update}",
+                f"HandleUpdate:{input.update}",
                 link_context_carrier=link_context_carrier,
                 kind=opentelemetry.trace.SpanKind.SERVER,
             )
