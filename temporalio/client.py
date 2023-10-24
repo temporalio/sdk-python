@@ -406,6 +406,8 @@ class Client:
             memo: Memo for the workflow.
             search_attributes: Search attributes for the workflow.
             start_delay: Amount of time to wait before starting the workflow.
+                This does not work with ``cron_schedule``. This is currently
+                experimental.
             start_signal: If present, this signal is sent as signal-with-start
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
