@@ -1452,7 +1452,7 @@ run `poetry update protobuf grpcio-tools`.
 
 For a less system-intrusive approach, you can:
 ```shell
-docker build -f scripts/Dockerfile .
+docker build -f scripts/_proto/Dockerfile .
 docker run -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
 poe format
 ```

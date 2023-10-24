@@ -276,9 +276,6 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
         assert pop_trace(
             "workflow.signal", lambda v: v.args[0] == "external-signal-val"
         )
-        assert pop_trace(
-            "workflow.update.validator", lambda v: v.args[0] == "update-val"
-        )
         assert pop_trace("workflow.update.handler", lambda v: v.args[0] == "update-val")
         assert pop_trace(
             "workflow.update.validator", lambda v: v.args[0] == "reject-me"

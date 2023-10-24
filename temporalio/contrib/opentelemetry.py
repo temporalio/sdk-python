@@ -426,6 +426,46 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         finally:
             opentelemetry.context.detach(token)
 
+    def handle_update_validator(
+        self, input: temporalio.worker.HandleUpdateInput
+    ) -> None:
+        """Implementation of
+        :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_validator`.
+        """
+        link_context_header = input.headers.get(self.header_key)
+        link_context_carrier: Optional[_CarrierDict] = None
+        if link_context_header:
+            link_context_carrier = self.payload_converter.from_payloads(
+                [link_context_header]
+            )[0]
+        with self._top_level_workflow_context(success_is_complete=False):
+            self._completed_span(
+                f"HandleUpdateValidator:{input.update}",
+                link_context_carrier=link_context_carrier,
+                kind=opentelemetry.trace.SpanKind.SERVER,
+            )
+            super().handle_update_validator(input)
+
+    async def handle_update_handler(
+        self, input: temporalio.worker.HandleUpdateInput
+    ) -> Any:
+        """Implementation of
+        :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_handler`.
+        """
+        link_context_header = input.headers.get(self.header_key)
+        link_context_carrier: Optional[_CarrierDict] = None
+        if link_context_header:
+            link_context_carrier = self.payload_converter.from_payloads(
+                [link_context_header]
+            )[0]
+        with self._top_level_workflow_context(success_is_complete=False):
+            self._completed_span(
+                f"HandleUpdateHandler:{input.update}",
+                link_context_carrier=link_context_carrier,
+                kind=opentelemetry.trace.SpanKind.SERVER,
+            )
+            return await super().handle_update_handler(input)
+
     def _load_workflow_context_carrier(self) -> Optional[_CarrierDict]:
         if self._workflow_context_carrier:
             return self._workflow_context_carrier

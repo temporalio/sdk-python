@@ -450,9 +450,9 @@ class _WorkflowInstanceImpl(
                     headers=job.headers,
                 )
 
-                # Always run the validator interceptor, which will only actually run a validator if one is defined.
-                with self._as_read_only():
-                    self._inbound.handle_update_validator(handler_input)
+                if job.run_validator and defn.validator is not None:
+                    with self._as_read_only():
+                        self._inbound.handle_update_validator(handler_input)
 
                 # Accept the update
                 command.update_response.accepted.SetInParent()
