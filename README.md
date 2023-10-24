@@ -594,8 +594,8 @@ Here are the decorators that can be applied:
   * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
   * Also accepts the `name` and `dynamic` parameters like signals and queries, with the same semantics.
   * Update handlers may optionally define a validator method by decorating it with `@update_handler_method.validator`.
-    Validators cannot be `async`, cannot mutate workflow state, and return nothing. They can be used to reject update 
-    calls before any events are written to history by throwing an exception.
+    To reject an update before any events are written to history, throw an exception in a validator. Validators cannot 
+    be `async`, cannot mutate workflow state, and return nothing.
 
 #### Running
 

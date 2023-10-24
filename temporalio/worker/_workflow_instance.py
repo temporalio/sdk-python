@@ -428,6 +428,7 @@ class _WorkflowInstanceImpl(
         async def run_update() -> None:
             command = self._add_command()
             command.update_response.protocol_instance_id = job.protocol_instance_id
+            past_validation = False
             try:
                 defn = self._updates.get(job.name) or self._updates.get(None)
                 if not defn:
@@ -453,7 +454,17 @@ class _WorkflowInstanceImpl(
                 if job.run_validator and defn.validator is not None:
                     with self._as_read_only():
                         self._inbound.handle_update_validator(handler_input)
+                        # Re-process arguments to avoid any problems caused by user mutation of them during validation
+                        args = self._process_handler_args(
+                            job.name,
+                            job.input,
+                            defn.name,
+                            defn.arg_types,
+                            defn.dynamic_vararg,
+                        )
+                        handler_input.args = args
 
+                past_validation = True
                 # Accept the update
                 command.update_response.accepted.SetInParent()
                 command = None  # type: ignore
@@ -482,17 +493,25 @@ class _WorkflowInstanceImpl(
                 if isinstance(err, temporalio.workflow.ReadOnlyContextError):
                     self._current_activation_error = err
                     return
-                # All other errors fail the update
-                if command is None:
-                    command = self._add_command()
-                    command.update_response.protocol_instance_id = (
-                        job.protocol_instance_id
+                # Temporal errors always fail the update. Other errors fail it during validation, but the task during
+                # handling.
+                if (
+                    isinstance(err, temporalio.exceptions.FailureError)
+                    or not past_validation
+                ):
+                    if command is None:
+                        command = self._add_command()
+                        command.update_response.protocol_instance_id = (
+                            job.protocol_instance_id
+                        )
+                    self._failure_converter.to_failure(
+                        err,
+                        self._payload_converter,
+                        command.update_response.rejected.cause,
                     )
-                self._failure_converter.to_failure(
-                    err,
-                    self._payload_converter,
-                    command.update_response.rejected.cause,
-                )
+                else:
+                    self._current_activation_error = err
+                    return
             except BaseException as err:
                 # During tear down, generator exit and no-runtime exceptions can appear
                 if not self._deleting:

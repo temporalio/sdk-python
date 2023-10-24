@@ -3507,6 +3507,7 @@ async def test_workflow_buffered_metrics(client: Client):
 
 
 bad_validator_fail_ct = 0
+task_fail_ct = 0
 
 
 @workflow.defn
@@ -3583,6 +3584,13 @@ class UpdateHandlersWorkflow:
         workflow.set_dynamic_update_handler(dynahandler, validator=dynavalidator)
         return "set"
 
+    @workflow.update
+    def throws_runtime_err(self) -> None:
+        global task_fail_ct
+        if task_fail_ct < 1:
+            task_fail_ct += 1
+            raise RuntimeError("intentional failure")
+
 
 async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
@@ -3649,7 +3657,7 @@ async def test_workflow_update_handlers_unhappy(
         assert isinstance(err.value.cause, ApplicationError)
         assert "'whargarbl' expected but not found" in err.value.cause.message
         assert (
-            "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic]"
+            "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic throws_runtime_err]"
             in err.value.cause.message
         )
 
@@ -3707,14 +3715,12 @@ async def test_workflow_update_handlers_unhappy(
         assert "Rejected" == err.value.cause.message
 
 
-async def test_workflow_update_command_in_validator(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
-    # Need to not sandbox so behavior of validator can change based on global
+    # Need to not sandbox so behavior can change based on globals
     async with new_worker(
         client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
     ) as worker:
@@ -3729,3 +3735,11 @@ async def test_workflow_update_command_in_validator(
         # update will return
         res = await handle.execute_update(UpdateHandlersWorkflow.bad_validator)
         assert res == "done"
+
+        # Non-temporal failure should cause task failure in update handler
+        await handle.execute_update(UpdateHandlersWorkflow.throws_runtime_err)
+
+        # Verify task failures did happen
+        global task_fail_ct, bad_validator_fail_ct
+        assert task_fail_ct == 1
+        assert bad_validator_fail_ct == 2

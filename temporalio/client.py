@@ -4440,7 +4440,7 @@ class OutboundInterceptor:
         return await self.next.start_workflow_update(input)
 
     async def poll_workflow_update(self, input: PollUpdateWorkflowInput) -> Any:
-        """May be called when calling :py:math:`WorkflowUpdateHandle.result`."""
+        """May be called when calling :py:meth:`WorkflowUpdateHandle.result`."""
         return await self.next.poll_workflow_update(input)
 
     ### Async activity calls
