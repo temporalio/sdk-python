@@ -1,5 +1,6 @@
 from .workflow_activation_pb2 import (
     CancelWorkflow,
+    DoUpdate,
     FireTimer,
     NotifyHasPatch,
     QueryWorkflow,
@@ -21,6 +22,7 @@ from .workflow_activation_pb2 import (
 
 __all__ = [
     "CancelWorkflow",
+    "DoUpdate",
     "FireTimer",
     "NotifyHasPatch",
     "QueryWorkflow",

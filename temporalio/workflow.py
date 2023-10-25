@@ -36,7 +36,13 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Concatenate, Literal, TypedDict
+from typing_extensions import (
+    Concatenate,
+    Literal,
+    Protocol,
+    TypedDict,
+    runtime_checkable,
+)
 
 import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
@@ -52,6 +58,7 @@ from .types import (
     CallableAsyncType,
     CallableSyncNoParam,
     CallableSyncOrAsyncReturnNoneType,
+    CallableSyncOrAsyncType,
     CallableSyncSingleParam,
     CallableType,
     ClassType,
@@ -63,6 +70,7 @@ from .types import (
     MethodSyncSingleParam,
     MultiParamSpec,
     ParamType,
+    ProtocolReturnType,
     ReturnType,
     SelfType,
 )
@@ -447,6 +455,14 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_get_update_handler(self, name: Optional[str]) -> Optional[Callable]:
+        ...
+
+    @abstractmethod
+    def workflow_get_update_validator(self, name: Optional[str]) -> Optional[Callable]:
+        ...
+
+    @abstractmethod
     def workflow_info(self) -> Info:
         ...
 
@@ -493,6 +509,15 @@ class _Runtime(ABC):
     @abstractmethod
     def workflow_set_signal_handler(
         self, name: Optional[str], handler: Optional[Callable]
+    ) -> None:
+        ...
+
+    @abstractmethod
+    def workflow_set_update_handler(
+        self,
+        name: Optional[str],
+        handler: Optional[Callable],
+        validator: Optional[Callable],
     ) -> None:
         ...
 
@@ -746,6 +771,124 @@ def time_ns() -> int:
     return _Runtime.current().workflow_time_ns()
 
 
+# Needs to be defined here to avoid a circular import
+@runtime_checkable
+class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
+    """Decorated workflow update functions implement this."""
+
+    _defn: temporalio.workflow._UpdateDefinition
+
+    def __call__(
+        self, *args: MultiParamSpec.args, **kwargs: MultiParamSpec.kwargs
+    ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
+        """Generic callable type callback."""
+        ...
+
+    def validator(
+        self, vfunc: Callable[MultiParamSpec, None]
+    ) -> Callable[MultiParamSpec, None]:
+        """Use to decorate a function to validate the arguments passed to the update handler."""
+        ...
+
+
+@overload
+def update(
+    fn: Callable[MultiParamSpec, Awaitable[ReturnType]]
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
+    ...
+
+
+@overload
+def update(
+    fn: Callable[MultiParamSpec, ReturnType]
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
+    ...
+
+
+@overload
+def update(
+    *, name: str
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+]:
+    ...
+
+
+@overload
+def update(
+    *, dynamic: Literal[True]
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+]:
+    ...
+
+
+def update(
+    fn: Optional[CallableSyncOrAsyncType] = None,
+    *,
+    name: Optional[str] = None,
+    dynamic: Optional[bool] = False,
+):
+    """Decorator for a workflow update handler method.
+
+    This is set on any async or non-async method that you wish to be called upon
+    receiving an update. If a function overrides one with this decorator, it too
+    must be decorated.
+
+    You may also optionally define a validator method that will be called before
+    this handler you have applied this decorator to. You can specify the validator
+    with ``@update_handler_function_name.validator``.
+
+    Update methods can only have positional parameters. Best practice for
+    non-dynamic update methods is to only take a single object/dataclass
+    argument that can accept more fields later if needed. The handler may return
+    a serializable value which will be sent back to the caller of the update.
+
+    .. warning::
+       This API is experimental
+
+    Args:
+        fn: The function to decorate.
+        name: Update name. Defaults to method ``__name__``. Cannot be present
+            when ``dynamic`` is present.
+        dynamic: If true, this handles all updates not otherwise handled. The
+            parameters of the method must be self, a string name, and a
+            ``*args`` positional varargs. Cannot be present when ``name`` is
+            present.
+    """
+
+    def with_name(
+        name: Optional[str], fn: CallableSyncOrAsyncType
+    ) -> CallableSyncOrAsyncType:
+        defn = _UpdateDefinition(name=name, fn=fn, is_method=True)
+        if defn.dynamic_vararg:
+            raise RuntimeError(
+                "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
+            )
+        setattr(fn, "_defn", defn)
+        setattr(fn, "validator", partial(_update_validator, defn))
+        return fn
+
+    if name is not None or dynamic:
+        if name is not None and dynamic:
+            raise RuntimeError("Cannot provide name and dynamic boolean")
+        return partial(with_name, name)
+    if fn is None:
+        raise RuntimeError("Cannot create update without function or name or dynamic")
+    return with_name(fn.__name__, fn)
+
+
+def _update_validator(
+    update_def: _UpdateDefinition, fn: Optional[Callable[..., None]] = None
+) -> Optional[Callable[..., None]]:
+    """Decorator for a workflow update validator method."""
+    if fn is not None:
+        update_def.set_validator(fn)
+    return fn
+
+
 def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
     """Upsert search attributes for this workflow.
 
@@ -952,6 +1095,7 @@ class _Definition:
     run_fn: Callable[..., Awaitable]
     signals: Mapping[Optional[str], _SignalDefinition]
     queries: Mapping[Optional[str], _QueryDefinition]
+    updates: Mapping[Optional[str], _UpdateDefinition]
     sandboxed: bool
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
@@ -998,12 +1142,13 @@ class _Definition:
             raise ValueError("Class already contains workflow definition")
         issues: List[str] = []
 
-        # Collect run fn and all signal/query fns
+        # Collect run fn and all signal/query/update fns
         members = inspect.getmembers(cls)
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
         seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
         queries: Dict[Optional[str], _QueryDefinition] = {}
+        updates: Dict[Optional[str], _UpdateDefinition] = {}
         for name, member in members:
             if hasattr(member, "__temporal_workflow_run"):
                 seen_run_attr = True
@@ -1045,6 +1190,16 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
+            elif isinstance(member, UpdateMethodMultiParam):
+                update_defn = member._defn
+                if update_defn.name in updates:
+                    defn_name = update_defn.name or "<dynamic>"
+                    issues.append(
+                        f"Multiple update methods found for {defn_name} "
+                        f"(at least on {name} and {updates[update_defn.name].fn.__name__})"
+                    )
+                else:
+                    updates[update_defn.name] = update_defn
 
         # Check base classes haven't defined things with different decorators
         for base_cls in inspect.getmro(cls)[1:]:
@@ -1078,6 +1233,12 @@ class _Definition:
                         issues.append(
                             f"@workflow.query defined on {base_member.__qualname__} but not on the override"
                         )
+                elif isinstance(base_member, UpdateMethodMultiParam):
+                    update_defn = base_member._defn
+                    if update_defn.name not in updates:
+                        issues.append(
+                            f"@workflow.update defined on {base_member.__qualname__} but not on the override"
+                        )
 
         if not seen_run_attr:
             issues.append("Missing @workflow.run method")
@@ -1095,6 +1256,7 @@ class _Definition:
             run_fn=run_fn,
             signals=signals,
             queries=queries,
+            updates=updates,
             sandboxed=sandboxed,
         )
         setattr(cls, "__temporal_workflow_definition", defn)
@@ -1137,9 +1299,9 @@ def _bind_method(obj: Any, fn: Callable[..., Any]) -> Callable[..., Any]:
 def _assert_dynamic_handler_args(
     fn: Callable, arg_types: Optional[List[Type]], is_method: bool
 ) -> bool:
-    # Dynamic query/signal must have three args: self, name, and
-    # Sequence[RawValue]. An older form accepted varargs for the third param so
-    # we will too (but will warn in the signal/query code)
+    # Dynamic query/signal/update must have three args: self, name, and
+    # Sequence[RawValue]. An older form accepted varargs for the third param for signals/queries so
+    # we will too (but will warn in the signal/query code).
     params = list(inspect.signature(fn).parameters.values())
     total_expected_params = 3 if is_method else 2
     if (
@@ -1240,6 +1402,45 @@ class _QueryDefinition:
 
     def bind_fn(self, obj: Any) -> Callable[..., Any]:
         return _bind_method(obj, self.fn)
+
+
+@dataclass(frozen=True)
+class _UpdateDefinition:
+    # None if dynamic
+    name: Optional[str]
+    fn: Callable[..., Union[Any, Awaitable[Any]]]
+    is_method: bool
+    # Types loaded on post init if None
+    arg_types: Optional[List[Type]] = None
+    ret_type: Optional[Type] = None
+    validator: Optional[Callable[..., None]] = None
+    dynamic_vararg: bool = False
+
+    def __post_init__(self) -> None:
+        if self.arg_types is None:
+            arg_types, ret_type = temporalio.common._type_hints_from_func(self.fn)
+            # Disallow dynamic varargs
+            if not self.name and not _assert_dynamic_handler_args(
+                self.fn, arg_types, self.is_method
+            ):
+                raise RuntimeError(
+                    "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
+                )
+            object.__setattr__(self, "arg_types", arg_types)
+            object.__setattr__(self, "ret_type", ret_type)
+
+    def bind_fn(self, obj: Any) -> Callable[..., Any]:
+        return _bind_method(obj, self.fn)
+
+    def bind_validator(self, obj: Any) -> Callable[..., Any]:
+        if self.validator is not None:
+            return _bind_method(obj, self.validator)
+        return lambda *args, **kwargs: None
+
+    def set_validator(self, validator: Callable[..., None]) -> None:
+        if self.validator:
+            raise RuntimeError(f"Validator already set for update {self.name}")
+        object.__setattr__(self, "validator", validator)
 
 
 # See https://mypy.readthedocs.io/en/latest/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
@@ -3946,6 +4147,64 @@ def set_dynamic_query_handler(handler: Optional[Callable]) -> None:
         handler: Callable to set or None to unset.
     """
     _Runtime.current().workflow_set_query_handler(None, handler)
+
+
+def get_update_handler(name: str) -> Optional[Callable]:
+    """Get the update handler for the given name if any.
+
+    This includes handlers created via the ``@workflow.update`` decorator.
+
+    Args:
+        name: Name of the update.
+
+    Returns:
+        Callable for the update if any. If a handler is not found for the name,
+        this will not return the dynamic handler even if there is one.
+    """
+    return _Runtime.current().workflow_get_update_handler(name)
+
+
+def set_update_handler(
+    name: str, handler: Optional[Callable], *, validator: Optional[Callable] = None
+) -> None:
+    """Set or unset the update handler for the given name.
+
+    This overrides any existing handlers for the given name, including handlers
+    created via the ``@workflow.update`` decorator.
+
+    Args:
+        name: Name of the update.
+        handler: Callable to set or None to unset.
+        validator: Callable to set or None to unset as the update validator.
+    """
+    _Runtime.current().workflow_set_update_handler(name, handler, validator)
+
+
+def get_dynamic_update_handler() -> Optional[Callable]:
+    """Get the dynamic update handler if any.
+
+    This includes dynamic handlers created via the ``@workflow.update``
+    decorator.
+
+    Returns:
+        Callable for the dynamic update handler if any.
+    """
+    return _Runtime.current().workflow_get_update_handler(None)
+
+
+def set_dynamic_update_handler(
+    handler: Optional[Callable], *, validator: Optional[Callable] = None
+) -> None:
+    """Set or unset the dynamic update handler.
+
+    This overrides the existing dynamic handler even if it was created via the
+    ``@workflow.update`` decorator.
+
+    Args:
+        handler: Callable to set or None to unset.
+        validator: Callable to set or None to unset as the update validator.
+    """
+    _Runtime.current().workflow_set_update_handler(None, handler, validator)
 
 
 def _is_unbound_method_on_cls(fn: Callable[..., Any], cls: Type) -> bool:

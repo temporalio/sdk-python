@@ -19,6 +19,7 @@ from .workflow_commands_pb2 import (
     SignalExternalWorkflowExecution,
     StartChildWorkflowExecution,
     StartTimer,
+    UpdateResponse,
     UpsertWorkflowSearchAttributes,
     WorkflowCommand,
 )
@@ -44,6 +45,7 @@ __all__ = [
     "SignalExternalWorkflowExecution",
     "StartChildWorkflowExecution",
     "StartTimer",
+    "UpdateResponse",
     "UpsertWorkflowSearchAttributes",
     "WorkflowCommand",
 ]

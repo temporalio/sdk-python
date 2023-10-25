@@ -458,8 +458,8 @@ Some things to note about the above code:
 #### Definition
 
 Workflows are defined as classes decorated with `@workflow.defn`. The method invoked for the workflow is decorated with
-`@workflow.run`. Methods for signals and queries are decorated with `@workflow.signal` and `@workflow.query`
-respectively. Here's an example of a workflow:
+`@workflow.run`. Methods for signals, queries, and updates are decorated with `@workflow.signal`, `@workflow.query`
+and `@workflow.update` respectively. Here's an example of a workflow:
 
 ```python
 import asyncio
@@ -515,6 +515,12 @@ class GreetingWorkflow:
     @workflow.query
     def current_greeting(self) -> str:
         return self._current_greeting
+    
+    @workflow.update
+    def set_and_get_greeting(self, greeting: str) -> str:
+      old = self._current_greeting
+      self._current_greeting = greeting
+      return old
 
 ```
 
@@ -582,6 +588,14 @@ Here are the decorators that can be applied:
   * All the same constraints as `@workflow.signal` but should return a value
   * Should not be `async`
   * Temporal queries should never mutate anything in the workflow or call any calls that would mutate the workflow
+* `@workflow.update` - Defines a method as an update
+  * May both accept as input and return a value
+  * May be `async` or non-`async`
+  * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
+  * Also accepts the `name` and `dynamic` parameters like signals and queries, with the same semantics.
+  * Update handlers may optionally define a validator method by decorating it with `@update_handler_method.validator`.
+    To reject an update before any events are written to history, throw an exception in a validator. Validators cannot 
+    be `async`, cannot mutate workflow state, and return nothing.
 
 #### Running
 
@@ -1439,6 +1453,13 @@ to `1` prior to running tests.
 
 Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore `pyproject.toml` and
 run `poetry update protobuf grpcio-tools`.
+
+For a less system-intrusive approach, you can:
+```shell
+docker build -f scripts/_proto/Dockerfile .
+docker run -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
+poe format
+```
 
 ### Style
 

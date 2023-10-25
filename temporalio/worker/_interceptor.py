@@ -191,6 +191,18 @@ class HandleQueryInput:
 
 
 @dataclass
+class HandleUpdateInput:
+    """Input for :py:meth:`WorkflowInboundInterceptor.handle_update_validator`
+    and :py:meth:`WorkflowInboundInterceptor.handle_update_handler`.
+    """
+
+    id: str
+    update: str
+    args: Sequence[Any]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
+
+
+@dataclass
 class SignalChildWorkflowInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.signal_child_workflow`."""
 
@@ -313,6 +325,14 @@ class WorkflowInboundInterceptor:
     async def handle_query(self, input: HandleQueryInput) -> Any:
         """Called to handle a query."""
         return await self.next.handle_query(input)
+
+    def handle_update_validator(self, input: HandleUpdateInput) -> None:
+        """Called to handle an update's validation stage."""
+        self.next.handle_update_validator(input)
+
+    async def handle_update_handler(self, input: HandleUpdateInput) -> Any:
+        """Called to handle an update's handler."""
+        return await self.next.handle_update_handler(input)
 
 
 class WorkflowOutboundInterceptor:

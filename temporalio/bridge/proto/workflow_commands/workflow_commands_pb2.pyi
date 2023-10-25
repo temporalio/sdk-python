@@ -10,6 +10,7 @@ import builtins
 import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.empty_pb2
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
@@ -91,6 +92,7 @@ class WorkflowCommand(google.protobuf.message.Message):
     REQUEST_CANCEL_LOCAL_ACTIVITY_FIELD_NUMBER: builtins.int
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     MODIFY_WORKFLOW_PROPERTIES_FIELD_NUMBER: builtins.int
+    UPDATE_RESPONSE_FIELD_NUMBER: builtins.int
     @property
     def start_timer(self) -> global___StartTimer: ...
     @property
@@ -141,6 +143,8 @@ class WorkflowCommand(google.protobuf.message.Message):
     ) -> global___UpsertWorkflowSearchAttributes: ...
     @property
     def modify_workflow_properties(self) -> global___ModifyWorkflowProperties: ...
+    @property
+    def update_response(self) -> global___UpdateResponse: ...
     def __init__(
         self,
         *,
@@ -169,6 +173,7 @@ class WorkflowCommand(google.protobuf.message.Message):
         upsert_workflow_search_attributes: global___UpsertWorkflowSearchAttributes
         | None = ...,
         modify_workflow_properties: global___ModifyWorkflowProperties | None = ...,
+        update_response: global___UpdateResponse | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -209,6 +214,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"start_child_workflow_execution",
             "start_timer",
             b"start_timer",
+            "update_response",
+            b"update_response",
             "upsert_workflow_search_attributes",
             b"upsert_workflow_search_attributes",
             "variant",
@@ -254,6 +261,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"start_child_workflow_execution",
             "start_timer",
             b"start_timer",
+            "update_response",
+            b"update_response",
             "upsert_workflow_search_attributes",
             b"upsert_workflow_search_attributes",
             "variant",
@@ -283,6 +292,7 @@ class WorkflowCommand(google.protobuf.message.Message):
             "request_cancel_local_activity",
             "upsert_workflow_search_attributes",
             "modify_workflow_properties",
+            "update_response",
         ]
         | None
     ): ...
@@ -1580,3 +1590,79 @@ class ModifyWorkflowProperties(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ModifyWorkflowProperties = ModifyWorkflowProperties
+
+class UpdateResponse(google.protobuf.message.Message):
+    """A reply to a `DoUpdate` job - lang must run the update's validator if told to, and then
+    immediately run the handler, if the update was accepted.
+
+    There must always be an accepted or rejected response immediately, in the same activation as
+    this job, to indicate the result of the validator. Accepted for ran and accepted or skipped, or
+    rejected for rejected.
+
+    Then, in the same or any subsequent activation, after the update handler has completed, respond
+    with completed or rejected as appropriate for the result of the handler.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PROTOCOL_INSTANCE_ID_FIELD_NUMBER: builtins.int
+    ACCEPTED_FIELD_NUMBER: builtins.int
+    REJECTED_FIELD_NUMBER: builtins.int
+    COMPLETED_FIELD_NUMBER: builtins.int
+    protocol_instance_id: builtins.str
+    """The protocol message instance ID"""
+    @property
+    def accepted(self) -> google.protobuf.empty_pb2.Empty:
+        """Must be sent if the update's validator has passed (or lang was not asked to run it, and
+        thus should be considered already-accepted, allowing lang to always send the same
+        sequence on replay).
+        """
+    @property
+    def rejected(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """Must be sent if the update's validator does not pass, or after acceptance if the update
+        handler fails.
+        """
+    @property
+    def completed(self) -> temporalio.api.common.v1.message_pb2.Payload:
+        """Must be sent once the update handler completes successfully."""
+    def __init__(
+        self,
+        *,
+        protocol_instance_id: builtins.str = ...,
+        accepted: google.protobuf.empty_pb2.Empty | None = ...,
+        rejected: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        completed: temporalio.api.common.v1.message_pb2.Payload | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "accepted",
+            b"accepted",
+            "completed",
+            b"completed",
+            "rejected",
+            b"rejected",
+            "response",
+            b"response",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "accepted",
+            b"accepted",
+            "completed",
+            b"completed",
+            "protocol_instance_id",
+            b"protocol_instance_id",
+            "rejected",
+            b"rejected",
+            "response",
+            b"response",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["response", b"response"]
+    ) -> typing_extensions.Literal["accepted", "rejected", "completed"] | None: ...
+
+global___UpdateResponse = UpdateResponse
