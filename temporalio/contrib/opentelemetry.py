@@ -246,7 +246,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
 
     async def start_workflow_update(
         self, input: temporalio.client.StartWorkflowUpdateInput
-    ) -> temporalio.client.WorkflowUpdateHandle:
+    ) -> temporalio.client.WorkflowUpdateHandle[Any]:
         with self.root._start_as_current_span(
             f"StartWorkflowUpdate:{input.update}",
             attributes={"temporalWorkflowID": input.id},

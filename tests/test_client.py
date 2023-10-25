@@ -405,13 +405,13 @@ class TracingClientOutboundInterceptor(OutboundInterceptor):
 
     async def start_workflow_update(
         self, input: StartWorkflowUpdateInput
-    ) -> WorkflowUpdateHandle:
+    ) -> WorkflowUpdateHandle[Any]:
         self._parent.traces.append(("start_workflow_update", input))
         return await super().start_workflow_update(input)
 
     async def poll_workflow_update(
         self, input: PollWorkflowUpdateInput
-    ) -> WorkflowUpdateHandle:
+    ) -> WorkflowUpdateHandle[Any]:
         self._parent.traces.append(("poll_workflow_update", input))
         return await super().poll_workflow_update(input)
 

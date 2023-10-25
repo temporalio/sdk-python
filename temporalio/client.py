@@ -1708,6 +1708,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
+            WorkflowUpdateFailedError: If the update failed
             RPCError: There was some issue sending the update to the workflow.
         """
         handle = await self._start_update(
@@ -3928,7 +3929,6 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         self,
         client: Client,
         id: str,
-        name: str,
         workflow_id: str,
         *,
         workflow_run_id: Optional[str] = None,
@@ -3941,21 +3941,15 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         """
         self._client = client
         self._id = id
-        self._name = name
         self._workflow_id = workflow_id
         self._workflow_run_id = workflow_run_id
         self._result_type = result_type
-        self._known_result: Optional[temporalio.api.update.v1.Outcome] = None
+        self._known_outcome: Optional[temporalio.api.update.v1.Outcome] = None
 
     @property
     def id(self) -> str:
         """ID of this Update request."""
         return self._id
-
-    @property
-    def name(self) -> str:
-        """The name of the Update being invoked."""
-        return self._name
 
     @property
     def workflow_id(self) -> str:
@@ -3974,8 +3968,9 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
-        """Wait for and return the result of the update. The result may already be known in which case no call is made.
-        Otherwise the result will be polled for until returned, or until the provided timeout is reached, if specified.
+        """Wait for and return the result of the update. The result may already be known in which case no network call
+        is made. Otherwise the result will be polled for until returned, or until the provided timeout is reached, if
+        specified.
 
         Args:
             timeout: Optional timeout specifying maximum wait time for the result.
@@ -3984,15 +3979,15 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
                 overall timeout has been reached.
 
         Raises:
+            WorkflowUpdateFailedError: If the update failed
             TimeoutError: The specified timeout was reached when waiting for the update result.
             RPCError: Update result could not be fetched for some other reason.
         """
-        if self._known_result is not None:
-            outcome = self._known_result
+        if self._known_outcome is not None:
+            outcome = self._known_outcome
             return await _update_outcome_to_result(
                 outcome,
                 self.id,
-                self.name,
                 self._client.data_converter,
                 self._result_type,
             )
@@ -4002,7 +3997,6 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
                 self.workflow_id,
                 self.workflow_run_id,
                 self.id,
-                self.name,
                 timeout,
                 self._result_type,
                 rpc_metadata,
@@ -4238,7 +4232,6 @@ class PollWorkflowUpdateInput:
     workflow_id: str
     run_id: Optional[str]
     update_id: str
-    update: str
     timeout: Optional[timedelta]
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
@@ -4491,7 +4484,7 @@ class OutboundInterceptor:
 
     async def start_workflow_update(
         self, input: StartWorkflowUpdateInput
-    ) -> WorkflowUpdateHandle:
+    ) -> WorkflowUpdateHandle[Any]:
         """Called for every :py:meth:`WorkflowHandle.update` and :py:meth:`WorkflowHandle.start_update` call."""
         return await self.next.start_workflow_update(input)
 
@@ -4823,7 +4816,7 @@ class _ClientImpl(OutboundInterceptor):
 
     async def start_workflow_update(
         self, input: StartWorkflowUpdateInput
-    ) -> WorkflowUpdateHandle:
+    ) -> WorkflowUpdateHandle[Any]:
         wait_policy = (
             temporalio.api.update.v1.WaitPolicy(lifecycle_stage=input.wait_for_stage)
             if input.wait_for_stage is not None
@@ -4865,13 +4858,12 @@ class _ClientImpl(OutboundInterceptor):
         update_handle: WorkflowUpdateHandle[Any] = WorkflowUpdateHandle(
             client=self._client,
             id=determined_id,
-            name=input.update,
             workflow_id=input.id,
             workflow_run_id=input.run_id,
             result_type=input.ret_type,
         )
         if resp.HasField("outcome"):
-            update_handle._known_result = resp.outcome
+            update_handle._known_outcome = resp.outcome
 
         return update_handle
 
@@ -4905,7 +4897,6 @@ class _ClientImpl(OutboundInterceptor):
                         return await _update_outcome_to_result(
                             res.outcome,
                             input.update_id,
-                            input.update,
                             self._client.data_converter,
                             input.ret_type,
                         )
@@ -5449,7 +5440,6 @@ def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
 async def _update_outcome_to_result(
     outcome: temporalio.api.update.v1.Outcome,
     id: str,
-    name: str,
     converter: temporalio.converter.DataConverter,
     rtype: Optional[Type],
 ) -> Any:
