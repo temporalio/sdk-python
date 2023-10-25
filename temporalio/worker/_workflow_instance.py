@@ -504,10 +504,11 @@ class _WorkflowInstanceImpl(
                         command.update_response.protocol_instance_id = (
                             job.protocol_instance_id
                         )
+                    command.update_response.rejected.SetInParent()
                     self._failure_converter.to_failure(
                         err,
                         self._payload_converter,
-                        command.update_response.rejected.cause,
+                        command.update_response.rejected,
                     )
                 else:
                     self._current_activation_error = err

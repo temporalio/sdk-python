@@ -5445,7 +5445,7 @@ async def _update_outcome_to_result(
 ) -> Any:
     if outcome.HasField("failure"):
         raise WorkflowUpdateFailedError(
-            await converter.decode_failure(outcome.failure.cause),
+            await converter.decode_failure(outcome.failure),
         )
     if not outcome.success.payloads:
         return None
