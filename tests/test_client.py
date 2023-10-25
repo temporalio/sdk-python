@@ -143,6 +143,53 @@ async def test_start_with_signal(client: Client, worker: ExternalWorker):
     assert "some signal arg" == await handle.result()
 
 
+async def test_start_delay(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support start delay")
+    start_delay = timedelta(hours=1, minutes=20, seconds=30)
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        KSWorkflowParams(
+            actions=[KSAction(result=KSResultAction(value="some result"))]
+        ),
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=worker.task_queue,
+        start_delay=start_delay,
+    )
+    # Check that first event has start delay
+    first_event = [e async for e in handle.fetch_history_events()][0]
+    assert (
+        start_delay
+        == first_event.workflow_execution_started_event_attributes.first_workflow_task_backoff.ToTimedelta()
+    )
+
+
+async def test_signal_with_start_delay(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support start delay")
+    start_delay = timedelta(hours=1, minutes=20, seconds=30)
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        KSWorkflowParams(
+            actions=[KSAction(result=KSResultAction(value="some result"))]
+        ),
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=worker.task_queue,
+        start_delay=start_delay,
+        start_signal="some-signal",
+    )
+    # Check that first event has start delay
+    first_event = [e async for e in handle.fetch_history_events()][0]
+    assert (
+        start_delay
+        == first_event.workflow_execution_started_event_attributes.first_workflow_task_backoff.ToTimedelta()
+    )
+
+
 async def test_result_follow_continue_as_new(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):

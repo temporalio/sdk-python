@@ -278,6 +278,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -302,6 +303,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -328,6 +330,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -354,6 +357,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -378,6 +382,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -403,6 +408,9 @@ class Client:
             cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
             memo: Memo for the workflow.
             search_attributes: Search attributes for the workflow.
+            start_delay: Amount of time to wait before starting the workflow.
+                This does not work with ``cron_schedule``. This is currently
+                experimental.
             start_signal: If present, this signal is sent as signal-with-start
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
@@ -447,6 +455,7 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
+                start_delay=start_delay,
                 headers={},
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
@@ -472,6 +481,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -496,6 +506,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -522,6 +533,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -548,6 +560,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -572,6 +585,7 @@ class Client:
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
         search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -600,6 +614,7 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
+                start_delay=start_delay,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
                 rpc_metadata=rpc_metadata,
@@ -4109,6 +4124,7 @@ class StartWorkflowInput:
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
     search_attributes: Optional[temporalio.common.SearchAttributes]
+    start_delay: Optional[timedelta]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
     start_signal_args: Sequence[Any]
@@ -4630,6 +4646,8 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.converter.encode_search_attributes(
                 input.search_attributes, req.search_attributes
             )
+        if input.start_delay is not None:
+            req.workflow_start_delay.FromTimedelta(input.start_delay)
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.header.fields)
 
