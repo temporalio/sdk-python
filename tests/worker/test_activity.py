@@ -52,6 +52,8 @@ _default_shared_state_manager = SharedStateManager.create_from_multiprocessing(
     multiprocessing.Manager()
 )
 
+default_max_concurrent_activities = 50
+
 
 async def test_activity_hello(client: Client, worker: ExternalWorker):
     @activity.defn
@@ -141,13 +143,19 @@ async def test_sync_activity_thread(client: Client, worker: ExternalWorker):
     def some_activity() -> str:
         return f"activity name: {activity.info().activity_type}"
 
+    # We intentionally leave max_workers by default in the thread pool executor
+    # to confirm that the warning is triggered
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        result = await _execute_workflow_with_activity(
-            client,
-            worker,
-            some_activity,
-            worker_config={"activity_executor": executor},
-        )
+        with pytest.warns(
+            UserWarning,
+            match=f"Worker max_concurrent_activities is {default_max_concurrent_activities} but activity_executor's max_workers is only",
+        ):
+            result = await _execute_workflow_with_activity(
+                client,
+                worker,
+                some_activity,
+                worker_config={"activity_executor": executor},
+            )
     assert result.result == "activity name: some_activity"
 
 
@@ -157,13 +165,19 @@ def picklable_activity() -> str:
 
 
 async def test_sync_activity_process(client: Client, worker: ExternalWorker):
+    # We intentionally leave max_workers by default in the process pool executor
+    # to confirm that the warning is triggered
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        result = await _execute_workflow_with_activity(
-            client,
-            worker,
-            picklable_activity,
-            worker_config={"activity_executor": executor},
-        )
+        with pytest.warns(
+            UserWarning,
+            match=f"Worker max_concurrent_activities is {default_max_concurrent_activities} but activity_executor's max_workers is only",
+        ):
+            result = await _execute_workflow_with_activity(
+                client,
+                worker,
+                picklable_activity,
+                worker_config={"activity_executor": executor},
+            )
     assert result.result == "activity name: picklable_activity"
 
 
@@ -288,7 +302,9 @@ async def test_sync_activity_thread_cancel_caught(
             assert activity.is_cancelled()
             return "Cancelled"
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=default_max_concurrent_activities
+    ) as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -311,7 +327,9 @@ async def test_sync_activity_thread_cancel_uncaught(
             activity.heartbeat()
 
     with pytest.raises(WorkflowFailureError) as err:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=default_max_concurrent_activities
+        ) as executor:
             await _execute_workflow_with_activity(
                 client,
                 worker,
@@ -339,7 +357,9 @@ async def test_sync_activity_thread_cancel_exception_disabled(
                 activity.heartbeat()
                 return "Cancelled"
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=default_max_concurrent_activities
+    ) as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -372,7 +392,9 @@ async def test_sync_activity_thread_cancel_exception_shielded(
         events.append("post1")
 
     with pytest.raises(WorkflowFailureError) as err:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=default_max_concurrent_activities
+        ) as executor:
             await _execute_workflow_with_activity(
                 client,
                 worker,
@@ -424,10 +446,13 @@ async def test_sync_activity_thread_cancel_on_worker_shutdown(client: Client):
             activities=[sync_activity_wait_cancel],
             workflows=[CancelOnWorkerShutdownWorkflow],
             activity_executor=executor,
+            max_concurrent_activities=default_max_concurrent_activities,
             max_cached_workflows=0,
         )
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=default_max_concurrent_activities
+    ) as executor:
         async with new_worker():
             # Start the workflow
             handle = await client.start_workflow(
@@ -678,7 +703,9 @@ def picklable_heartbeat_details_activity() -> str:
 async def test_sync_activity_thread_heartbeat_details(
     client: Client, worker: ExternalWorker
 ):
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=default_max_concurrent_activities
+    ) as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -890,6 +917,7 @@ async def test_sync_activity_process_worker_shutdown_graceful(
             task_queue=act_task_queue,
             activities=[picklable_wait_on_event],
             activity_executor=executor,
+            max_concurrent_activities=default_max_concurrent_activities,
             graceful_shutdown_timeout=timedelta(seconds=2),
             shared_state_manager=_default_shared_state_manager,
         )
@@ -946,6 +974,7 @@ async def test_sync_activity_process_executor_crash(
             task_queue=act_task_queue,
             activities=[kill_my_process],
             activity_executor=executor,
+            max_concurrent_activities=default_max_concurrent_activities,
             graceful_shutdown_timeout=timedelta(seconds=2),
             shared_state_manager=_default_shared_state_manager,
         )
@@ -1110,7 +1139,9 @@ async def test_sync_activity_contextvars(client: Client, worker: ExternalWorker)
     def some_activity() -> str:
         return f"context var: {some_context_var.get()}"
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=default_max_concurrent_activities
+    ) as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -1191,7 +1222,9 @@ async def test_activity_dynamic(client: Client, worker: ExternalWorker):
 
 
 async def test_sync_activity_dynamic_thread(client: Client, worker: ExternalWorker):
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=default_max_concurrent_activities
+    ) as executor:
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -1268,6 +1301,8 @@ async def _execute_workflow_with_activity(
     worker_config["task_queue"] = str(uuid.uuid4())
     worker_config["activities"] = [fn] + additional_activities
     worker_config["shared_state_manager"] = _default_shared_state_manager
+    if not worker_config.get("max_concurrent_activities"):
+        worker_config["max_concurrent_activities"] = default_max_concurrent_activities
     async with Worker(**worker_config):
         try:
             handle = await client.start_workflow(

@@ -39,6 +39,14 @@ class ClientRetryConfig:
 
 
 @dataclass
+class ClientKeepAliveConfig:
+    """Python representation of the Rust struct for configuring keep alive."""
+
+    interval_millis: int
+    timeout_millis: int
+
+
+@dataclass
 class ClientConfig:
     """Python representation of the Rust struct for configuring the client."""
 
@@ -47,6 +55,7 @@ class ClientConfig:
     identity: str
     tls_config: Optional[ClientTlsConfig]
     retry_config: Optional[ClientRetryConfig]
+    keep_alive_config: Optional[ClientKeepAliveConfig]
     client_name: str
     client_version: str
 

@@ -1,6 +1,8 @@
 import asyncio
+import socket
 import time
 import uuid
+from contextlib import closing
 from datetime import timedelta
 from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
@@ -88,3 +90,9 @@ async def ensure_search_attributes_present(client: Client, *keys: SearchAttribut
         )
     # Confirm now present
     assert await search_attributes_present()
+
+def find_free_port() -> int:
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(("", 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]

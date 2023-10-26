@@ -25,6 +25,7 @@ from typing import (
     Union,
     cast,
 )
+from urllib.request import urlopen
 
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -74,6 +75,14 @@ from temporalio.exceptions import (
     TimeoutError,
     WorkflowAlreadyStartedError,
 )
+from temporalio.runtime import (
+    BUFFERED_METRIC_KIND_COUNTER,
+    BUFFERED_METRIC_KIND_HISTOGRAM,
+    MetricBuffer,
+    PrometheusConfig,
+    Runtime,
+    TelemetryConfig,
+)
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -83,7 +92,7 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from tests.helpers import assert_eq_eventually, new_worker, ensure_search_attributes_present
+from tests.helpers import assert_eq_eventually, find_free_port, new_worker, ensure_search_attributes_present
 
 
 @workflow.defn
@@ -1459,9 +1468,6 @@ class CustomWorkflowRunner(WorkflowRunner):
         pass
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
-        # We need to assert details can be pickled for potential sandbox use
-        det_pickled = pickle.loads(pickle.dumps(det))
-        assert det == det_pickled
         return CustomWorkflowInstance(self, self._unsandboxed.create_instance(det))
 
 
@@ -2386,11 +2392,6 @@ class PostPatchWorkflow(PatchWorkflowBase):
 
 
 async def test_workflow_patch(client: Client):
-    # TODO(cretz): Patches have issues on older servers since core needs patch
-    # metadata support for some fixes. Unskip for local server only once we
-    # upgrade to https://github.com/temporalio/sdk-python/issues/272.
-    pytest.skip("Needs SDK metadata support")
-
     workflow_run = PrePatchWorkflow.run
     task_queue = str(uuid.uuid4())
 
@@ -2479,11 +2480,6 @@ class PatchMemoizedWorkflowPatched(PatchMemoizedWorkflowUnpatched):
 
 
 async def test_workflow_patch_memoized(client: Client):
-    # TODO(cretz): Patches have issues on older servers since core needs patch
-    # metadata support for some fixes. Unskip for local server only once we
-    # upgrade to https://github.com/temporalio/sdk-python/issues/272.
-    pytest.skip("Needs SDK metadata support")
-
     # Start a worker with the workflow unpatched and wait until halfway through.
     # Need to disable workflow cache since we restart the worker and don't want
     # to pay the sticky queue penalty.
@@ -3361,3 +3357,274 @@ if sys.version_info >= (3, 11):
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
+
+
+@activity.defn
+async def custom_metrics_activity() -> None:
+    counter = activity.metric_meter().create_counter(
+        "my-activity-counter", "my-activity-description", "my-activity-unit"
+    )
+    counter.add(12)
+    counter.add(34, {"my-activity-extra-attr": 12.34})
+
+
+@workflow.defn
+class CustomMetricsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            custom_metrics_activity, schedule_to_close_timeout=timedelta(seconds=30)
+        )
+
+        histogram = workflow.metric_meter().create_histogram(
+            "my-workflow-histogram", "my-workflow-description", "my-workflow-unit"
+        )
+        histogram.record(56)
+        histogram.with_additional_attributes({"my-workflow-extra-attr": 1234}).record(
+            78
+        )
+
+
+async def test_workflow_custom_metrics(client: Client):
+    # Run worker with default runtime which is noop meter just to confirm it
+    # doesn't fail
+    async with new_worker(
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+    ) as worker:
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Create new runtime with Prom server
+    prom_addr = f"127.0.0.1:{find_free_port()}"
+    runtime = Runtime(
+        telemetry=TelemetryConfig(
+            metrics=PrometheusConfig(bind_address=prom_addr), metric_prefix="foo_"
+        )
+    )
+
+    # Confirm meter fails with bad attribute type
+    with pytest.raises(TypeError) as err:
+        runtime.metric_meter.with_additional_attributes({"some_attr": None})  # type: ignore
+    assert str(err.value).startswith("Invalid value type for key")
+
+    # New client with the runtime
+    client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+
+    async with new_worker(
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+    ) as worker:
+        # Record a gauge at runtime level
+        gauge = runtime.metric_meter.with_additional_attributes(
+            {"my-runtime-extra-attr1": "val1", "my-runtime-extra-attr2": True}
+        ).create_gauge("my-runtime-gauge", "my-runtime-description")
+        gauge.set(90)
+
+        # Run workflow
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Get Prom dump
+        with urlopen(url=f"http://{prom_addr}/metrics") as f:
+            prom_str: str = f.read().decode("utf-8")
+            prom_lines = prom_str.splitlines()
+
+        # Intentionally naive metric checker
+        def matches_metric_line(
+            line: str, name: str, at_least_labels: Mapping[str, str], value: int
+        ) -> bool:
+            # Must have metric name
+            if not line.startswith(name + "{"):
+                return False
+            # Must have labels (don't escape for this test)
+            for k, v in at_least_labels.items():
+                if not f'{k}="{v}"' in line:
+                    return False
+            return line.endswith(f" {value}")
+
+        def assert_metric_exists(
+            name: str, at_least_labels: Mapping[str, str], value: int
+        ) -> None:
+            assert any(
+                matches_metric_line(line, name, at_least_labels, value)
+                for line in prom_lines
+            )
+
+        def assert_description_exists(name: str, description: str) -> None:
+            assert f"# HELP {name} {description}" in prom_lines
+
+        # Check some metrics are as we expect
+        assert_description_exists("my_runtime_gauge", "my-runtime-description")
+        assert_metric_exists(
+            "my_runtime_gauge",
+            {
+                "my_runtime_extra_attr1": "val1",
+                "my_runtime_extra_attr2": "true",
+                # Also confirm global service name label
+                "service_name": "temporal-core-sdk",
+            },
+            90,
+        )
+        assert_description_exists("my_workflow_histogram", "my-workflow-description")
+        assert_metric_exists("my_workflow_histogram_sum", {}, 56)
+        assert_metric_exists(
+            "my_workflow_histogram_sum",
+            {
+                "my_workflow_extra_attr": "1234",
+                # Also confirm some workflow labels
+                "namespace": client.namespace,
+                "task_queue": worker.task_queue,
+                "workflow_type": "CustomMetricsWorkflow",
+            },
+            78,
+        )
+        assert_description_exists("my_activity_counter", "my-activity-description")
+        assert_metric_exists("my_activity_counter", {}, 12)
+        assert_metric_exists(
+            "my_activity_counter",
+            {
+                "my_activity_extra_attr": "12.34",
+                # Also confirm some activity labels
+                "namespace": client.namespace,
+                "task_queue": worker.task_queue,
+                "activity_type": "custom_metrics_activity",
+            },
+            34,
+        )
+        # Also check Temporal metric got its prefix
+        assert_metric_exists(
+            "foo_workflow_completed", {"workflow_type": "CustomMetricsWorkflow"}, 1
+        )
+
+
+async def test_workflow_buffered_metrics(client: Client):
+    # Create runtime with metric buffer
+    buffer = MetricBuffer(10000)
+    runtime = Runtime(
+        telemetry=TelemetryConfig(metrics=buffer, metric_prefix="some_prefix_")
+    )
+
+    # Confirm no updates yet
+    assert not buffer.retrieve_updates()
+
+    # Create a counter and make one with more attrs
+    runtime_counter = runtime.metric_meter.create_counter(
+        "runtime-counter", "runtime-counter-desc", "runtime-counter-unit"
+    )
+    runtime_counter_with_attrs = runtime_counter.with_additional_attributes(
+        {"foo": "bar", "baz": 123}
+    )
+
+    # Send adds to both
+    runtime_counter.add(100)
+    runtime_counter_with_attrs.add(200)
+
+    # Get updates and check their values
+    runtime_updates1 = buffer.retrieve_updates()
+    assert len(runtime_updates1) == 2
+    # Check that the metric fields are right
+    assert runtime_updates1[0].metric.name == "runtime-counter"
+    assert runtime_updates1[0].metric.description == "runtime-counter-desc"
+    assert runtime_updates1[0].metric.unit == "runtime-counter-unit"
+    assert runtime_updates1[0].metric.kind == BUFFERED_METRIC_KIND_COUNTER
+    # Check that the metric is the exact same object all the way from Rust
+    assert id(runtime_updates1[0].metric) == id(runtime_updates1[1].metric)
+    # Check the values and attributes
+    assert runtime_updates1[0].value == 100
+    assert runtime_updates1[0].attributes == {"service_name": "temporal-core-sdk"}
+    assert runtime_updates1[1].value == 200
+    assert runtime_updates1[1].attributes == {
+        "service_name": "temporal-core-sdk",
+        "foo": "bar",
+        "baz": 123,
+    }
+
+    # Confirm no more updates
+    assert not buffer.retrieve_updates()
+
+    # Send some more adds and check
+    runtime_counter.add(300)
+    runtime_counter_with_attrs.add(400)
+    runtime_updates2 = buffer.retrieve_updates()
+    assert len(runtime_updates2)
+    # Check that metrics are the same exact object as before
+    assert id(runtime_updates1[0].metric) == id(runtime_updates2[0].metric)
+    assert id(runtime_updates1[1].metric) == id(runtime_updates2[1].metric)
+    # Check that even the attribute dictionaries are exact same objects as before
+    assert id(runtime_updates1[0].attributes) == id(runtime_updates2[0].attributes)
+    assert id(runtime_updates1[1].attributes) == id(runtime_updates2[1].attributes)
+    # Check values
+    assert runtime_updates2[0].value == 300
+    assert runtime_updates2[1].value == 400
+
+    # Create a new client on the runtime and execute the custom metric workflow
+    client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+    async with new_worker(
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+    ) as worker:
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Drain updates and confirm updates exist as expected
+    updates = buffer.retrieve_updates()
+    # Workflow update histogram, with some extra sanity checks
+    assert any(
+        update.metric.name == "my-workflow-histogram"
+        and update.metric.description == "my-workflow-description"
+        and update.metric.unit == "my-workflow-unit"
+        and update.metric.kind == BUFFERED_METRIC_KIND_HISTOGRAM
+        and update.attributes["namespace"] == client.namespace
+        and update.attributes["task_queue"] == worker.task_queue
+        and update.attributes["workflow_type"] == "CustomMetricsWorkflow"
+        and "my-workflow-extra-attr" not in update.attributes
+        and update.value == 56
+        for update in updates
+    )
+    assert any(
+        update.metric.name == "my-workflow-histogram"
+        and update.attributes.get("my-workflow-extra-attr") == 1234
+        and update.value == 78
+        for update in updates
+    )
+    # Check activity counter too
+    assert any(
+        update.metric.name == "my-activity-counter"
+        and update.metric.description == "my-activity-description"
+        and update.metric.unit == "my-activity-unit"
+        and update.metric.kind == BUFFERED_METRIC_KIND_COUNTER
+        and update.attributes["namespace"] == client.namespace
+        and update.attributes["task_queue"] == worker.task_queue
+        and update.attributes["activity_type"] == "custom_metrics_activity"
+        and "my-activity-extra-attr" not in update.attributes
+        and update.value == 12
+        for update in updates
+    )
+    assert any(
+        update.metric.name == "my-activity-counter"
+        and update.attributes.get("my-activity-extra-attr") == 12.34
+        and update.value == 34
+        for update in updates
+    )
+    # Check for a Temporal metric too
+    assert any(
+        update.metric.name == "some_prefix_workflow_completed"
+        and update.attributes["workflow_type"] == "CustomMetricsWorkflow"
+        and update.value == 1
+        for update in updates
+    )

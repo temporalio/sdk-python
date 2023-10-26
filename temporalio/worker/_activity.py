@@ -68,6 +68,7 @@ class _ActivityWorker:
         shared_state_manager: Optional[SharedStateManager],
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
+        metric_meter: temporalio.common.MetricMeter,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
@@ -76,6 +77,7 @@ class _ActivityWorker:
         self._running_activities: Dict[bytes, _RunningActivity] = {}
         self._data_converter = data_converter
         self._interceptors = interceptors
+        self._metric_meter = metric_meter
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         # Lazily created on first activity
         self._worker_shutdown_event: Optional[
@@ -195,6 +197,13 @@ class _ActivityWorker:
             except temporalio.bridge.worker.PollShutdownError:
                 return
 
+    # Only call this after run()/drain_poll_queue() have returned. This will not
+    # raise an exception.
+    async def wait_all_completed(self) -> None:
+        running_tasks = [v.task for v in self._running_activities.values() if v.task]
+        if running_tasks:
+            await asyncio.gather(*running_tasks, return_exceptions=False)
+
     def _cancel(
         self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
     ) -> None:
@@ -288,6 +297,7 @@ class _ActivityWorker:
                 )
 
             # Setup events
+            sync_non_threaded = False
             if not activity_def.is_async:
                 running_activity.sync = True
                 # If we're in a thread-pool executor we can use threading events
@@ -303,6 +313,7 @@ class _ActivityWorker:
                     if not activity_def.no_thread_cancel_exception:
                         running_activity.cancel_thread_raiser = _ThreadExceptionRaiser()
                 else:
+                    sync_non_threaded = True
                     manager = self._shared_state_manager
                     # Pre-checked on worker init
                     assert manager
@@ -414,6 +425,9 @@ class _ActivityWorker:
                     if not running_activity.cancel_thread_raiser
                     else running_activity.cancel_thread_raiser.shielded,
                     payload_converter_class_or_instance=self._data_converter.payload_converter,
+                    runtime_metric_meter=None
+                    if sync_non_threaded
+                    else self._metric_meter,
                 )
             )
             temporalio.activity.logger.debug("Starting activity")
@@ -667,6 +681,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     cancelled_event.thread_event,
                     worker_shutdown_event.thread_event,
                     payload_converter_class_or_instance,
+                    ctx.runtime_metric_meter,
                     input.fn,
                     *input.args,
                 ]
@@ -713,6 +728,7 @@ def _execute_sync_activity(
         Type[temporalio.converter.PayloadConverter],
         temporalio.converter.PayloadConverter,
     ],
+    runtime_metric_meter: Optional[temporalio.common.MetricMeter],
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -743,6 +759,7 @@ def _execute_sync_activity(
             if not cancel_thread_raiser
             else cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=payload_converter_class_or_instance,
+            runtime_metric_meter=runtime_metric_meter,
         )
     )
     return fn(*args)

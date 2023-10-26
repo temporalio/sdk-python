@@ -7,9 +7,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import ClassVar, Mapping, Optional, Union
+from enum import Enum
+from typing import ClassVar, Mapping, NewType, Optional, Sequence, Union
 
+from typing_extensions import Literal, Protocol
+
+import temporalio.bridge.metric
 import temporalio.bridge.runtime
+import temporalio.common
 
 _default_runtime: Optional[Runtime] = None
 
@@ -20,6 +25,8 @@ class Runtime:
     Users are encouraged to use :py:meth:`default`. It can be set with
     :py:meth:`set_default`. Every time a new runtime is created, a new internal
     thread pool is created.
+
+    Runtimes do not work across forks.
     """
 
     @staticmethod
@@ -63,6 +70,20 @@ class Runtime:
         self._core_runtime = temporalio.bridge.runtime.Runtime(
             telemetry=telemetry._to_bridge_config()
         )
+        if isinstance(telemetry.metrics, MetricBuffer):
+            telemetry.metrics._runtime = self
+        core_meter = temporalio.bridge.metric.MetricMeter.create(self._core_runtime)
+        if not core_meter:
+            self._metric_meter = temporalio.common.MetricMeter.noop
+        else:
+            self._metric_meter = _MetricMeter(core_meter, core_meter.default_attributes)
+
+    @property
+    def metric_meter(self) -> temporalio.common.MetricMeter:
+        """Metric meter for this runtime. This is a no-op metric meter if no
+        metrics were configured.
+        """
+        return self._metric_meter
 
 
 @dataclass
@@ -84,25 +105,6 @@ class TelemetryFilter:
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
         return f"{self.other_level},temporal_sdk_core={self.core_level},temporal_client={self.core_level},temporal_sdk={self.core_level}"
-
-
-@dataclass(frozen=True)
-class TracingConfig:
-    """Configuration for runtime tracing."""
-
-    filter: Union[TelemetryFilter, str]
-    """Filter for tracing. Can use :py:class:`TelemetryFilter` or raw string."""
-
-    opentelemetry: OpenTelemetryConfig
-    """Configuration for OpenTelemetry tracing collector."""
-
-    def _to_bridge_config(self) -> temporalio.bridge.runtime.TracingConfig:
-        return temporalio.bridge.runtime.TracingConfig(
-            filter=self.filter
-            if isinstance(self.filter, str)
-            else self.filter.formatted(),
-            opentelemetry=self.opentelemetry._to_bridge_config(),
-        )
 
 
 @dataclass(frozen=True)
@@ -132,6 +134,13 @@ LoggingConfig.default = LoggingConfig(
 )
 
 
+class OpenTelemetryMetricTemporality(Enum):
+    """Temporality for OpenTelemetry metrics."""
+
+    CUMULATIVE = 1
+    DELTA = 2
+
+
 @dataclass(frozen=True)
 class OpenTelemetryConfig:
     """Configuration for OpenTelemetry collector."""
@@ -139,6 +148,9 @@ class OpenTelemetryConfig:
     url: str
     headers: Optional[Mapping[str, str]] = None
     metric_periodicity: Optional[timedelta] = None
+    metric_temporality: OpenTelemetryMetricTemporality = (
+        OpenTelemetryMetricTemporality.CUMULATIVE
+    )
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.OpenTelemetryConfig:
         return temporalio.bridge.runtime.OpenTelemetryConfig(
@@ -147,6 +159,8 @@ class OpenTelemetryConfig:
             metric_periodicity_millis=None
             if not self.metric_periodicity
             else round(self.metric_periodicity.total_seconds() * 1000),
+            metric_temporality_delta=self.metric_temporality
+            == OpenTelemetryMetricTemporality.DELTA,
         )
 
 
@@ -155,32 +169,79 @@ class PrometheusConfig:
     """Configuration for Prometheus metrics endpoint."""
 
     bind_address: str
+    counters_total_suffix: bool = False
+    unit_suffix: bool = False
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.PrometheusConfig:
         return temporalio.bridge.runtime.PrometheusConfig(
-            bind_address=self.bind_address
+            bind_address=self.bind_address,
+            counters_total_suffix=self.counters_total_suffix,
+            unit_suffix=self.unit_suffix,
         )
+
+
+class MetricBuffer:
+    """A buffer that can be set on :py:class:`TelemetryConfig` to record
+    metrics instead of ignoring/exporting them.
+
+    .. warning::
+        It is important that the buffer size is set to a high number and that
+        :py:meth:`retrieve_updates` is called regularly to drain the buffer. If
+        the buffer is full, metric updates will be dropped and an error will be
+        logged.
+    """
+
+    def __init__(self, buffer_size: int) -> None:
+        """Create a buffer with the given size.
+
+        .. warning::
+            It is important that the buffer size is set to a high number and is
+            drained regularly. See :py:class:`MetricBuffer` warning.
+
+        Args:
+            buffer_size: Size of the buffer. Set this to a large value. A value
+                in the tens of thousands or higher is plenty reasonable.
+        """
+        self._buffer_size = buffer_size
+        self._runtime: Optional[Runtime] = None
+
+    def retrieve_updates(self) -> Sequence[BufferedMetricUpdate]:
+        """Drain the buffer and return all metric updates.
+
+        .. warning::
+            It is important that this is called regularly. See
+            :py:class:`MetricBuffer` warning.
+
+        Returns:
+            A sequence of metric updates.
+        """
+        if not self._runtime:
+            raise RuntimeError("Attempting to retrieve updates before runtime created")
+        return self._runtime._core_runtime.retrieve_buffered_metrics()
 
 
 @dataclass(frozen=True)
 class TelemetryConfig:
     """Configuration for Core telemetry."""
 
-    tracing: Optional[TracingConfig] = None
-    """Tracing configuration."""
-
     logging: Optional[LoggingConfig] = LoggingConfig.default
     """Logging configuration."""
 
-    metrics: Optional[Union[OpenTelemetryConfig, PrometheusConfig]] = None
-    """Metrics configuration."""
+    metrics: Optional[Union[OpenTelemetryConfig, PrometheusConfig, MetricBuffer]] = None
+    """Metrics configuration or buffer."""
 
     global_tags: Mapping[str, str] = field(default_factory=dict)
-    """OTel resource tags to be applied to all metrics and traces"""
+    """OTel resource tags to be applied to all metrics."""
+
+    attach_service_name: bool = True
+    """Whether to put the service_name on every metric."""
+
+    metric_prefix: Optional[str] = None
+    """Prefix to put on every Temporal metric. If unset, defaults to
+    ``temporal_``."""
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.TelemetryConfig:
         return temporalio.bridge.runtime.TelemetryConfig(
-            tracing=None if not self.tracing else self.tracing._to_bridge_config(),
             logging=None if not self.logging else self.logging._to_bridge_config(),
             metrics=None
             if not self.metrics
@@ -191,6 +252,307 @@ class TelemetryConfig:
                 prometheus=None
                 if not isinstance(self.metrics, PrometheusConfig)
                 else self.metrics._to_bridge_config(),
+                buffered_with_size=0
+                if not isinstance(self.metrics, MetricBuffer)
+                else self.metrics._buffer_size,
+                attach_service_name=self.attach_service_name,
+                global_tags=self.global_tags or None,
+                metric_prefix=self.metric_prefix,
             ),
-            global_tags=self.global_tags,
+        )
+
+
+BufferedMetricKind = NewType("BufferedMetricKind", int)
+"""Representation of a buffered metric kind."""
+
+BUFFERED_METRIC_KIND_COUNTER = BufferedMetricKind(0)
+"""Buffered metric is a counter which means values are deltas."""
+
+BUFFERED_METRIC_KIND_GAUGE = BufferedMetricKind(1)
+"""Buffered metric is a gauge."""
+
+BUFFERED_METRIC_KIND_HISTOGRAM = BufferedMetricKind(2)
+"""Buffered metric is a histogram."""
+
+
+# WARNING: This must match Rust metric::BufferedMetric
+class BufferedMetric(Protocol):
+    """A metric for a buffered update.
+
+    The same metric for the same name and runtime is guaranteed to be the exact
+    same object for performance reasons. This means py:func:`id` will be the
+    same for the same metric across updates.
+    """
+
+    @property
+    def name(self) -> str:
+        """Get the name of the metric."""
+        ...
+
+    @property
+    def description(self) -> Optional[str]:
+        """Get the description of the metric if any."""
+        ...
+
+    @property
+    def unit(self) -> Optional[str]:
+        """Get the unit of the metric if any."""
+        ...
+
+    @property
+    def kind(self) -> BufferedMetricKind:
+        """Get the metric kind.
+
+        This is one of :py:const:`BUFFERED_METRIC_KIND_COUNTER`,
+        :py:const:`BUFFERED_METRIC_KIND_GAUGE`, or
+        :py:const:`BUFFERED_METRIC_KIND_HISTOGRAM`.
+        """
+        ...
+
+
+# WARNING: This must match Rust metric::BufferedMetricUpdate
+class BufferedMetricUpdate(Protocol):
+    """A single metric value update."""
+
+    @property
+    def metric(self) -> BufferedMetric:
+        """Metric being updated.
+
+        For performance reasons, this is the same object across updates for the
+        same metric. This means py:func:`id` will be the same for the same
+        metric across updates.
+        """
+        ...
+
+    @property
+    def value(self) -> Union[int, float]:
+        """Value for the update.
+
+        For counters this is a delta, for gauges and histograms this is just the
+        value.
+        """
+        ...
+
+    @property
+    def attributes(self) -> temporalio.common.MetricAttributes:
+        """Attributes for the update.
+
+        For performance reasons, this is the same object across updates for the
+        same attribute set. This means py:func:`id` will be the same for the
+        same attribute set across updates. Note this is for same "attribute set"
+        as created by the metric creator, but different attribute sets may have
+        the same values.
+
+        Do not mutate this.
+        """
+        ...
+
+
+class _MetricMeter(temporalio.common.MetricMeter):
+    def __init__(
+        self,
+        core_meter: temporalio.bridge.metric.MetricMeter,
+        core_attrs: temporalio.bridge.metric.MetricAttributes,
+    ) -> None:
+        self._core_meter = core_meter
+        self._core_attrs = core_attrs
+
+    def create_counter(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricCounter:
+        return _MetricCounter(
+            name,
+            description,
+            unit,
+            temporalio.bridge.metric.MetricCounter(
+                self._core_meter, name, description, unit
+            ),
+            self._core_attrs,
+        )
+
+    def create_histogram(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricHistogram:
+        return _MetricHistogram(
+            name,
+            description,
+            unit,
+            temporalio.bridge.metric.MetricHistogram(
+                self._core_meter, name, description, unit
+            ),
+            self._core_attrs,
+        )
+
+    def create_gauge(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricGauge:
+        return _MetricGauge(
+            name,
+            description,
+            unit,
+            temporalio.bridge.metric.MetricGauge(
+                self._core_meter, name, description, unit
+            ),
+            self._core_attrs,
+        )
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricMeter:
+        return _MetricMeter(
+            self._core_meter,
+            self._core_attrs.with_additional_attributes(additional_attributes),
+        )
+
+
+class _MetricCounter(temporalio.common.MetricCounter):
+    def __init__(
+        self,
+        name: str,
+        description: Optional[str],
+        unit: Optional[str],
+        core_metric: temporalio.bridge.metric.MetricCounter,
+        core_attrs: temporalio.bridge.metric.MetricAttributes,
+    ) -> None:
+        self._name = name
+        self._description = description
+        self._unit = unit
+        self._core_metric = core_metric
+        self._core_attrs = core_attrs
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._description
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._unit
+
+    def add(
+        self,
+        value: int,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if value < 0:
+            raise ValueError("Metric value cannot be negative")
+        core_attrs = self._core_attrs
+        if additional_attributes:
+            core_attrs = core_attrs.with_additional_attributes(additional_attributes)
+        self._core_metric.add(value, core_attrs)
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricCounter:
+        return _MetricCounter(
+            self._name,
+            self._description,
+            self._unit,
+            self._core_metric,
+            self._core_attrs.with_additional_attributes(additional_attributes),
+        )
+
+
+class _MetricHistogram(temporalio.common.MetricHistogram):
+    def __init__(
+        self,
+        name: str,
+        description: Optional[str],
+        unit: Optional[str],
+        core_metric: temporalio.bridge.metric.MetricHistogram,
+        core_attrs: temporalio.bridge.metric.MetricAttributes,
+    ) -> None:
+        self._name = name
+        self._description = description
+        self._unit = unit
+        self._core_metric = core_metric
+        self._core_attrs = core_attrs
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._description
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._unit
+
+    def record(
+        self,
+        value: int,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if value < 0:
+            raise ValueError("Metric value cannot be negative")
+        core_attrs = self._core_attrs
+        if additional_attributes:
+            core_attrs = core_attrs.with_additional_attributes(additional_attributes)
+        self._core_metric.record(value, core_attrs)
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricHistogram:
+        return _MetricHistogram(
+            self._name,
+            self._description,
+            self._unit,
+            self._core_metric,
+            self._core_attrs.with_additional_attributes(additional_attributes),
+        )
+
+
+class _MetricGauge(temporalio.common.MetricGauge):
+    def __init__(
+        self,
+        name: str,
+        description: Optional[str],
+        unit: Optional[str],
+        core_metric: temporalio.bridge.metric.MetricGauge,
+        core_attrs: temporalio.bridge.metric.MetricAttributes,
+    ) -> None:
+        self._name = name
+        self._description = description
+        self._unit = unit
+        self._core_metric = core_metric
+        self._core_attrs = core_attrs
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._description
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._unit
+
+    def set(
+        self,
+        value: int,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if value < 0:
+            raise ValueError("Metric value cannot be negative")
+        core_attrs = self._core_attrs
+        if additional_attributes:
+            core_attrs = core_attrs.with_additional_attributes(additional_attributes)
+        self._core_metric.set(value, core_attrs)
+
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> temporalio.common.MetricGauge:
+        return _MetricGauge(
+            self._name,
+            self._description,
+            self._unit,
+            self._core_metric,
+            self._core_attrs.with_additional_attributes(additional_attributes),
         )

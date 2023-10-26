@@ -30,7 +30,7 @@ from typing import (
 )
 
 import google.protobuf.internal.containers
-from typing_extensions import NamedTuple, TypeAlias, get_origin
+from typing_extensions import ClassVar, NamedTuple, TypeAlias, get_origin
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -526,6 +526,338 @@ def _warn_on_deprecated_search_attributes(
             stacklevel=1 + stack_level,
         )
 
+
+MetricAttributes: TypeAlias = Mapping[str, Union[str, int, float, bool]]
+
+
+class MetricMeter(ABC):
+    """Metric meter for recording metrics."""
+
+    noop: ClassVar[MetricMeter]
+    """Metric meter implementation that does nothing."""
+
+    @abstractmethod
+    def create_counter(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricCounter:
+        """Create a counter metric for adding values.
+
+        Args:
+            name: Name for the metric.
+            description: Optional description for the metric.
+            unit: Optional unit for the metric.
+
+        Returns:
+            Counter metric.
+        """
+        ...
+
+    @abstractmethod
+    def create_histogram(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricHistogram:
+        """Create a histogram metric for recording values.
+
+        Args:
+            name: Name for the metric.
+            description: Optional description for the metric.
+            unit: Optional unit for the metric.
+
+        Returns:
+            Histogram metric.
+        """
+        ...
+
+    @abstractmethod
+    def create_gauge(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricGauge:
+        """Create a gauge metric for setting values.
+
+        Args:
+            name: Name for the metric.
+            description: Optional description for the metric.
+            unit: Optional unit for the metric.
+
+        Returns:
+            Gauge metric.
+        """
+        ...
+
+    @abstractmethod
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricMeter:
+        """Create a new metric meter with the given attributes appended to the
+        current set.
+
+        Args:
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Returns:
+            New metric meter.
+
+        Raises:
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+
+class MetricCounter(ABC):
+    """Counter metric created by a metric meter."""
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Name for the metric."""
+        ...
+
+    @property
+    @abstractmethod
+    def description(self) -> Optional[str]:
+        """Description for the metric if any."""
+        ...
+
+    @property
+    @abstractmethod
+    def unit(self) -> Optional[str]:
+        """Unit for the metric if any."""
+        ...
+
+    @abstractmethod
+    def add(
+        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        """Add a value to the counter.
+
+        Args:
+            value: A non-negative integer to add.
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Raises:
+            ValueError: Value is negative.
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+    @abstractmethod
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricCounter:
+        """Create a new counter with the given attributes appended to the
+        current set.
+
+        Args:
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Returns:
+            New counter.
+
+        Raises:
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+
+class MetricHistogram(ABC):
+    """Histogram metric created by a metric meter."""
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Name for the metric."""
+        ...
+
+    @property
+    @abstractmethod
+    def description(self) -> Optional[str]:
+        """Description for the metric if any."""
+        ...
+
+    @property
+    @abstractmethod
+    def unit(self) -> Optional[str]:
+        """Unit for the metric if any."""
+        ...
+
+    @abstractmethod
+    def record(
+        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        """Record a value on the histogram.
+
+        Args:
+            value: A non-negative integer to record.
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Raises:
+            ValueError: Value is negative.
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+    @abstractmethod
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricHistogram:
+        """Create a new histogram with the given attributes appended to the
+        current set.
+
+        Args:
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Returns:
+            New histogram.
+
+        Raises:
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+
+class MetricGauge(ABC):
+    """Gauge metric created by a metric meter."""
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Name for the metric."""
+        ...
+
+    @property
+    @abstractmethod
+    def description(self) -> Optional[str]:
+        """Description for the metric if any."""
+        ...
+
+    @property
+    @abstractmethod
+    def unit(self) -> Optional[str]:
+        """Unit for the metric if any."""
+        ...
+
+    @abstractmethod
+    def set(
+        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        """Set a value on the gauge.
+
+        Args:
+            value: A non-negative integer to set.
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Raises:
+            ValueError: Value is negative.
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+    @abstractmethod
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricGauge:
+        """Create a new gauge with the given attributes appended to the
+        current set.
+
+        Args:
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Returns:
+            New gauge.
+
+        Raises:
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+
+class _NoopMetricMeter(MetricMeter):
+    def create_counter(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricCounter:
+        return _NoopMetricCounter(name, description, unit)
+
+    def create_histogram(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricHistogram:
+        return _NoopMetricHistogram(name, description, unit)
+
+    def create_gauge(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricGauge:
+        return _NoopMetricGauge(name, description, unit)
+
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricMeter:
+        return self
+
+
+class _NoopMetric:
+    def __init__(
+        self, name: str, description: Optional[str], unit: Optional[str]
+    ) -> None:
+        self._name = name
+        self._description = description
+        self._unit = unit
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._description
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._unit
+
+
+class _NoopMetricCounter(_NoopMetric, MetricCounter):
+    def add(
+        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        pass
+
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricCounter:
+        return self
+
+
+class _NoopMetricHistogram(_NoopMetric, MetricHistogram):
+    def record(
+        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        pass
+
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricHistogram:
+        return self
+
+
+class _NoopMetricGauge(_NoopMetric, MetricGauge):
+    def set(
+        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        pass
+
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> MetricGauge:
+        return self
+
+
+MetricMeter.noop = _NoopMetricMeter()
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument
 # is unset. This is different than None which is a legitimate argument.

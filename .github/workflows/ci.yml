@@ -44,7 +44,9 @@ jobs:
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python }}
+          # Due to a yet-uninvestigated change in 3.11.6 that breaks the Rust
+          # linker on Windows, we are pinning 3.11 to 3.11.5 here
+          python-version: ${{ matrix.python == '3.11' && '3.11.5' || matrix.python }}
       - if: ${{ matrix.os == 'ubuntu-arm' }}
         uses: deadsnakes/action@v2.1.1
         with:

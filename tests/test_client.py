@@ -911,10 +911,7 @@ async def test_schedule_backfill(
         pytest.skip("Java test server doesn't support schedules")
     await assert_no_schedules(client)
 
-    # Just in case it's on the minute boundary, move it off
-    now = datetime.utcnow()
-    if now.second == 0:
-        now += timedelta(seconds=1)
+    begin = datetime(year=2020, month=1, day=20, hour=5)
 
     # Create paused schedule that runs every minute and has two backfills
     handle = await client.create_schedule(
@@ -935,8 +932,8 @@ async def test_schedule_backfill(
         ),
         backfill=[
             ScheduleBackfill(
-                start_at=now - timedelta(minutes=30),
-                end_at=now - timedelta(minutes=29),
+                start_at=begin - timedelta(minutes=30),
+                end_at=begin - timedelta(minutes=29),
                 overlap=ScheduleOverlapPolicy.ALLOW_ALL,
             )
         ],
@@ -946,13 +943,13 @@ async def test_schedule_backfill(
     # Add two more backfills and and -2m will be deduped
     await handle.backfill(
         ScheduleBackfill(
-            start_at=now - timedelta(minutes=4),
-            end_at=now - timedelta(minutes=2),
+            start_at=begin - timedelta(minutes=4),
+            end_at=begin - timedelta(minutes=2),
             overlap=ScheduleOverlapPolicy.ALLOW_ALL,
         ),
         ScheduleBackfill(
-            start_at=now - timedelta(minutes=2),
-            end_at=now,
+            start_at=begin - timedelta(minutes=2),
+            end_at=begin,
             overlap=ScheduleOverlapPolicy.ALLOW_ALL,
         ),
     )
