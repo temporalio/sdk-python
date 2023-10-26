@@ -1,0 +1,11 @@
+.git/
+.idea/
+.mypy_cache/
+.pytest_cache/
+.venv/
+build/
+dist/
+temporalio/api/
+temporalio/bridge/**/target/
+temporalio/bridge/**/*.so
+Dockerfile

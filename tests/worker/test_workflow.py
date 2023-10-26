@@ -50,6 +50,7 @@ from temporalio.client import (
     WorkflowFailureError,
     WorkflowHandle,
     WorkflowQueryFailedError,
+    WorkflowUpdateFailedError,
 )
 from temporalio.common import (
     RawValue,
@@ -3628,3 +3629,242 @@ async def test_workflow_buffered_metrics(client: Client):
         and update.value == 1
         for update in updates
     )
+
+
+bad_validator_fail_ct = 0
+task_fail_ct = 0
+
+
+@workflow.defn
+class UpdateHandlersWorkflow:
+    def __init__(self) -> None:
+        self._last_event: Optional[str] = None
+
+    @workflow.run
+    async def run(self) -> None:
+        workflow.set_update_handler("first_task_update", lambda: "worked")
+
+        # Wait forever
+        await asyncio.Future()
+
+    @workflow.update
+    def last_event(self, an_arg: str) -> str:
+        if an_arg == "fail":
+            raise ApplicationError("SyncFail")
+        le = self._last_event or "<no event>"
+        self._last_event = an_arg
+        return le
+
+    @last_event.validator
+    def last_event_validator(self, an_arg: str) -> None:
+        workflow.logger.info("Running validator with arg %s", an_arg)
+        if an_arg == "reject_me":
+            raise ApplicationError("Rejected")
+
+    @workflow.update
+    async def last_event_async(self, an_arg: str) -> str:
+        await asyncio.sleep(1)
+        if an_arg == "fail":
+            raise ApplicationError("AsyncFail")
+        le = self._last_event or "<no event>"
+        self._last_event = an_arg
+        return le
+
+    @workflow.update
+    async def runs_activity(self, name: str) -> str:
+        act = workflow.start_activity(
+            say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
+        )
+        act.cancel()
+        await act
+        return "done"
+
+    @workflow.update(name="renamed")
+    async def async_named(self) -> str:
+        return "named"
+
+    @workflow.update
+    async def bad_validator(self) -> str:
+        return "done"
+
+    @bad_validator.validator
+    def bad_validator_validator(self) -> None:
+        global bad_validator_fail_ct
+        # Run a command which should not be allowed the first few tries, then "fix" it as if new code was deployed
+        if bad_validator_fail_ct < 2:
+            bad_validator_fail_ct += 1
+            workflow.start_activity(
+                say_hello, "boo", schedule_to_close_timeout=timedelta(seconds=5)
+            )
+
+    @workflow.update
+    async def set_dynamic(self) -> str:
+        def dynahandler(name: str, _args: Sequence[RawValue]) -> str:
+            return "dynahandler - " + name
+
+        def dynavalidator(name: str, _args: Sequence[RawValue]) -> None:
+            if name == "reject_me":
+                raise ApplicationError("Rejected")
+
+        workflow.set_dynamic_update_handler(dynahandler, validator=dynavalidator)
+        return "set"
+
+    @workflow.update
+    def throws_runtime_err(self) -> None:
+        global task_fail_ct
+        if task_fail_ct < 1:
+            task_fail_ct += 1
+            raise RuntimeError("intentional failure")
+
+
+async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    async with new_worker(
+        client, UpdateHandlersWorkflow, activities=[say_hello]
+    ) as worker:
+        wf_id = f"update-handlers-workflow-{uuid.uuid4()}"
+        handle = await client.start_workflow(
+            UpdateHandlersWorkflow.run,
+            id=wf_id,
+            task_queue=worker.task_queue,
+        )
+
+        # Dynamically registered and used in first task
+        assert "worked" == await handle.execute_update("first_task_update")
+
+        # Normal handling
+        last_event = await handle.execute_update(
+            UpdateHandlersWorkflow.last_event, "val2"
+        )
+        assert "<no event>" == last_event
+
+        # Async handler
+        last_event = await handle.execute_update(
+            UpdateHandlersWorkflow.last_event_async, "val3"
+        )
+        assert "val2" == last_event
+
+        # Dynamic handler
+        await handle.execute_update(UpdateHandlersWorkflow.set_dynamic)
+        assert "dynahandler - made_up" == await handle.execute_update("made_up")
+
+        # Name overload
+        assert "named" == await handle.execute_update(
+            UpdateHandlersWorkflow.async_named
+        )
+
+        # Get untyped handle
+        assert "val3" == await client.get_workflow_handle(wf_id).execute_update(
+            UpdateHandlersWorkflow.last_event, "val4"
+        )
+
+
+async def test_workflow_update_handlers_unhappy(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    async with new_worker(client, UpdateHandlersWorkflow) as worker:
+        handle = await client.start_workflow(
+            UpdateHandlersWorkflow.run,
+            id=f"update-handlers-workflow-unhappy-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Undefined handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update("whargarbl", "whatever")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "'whargarbl' expected but not found" in err.value.cause.message
+        assert (
+            "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic throws_runtime_err]"
+            in err.value.cause.message
+        )
+
+        # Rejection by validator
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update(UpdateHandlersWorkflow.last_event, "reject_me")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Rejected" == err.value.cause.message
+
+        # Failure during update handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update(UpdateHandlersWorkflow.last_event, "fail")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "SyncFail" == err.value.cause.message
+
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update(UpdateHandlersWorkflow.last_event_async, "fail")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "AsyncFail" == err.value.cause.message
+
+        # Cancel inside handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update(UpdateHandlersWorkflow.runs_activity, "foo")
+        assert isinstance(err.value.cause, CancelledError)
+
+        # Incorrect args for handler
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update("last_event", args=[121, "badarg"])
+        assert isinstance(err.value.cause, ApplicationError)
+        assert (
+            "last_event_validator() takes 2 positional arguments but 3 were given"
+            in err.value.cause.message
+        )
+
+        # Un-deserializeable nonsense
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update(
+                "last_event",
+                arg=RawValue(
+                    payload=Payload(
+                        metadata={"encoding": b"u-dont-know-me"}, data=b"enchi-cat"
+                    )
+                ),
+            )
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Failed decoding arguments" == err.value.cause.message
+
+        # Dynamic handler
+        await handle.execute_update(UpdateHandlersWorkflow.set_dynamic)
+
+        # Rejection by dynamic handler validator
+        with pytest.raises(WorkflowUpdateFailedError) as err:
+            await handle.execute_update("reject_me")
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Rejected" == err.value.cause.message
+
+
+async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    # Need to not sandbox so behavior can change based on globals
+    async with new_worker(
+        client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
+    ) as worker:
+        handle = await client.start_workflow(
+            UpdateHandlersWorkflow.run,
+            id=f"update-handlers-command-in-validator-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=timedelta(seconds=1),
+        )
+
+        # This will produce a WFT failure which will eventually resolve and then this
+        # update will return
+        res = await handle.execute_update(UpdateHandlersWorkflow.bad_validator)
+        assert res == "done"
+
+        # Non-temporal failure should cause task failure in update handler
+        await handle.execute_update(UpdateHandlersWorkflow.throws_runtime_err)
+
+        # Verify task failures did happen
+        global task_fail_ct, bad_validator_fail_ct
+        assert task_fail_ct == 1
+        assert bad_validator_fail_ct == 2

@@ -19,7 +19,7 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
+from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 
 @dataclass
@@ -48,6 +48,7 @@ class TracingWorkflowAction:
     activity: Optional[TracingWorkflowActionActivity] = None
     continue_as_new: Optional[TracingWorkflowActionContinueAsNew] = None
     wait_until_signal_count: int = 0
+    wait_and_do_update: bool = False
 
 
 @dataclass
@@ -71,10 +72,14 @@ class TracingWorkflowActionContinueAsNew:
     param: TracingWorkflowParam
 
 
+ready_for_update: asyncio.Semaphore
+
+
 @workflow.defn
 class TracingWorkflow:
     def __init__(self) -> None:
         self._signal_count = 0
+        self._did_update = False
 
     @workflow.run
     async def run(self, param: TracingWorkflowParam) -> None:
@@ -126,6 +131,9 @@ class TracingWorkflow:
                 await workflow.wait_condition(
                     lambda: self._signal_count >= action.wait_until_signal_count
                 )
+            if action.wait_and_do_update:
+                ready_for_update.release()
+                await workflow.wait_condition(lambda: self._did_update)
 
     async def _raise_on_non_replay(self) -> None:
         replaying = workflow.unsafe.is_replaying()
@@ -143,6 +151,14 @@ class TracingWorkflow:
     def signal(self) -> None:
         self._signal_count += 1
 
+    @workflow.update
+    def update(self) -> None:
+        self._did_update = True
+
+    @update.validator
+    def update_validator(self) -> None:
+        pass
+
 
 async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
@@ -150,6 +166,8 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
         )
+    global ready_for_update
+    ready_for_update = asyncio.Semaphore(0)
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
@@ -166,6 +184,8 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         task_queue=task_queue,
         workflows=[TracingWorkflow],
         activities=[tracing_activity],
+        # Needed so we can wait to send update at the right time
+        workflow_runner=UnsandboxedWorkflowRunner(),
     ):
         # Run workflow with various actions
         workflow_id = f"workflow_{uuid.uuid4()}"
@@ -184,6 +204,8 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
                             fail_on_non_replay_before_complete=True,
                         ),
                     ),
+                    # Wait for update
+                    TracingWorkflowAction(wait_and_do_update=True),
                     # Exec child workflow that fails task before complete
                     TracingWorkflowAction(
                         child_workflow=TracingWorkflowActionChildWorkflow(
@@ -230,6 +252,10 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         # Send query, then signal to move it along
         assert "some query" == await handle.query(TracingWorkflow.query)
         await handle.signal(TracingWorkflow.signal)
+        # Wait to send the update until after the things that fail tasks are over, as failing a task while the update
+        # is running can mean we execute it twice, which will mess up our spans.
+        async with ready_for_update:
+            await handle.execute_update(TracingWorkflow.update)
         await handle.result()
 
     # Dump debug with attributes, but do string assertion test without
@@ -245,6 +271,8 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         "  StartActivity:tracing_activity",
         "    RunActivity:tracing_activity",
         "    RunActivity:tracing_activity",
+        "  ValidateUpdate:update (links: StartWorkflowUpdate:update)",
+        "  HandleUpdate:update (links: StartWorkflowUpdate:update)",
         "  StartChildWorkflow:TracingWorkflow",
         "    RunWorkflow:TracingWorkflow",
         "    MyCustomSpan",
@@ -263,6 +291,7 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         "QueryWorkflow:query",
         "  HandleQuery:query (links: StartWorkflow:TracingWorkflow)",
         "SignalWorkflow:signal",
+        "StartWorkflowUpdate:update",
     ]
 
 

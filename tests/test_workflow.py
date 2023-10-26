@@ -19,6 +19,10 @@ class GoodDefnBase:
     def base_query(self):
         pass
 
+    @workflow.update
+    def base_update(self):
+        pass
+
 
 @workflow.defn(name="workflow-custom")
 class GoodDefn(GoodDefnBase):
@@ -48,6 +52,18 @@ class GoodDefn(GoodDefnBase):
 
     @workflow.query(dynamic=True)
     def query3(self, name: str, args: Sequence[RawValue]):
+        pass
+
+    @workflow.update
+    def update1(self):
+        pass
+
+    @workflow.update(name="update-custom")
+    def update2(self):
+        pass
+
+    @workflow.update(dynamic=True)
+    def update3(self, name: str, args: Sequence[RawValue]):
         pass
 
 
@@ -87,6 +103,20 @@ def test_workflow_defn_good():
                 name="base_query", fn=GoodDefnBase.base_query, is_method=True
             ),
         },
+        updates={
+            "update1": workflow._UpdateDefinition(
+                name="update1", fn=GoodDefn.update1, is_method=True
+            ),
+            "update-custom": workflow._UpdateDefinition(
+                name="update-custom", fn=GoodDefn.update2, is_method=True
+            ),
+            None: workflow._UpdateDefinition(
+                name=None, fn=GoodDefn.update3, is_method=True
+            ),
+            "base_update": workflow._UpdateDefinition(
+                name="base_update", fn=GoodDefnBase.base_update, is_method=True
+            ),
+        },
         sandboxed=True,
     )
 
@@ -98,6 +128,10 @@ class BadDefnBase:
 
     @workflow.query
     def base_query(self):
+        pass
+
+    @workflow.update
+    def base_update(self):
         pass
 
 
@@ -144,12 +178,24 @@ class BadDefn(BadDefnBase):
     def base_query(self):
         pass
 
+    @workflow.update
+    def update1(self, arg1: str):
+        pass
+
+    @workflow.update(name="update1")
+    def update2(self, arg1: str):
+        pass
+
+    # Intentionally missing decorator
+    def base_update(self):
+        pass
+
 
 def test_workflow_defn_bad():
     with pytest.raises(ValueError) as err:
         workflow.defn(BadDefn)
 
-    assert "Invalid workflow class for 7 reasons" in str(err.value)
+    assert "Invalid workflow class for 9 reasons" in str(err.value)
     assert "Missing @workflow.run method" in str(err.value)
     assert (
         "Multiple signal methods found for signal1 (at least on signal2 and signal1)"
@@ -173,6 +219,14 @@ def test_workflow_defn_bad():
     )
     assert (
         "@workflow.query defined on BadDefnBase.base_query but not on the override"
+        in str(err.value)
+    )
+    assert (
+        "Multiple update methods found for update1 (at least on update2 and update1)"
+        in str(err.value)
+    )
+    assert (
+        "@workflow.update defined on BadDefnBase.base_update but not on the override"
         in str(err.value)
     )
 

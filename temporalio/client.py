@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import dataclasses
 import inspect
 import json
 import re
+import sys
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -43,6 +45,7 @@ import temporalio.api.failure.v1
 import temporalio.api.history.v1
 import temporalio.api.schedule.v1
 import temporalio.api.taskqueue.v1
+import temporalio.api.update.v1
 import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
@@ -280,6 +283,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -309,6 +313,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -340,6 +345,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -371,6 +377,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -400,6 +407,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -428,6 +436,9 @@ class Client:
             search_attributes: Search attributes for the workflow. The
                 dictionary form of this is deprecated, use
                 :py:class:`temporalio.common.TypedSearchAttributes`.
+            start_delay: Amount of time to wait before starting the workflow.
+                This does not work with ``cron_schedule``. This is currently
+                experimental.
             start_signal: If present, this signal is sent as signal-with-start
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
@@ -475,6 +486,7 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
+                start_delay=start_delay,
                 headers={},
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
@@ -505,6 +517,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -534,6 +547,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -565,6 +579,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -596,6 +611,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -625,6 +641,7 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
@@ -653,6 +670,7 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
+                start_delay=start_delay,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
                 rpc_metadata=rpc_metadata,
@@ -1673,6 +1691,259 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 first_execution_run_id=self._first_execution_run_id,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+            )
+        )
+
+    # Overload for no-param update
+    @overload
+    async def execute_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> LocalReturnType:
+        ...
+
+    # Overload for single-param update
+    @overload
+    async def execute_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            [SelfType, ParamType], LocalReturnType
+        ],
+        arg: ParamType,
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> LocalReturnType:
+        ...
+
+    # Overload for multi-param update
+    @overload
+    async def execute_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            MultiParamSpec, LocalReturnType
+        ],
+        *,
+        args: MultiParamSpec.args,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> LocalReturnType:
+        ...
+
+    # Overload for string-name update
+    @overload
+    async def execute_update(
+        self,
+        update: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> Any:
+        ...
+
+    async def execute_update(
+        self,
+        update: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> Any:
+        """Send an update request to the workflow and wait for it to complete.
+
+        This will target the workflow with :py:attr:`run_id` if present. To use a
+        different run ID, create a new handle with via :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+           This API is experimental
+
+        .. warning::
+            WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
+            send updates to the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
+
+        Args:
+            update: Update function or name on the workflow.
+            arg: Single argument to the update.
+            args: Multiple arguments to the update. Cannot be set if arg is.
+            id: ID of the update. If not set, the server will set a UUID as the ID.
+            result_type: For string updates, this can set the specific result
+                type hint to deserialize into.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Raises:
+            WorkflowUpdateFailedError: If the update failed
+            RPCError: There was some issue sending the update to the workflow.
+        """
+        handle = await self._start_update(
+            update,
+            arg,
+            args=args,
+            id=id,
+            wait_for_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED,
+            result_type=result_type,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+        return await handle.result()
+
+    # Overload for no-param start update
+    @overload
+    async def start_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]:
+        ...
+
+    # Overload for single-param start update
+    @overload
+    async def start_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            [SelfType, ParamType], LocalReturnType
+        ],
+        arg: ParamType,
+        *,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]:
+        ...
+
+    # Overload for multi-param start update
+    @overload
+    async def start_update(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            MultiParamSpec, LocalReturnType
+        ],
+        *,
+        args: MultiParamSpec.args,
+        id: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]:
+        ...
+
+    # Overload for string-name start update
+    @overload
+    async def start_update(
+        self,
+        update: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[Any]:
+        ...
+
+    async def start_update(
+        self,
+        update: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[Any]:
+        """Send an update request to the workflow and return a handle to it.
+
+        This will target the workflow with :py:attr:`run_id` if present. To use a
+        different run ID, create a new handle with via :py:meth:`Client.get_workflow_handle`.
+
+        .. warning::
+           This API is experimental
+
+        .. warning::
+            WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
+            send updates to the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
+
+        Args:
+            update: Update function or name on the workflow.
+            arg: Single argument to the update.
+            args: Multiple arguments to the update. Cannot be set if arg is.
+            id: ID of the update. If not set, the server will set a UUID as the ID.
+            result_type: For string updates, this can set the specific result
+                type hint to deserialize into.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Raises:
+            RPCError: There was some issue sending the update to the workflow.
+        """
+        return await self._start_update(
+            update,
+            arg,
+            args=args,
+            id=id,
+            wait_for_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED,
+            result_type=result_type,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+    async def _start_update(
+        self,
+        update: Union[str, Callable],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: Optional[str] = None,
+        wait_for_stage: temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType = temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED,
+        result_type: Optional[Type] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowUpdateHandle[Any]:
+        update_name: str
+        ret_type = result_type
+        if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
+            defn = update._defn
+            if not defn.name:
+                raise RuntimeError("Cannot invoke dynamic update definition")
+            # TODO(cretz): Check count/type of args at runtime?
+            update_name = defn.name
+            ret_type = defn.ret_type
+        else:
+            update_name = str(update)
+
+        return await self._client._impl.start_workflow_update(
+            StartWorkflowUpdateInput(
+                id=self._id,
+                run_id=self._run_id,
+                update_id=id,
+                update=update_name,
+                args=temporalio.common._arg_or_args(arg, args),
+                headers={},
+                ret_type=ret_type,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                wait_for_stage=wait_for_stage,
             )
         )
 
@@ -2796,7 +3067,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None
 
     @staticmethod
-    def _from_proto(info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo) -> ScheduleActionStartWorkflow:  # type: ignore[override]
+    def _from_proto(
+        info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo,  # type: ignore[override]
+    ) -> ScheduleActionStartWorkflow:
         return ScheduleActionStartWorkflow("<unset>", raw_info=info)
 
     # Overload for no-param workflow
@@ -3818,6 +4091,89 @@ class ScheduleAsyncIterator:
             return ret
 
 
+class WorkflowUpdateHandle(Generic[LocalReturnType]):
+    """Handle for a workflow update execution request."""
+
+    def __init__(
+        self,
+        client: Client,
+        id: str,
+        workflow_id: str,
+        *,
+        workflow_run_id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+    ):
+        """Create a workflow update handle.
+
+        Users should not create this directly, but rather use
+        :py:meth:`Client.start_workflow_update`.
+        """
+        self._client = client
+        self._id = id
+        self._workflow_id = workflow_id
+        self._workflow_run_id = workflow_run_id
+        self._result_type = result_type
+        self._known_outcome: Optional[temporalio.api.update.v1.Outcome] = None
+
+    @property
+    def id(self) -> str:
+        """ID of this Update request."""
+        return self._id
+
+    @property
+    def workflow_id(self) -> str:
+        """The ID of the Workflow targeted by this Update."""
+        return self._workflow_id
+
+    @property
+    def workflow_run_id(self) -> Optional[str]:
+        """If specified, the specific run of the Workflow targeted by this Update."""
+        return self._workflow_run_id
+
+    async def result(
+        self,
+        *,
+        timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> LocalReturnType:
+        """Wait for and return the result of the update. The result may already be known in which case no network call
+        is made. Otherwise the result will be polled for until returned, or until the provided timeout is reached, if
+        specified.
+
+        Args:
+            timeout: Optional timeout specifying maximum wait time for the result.
+            rpc_metadata: Headers used on the RPC call. Keys here override client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call. If this elapses, the poll is retried until the
+                overall timeout has been reached.
+
+        Raises:
+            WorkflowUpdateFailedError: If the update failed
+            TimeoutError: The specified timeout was reached when waiting for the update result.
+            RPCError: Update result could not be fetched for some other reason.
+        """
+        if self._known_outcome is not None:
+            outcome = self._known_outcome
+            return await _update_outcome_to_result(
+                outcome,
+                self.id,
+                self._client.data_converter,
+                self._result_type,
+            )
+
+        return await self._client._impl.poll_workflow_update(
+            PollWorkflowUpdateInput(
+                self.workflow_id,
+                self.workflow_run_id,
+                self.id,
+                timeout,
+                self._result_type,
+                rpc_metadata,
+                rpc_timeout,
+            )
+        )
+
+
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
     """Error that occurs when a workflow is unsuccessful."""
 
@@ -3875,6 +4231,21 @@ class WorkflowQueryFailedError(temporalio.exceptions.TemporalError):
         return self._message
 
 
+class WorkflowUpdateFailedError(temporalio.exceptions.TemporalError):
+    """Error that occurs when an update fails."""
+
+    def __init__(self, cause: BaseException) -> None:
+        """Create workflow update failed error."""
+        super().__init__("Workflow update failed")
+        self.__cause__ = cause
+
+    @property
+    def cause(self) -> BaseException:
+        """Cause of the update failure."""
+        assert self.__cause__
+        return self.__cause__
+
+
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""
 
@@ -3911,6 +4282,7 @@ class StartWorkflowInput:
             temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
         ]
     ]
+    start_delay: Optional[timedelta]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
     start_signal_args: Sequence[Any]
@@ -4005,6 +4377,37 @@ class TerminateWorkflowInput:
     first_execution_run_id: Optional[str]
     args: Sequence[Any]
     reason: Optional[str]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
+
+
+@dataclass
+class StartWorkflowUpdateInput:
+    """Input for :py:meth:`OutboundInterceptor.start_workflow_update`."""
+
+    id: str
+    run_id: Optional[str]
+    update_id: Optional[str]
+    update: str
+    args: Sequence[Any]
+    wait_for_stage: Optional[
+        temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType
+    ]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
+    ret_type: Optional[Type]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
+
+
+@dataclass
+class PollWorkflowUpdateInput:
+    """Input for :py:meth:`OutboundInterceptor.poll_workflow_update`."""
+
+    workflow_id: str
+    run_id: Optional[str]
+    update_id: str
+    timeout: Optional[timedelta]
+    ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
 
@@ -4257,6 +4660,16 @@ class OutboundInterceptor:
         """Called for every :py:meth:`WorkflowHandle.terminate` call."""
         await self.next.terminate_workflow(input)
 
+    async def start_workflow_update(
+        self, input: StartWorkflowUpdateInput
+    ) -> WorkflowUpdateHandle[Any]:
+        """Called for every :py:meth:`WorkflowHandle.update` and :py:meth:`WorkflowHandle.start_update` call."""
+        return await self.next.start_workflow_update(input)
+
+    async def poll_workflow_update(self, input: PollWorkflowUpdateInput) -> Any:
+        """May be called when calling :py:meth:`WorkflowUpdateHandle.result`."""
+        return await self.next.poll_workflow_update(input)
+
     ### Async activity calls
 
     async def heartbeat_async_activity(
@@ -4395,6 +4808,8 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.converter.encode_search_attributes(
                 input.search_attributes, req.search_attributes
             )
+        if input.start_delay is not None:
+            req.workflow_start_delay.FromTimedelta(input.start_delay)
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.header.fields)
 
@@ -4577,6 +4992,101 @@ class _ClientImpl(OutboundInterceptor):
             )
         await self._client.workflow_service.terminate_workflow_execution(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+        )
+
+    async def start_workflow_update(
+        self, input: StartWorkflowUpdateInput
+    ) -> WorkflowUpdateHandle[Any]:
+        wait_policy = (
+            temporalio.api.update.v1.WaitPolicy(lifecycle_stage=input.wait_for_stage)
+            if input.wait_for_stage is not None
+            else None
+        )
+        req = temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest(
+            namespace=self._client.namespace,
+            workflow_execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=input.id,
+                run_id=input.run_id or "",
+            ),
+            request=temporalio.api.update.v1.Request(
+                meta=temporalio.api.update.v1.Meta(
+                    update_id=input.update_id or "",
+                    identity=self._client.identity,
+                ),
+                input=temporalio.api.update.v1.Input(
+                    name=input.update,
+                ),
+            ),
+            wait_policy=wait_policy,
+        )
+        if input.args:
+            req.request.input.args.payloads.extend(
+                await self._client.data_converter.encode(input.args)
+            )
+        if input.headers is not None:
+            temporalio.common._apply_headers(
+                input.headers, req.request.input.header.fields
+            )
+        try:
+            resp = await self._client.workflow_service.update_workflow_execution(
+                req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+            )
+        except RPCError as err:
+            raise
+
+        determined_id = resp.update_ref.update_id
+        update_handle: WorkflowUpdateHandle[Any] = WorkflowUpdateHandle(
+            client=self._client,
+            id=determined_id,
+            workflow_id=input.id,
+            workflow_run_id=input.run_id,
+            result_type=input.ret_type,
+        )
+        if resp.HasField("outcome"):
+            update_handle._known_outcome = resp.outcome
+
+        return update_handle
+
+    async def poll_workflow_update(self, input: PollWorkflowUpdateInput) -> Any:
+        req = temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest(
+            namespace=self._client.namespace,
+            update_ref=temporalio.api.update.v1.UpdateRef(
+                workflow_execution=temporalio.api.common.v1.WorkflowExecution(
+                    workflow_id=input.workflow_id,
+                    run_id=input.run_id or "",
+                ),
+                update_id=input.update_id,
+            ),
+            identity=self._client.identity,
+            wait_policy=temporalio.api.update.v1.WaitPolicy(
+                lifecycle_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED
+            ),
+        )
+
+        async def poll_loop():
+            # Continue polling as long as we have either an empty response, or an *rpc* timeout
+            while True:
+                try:
+                    res = await self._client.workflow_service.poll_workflow_execution_update(
+                        req,
+                        retry=True,
+                        metadata=input.rpc_metadata,
+                        timeout=input.rpc_timeout,
+                    )
+                    if res.HasField("outcome"):
+                        return await _update_outcome_to_result(
+                            res.outcome,
+                            input.update_id,
+                            self._client.data_converter,
+                            input.ret_type,
+                        )
+                except RPCError as err:
+                    if err.status != RPCStatusCode.DEADLINE_EXCEEDED:
+                        raise
+
+        # Wait for at most the *overall* timeout
+        return await asyncio.wait_for(
+            poll_loop(), input.timeout.total_seconds() if input.timeout else None
         )
 
     ### Async activity calls
@@ -5102,6 +5612,27 @@ def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
             for child_item in child:
                 if isinstance(child_item, dict):
                     _fix_history_enum(prefix, child_item, *attrs[1:])
+
+
+async def _update_outcome_to_result(
+    outcome: temporalio.api.update.v1.Outcome,
+    id: str,
+    converter: temporalio.converter.DataConverter,
+    rtype: Optional[Type],
+) -> Any:
+    if outcome.HasField("failure"):
+        raise WorkflowUpdateFailedError(
+            await converter.decode_failure(outcome.failure),
+        )
+    if not outcome.success.payloads:
+        return None
+    type_hints = [rtype] if rtype else None
+    results = await converter.decode(outcome.success.payloads, type_hints)
+    if not results:
+        return None
+    elif len(results) > 1:
+        warnings.warn(f"Expected single update result, got {len(results)}")
+    return results[0]
 
 
 @dataclass(frozen=True)
