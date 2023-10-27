@@ -1063,24 +1063,25 @@ async def test_schedule_search_attribute_update(
 
     # Put search attribute on server
     text_attr_key = SearchAttributeKey.for_text(f"python-test-schedule-text")
-    await ensure_search_attributes_present(client, text_attr_key)
+    untyped_keyword_key = SearchAttributeKey.for_keyword(f"python-test-schedule-keyword")
+    await ensure_search_attributes_present(client, text_attr_key, untyped_keyword_key)
 
     # Create a schedule with search attributes on the schedule and on the
     # workflow
+    create_action = ScheduleActionStartWorkflow(
+        "some workflow",
+        [],
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=f"tq-{uuid.uuid4()}",
+        typed_search_attributes=TypedSearchAttributes(
+            [SearchAttributePair(text_attr_key, "some-workflow-attr1")]
+        ),
+    )
+    # To test untyped search attributes, we'll manually put them on the action
+    create_action.untyped_search_attributes = { untyped_keyword_key.name: ["some-untyped-attr1"] }
     handle = await client.create_schedule(
         f"schedule-{uuid.uuid4()}",
-        Schedule(
-            action=ScheduleActionStartWorkflow(
-                "some workflow",
-                [],
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=f"tq-{uuid.uuid4()}",
-                typed_search_attributes=TypedSearchAttributes(
-                    [SearchAttributePair(text_attr_key, "some-workflow-attr1")]
-                ),
-            ),
-            spec=ScheduleSpec(),
-        ),
+        Schedule(action=create_action, spec=ScheduleSpec()),
         search_attributes=TypedSearchAttributes(
             [SearchAttributePair(text_attr_key, "some-schedule-attr1")]
         ),
@@ -1104,11 +1105,19 @@ async def test_schedule_search_attribute_update(
         )
         assert (
             input.description.schedule.action.typed_search_attributes
+            and len(input.description.schedule.action.typed_search_attributes) == 1
             and input.description.schedule.action.typed_search_attributes[text_attr_key]
             == "some-workflow-attr1"
         )
+        assert (
+            input.description.schedule.action.untyped_search_attributes
+            and len(input.description.schedule.action.untyped_search_attributes) == 1
+            and input.description.schedule.action.untyped_search_attributes[untyped_keyword_key.name]
+            == ["some-untyped-attr1"]
+        )
 
-        # Update the workflow search attribute with a new value
+        # Update the workflow search attribute with a new typed value but does
+        # not change the untyped value
         return ScheduleUpdate(
             dataclasses.replace(
                 input.description.schedule,
@@ -1128,26 +1137,37 @@ async def test_schedule_search_attribute_update(
     assert isinstance(desc.schedule.action, ScheduleActionStartWorkflow)
     assert (
         desc.schedule.action.typed_search_attributes
+        and len(desc.schedule.action.typed_search_attributes) == 1
         and desc.schedule.action.typed_search_attributes[text_attr_key]
         == "some-workflow-attr2"
     )
+    assert (
+        desc.schedule.action.untyped_search_attributes
+        and len(desc.schedule.action.untyped_search_attributes) == 1
+        and desc.schedule.action.untyped_search_attributes[untyped_keyword_key.name]
+        == ["some-untyped-attr1"]
+    )
 
-    # Normal update with no attr change
-    def update_schedule_no_attr_change(
+    # Normal update with no typed attr change but remove untyped
+    def update_schedule_remove_untyped(
         input: ScheduleUpdateInput,
     ) -> Optional[ScheduleUpdate]:
+        assert isinstance(input.description.schedule.action, ScheduleActionStartWorkflow)
+        input.description.schedule.action.untyped_search_attributes = {}
         return ScheduleUpdate(input.description.schedule)
 
-    await handle.update(update_schedule_no_attr_change)
+    await handle.update(update_schedule_remove_untyped)
 
-    # Check that it did not change
+    # Check that typed did not change but untyped did
     desc = await handle.describe()
     assert isinstance(desc.schedule.action, ScheduleActionStartWorkflow)
     assert (
         desc.schedule.action.typed_search_attributes
+        and len(desc.schedule.action.typed_search_attributes) == 1
         and desc.schedule.action.typed_search_attributes[text_attr_key]
         == "some-workflow-attr2"
     )
+    assert not desc.schedule.action.untyped_search_attributes
 
 
 async def assert_no_schedules(client: Client) -> None:

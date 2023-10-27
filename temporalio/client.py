@@ -3036,8 +3036,13 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     memo: Optional[
         Union[Mapping[str, Any], Mapping[str, temporalio.api.common.v1.Payload]]
     ]
-    typed_search_attributes: Optional[temporalio.common.TypedSearchAttributes]
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
+    untyped_search_attributes: temporalio.common.SearchAttributes
+    """This is deprecated and is only present in case existing untyped
+    attributes already exist for update. This should never be used when
+    creating."""
+
+    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
     @staticmethod
     def _from_proto(
@@ -3143,6 +3148,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
+        untyped_search_attributes: temporalio.common.SearchAttributes = { },
         headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None,
         raw_info: Optional[temporalio.api.workflow.v1.NewWorkflowExecutionInfo] = None,
     ) -> None:
@@ -3185,6 +3191,13 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 )
             )
             self.headers = raw_info.header.fields if raw_info.header.fields else None
+            # Also set the untyped attributes as the set of attributes from
+            # decode with the typed ones removed
+            self.untyped_search_attributes = temporalio.converter.decode_search_attributes(raw_info.search_attributes)
+            for pair in self.typed_search_attributes:
+                if pair.key.name in self.untyped_search_attributes:
+                    # We know this is mutable here
+                    del self.untyped_search_attributes[pair.key.name] # type: ignore
         else:
             if not id:
                 raise ValueError("ID required")
@@ -3208,6 +3221,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             self.retry_policy = retry_policy
             self.memo = memo
             self.typed_search_attributes = typed_search_attributes
+            self.untyped_search_attributes = untyped_search_attributes
             self.headers = headers
 
     async def _to_proto(
@@ -3260,6 +3274,12 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 ),
             ),
         )
+        # Add any untyped attributes that are not also in the typed set
+        untyped_not_in_typed = { k: v for k, v in self.untyped_search_attributes.items() if k not in self.typed_search_attributes }
+        if untyped_not_in_typed:
+            temporalio.converter.encode_search_attributes(
+                untyped_not_in_typed, action.start_workflow.search_attributes
+            )
         if self.typed_search_attributes:
             temporalio.converter.encode_search_attributes(
                 self.typed_search_attributes, action.start_workflow.search_attributes
