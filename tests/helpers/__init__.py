@@ -6,13 +6,16 @@ from contextlib import closing
 from datetime import timedelta
 from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
+from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.operatorservice.v1 import (
+    AddSearchAttributesRequest,
+    ListSearchAttributesRequest,
+)
 from temporalio.client import BuildIdOpAddNewDefault, Client
-from temporalio.service import RPCError, RPCStatusCode
 from temporalio.common import SearchAttributeKey
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
-from temporalio.api.enums.v1 import IndexedValueType
-from temporalio.api.operatorservice.v1 import ListSearchAttributesRequest, AddSearchAttributesRequest
 
 
 def new_worker(
@@ -69,16 +72,16 @@ async def worker_versioning_enabled(client: Client) -> bool:
             return False
         raise
 
-async def ensure_search_attributes_present(client: Client, *keys: SearchAttributeKey) -> None:
-    """Ensure all search attributes are present or attempt to add all."""
-    async def search_attributes_present() -> bool:
-        resp = await client.operator_service.list_search_attributes(
-            ListSearchAttributesRequest(namespace=client.namespace)
-        )
-        return sorted(resp.custom_attributes.keys()) == sorted([key.name for key in keys])
 
+async def ensure_search_attributes_present(
+    client: Client, *keys: SearchAttributeKey
+) -> None:
+    """Ensure all search attributes are present or attempt to add all."""
     # Add search attributes if not already present
-    if not await search_attributes_present():
+    resp = await client.operator_service.list_search_attributes(
+        ListSearchAttributesRequest(namespace=client.namespace)
+    )
+    if not set(key.name for key in keys).issubset(resp.custom_attributes.keys()):
         await client.operator_service.add_search_attributes(
             AddSearchAttributesRequest(
                 namespace=client.namespace,
@@ -88,8 +91,12 @@ async def ensure_search_attributes_present(client: Client, *keys: SearchAttribut
                 },
             ),
         )
-    # Confirm now present
-    assert await search_attributes_present()
+        # Confirm now present
+        resp = await client.operator_service.list_search_attributes(
+            ListSearchAttributesRequest(namespace=client.namespace)
+        )
+        assert set(key.name for key in keys).issubset(resp.custom_attributes.keys())
+
 
 def find_free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:

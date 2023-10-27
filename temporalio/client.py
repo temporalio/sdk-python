@@ -8,7 +8,6 @@ import dataclasses
 import inspect
 import json
 import re
-import sys
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -3037,33 +3036,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     memo: Optional[
         Union[Mapping[str, Any], Mapping[str, temporalio.api.common.v1.Payload]]
     ]
-
-    search_attributes: temporalio.common.SearchAttributes
-    """Search attributes for the schedule.
-    
-    .. deprecated::
-        Use :py:attr:`typed_search_attributes` instead when creating a new
-        schedule.
-
-    .. warning::
-        During update, if :py:attr:`typed_search_attributes` is present, it will
-        be used and this will be ignored. This means once users begin using
-        :py:attr:`typed_search_attributes` they should not go back to untyped.
-    """
-
     typed_search_attributes: Optional[temporalio.common.TypedSearchAttributes]
-    """Search attributes for the schedule.
-
-    This will only be set if there is at least one search attribute and this was
-    previously used on create/update before.
-    
-    .. warning::
-        If :py:attr:`search_attributes` was used before, this value may not have
-        all search attributes. Users should either update and replace with this
-        :py:attr:`typed_search_attributes` or continue to use
-        :py:attr:`search_attributes`.
-    """
-
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None
 
     @staticmethod
@@ -3085,8 +3058,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
-        typed_search_attributes: Optional[temporalio.common.TypedSearchAttributes] = None,
+        typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
 
@@ -3104,8 +3076,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
-        typed_search_attributes: Optional[temporalio.common.TypedSearchAttributes] = None,
+        typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
 
@@ -3125,8 +3096,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
-        typed_search_attributes: Optional[temporalio.common.TypedSearchAttributes] = None,
+        typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
 
@@ -3145,7 +3115,6 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
     ) -> None:
         ...
@@ -3173,7 +3142,6 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         task_timeout: Optional[timedelta] = None,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: temporalio.common.SearchAttributes = {},
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None,
         raw_info: Optional[temporalio.api.workflow.v1.NewWorkflowExecutionInfo] = None,
@@ -3211,15 +3179,12 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 else None
             )
             self.memo = raw_info.memo.fields if raw_info.memo.fields else None
-            self.search_attributes = temporalio.converter.decode_search_attributes(
-                raw_info.search_attributes
-            )
             self.typed_search_attributes = (
                 temporalio.converter.decode_typed_search_attributes(
                     raw_info.search_attributes
                 )
             )
-            self.headers = raw_info.header.fields
+            self.headers = raw_info.header.fields if raw_info.header.fields else None
         else:
             if not id:
                 raise ValueError("ID required")
@@ -3242,7 +3207,6 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             self.task_timeout = task_timeout
             self.retry_policy = retry_policy
             self.memo = memo
-            self.search_attributes = search_attributes
             self.typed_search_attributes = typed_search_attributes
             self.headers = headers
 
@@ -3294,38 +3258,16 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                         for k, v in self.memo.items()
                     },
                 ),
-                header=None
-                if not self.headers
-                else temporalio.api.common.v1.Header(fields=self.headers),
             ),
         )
-
-        # If typed is present, we have to use it
-
-
-        # Must unset unmodified attr on untyped SA if present
-        if "__temporal_search_attributes_unmodified" in self.search_attributes:
-            del self.search_attributes["__temporal_search_attributes_unmodified"]
-
-        # If this is for update, if typed search attributes are modified, use
-        # them
-
-        # If typed is unmodified, it should not be included in the update. But
-        # if it is present with values, it needs to overwrite search attributes
-        # blindly. We have no way to check whether untyped was unmodified
-        # because we can't store an arbitrary attr on a dict that's not a key.
-        # So we have to accept that both present means typed wins since typed
-        # may have been updated and there is no check for accidentally
-        # explicitly setting both at this time. This tradeoff is preferred over
-        # the complexity of diffing. This also means that typed search
-        # attributes cannot be used to unset all attributes.
-        if getattr(self.typed_search_attributes, "__temporal_search_attributes_unmodified", False) or not self.typed_search_attributes or not self.typed_search_attributes.search_attributes:
-            print("!!! PERSISTING: ", self.search_attributes)
-            temporalio.converter.encode_search_attributes(self.search_attributes, action.start_workflow.search_attributes)
-        else:
-            temporalio.converter.encode_search_attributes(self.typed_search_attributes, action.start_workflow.search_attributes)
+        if self.typed_search_attributes:
+            temporalio.converter.encode_search_attributes(
+                self.typed_search_attributes, action.start_workflow.search_attributes
+            )
         if self.headers:
-            temporalio.common._apply_headers(self.headers, action.start_workflow.header.fields)
+            temporalio.common._apply_headers(
+                self.headers, action.start_workflow.header.fields
+            )
         return action
 
 

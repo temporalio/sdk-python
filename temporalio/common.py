@@ -496,7 +496,7 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
             return self.__getitem__(key)
         except KeyError:
             return default
-        
+
     def updated(self, *search_attributes: SearchAttributePair) -> TypedSearchAttributes:
         """Copy this collection, replacing attributes with matching key names or
         adding if key name not present.
@@ -504,7 +504,10 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
         attrs = list(self.search_attributes)
         # Go over each update, replacing matching keys by index or adding
         for attr in search_attributes:
-            existing_index = next((i for i, attr in enumerate(attrs) if attr.key.name == attr.key.name), None)
+            existing_index = next(
+                (i for i, attr in enumerate(attrs) if attr.key.name == attr.key.name),
+                None,
+            )
             if existing_index is None:
                 attrs.append(attr)
             else:

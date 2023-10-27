@@ -823,6 +823,7 @@ def upsert_search_attributes(
     temporalio.common._warn_on_deprecated_search_attributes(attributes)
     _Runtime.current().workflow_upsert_search_attributes(attributes)
 
+
 # Needs to be defined here to avoid a circular import
 @runtime_checkable
 class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):

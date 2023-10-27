@@ -3,7 +3,6 @@ import dataclasses
 import json
 import logging
 import logging.handlers
-import pickle
 import queue
 import sys
 import threading
@@ -33,12 +32,8 @@ from typing_extensions import Protocol, runtime_checkable
 
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
-from temporalio.api.enums.v1 import EventType, IndexedValueType
+from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
-from temporalio.api.operatorservice.v1 import (
-    AddSearchAttributesRequest,
-    ListSearchAttributesRequest,
-)
 from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
@@ -93,7 +88,12 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from tests.helpers import assert_eq_eventually, find_free_port, new_worker, ensure_search_attributes_present
+from tests.helpers import (
+    assert_eq_eventually,
+    ensure_search_attributes_present,
+    find_free_port,
+    new_worker,
+)
 
 
 @workflow.defn

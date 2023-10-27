@@ -37,7 +37,6 @@ from typing import (
     cast,
 )
 
-import google.protobuf.empty_pb2
 from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.activity
