@@ -1063,7 +1063,9 @@ async def test_schedule_search_attribute_update(
 
     # Put search attribute on server
     text_attr_key = SearchAttributeKey.for_text(f"python-test-schedule-text")
-    untyped_keyword_key = SearchAttributeKey.for_keyword(f"python-test-schedule-keyword")
+    untyped_keyword_key = SearchAttributeKey.for_keyword(
+        f"python-test-schedule-keyword"
+    )
     await ensure_search_attributes_present(client, text_attr_key, untyped_keyword_key)
 
     # Create a schedule with search attributes on the schedule and on the
@@ -1078,7 +1080,9 @@ async def test_schedule_search_attribute_update(
         ),
     )
     # To test untyped search attributes, we'll manually put them on the action
-    create_action.untyped_search_attributes = { untyped_keyword_key.name: ["some-untyped-attr1"] }
+    create_action.untyped_search_attributes = {
+        untyped_keyword_key.name: ["some-untyped-attr1"]
+    }
     handle = await client.create_schedule(
         f"schedule-{uuid.uuid4()}",
         Schedule(action=create_action, spec=ScheduleSpec()),
@@ -1112,7 +1116,9 @@ async def test_schedule_search_attribute_update(
         assert (
             input.description.schedule.action.untyped_search_attributes
             and len(input.description.schedule.action.untyped_search_attributes) == 1
-            and input.description.schedule.action.untyped_search_attributes[untyped_keyword_key.name]
+            and input.description.schedule.action.untyped_search_attributes[
+                untyped_keyword_key.name
+            ]
             == ["some-untyped-attr1"]
         )
 
@@ -1152,7 +1158,9 @@ async def test_schedule_search_attribute_update(
     def update_schedule_remove_untyped(
         input: ScheduleUpdateInput,
     ) -> Optional[ScheduleUpdate]:
-        assert isinstance(input.description.schedule.action, ScheduleActionStartWorkflow)
+        assert isinstance(
+            input.description.schedule.action, ScheduleActionStartWorkflow
+        )
         input.description.schedule.action.untyped_search_attributes = {}
         return ScheduleUpdate(input.description.schedule)
 
