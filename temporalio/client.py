@@ -3979,7 +3979,6 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
     async def result(
         self,
         *,
-        timeout: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
@@ -3988,7 +3987,6 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         specified.
 
         Args:
-            timeout: Optional timeout specifying maximum wait time for the result.
             rpc_metadata: Headers used on the RPC call. Keys here override client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call. If this elapses, the poll is retried until the
                 overall timeout has been reached.
@@ -4022,31 +4020,27 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
             ),
         )
 
-        async def poll_loop():
-            # Continue polling as long as we have either an empty response, or an *rpc* timeout
-            while True:
-                try:
-                    res = await self._client.workflow_service.poll_workflow_execution_update(
+        # Continue polling as long as we have either an empty response, or an *rpc* timeout
+        while True:
+            try:
+                res = (
+                    await self._client.workflow_service.poll_workflow_execution_update(
                         req,
                         retry=True,
                         metadata=rpc_metadata,
                         timeout=rpc_timeout,
                     )
-                    if res.HasField("outcome"):
-                        return await _update_outcome_to_result(
-                            res.outcome,
-                            self.id,
-                            self._client.data_converter,
-                            self._result_type,
-                        )
-                except RPCError as err:
-                    if err.status != RPCStatusCode.DEADLINE_EXCEEDED:
-                        raise
-
-        # Wait for at most the *overall* timeout
-        return await asyncio.wait_for(
-            poll_loop(), timeout.total_seconds() if timeout else None
-        )
+                )
+                if res.HasField("outcome"):
+                    return await _update_outcome_to_result(
+                        res.outcome,
+                        self.id,
+                        self._client.data_converter,
+                        self._result_type,
+                    )
+            except RPCError as err:
+                if err.status != RPCStatusCode.DEADLINE_EXCEEDED:
+                    raise
 
 
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
