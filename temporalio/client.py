@@ -3979,7 +3979,6 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
     async def result(
         self,
         *,
-        timeout: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
@@ -3988,7 +3987,6 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         specified.
 
         Args:
-            timeout: Optional timeout specifying maximum wait time for the result.
             rpc_metadata: Headers used on the RPC call. Keys here override client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call. If this elapses, the poll is retried until the
                 overall timeout has been reached.
@@ -4007,17 +4005,42 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
                 self._result_type,
             )
 
-        return await self._client._impl.poll_workflow_update(
-            PollWorkflowUpdateInput(
-                self.workflow_id,
-                self.workflow_run_id,
-                self.id,
-                timeout,
-                self._result_type,
-                rpc_metadata,
-                rpc_timeout,
-            )
+        req = temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest(
+            namespace=self._client.namespace,
+            update_ref=temporalio.api.update.v1.UpdateRef(
+                workflow_execution=temporalio.api.common.v1.WorkflowExecution(
+                    workflow_id=self.workflow_id,
+                    run_id=self.workflow_run_id or "",
+                ),
+                update_id=self.id,
+            ),
+            identity=self._client.identity,
+            wait_policy=temporalio.api.update.v1.WaitPolicy(
+                lifecycle_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED
+            ),
         )
+
+        # Continue polling as long as we have either an empty response, or an *rpc* timeout
+        while True:
+            try:
+                res = (
+                    await self._client.workflow_service.poll_workflow_execution_update(
+                        req,
+                        retry=True,
+                        metadata=rpc_metadata,
+                        timeout=rpc_timeout,
+                    )
+                )
+                if res.HasField("outcome"):
+                    return await _update_outcome_to_result(
+                        res.outcome,
+                        self.id,
+                        self._client.data_converter,
+                        self._result_type,
+                    )
+            except RPCError as err:
+                if err.status != RPCStatusCode.DEADLINE_EXCEEDED:
+                    raise
 
 
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
@@ -4236,19 +4259,6 @@ class StartWorkflowUpdateInput:
         temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType
     ]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, str]
-    rpc_timeout: Optional[timedelta]
-
-
-@dataclass
-class PollWorkflowUpdateInput:
-    """Input for :py:meth:`OutboundInterceptor.poll_workflow_update`."""
-
-    workflow_id: str
-    run_id: Optional[str]
-    update_id: str
-    timeout: Optional[timedelta]
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
@@ -4503,10 +4513,6 @@ class OutboundInterceptor:
     ) -> WorkflowUpdateHandle[Any]:
         """Called for every :py:meth:`WorkflowHandle.update` and :py:meth:`WorkflowHandle.start_update` call."""
         return await self.next.start_workflow_update(input)
-
-    async def poll_workflow_update(self, input: PollWorkflowUpdateInput) -> Any:
-        """May be called when calling :py:meth:`WorkflowUpdateHandle.result`."""
-        return await self.next.poll_workflow_update(input)
 
     ### Async activity calls
 
@@ -4884,48 +4890,6 @@ class _ClientImpl(OutboundInterceptor):
             update_handle._known_outcome = resp.outcome
 
         return update_handle
-
-    async def poll_workflow_update(self, input: PollWorkflowUpdateInput) -> Any:
-        req = temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest(
-            namespace=self._client.namespace,
-            update_ref=temporalio.api.update.v1.UpdateRef(
-                workflow_execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=input.workflow_id,
-                    run_id=input.run_id or "",
-                ),
-                update_id=input.update_id,
-            ),
-            identity=self._client.identity,
-            wait_policy=temporalio.api.update.v1.WaitPolicy(
-                lifecycle_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED
-            ),
-        )
-
-        async def poll_loop():
-            # Continue polling as long as we have either an empty response, or an *rpc* timeout
-            while True:
-                try:
-                    res = await self._client.workflow_service.poll_workflow_execution_update(
-                        req,
-                        retry=True,
-                        metadata=input.rpc_metadata,
-                        timeout=input.rpc_timeout,
-                    )
-                    if res.HasField("outcome"):
-                        return await _update_outcome_to_result(
-                            res.outcome,
-                            input.update_id,
-                            self._client.data_converter,
-                            input.ret_type,
-                        )
-                except RPCError as err:
-                    if err.status != RPCStatusCode.DEADLINE_EXCEEDED:
-                        raise
-
-        # Wait for at most the *overall* timeout
-        return await asyncio.wait_for(
-            poll_loop(), input.timeout.total_seconds() if input.timeout else None
-        )
 
     ### Async activity calls
 
