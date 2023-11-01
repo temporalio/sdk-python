@@ -429,7 +429,7 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
     """Underlying sequence of search attribute pairs. Do not mutate this, only
     create new ``TypedSearchAttribute`` instances.
 
-    These are sorted by key name during construction.
+    These are sorted by key name during construction. Duplicates cannot exist.
     """
 
     empty: ClassVar[TypedSearchAttributes]
@@ -443,6 +443,12 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
             "search_attributes",
             sorted(self.search_attributes, key=lambda pair: pair.key.name),
         )
+        # Ensure no duplicates
+        for i, pair in enumerate(self.search_attributes):
+            if i > 0 and self.search_attributes[i - 1].key.name == pair.key.name:
+                raise ValueError(
+                    f"Duplicate search attribute entries found for key {pair.key.name}"
+                )
 
     def __len__(self) -> int:
         """Get the number of search attributes."""

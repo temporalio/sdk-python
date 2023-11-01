@@ -8,7 +8,14 @@ from typing import Any
 import pytest
 
 from temporalio.api.common.v1 import Payload
-from temporalio.common import RawValue, RetryPolicy, _type_hints_from_func
+from temporalio.common import (
+    RawValue,
+    RetryPolicy,
+    SearchAttributeKey,
+    SearchAttributePair,
+    TypedSearchAttributes,
+    _type_hints_from_func,
+)
 
 
 def test_retry_policy_validate():
@@ -74,3 +81,18 @@ def test_raw_value_pickle():
     assert isinstance(unpickled.payload, Payload)
     assert unpickled.payload.metadata == {"meta-key": b"meta-val"}
     assert unpickled.payload.data == b"data-val"
+
+
+def test_typed_search_attribute_duplicates():
+    key1 = SearchAttributeKey.for_keyword("my-key1")
+    key2 = SearchAttributeKey.for_int("my-key2")
+    key1_dupe = SearchAttributeKey.for_int("my-key1")
+    # Different keys fine
+    TypedSearchAttributes(
+        [SearchAttributePair(key1, "some-val"), SearchAttributePair(key2, 123)]
+    )
+    # Same key bad
+    with pytest.raises(ValueError):
+        TypedSearchAttributes(
+            [SearchAttributePair(key1, "some-val"), SearchAttributePair(key1_dupe, 123)]
+        )
