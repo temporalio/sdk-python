@@ -11,6 +11,7 @@ from typing import Any, Type
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.common
 import temporalio.converter
 import temporalio.worker._workflow_instance
 import temporalio.workflow
@@ -24,6 +25,27 @@ from .._workflow_instance import (
 )
 from ._importer import Importer
 from ._restrictions import RestrictionContext, SandboxRestrictions
+
+_fake_info = temporalio.workflow.Info(
+    attempt=-1,
+    continued_run_id=None,
+    cron_schedule=None,
+    execution_timeout=None,
+    headers={},
+    namespace="sandbox-validate-namespace",
+    parent=None,
+    raw_memo={},
+    retry_policy=None,
+    run_id="sandbox-validate-run_id",
+    run_timeout=None,
+    search_attributes={},
+    start_time=datetime.fromtimestamp(0, timezone.utc),
+    task_queue="sandbox-validate-task_queue",
+    task_timeout=timedelta(),
+    typed_search_attributes=temporalio.common.TypedSearchAttributes.empty,
+    workflow_id="sandbox-validate-workflow_id",
+    workflow_type="sandbox-validate-workflow_type",
+)
 
 
 class SandboxedWorkflowRunner(WorkflowRunner):
@@ -57,25 +79,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 interceptor_classes=[],
                 defn=defn,
                 # Just use fake info during validation
-                info=temporalio.workflow.Info(
-                    attempt=-1,
-                    continued_run_id=None,
-                    cron_schedule=None,
-                    execution_timeout=None,
-                    headers={},
-                    namespace="sandbox-validate-namespace",
-                    parent=None,
-                    raw_memo={},
-                    retry_policy=None,
-                    run_id="sandbox-validate-run_id",
-                    run_timeout=None,
-                    search_attributes={},
-                    start_time=datetime.fromtimestamp(0, timezone.utc),
-                    task_queue="sandbox-validate-task_queue",
-                    task_timeout=timedelta(),
-                    workflow_id="sandbox-validate-workflow_id",
-                    workflow_type="sandbox-validate-workflow_type",
-                ),
+                info=_fake_info,
                 randomness_seed=-1,
                 extern_functions={},
                 disable_eager_activity_execution=False,

@@ -37,7 +37,6 @@ from typing import (
     cast,
 )
 
-import google.protobuf.empty_pb2
 from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.activity
@@ -824,7 +823,12 @@ class _WorkflowInstanceImpl(
         task_timeout: Optional[timedelta],
         retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[temporalio.common.SearchAttributes],
+        search_attributes: Optional[
+            Union[
+                temporalio.common.SearchAttributes,
+                temporalio.common.TypedSearchAttributes,
+            ]
+        ],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
     ) -> NoReturn:
         self._assert_not_read_only("continue as new")
@@ -1108,7 +1112,12 @@ class _WorkflowInstanceImpl(
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cron_schedule: str,
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[temporalio.common.SearchAttributes],
+        search_attributes: Optional[
+            Union[
+                temporalio.common.SearchAttributes,
+                temporalio.common.TypedSearchAttributes,
+            ]
+        ],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
@@ -1200,15 +1209,107 @@ class _WorkflowInstanceImpl(
         return self._time_ns
 
     def workflow_upsert_search_attributes(
-        self, attributes: temporalio.common.SearchAttributes
+        self,
+        attributes: Union[
+            temporalio.common.SearchAttributes,
+            Sequence[temporalio.common.SearchAttributeUpdate],
+        ],
     ) -> None:
         v = self._add_command().upsert_workflow_search_attributes
-        _encode_search_attributes(attributes, v.search_attributes)
-        # Update the keys in the existing dictionary. We keep exact values sent
-        # in instead of any kind of normalization. This means empty lists remain
-        # as empty lists which matches what the server does. We know this is
-        # mutable, so we can cast it as such.
-        cast(MutableMapping, self._info.search_attributes).update(attributes)
+
+        # Update the attrs on info, casting to their mutable forms first
+        mut_attrs = cast(
+            MutableMapping[str, temporalio.common.SearchAttributeValues],
+            self._info.search_attributes,
+        )
+        mut_typed_attrs = cast(
+            List[temporalio.common.SearchAttributePair],
+            self._info.typed_search_attributes.search_attributes,
+        )
+
+        # Do different things for untyped (i.e. Mapping) and typed
+        if isinstance(attributes, Mapping):
+            # Update the keys in the existing dictionary. We keep exact values
+            # sent in instead of any kind of normalization. This means empty
+            # lists remain as empty lists which matches what the server does.
+            mut_attrs.update(attributes)
+            for k, vals in attributes.items():
+                # Add to command
+                v.search_attributes[k].CopyFrom(
+                    temporalio.converter.encode_search_attribute_values(vals)
+                )
+
+                # To apply to typed search attributes we remove, replace, or add. We
+                # don't know any of the key types, so we do our best.
+                index = next(
+                    i for i, a in enumerate(mut_typed_attrs) if a.key.name == k
+                )
+                if not vals:
+                    if index is not None:
+                        del mut_typed_attrs[index]
+                else:
+                    # Attempt to derive type the value and ignore if we can't.
+                    # No need to warn because we're already warning on using
+                    # this deprecated form.
+                    key = (
+                        temporalio.common.SearchAttributeKey._guess_from_untyped_values(
+                            k, vals
+                        )
+                    )
+                    if key:
+                        val: Any = vals
+                        # If the key is not a keyword list, we only support
+                        # single item lists
+                        if (
+                            key.indexed_value_type
+                            != temporalio.common.SearchAttributeIndexedValueType.KEYWORD_LIST
+                        ):
+                            if len(vals) != 1:
+                                continue
+                            val = vals[0]
+                        pair = temporalio.common.SearchAttributePair(key, val)
+                        if index is None:
+                            mut_typed_attrs.append(pair)
+                        else:
+                            mut_typed_attrs[index] = pair
+        else:
+            # Update typed and untyped keys, replacing typed as needed
+            for update in attributes:
+                # Set on command (delete is a proper null)
+                v.search_attributes[update.key.name].CopyFrom(
+                    temporalio.converter.encode_typed_search_attribute_value(
+                        update.key, update.value
+                    )
+                )
+
+                # Update typed and untyped in info
+                index = next(
+                    i
+                    for i, a in enumerate(mut_typed_attrs)
+                    if a.key.name == update.key.name
+                )
+                if update.value is None:
+                    # Delete
+                    if index is not None:
+                        del mut_typed_attrs[index]
+                    # Just empty-list the untyped one
+                    mut_attrs[update.key.name] = cast(List[str], [])
+                else:
+                    # Update
+                    pair = temporalio.common.SearchAttributePair(
+                        update.key, update.value
+                    )
+                    if index is None:
+                        mut_typed_attrs.append()
+                    else:
+                        mut_typed_attrs[index] = pair
+                    # Single-item list if not already a sequence for untyped
+                    mut_attrs[update.key.name] = (
+                        list(update.value)
+                        if update.key.indexed_value_type
+                        == temporalio.common.SearchAttributeIndexedValueType.KEYWORD_LIST
+                        else [update.value]
+                    )
 
     async def workflow_wait_condition(
         self, fn: Callable[[], bool], *, timeout: Optional[float] = None
@@ -2246,12 +2347,23 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
 
 
 def _encode_search_attributes(
-    attributes: temporalio.common.SearchAttributes,
+    attributes: Union[
+        temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+    ],
     payloads: Mapping[str, temporalio.api.common.v1.Payload],
 ) -> None:
-    """Encode search attributes as bridge payloads."""
-    for k, vals in attributes.items():
-        payloads[k].CopyFrom(temporalio.converter.encode_search_attribute_values(vals))
+    if isinstance(attributes, temporalio.common.TypedSearchAttributes):
+        for pair in attributes:
+            payloads[pair.key.name].CopyFrom(
+                temporalio.converter.encode_typed_search_attribute_value(
+                    pair.key, pair.value
+                )
+            )
+    else:
+        for k, vals in attributes.items():
+            payloads[k].CopyFrom(
+                temporalio.converter.encode_search_attribute_values(vals)
+            )
 
 
 class _WorkflowExternFunctions(TypedDict):

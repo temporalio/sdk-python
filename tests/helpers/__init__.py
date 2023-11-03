@@ -6,7 +6,13 @@ from contextlib import closing
 from datetime import timedelta
 from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
+from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.operatorservice.v1 import (
+    AddSearchAttributesRequest,
+    ListSearchAttributesRequest,
+)
 from temporalio.client import BuildIdOpAddNewDefault, Client
+from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -65,6 +71,31 @@ async def worker_versioning_enabled(client: Client) -> bool:
         if e.status in [RPCStatusCode.PERMISSION_DENIED, RPCStatusCode.UNIMPLEMENTED]:
             return False
         raise
+
+
+async def ensure_search_attributes_present(
+    client: Client, *keys: SearchAttributeKey
+) -> None:
+    """Ensure all search attributes are present or attempt to add all."""
+    # Add search attributes if not already present
+    resp = await client.operator_service.list_search_attributes(
+        ListSearchAttributesRequest(namespace=client.namespace)
+    )
+    if not set(key.name for key in keys).issubset(resp.custom_attributes.keys()):
+        await client.operator_service.add_search_attributes(
+            AddSearchAttributesRequest(
+                namespace=client.namespace,
+                search_attributes={
+                    key.name: IndexedValueType.ValueType(key.indexed_value_type)
+                    for key in keys
+                },
+            ),
+        )
+        # Confirm now present
+        resp = await client.operator_service.list_search_attributes(
+            ListSearchAttributesRequest(namespace=client.namespace)
+        )
+        assert set(key.name for key in keys).issubset(resp.custom_attributes.keys())
 
 
 def find_free_port() -> int:

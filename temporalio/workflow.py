@@ -264,7 +264,7 @@ def query(
             when ``dynamic`` is present.
         dynamic: If true, this handles all queries not otherwise handled. The
             parameters of the method should be self, a string name, and a
-            `Sequence[RawValue]`. An older form of this accepted vararg
+            ``Sequence[RawValue]``. An older form of this accepted vararg
             parameters which will now warn. Cannot be present when ``name`` is
             present.
     """
@@ -308,8 +308,12 @@ class Info:
     """Information about the running workflow.
 
     Retrieved inside a workflow via :py:func:`info`. This object is immutable
-    with the exception of the :py:attr:`search_attributes` mapping which is
-    updated on :py:func:`upsert_search_attributes`.
+    with the exception of the :py:attr:`search_attributes` and
+    :py:attr:`typed_search_attributes` which is updated on
+    :py:func:`upsert_search_attributes`.
+
+    Note, required fields may be added here in future versions. This class
+    should never be constructed by users.
     """
 
     attempt: int
@@ -323,10 +327,26 @@ class Info:
     retry_policy: Optional[temporalio.common.RetryPolicy]
     run_id: str
     run_timeout: Optional[timedelta]
+
     search_attributes: temporalio.common.SearchAttributes
+    """Search attributes for the workflow.
+
+    .. deprecated::
+        Use :py:attr:`typed_search_attributes` instead.
+    """
+
     start_time: datetime
     task_queue: str
     task_timeout: timedelta
+
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
+    """Search attributes for the workflow.
+    
+    Note, this may have invalid values or be missing values if passing the
+    deprecated form of dictionary attributes to
+    :py:meth:`upsert_search_attributes`.
+    """
+
     workflow_id: str
     workflow_type: str
 
@@ -423,7 +443,12 @@ class _Runtime(ABC):
         task_timeout: Optional[timedelta],
         retry_policy: Optional[temporalio.common.RetryPolicy],
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[temporalio.common.SearchAttributes],
+        search_attributes: Optional[
+            Union[
+                temporalio.common.SearchAttributes,
+                temporalio.common.TypedSearchAttributes,
+            ]
+        ],
         versioning_intent: Optional[VersioningIntent],
     ) -> NoReturn:
         ...
@@ -556,7 +581,12 @@ class _Runtime(ABC):
         retry_policy: Optional[temporalio.common.RetryPolicy],
         cron_schedule: str,
         memo: Optional[Mapping[str, Any]],
-        search_attributes: Optional[temporalio.common.SearchAttributes],
+        search_attributes: Optional[
+            Union[
+                temporalio.common.SearchAttributes,
+                temporalio.common.TypedSearchAttributes,
+            ]
+        ],
         versioning_intent: Optional[VersioningIntent],
     ) -> ChildWorkflowHandle[Any, Any]:
         ...
@@ -583,7 +613,11 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_upsert_search_attributes(
-        self, attributes: temporalio.common.SearchAttributes
+        self,
+        attributes: Union[
+            temporalio.common.SearchAttributes,
+            Sequence[temporalio.common.SearchAttributeUpdate],
+        ],
     ) -> None:
         ...
 
@@ -771,6 +805,25 @@ def time_ns() -> int:
     return _Runtime.current().workflow_time_ns()
 
 
+def upsert_search_attributes(
+    attributes: Union[
+        temporalio.common.SearchAttributes,
+        Sequence[temporalio.common.SearchAttributeUpdate],
+    ]
+) -> None:
+    """Upsert search attributes for this workflow.
+
+    Args:
+        attributes: The attributes to set. This should be a sequence of
+            updates (i.e. values created via value_set and value_unset calls on
+            search attribute keys). The dictionary form of attributes is
+            DEPRECATED and if used, result in invalid key types on the
+            typed_search_attributes property in the info.
+    """
+    temporalio.common._warn_on_deprecated_search_attributes(attributes)
+    _Runtime.current().workflow_upsert_search_attributes(attributes)
+
+
 # Needs to be defined here to avoid a circular import
 @runtime_checkable
 class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
@@ -887,23 +940,6 @@ def _update_validator(
     if fn is not None:
         update_def.set_validator(fn)
     return fn
-
-
-def upsert_search_attributes(attributes: temporalio.common.SearchAttributes) -> None:
-    """Upsert search attributes for this workflow.
-
-    The keys will be added or replaced on top of the existing search attributes
-    in the same manner as :py:meth:`dict.update`.
-    :py:attr:`Info.search_attributes` will also be updated with these values.
-
-    Technically an existing search attribute cannot be deleted, but an empty
-    list can be provided for the values which is effectively the same thing.
-
-    Args:
-        attributes: The attributes to set. Keys are search attribute names and
-            values are a :py:class:`list` of values.
-    """
-    _Runtime.current().workflow_upsert_search_attributes(attributes)
 
 
 def uuid4() -> uuid.UUID:
@@ -2618,7 +2654,6 @@ def start_local_activity(
         args: Multiple arguments to the activity. Cannot be set if arg is.
         result_type: For string activities, this can set the specific result
             type hint to deserialize into.
-        activity_id: Optional unique identifier for the activity.
         schedule_to_close_timeout: Max amount of time the activity can take from
             first being scheduled to being completed before it times out. This
             is inclusive of all retries.
@@ -3470,7 +3505,11 @@ class ChildWorkflowConfig(TypedDict, total=False):
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[temporalio.common.SearchAttributes]
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ]
 
 
 # Overload for no-param workflow
@@ -3489,7 +3528,11 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]:
     ...
@@ -3512,7 +3555,11 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]:
     ...
@@ -3535,7 +3582,11 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]:
     ...
@@ -3560,7 +3611,11 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     ...
@@ -3583,7 +3638,11 @@ async def start_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
@@ -3610,13 +3669,15 @@ async def start_child_workflow(
         retry_policy: Retry policy for the workflow.
         cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
         memo: Memo for the workflow.
-        search_attributes: Search attributes for the workflow.
+        search_attributes: Search attributes for the workflow. The dictionary
+            form of this is DEPRECATED.
         versioning_intent:  When using the Worker Versioning feature, specifies whether this Child
             Workflow should run on a worker with a compatible Build Id or not.
 
     Returns:
         A workflow handle to the started/existing workflow.
     """
+    temporalio.common._warn_on_deprecated_search_attributes(search_attributes)
     return await _Runtime.current().workflow_start_child_workflow(
         workflow,
         *temporalio.common._arg_or_args(arg, args),
@@ -3653,7 +3714,11 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
@@ -3676,7 +3741,11 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
@@ -3699,7 +3768,11 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> ReturnType:
     ...
@@ -3724,7 +3797,11 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     ...
@@ -3747,13 +3824,18 @@ async def execute_child_workflow(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     cron_schedule: str = "",
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> Any:
     """Start a child workflow and wait for completion.
 
     This is a shortcut for ``await`` :py:meth:`start_child_workflow`.
     """
+    temporalio.common._warn_on_deprecated_search_attributes(search_attributes)
     # We call the runtime directly instead of top-level start_child_workflow to
     # ensure we don't miss new parameters
     handle = await _Runtime.current().workflow_start_child_workflow(
@@ -3914,7 +3996,11 @@ def continue_as_new(
     task_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
@@ -3930,7 +4016,11 @@ def continue_as_new(
     task_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
@@ -3947,7 +4037,11 @@ def continue_as_new(
     task_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
@@ -3964,7 +4058,11 @@ def continue_as_new(
     task_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
@@ -3981,7 +4079,11 @@ def continue_as_new(
     task_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     ...
@@ -3997,7 +4099,11 @@ def continue_as_new(
     task_timeout: Optional[timedelta] = None,
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     memo: Optional[Mapping[str, Any]] = None,
-    search_attributes: Optional[temporalio.common.SearchAttributes] = None,
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
+        ]
+    ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
@@ -4016,7 +4122,8 @@ def continue_as_new(
             workflow's task timeout.
         memo: Memo for the workflow. Defaults to the current workflow's memo.
         search_attributes: Search attributes for the workflow. Defaults to the
-            current workflow's search attributes.
+            current workflow's search attributes. The dictionary form of this is
+            DEPRECATED.
         versioning_intent: When using the Worker Versioning feature, specifies whether this Workflow
             should Continue-as-New onto a worker with a compatible Build Id or not.
 
@@ -4027,6 +4134,7 @@ def continue_as_new(
         ContinueAsNewError: Always raised by this function. Should not be caught
             but instead be allowed to
     """
+    temporalio.common._warn_on_deprecated_search_attributes(search_attributes)
     _Runtime.current().workflow_continue_as_new(
         *temporalio.common._arg_or_args(arg, args),
         workflow=workflow,
