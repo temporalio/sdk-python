@@ -6,7 +6,7 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, NewType, Optional, Sequence, Type
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Type
 
 from typing_extensions import Protocol
 
@@ -85,25 +85,6 @@ class TelemetryConfig:
 
     logging: Optional[LoggingConfig]
     metrics: Optional[MetricsConfig]
-
-
-BufferedLogLevel = NewType("BufferedLogLevel", int)
-"""Representation of a log level for a buffered log entry."""
-
-BUFFERED_LOG_LEVEL_TRACE = BufferedLogLevel(0)
-"""Trace log level."""
-
-BUFFERED_LOG_LEVEL_DEBUG = BufferedLogLevel(1)
-"""Debug log level."""
-
-BUFFERED_LOG_LEVEL_INFO = BufferedLogLevel(2)
-"""Info log level."""
-
-BUFFERED_LOG_LEVEL_WARN = BufferedLogLevel(3)
-"""Warn log level."""
-
-BUFFERED_LOG_LEVEL_ERROR = BufferedLogLevel(4)
-"""Error log level."""
 
 
 # WARNING: This must match Rust runtime::BufferedLogEntry

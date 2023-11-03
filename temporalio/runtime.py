@@ -153,7 +153,7 @@ class LogForwardingConfig:
 
     If for some reason lots of logs occur within the buffered time (i.e.
     thousands), they may be sent earlier. Users are discouraged from using this
-    with ``TRACE`` core logging.
+    with ``TRACE`` Core logging.
 
     All log records produced have a ``temporal_log`` attribute that contains a
     representation of the Core log. This representation has a ``fields``
@@ -220,8 +220,6 @@ class LogForwardingConfig:
                 # We can't access logging module's start time and it's not worth
                 # doing difference math to get relative time right here, so
                 # we'll make time relative to _our_ module's start time
-                # We are scared of using a private variable here, so we will
-                # swallow any exceptions
                 self.relativeCreated = (record.created - _module_start_time) * 1000
             # Log the record
             self.logger.handle(record)
