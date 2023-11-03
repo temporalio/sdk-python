@@ -1,22 +1,28 @@
+use futures::channel::mpsc::Receiver;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::AsPyPointer;
+use pythonize::pythonize;
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 use temporal_sdk_core::telemetry::{
-    build_otlp_metric_exporter, start_prometheus_metric_exporter, MetricsCallBuffer,
+    build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
+    MetricsCallBuffer,
 };
 use temporal_sdk_core::CoreRuntime;
 use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
 use temporal_sdk_core_api::telemetry::{
-    Logger, MetricTemporality, OtelCollectorOptionsBuilder, PrometheusExporterOptionsBuilder,
-    TelemetryOptions, TelemetryOptionsBuilder,
+    CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder,
+    PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder,
 };
+use tokio::task::JoinHandle;
+use tokio_stream::StreamExt;
+use tracing::Level;
 use url::Url;
 
 use crate::metric::{convert_metric_events, BufferedMetricRef, BufferedMetricUpdate};
@@ -30,6 +36,7 @@ pub struct RuntimeRef {
 pub(crate) struct Runtime {
     pub(crate) core: Arc<CoreRuntime>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
+    log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
 }
 
 #[derive(FromPyObject)]
@@ -41,7 +48,12 @@ pub struct TelemetryConfig {
 #[derive(FromPyObject)]
 pub struct LoggingConfig {
     filter: String,
-    forward: bool,
+    forward_to: Option<PyObject>,
+}
+
+#[pyclass]
+pub struct BufferedLogEntry {
+    core_log: CoreLog,
 }
 
 #[derive(FromPyObject)]
@@ -71,18 +83,52 @@ pub struct PrometheusConfig {
     unit_suffix: bool,
 }
 
+const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
+const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
+
 pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
+    // Have to build/start telemetry config pieces
+    let mut telemetry_build = TelemetryOptionsBuilder::default();
+
+    // Build logging config, capturing forwarding info to start later
+    let mut log_forwarding: Option<(Receiver<CoreLog>, PyObject)> = None;
+    if let Some(logging_conf) = telemetry_config.logging {
+        telemetry_build.logging(if let Some(forward_to) = logging_conf.forward_to {
+            // Note, actual log forwarding is started later
+            let (consumer, stream) = CoreLogStreamConsumer::new(FORWARD_LOG_BUFFER_SIZE);
+            log_forwarding = Some((stream, forward_to));
+            Logger::Push {
+                filter: logging_conf.filter.to_string(),
+                consumer: Arc::new(consumer),
+            }
+        } else {
+            Logger::Console {
+                filter: logging_conf.filter.to_string(),
+            }
+        });
+    }
+
+    // Build metric config, but actual metrics instance is late-bound after
+    // CoreRuntime is created since it needs Tokio runtime
+    if let Some(metrics_conf) = telemetry_config.metrics.as_ref() {
+        telemetry_build.attach_service_name(metrics_conf.attach_service_name);
+        if let Some(prefix) = &metrics_conf.metric_prefix {
+            telemetry_build.metric_prefix(prefix.to_string());
+        }
+    }
+
+    // Create core runtime which starts tokio multi-thread runtime
     let mut core = CoreRuntime::new(
-        // We don't move telemetry config here because we need it for
-        // late-binding metrics
-        (&telemetry_config).try_into()?,
+        telemetry_build
+            .build()
+            .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {}", err)))?,
         tokio::runtime::Builder::new_multi_thread(),
     )
     .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err)))?;
 
     // We late-bind the metrics after core runtime is created since it needs
     // the Tokio handle
-    let mut maybe_metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>> = None;
+    let mut metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>> = None;
     if let Some(metrics_conf) = telemetry_config.metrics {
         let _guard = core.tokio_handle().enter();
         // If they want buffered, cannot have Prom/OTel and we make buffered
@@ -92,21 +138,41 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
                     "Cannot have buffer size with OpenTelemetry or Prometheus metric config",
                 ));
             }
-            let metrics_call_buffer =
-                Arc::new(MetricsCallBuffer::new(metrics_conf.buffered_with_size));
+            let buffer = Arc::new(MetricsCallBuffer::new(metrics_conf.buffered_with_size));
             core.telemetry_mut()
-                .attach_late_init_metrics(metrics_call_buffer.clone());
-            maybe_metrics_call_buffer = Some(metrics_call_buffer);
+                .attach_late_init_metrics(buffer.clone());
+            metrics_call_buffer = Some(buffer);
         } else {
             core.telemetry_mut()
                 .attach_late_init_metrics(metrics_conf.try_into()?);
         }
     }
 
+    // Start log forwarding if needed
+    let log_forwarder_handle = log_forwarding.map(|(stream, callback)| {
+        Arc::new(core.tokio_handle().spawn(async move {
+            let mut stream = std::pin::pin!(stream.chunks_timeout(
+                FORWARD_LOG_BUFFER_SIZE,
+                Duration::from_millis(FORWARD_LOG_MAX_FREQ_MS)
+            ));
+            while let Some(core_logs) = stream.next().await {
+                // Create vec of buffered logs
+                let entries = core_logs
+                    .into_iter()
+                    .map(|core_log| BufferedLogEntry { core_log })
+                    .collect::<Vec<_>>();
+                // We silently swallow errors here because logging them could
+                // cause a bad loop and we don't want to assume console presence
+                let _ = Python::with_gil(|py| callback.call1(py, (entries,)));
+            }
+        }))
+    });
+
     Ok(RuntimeRef {
         runtime: Runtime {
             core: Arc::new(core),
-            metrics_call_buffer: maybe_metrics_call_buffer,
+            metrics_call_buffer,
+            log_forwarder_handle,
         },
     })
 }
@@ -126,6 +192,15 @@ impl Runtime {
     }
 }
 
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        // Stop the log forwarder
+        if let Some(handle) = self.log_forwarder_handle.as_ref() {
+            handle.abort();
+        }
+    }
+}
+
 #[pymethods]
 impl RuntimeRef {
     fn retrieve_buffered_metrics<'p>(&self, py: Python<'p>) -> Vec<BufferedMetricUpdate> {
@@ -138,34 +213,76 @@ impl RuntimeRef {
                 .retrieve(),
         )
     }
+
+    fn write_test_info_log(&self, message: &str, extra_data: &str) {
+        let _g = tracing::subscriber::set_default(
+            self.runtime
+                .core
+                .telemetry()
+                .trace_subscriber()
+                .unwrap()
+                .clone(),
+        );
+        tracing::info!(message, extra_data = extra_data);
+    }
+
+    fn write_test_debug_log(&self, message: &str, extra_data: &str) {
+        let _g = tracing::subscriber::set_default(
+            self.runtime
+                .core
+                .telemetry()
+                .trace_subscriber()
+                .unwrap()
+                .clone(),
+        );
+        tracing::debug!(message, extra_data = extra_data);
+    }
 }
 
-impl TryFrom<&TelemetryConfig> for TelemetryOptions {
-    type Error = PyErr;
+// WARNING: This must match temporalio.bridge.runtime.BufferedLogEntry protocol
+#[pymethods]
+impl BufferedLogEntry {
+    #[getter]
+    fn target(&self) -> &str {
+        &self.core_log.target
+    }
 
-    fn try_from(conf: &TelemetryConfig) -> PyResult<Self> {
-        let mut build = TelemetryOptionsBuilder::default();
-        if let Some(logging_conf) = &conf.logging {
-            build.logging(if logging_conf.forward {
-                Logger::Forward {
-                    filter: logging_conf.filter.to_string(),
-                }
-            } else {
-                Logger::Console {
-                    filter: logging_conf.filter.to_string(),
-                }
-            });
+    #[getter]
+    fn message(&self) -> &str {
+        &self.core_log.message
+    }
+
+    #[getter]
+    fn time(&self) -> f64 {
+        self.core_log
+            .timestamp
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO)
+            .as_secs_f64()
+    }
+
+    #[getter]
+    fn level(&self) -> u8 {
+        // Convert to Python log levels, with trace as 9
+        match self.core_log.level {
+            Level::TRACE => 9,
+            Level::DEBUG => 10,
+            Level::INFO => 20,
+            Level::WARN => 30,
+            Level::ERROR => 40,
         }
-        if let Some(metrics_conf) = &conf.metrics {
-            // Note, actual metrics instance is late-bound in init_runtime
-            build.attach_service_name(metrics_conf.attach_service_name);
-            if let Some(prefix) = &metrics_conf.metric_prefix {
-                build.metric_prefix(prefix.to_string());
-            }
-        }
-        build
-            .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {}", err)))
+    }
+
+    #[getter]
+    fn fields(&self, py: Python<'_>) -> PyResult<HashMap<&str, PyObject>> {
+        self.core_log
+            .fields
+            .iter()
+            .map(|(key, value)| match pythonize(py, value) {
+                Ok(value) => Ok((key.as_str(), value)),
+                Err(err) => Err(err.into()),
+            })
+            .collect()
     }
 }
 

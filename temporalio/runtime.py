@@ -5,12 +5,14 @@ This module is currently experimental. The API may change.
 
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 from typing import ClassVar, Mapping, NewType, Optional, Sequence, Union
 
-from typing_extensions import Literal, Protocol
+from typing_extensions import Protocol
 
 import temporalio.bridge.metric
 import temporalio.bridge.runtime
@@ -114,6 +116,10 @@ class LoggingConfig:
     filter: Union[TelemetryFilter, str]
     """Filter for logging. Can use :py:class:`TelemetryFilter` or raw string."""
 
+    forwarding: Optional[LogForwardingConfig] = None
+    """If present, Core logger messages will be forwarded to a Python logger.
+    See the :py:class:`LogForwardingConfig` docs for more info."""
+
     default: ClassVar[LoggingConfig]
     """Default logging configuration of Core WARN level and other ERROR
     level.
@@ -124,14 +130,101 @@ class LoggingConfig:
             filter=self.filter
             if isinstance(self.filter, str)
             else self.filter.formatted(),
-            # Log forwarding not currently supported in Python
-            forward=False,
+            forward_to=None if not self.forwarding else self.forwarding._on_logs,
         )
 
 
 LoggingConfig.default = LoggingConfig(
     filter=TelemetryFilter(core_level="WARN", other_level="ERROR")
 )
+
+_module_start_time = time.time()
+
+
+@dataclass
+class LogForwardingConfig:
+    """Configuration for log forwarding from Core.
+
+    Configuring this will send logs from Core to the given Python logger. By
+    default, log timestamps are overwritten and internally throttled/buffered
+    for a few milliseconds to prevent overloading Python. This means those log
+    records may have a time in the past and technically may appear out of order
+    with Python-originated log messages by a few milliseconds.
+
+    If for some reason lots of logs occur within the buffered time (i.e.
+    thousands), they may be sent earlier. Users are discouraged from using this
+    with ``TRACE`` core logging.
+
+    All log records produced have a ``temporal_log`` attribute that contains a
+    representation of the Core log. This representation has a ``fields``
+    attribute which has arbitrary extra data from Core. By default a string
+    representation of this extra ``fields`` attribute is appended to the
+    message.
+    """
+
+    logger: logging.Logger
+    """Core logger messages will be sent to this logger."""
+
+    append_target_to_name: bool = True
+    """If true, the default, the target is appended to the name."""
+
+    prepend_target_on_message: bool = True
+    """If true, the default, the target is appended to the name."""
+
+    overwrite_log_record_time: bool = True
+    """If true, the default, the log record time is overwritten with the core
+    log time."""
+
+    append_log_fields_to_message: bool = True
+    """If true, the default, the extra fields dict is appended to the
+    message."""
+
+    def _on_logs(
+        self, logs: Sequence[temporalio.bridge.runtime.BufferedLogEntry]
+    ) -> None:
+        for log in logs:
+            # Don't go further if not enabled
+            level = log.level
+            if not self.logger.isEnabledFor(level):
+                continue
+
+            # Create the record
+            name = self.logger.name
+            if self.append_target_to_name:
+                name += f"-sdk_core::{log.target}"
+            message = log.message
+            if self.prepend_target_on_message:
+                message = f"[sdk_core::{log.target}] {message}"
+            if self.append_log_fields_to_message:
+                # Swallow error converting fields (should never happen, but
+                # just in case)
+                try:
+                    message += f" {log.fields}"
+                except:
+                    pass
+            record = self.logger.makeRecord(
+                name,
+                level,
+                "(sdk-core)",
+                0,
+                message,
+                (),
+                None,
+                "(sdk-core)",
+                {"temporal_log": log},
+                None,
+            )
+            if self.overwrite_log_record_time:
+                record.created = log.time
+                record.msecs = (record.created - int(record.created)) * 1000
+                # We can't access logging module's start time and it's not worth
+                # doing difference math to get relative time right here, so
+                # we'll make time relative to _our_ module's start time
+                # We are scared of using a private variable here, so we will
+                # swallow any exceptions
+                self.relativeCreated = (record.created - _module_start_time) * 1000
+            # Log the record
+            self.logger.handle(record)
 
 
 class OpenTelemetryMetricTemporality(Enum):
