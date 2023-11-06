@@ -4107,17 +4107,16 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
         """Wait for and return the result of the update. The result may already be known in which case no network call
-        is made. Otherwise the result will be polled for until returned, or until the provided timeout is reached, if
-        specified.
+        is made. Otherwise the result will be polled for until it is returned.
 
         Args:
             rpc_metadata: Headers used on the RPC call. Keys here override client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for the RPC call. If this elapses, the poll is retried until the
-                overall timeout has been reached.
+            rpc_timeout: Optional RPC deadline to set for each RPC call. Note: this is the timeout for each
+                RPC call while polling, not a timeout for the function as a whole. If an individual RPC times out,
+                it will be retried until the result is available.
 
         Raises:
             WorkflowUpdateFailedError: If the update failed
-            TimeoutError: The specified timeout was reached when waiting for the update result.
             RPCError: Update result could not be fetched for some other reason.
         """
         if self._known_outcome is not None:
