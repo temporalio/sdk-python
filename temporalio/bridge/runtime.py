@@ -6,7 +6,9 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Sequence, Type
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Type
+
+from typing_extensions import Protocol
 
 import temporalio.bridge.temporal_sdk_bridge
 
@@ -29,13 +31,21 @@ class Runtime:
         """Get buffered metrics."""
         return self._ref.retrieve_buffered_metrics()
 
+    def write_test_info_log(self, message: str, extra_data: str) -> None:
+        """Write a test core log at INFO level."""
+        self._ref.write_test_info_log(message, extra_data)
+
+    def write_test_debug_log(self, message: str, extra_data: str) -> None:
+        """Write a test core log at DEBUG level."""
+        self._ref.write_test_debug_log(message, extra_data)
+
 
 @dataclass(frozen=True)
 class LoggingConfig:
     """Python representation of the Rust struct for logging config."""
 
     filter: str
-    forward: bool
+    forward_to: Optional[Callable[[Sequence[BufferedLogEntry]], None]]
 
 
 @dataclass(frozen=True)
@@ -75,3 +85,42 @@ class TelemetryConfig:
 
     logging: Optional[LoggingConfig]
     metrics: Optional[MetricsConfig]
+
+
+# WARNING: This must match Rust runtime::BufferedLogEntry
+class BufferedLogEntry(Protocol):
+    """A buffered log entry."""
+
+    @property
+    def target(self) -> str:
+        """Target category for the log entry."""
+        ...
+
+    @property
+    def message(self) -> str:
+        """Log message."""
+        ...
+
+    @property
+    def time(self) -> float:
+        """Time as from ``time.time`` since Unix epoch."""
+        ...
+
+    @property
+    def level(self) -> int:
+        """Python log level, with trace as 9."""
+        ...
+
+    @property
+    def fields(self) -> Dict[str, Any]:
+        """Additional log entry fields.
+        Requesting this property performs a conversion from the internal
+        representation to the Python representation on every request. Therefore
+        callers should store the result instead of repeatedly calling.
+
+        Raises:
+            Exception: If the internal representation cannot be converted. This
+                should not happen and if it does it is considered a bug in the
+                SDK and should be reported.
+        """
+        ...
