@@ -118,7 +118,11 @@ class LoggingConfig:
 
     forwarding: Optional[LogForwardingConfig] = None
     """If present, Core logger messages will be forwarded to a Python logger.
-    See the :py:class:`LogForwardingConfig` docs for more info."""
+    See the :py:class:`LogForwardingConfig` docs for more info.
+
+    .. warning::
+        This API is experimental
+    """
 
     default: ClassVar[LoggingConfig]
     """Default logging configuration of Core WARN level and other ERROR
@@ -160,6 +164,9 @@ class LogForwardingConfig:
     attribute which has arbitrary extra data from Core. By default a string
     representation of this extra ``fields`` attribute is appended to the
     message.
+
+    .. warning::
+        This API is experimental
     """
 
     logger: logging.Logger
