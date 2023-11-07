@@ -1,4 +1,5 @@
 import os
+import pathlib
 import shutil
 import subprocess
 from glob import glob
@@ -49,6 +50,18 @@ if __name__ == "__main__":
             found_wheel_tag = True
     if not found_wheel_tag:
         raise RuntimeError("Could not find WHEEL tag")
+
+    # On Windows due to setuptools-rust changing how the pyd file is named, we
+    # are renaming it back.
+    # https://github.com/PyO3/setuptools-rust/pull/352#discussion_r1293444464
+    # explains our exact situation, but no clear remedy.
+    # TODO(cretz): Investigate as part of https://github.com/temporalio/sdk-python/issues/398
+    pyd_files = glob("dist/temp/*/temporalio/bridge/*-win_amd64.pyd")
+    if pyd_files:
+        os.rename(
+            pyd_files[0],
+            pathlib.Path(pyd_files[0]).with_name("temporal_sdk_bridge.pyd"),
+        )
 
     # Write the WHEEL file
     with open(wheel_files[0], "w") as f:
