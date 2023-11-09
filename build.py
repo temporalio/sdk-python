@@ -16,7 +16,7 @@ def build(setup_kwargs):
                 path="temporalio/bridge/Cargo.toml",
                 binding=Binding.PyO3,
                 py_limited_api=True,
-                features=["pyo3/abi3-py37"],
+                features=["pyo3/abi3-py38"],
             )
         ],
         zip_safe=False,
