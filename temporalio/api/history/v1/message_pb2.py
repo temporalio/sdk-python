@@ -210,7 +210,7 @@ WorkflowExecutionStartedEventAttributes = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONSTARTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionStartedEventAttributes)
     },
 )
@@ -221,7 +221,7 @@ WorkflowExecutionCompletedEventAttributes = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONCOMPLETEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionCompletedEventAttributes)
     },
 )
@@ -232,7 +232,7 @@ WorkflowExecutionFailedEventAttributes = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionFailedEventAttributes)
     },
 )
@@ -243,20 +243,22 @@ WorkflowExecutionTimedOutEventAttributes = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONTIMEDOUTEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionTimedOutEventAttributes)
     },
 )
 _sym_db.RegisterMessage(WorkflowExecutionTimedOutEventAttributes)
 
-WorkflowExecutionContinuedAsNewEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "WorkflowExecutionContinuedAsNewEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWEXECUTIONCONTINUEDASNEWEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionContinuedAsNewEventAttributes)
-    },
+WorkflowExecutionContinuedAsNewEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "WorkflowExecutionContinuedAsNewEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _WORKFLOWEXECUTIONCONTINUEDASNEWEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionContinuedAsNewEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(WorkflowExecutionContinuedAsNewEventAttributes)
 
@@ -265,7 +267,7 @@ WorkflowTaskScheduledEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTASKSCHEDULEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowTaskScheduledEventAttributes)
     },
 )
@@ -276,7 +278,7 @@ WorkflowTaskStartedEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTASKSTARTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowTaskStartedEventAttributes)
     },
 )
@@ -287,7 +289,7 @@ WorkflowTaskCompletedEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTASKCOMPLETEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowTaskCompletedEventAttributes)
     },
 )
@@ -298,7 +300,7 @@ WorkflowTaskTimedOutEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTASKTIMEDOUTEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowTaskTimedOutEventAttributes)
     },
 )
@@ -309,7 +311,7 @@ WorkflowTaskFailedEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTASKFAILEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowTaskFailedEventAttributes)
     },
 )
@@ -320,7 +322,7 @@ ActivityTaskScheduledEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKSCHEDULEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityTaskScheduledEventAttributes)
     },
 )
@@ -331,7 +333,7 @@ ActivityTaskStartedEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKSTARTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityTaskStartedEventAttributes)
     },
 )
@@ -342,7 +344,7 @@ ActivityTaskCompletedEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKCOMPLETEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityTaskCompletedEventAttributes)
     },
 )
@@ -353,7 +355,7 @@ ActivityTaskFailedEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKFAILEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityTaskFailedEventAttributes)
     },
 )
@@ -364,7 +366,7 @@ ActivityTaskTimedOutEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKTIMEDOUTEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityTaskTimedOutEventAttributes)
     },
 )
@@ -375,7 +377,7 @@ ActivityTaskCancelRequestedEventAttributes = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKCANCELREQUESTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityTaskCancelRequestedEventAttributes)
     },
 )
@@ -386,7 +388,7 @@ ActivityTaskCanceledEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKCANCELEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityTaskCanceledEventAttributes)
     },
 )
@@ -397,7 +399,7 @@ TimerStartedEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TIMERSTARTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.TimerStartedEventAttributes)
     },
 )
@@ -408,7 +410,7 @@ TimerFiredEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TIMERFIREDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.TimerFiredEventAttributes)
     },
 )
@@ -419,20 +421,22 @@ TimerCanceledEventAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TIMERCANCELEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.TimerCanceledEventAttributes)
     },
 )
 _sym_db.RegisterMessage(TimerCanceledEventAttributes)
 
-WorkflowExecutionCancelRequestedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "WorkflowExecutionCancelRequestedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWEXECUTIONCANCELREQUESTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionCancelRequestedEventAttributes)
-    },
+WorkflowExecutionCancelRequestedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "WorkflowExecutionCancelRequestedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _WORKFLOWEXECUTIONCANCELREQUESTEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionCancelRequestedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(WorkflowExecutionCancelRequestedEventAttributes)
 
@@ -441,7 +445,7 @@ WorkflowExecutionCanceledEventAttributes = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONCANCELEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionCanceledEventAttributes)
     },
 )
@@ -456,12 +460,12 @@ MarkerRecordedEventAttributes = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _MARKERRECORDEDEVENTATTRIBUTES_DETAILSENTRY,
-                "__module__": "temporal.api.history.v1.message_pb2"
+                "__module__": "temporal.api.history.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.history.v1.MarkerRecordedEventAttributes.DetailsEntry)
             },
         ),
         "DESCRIPTOR": _MARKERRECORDEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.MarkerRecordedEventAttributes)
     },
 )
@@ -473,7 +477,7 @@ WorkflowExecutionSignaledEventAttributes = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONSIGNALEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionSignaledEventAttributes)
     },
 )
@@ -484,7 +488,7 @@ WorkflowExecutionTerminatedEventAttributes = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONTERMINATEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionTerminatedEventAttributes)
     },
 )
@@ -495,75 +499,87 @@ RequestCancelExternalWorkflowExecutionInitiatedEventAttributes = _reflection.Gen
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.RequestCancelExternalWorkflowExecutionInitiatedEventAttributes)
     },
 )
 _sym_db.RegisterMessage(RequestCancelExternalWorkflowExecutionInitiatedEventAttributes)
 
-RequestCancelExternalWorkflowExecutionFailedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "RequestCancelExternalWorkflowExecutionFailedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.RequestCancelExternalWorkflowExecutionFailedEventAttributes)
-    },
+RequestCancelExternalWorkflowExecutionFailedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "RequestCancelExternalWorkflowExecutionFailedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.RequestCancelExternalWorkflowExecutionFailedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(RequestCancelExternalWorkflowExecutionFailedEventAttributes)
 
-ExternalWorkflowExecutionCancelRequestedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "ExternalWorkflowExecutionCancelRequestedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _EXTERNALWORKFLOWEXECUTIONCANCELREQUESTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ExternalWorkflowExecutionCancelRequestedEventAttributes)
-    },
+ExternalWorkflowExecutionCancelRequestedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "ExternalWorkflowExecutionCancelRequestedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _EXTERNALWORKFLOWEXECUTIONCANCELREQUESTEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ExternalWorkflowExecutionCancelRequestedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(ExternalWorkflowExecutionCancelRequestedEventAttributes)
 
-SignalExternalWorkflowExecutionInitiatedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "SignalExternalWorkflowExecutionInitiatedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SIGNALEXTERNALWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.SignalExternalWorkflowExecutionInitiatedEventAttributes)
-    },
+SignalExternalWorkflowExecutionInitiatedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "SignalExternalWorkflowExecutionInitiatedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _SIGNALEXTERNALWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.SignalExternalWorkflowExecutionInitiatedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(SignalExternalWorkflowExecutionInitiatedEventAttributes)
 
-SignalExternalWorkflowExecutionFailedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "SignalExternalWorkflowExecutionFailedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SIGNALEXTERNALWORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes)
-    },
+SignalExternalWorkflowExecutionFailedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "SignalExternalWorkflowExecutionFailedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _SIGNALEXTERNALWORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.SignalExternalWorkflowExecutionFailedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(SignalExternalWorkflowExecutionFailedEventAttributes)
 
-ExternalWorkflowExecutionSignaledEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "ExternalWorkflowExecutionSignaledEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _EXTERNALWORKFLOWEXECUTIONSIGNALEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ExternalWorkflowExecutionSignaledEventAttributes)
-    },
+ExternalWorkflowExecutionSignaledEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "ExternalWorkflowExecutionSignaledEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _EXTERNALWORKFLOWEXECUTIONSIGNALEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ExternalWorkflowExecutionSignaledEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(ExternalWorkflowExecutionSignaledEventAttributes)
 
-UpsertWorkflowSearchAttributesEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "UpsertWorkflowSearchAttributesEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _UPSERTWORKFLOWSEARCHATTRIBUTESEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.UpsertWorkflowSearchAttributesEventAttributes)
-    },
+UpsertWorkflowSearchAttributesEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "UpsertWorkflowSearchAttributesEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _UPSERTWORKFLOWSEARCHATTRIBUTESEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.UpsertWorkflowSearchAttributesEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(UpsertWorkflowSearchAttributesEventAttributes)
 
@@ -572,31 +588,35 @@ WorkflowPropertiesModifiedEventAttributes = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWPROPERTIESMODIFIEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowPropertiesModifiedEventAttributes)
     },
 )
 _sym_db.RegisterMessage(WorkflowPropertiesModifiedEventAttributes)
 
-StartChildWorkflowExecutionInitiatedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "StartChildWorkflowExecutionInitiatedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _STARTCHILDWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.StartChildWorkflowExecutionInitiatedEventAttributes)
-    },
+StartChildWorkflowExecutionInitiatedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "StartChildWorkflowExecutionInitiatedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _STARTCHILDWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.StartChildWorkflowExecutionInitiatedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(StartChildWorkflowExecutionInitiatedEventAttributes)
 
-StartChildWorkflowExecutionFailedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "StartChildWorkflowExecutionFailedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _STARTCHILDWORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.StartChildWorkflowExecutionFailedEventAttributes)
-    },
+StartChildWorkflowExecutionFailedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "StartChildWorkflowExecutionFailedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _STARTCHILDWORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.StartChildWorkflowExecutionFailedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(StartChildWorkflowExecutionFailedEventAttributes)
 
@@ -605,20 +625,22 @@ ChildWorkflowExecutionStartedEventAttributes = _reflection.GeneratedProtocolMess
     (_message.Message,),
     {
         "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONSTARTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionStartedEventAttributes)
     },
 )
 _sym_db.RegisterMessage(ChildWorkflowExecutionStartedEventAttributes)
 
-ChildWorkflowExecutionCompletedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "ChildWorkflowExecutionCompletedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONCOMPLETEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionCompletedEventAttributes)
-    },
+ChildWorkflowExecutionCompletedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "ChildWorkflowExecutionCompletedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONCOMPLETEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionCompletedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(ChildWorkflowExecutionCompletedEventAttributes)
 
@@ -627,97 +649,113 @@ ChildWorkflowExecutionFailedEventAttributes = _reflection.GeneratedProtocolMessa
     (_message.Message,),
     {
         "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONFAILEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionFailedEventAttributes)
     },
 )
 _sym_db.RegisterMessage(ChildWorkflowExecutionFailedEventAttributes)
 
-ChildWorkflowExecutionCanceledEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "ChildWorkflowExecutionCanceledEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONCANCELEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes)
-    },
+ChildWorkflowExecutionCanceledEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "ChildWorkflowExecutionCanceledEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONCANCELEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionCanceledEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(ChildWorkflowExecutionCanceledEventAttributes)
 
-ChildWorkflowExecutionTimedOutEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "ChildWorkflowExecutionTimedOutEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONTIMEDOUTEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionTimedOutEventAttributes)
-    },
+ChildWorkflowExecutionTimedOutEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "ChildWorkflowExecutionTimedOutEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONTIMEDOUTEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionTimedOutEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(ChildWorkflowExecutionTimedOutEventAttributes)
 
-ChildWorkflowExecutionTerminatedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "ChildWorkflowExecutionTerminatedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONTERMINATEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionTerminatedEventAttributes)
-    },
+ChildWorkflowExecutionTerminatedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "ChildWorkflowExecutionTerminatedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONTERMINATEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ChildWorkflowExecutionTerminatedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(ChildWorkflowExecutionTerminatedEventAttributes)
 
-WorkflowPropertiesModifiedExternallyEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "WorkflowPropertiesModifiedExternallyEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWPROPERTIESMODIFIEDEXTERNALLYEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowPropertiesModifiedExternallyEventAttributes)
-    },
+WorkflowPropertiesModifiedExternallyEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "WorkflowPropertiesModifiedExternallyEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _WORKFLOWPROPERTIESMODIFIEDEXTERNALLYEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowPropertiesModifiedExternallyEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(WorkflowPropertiesModifiedExternallyEventAttributes)
 
-ActivityPropertiesModifiedExternallyEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "ActivityPropertiesModifiedExternallyEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _ACTIVITYPROPERTIESMODIFIEDEXTERNALLYEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityPropertiesModifiedExternallyEventAttributes)
-    },
+ActivityPropertiesModifiedExternallyEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "ActivityPropertiesModifiedExternallyEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _ACTIVITYPROPERTIESMODIFIEDEXTERNALLYEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.ActivityPropertiesModifiedExternallyEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(ActivityPropertiesModifiedExternallyEventAttributes)
 
-WorkflowExecutionUpdateAcceptedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "WorkflowExecutionUpdateAcceptedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWEXECUTIONUPDATEACCEPTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionUpdateAcceptedEventAttributes)
-    },
+WorkflowExecutionUpdateAcceptedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "WorkflowExecutionUpdateAcceptedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _WORKFLOWEXECUTIONUPDATEACCEPTEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionUpdateAcceptedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(WorkflowExecutionUpdateAcceptedEventAttributes)
 
-WorkflowExecutionUpdateCompletedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "WorkflowExecutionUpdateCompletedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWEXECUTIONUPDATECOMPLETEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionUpdateCompletedEventAttributes)
-    },
+WorkflowExecutionUpdateCompletedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "WorkflowExecutionUpdateCompletedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _WORKFLOWEXECUTIONUPDATECOMPLETEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionUpdateCompletedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(WorkflowExecutionUpdateCompletedEventAttributes)
 
-WorkflowExecutionUpdateRejectedEventAttributes = _reflection.GeneratedProtocolMessageType(
-    "WorkflowExecutionUpdateRejectedEventAttributes",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWEXECUTIONUPDATEREJECTEDEVENTATTRIBUTES,
-        "__module__": "temporal.api.history.v1.message_pb2"
-        # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionUpdateRejectedEventAttributes)
-    },
+WorkflowExecutionUpdateRejectedEventAttributes = (
+    _reflection.GeneratedProtocolMessageType(
+        "WorkflowExecutionUpdateRejectedEventAttributes",
+        (_message.Message,),
+        {
+            "DESCRIPTOR": _WORKFLOWEXECUTIONUPDATEREJECTEDEVENTATTRIBUTES,
+            "__module__": "temporal.api.history.v1.message_pb2",
+            # @@protoc_insertion_point(class_scope:temporal.api.history.v1.WorkflowExecutionUpdateRejectedEventAttributes)
+        },
+    )
 )
 _sym_db.RegisterMessage(WorkflowExecutionUpdateRejectedEventAttributes)
 
@@ -726,7 +764,7 @@ HistoryEvent = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HISTORYEVENT,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.HistoryEvent)
     },
 )
@@ -737,7 +775,7 @@ History = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HISTORY,
-        "__module__": "temporal.api.history.v1.message_pb2"
+        "__module__": "temporal.api.history.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.history.v1.History)
     },
 )
@@ -920,9 +958,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _WORKFLOWEXECUTIONSIGNALEDEVENTATTRIBUTES._serialized_end = 7916
     _WORKFLOWEXECUTIONTERMINATEDEVENTATTRIBUTES._serialized_start = 7919
     _WORKFLOWEXECUTIONTERMINATEDEVENTATTRIBUTES._serialized_end = 8048
-    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES._serialized_start = (
-        8051
-    )
+    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES._serialized_start = 8051
     _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONINITIATEDEVENTATTRIBUTES._serialized_end = (
         8331
     )

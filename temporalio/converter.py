@@ -878,9 +878,7 @@ class DefaultFailureConverter(FailureConverter):
         elif isinstance(error, temporalio.exceptions.ChildWorkflowError):
             failure.child_workflow_execution_failure_info.SetInParent()
             failure.child_workflow_execution_failure_info.namespace = error.namespace
-            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = (
-                error.workflow_id
-            )
+            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = error.workflow_id
             failure.child_workflow_execution_failure_info.workflow_execution.run_id = (
                 error.run_id
             )

@@ -86,7 +86,7 @@ WorkflowActivation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWACTIVATION,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.WorkflowActivation)
     },
 )
@@ -97,7 +97,7 @@ WorkflowActivationJob = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWACTIVATIONJOB,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.WorkflowActivationJob)
     },
 )
@@ -112,12 +112,12 @@ StartWorkflow = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _STARTWORKFLOW_HEADERSENTRY,
-                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
                 # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.StartWorkflow.HeadersEntry)
             },
         ),
         "DESCRIPTOR": _STARTWORKFLOW,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.StartWorkflow)
     },
 )
@@ -129,7 +129,7 @@ FireTimer = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _FIRETIMER,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.FireTimer)
     },
 )
@@ -140,7 +140,7 @@ ResolveActivity = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVEACTIVITY,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveActivity)
     },
 )
@@ -151,7 +151,7 @@ ResolveChildWorkflowExecutionStart = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVECHILDWORKFLOWEXECUTIONSTART,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveChildWorkflowExecutionStart)
     },
 )
@@ -162,7 +162,7 @@ ResolveChildWorkflowExecutionStartSuccess = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVECHILDWORKFLOWEXECUTIONSTARTSUCCESS,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveChildWorkflowExecutionStartSuccess)
     },
 )
@@ -173,7 +173,7 @@ ResolveChildWorkflowExecutionStartFailure = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVECHILDWORKFLOWEXECUTIONSTARTFAILURE,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveChildWorkflowExecutionStartFailure)
     },
 )
@@ -184,7 +184,7 @@ ResolveChildWorkflowExecutionStartCancelled = _reflection.GeneratedProtocolMessa
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVECHILDWORKFLOWEXECUTIONSTARTCANCELLED,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveChildWorkflowExecutionStartCancelled)
     },
 )
@@ -195,7 +195,7 @@ ResolveChildWorkflowExecution = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVECHILDWORKFLOWEXECUTION,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveChildWorkflowExecution)
     },
 )
@@ -206,7 +206,7 @@ UpdateRandomSeed = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATERANDOMSEED,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.UpdateRandomSeed)
     },
 )
@@ -221,12 +221,12 @@ QueryWorkflow = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _QUERYWORKFLOW_HEADERSENTRY,
-                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
                 # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.QueryWorkflow.HeadersEntry)
             },
         ),
         "DESCRIPTOR": _QUERYWORKFLOW,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.QueryWorkflow)
     },
 )
@@ -238,7 +238,7 @@ CancelWorkflow = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELWORKFLOW,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.CancelWorkflow)
     },
 )
@@ -253,12 +253,12 @@ SignalWorkflow = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _SIGNALWORKFLOW_HEADERSENTRY,
-                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
                 # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.SignalWorkflow.HeadersEntry)
             },
         ),
         "DESCRIPTOR": _SIGNALWORKFLOW,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.SignalWorkflow)
     },
 )
@@ -270,7 +270,7 @@ NotifyHasPatch = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NOTIFYHASPATCH,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.NotifyHasPatch)
     },
 )
@@ -281,7 +281,7 @@ ResolveSignalExternalWorkflow = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVESIGNALEXTERNALWORKFLOW,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveSignalExternalWorkflow)
     },
 )
@@ -292,7 +292,7 @@ ResolveRequestCancelExternalWorkflow = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOLVEREQUESTCANCELEXTERNALWORKFLOW,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.ResolveRequestCancelExternalWorkflow)
     },
 )
@@ -307,12 +307,12 @@ DoUpdate = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _DOUPDATE_HEADERSENTRY,
-                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+                "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
                 # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.DoUpdate.HeadersEntry)
             },
         ),
         "DESCRIPTOR": _DOUPDATE,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.DoUpdate)
     },
 )
@@ -324,7 +324,7 @@ RemoveFromCache = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REMOVEFROMCACHE,
-        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2"
+        "__module__": "temporal.sdk.core.workflow_activation.workflow_activation_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_activation.RemoveFromCache)
     },
 )

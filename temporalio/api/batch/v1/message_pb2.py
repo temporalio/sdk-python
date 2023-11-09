@@ -48,7 +48,7 @@ BatchOperationInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BATCHOPERATIONINFO,
-        "__module__": "temporal.api.batch.v1.message_pb2"
+        "__module__": "temporal.api.batch.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationInfo)
     },
 )
@@ -59,7 +59,7 @@ BatchOperationTermination = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BATCHOPERATIONTERMINATION,
-        "__module__": "temporal.api.batch.v1.message_pb2"
+        "__module__": "temporal.api.batch.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationTermination)
     },
 )
@@ -70,7 +70,7 @@ BatchOperationSignal = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BATCHOPERATIONSIGNAL,
-        "__module__": "temporal.api.batch.v1.message_pb2"
+        "__module__": "temporal.api.batch.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationSignal)
     },
 )
@@ -81,7 +81,7 @@ BatchOperationCancellation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BATCHOPERATIONCANCELLATION,
-        "__module__": "temporal.api.batch.v1.message_pb2"
+        "__module__": "temporal.api.batch.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationCancellation)
     },
 )
@@ -92,7 +92,7 @@ BatchOperationDeletion = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BATCHOPERATIONDELETION,
-        "__module__": "temporal.api.batch.v1.message_pb2"
+        "__module__": "temporal.api.batch.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationDeletion)
     },
 )
@@ -103,7 +103,7 @@ BatchOperationReset = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BATCHOPERATIONRESET,
-        "__module__": "temporal.api.batch.v1.message_pb2"
+        "__module__": "temporal.api.batch.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationReset)
     },
 )

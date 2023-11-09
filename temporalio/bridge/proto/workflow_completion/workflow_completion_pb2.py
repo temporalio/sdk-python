@@ -41,7 +41,7 @@ WorkflowActivationCompletion = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWACTIVATIONCOMPLETION,
-        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2"
+        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_completion.WorkflowActivationCompletion)
     },
 )
@@ -52,7 +52,7 @@ Success = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SUCCESS,
-        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2"
+        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_completion.Success)
     },
 )
@@ -63,7 +63,7 @@ Failure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _FAILURE,
-        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2"
+        "__module__": "temporal.sdk.core.workflow_completion.workflow_completion_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.workflow_completion.Failure)
     },
 )

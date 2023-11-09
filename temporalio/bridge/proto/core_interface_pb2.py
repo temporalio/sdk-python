@@ -54,7 +54,7 @@ ActivityHeartbeat = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYHEARTBEAT,
-        "__module__": "temporal.sdk.core.core_interface_pb2"
+        "__module__": "temporal.sdk.core.core_interface_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.ActivityHeartbeat)
     },
 )
@@ -65,7 +65,7 @@ ActivityTaskCompletion = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASKCOMPLETION,
-        "__module__": "temporal.sdk.core.core_interface_pb2"
+        "__module__": "temporal.sdk.core.core_interface_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.ActivityTaskCompletion)
     },
 )

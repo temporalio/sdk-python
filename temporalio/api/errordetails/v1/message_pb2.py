@@ -62,7 +62,7 @@ NotFoundFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NOTFOUNDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NotFoundFailure)
     },
 )
@@ -73,7 +73,7 @@ WorkflowExecutionAlreadyStartedFailure = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure)
     },
 )
@@ -84,7 +84,7 @@ NamespaceNotActiveFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACENOTACTIVEFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceNotActiveFailure)
     },
 )
@@ -95,7 +95,7 @@ NamespaceInvalidStateFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEINVALIDSTATEFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceInvalidStateFailure)
     },
 )
@@ -106,7 +106,7 @@ NamespaceNotFoundFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACENOTFOUNDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceNotFoundFailure)
     },
 )
@@ -117,7 +117,7 @@ NamespaceAlreadyExistsFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEALREADYEXISTSFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceAlreadyExistsFailure)
     },
 )
@@ -128,7 +128,7 @@ ClientVersionNotSupportedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CLIENTVERSIONNOTSUPPORTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.ClientVersionNotSupportedFailure)
     },
 )
@@ -139,7 +139,7 @@ ServerVersionNotSupportedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SERVERVERSIONNOTSUPPORTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.ServerVersionNotSupportedFailure)
     },
 )
@@ -150,7 +150,7 @@ CancellationAlreadyRequestedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELLATIONALREADYREQUESTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.CancellationAlreadyRequestedFailure)
     },
 )
@@ -161,7 +161,7 @@ QueryFailedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _QUERYFAILEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.QueryFailedFailure)
     },
 )
@@ -172,7 +172,7 @@ PermissionDeniedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PERMISSIONDENIEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.PermissionDeniedFailure)
     },
 )
@@ -183,7 +183,7 @@ ResourceExhaustedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOURCEEXHAUSTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.ResourceExhaustedFailure)
     },
 )
@@ -194,7 +194,7 @@ SystemWorkflowFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SYSTEMWORKFLOWFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.SystemWorkflowFailure)
     },
 )
@@ -205,7 +205,7 @@ WorkflowNotReadyFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWNOTREADYFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.WorkflowNotReadyFailure)
     },
 )
@@ -216,7 +216,7 @@ NewerBuildExistsFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NEWERBUILDEXISTSFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        "__module__": "temporal.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NewerBuildExistsFailure)
     },
 )

@@ -3371,9 +3371,7 @@ class ScheduleBackfill:
         start_time.FromDatetime(self.start_at)
         end_time = google.protobuf.timestamp_pb2.Timestamp()
         end_time.FromDatetime(self.end_at)
-        overlap_policy = (
-            temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
-        )
+        overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
         if self.overlap:
             overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.ValueType(
                 self.overlap
@@ -4817,9 +4815,7 @@ class _ClientImpl(OutboundInterceptor):
             # If the status is ALREADY_EXISTS and the details can be extracted
             # as already started, use a different exception
             if err.status == RPCStatusCode.ALREADY_EXISTS and err.grpc_status.details:
-                details = (
-                    temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
-                )
+                details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
                 if err.grpc_status.details[0].Unpack(details):
                     raise temporalio.exceptions.WorkflowAlreadyStartedError(
                         input.id, input.workflow, run_id=details.run_id
@@ -5305,9 +5301,7 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def trigger_schedule(self, input: TriggerScheduleInput) -> None:
-        overlap_policy = (
-            temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
-        )
+        overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
         if input.overlap:
             overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.ValueType(
                 input.overlap
@@ -5821,17 +5815,11 @@ class TaskReachabilityType(Enum):
                 temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_NEW_WORKFLOWS
             )
         elif self == TaskReachabilityType.EXISTING_WORKFLOWS:
-            return (
-                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_EXISTING_WORKFLOWS
-            )
+            return temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_EXISTING_WORKFLOWS
         elif self == TaskReachabilityType.OPEN_WORKFLOWS:
-            return (
-                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_OPEN_WORKFLOWS
-            )
+            return temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_OPEN_WORKFLOWS
         elif self == TaskReachabilityType.CLOSED_WORKFLOWS:
-            return (
-                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_CLOSED_WORKFLOWS
-            )
+            return temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_CLOSED_WORKFLOWS
         else:
             return (
                 temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_UNSPECIFIED

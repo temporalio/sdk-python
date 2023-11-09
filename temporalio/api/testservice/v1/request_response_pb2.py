@@ -42,7 +42,7 @@ LockTimeSkippingRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LOCKTIMESKIPPINGREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.LockTimeSkippingRequest)
     },
 )
@@ -53,7 +53,7 @@ LockTimeSkippingResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LOCKTIMESKIPPINGRESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.LockTimeSkippingResponse)
     },
 )
@@ -64,7 +64,7 @@ UnlockTimeSkippingRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UNLOCKTIMESKIPPINGREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.UnlockTimeSkippingRequest)
     },
 )
@@ -75,7 +75,7 @@ UnlockTimeSkippingResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UNLOCKTIMESKIPPINGRESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.UnlockTimeSkippingResponse)
     },
 )
@@ -86,7 +86,7 @@ SleepUntilRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SLEEPUNTILREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.SleepUntilRequest)
     },
 )
@@ -97,7 +97,7 @@ SleepRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SLEEPREQUEST,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.SleepRequest)
     },
 )
@@ -108,7 +108,7 @@ SleepResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SLEEPRESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.SleepResponse)
     },
 )
@@ -119,7 +119,7 @@ GetCurrentTimeResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETCURRENTTIMERESPONSE,
-        "__module__": "temporal.api.testservice.v1.request_response_pb2"
+        "__module__": "temporal.api.testservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.testservice.v1.GetCurrentTimeResponse)
     },
 )

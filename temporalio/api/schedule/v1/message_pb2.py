@@ -57,7 +57,7 @@ CalendarSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CALENDARSPEC,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.CalendarSpec)
     },
 )
@@ -68,7 +68,7 @@ Range = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RANGE,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.Range)
     },
 )
@@ -79,7 +79,7 @@ StructuredCalendarSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STRUCTUREDCALENDARSPEC,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.StructuredCalendarSpec)
     },
 )
@@ -90,7 +90,7 @@ IntervalSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _INTERVALSPEC,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.IntervalSpec)
     },
 )
@@ -101,7 +101,7 @@ ScheduleSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULESPEC,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.ScheduleSpec)
     },
 )
@@ -112,7 +112,7 @@ SchedulePolicies = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULEPOLICIES,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.SchedulePolicies)
     },
 )
@@ -123,7 +123,7 @@ ScheduleAction = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULEACTION,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.ScheduleAction)
     },
 )
@@ -134,7 +134,7 @@ ScheduleActionResult = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULEACTIONRESULT,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.ScheduleActionResult)
     },
 )
@@ -145,7 +145,7 @@ ScheduleState = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULESTATE,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.ScheduleState)
     },
 )
@@ -156,7 +156,7 @@ TriggerImmediatelyRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TRIGGERIMMEDIATELYREQUEST,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.TriggerImmediatelyRequest)
     },
 )
@@ -167,7 +167,7 @@ BackfillRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BACKFILLREQUEST,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.BackfillRequest)
     },
 )
@@ -178,7 +178,7 @@ SchedulePatch = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULEPATCH,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.SchedulePatch)
     },
 )
@@ -189,7 +189,7 @@ ScheduleInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULEINFO,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.ScheduleInfo)
     },
 )
@@ -200,7 +200,7 @@ Schedule = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULE,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.Schedule)
     },
 )
@@ -211,7 +211,7 @@ ScheduleListInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULELISTINFO,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.ScheduleListInfo)
     },
 )
@@ -222,7 +222,7 @@ ScheduleListEntry = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULELISTENTRY,
-        "__module__": "temporal.api.schedule.v1.message_pb2"
+        "__module__": "temporal.api.schedule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.schedule.v1.ScheduleListEntry)
     },
 )

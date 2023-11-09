@@ -424,12 +424,12 @@ RegisterNamespaceRequest = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _REGISTERNAMESPACEREQUEST_DATAENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RegisterNamespaceRequest.DataEntry)
             },
         ),
         "DESCRIPTOR": _REGISTERNAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RegisterNamespaceRequest)
     },
 )
@@ -441,7 +441,7 @@ RegisterNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REGISTERNAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RegisterNamespaceResponse)
     },
 )
@@ -452,7 +452,7 @@ ListNamespacesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTNAMESPACESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListNamespacesRequest)
     },
 )
@@ -463,7 +463,7 @@ ListNamespacesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTNAMESPACESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListNamespacesResponse)
     },
 )
@@ -474,7 +474,7 @@ DescribeNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBENAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeNamespaceRequest)
     },
 )
@@ -485,7 +485,7 @@ DescribeNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBENAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeNamespaceResponse)
     },
 )
@@ -496,7 +496,7 @@ UpdateNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATENAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateNamespaceRequest)
     },
 )
@@ -507,7 +507,7 @@ UpdateNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATENAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateNamespaceResponse)
     },
 )
@@ -518,7 +518,7 @@ DeprecateNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPRECATENAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeprecateNamespaceRequest)
     },
 )
@@ -529,7 +529,7 @@ DeprecateNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPRECATENAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeprecateNamespaceResponse)
     },
 )
@@ -540,7 +540,7 @@ StartWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartWorkflowExecutionRequest)
     },
 )
@@ -551,7 +551,7 @@ StartWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartWorkflowExecutionResponse)
     },
 )
@@ -562,7 +562,7 @@ GetWorkflowExecutionHistoryRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest)
     },
 )
@@ -573,7 +573,7 @@ GetWorkflowExecutionHistoryResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse)
     },
 )
@@ -584,7 +584,7 @@ GetWorkflowExecutionHistoryReverseRequest = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYREVERSEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseRequest)
     },
 )
@@ -595,7 +595,7 @@ GetWorkflowExecutionHistoryReverseResponse = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYREVERSERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseResponse)
     },
 )
@@ -606,7 +606,7 @@ PollWorkflowTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLWORKFLOWTASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowTaskQueueRequest)
     },
 )
@@ -621,12 +621,12 @@ PollWorkflowTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _POLLWORKFLOWTASKQUEUERESPONSE_QUERIESENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse.QueriesEntry)
             },
         ),
         "DESCRIPTOR": _POLLWORKFLOWTASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse)
     },
 )
@@ -642,12 +642,12 @@ RespondWorkflowTaskCompletedRequest = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_QUERYRESULTSENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest.QueryResultsEntry)
             },
         ),
         "DESCRIPTOR": _RESPONDWORKFLOWTASKCOMPLETEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest)
     },
 )
@@ -659,7 +659,7 @@ RespondWorkflowTaskCompletedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDWORKFLOWTASKCOMPLETEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedResponse)
     },
 )
@@ -670,7 +670,7 @@ RespondWorkflowTaskFailedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDWORKFLOWTASKFAILEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskFailedRequest)
     },
 )
@@ -681,7 +681,7 @@ RespondWorkflowTaskFailedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDWORKFLOWTASKFAILEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskFailedResponse)
     },
 )
@@ -692,7 +692,7 @@ PollActivityTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLACTIVITYTASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollActivityTaskQueueRequest)
     },
 )
@@ -703,7 +703,7 @@ PollActivityTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLACTIVITYTASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollActivityTaskQueueResponse)
     },
 )
@@ -714,7 +714,7 @@ RecordActivityTaskHeartbeatRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest)
     },
 )
@@ -725,7 +725,7 @@ RecordActivityTaskHeartbeatResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatResponse)
     },
 )
@@ -736,7 +736,7 @@ RecordActivityTaskHeartbeatByIdRequest = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest)
     },
 )
@@ -747,7 +747,7 @@ RecordActivityTaskHeartbeatByIdResponse = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdResponse)
     },
 )
@@ -758,7 +758,7 @@ RespondActivityTaskCompletedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest)
     },
 )
@@ -769,7 +769,7 @@ RespondActivityTaskCompletedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedResponse)
     },
 )
@@ -780,7 +780,7 @@ RespondActivityTaskCompletedByIdRequest = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest)
     },
 )
@@ -791,7 +791,7 @@ RespondActivityTaskCompletedByIdResponse = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdResponse)
     },
 )
@@ -802,7 +802,7 @@ RespondActivityTaskFailedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedRequest)
     },
 )
@@ -813,7 +813,7 @@ RespondActivityTaskFailedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedResponse)
     },
 )
@@ -824,7 +824,7 @@ RespondActivityTaskFailedByIdRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest)
     },
 )
@@ -835,7 +835,7 @@ RespondActivityTaskFailedByIdResponse = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdResponse)
     },
 )
@@ -846,7 +846,7 @@ RespondActivityTaskCanceledRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest)
     },
 )
@@ -857,7 +857,7 @@ RespondActivityTaskCanceledResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledResponse)
     },
 )
@@ -868,7 +868,7 @@ RespondActivityTaskCanceledByIdRequest = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest)
     },
 )
@@ -879,7 +879,7 @@ RespondActivityTaskCanceledByIdResponse = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdResponse)
     },
 )
@@ -890,7 +890,7 @@ RequestCancelWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest)
     },
 )
@@ -901,7 +901,7 @@ RequestCancelWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse)
     },
 )
@@ -912,7 +912,7 @@ SignalWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWorkflowExecutionRequest)
     },
 )
@@ -923,7 +923,7 @@ SignalWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWorkflowExecutionResponse)
     },
 )
@@ -934,7 +934,7 @@ SignalWithStartWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest)
     },
 )
@@ -945,7 +945,7 @@ SignalWithStartWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWITHSTARTWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse)
     },
 )
@@ -956,7 +956,7 @@ ResetWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetWorkflowExecutionRequest)
     },
 )
@@ -967,7 +967,7 @@ ResetWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetWorkflowExecutionResponse)
     },
 )
@@ -978,7 +978,7 @@ TerminateWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TERMINATEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.TerminateWorkflowExecutionRequest)
     },
 )
@@ -989,7 +989,7 @@ TerminateWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TERMINATEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.TerminateWorkflowExecutionResponse)
     },
 )
@@ -1000,7 +1000,7 @@ DeleteWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteWorkflowExecutionRequest)
     },
 )
@@ -1011,7 +1011,7 @@ DeleteWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteWorkflowExecutionResponse)
     },
 )
@@ -1022,7 +1022,7 @@ ListOpenWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTOPENWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsRequest)
     },
 )
@@ -1033,7 +1033,7 @@ ListOpenWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTOPENWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse)
     },
 )
@@ -1044,7 +1044,7 @@ ListClosedWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTCLOSEDWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsRequest)
     },
 )
@@ -1055,7 +1055,7 @@ ListClosedWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTCLOSEDWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsResponse)
     },
 )
@@ -1066,7 +1066,7 @@ ListWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest)
     },
 )
@@ -1077,7 +1077,7 @@ ListWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListWorkflowExecutionsResponse)
     },
 )
@@ -1088,7 +1088,7 @@ ListArchivedWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTARCHIVEDWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsRequest)
     },
 )
@@ -1099,7 +1099,7 @@ ListArchivedWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTARCHIVEDWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsResponse)
     },
 )
@@ -1110,7 +1110,7 @@ ScanWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCANWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ScanWorkflowExecutionsRequest)
     },
 )
@@ -1121,7 +1121,7 @@ ScanWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCANWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ScanWorkflowExecutionsResponse)
     },
 )
@@ -1132,7 +1132,7 @@ CountWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _COUNTWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest)
     },
 )
@@ -1143,7 +1143,7 @@ CountWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _COUNTWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse)
     },
 )
@@ -1154,7 +1154,7 @@ GetSearchAttributesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETSEARCHATTRIBUTESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSearchAttributesRequest)
     },
 )
@@ -1169,12 +1169,12 @@ GetSearchAttributesResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSearchAttributesResponse.KeysEntry)
             },
         ),
         "DESCRIPTOR": _GETSEARCHATTRIBUTESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSearchAttributesResponse)
     },
 )
@@ -1186,7 +1186,7 @@ RespondQueryTaskCompletedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDQUERYTASKCOMPLETEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondQueryTaskCompletedRequest)
     },
 )
@@ -1197,7 +1197,7 @@ RespondQueryTaskCompletedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDQUERYTASKCOMPLETEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondQueryTaskCompletedResponse)
     },
 )
@@ -1208,7 +1208,7 @@ ResetStickyTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETSTICKYTASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetStickyTaskQueueRequest)
     },
 )
@@ -1219,7 +1219,7 @@ ResetStickyTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETSTICKYTASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetStickyTaskQueueResponse)
     },
 )
@@ -1230,7 +1230,7 @@ QueryWorkflowRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _QUERYWORKFLOWREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.QueryWorkflowRequest)
     },
 )
@@ -1241,7 +1241,7 @@ QueryWorkflowResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _QUERYWORKFLOWRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.QueryWorkflowResponse)
     },
 )
@@ -1252,7 +1252,7 @@ DescribeWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeWorkflowExecutionRequest)
     },
 )
@@ -1263,7 +1263,7 @@ DescribeWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeWorkflowExecutionResponse)
     },
 )
@@ -1274,7 +1274,7 @@ DescribeTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBETASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeTaskQueueRequest)
     },
 )
@@ -1285,7 +1285,7 @@ DescribeTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBETASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeTaskQueueResponse)
     },
 )
@@ -1296,7 +1296,7 @@ GetClusterInfoRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETCLUSTERINFOREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetClusterInfoRequest)
     },
 )
@@ -1311,12 +1311,12 @@ GetClusterInfoResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetClusterInfoResponse.SupportedClientsEntry)
             },
         ),
         "DESCRIPTOR": _GETCLUSTERINFORESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetClusterInfoResponse)
     },
 )
@@ -1328,7 +1328,7 @@ GetSystemInfoRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETSYSTEMINFOREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSystemInfoRequest)
     },
 )
@@ -1343,12 +1343,12 @@ GetSystemInfoResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _GETSYSTEMINFORESPONSE_CAPABILITIES,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSystemInfoResponse.Capabilities)
             },
         ),
         "DESCRIPTOR": _GETSYSTEMINFORESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSystemInfoResponse)
     },
 )
@@ -1360,7 +1360,7 @@ ListTaskQueuePartitionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTTASKQUEUEPARTITIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListTaskQueuePartitionsRequest)
     },
 )
@@ -1371,7 +1371,7 @@ ListTaskQueuePartitionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTTASKQUEUEPARTITIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse)
     },
 )
@@ -1382,7 +1382,7 @@ CreateScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CREATESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CreateScheduleRequest)
     },
 )
@@ -1393,7 +1393,7 @@ CreateScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CREATESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CreateScheduleResponse)
     },
 )
@@ -1404,7 +1404,7 @@ DescribeScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeScheduleRequest)
     },
 )
@@ -1415,7 +1415,7 @@ DescribeScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeScheduleResponse)
     },
 )
@@ -1426,7 +1426,7 @@ UpdateScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateScheduleRequest)
     },
 )
@@ -1437,7 +1437,7 @@ UpdateScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateScheduleResponse)
     },
 )
@@ -1448,7 +1448,7 @@ PatchScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PATCHSCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PatchScheduleRequest)
     },
 )
@@ -1459,7 +1459,7 @@ PatchScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PATCHSCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PatchScheduleResponse)
     },
 )
@@ -1470,7 +1470,7 @@ ListScheduleMatchingTimesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULEMATCHINGTIMESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListScheduleMatchingTimesRequest)
     },
 )
@@ -1481,7 +1481,7 @@ ListScheduleMatchingTimesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULEMATCHINGTIMESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListScheduleMatchingTimesResponse)
     },
 )
@@ -1492,7 +1492,7 @@ DeleteScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteScheduleRequest)
     },
 )
@@ -1503,7 +1503,7 @@ DeleteScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteScheduleResponse)
     },
 )
@@ -1514,7 +1514,7 @@ ListSchedulesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListSchedulesRequest)
     },
 )
@@ -1525,7 +1525,7 @@ ListSchedulesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListSchedulesResponse)
     },
 )
@@ -1540,7 +1540,7 @@ UpdateWorkerBuildIdCompatibilityRequest = _reflection.GeneratedProtocolMessageTy
             (_message.Message,),
             {
                 "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.AddNewCompatibleVersion)
             },
         ),
@@ -1549,12 +1549,12 @@ UpdateWorkerBuildIdCompatibilityRequest = _reflection.GeneratedProtocolMessageTy
             (_message.Message,),
             {
                 "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_MERGESETS,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.MergeSets)
             },
         ),
         "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest)
     },
 )
@@ -1567,7 +1567,7 @@ UpdateWorkerBuildIdCompatibilityResponse = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityResponse)
     },
 )
@@ -1578,7 +1578,7 @@ GetWorkerBuildIdCompatibilityRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERBUILDIDCOMPATIBILITYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityRequest)
     },
 )
@@ -1589,7 +1589,7 @@ GetWorkerBuildIdCompatibilityResponse = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERBUILDIDCOMPATIBILITYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityResponse)
     },
 )
@@ -1600,7 +1600,7 @@ GetWorkerTaskReachabilityRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERTASKREACHABILITYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerTaskReachabilityRequest)
     },
 )
@@ -1611,7 +1611,7 @@ GetWorkerTaskReachabilityResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERTASKREACHABILITYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerTaskReachabilityResponse)
     },
 )
@@ -1622,7 +1622,7 @@ UpdateWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkflowExecutionRequest)
     },
 )
@@ -1633,7 +1633,7 @@ UpdateWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkflowExecutionResponse)
     },
 )
@@ -1644,7 +1644,7 @@ StartBatchOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTBATCHOPERATIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartBatchOperationRequest)
     },
 )
@@ -1655,7 +1655,7 @@ StartBatchOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTBATCHOPERATIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartBatchOperationResponse)
     },
 )
@@ -1666,7 +1666,7 @@ StopBatchOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STOPBATCHOPERATIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StopBatchOperationRequest)
     },
 )
@@ -1677,7 +1677,7 @@ StopBatchOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STOPBATCHOPERATIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StopBatchOperationResponse)
     },
 )
@@ -1688,7 +1688,7 @@ DescribeBatchOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEBATCHOPERATIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeBatchOperationRequest)
     },
 )
@@ -1699,7 +1699,7 @@ DescribeBatchOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEBATCHOPERATIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeBatchOperationResponse)
     },
 )
@@ -1710,7 +1710,7 @@ ListBatchOperationsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTBATCHOPERATIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListBatchOperationsRequest)
     },
 )
@@ -1721,7 +1721,7 @@ ListBatchOperationsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTBATCHOPERATIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListBatchOperationsResponse)
     },
 )
@@ -1732,7 +1732,7 @@ PollWorkflowExecutionUpdateRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLWORKFLOWEXECUTIONUPDATEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest)
     },
 )
@@ -1743,7 +1743,7 @@ PollWorkflowExecutionUpdateResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLWORKFLOWEXECUTIONUPDATERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse)
     },
 )
@@ -2082,9 +2082,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _LISTSCHEDULESRESPONSE._serialized_end = 20279
     _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_start = 20282
     _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_end = 20928
-    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_start = (
-        20729
-    )
+    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_start = 20729
     _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_end = (
         20840
     )

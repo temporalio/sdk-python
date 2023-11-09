@@ -37,7 +37,7 @@ ClusterReplicationConfig = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CLUSTERREPLICATIONCONFIG,
-        "__module__": "temporal.api.replication.v1.message_pb2"
+        "__module__": "temporal.api.replication.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.replication.v1.ClusterReplicationConfig)
     },
 )
@@ -48,7 +48,7 @@ NamespaceReplicationConfig = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEREPLICATIONCONFIG,
-        "__module__": "temporal.api.replication.v1.message_pb2"
+        "__module__": "temporal.api.replication.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.replication.v1.NamespaceReplicationConfig)
     },
 )
@@ -59,7 +59,7 @@ FailoverStatus = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _FAILOVERSTATUS,
-        "__module__": "temporal.api.replication.v1.message_pb2"
+        "__module__": "temporal.api.replication.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.replication.v1.FailoverStatus)
     },
 )

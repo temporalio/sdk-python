@@ -28,7 +28,7 @@ LocalActivityMarkerData = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LOCALACTIVITYMARKERDATA,
-        "__module__": "temporal.sdk.core.external_data.external_data_pb2"
+        "__module__": "temporal.sdk.core.external_data.external_data_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.external_data.LocalActivityMarkerData)
     },
 )
@@ -39,7 +39,7 @@ PatchedMarkerData = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PATCHEDMARKERDATA,
-        "__module__": "temporal.sdk.core.external_data.external_data_pb2"
+        "__module__": "temporal.sdk.core.external_data.external_data_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.external_data.PatchedMarkerData)
     },
 )

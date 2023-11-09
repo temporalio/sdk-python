@@ -1,3 +1,4 @@
+# isort: skip_file
 .venv
 __pycache__
 /build

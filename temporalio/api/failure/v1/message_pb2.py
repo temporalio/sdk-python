@@ -41,7 +41,7 @@ ApplicationFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _APPLICATIONFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.ApplicationFailureInfo)
     },
 )
@@ -52,7 +52,7 @@ TimeoutFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TIMEOUTFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.TimeoutFailureInfo)
     },
 )
@@ -63,7 +63,7 @@ CanceledFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELEDFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.CanceledFailureInfo)
     },
 )
@@ -74,7 +74,7 @@ TerminatedFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TERMINATEDFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.TerminatedFailureInfo)
     },
 )
@@ -85,7 +85,7 @@ ServerFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SERVERFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.ServerFailureInfo)
     },
 )
@@ -96,7 +96,7 @@ ResetWorkflowFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETWORKFLOWFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.ResetWorkflowFailureInfo)
     },
 )
@@ -107,7 +107,7 @@ ActivityFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.ActivityFailureInfo)
     },
 )
@@ -118,7 +118,7 @@ ChildWorkflowExecutionFailureInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CHILDWORKFLOWEXECUTIONFAILUREINFO,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.ChildWorkflowExecutionFailureInfo)
     },
 )
@@ -129,7 +129,7 @@ Failure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _FAILURE,
-        "__module__": "temporal.api.failure.v1.message_pb2"
+        "__module__": "temporal.api.failure.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.failure.v1.Failure)
     },
 )

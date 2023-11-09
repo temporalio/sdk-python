@@ -26,7 +26,7 @@ Message = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _MESSAGE,
-        "__module__": "temporal.api.protocol.v1.message_pb2"
+        "__module__": "temporal.api.protocol.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.protocol.v1.Message)
     },
 )

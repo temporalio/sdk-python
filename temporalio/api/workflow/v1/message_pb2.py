@@ -52,7 +52,7 @@ WorkflowExecutionInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionInfo)
     },
 )
@@ -63,7 +63,7 @@ WorkflowExecutionConfig = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONCONFIG,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionConfig)
     },
 )
@@ -74,7 +74,7 @@ PendingActivityInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PENDINGACTIVITYINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingActivityInfo)
     },
 )
@@ -85,7 +85,7 @@ PendingChildExecutionInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PENDINGCHILDEXECUTIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingChildExecutionInfo)
     },
 )
@@ -96,7 +96,7 @@ PendingWorkflowTaskInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PENDINGWORKFLOWTASKINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingWorkflowTaskInfo)
     },
 )
@@ -107,7 +107,7 @@ ResetPoints = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETPOINTS,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.ResetPoints)
     },
 )
@@ -118,7 +118,7 @@ ResetPointInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETPOINTINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.ResetPointInfo)
     },
 )
@@ -129,7 +129,7 @@ NewWorkflowExecutionInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NEWWORKFLOWEXECUTIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2"
+        "__module__": "temporal.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.NewWorkflowExecutionInfo)
     },
 )

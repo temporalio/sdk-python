@@ -40,7 +40,7 @@ ActivityExecutionResult = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYEXECUTIONRESULT,
-        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2"
+        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_result.ActivityExecutionResult)
     },
 )
@@ -51,7 +51,7 @@ ActivityResolution = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYRESOLUTION,
-        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2"
+        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_result.ActivityResolution)
     },
 )
@@ -62,7 +62,7 @@ Success = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SUCCESS,
-        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2"
+        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_result.Success)
     },
 )
@@ -73,7 +73,7 @@ Failure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _FAILURE,
-        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2"
+        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_result.Failure)
     },
 )
@@ -84,7 +84,7 @@ Cancellation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELLATION,
-        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2"
+        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_result.Cancellation)
     },
 )
@@ -95,7 +95,7 @@ WillCompleteAsync = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WILLCOMPLETEASYNC,
-        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2"
+        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_result.WillCompleteAsync)
     },
 )
@@ -106,7 +106,7 @@ DoBackoff = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DOBACKOFF,
-        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2"
+        "__module__": "temporal.sdk.core.activity_result.activity_result_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_result.DoBackoff)
     },
 )

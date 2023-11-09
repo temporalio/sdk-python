@@ -51,7 +51,7 @@ TaskQueue = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TASKQUEUE,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskQueue)
     },
 )
@@ -62,7 +62,7 @@ TaskQueueMetadata = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TASKQUEUEMETADATA,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskQueueMetadata)
     },
 )
@@ -73,7 +73,7 @@ TaskQueueStatus = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TASKQUEUESTATUS,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskQueueStatus)
     },
 )
@@ -84,7 +84,7 @@ TaskIdBlock = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TASKIDBLOCK,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskIdBlock)
     },
 )
@@ -95,7 +95,7 @@ TaskQueuePartitionMetadata = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TASKQUEUEPARTITIONMETADATA,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskQueuePartitionMetadata)
     },
 )
@@ -106,7 +106,7 @@ PollerInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLERINFO,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.PollerInfo)
     },
 )
@@ -117,7 +117,7 @@ StickyExecutionAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STICKYEXECUTIONATTRIBUTES,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.StickyExecutionAttributes)
     },
 )
@@ -128,7 +128,7 @@ CompatibleVersionSet = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _COMPATIBLEVERSIONSET,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.CompatibleVersionSet)
     },
 )
@@ -139,7 +139,7 @@ TaskQueueReachability = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TASKQUEUEREACHABILITY,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskQueueReachability)
     },
 )
@@ -150,7 +150,7 @@ BuildIdReachability = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BUILDIDREACHABILITY,
-        "__module__": "temporal.api.taskqueue.v1.message_pb2"
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.BuildIdReachability)
     },
 )

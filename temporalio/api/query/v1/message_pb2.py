@@ -36,7 +36,7 @@ WorkflowQuery = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWQUERY,
-        "__module__": "temporal.api.query.v1.message_pb2"
+        "__module__": "temporal.api.query.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.query.v1.WorkflowQuery)
     },
 )
@@ -47,7 +47,7 @@ WorkflowQueryResult = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWQUERYRESULT,
-        "__module__": "temporal.api.query.v1.message_pb2"
+        "__module__": "temporal.api.query.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.query.v1.WorkflowQueryResult)
     },
 )
@@ -58,7 +58,7 @@ QueryRejected = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _QUERYREJECTED,
-        "__module__": "temporal.api.query.v1.message_pb2"
+        "__module__": "temporal.api.query.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.query.v1.QueryRejected)
     },
 )

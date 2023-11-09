@@ -49,12 +49,12 @@ NamespaceInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _NAMESPACEINFO_DATAENTRY,
-                "__module__": "temporal.api.namespace.v1.message_pb2"
+                "__module__": "temporal.api.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.NamespaceInfo.DataEntry)
             },
         ),
         "DESCRIPTOR": _NAMESPACEINFO,
-        "__module__": "temporal.api.namespace.v1.message_pb2"
+        "__module__": "temporal.api.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.NamespaceInfo)
     },
 )
@@ -70,12 +70,12 @@ NamespaceConfig = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _NAMESPACECONFIG_CUSTOMSEARCHATTRIBUTEALIASESENTRY,
-                "__module__": "temporal.api.namespace.v1.message_pb2"
+                "__module__": "temporal.api.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.NamespaceConfig.CustomSearchAttributeAliasesEntry)
             },
         ),
         "DESCRIPTOR": _NAMESPACECONFIG,
-        "__module__": "temporal.api.namespace.v1.message_pb2"
+        "__module__": "temporal.api.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.NamespaceConfig)
     },
 )
@@ -91,12 +91,12 @@ BadBinaries = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _BADBINARIES_BINARIESENTRY,
-                "__module__": "temporal.api.namespace.v1.message_pb2"
+                "__module__": "temporal.api.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.BadBinaries.BinariesEntry)
             },
         ),
         "DESCRIPTOR": _BADBINARIES,
-        "__module__": "temporal.api.namespace.v1.message_pb2"
+        "__module__": "temporal.api.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.BadBinaries)
     },
 )
@@ -108,7 +108,7 @@ BadBinaryInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _BADBINARYINFO,
-        "__module__": "temporal.api.namespace.v1.message_pb2"
+        "__module__": "temporal.api.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.BadBinaryInfo)
     },
 )
@@ -123,12 +123,12 @@ UpdateNamespaceInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _UPDATENAMESPACEINFO_DATAENTRY,
-                "__module__": "temporal.api.namespace.v1.message_pb2"
+                "__module__": "temporal.api.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.UpdateNamespaceInfo.DataEntry)
             },
         ),
         "DESCRIPTOR": _UPDATENAMESPACEINFO,
-        "__module__": "temporal.api.namespace.v1.message_pb2"
+        "__module__": "temporal.api.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.UpdateNamespaceInfo)
     },
 )
@@ -140,7 +140,7 @@ NamespaceFilter = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEFILTER,
-        "__module__": "temporal.api.namespace.v1.message_pb2"
+        "__module__": "temporal.api.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.namespace.v1.NamespaceFilter)
     },
 )

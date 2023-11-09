@@ -35,7 +35,7 @@ NamespacedWorkflowExecution = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEDWORKFLOWEXECUTION,
-        "__module__": "temporal.sdk.core.common.common_pb2"
+        "__module__": "temporal.sdk.core.common.common_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.common.NamespacedWorkflowExecution)
     },
 )

@@ -26,7 +26,7 @@ GrpcStatus = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GRPCSTATUS,
-        "__module__": "temporal.api.common.v1.grpc_status_pb2"
+        "__module__": "temporal.api.common.v1.grpc_status_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.GrpcStatus)
     },
 )

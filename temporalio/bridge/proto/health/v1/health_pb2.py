@@ -28,7 +28,7 @@ HealthCheckRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HEALTHCHECKREQUEST,
-        "__module__": "health.v1.health_pb2"
+        "__module__": "health.v1.health_pb2",
         # @@protoc_insertion_point(class_scope:temporal.grpc.health.v1.HealthCheckRequest)
     },
 )
@@ -39,7 +39,7 @@ HealthCheckResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HEALTHCHECKRESPONSE,
-        "__module__": "health.v1.health_pb2"
+        "__module__": "health.v1.health_pb2",
         # @@protoc_insertion_point(class_scope:temporal.grpc.health.v1.HealthCheckResponse)
     },
 )

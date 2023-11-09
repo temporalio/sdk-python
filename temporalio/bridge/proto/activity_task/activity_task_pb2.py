@@ -45,7 +45,7 @@ ActivityTask = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTASK,
-        "__module__": "temporal.sdk.core.activity_task.activity_task_pb2"
+        "__module__": "temporal.sdk.core.activity_task.activity_task_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_task.ActivityTask)
     },
 )
@@ -60,12 +60,12 @@ Start = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _START_HEADERFIELDSENTRY,
-                "__module__": "temporal.sdk.core.activity_task.activity_task_pb2"
+                "__module__": "temporal.sdk.core.activity_task.activity_task_pb2",
                 # @@protoc_insertion_point(class_scope:coresdk.activity_task.Start.HeaderFieldsEntry)
             },
         ),
         "DESCRIPTOR": _START,
-        "__module__": "temporal.sdk.core.activity_task.activity_task_pb2"
+        "__module__": "temporal.sdk.core.activity_task.activity_task_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_task.Start)
     },
 )
@@ -77,7 +77,7 @@ Cancel = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCEL,
-        "__module__": "temporal.sdk.core.activity_task.activity_task_pb2"
+        "__module__": "temporal.sdk.core.activity_task.activity_task_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.activity_task.Cancel)
     },
 )

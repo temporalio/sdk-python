@@ -26,7 +26,7 @@ SomeMessage = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SOMEMESSAGE,
-        "__module__": "worker.workflow_sandbox.testmodules.proto.proto_message_pb2"
+        "__module__": "worker.workflow_sandbox.testmodules.proto.proto_message_pb2",
         # @@protoc_insertion_point(class_scope:worker.workflow_sandbox.testmodules.proto.SomeMessage)
     },
 )

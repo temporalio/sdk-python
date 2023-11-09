@@ -37,7 +37,7 @@ Meta = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _META,
-        "__module__": "temporal.api.interaction.v1.message_pb2"
+        "__module__": "temporal.api.interaction.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.interaction.v1.Meta)
     },
 )
@@ -48,7 +48,7 @@ Input = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _INPUT,
-        "__module__": "temporal.api.interaction.v1.message_pb2"
+        "__module__": "temporal.api.interaction.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.interaction.v1.Input)
     },
 )
@@ -59,7 +59,7 @@ Output = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _OUTPUT,
-        "__module__": "temporal.api.interaction.v1.message_pb2"
+        "__module__": "temporal.api.interaction.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.interaction.v1.Output)
     },
 )
@@ -70,7 +70,7 @@ Invocation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _INVOCATION,
-        "__module__": "temporal.api.interaction.v1.message_pb2"
+        "__module__": "temporal.api.interaction.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.interaction.v1.Invocation)
     },
 )

@@ -63,7 +63,7 @@ ChildWorkflowResult = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CHILDWORKFLOWRESULT,
-        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2"
+        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.child_workflow.ChildWorkflowResult)
     },
 )
@@ -74,7 +74,7 @@ Success = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SUCCESS,
-        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2"
+        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.child_workflow.Success)
     },
 )
@@ -85,7 +85,7 @@ Failure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _FAILURE,
-        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2"
+        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.child_workflow.Failure)
     },
 )
@@ -96,7 +96,7 @@ Cancellation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELLATION,
-        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2"
+        "__module__": "temporal.sdk.core.child_workflow.child_workflow_pb2",
         # @@protoc_insertion_point(class_scope:coresdk.child_workflow.Cancellation)
     },
 )
