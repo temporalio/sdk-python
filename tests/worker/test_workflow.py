@@ -3448,7 +3448,7 @@ async def test_workflow_custom_metrics(client: Client):
                 return False
             # Must have labels (don't escape for this test)
             for k, v in at_least_labels.items():
-                if not f'{k}="{v}"' in line:
+                if f'{k}="{v}"' not in line:
                     return False
             return line.endswith(f" {value}")
 

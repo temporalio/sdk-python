@@ -22,14 +22,6 @@ __all__ = [
 
 # gRPC is optional
 try:
-    import grpc
-
-    from .service_pb2_grpc import (
-        TestServiceServicer,
-        TestServiceStub,
-        add_TestServiceServicer_to_server,
-    )
-
     __all__.extend(
         ["TestServiceServicer", "TestServiceStub", "add_TestServiceServicer_to_server"]
     )

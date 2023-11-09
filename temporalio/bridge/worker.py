@@ -22,7 +22,6 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
-from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
 @dataclass

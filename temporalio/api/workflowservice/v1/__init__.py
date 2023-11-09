@@ -234,14 +234,6 @@ __all__ = [
 
 # gRPC is optional
 try:
-    import grpc
-
-    from .service_pb2_grpc import (
-        WorkflowServiceServicer,
-        WorkflowServiceStub,
-        add_WorkflowServiceServicer_to_server,
-    )
-
     __all__.extend(
         [
             "WorkflowServiceServicer",

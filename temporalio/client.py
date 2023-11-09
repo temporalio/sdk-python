@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import copy
 import dataclasses
 import inspect
@@ -5002,7 +5001,7 @@ class _ClientImpl(OutboundInterceptor):
             resp = await self._client.workflow_service.update_workflow_execution(
                 req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
             )
-        except RPCError as err:
+        except RPCError:
             raise
 
         determined_id = resp.update_ref.update_id

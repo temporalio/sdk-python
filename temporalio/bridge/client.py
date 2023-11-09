@@ -13,7 +13,6 @@ import google.protobuf.message
 
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
-from temporalio.bridge.temporal_sdk_bridge import RPCError
 
 
 @dataclass

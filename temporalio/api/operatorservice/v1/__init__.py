@@ -36,14 +36,6 @@ __all__ = [
 
 # gRPC is optional
 try:
-    import grpc
-
-    from .service_pb2_grpc import (
-        OperatorServiceServicer,
-        OperatorServiceStub,
-        add_OperatorServiceServicer_to_server,
-    )
-
     __all__.extend(
         [
             "OperatorServiceServicer",

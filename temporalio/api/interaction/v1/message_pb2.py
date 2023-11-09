@@ -13,16 +13,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from temporalio.api.common.v1 import (
-    message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
-)
-from temporalio.api.enums.v1 import (
-    interaction_type_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_interaction__type__pb2,
-)
-from temporalio.api.failure.v1 import (
-    message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n)temporal/api/interaction/v1/message.proto\x12\x1btemporal.api.interaction.v1\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/failure/v1/message.proto\x1a,temporal/api/enums/v1/interaction_type.proto"\x8c\x01\n\x04Meta\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08\x65vent_id\x18\x02 \x01(\x03\x12@\n\x10interaction_type\x18\x03 \x01(\x0e\x32&.temporal.api.enums.v1.InteractionType\x12\x10\n\x08identity\x18\x04 \x01(\t\x12\x12\n\nrequest_id\x18\x05 \x01(\t"u\n\x05Input\x12.\n\x06header\x18\x01 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x0c\n\x04name\x18\x02 \x01(\t\x12.\n\x04\x61rgs\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\xac\x01\n\x06Output\x12.\n\x06header\x18\x01 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x33\n\x07success\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.PayloadsH\x00\x12\x33\n\x07\x66\x61ilure\x18\x03 \x01(\x0b\x32 .temporal.api.failure.v1.FailureH\x00\x42\x08\n\x06result"p\n\nInvocation\x12/\n\x04meta\x18\x01 \x01(\x0b\x32!.temporal.api.interaction.v1.Meta\x12\x31\n\x05input\x18\x02 \x01(\x0b\x32".temporal.api.interaction.v1.InputB\xa2\x01\n\x1eio.temporal.api.interaction.v1B\x0cMessageProtoP\x01Z-go.temporal.io/api/interaction/v1;interaction\xaa\x02\x1dTemporalio.Api.Interaction.V1\xea\x02 Temporalio::Api::Interaction::V1b\x06proto3'
 )
@@ -76,7 +66,7 @@ Invocation = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(Invocation)
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\036io.temporal.api.interaction.v1B\014MessageProtoP\001Z-go.temporal.io/api/interaction/v1;interaction\252\002\035Temporalio.Api.Interaction.V1\352\002 Temporalio::Api::Interaction::V1"
     _META._serialized_start = 198

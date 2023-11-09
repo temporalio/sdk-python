@@ -4,8 +4,6 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import enum_type_wrapper
 
@@ -31,7 +29,7 @@ QUERY_REJECT_CONDITION_NOT_OPEN = 2
 QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY = 3
 
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\nQueryProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
     _QUERYRESULTTYPE._serialized_start = 60

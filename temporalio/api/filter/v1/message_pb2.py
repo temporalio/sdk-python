@@ -13,15 +13,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
-
-from temporalio.api.dependencies.gogoproto import (
-    gogo_pb2 as dependencies_dot_gogoproto_dot_gogo__pb2,
-)
-from temporalio.api.enums.v1 import (
-    workflow_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_workflow__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n$temporal/api/filter/v1/message.proto\x12\x16temporal.api.filter.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto\x1a$temporal/api/enums/v1/workflow.proto">\n\x17WorkflowExecutionFilter\x12\x13\n\x0bworkflow_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t""\n\x12WorkflowTypeFilter\x12\x0c\n\x04name\x18\x01 \x01(\t"\x81\x01\n\x0fStartTimeFilter\x12\x37\n\rearliest_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x35\n\x0blatest_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01"N\n\x0cStatusFilter\x12>\n\x06status\x18\x01 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowExecutionStatusB\x89\x01\n\x19io.temporal.api.filter.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/filter/v1;filter\xaa\x02\x18Temporalio.Api.Filter.V1\xea\x02\x1bTemporalio::Api::Filter::V1b\x06proto3'
 )
@@ -75,7 +66,7 @@ StatusFilter = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(StatusFilter)
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.filter.v1B\014MessageProtoP\001Z#go.temporal.io/api/filter/v1;filter\252\002\030Temporalio.Api.Filter.V1\352\002\033Temporalio::Api::Filter::V1"
     _STARTTIMEFILTER.fields_by_name["earliest_time"]._options = None

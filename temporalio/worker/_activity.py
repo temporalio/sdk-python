@@ -748,9 +748,9 @@ def _execute_sync_activity(
     if isinstance(heartbeat, SharedHeartbeatSender):
         # To make mypy happy
         heartbeat_sender = heartbeat
-        heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
-            info.task_token, *details
-        )
+
+        def heartbeat_fn(*details):
+            return heartbeat_sender.send_heartbeat(info.task_token, *details)
     else:
         heartbeat_fn = heartbeat
     temporalio.activity._Context.set(

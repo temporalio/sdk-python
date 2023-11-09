@@ -14,8 +14,6 @@ from google.protobuf.internal import enum_type_wrapper
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n%temporal/sdk/core/common/common.proto\x12\x0e\x63oresdk.common\x1a\x1egoogle/protobuf/duration.proto"U\n\x1bNamespacedWorkflowExecution\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t*@\n\x10VersioningIntent\x12\x0f\n\x0bUNSPECIFIED\x10\x00\x12\x0e\n\nCOMPATIBLE\x10\x01\x12\x0b\n\x07\x44\x45\x46\x41ULT\x10\x02\x42"\xea\x02\x1fTemporalio::Bridge::Api::Commonb\x06proto3'
 )
@@ -41,7 +39,7 @@ NamespacedWorkflowExecution = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(NamespacedWorkflowExecution)
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\352\002\037Temporalio::Bridge::Api::Common"
     _VERSIONINGINTENT._serialized_start = 176

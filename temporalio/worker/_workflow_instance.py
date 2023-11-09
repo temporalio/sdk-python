@@ -803,7 +803,7 @@ class _WorkflowInstanceImpl(
         )
         self._primary_task = self.create_task(
             self._run_top_level_workflow_function(run_workflow(input)),
-            name=f"run",
+            name="run",
         )
 
     def _apply_update_random_seed(

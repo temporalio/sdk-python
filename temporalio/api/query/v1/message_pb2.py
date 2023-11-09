@@ -13,16 +13,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from temporalio.api.common.v1 import (
-    message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
-)
-from temporalio.api.enums.v1 import (
-    query_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_query__pb2,
-)
-from temporalio.api.enums.v1 import (
-    workflow_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_workflow__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n#temporal/api/query/v1/message.proto\x12\x15temporal.api.query.v1\x1a!temporal/api/enums/v1/query.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a$temporal/api/common/v1/message.proto"\x89\x01\n\rWorkflowQuery\x12\x12\n\nquery_type\x18\x01 \x01(\t\x12\x34\n\nquery_args\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header"\x9b\x01\n\x13WorkflowQueryResult\x12;\n\x0bresult_type\x18\x01 \x01(\x0e\x32&.temporal.api.enums.v1.QueryResultType\x12\x30\n\x06\x61nswer\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rerror_message\x18\x03 \x01(\t"O\n\rQueryRejected\x12>\n\x06status\x18\x01 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowExecutionStatusB\x84\x01\n\x18io.temporal.api.query.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/query/v1;query\xaa\x02\x17Temporalio.Api.Query.V1\xea\x02\x1aTemporalio::Api::Query::V1b\x06proto3'
 )
@@ -64,7 +54,7 @@ QueryRejected = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(QueryRejected)
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.query.v1B\014MessageProtoP\001Z!go.temporal.io/api/query/v1;query\252\002\027Temporalio.Api.Query.V1\352\002\032Temporalio::Api::Query::V1"
     _WORKFLOWQUERY._serialized_start = 174

@@ -4,8 +4,6 @@
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
 
 # @@protoc_insertion_point(imports)
@@ -173,7 +171,7 @@ stdduration = DESCRIPTOR.extensions_by_name["stdduration"]
 WKTPOINTER_FIELD_NUMBER = 65012
 wktpointer = DESCRIPTOR.extensions_by_name["wktpointer"]
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     google_dot_protobuf_dot_descriptor__pb2.EnumOptions.RegisterExtension(
         goproto_enum_prefix
     )

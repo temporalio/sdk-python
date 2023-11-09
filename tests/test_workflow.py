@@ -1,4 +1,4 @@
-from typing import Any, Sequence
+from typing import Sequence
 
 import pytest
 

@@ -331,7 +331,7 @@ async def test_query(client: Client, worker: ExternalWorker):
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Try a query not on the workflow
-    with pytest.raises(WorkflowQueryFailedError) as err:
+    with pytest.raises(WorkflowQueryFailedError):
         await handle.query("does not exist")
 
 
@@ -1039,10 +1039,8 @@ async def test_schedule_search_attribute_update(
     await assert_no_schedules(client)
 
     # Put search attribute on server
-    text_attr_key = SearchAttributeKey.for_text(f"python-test-schedule-text")
-    untyped_keyword_key = SearchAttributeKey.for_keyword(
-        f"python-test-schedule-keyword"
-    )
+    text_attr_key = SearchAttributeKey.for_text("python-test-schedule-text")
+    untyped_keyword_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
     await ensure_search_attributes_present(client, text_attr_key, untyped_keyword_key)
 
     # Create a schedule with search attributes on the schedule and on the
