@@ -331,7 +331,7 @@ async def test_query(client: Client, worker: ExternalWorker):
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Try a query not on the workflow
-    with pytest.raises(WorkflowQueryFailedError) as err:
+    with pytest.raises(WorkflowQueryFailedError):
         await handle.query("does not exist")
 
 
@@ -575,48 +575,32 @@ def test_history_from_json():
 
     # Make history with some enums, one one each event
     history = History()
-    history.events.add().request_cancel_external_workflow_execution_failed_event_attributes.cause = (
-        CancelExternalWorkflowExecutionFailedCause.CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
-    )
+    history.events.add().request_cancel_external_workflow_execution_failed_event_attributes.cause = CancelExternalWorkflowExecutionFailedCause.CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
     history.events.add().workflow_execution_started_event_attributes.initiator = (
         ContinueAsNewInitiator.CONTINUE_AS_NEW_INITIATOR_CRON_SCHEDULE
     )
     history.events.add().event_type = (
         EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED
     )
-    history.events.add().start_child_workflow_execution_initiated_event_attributes.parent_close_policy = (
-        ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON
-    )
+    history.events.add().start_child_workflow_execution_initiated_event_attributes.parent_close_policy = ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON
     history.events.add().workflow_execution_failed_event_attributes.retry_state = (
         RetryState.RETRY_STATE_CANCEL_REQUESTED
     )
-    history.events.add().signal_external_workflow_execution_failed_event_attributes.cause = (
-        SignalExternalWorkflowExecutionFailedCause.SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
-    )
-    history.events.add().start_child_workflow_execution_failed_event_attributes.cause = (
-        StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
-    )
+    history.events.add().signal_external_workflow_execution_failed_event_attributes.cause = SignalExternalWorkflowExecutionFailedCause.SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
+    history.events.add().start_child_workflow_execution_failed_event_attributes.cause = StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
     history.events.add().workflow_execution_started_event_attributes.task_queue.kind = (
         TaskQueueKind.TASK_QUEUE_KIND_NORMAL
     )
     history.events.add().workflow_task_timed_out_event_attributes.timeout_type = (
         TimeoutType.TIMEOUT_TYPE_HEARTBEAT
     )
-    history.events.add().start_child_workflow_execution_initiated_event_attributes.workflow_id_reuse_policy = (
-        WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
-    )
+    history.events.add().start_child_workflow_execution_initiated_event_attributes.workflow_id_reuse_policy = WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
     history.events.add().workflow_task_failed_event_attributes.cause = (
         WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_BAD_BINARY
     )
-    history.events.add().workflow_execution_started_event_attributes.continued_failure.timeout_failure_info.timeout_type = (
-        TimeoutType.TIMEOUT_TYPE_SCHEDULE_TO_CLOSE
-    )
-    history.events.add().activity_task_started_event_attributes.last_failure.activity_failure_info.retry_state = (
-        RetryState.RETRY_STATE_IN_PROGRESS
-    )
-    history.events.add().workflow_execution_failed_event_attributes.failure.cause.child_workflow_execution_failure_info.retry_state = (
-        RetryState.RETRY_STATE_INTERNAL_SERVER_ERROR
-    )
+    history.events.add().workflow_execution_started_event_attributes.continued_failure.timeout_failure_info.timeout_type = TimeoutType.TIMEOUT_TYPE_SCHEDULE_TO_CLOSE
+    history.events.add().activity_task_started_event_attributes.last_failure.activity_failure_info.retry_state = RetryState.RETRY_STATE_IN_PROGRESS
+    history.events.add().workflow_execution_failed_event_attributes.failure.cause.child_workflow_execution_failure_info.retry_state = RetryState.RETRY_STATE_INTERNAL_SERVER_ERROR
 
     # Convert to JSON dict and alter enums to pascal versions
     bad_history_dict = json_format.MessageToDict(history)
@@ -1055,10 +1039,8 @@ async def test_schedule_search_attribute_update(
     await assert_no_schedules(client)
 
     # Put search attribute on server
-    text_attr_key = SearchAttributeKey.for_text(f"python-test-schedule-text")
-    untyped_keyword_key = SearchAttributeKey.for_keyword(
-        f"python-test-schedule-keyword"
-    )
+    text_attr_key = SearchAttributeKey.for_text("python-test-schedule-text")
+    untyped_keyword_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
     await ensure_search_attributes_present(client, text_attr_key, untyped_keyword_key)
 
     # Create a schedule with search attributes on the schedule and on the

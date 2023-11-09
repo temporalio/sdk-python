@@ -28,7 +28,7 @@ def test_workflow_sandbox_stdlib_module_names():
         if len(code_lines[-1]) > 80:
             code_lines.append("")
         code_lines[-1] += mod_name
-    code = f'_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
+    code = '_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
     # TODO(cretz): Point releases may add modules :-(
     assert (
         actual_names == _stdlib_module_names

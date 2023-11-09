@@ -356,21 +356,24 @@ SandboxRestrictions.passthrough_modules_minimum = {
     "temporalio.bridge.temporal_sdk_bridge",
 }
 
-SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | {
-    # is_subclass is broken in sandbox due to Python bug on ABC C extension.
-    # So we have to include all things that might extend an ABC class and
-    # do a subclass check. See https://bugs.python.org/issue44847 and
-    # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
-    "asyncio",
-    "abc",
-    "temporalio",
-    # Due to pkg_resources use of base classes caused by the ABC issue
-    # above, and Otel's use of pkg_resources, we pass it through
-    "pkg_resources",
-    # Due to how Pydantic is importing lazily inside of some classes, we choose
-    # to always pass it through
-    "pydantic",
-}
+SandboxRestrictions.passthrough_modules_with_temporal = (
+    SandboxRestrictions.passthrough_modules_minimum
+    | {
+        # is_subclass is broken in sandbox due to Python bug on ABC C extension.
+        # So we have to include all things that might extend an ABC class and
+        # do a subclass check. See https://bugs.python.org/issue44847 and
+        # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
+        "asyncio",
+        "abc",
+        "temporalio",
+        # Due to pkg_resources use of base classes caused by the ABC issue
+        # above, and Otel's use of pkg_resources, we pass it through
+        "pkg_resources",
+        # Due to how Pydantic is importing lazily inside of some classes, we choose
+        # to always pass it through
+        "pydantic",
+    }
+)
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
 # test will fail if this list doesn't match the latest Python version it was
@@ -410,15 +413,18 @@ _stdlib_module_names = (
     "xdrlib,xml,xmlrpc,zipapp,zipfile,zipimport,zlib,zoneinfo"
 )
 
-SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | {
-    # All stdlib modules except "sys" and their children. Children are not
-    # listed in stdlib names but we need them because in some cases (e.g. os
-    # manually setting sys.modules["os.path"]) they have certain child
-    # expectations.
-    v
-    for v in _stdlib_module_names.split(",")
-    if v != "sys"
-}
+SandboxRestrictions.passthrough_modules_maximum = (
+    SandboxRestrictions.passthrough_modules_with_temporal
+    | {
+        # All stdlib modules except "sys" and their children. Children are not
+        # listed in stdlib names but we need them because in some cases (e.g. os
+        # manually setting sys.modules["os.path"]) they have certain child
+        # expectations.
+        v
+        for v in _stdlib_module_names.split(",")
+        if v != "sys"
+    }
+)
 
 SandboxRestrictions.passthrough_modules_default = (
     SandboxRestrictions.passthrough_modules_maximum

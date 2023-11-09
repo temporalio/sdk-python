@@ -19,7 +19,7 @@ from .testmodules import restrictions
 def test_workflow_sandbox_importer_invalid_module():
     with pytest.raises(RestrictedWorkflowAccessError) as err:
         with Importer(restrictions, RestrictionContext()).applied():
-            import tests.worker.workflow_sandbox.testmodules.invalid_module
+            pass
     assert (
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module"
@@ -70,9 +70,7 @@ def test_workflow_sandbox_importer_invalid_module_members():
     with importer.applied():
         import tests.worker.workflow_sandbox.testmodules.invalid_module_members
 
-        _ = (
-            tests.worker.workflow_sandbox.testmodules.invalid_module_members.invalid_function
-        )
+        _ = tests.worker.workflow_sandbox.testmodules.invalid_module_members.invalid_function
 
     # Cannot call qualified
     with pytest.raises(RestrictedWorkflowAccessError) as err:

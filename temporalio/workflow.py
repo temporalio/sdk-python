@@ -809,7 +809,7 @@ def upsert_search_attributes(
     attributes: Union[
         temporalio.common.SearchAttributes,
         Sequence[temporalio.common.SearchAttributeUpdate],
-    ]
+    ],
 ) -> None:
     """Upsert search attributes for this workflow.
 

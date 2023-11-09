@@ -247,7 +247,7 @@ def in_activity() -> bool:
     Returns:
         True if in an activity, False otherwise.
     """
-    return not _current_context.get(None) is None
+    return _current_context.get(None) is not None
 
 
 def info() -> Info:
@@ -524,7 +524,8 @@ class _Definition:
                 fn=fn,
                 # iscoroutinefunction does not return true for async __call__
                 # TODO(cretz): Why can't MyPy handle this?
-                is_async=inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
+                is_async=inspect.iscoroutinefunction(fn)
+                or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
                 no_thread_cancel_exception=no_thread_cancel_exception,
             ),
         )

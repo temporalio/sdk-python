@@ -26,13 +26,13 @@ WorkflowTaskCompletedMetadata = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTASKCOMPLETEDMETADATA,
-        "__module__": "temporal.api.sdk.v1.task_complete_metadata_pb2"
+        "__module__": "temporal.api.sdk.v1.task_complete_metadata_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkflowTaskCompletedMetadata)
     },
 )
 _sym_db.RegisterMessage(WorkflowTaskCompletedMetadata)
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\026io.temporal.api.sdk.v1B\031TaskCompleteMetadataProtoP\001Z\035go.temporal.io/api/sdk/v1;sdk\252\002\025Temporalio.Api.Sdk.V1\352\002\030Temporalio::Api::Sdk::V1"
     _WORKFLOWTASKCOMPLETEDMETADATA._serialized_start = 73

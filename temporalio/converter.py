@@ -878,9 +878,7 @@ class DefaultFailureConverter(FailureConverter):
         elif isinstance(error, temporalio.exceptions.ChildWorkflowError):
             failure.child_workflow_execution_failure_info.SetInParent()
             failure.child_workflow_execution_failure_info.namespace = error.namespace
-            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = (
-                error.workflow_id
-            )
+            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = error.workflow_id
             failure.child_workflow_execution_failure_info.workflow_execution.run_id = (
                 error.run_id
             )
@@ -1190,7 +1188,7 @@ def encode_typed_search_attribute_value(
     if isinstance(value, Sequence):
         for v in value:
             if not isinstance(v, str):
-                raise TypeError(f"All values of a keyword list must be strings")
+                raise TypeError("All values of a keyword list must be strings")
     # Convert value
     payload = default().payload_converter.to_payload(value)
     # Set metadata type
@@ -1228,7 +1226,7 @@ def encode_search_attribute_values(
             )
         elif val_type and type(v) is not val_type:
             raise TypeError(
-                f"Search attribute values must have the same type for the same key"
+                "Search attribute values must have the same type for the same key"
             )
         elif not val_type:
             val_type = type(v)

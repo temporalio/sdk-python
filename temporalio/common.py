@@ -56,7 +56,7 @@ class RetryPolicy:
 
     maximum_attempts: int = 0
     """Maximum number of attempts.
-    
+
     If 0, the default, there is no maximum.
     """
 

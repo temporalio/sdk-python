@@ -28,7 +28,7 @@ HealthCheckRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HEALTHCHECKREQUEST,
-        "__module__": "health.v1.health_pb2"
+        "__module__": "health.v1.health_pb2",
         # @@protoc_insertion_point(class_scope:temporal.grpc.health.v1.HealthCheckRequest)
     },
 )
@@ -39,14 +39,14 @@ HealthCheckResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HEALTHCHECKRESPONSE,
-        "__module__": "health.v1.health_pb2"
+        "__module__": "health.v1.health_pb2",
         # @@protoc_insertion_point(class_scope:temporal.grpc.health.v1.HealthCheckResponse)
     },
 )
 _sym_db.RegisterMessage(HealthCheckResponse)
 
 _HEALTH = DESCRIPTOR.services_by_name["Health"]
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\021io.grpc.health.v1B\013HealthProtoP\001Z,google.golang.org/grpc/health/grpc_health_v1\252\002\016Grpc.Health.V1"
     _HEALTHCHECKREQUEST._serialized_start = 51

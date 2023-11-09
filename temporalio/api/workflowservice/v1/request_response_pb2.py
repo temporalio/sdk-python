@@ -13,85 +13,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
-from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
-
-from temporalio.api.batch.v1 import (
-    message_pb2 as temporal_dot_api_dot_batch_dot_v1_dot_message__pb2,
-)
-from temporalio.api.command.v1 import (
-    message_pb2 as temporal_dot_api_dot_command_dot_v1_dot_message__pb2,
-)
-from temporalio.api.common.v1 import (
-    message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
-)
-from temporalio.api.dependencies.gogoproto import (
-    gogo_pb2 as dependencies_dot_gogoproto_dot_gogo__pb2,
-)
-from temporalio.api.enums.v1 import (
-    batch_operation_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_batch__operation__pb2,
-)
-from temporalio.api.enums.v1 import (
-    common_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_common__pb2,
-)
-from temporalio.api.enums.v1 import (
-    failed_cause_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_failed__cause__pb2,
-)
-from temporalio.api.enums.v1 import (
-    namespace_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_namespace__pb2,
-)
-from temporalio.api.enums.v1 import (
-    query_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_query__pb2,
-)
-from temporalio.api.enums.v1 import (
-    reset_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_reset__pb2,
-)
-from temporalio.api.enums.v1 import (
-    task_queue_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_task__queue__pb2,
-)
-from temporalio.api.enums.v1 import (
-    workflow_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_workflow__pb2,
-)
-from temporalio.api.failure.v1 import (
-    message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2,
-)
-from temporalio.api.filter.v1 import (
-    message_pb2 as temporal_dot_api_dot_filter_dot_v1_dot_message__pb2,
-)
-from temporalio.api.history.v1 import (
-    message_pb2 as temporal_dot_api_dot_history_dot_v1_dot_message__pb2,
-)
-from temporalio.api.namespace.v1 import (
-    message_pb2 as temporal_dot_api_dot_namespace_dot_v1_dot_message__pb2,
-)
-from temporalio.api.protocol.v1 import (
-    message_pb2 as temporal_dot_api_dot_protocol_dot_v1_dot_message__pb2,
-)
-from temporalio.api.query.v1 import (
-    message_pb2 as temporal_dot_api_dot_query_dot_v1_dot_message__pb2,
-)
-from temporalio.api.replication.v1 import (
-    message_pb2 as temporal_dot_api_dot_replication_dot_v1_dot_message__pb2,
-)
-from temporalio.api.schedule.v1 import (
-    message_pb2 as temporal_dot_api_dot_schedule_dot_v1_dot_message__pb2,
-)
-from temporalio.api.sdk.v1 import (
-    task_complete_metadata_pb2 as temporal_dot_api_dot_sdk_dot_v1_dot_task__complete__metadata__pb2,
-)
-from temporalio.api.taskqueue.v1 import (
-    message_pb2 as temporal_dot_api_dot_taskqueue_dot_v1_dot_message__pb2,
-)
-from temporalio.api.update.v1 import (
-    message_pb2 as temporal_dot_api_dot_update_dot_v1_dot_message__pb2,
-)
-from temporalio.api.version.v1 import (
-    message_pb2 as temporal_dot_api_dot_version_dot_v1_dot_message__pb2,
-)
-from temporalio.api.workflow.v1 import (
-    message_pb2 as temporal_dot_api_dot_workflow_dot_v1_dot_message__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n6temporal/api/workflowservice/v1/request_response.proto\x12\x1ftemporal.api.workflowservice.v1\x1a+temporal/api/enums/v1/batch_operation.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a%temporal/api/enums/v1/namespace.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a"temporal/api/enums/v1/common.proto\x1a!temporal/api/enums/v1/query.proto\x1a!temporal/api/enums/v1/reset.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/history/v1/message.proto\x1a&temporal/api/workflow/v1/message.proto\x1a%temporal/api/command/v1/message.proto\x1a%temporal/api/failure/v1/message.proto\x1a$temporal/api/filter/v1/message.proto\x1a&temporal/api/protocol/v1/message.proto\x1a\'temporal/api/namespace/v1/message.proto\x1a#temporal/api/query/v1/message.proto\x1a)temporal/api/replication/v1/message.proto\x1a&temporal/api/schedule/v1/message.proto\x1a\'temporal/api/taskqueue/v1/message.proto\x1a$temporal/api/update/v1/message.proto\x1a%temporal/api/version/v1/message.proto\x1a#temporal/api/batch/v1/message.proto\x1a\x30temporal/api/sdk/v1/task_complete_metadata.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto"\x8e\x05\n\x18RegisterNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x13\n\x0bowner_email\x18\x03 \x01(\t\x12L\n#workflow_execution_retention_period\x18\x04 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12G\n\x08\x63lusters\x18\x05 \x03(\x0b\x32\x35.temporal.api.replication.v1.ClusterReplicationConfig\x12\x1b\n\x13\x61\x63tive_cluster_name\x18\x06 \x01(\t\x12Q\n\x04\x64\x61ta\x18\x07 \x03(\x0b\x32\x43.temporal.api.workflowservice.v1.RegisterNamespaceRequest.DataEntry\x12\x16\n\x0esecurity_token\x18\x08 \x01(\t\x12\x1b\n\x13is_global_namespace\x18\t \x01(\x08\x12\x44\n\x16history_archival_state\x18\n \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1c\n\x14history_archival_uri\x18\x0b \x01(\t\x12G\n\x19visibility_archival_state\x18\x0c \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1f\n\x17visibility_archival_uri\x18\r \x01(\t\x1a+\n\tDataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\x1b\n\x19RegisterNamespaceResponse"\x89\x01\n\x15ListNamespacesRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x44\n\x10namespace_filter\x18\x03 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceFilter"\x81\x01\n\x16ListNamespacesResponse\x12N\n\nnamespaces\x18\x01 \x03(\x0b\x32:.temporal.api.workflowservice.v1.DescribeNamespaceResponse\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"9\n\x18\x44\x65scribeNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t"\xec\x02\n\x19\x44\x65scribeNamespaceResponse\x12@\n\x0enamespace_info\x18\x01 \x01(\x0b\x32(.temporal.api.namespace.v1.NamespaceInfo\x12:\n\x06\x63onfig\x18\x02 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x03 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x18\n\x10\x66\x61ilover_version\x18\x04 \x01(\x03\x12\x1b\n\x13is_global_namespace\x18\x05 \x01(\x08\x12\x45\n\x10\x66\x61ilover_history\x18\x06 \x03(\x0b\x32+.temporal.api.replication.v1.FailoverStatus"\xcf\x02\n\x16UpdateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x43\n\x0bupdate_info\x18\x02 \x01(\x0b\x32..temporal.api.namespace.v1.UpdateNamespaceInfo\x12:\n\x06\x63onfig\x18\x03 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x04 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x16\n\x0esecurity_token\x18\x05 \x01(\t\x12\x19\n\x11\x64\x65lete_bad_binary\x18\x06 \x01(\t\x12\x19\n\x11promote_namespace\x18\x07 \x01(\x08"\xa3\x02\n\x17UpdateNamespaceResponse\x12@\n\x0enamespace_info\x18\x01 \x01(\x0b\x32(.temporal.api.namespace.v1.NamespaceInfo\x12:\n\x06\x63onfig\x18\x02 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x03 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x18\n\x10\x66\x61ilover_version\x18\x04 \x01(\x03\x12\x1b\n\x13is_global_namespace\x18\x05 \x01(\x08"F\n\x19\x44\x65precateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x16\n\x0esecurity_token\x18\x02 \x01(\t"\x1c\n\x1a\x44\x65precateNamespaceResponse"\xfb\x07\n\x1dStartWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x43\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12=\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12>\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12\x10\n\x08identity\x18\t \x01(\t\x12\x12\n\nrequest_id\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12\x39\n\x0cretry_policy\x18\x0c \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\r \x01(\t\x12*\n\x04memo\x18\x0e \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x0f \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12.\n\x06header\x18\x10 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x1f\n\x17request_eager_execution\x18\x11 \x01(\x08\x12;\n\x11\x63ontinued_failure\x18\x12 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12@\n\x16last_completion_result\x18\x13 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12=\n\x14workflow_start_delay\x18\x14 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01"\x8d\x01\n\x1eStartWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12[\n\x13\x65\x61ger_workflow_task\x18\x02 \x01(\x0b\x32>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse"\xaa\x02\n"GetWorkflowExecutionHistoryRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x19\n\x11maximum_page_size\x18\x03 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c\x12\x16\n\x0ewait_new_event\x18\x05 \x01(\x08\x12P\n\x19history_event_filter_type\x18\x06 \x01(\x0e\x32-.temporal.api.enums.v1.HistoryEventFilterType\x12\x15\n\rskip_archival\x18\x07 \x01(\x08"\xba\x01\n#GetWorkflowExecutionHistoryResponse\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x35\n\x0braw_history\x18\x02 \x03(\x0b\x32 .temporal.api.common.v1.DataBlob\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x10\n\x08\x61rchived\x18\x04 \x01(\x08"\xb0\x01\n)GetWorkflowExecutionHistoryReverseRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x19\n\x11maximum_page_size\x18\x03 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"x\n*GetWorkflowExecutionHistoryReverseResponse\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"\xee\x01\n\x1cPollWorkflowTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x17\n\x0f\x62inary_checksum\x18\x04 \x01(\t\x12V\n\x1bworker_version_capabilities\x18\x05 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilities"\xca\x06\n\x1dPollWorkflowTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12!\n\x19previous_started_event_id\x18\x04 \x01(\x03\x12\x18\n\x10started_event_id\x18\x05 \x01(\x03\x12\x0f\n\x07\x61ttempt\x18\x06 \x01(\x05\x12\x1a\n\x12\x62\x61\x63klog_count_hint\x18\x07 \x01(\x03\x12\x31\n\x07history\x18\x08 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x17\n\x0fnext_page_token\x18\t \x01(\x0c\x12\x33\n\x05query\x18\n \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery\x12K\n\x1dworkflow_execution_task_queue\x18\x0b \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x38\n\x0escheduled_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x36\n\x0cstarted_time\x18\r \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\\\n\x07queries\x18\x0e \x03(\x0b\x32K.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse.QueriesEntry\x12\x33\n\x08messages\x18\x0f \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x1aT\n\x0cQueriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x33\n\x05value\x18\x02 \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery:\x02\x38\x01"\xa4\x06\n#RespondWorkflowTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x32\n\x08\x63ommands\x18\x02 \x03(\x0b\x32 .temporal.api.command.v1.Command\x12\x10\n\x08identity\x18\x03 \x01(\t\x12O\n\x11sticky_attributes\x18\x04 \x01(\x0b\x32\x34.temporal.api.taskqueue.v1.StickyExecutionAttributes\x12 \n\x18return_new_workflow_task\x18\x05 \x01(\x08\x12&\n\x1e\x66orce_create_new_workflow_task\x18\x06 \x01(\x08\x12\x17\n\x0f\x62inary_checksum\x18\x07 \x01(\t\x12m\n\rquery_results\x18\x08 \x03(\x0b\x32V.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest.QueryResultsEntry\x12\x11\n\tnamespace\x18\t \x01(\t\x12H\n\x14worker_version_stamp\x18\n \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStamp\x12\x33\n\x08messages\x18\x0b \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12H\n\x0csdk_metadata\x18\x0c \x01(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowTaskCompletedMetadata\x12\x43\n\x11metering_metadata\x18\r \x01(\x0b\x32(.temporal.api.common.v1.MeteringMetadata\x1a_\n\x11QueryResultsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x39\n\x05value\x18\x02 \x01(\x0b\x32*.temporal.api.query.v1.WorkflowQueryResult:\x02\x38\x01"\xf5\x01\n$RespondWorkflowTaskCompletedResponse\x12U\n\rworkflow_task\x18\x01 \x01(\x0b\x32>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse\x12V\n\x0e\x61\x63tivity_tasks\x18\x02 \x03(\x0b\x32>.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse\x12\x1e\n\x16reset_history_event_id\x18\x03 \x01(\x03"\xdf\x02\n RespondWorkflowTaskFailedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12=\n\x05\x63\x61use\x18\x02 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowTaskFailedCause\x12\x31\n\x07\x66\x61ilure\x18\x03 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x04 \x01(\t\x12\x17\n\x0f\x62inary_checksum\x18\x05 \x01(\t\x12\x11\n\tnamespace\x18\x06 \x01(\t\x12\x33\n\x08messages\x18\x07 \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12\x42\n\x0eworker_version\x18\x08 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStamp"#\n!RespondWorkflowTaskFailedResponse"\xa0\x02\n\x1cPollActivityTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x10\n\x08identity\x18\x03 \x01(\t\x12I\n\x13task_queue_metadata\x18\x04 \x01(\x0b\x32,.temporal.api.taskqueue.v1.TaskQueueMetadata\x12V\n\x1bworker_version_capabilities\x18\x05 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilities"\x8c\x07\n\x1dPollActivityTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x1a\n\x12workflow_namespace\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x45\n\x12workflow_execution\x18\x04 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\ractivity_type\x18\x05 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x13\n\x0b\x61\x63tivity_id\x18\x06 \x01(\t\x12.\n\x06header\x18\x07 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12/\n\x05input\x18\x08 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12;\n\x11heartbeat_details\x18\t \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x38\n\x0escheduled_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12H\n\x1e\x63urrent_attempt_scheduled_time\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x36\n\x0cstarted_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x0f\n\x07\x61ttempt\x18\r \x01(\x05\x12\x42\n\x19schedule_to_close_timeout\x18\x0e \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12?\n\x16start_to_close_timeout\x18\x0f \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12:\n\x11heartbeat_timeout\x18\x10 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12\x39\n\x0cretry_policy\x18\x11 \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy"\x90\x01\n"RecordActivityTaskHeartbeatRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t"?\n#RecordActivityTaskHeartbeatResponse\x12\x18\n\x10\x63\x61ncel_requested\x18\x01 \x01(\x08"\xba\x01\n&RecordActivityTaskHeartbeatByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t"C\n\'RecordActivityTaskHeartbeatByIdResponse\x12\x18\n\x10\x63\x61ncel_requested\x18\x01 \x01(\x08"\xd4\x01\n#RespondActivityTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x06result\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x42\n\x0eworker_version\x18\x05 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStamp"&\n$RespondActivityTaskCompletedResponse"\xba\x01\n\'RespondActivityTaskCompletedByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x30\n\x06result\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t"*\n(RespondActivityTaskCompletedByIdResponse"\x94\x02\n RespondActivityTaskFailedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12@\n\x16last_heartbeat_details\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x42\n\x0eworker_version\x18\x06 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStamp"W\n!RespondActivityTaskFailedResponse\x12\x32\n\x08\x66\x61ilures\x18\x01 \x03(\x0b\x32 .temporal.api.failure.v1.Failure"\xfa\x01\n$RespondActivityTaskFailedByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x06 \x01(\t\x12@\n\x16last_heartbeat_details\x18\x07 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"[\n%RespondActivityTaskFailedByIdResponse\x12\x32\n\x08\x66\x61ilures\x18\x01 \x03(\x0b\x32 .temporal.api.failure.v1.Failure"\xd4\x01\n"RespondActivityTaskCanceledRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x42\n\x0eworker_version\x18\x05 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStamp"%\n#RespondActivityTaskCanceledResponse"\xba\x01\n&RespondActivityTaskCanceledByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t")\n\'RespondActivityTaskCanceledByIdResponse"\xd7\x01\n%RequestCancelWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x12\n\nrequest_id\x18\x04 \x01(\t\x12\x1e\n\x16\x66irst_execution_run_id\x18\x05 \x01(\t\x12\x0e\n\x06reason\x18\x06 \x01(\t"(\n&RequestCancelWorkflowExecutionResponse"\xcc\x02\n\x1eSignalWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x13\n\x0bsignal_name\x18\x03 \x01(\t\x12/\n\x05input\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12\x0f\n\x07\x63ontrol\x18\x07 \x01(\t\x12.\n\x06header\x18\x08 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12#\n\x1bskip_generate_workflow_task\x18\t \x01(\x08"!\n\x1fSignalWorkflowExecutionResponse"\xe8\x07\n\'SignalWithStartWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x43\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12=\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12>\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12\x10\n\x08identity\x18\t \x01(\t\x12\x12\n\nrequest_id\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12\x13\n\x0bsignal_name\x18\x0c \x01(\t\x12\x36\n\x0csignal_input\x18\r \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x0f\n\x07\x63ontrol\x18\x0e \x01(\t\x12\x39\n\x0cretry_policy\x18\x0f \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\x10 \x01(\t\x12*\n\x04memo\x18\x11 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x12 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12.\n\x06header\x18\x13 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12=\n\x14workflow_start_delay\x18\x14 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12#\n\x1bskip_generate_workflow_task\x18\x15 \x01(\x08":\n(SignalWithStartWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t"\x89\x02\n\x1dResetWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12%\n\x1dworkflow_task_finish_event_id\x18\x04 \x01(\x03\x12\x12\n\nrequest_id\x18\x05 \x01(\t\x12\x43\n\x12reset_reapply_type\x18\x06 \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyType"0\n\x1eResetWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t"\xf2\x01\n!TerminateWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x1e\n\x16\x66irst_execution_run_id\x18\x06 \x01(\t"$\n"TerminateWorkflowExecutionResponse"z\n\x1e\x44\x65leteWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"!\n\x1f\x44\x65leteWorkflowExecutionResponse"\xc9\x02\n!ListOpenWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x42\n\x11start_time_filter\x18\x04 \x01(\x0b\x32\'.temporal.api.filter.v1.StartTimeFilter\x12K\n\x10\x65xecution_filter\x18\x05 \x01(\x0b\x32/.temporal.api.filter.v1.WorkflowExecutionFilterH\x00\x12\x41\n\x0btype_filter\x18\x06 \x01(\x0b\x32*.temporal.api.filter.v1.WorkflowTypeFilterH\x00\x42\t\n\x07\x66ilters"\x82\x01\n"ListOpenWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\x8a\x03\n#ListClosedWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x42\n\x11start_time_filter\x18\x04 \x01(\x0b\x32\'.temporal.api.filter.v1.StartTimeFilter\x12K\n\x10\x65xecution_filter\x18\x05 \x01(\x0b\x32/.temporal.api.filter.v1.WorkflowExecutionFilterH\x00\x12\x41\n\x0btype_filter\x18\x06 \x01(\x0b\x32*.temporal.api.filter.v1.WorkflowTypeFilterH\x00\x12=\n\rstatus_filter\x18\x07 \x01(\x0b\x32$.temporal.api.filter.v1.StatusFilterH\x00\x42\t\n\x07\x66ilters"\x84\x01\n$ListClosedWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"m\n\x1dListWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"~\n\x1eListWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"u\n%ListArchivedWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"\x86\x01\n&ListArchivedWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"m\n\x1dScanWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"~\n\x1eScanWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"B\n\x1e\x43ountWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\r\n\x05query\x18\x02 \x01(\t"0\n\x1f\x43ountWorkflowExecutionsResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03"\x1c\n\x1aGetSearchAttributesRequest"\xc9\x01\n\x1bGetSearchAttributesResponse\x12T\n\x04keys\x18\x01 \x03(\x0b\x32\x46.temporal.api.workflowservice.v1.GetSearchAttributesResponse.KeysEntry\x1aT\n\tKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\xde\x01\n RespondQueryTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12>\n\x0e\x63ompleted_type\x18\x02 \x01(\x0e\x32&.temporal.api.enums.v1.QueryResultType\x12\x36\n\x0cquery_result\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rerror_message\x18\x04 \x01(\t\x12\x11\n\tnamespace\x18\x06 \x01(\tJ\x04\x08\x05\x10\x06"#\n!RespondQueryTaskCompletedResponse"n\n\x1bResetStickyTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"\x1e\n\x1cResetStickyTaskQueueResponse"\xe9\x01\n\x14QueryWorkflowRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x33\n\x05query\x18\x03 \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery\x12K\n\x16query_reject_condition\x18\x04 \x01(\x0e\x32+.temporal.api.enums.v1.QueryRejectCondition"\x8d\x01\n\x15QueryWorkflowResponse\x12\x36\n\x0cquery_result\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12<\n\x0equery_rejected\x18\x02 \x01(\x0b\x32$.temporal.api.query.v1.QueryRejected"s\n DescribeWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"\xae\x03\n!DescribeWorkflowExecutionResponse\x12K\n\x10\x65xecution_config\x18\x01 \x01(\x0b\x32\x31.temporal.api.workflow.v1.WorkflowExecutionConfig\x12P\n\x17workflow_execution_info\x18\x02 \x01(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12I\n\x12pending_activities\x18\x03 \x03(\x0b\x32-.temporal.api.workflow.v1.PendingActivityInfo\x12M\n\x10pending_children\x18\x04 \x03(\x0b\x32\x33.temporal.api.workflow.v1.PendingChildExecutionInfo\x12P\n\x15pending_workflow_task\x18\x05 \x01(\x0b\x32\x31.temporal.api.workflow.v1.PendingWorkflowTaskInfo"\xc9\x01\n\x18\x44\x65scribeTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12=\n\x0ftask_queue_type\x18\x03 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12!\n\x19include_task_queue_status\x18\x04 \x01(\x08"\x9a\x01\n\x19\x44\x65scribeTaskQueueResponse\x12\x36\n\x07pollers\x18\x01 \x03(\x0b\x32%.temporal.api.taskqueue.v1.PollerInfo\x12\x45\n\x11task_queue_status\x18\x02 \x01(\x0b\x32*.temporal.api.taskqueue.v1.TaskQueueStatus"\x17\n\x15GetClusterInfoRequest"\x8b\x03\n\x16GetClusterInfoResponse\x12h\n\x11supported_clients\x18\x01 \x03(\x0b\x32M.temporal.api.workflowservice.v1.GetClusterInfoResponse.SupportedClientsEntry\x12\x16\n\x0eserver_version\x18\x02 \x01(\t\x12\x12\n\ncluster_id\x18\x03 \x01(\t\x12:\n\x0cversion_info\x18\x04 \x01(\x0b\x32$.temporal.api.version.v1.VersionInfo\x12\x14\n\x0c\x63luster_name\x18\x05 \x01(\t\x12\x1b\n\x13history_shard_count\x18\x06 \x01(\x05\x12\x19\n\x11persistence_store\x18\x07 \x01(\t\x12\x18\n\x10visibility_store\x18\x08 \x01(\t\x1a\x37\n\x15SupportedClientsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\x16\n\x14GetSystemInfoRequest"\xbc\x03\n\x15GetSystemInfoResponse\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12Y\n\x0c\x63\x61pabilities\x18\x02 \x01(\x0b\x32\x43.temporal.api.workflowservice.v1.GetSystemInfoResponse.Capabilities\x1a\xaf\x02\n\x0c\x43\x61pabilities\x12\x1f\n\x17signal_and_query_header\x18\x01 \x01(\x08\x12&\n\x1einternal_error_differentiation\x18\x02 \x01(\x08\x12*\n"activity_failure_include_heartbeat\x18\x03 \x01(\x08\x12\x1a\n\x12supports_schedules\x18\x04 \x01(\x08\x12"\n\x1a\x65ncoded_failure_attributes\x18\x05 \x01(\x08\x12!\n\x19\x62uild_id_based_versioning\x18\x06 \x01(\x08\x12\x13\n\x0bupsert_memo\x18\x07 \x01(\x08\x12\x1c\n\x14\x65\x61ger_workflow_start\x18\x08 \x01(\x08\x12\x14\n\x0csdk_metadata\x18\t \x01(\x08"m\n\x1eListTaskQueuePartitionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue"\xdf\x01\n\x1fListTaskQueuePartitionsResponse\x12]\n\x1e\x61\x63tivity_task_queue_partitions\x18\x01 \x03(\x0b\x32\x35.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata\x12]\n\x1eworkflow_task_queue_partitions\x18\x02 \x03(\x0b\x32\x35.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata"\xcc\x02\n\x15\x43reateScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x34\n\x08schedule\x18\x03 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12>\n\rinitial_patch\x18\x04 \x01(\x0b\x32\'.temporal.api.schedule.v1.SchedulePatch\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12*\n\x04memo\x18\x07 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x08 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes"0\n\x16\x43reateScheduleResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c"A\n\x17\x44\x65scribeScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t"\x8f\x02\n\x18\x44\x65scribeScheduleResponse\x12\x34\n\x08schedule\x18\x01 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12\x34\n\x04info\x18\x02 \x01(\x0b\x32&.temporal.api.schedule.v1.ScheduleInfo\x12*\n\x04memo\x18\x03 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x04 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x16\n\x0e\x63onflict_token\x18\x05 \x01(\x0c"\xb3\x01\n\x15UpdateScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x34\n\x08schedule\x18\x03 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12\x16\n\x0e\x63onflict_token\x18\x04 \x01(\x0c\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t"\x18\n\x16UpdateScheduleResponse"\x9c\x01\n\x14PatchScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x36\n\x05patch\x18\x03 \x01(\x0b\x32\'.temporal.api.schedule.v1.SchedulePatch\x12\x10\n\x08identity\x18\x04 \x01(\t\x12\x12\n\nrequest_id\x18\x05 \x01(\t"\x17\n\x15PatchScheduleResponse"\xb4\x01\n ListScheduleMatchingTimesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x34\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x32\n\x08\x65nd_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01"Y\n!ListScheduleMatchingTimesResponse\x12\x34\n\nstart_time\x18\x01 \x03(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01"Q\n\x15\x44\x65leteScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x10\n\x08identity\x18\x03 \x01(\t"\x18\n\x16\x44\x65leteScheduleResponse"]\n\x14ListSchedulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"p\n\x15ListSchedulesResponse\x12>\n\tschedules\x18\x01 \x03(\x0b\x32+.temporal.api.schedule.v1.ScheduleListEntry\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\x86\x05\n\'UpdateWorkerBuildIdCompatibilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12-\n#add_new_build_id_in_new_default_set\x18\x03 \x01(\tH\x00\x12\x87\x01\n\x1b\x61\x64\x64_new_compatible_build_id\x18\x04 \x01(\x0b\x32`.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.AddNewCompatibleVersionH\x00\x12!\n\x17promote_set_by_build_id\x18\x05 \x01(\tH\x00\x12%\n\x1bpromote_build_id_within_set\x18\x06 \x01(\tH\x00\x12h\n\nmerge_sets\x18\x07 \x01(\x0b\x32R.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.MergeSetsH\x00\x1ao\n\x17\x41\x64\x64NewCompatibleVersion\x12\x14\n\x0cnew_build_id\x18\x01 \x01(\t\x12$\n\x1c\x65xisting_compatible_build_id\x18\x02 \x01(\t\x12\x18\n\x10make_set_default\x18\x03 \x01(\x08\x1aI\n\tMergeSets\x12\x1c\n\x14primary_set_build_id\x18\x01 \x01(\t\x12\x1e\n\x16secondary_set_build_id\x18\x02 \x01(\tB\x0b\n\toperation"B\n(UpdateWorkerBuildIdCompatibilityResponse\x12\x16\n\x0eversion_set_id\x18\x01 \x01(\t"_\n$GetWorkerBuildIdCompatibilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12\x10\n\x08max_sets\x18\x03 \x01(\x05"t\n%GetWorkerBuildIdCompatibilityResponse\x12K\n\x12major_version_sets\x18\x01 \x03(\x0b\x32/.temporal.api.taskqueue.v1.CompatibleVersionSet"\x9c\x01\n GetWorkerTaskReachabilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tbuild_ids\x18\x02 \x03(\t\x12\x13\n\x0btask_queues\x18\x03 \x03(\t\x12=\n\x0creachability\x18\x04 \x01(\x0e\x32\'.temporal.api.enums.v1.TaskReachability"r\n!GetWorkerTaskReachabilityResponse\x12M\n\x15\x62uild_id_reachability\x18\x01 \x03(\x0b\x32..temporal.api.taskqueue.v1.BuildIdReachability"\x85\x02\n\x1eUpdateWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x1e\n\x16\x66irst_execution_run_id\x18\x03 \x01(\t\x12\x37\n\x0bwait_policy\x18\x04 \x01(\x0b\x32".temporal.api.update.v1.WaitPolicy\x12\x30\n\x07request\x18\x05 \x01(\x0b\x32\x1f.temporal.api.update.v1.Request"\x8a\x01\n\x1fUpdateWorkflowExecutionResponse\x12\x35\n\nupdate_ref\x18\x01 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef\x12\x30\n\x07outcome\x18\x02 \x01(\x0b\x32\x1f.temporal.api.update.v1.Outcome"\xba\x04\n\x1aStartBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x18\n\x10visibility_query\x18\x02 \x01(\t\x12\x0e\n\x06job_id\x18\x03 \x01(\t\x12\x0e\n\x06reason\x18\x04 \x01(\t\x12=\n\nexecutions\x18\x05 \x03(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12Q\n\x15termination_operation\x18\n \x01(\x0b\x32\x30.temporal.api.batch.v1.BatchOperationTerminationH\x00\x12G\n\x10signal_operation\x18\x0b \x01(\x0b\x32+.temporal.api.batch.v1.BatchOperationSignalH\x00\x12S\n\x16\x63\x61ncellation_operation\x18\x0c \x01(\x0b\x32\x31.temporal.api.batch.v1.BatchOperationCancellationH\x00\x12K\n\x12\x64\x65letion_operation\x18\r \x01(\x0b\x32-.temporal.api.batch.v1.BatchOperationDeletionH\x00\x12\x45\n\x0freset_operation\x18\x0e \x01(\x0b\x32*.temporal.api.batch.v1.BatchOperationResetH\x00\x42\x0b\n\toperation"\x1d\n\x1bStartBatchOperationResponse"`\n\x19StopBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06job_id\x18\x02 \x01(\t\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12\x10\n\x08identity\x18\x04 \x01(\t"\x1c\n\x1aStopBatchOperationResponse"B\n\x1d\x44\x65scribeBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06job_id\x18\x02 \x01(\t"\x9e\x03\n\x1e\x44\x65scribeBatchOperationResponse\x12\x41\n\x0eoperation_type\x18\x01 \x01(\x0e\x32).temporal.api.enums.v1.BatchOperationType\x12\x0e\n\x06job_id\x18\x02 \x01(\t\x12\x39\n\x05state\x18\x03 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12\x34\n\nstart_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x34\n\nclose_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12\x1d\n\x15total_operation_count\x18\x06 \x01(\x03\x12 \n\x18\x63omplete_operation_count\x18\x07 \x01(\x03\x12\x1f\n\x17\x66\x61ilure_operation_count\x18\x08 \x01(\x03\x12\x10\n\x08identity\x18\t \x01(\t\x12\x0e\n\x06reason\x18\n \x01(\t"[\n\x1aListBatchOperationsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"y\n\x1bListBatchOperationsResponse\x12\x41\n\x0eoperation_info\x18\x01 \x03(\x0b\x32).temporal.api.batch.v1.BatchOperationInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\xb9\x01\n"PollWorkflowExecutionUpdateRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x35\n\nupdate_ref\x18\x02 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x37\n\x0bwait_policy\x18\x04 \x01(\x0b\x32".temporal.api.update.v1.WaitPolicy"W\n#PollWorkflowExecutionUpdateResponse\x12\x30\n\x07outcome\x18\x01 \x01(\x0b\x32\x1f.temporal.api.update.v1.OutcomeB\xbe\x01\n"io.temporal.api.workflowservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/workflowservice/v1;workflowservice\xaa\x02!Temporalio.Api.WorkflowService.V1\xea\x02$Temporalio::Api::WorkflowService::V1b\x06proto3'
 )
@@ -424,12 +345,12 @@ RegisterNamespaceRequest = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _REGISTERNAMESPACEREQUEST_DATAENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RegisterNamespaceRequest.DataEntry)
             },
         ),
         "DESCRIPTOR": _REGISTERNAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RegisterNamespaceRequest)
     },
 )
@@ -441,7 +362,7 @@ RegisterNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REGISTERNAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RegisterNamespaceResponse)
     },
 )
@@ -452,7 +373,7 @@ ListNamespacesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTNAMESPACESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListNamespacesRequest)
     },
 )
@@ -463,7 +384,7 @@ ListNamespacesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTNAMESPACESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListNamespacesResponse)
     },
 )
@@ -474,7 +395,7 @@ DescribeNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBENAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeNamespaceRequest)
     },
 )
@@ -485,7 +406,7 @@ DescribeNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBENAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeNamespaceResponse)
     },
 )
@@ -496,7 +417,7 @@ UpdateNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATENAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateNamespaceRequest)
     },
 )
@@ -507,7 +428,7 @@ UpdateNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATENAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateNamespaceResponse)
     },
 )
@@ -518,7 +439,7 @@ DeprecateNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPRECATENAMESPACEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeprecateNamespaceRequest)
     },
 )
@@ -529,7 +450,7 @@ DeprecateNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPRECATENAMESPACERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeprecateNamespaceResponse)
     },
 )
@@ -540,7 +461,7 @@ StartWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartWorkflowExecutionRequest)
     },
 )
@@ -551,7 +472,7 @@ StartWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartWorkflowExecutionResponse)
     },
 )
@@ -562,7 +483,7 @@ GetWorkflowExecutionHistoryRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest)
     },
 )
@@ -573,7 +494,7 @@ GetWorkflowExecutionHistoryResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse)
     },
 )
@@ -584,7 +505,7 @@ GetWorkflowExecutionHistoryReverseRequest = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYREVERSEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseRequest)
     },
 )
@@ -595,7 +516,7 @@ GetWorkflowExecutionHistoryReverseResponse = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKFLOWEXECUTIONHISTORYREVERSERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseResponse)
     },
 )
@@ -606,7 +527,7 @@ PollWorkflowTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLWORKFLOWTASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowTaskQueueRequest)
     },
 )
@@ -621,12 +542,12 @@ PollWorkflowTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _POLLWORKFLOWTASKQUEUERESPONSE_QUERIESENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse.QueriesEntry)
             },
         ),
         "DESCRIPTOR": _POLLWORKFLOWTASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse)
     },
 )
@@ -642,12 +563,12 @@ RespondWorkflowTaskCompletedRequest = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_QUERYRESULTSENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest.QueryResultsEntry)
             },
         ),
         "DESCRIPTOR": _RESPONDWORKFLOWTASKCOMPLETEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest)
     },
 )
@@ -659,7 +580,7 @@ RespondWorkflowTaskCompletedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDWORKFLOWTASKCOMPLETEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedResponse)
     },
 )
@@ -670,7 +591,7 @@ RespondWorkflowTaskFailedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDWORKFLOWTASKFAILEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskFailedRequest)
     },
 )
@@ -681,7 +602,7 @@ RespondWorkflowTaskFailedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDWORKFLOWTASKFAILEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondWorkflowTaskFailedResponse)
     },
 )
@@ -692,7 +613,7 @@ PollActivityTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLACTIVITYTASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollActivityTaskQueueRequest)
     },
 )
@@ -703,7 +624,7 @@ PollActivityTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLACTIVITYTASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollActivityTaskQueueResponse)
     },
 )
@@ -714,7 +635,7 @@ RecordActivityTaskHeartbeatRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest)
     },
 )
@@ -725,7 +646,7 @@ RecordActivityTaskHeartbeatResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatResponse)
     },
 )
@@ -736,7 +657,7 @@ RecordActivityTaskHeartbeatByIdRequest = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest)
     },
 )
@@ -747,7 +668,7 @@ RecordActivityTaskHeartbeatByIdResponse = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDACTIVITYTASKHEARTBEATBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdResponse)
     },
 )
@@ -758,7 +679,7 @@ RespondActivityTaskCompletedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest)
     },
 )
@@ -769,7 +690,7 @@ RespondActivityTaskCompletedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedResponse)
     },
 )
@@ -780,7 +701,7 @@ RespondActivityTaskCompletedByIdRequest = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest)
     },
 )
@@ -791,7 +712,7 @@ RespondActivityTaskCompletedByIdResponse = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCOMPLETEDBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdResponse)
     },
 )
@@ -802,7 +723,7 @@ RespondActivityTaskFailedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedRequest)
     },
 )
@@ -813,7 +734,7 @@ RespondActivityTaskFailedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedResponse)
     },
 )
@@ -824,7 +745,7 @@ RespondActivityTaskFailedByIdRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest)
     },
 )
@@ -835,7 +756,7 @@ RespondActivityTaskFailedByIdResponse = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKFAILEDBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdResponse)
     },
 )
@@ -846,7 +767,7 @@ RespondActivityTaskCanceledRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest)
     },
 )
@@ -857,7 +778,7 @@ RespondActivityTaskCanceledResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledResponse)
     },
 )
@@ -868,7 +789,7 @@ RespondActivityTaskCanceledByIdRequest = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDBYIDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest)
     },
 )
@@ -879,7 +800,7 @@ RespondActivityTaskCanceledByIdResponse = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDACTIVITYTASKCANCELEDBYIDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdResponse)
     },
 )
@@ -890,7 +811,7 @@ RequestCancelWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest)
     },
 )
@@ -901,7 +822,7 @@ RequestCancelWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse)
     },
 )
@@ -912,7 +833,7 @@ SignalWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWorkflowExecutionRequest)
     },
 )
@@ -923,7 +844,7 @@ SignalWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWorkflowExecutionResponse)
     },
 )
@@ -934,7 +855,7 @@ SignalWithStartWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageTy
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest)
     },
 )
@@ -945,7 +866,7 @@ SignalWithStartWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _SIGNALWITHSTARTWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse)
     },
 )
@@ -956,7 +877,7 @@ ResetWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetWorkflowExecutionRequest)
     },
 )
@@ -967,7 +888,7 @@ ResetWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetWorkflowExecutionResponse)
     },
 )
@@ -978,7 +899,7 @@ TerminateWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TERMINATEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.TerminateWorkflowExecutionRequest)
     },
 )
@@ -989,7 +910,7 @@ TerminateWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _TERMINATEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.TerminateWorkflowExecutionResponse)
     },
 )
@@ -1000,7 +921,7 @@ DeleteWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteWorkflowExecutionRequest)
     },
 )
@@ -1011,7 +932,7 @@ DeleteWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteWorkflowExecutionResponse)
     },
 )
@@ -1022,7 +943,7 @@ ListOpenWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTOPENWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsRequest)
     },
 )
@@ -1033,7 +954,7 @@ ListOpenWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTOPENWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse)
     },
 )
@@ -1044,7 +965,7 @@ ListClosedWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTCLOSEDWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsRequest)
     },
 )
@@ -1055,7 +976,7 @@ ListClosedWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTCLOSEDWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsResponse)
     },
 )
@@ -1066,7 +987,7 @@ ListWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest)
     },
 )
@@ -1077,7 +998,7 @@ ListWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListWorkflowExecutionsResponse)
     },
 )
@@ -1088,7 +1009,7 @@ ListArchivedWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTARCHIVEDWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsRequest)
     },
 )
@@ -1099,7 +1020,7 @@ ListArchivedWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTARCHIVEDWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsResponse)
     },
 )
@@ -1110,7 +1031,7 @@ ScanWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCANWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ScanWorkflowExecutionsRequest)
     },
 )
@@ -1121,7 +1042,7 @@ ScanWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCANWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ScanWorkflowExecutionsResponse)
     },
 )
@@ -1132,7 +1053,7 @@ CountWorkflowExecutionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _COUNTWORKFLOWEXECUTIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest)
     },
 )
@@ -1143,7 +1064,7 @@ CountWorkflowExecutionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _COUNTWORKFLOWEXECUTIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse)
     },
 )
@@ -1154,7 +1075,7 @@ GetSearchAttributesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETSEARCHATTRIBUTESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSearchAttributesRequest)
     },
 )
@@ -1169,12 +1090,12 @@ GetSearchAttributesResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSearchAttributesResponse.KeysEntry)
             },
         ),
         "DESCRIPTOR": _GETSEARCHATTRIBUTESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSearchAttributesResponse)
     },
 )
@@ -1186,7 +1107,7 @@ RespondQueryTaskCompletedRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDQUERYTASKCOMPLETEDREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondQueryTaskCompletedRequest)
     },
 )
@@ -1197,7 +1118,7 @@ RespondQueryTaskCompletedResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONDQUERYTASKCOMPLETEDRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RespondQueryTaskCompletedResponse)
     },
 )
@@ -1208,7 +1129,7 @@ ResetStickyTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETSTICKYTASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetStickyTaskQueueRequest)
     },
 )
@@ -1219,7 +1140,7 @@ ResetStickyTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETSTICKYTASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ResetStickyTaskQueueResponse)
     },
 )
@@ -1230,7 +1151,7 @@ QueryWorkflowRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _QUERYWORKFLOWREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.QueryWorkflowRequest)
     },
 )
@@ -1241,7 +1162,7 @@ QueryWorkflowResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _QUERYWORKFLOWRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.QueryWorkflowResponse)
     },
 )
@@ -1252,7 +1173,7 @@ DescribeWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeWorkflowExecutionRequest)
     },
 )
@@ -1263,7 +1184,7 @@ DescribeWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeWorkflowExecutionResponse)
     },
 )
@@ -1274,7 +1195,7 @@ DescribeTaskQueueRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBETASKQUEUEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeTaskQueueRequest)
     },
 )
@@ -1285,7 +1206,7 @@ DescribeTaskQueueResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBETASKQUEUERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeTaskQueueResponse)
     },
 )
@@ -1296,7 +1217,7 @@ GetClusterInfoRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETCLUSTERINFOREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetClusterInfoRequest)
     },
 )
@@ -1311,12 +1232,12 @@ GetClusterInfoResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetClusterInfoResponse.SupportedClientsEntry)
             },
         ),
         "DESCRIPTOR": _GETCLUSTERINFORESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetClusterInfoResponse)
     },
 )
@@ -1328,7 +1249,7 @@ GetSystemInfoRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETSYSTEMINFOREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSystemInfoRequest)
     },
 )
@@ -1343,12 +1264,12 @@ GetSystemInfoResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _GETSYSTEMINFORESPONSE_CAPABILITIES,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSystemInfoResponse.Capabilities)
             },
         ),
         "DESCRIPTOR": _GETSYSTEMINFORESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetSystemInfoResponse)
     },
 )
@@ -1360,7 +1281,7 @@ ListTaskQueuePartitionsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTTASKQUEUEPARTITIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListTaskQueuePartitionsRequest)
     },
 )
@@ -1371,7 +1292,7 @@ ListTaskQueuePartitionsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTTASKQUEUEPARTITIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse)
     },
 )
@@ -1382,7 +1303,7 @@ CreateScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CREATESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CreateScheduleRequest)
     },
 )
@@ -1393,7 +1314,7 @@ CreateScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CREATESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.CreateScheduleResponse)
     },
 )
@@ -1404,7 +1325,7 @@ DescribeScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeScheduleRequest)
     },
 )
@@ -1415,7 +1336,7 @@ DescribeScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeScheduleResponse)
     },
 )
@@ -1426,7 +1347,7 @@ UpdateScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateScheduleRequest)
     },
 )
@@ -1437,7 +1358,7 @@ UpdateScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateScheduleResponse)
     },
 )
@@ -1448,7 +1369,7 @@ PatchScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PATCHSCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PatchScheduleRequest)
     },
 )
@@ -1459,7 +1380,7 @@ PatchScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PATCHSCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PatchScheduleResponse)
     },
 )
@@ -1470,7 +1391,7 @@ ListScheduleMatchingTimesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULEMATCHINGTIMESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListScheduleMatchingTimesRequest)
     },
 )
@@ -1481,7 +1402,7 @@ ListScheduleMatchingTimesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULEMATCHINGTIMESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListScheduleMatchingTimesResponse)
     },
 )
@@ -1492,7 +1413,7 @@ DeleteScheduleRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETESCHEDULEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteScheduleRequest)
     },
 )
@@ -1503,7 +1424,7 @@ DeleteScheduleResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETESCHEDULERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DeleteScheduleResponse)
     },
 )
@@ -1514,7 +1435,7 @@ ListSchedulesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULESREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListSchedulesRequest)
     },
 )
@@ -1525,7 +1446,7 @@ ListSchedulesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSCHEDULESRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListSchedulesResponse)
     },
 )
@@ -1540,7 +1461,7 @@ UpdateWorkerBuildIdCompatibilityRequest = _reflection.GeneratedProtocolMessageTy
             (_message.Message,),
             {
                 "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.AddNewCompatibleVersion)
             },
         ),
@@ -1549,12 +1470,12 @@ UpdateWorkerBuildIdCompatibilityRequest = _reflection.GeneratedProtocolMessageTy
             (_message.Message,),
             {
                 "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_MERGESETS,
-                "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.MergeSets)
             },
         ),
         "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest)
     },
 )
@@ -1567,7 +1488,7 @@ UpdateWorkerBuildIdCompatibilityResponse = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATEWORKERBUILDIDCOMPATIBILITYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityResponse)
     },
 )
@@ -1578,7 +1499,7 @@ GetWorkerBuildIdCompatibilityRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERBUILDIDCOMPATIBILITYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityRequest)
     },
 )
@@ -1589,7 +1510,7 @@ GetWorkerBuildIdCompatibilityResponse = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERBUILDIDCOMPATIBILITYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityResponse)
     },
 )
@@ -1600,7 +1521,7 @@ GetWorkerTaskReachabilityRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERTASKREACHABILITYREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerTaskReachabilityRequest)
     },
 )
@@ -1611,7 +1532,7 @@ GetWorkerTaskReachabilityResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETWORKERTASKREACHABILITYRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.GetWorkerTaskReachabilityResponse)
     },
 )
@@ -1622,7 +1543,7 @@ UpdateWorkflowExecutionRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATEWORKFLOWEXECUTIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkflowExecutionRequest)
     },
 )
@@ -1633,7 +1554,7 @@ UpdateWorkflowExecutionResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATEWORKFLOWEXECUTIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.UpdateWorkflowExecutionResponse)
     },
 )
@@ -1644,7 +1565,7 @@ StartBatchOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTBATCHOPERATIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartBatchOperationRequest)
     },
 )
@@ -1655,7 +1576,7 @@ StartBatchOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTBATCHOPERATIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StartBatchOperationResponse)
     },
 )
@@ -1666,7 +1587,7 @@ StopBatchOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STOPBATCHOPERATIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StopBatchOperationRequest)
     },
 )
@@ -1677,7 +1598,7 @@ StopBatchOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STOPBATCHOPERATIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.StopBatchOperationResponse)
     },
 )
@@ -1688,7 +1609,7 @@ DescribeBatchOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEBATCHOPERATIONREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeBatchOperationRequest)
     },
 )
@@ -1699,7 +1620,7 @@ DescribeBatchOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DESCRIBEBATCHOPERATIONRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeBatchOperationResponse)
     },
 )
@@ -1710,7 +1631,7 @@ ListBatchOperationsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTBATCHOPERATIONSREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListBatchOperationsRequest)
     },
 )
@@ -1721,7 +1642,7 @@ ListBatchOperationsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTBATCHOPERATIONSRESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListBatchOperationsResponse)
     },
 )
@@ -1732,7 +1653,7 @@ PollWorkflowExecutionUpdateRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLWORKFLOWEXECUTIONUPDATEREQUEST,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest)
     },
 )
@@ -1743,13 +1664,13 @@ PollWorkflowExecutionUpdateResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _POLLWORKFLOWEXECUTIONUPDATERESPONSE,
-        "__module__": "temporal.api.workflowservice.v1.request_response_pb2"
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse)
     },
 )
 _sym_db.RegisterMessage(PollWorkflowExecutionUpdateResponse)
 
-if _descriptor._USE_C_DESCRIPTORS == False:
+if _descriptor._USE_C_DESCRIPTORS is False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n"io.temporal.api.workflowservice.v1B\024RequestResponseProtoP\001Z5go.temporal.io/api/workflowservice/v1;workflowservice\252\002!Temporalio.Api.WorkflowService.V1\352\002$Temporalio::Api::WorkflowService::V1'
     _REGISTERNAMESPACEREQUEST_DATAENTRY._options = None
@@ -2082,9 +2003,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _LISTSCHEDULESRESPONSE._serialized_end = 20279
     _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_start = 20282
     _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_end = 20928
-    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_start = (
-        20729
-    )
+    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_start = 20729
     _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_end = (
         20840
     )
