@@ -286,7 +286,8 @@ class _ActivityWorker:
             if not activity_def:
                 activity_names = ", ".join(sorted(self._activities.keys()))
                 raise temporalio.exceptions.ApplicationError(
-                    f"Activity function {start.activity_type} is not registered on this worker, available activities: {activity_names}",
+                    f"Activity function {start.activity_type} for workflow {start.workflow_execution.workflow_id} "
+                    f"is not registered on this worker, available activities: {activity_names}",
                     type="NotFoundError",
                 )
 
