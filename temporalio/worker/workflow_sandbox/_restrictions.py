@@ -344,6 +344,12 @@ SandboxRestrictions.passthrough_modules_minimum = {
     # zipfile.ZipFile. TODO(cretz): Fix when subclassing restricted classes
     # is fixed.
     "importlib_metadata",
+    # Platform is needed because its initialization makes restricted calls and
+    # we don't want to disallow them
+    "platform",
+    # Due to a metaclass conflict in sandbox, we need zipfile module to pass
+    # through always
+    "zipfile",
     # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
     # for older versions. This unfortunately means that on those versions,
     # everyone using Python protos has to pass their module through.

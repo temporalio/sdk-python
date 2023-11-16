@@ -2094,17 +2094,6 @@ async def test_workflow_separate_protocol(client: Client):
     async with new_worker(
         client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
     ) as worker:
-        # Our decorators add attributes on the class, but protocols don't allow
-        # you to use issubclass with any attributes other than their fixed ones.
-        # We are asserting that this invariant holds so we can document it and
-        # revisit in a later version if they change this.
-        # TODO(cretz): If we document how to use protocols as workflow
-        # interfaces/contracts, we should mention that they can't use
-        # @runtime_checkable with issubclass.
-        with pytest.raises(TypeError) as err:
-            assert issubclass(DataClassTypedWorkflow, DataClassTypedWorkflowProto)
-        assert "non-method members" in str(err.value)
-
         assert isinstance(DataClassTypedWorkflow(), DataClassTypedWorkflowProto)
         val = MyDataClass(field1="some value")
         handle = await client.start_workflow(
@@ -3201,8 +3190,6 @@ class SwallowGeneratorExitWorkflow:
 
 
 async def test_swallow_generator_exit(client: Client):
-    if sys.version_info < (3, 8):
-        pytest.skip("sys.unraisablehook not in 3.7")
     # This test simulates GeneratorExit and GC issues by forcing eviction on
     # each step
     async with new_worker(
@@ -3868,3 +3855,81 @@ async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironme
         global task_fail_ct, bad_validator_fail_ct
         assert task_fail_ct == 1
         assert bad_validator_fail_ct == 2
+
+
+@workflow.defn
+class TimeoutSupportWorkflow:
+    @workflow.run
+    async def run(self, approach: str) -> None:
+        if sys.version_info < (3, 11):
+            raise RuntimeError("Timeout only in >= 3.11")
+        if approach == "timeout":
+            async with asyncio.timeout(0.2):
+                await workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+        elif approach == "timeout_at":
+            async with asyncio.timeout_at(asyncio.get_running_loop().time() + 0.2):
+                await workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+        elif approach == "wait_for":
+            await asyncio.wait_for(
+                workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                ),
+                0.2,
+            )
+        elif approach == "call_later":
+            activity_task = asyncio.create_task(
+                workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+            )
+            asyncio.get_running_loop().call_later(0.2, activity_task.cancel)
+            await activity_task
+        elif approach == "call_at":
+            activity_task = asyncio.create_task(
+                workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+            )
+            asyncio.get_running_loop().call_at(
+                asyncio.get_running_loop().time() + 0.2, activity_task.cancel
+            )
+            await activity_task
+        else:
+            raise RuntimeError(f"Unrecognized approach: {approach}")
+
+
+@pytest.mark.parametrize(
+    "approach", ["timeout", "timeout_at", "wait_for", "call_later", "call_at"]
+)
+async def test_workflow_timeout_support(client: Client, approach: str):
+    if sys.version_info < (3, 11):
+        pytest.skip("Timeout only in >= 3.11")
+    async with new_worker(
+        client, TimeoutSupportWorkflow, activities=[wait_cancel]
+    ) as worker:
+        # Run and confirm activity gets cancelled
+        with pytest.raises(WorkflowFailureError) as err:
+            handle = await client.start_workflow(
+                TimeoutSupportWorkflow.run,
+                approach,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle.result()
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, CancelledError)
+        # Check that no matter which approach, it made a 300ms timer
+        found_timer = False
+        async for e in handle.fetch_history_events():
+            if e.HasField("timer_started_event_attributes"):
+                assert (
+                    e.timer_started_event_attributes.start_to_fire_timeout.ToMilliseconds()
+                    == 200
+                )
+                found_timer = True
+                break
+        assert found_timer

@@ -1,6 +1,6 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
 
-[![Python 3.7+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.8+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
@@ -668,6 +668,9 @@ Some things to note about the above code:
 * A timer is represented by normal `asyncio.sleep()`
 * Timers are also implicitly started on any `asyncio` calls with timeouts (e.g. `asyncio.wait_for`)
 * Timers are Temporal server timers, not local ones, so sub-second resolution rarely has value
+* Calls that use a specific point in time, e.g. `call_at` or `timeout_at`, should be based on the current loop time
+  (i.e. `workflow.time()`) and not an actual point in time. This is because fixed times are translated to relative ones
+  by subtracting the current loop time which may not be the actual current time.
 
 #### Conditions
 
@@ -683,7 +686,6 @@ of the common `asyncio` calls work as normal. Some asyncio features are disabled
 * Thread related calls such as `to_thread()`, `run_coroutine_threadsafe()`, `loop.run_in_executor()`, etc
 * Calls that alter the event loop such as `loop.close()`, `loop.stop()`, `loop.run_forever()`,
   `loop.set_task_factory()`, etc
-* Calls that use a specific time such as `loop.call_at()`
 * Calls that use anything external such as networking, subprocesses, disk IO, etc
 
 Cancellation is done the same way as `asyncio`. Specifically, a task can be requested to be cancelled but does not
@@ -1295,7 +1297,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.7 and newer. It is built using
+The Python SDK is built to work with Python 3.8 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
 
 ### Building
@@ -1304,7 +1306,7 @@ The Python SDK is built to work with Python 3.7 and newer. It is built using
 
 To build the SDK from source for use as a dependency, the following prerequisites are required:
 
-* [Python](https://www.python.org/) >= 3.7
+* [Python](https://www.python.org/) >= 3.8
 * [Rust](https://www.rust-lang.org/)
 * [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
 * [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
