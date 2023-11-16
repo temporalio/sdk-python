@@ -114,6 +114,21 @@ async def test_workflow_hello(client: Client):
         assert result == "Hello, Temporal!"
 
 
+async def test_workflow_hello_eager(client: Client):
+    async with new_worker(client, HelloWorkflow) as worker:
+        handle = await client.start_workflow(
+            HelloWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            eager_start=True,
+            task_timeout=timedelta(hours=1),  # hang if retry needed
+        )
+        assert handle.eager_start_active
+        result = await handle.result()
+        assert result == "Hello, Temporal!"
+
+
 @activity.defn
 async def multi_param_activity(param1: int, param2: str) -> str:
     return f"param1: {param1}, param2: {param2}"
