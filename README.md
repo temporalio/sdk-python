@@ -669,8 +669,8 @@ Some things to note about the above code:
 * Timers are also implicitly started on any `asyncio` calls with timeouts (e.g. `asyncio.wait_for`)
 * Timers are Temporal server timers, not local ones, so sub-second resolution rarely has value
 * Calls that use a specific point in time, e.g. `call_at` or `timeout_at`, should be based on the current loop time
-  (i.e. `loop.time()`) and not an actual point in time. This is because fixed times are translated to relative ones by
-  subtracting the current loop time which may not be the actual current time.
+  (i.e. `workflow.time()`) and not an actual point in time. This is because fixed times are translated to relative ones
+  by subtracting the current loop time which may not be the actual current time.
 
 #### Conditions
 
