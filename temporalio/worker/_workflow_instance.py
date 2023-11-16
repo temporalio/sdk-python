@@ -19,6 +19,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Deque,
     Dict,
     Generator,
@@ -1767,6 +1768,25 @@ class _WorkflowInstanceImpl(
         self._pending_timers[seq] = handle
         return handle
 
+    def call_at(
+        self,
+        when: float,
+        callback: Callable[..., Any],
+        *args: Any,
+        context: Optional[contextvars.Context] = None,
+    ) -> asyncio.TimerHandle:
+        # We usually would not support fixed-future-time call (and we didn't
+        # previously), but 3.11 added asyncio.timeout which uses it and 3.12
+        # changed wait_for to use asyncio.timeout. We now simply count on users
+        # to only add to loop.time() and not an actual fixed point. Due to the
+        # fact that loop.time() is at a nanosecond level which floats can't
+        # always express well, we round to the nearest millisecond. We do this
+        # after the subtraction not before because this may be the result of a
+        # previous addition in Python code.
+        return self.call_later(
+            round(when - self.time(), 3), callback, *args, context=context
+        )
+
     def time(self) -> float:
         return self._time_ns / 1e9
 
@@ -2006,7 +2026,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self,
         instance: _WorkflowInstanceImpl,
         input: Union[StartActivityInput, StartLocalActivityInput],
-        fn: Awaitable[Any],
+        fn: Coroutine[Any, Any, Any],
     ) -> None:
         super().__init__(fn)
         self._instance = instance
@@ -2138,7 +2158,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         instance: _WorkflowInstanceImpl,
         seq: int,
         input: StartChildWorkflowInput,
-        fn: Awaitable[Any],
+        fn: Coroutine[Any, Any, Any],
     ) -> None:
         super().__init__(fn)
         self._instance = instance
