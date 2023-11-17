@@ -121,10 +121,10 @@ async def test_workflow_hello_eager(client: Client):
             "Temporal",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            eager_start=True,
+            request_eager_start=True,
             task_timeout=timedelta(hours=1),  # hang if retry needed
         )
-        assert handle.eager_start_active
+        assert handle.__temporal_eagerly_started
         result = await handle.result()
         assert result == "Hello, Temporal!"
 
