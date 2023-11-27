@@ -3,9 +3,3 @@
 # @temporalio/sdk will be requested for review when
 # someone opens a pull request.
 * @temporalio/sdk
-
-# Security team must approve exceptions to static analysis
-# scans, and any custom rules.
-
-.semgrepignore @temporalio/security
-.semgrep/ @temporalio/security
