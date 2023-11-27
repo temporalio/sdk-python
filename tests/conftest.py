@@ -81,6 +81,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "system.forceSearchAttributesCacheRefreshOnRead=true",
                 "--dynamic-config-value",
                 f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
+                "--dynamic-config-value",
+                "system.enableEagerWorkflowStart=true",
             ]
         )
     elif env_type == "time-skipping":
