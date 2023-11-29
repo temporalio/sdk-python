@@ -1825,6 +1825,33 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
 
 
 @workflow.defn
+class NoSearchAttributesWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        workflow.upsert_search_attributes(
+            [
+                SearchAttributeWorkflow.text_attribute.value_set("text2"),
+            ]
+        )
+        # All we need to do is complete
+
+
+async def test_workflow_no_initial_search_attributes(client: Client, env_type: str):
+    await ensure_search_attributes_present(
+        client,
+        SearchAttributeWorkflow.text_attribute,
+    )
+    async with new_worker(client, NoSearchAttributesWorkflow) as worker:
+        handle = await client.start_workflow(
+            NoSearchAttributesWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            # importantly, no initial search attributes
+        )
+        await handle.result()
+
+
+@workflow.defn
 class LoggingWorkflow:
     def __init__(self) -> None:
         self._last_signal = "<none>"

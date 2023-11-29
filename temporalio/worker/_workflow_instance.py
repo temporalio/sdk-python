@@ -1243,7 +1243,7 @@ class _WorkflowInstanceImpl(
                 # To apply to typed search attributes we remove, replace, or add. We
                 # don't know any of the key types, so we do our best.
                 index = next(
-                    i for i, a in enumerate(mut_typed_attrs) if a.key.name == k
+                    (i for i, a in enumerate(mut_typed_attrs) if a.key.name == k), None
                 )
                 if not vals:
                     if index is not None:
@@ -1285,9 +1285,12 @@ class _WorkflowInstanceImpl(
 
                 # Update typed and untyped in info
                 index = next(
-                    i
-                    for i, a in enumerate(mut_typed_attrs)
-                    if a.key.name == update.key.name
+                    (
+                        i
+                        for i, a in enumerate(mut_typed_attrs)
+                        if a.key.name == update.key.name
+                    ),
+                    None,
                 )
                 if update.value is None:
                     # Delete
@@ -1301,7 +1304,7 @@ class _WorkflowInstanceImpl(
                         update.key, update.value
                     )
                     if index is None:
-                        mut_typed_attrs.append()
+                        mut_typed_attrs.append(pair)
                     else:
                         mut_typed_attrs[index] = pair
                     # Single-item list if not already a sequence for untyped
