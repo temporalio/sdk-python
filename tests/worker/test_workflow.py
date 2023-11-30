@@ -1837,6 +1837,8 @@ class NoSearchAttributesWorkflow:
 
 
 async def test_workflow_no_initial_search_attributes(client: Client, env_type: str):
+    if env_type != "local":
+        pytest.skip("Only testing search attributes on local which disables cache")
     await ensure_search_attributes_present(
         client,
         SearchAttributeWorkflow.text_attribute,
