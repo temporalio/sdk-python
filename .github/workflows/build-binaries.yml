@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+      - josh/fix-wheel-use-wheel3 # will remove before merge
 
 jobs:
   # Compile the binaries and upload artifacts
