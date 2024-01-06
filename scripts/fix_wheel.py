@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # Run unpack into temp directory
     if os.path.exists("dist/temp"):
         raise RuntimeError("dist/temp directory already present")
-    subprocess.check_call(["wheel", "unpack", "--dest", "dist/temp", dist_files[0]])
+    subprocess.check_call(["wheel3", "unpack", "--dest", "dist/temp", dist_files[0]])
 
     # Read WHEEL contents
     wheel_files = glob("dist/temp/*/*.dist-info/WHEEL")
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
     # Pack the wheel
     unpacked_dirs = glob("dist/temp/*")
-    subprocess.check_call(["wheel", "pack", "--dest", "dist", unpacked_dirs[0]])
+    subprocess.check_call(["wheel3", "pack", "--dest", "dist", unpacked_dirs[0]])
 
     # Remove temp dir
     shutil.rmtree("dist/temp")
