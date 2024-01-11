@@ -59,6 +59,7 @@ setuptools = ">=65.0.0"
 setuptools-rust = ">=1.3.0"
 toml = "^0.10.2"
 twine = "^4.0.1"
+wheel = "^0.42.0"
 
 [tool.poetry.extras]
 opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
