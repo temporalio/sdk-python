@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+      - "josh/add-wheel-to-dev-deps" # for test only, remove before merge
 
 jobs:
   # Compile the binaries and upload artifacts
