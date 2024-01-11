@@ -362,10 +362,11 @@ class Info:
         }
 
     def get_current_build_id(self) -> str:
-        """The Build ID of the worker which executed the current Workflow Task. May be undefined if the
-        task was completed by a worker without a Build ID. If this worker is the one executing this
-        task for the first time and has a Build ID set, then its ID will be used. This value may change
-        over the lifetime of the workflow run, but is deterministic and safe to use for branching.
+        """Get the Build ID of the worker which executed the current Workflow Task.
+
+        May be undefined if the task was completed by a worker without a Build ID. If this worker is the one executing
+        this task for the first time and has a Build ID set, then its ID will be used. This value may change over the
+        lifetime of the workflow run, but is deterministic and safe to use for branching.
         """
         return _Runtime.current().workflow_get_current_build_id()
 
