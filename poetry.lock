@@ -1832,4 +1832,4 @@ opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "5075292eb9b3fb443847adc4aca1b1cbfeabddbe7208a85e8d493400f3c220ce"
+content-hash = "b4bbf7e44096b2e4f81b502d6a0974da7722182f4488020dc2db38fb8d51b95d"
