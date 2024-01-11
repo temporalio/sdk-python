@@ -1117,10 +1117,11 @@ class LoggerAdapter(logging.LoggerAdapter):
                     kwargs["extra"] = extra
         return (msg, kwargs)
 
-    def log(self, *args, **kwargs) -> None:
+    def isEnabledFor(self, level: int) -> bool:
         """Override to ignore replay logs."""
-        if self.log_during_replay or not unsafe.is_replaying():
-            super().log(*args, **kwargs)
+        if not self.log_during_replay and unsafe.is_replaying():
+            return False
+        return super().isEnabledFor(level)
 
     @property
     def base_logger(self) -> logging.Logger:

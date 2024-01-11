@@ -1910,11 +1910,12 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
         assert find_log("Signal: signal 1 ({'attempt':")
         assert find_log("Signal: signal 2")
         assert not find_log("Signal: signal 3")
-        # Also make sure it has some workflow info
+        # Also make sure it has some workflow info and correct funcName
         record = find_log("Signal: signal 1")
         assert (
             record
             and record.__dict__["workflow_info"].workflow_type == "LoggingWorkflow"
+            and record.funcName == "my_signal"
         )
 
         # Clear queue and start a new one with more signals
