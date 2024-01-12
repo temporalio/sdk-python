@@ -14,16 +14,17 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
-from temporalio.api.dependencies.gogoproto import (
-    gogo_pb2 as dependencies_dot_gogoproto_dot_gogo__pb2,
-)
 from temporalio.api.enums.v1 import (
     common_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_common__pb2,
 )
+from temporalio.api.enums.v1 import (
+    reset_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_reset__pb2,
+)
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n$temporal/api/common/v1/message.proto\x12\x16temporal.api.common.v1\x1a\x1egoogle/protobuf/duration.proto\x1a!dependencies/gogoproto/gogo.proto\x1a"temporal/api/enums/v1/common.proto"T\n\x08\x44\x61taBlob\x12:\n\rencoding_type\x18\x01 \x01(\x0e\x32#.temporal.api.enums.v1.EncodingType\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c"=\n\x08Payloads\x12\x31\n\x08payloads\x18\x01 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload"\x89\x01\n\x07Payload\x12?\n\x08metadata\x18\x01 \x03(\x0b\x32-.temporal.api.common.v1.Payload.MetadataEntry\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x0c:\x02\x38\x01"\xbe\x01\n\x10SearchAttributes\x12S\n\x0eindexed_fields\x18\x01 \x03(\x0b\x32;.temporal.api.common.v1.SearchAttributes.IndexedFieldsEntry\x1aU\n\x12IndexedFieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\x90\x01\n\x04Memo\x12\x38\n\x06\x66ields\x18\x01 \x03(\x0b\x32(.temporal.api.common.v1.Memo.FieldsEntry\x1aN\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\x94\x01\n\x06Header\x12:\n\x06\x66ields\x18\x01 \x03(\x0b\x32*.temporal.api.common.v1.Header.FieldsEntry\x1aN\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"8\n\x11WorkflowExecution\x12\x13\n\x0bworkflow_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"\x1c\n\x0cWorkflowType\x12\x0c\n\x04name\x18\x01 \x01(\t"\x1c\n\x0c\x41\x63tivityType\x12\x0c\n\x04name\x18\x01 \x01(\t"\xdd\x01\n\x0bRetryPolicy\x12\x39\n\x10initial_interval\x18\x01 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12\x1b\n\x13\x62\x61\x63koff_coefficient\x18\x02 \x01(\x01\x12\x39\n\x10maximum_interval\x18\x03 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01\x12\x18\n\x10maximum_attempts\x18\x04 \x01(\x05\x12!\n\x19non_retryable_error_types\x18\x05 \x03(\t"F\n\x10MeteringMetadata\x12\x32\n*nonfirst_local_activity_execution_attempts\x18\r \x01(\r"Q\n\x12WorkerVersionStamp\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\x11\n\tbundle_id\x18\x02 \x01(\t\x12\x16\n\x0euse_versioning\x18\x03 \x01(\x08"E\n\x19WorkerVersionCapabilities\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\x16\n\x0euse_versioning\x18\x02 \x01(\x08\x42\x89\x01\n\x19io.temporal.api.common.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/common/v1;common\xaa\x02\x18Temporalio.Api.Common.V1\xea\x02\x1bTemporalio::Api::Common::V1b\x06proto3'
+    b'\n$temporal/api/common/v1/message.proto\x12\x16temporal.api.common.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a"temporal/api/enums/v1/common.proto\x1a!temporal/api/enums/v1/reset.proto"T\n\x08\x44\x61taBlob\x12:\n\rencoding_type\x18\x01 \x01(\x0e\x32#.temporal.api.enums.v1.EncodingType\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c"=\n\x08Payloads\x12\x31\n\x08payloads\x18\x01 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload"\x89\x01\n\x07Payload\x12?\n\x08metadata\x18\x01 \x03(\x0b\x32-.temporal.api.common.v1.Payload.MetadataEntry\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x0c:\x02\x38\x01"\xbe\x01\n\x10SearchAttributes\x12S\n\x0eindexed_fields\x18\x01 \x03(\x0b\x32;.temporal.api.common.v1.SearchAttributes.IndexedFieldsEntry\x1aU\n\x12IndexedFieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\x90\x01\n\x04Memo\x12\x38\n\x06\x66ields\x18\x01 \x03(\x0b\x32(.temporal.api.common.v1.Memo.FieldsEntry\x1aN\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\x94\x01\n\x06Header\x12:\n\x06\x66ields\x18\x01 \x03(\x0b\x32*.temporal.api.common.v1.Header.FieldsEntry\x1aN\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"8\n\x11WorkflowExecution\x12\x13\n\x0bworkflow_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"\x1c\n\x0cWorkflowType\x12\x0c\n\x04name\x18\x01 \x01(\t"\x1c\n\x0c\x41\x63tivityType\x12\x0c\n\x04name\x18\x01 \x01(\t"\xd1\x01\n\x0bRetryPolicy\x12\x33\n\x10initial_interval\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x1b\n\x13\x62\x61\x63koff_coefficient\x18\x02 \x01(\x01\x12\x33\n\x10maximum_interval\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x18\n\x10maximum_attempts\x18\x04 \x01(\x05\x12!\n\x19non_retryable_error_types\x18\x05 \x03(\t"F\n\x10MeteringMetadata\x12\x32\n*nonfirst_local_activity_execution_attempts\x18\r \x01(\r"Q\n\x12WorkerVersionStamp\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\x11\n\tbundle_id\x18\x02 \x01(\t\x12\x16\n\x0euse_versioning\x18\x03 \x01(\x08"E\n\x19WorkerVersionCapabilities\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\x16\n\x0euse_versioning\x18\x02 \x01(\x08"\x94\x02\n\x0cResetOptions\x12\x35\n\x13\x66irst_workflow_task\x18\x01 \x01(\x0b\x32\x16.google.protobuf.EmptyH\x00\x12\x34\n\x12last_workflow_task\x18\x02 \x01(\x0b\x32\x16.google.protobuf.EmptyH\x00\x12\x1a\n\x10workflow_task_id\x18\x03 \x01(\x03H\x00\x12\x12\n\x08\x62uild_id\x18\x04 \x01(\tH\x00\x12\x43\n\x12reset_reapply_type\x18\n \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyType\x12\x18\n\x10\x63urrent_run_only\x18\x0b \x01(\x08\x42\x08\n\x06targetB\x89\x01\n\x19io.temporal.api.common.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/common/v1;common\xaa\x02\x18Temporalio.Api.Common.V1\xea\x02\x1bTemporalio::Api::Common::V1b\x06proto3'
 )
 
 
@@ -48,6 +49,7 @@ _WORKERVERSIONSTAMP = DESCRIPTOR.message_types_by_name["WorkerVersionStamp"]
 _WORKERVERSIONCAPABILITIES = DESCRIPTOR.message_types_by_name[
     "WorkerVersionCapabilities"
 ]
+_RESETOPTIONS = DESCRIPTOR.message_types_by_name["ResetOptions"]
 DataBlob = _reflection.GeneratedProtocolMessageType(
     "DataBlob",
     (_message.Message,),
@@ -231,6 +233,17 @@ WorkerVersionCapabilities = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(WorkerVersionCapabilities)
 
+ResetOptions = _reflection.GeneratedProtocolMessageType(
+    "ResetOptions",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _RESETOPTIONS,
+        "__module__": "temporal.api.common.v1.message_pb2"
+        # @@protoc_insertion_point(class_scope:temporal.api.common.v1.ResetOptions)
+    },
+)
+_sym_db.RegisterMessage(ResetOptions)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.common.v1B\014MessageProtoP\001Z#go.temporal.io/api/common/v1;common\252\002\030Temporalio.Api.Common.V1\352\002\033Temporalio::Api::Common::V1"
@@ -242,46 +255,40 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _MEMO_FIELDSENTRY._serialized_options = b"8\001"
     _HEADER_FIELDSENTRY._options = None
     _HEADER_FIELDSENTRY._serialized_options = b"8\001"
-    _RETRYPOLICY.fields_by_name["initial_interval"]._options = None
-    _RETRYPOLICY.fields_by_name[
-        "initial_interval"
-    ]._serialized_options = b"\230\337\037\001"
-    _RETRYPOLICY.fields_by_name["maximum_interval"]._options = None
-    _RETRYPOLICY.fields_by_name[
-        "maximum_interval"
-    ]._serialized_options = b"\230\337\037\001"
-    _DATABLOB._serialized_start = 167
-    _DATABLOB._serialized_end = 251
-    _PAYLOADS._serialized_start = 253
-    _PAYLOADS._serialized_end = 314
-    _PAYLOAD._serialized_start = 317
-    _PAYLOAD._serialized_end = 454
-    _PAYLOAD_METADATAENTRY._serialized_start = 407
-    _PAYLOAD_METADATAENTRY._serialized_end = 454
-    _SEARCHATTRIBUTES._serialized_start = 457
-    _SEARCHATTRIBUTES._serialized_end = 647
-    _SEARCHATTRIBUTES_INDEXEDFIELDSENTRY._serialized_start = 562
-    _SEARCHATTRIBUTES_INDEXEDFIELDSENTRY._serialized_end = 647
-    _MEMO._serialized_start = 650
-    _MEMO._serialized_end = 794
-    _MEMO_FIELDSENTRY._serialized_start = 716
-    _MEMO_FIELDSENTRY._serialized_end = 794
-    _HEADER._serialized_start = 797
-    _HEADER._serialized_end = 945
-    _HEADER_FIELDSENTRY._serialized_start = 716
-    _HEADER_FIELDSENTRY._serialized_end = 794
-    _WORKFLOWEXECUTION._serialized_start = 947
-    _WORKFLOWEXECUTION._serialized_end = 1003
-    _WORKFLOWTYPE._serialized_start = 1005
-    _WORKFLOWTYPE._serialized_end = 1033
-    _ACTIVITYTYPE._serialized_start = 1035
-    _ACTIVITYTYPE._serialized_end = 1063
-    _RETRYPOLICY._serialized_start = 1066
-    _RETRYPOLICY._serialized_end = 1287
-    _METERINGMETADATA._serialized_start = 1289
-    _METERINGMETADATA._serialized_end = 1359
-    _WORKERVERSIONSTAMP._serialized_start = 1361
-    _WORKERVERSIONSTAMP._serialized_end = 1442
-    _WORKERVERSIONCAPABILITIES._serialized_start = 1444
-    _WORKERVERSIONCAPABILITIES._serialized_end = 1513
+    _DATABLOB._serialized_start = 196
+    _DATABLOB._serialized_end = 280
+    _PAYLOADS._serialized_start = 282
+    _PAYLOADS._serialized_end = 343
+    _PAYLOAD._serialized_start = 346
+    _PAYLOAD._serialized_end = 483
+    _PAYLOAD_METADATAENTRY._serialized_start = 436
+    _PAYLOAD_METADATAENTRY._serialized_end = 483
+    _SEARCHATTRIBUTES._serialized_start = 486
+    _SEARCHATTRIBUTES._serialized_end = 676
+    _SEARCHATTRIBUTES_INDEXEDFIELDSENTRY._serialized_start = 591
+    _SEARCHATTRIBUTES_INDEXEDFIELDSENTRY._serialized_end = 676
+    _MEMO._serialized_start = 679
+    _MEMO._serialized_end = 823
+    _MEMO_FIELDSENTRY._serialized_start = 745
+    _MEMO_FIELDSENTRY._serialized_end = 823
+    _HEADER._serialized_start = 826
+    _HEADER._serialized_end = 974
+    _HEADER_FIELDSENTRY._serialized_start = 745
+    _HEADER_FIELDSENTRY._serialized_end = 823
+    _WORKFLOWEXECUTION._serialized_start = 976
+    _WORKFLOWEXECUTION._serialized_end = 1032
+    _WORKFLOWTYPE._serialized_start = 1034
+    _WORKFLOWTYPE._serialized_end = 1062
+    _ACTIVITYTYPE._serialized_start = 1064
+    _ACTIVITYTYPE._serialized_end = 1092
+    _RETRYPOLICY._serialized_start = 1095
+    _RETRYPOLICY._serialized_end = 1304
+    _METERINGMETADATA._serialized_start = 1306
+    _METERINGMETADATA._serialized_end = 1376
+    _WORKERVERSIONSTAMP._serialized_start = 1378
+    _WORKERVERSIONSTAMP._serialized_end = 1459
+    _WORKERVERSIONCAPABILITIES._serialized_start = 1461
+    _WORKERVERSIONCAPABILITIES._serialized_end = 1530
+    _RESETOPTIONS._serialized_start = 1533
+    _RESETOPTIONS._serialized_end = 1809
 # @@protoc_insertion_point(module_scope)

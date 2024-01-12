@@ -63,7 +63,7 @@ class WaitPolicy(google.protobuf.message.Message):
 global___WaitPolicy = WaitPolicy
 
 class UpdateRef(google.protobuf.message.Message):
-    """The data needed by a client to refer to an previously invoked workflow
+    """The data needed by a client to refer to a previously invoked workflow
     execution update process.
     """
 

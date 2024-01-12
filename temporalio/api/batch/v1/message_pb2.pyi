@@ -220,27 +220,37 @@ class BatchOperationReset(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    IDENTITY_FIELD_NUMBER: builtins.int
+    OPTIONS_FIELD_NUMBER: builtins.int
     RESET_TYPE_FIELD_NUMBER: builtins.int
     RESET_REAPPLY_TYPE_FIELD_NUMBER: builtins.int
-    IDENTITY_FIELD_NUMBER: builtins.int
-    reset_type: temporalio.api.enums.v1.reset_pb2.ResetType.ValueType
-    """Reset type."""
-    reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """History event reapply options."""
     identity: builtins.str
     """The identity of the worker/client."""
+    @property
+    def options(self) -> temporalio.api.common.v1.message_pb2.ResetOptions:
+        """Describes what to reset to and how. If set, `reset_type` and `reset_reapply_type` are ignored."""
+    reset_type: temporalio.api.enums.v1.reset_pb2.ResetType.ValueType
+    """Reset type (deprecated, use `options`)."""
+    reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
+    """History event reapply options (deprecated, use `options`)."""
     def __init__(
         self,
         *,
+        identity: builtins.str = ...,
+        options: temporalio.api.common.v1.message_pb2.ResetOptions | None = ...,
         reset_type: temporalio.api.enums.v1.reset_pb2.ResetType.ValueType = ...,
         reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType = ...,
-        identity: builtins.str = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["options", b"options"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "identity",
             b"identity",
+            "options",
+            b"options",
             "reset_reapply_type",
             b"reset_reapply_type",
             "reset_type",

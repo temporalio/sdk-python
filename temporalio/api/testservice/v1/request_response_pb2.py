@@ -16,12 +16,8 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
-from temporalio.api.dependencies.gogoproto import (
-    gogo_pb2 as dependencies_dot_gogoproto_dot_gogo__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n2temporal/api/testservice/v1/request_response.proto\x12\x1btemporal.api.testservice.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!dependencies/gogoproto/gogo.proto"\x19\n\x17LockTimeSkippingRequest"\x1a\n\x18LockTimeSkippingResponse"\x1b\n\x19UnlockTimeSkippingRequest"\x1c\n\x1aUnlockTimeSkippingResponse"H\n\x11SleepUntilRequest\x12\x33\n\ttimestamp\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01"A\n\x0cSleepRequest\x12\x31\n\x08\x64uration\x18\x01 \x01(\x0b\x32\x19.google.protobuf.DurationB\x04\x98\xdf\x1f\x01"\x0f\n\rSleepResponse"H\n\x16GetCurrentTimeResponse\x12.\n\x04time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x42\xaa\x01\n\x1eio.temporal.api.testservice.v1B\x14RequestResponseProtoP\x01Z-go.temporal.io/api/testservice/v1;testservice\xaa\x02\x1dTemporalio.Api.TestService.V1\xea\x02 Temporalio::Api::TestService::V1b\x06proto3'
+    b'\n2temporal/api/testservice/v1/request_response.proto\x12\x1btemporal.api.testservice.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\x19\n\x17LockTimeSkippingRequest"\x1a\n\x18LockTimeSkippingResponse"\x1b\n\x19UnlockTimeSkippingRequest"\x1c\n\x1aUnlockTimeSkippingResponse"B\n\x11SleepUntilRequest\x12-\n\ttimestamp\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp";\n\x0cSleepRequest\x12+\n\x08\x64uration\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration"\x0f\n\rSleepResponse"B\n\x16GetCurrentTimeResponse\x12(\n\x04time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\xaa\x01\n\x1eio.temporal.api.testservice.v1B\x14RequestResponseProtoP\x01Z-go.temporal.io/api/testservice/v1;testservice\xaa\x02\x1dTemporalio.Api.TestService.V1\xea\x02 Temporalio::Api::TestService::V1b\x06proto3'
 )
 
 
@@ -128,30 +124,20 @@ _sym_db.RegisterMessage(GetCurrentTimeResponse)
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\036io.temporal.api.testservice.v1B\024RequestResponseProtoP\001Z-go.temporal.io/api/testservice/v1;testservice\252\002\035Temporalio.Api.TestService.V1\352\002 Temporalio::Api::TestService::V1"
-    _SLEEPUNTILREQUEST.fields_by_name["timestamp"]._options = None
-    _SLEEPUNTILREQUEST.fields_by_name[
-        "timestamp"
-    ]._serialized_options = b"\220\337\037\001"
-    _SLEEPREQUEST.fields_by_name["duration"]._options = None
-    _SLEEPREQUEST.fields_by_name["duration"]._serialized_options = b"\230\337\037\001"
-    _GETCURRENTTIMERESPONSE.fields_by_name["time"]._options = None
-    _GETCURRENTTIMERESPONSE.fields_by_name[
-        "time"
-    ]._serialized_options = b"\220\337\037\001"
-    _LOCKTIMESKIPPINGREQUEST._serialized_start = 183
-    _LOCKTIMESKIPPINGREQUEST._serialized_end = 208
-    _LOCKTIMESKIPPINGRESPONSE._serialized_start = 210
-    _LOCKTIMESKIPPINGRESPONSE._serialized_end = 236
-    _UNLOCKTIMESKIPPINGREQUEST._serialized_start = 238
-    _UNLOCKTIMESKIPPINGREQUEST._serialized_end = 265
-    _UNLOCKTIMESKIPPINGRESPONSE._serialized_start = 267
-    _UNLOCKTIMESKIPPINGRESPONSE._serialized_end = 295
-    _SLEEPUNTILREQUEST._serialized_start = 297
-    _SLEEPUNTILREQUEST._serialized_end = 369
-    _SLEEPREQUEST._serialized_start = 371
-    _SLEEPREQUEST._serialized_end = 436
-    _SLEEPRESPONSE._serialized_start = 438
-    _SLEEPRESPONSE._serialized_end = 453
-    _GETCURRENTTIMERESPONSE._serialized_start = 455
-    _GETCURRENTTIMERESPONSE._serialized_end = 527
+    _LOCKTIMESKIPPINGREQUEST._serialized_start = 148
+    _LOCKTIMESKIPPINGREQUEST._serialized_end = 173
+    _LOCKTIMESKIPPINGRESPONSE._serialized_start = 175
+    _LOCKTIMESKIPPINGRESPONSE._serialized_end = 201
+    _UNLOCKTIMESKIPPINGREQUEST._serialized_start = 203
+    _UNLOCKTIMESKIPPINGREQUEST._serialized_end = 230
+    _UNLOCKTIMESKIPPINGRESPONSE._serialized_start = 232
+    _UNLOCKTIMESKIPPINGRESPONSE._serialized_end = 260
+    _SLEEPUNTILREQUEST._serialized_start = 262
+    _SLEEPUNTILREQUEST._serialized_end = 328
+    _SLEEPREQUEST._serialized_start = 330
+    _SLEEPREQUEST._serialized_end = 389
+    _SLEEPRESPONSE._serialized_start = 391
+    _SLEEPRESPONSE._serialized_end = 406
+    _GETCURRENTTIMERESPONSE._serialized_start = 408
+    _GETCURRENTTIMERESPONSE._serialized_end = 474
 # @@protoc_insertion_point(module_scope)

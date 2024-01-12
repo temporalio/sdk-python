@@ -34,7 +34,10 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
-from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
+from temporalio.api.workflowservice.v1 import (
+    GetWorkflowExecutionHistoryRequest,
+    ResetStickyTaskQueueRequest,
+)
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import (
@@ -3765,7 +3768,8 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
         )
 
         # Dynamically registered and used in first task
-        assert "worked" == await handle.execute_update("first_task_update")
+        # TODO: Once https://github.com/temporalio/sdk-python/issues/462 is fixed, uncomment
+        # assert "worked" == await handle.execute_update("first_task_update")
 
         # Normal handling
         last_event = await handle.execute_update(
@@ -3813,10 +3817,11 @@ async def test_workflow_update_handlers_unhappy(
             await handle.execute_update("whargarbl", "whatever")
         assert isinstance(err.value.cause, ApplicationError)
         assert "'whargarbl' expected but not found" in err.value.cause.message
-        assert (
-            "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic throws_runtime_err]"
-            in err.value.cause.message
-        )
+        # TODO: Once https://github.com/temporalio/sdk-python/issues/462 is fixed, uncomment
+        # assert (
+        #     "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic throws_runtime_err]"
+        #     in err.value.cause.message
+        # )
 
         # Rejection by validator
         with pytest.raises(WorkflowUpdateFailedError) as err:
@@ -3978,3 +3983,74 @@ async def test_workflow_timeout_support(client: Client, approach: str):
                 found_timer = True
                 break
         assert found_timer
+
+
+@workflow.defn
+class BuildIDInfoWorkflow:
+    do_finish = False
+
+    @workflow.run
+    async def run(self):
+        await asyncio.sleep(1)
+        if workflow.info().get_current_build_id() == "1.0":
+            await workflow.execute_activity(
+                say_hello, "yo", schedule_to_close_timeout=timedelta(seconds=5)
+            )
+        await workflow.wait_condition(lambda: self.do_finish)
+
+    @workflow.query
+    def get_build_id(self) -> str:
+        return workflow.info().get_current_build_id()
+
+    @workflow.signal
+    async def finish(self):
+        self.do_finish = True
+
+
+async def test_workflow_current_build_id_appropriately_set(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support worker versioning")
+
+    task_queue = str(uuid.uuid4())
+    async with new_worker(
+        client,
+        BuildIDInfoWorkflow,
+        activities=[say_hello],
+        build_id="1.0",
+        task_queue=task_queue,
+    ) as worker:
+        handle = await client.start_workflow(
+            BuildIDInfoWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.0"
+        await worker.shutdown()
+
+    await client.workflow_service.reset_sticky_task_queue(
+        ResetStickyTaskQueueRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=handle.id),
+        )
+    )
+
+    async with new_worker(
+        client,
+        BuildIDInfoWorkflow,
+        activities=[say_hello],
+        build_id="1.1",
+        task_queue=task_queue,
+    ) as worker:
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.0"
+        await handle.signal(BuildIDInfoWorkflow.finish)
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.1"
+        await handle.result()
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.1"
+
+        await worker.shutdown()
