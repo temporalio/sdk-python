@@ -4007,7 +4007,12 @@ class BuildIDInfoWorkflow:
         self.do_finish = True
 
 
-async def test_workflow_current_build_id_appropriately_set(client: Client):
+async def test_workflow_current_build_id_appropriately_set(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support worker versioning")
+
     task_queue = str(uuid.uuid4())
     async with new_worker(
         client,
