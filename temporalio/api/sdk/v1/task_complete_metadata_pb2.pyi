@@ -42,6 +42,8 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
 
     CORE_USED_FLAGS_FIELD_NUMBER: builtins.int
     LANG_USED_FLAGS_FIELD_NUMBER: builtins.int
+    SDK_NAME_FIELD_NUMBER: builtins.int
+    SDK_VERSION_FIELD_NUMBER: builtins.int
     @property
     def core_used_flags(
         self,
@@ -77,16 +79,38 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
         (-- api-linter: core::0141::forbidden-types=disabled
             aip.dev/not-precedent: These really shouldn't have negative values. --)
         """
+    sdk_name: builtins.str
+    """Name of the SDK that processed the task. This is usually something like "temporal-go" and is
+    usually the same as client-name gRPC header. This should only be set if its value changed
+    since the last time recorded on the workflow (or be set on the first task).
+
+    (-- api-linter: core::0122::name-suffix=disabled
+        aip.dev/not-precedent: We're ok with a name suffix here. --)
+    """
+    sdk_version: builtins.str
+    """Version of the SDK that processed the task. This is usually something like "1.20.0" and is
+    usually the same as client-version gRPC header. This should only be set if its value changed
+    since the last time recorded on the workflow (or be set on the first task).
+    """
     def __init__(
         self,
         *,
         core_used_flags: collections.abc.Iterable[builtins.int] | None = ...,
         lang_used_flags: collections.abc.Iterable[builtins.int] | None = ...,
+        sdk_name: builtins.str = ...,
+        sdk_version: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "core_used_flags", b"core_used_flags", "lang_used_flags", b"lang_used_flags"
+            "core_used_flags",
+            b"core_used_flags",
+            "lang_used_flags",
+            b"lang_used_flags",
+            "sdk_name",
+            b"sdk_name",
+            "sdk_version",
+            b"sdk_version",
         ],
     ) -> None: ...
 

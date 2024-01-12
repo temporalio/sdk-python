@@ -316,6 +316,9 @@ class ScheduleSpec(google.protobuf.message.Message):
     On input, calendar and cron_string fields will be compiled into
     structured_calendar (and maybe interval and timezone_name), so if you
     Describe a schedule, you'll see only structured_calendar, interval, etc.
+
+    If a spec has no matching times after the current time, then the schedule
+    will be subject to automatic deletion (after several days).
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -503,7 +506,7 @@ class SchedulePolicies(google.protobuf.message.Message):
         If the Temporal server misses an action due to one or more components
         being down, and comes back up, the action will be run if the scheduled
         time is within this window from the current time.
-        This value defaults to 60 seconds, and can't be less than 10 seconds.
+        This value defaults to one year, and can't be less than 10 seconds.
         """
     pause_on_failure: builtins.bool
     """If true, and a workflow run fails or times out, turn on "paused".
@@ -642,6 +645,8 @@ class ScheduleState(google.protobuf.message.Message):
     is zero. Actions may still be taken by explicit request (i.e. trigger
     immediately or backfill). Skipped actions (due to overlap policy) do not
     count against remaining actions.
+    If a schedule has no more remaining actions, then the schedule will be
+    subject to automatic deletion (after several days).
     """
     remaining_actions: builtins.int
     def __init__(
@@ -673,7 +678,7 @@ class TriggerImmediatelyRequest(google.protobuf.message.Message):
 
     OVERLAP_POLICY_FIELD_NUMBER: builtins.int
     overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType
-    """Override overlap policy for this one request."""
+    """If set, override overlap policy for this one request."""
     def __init__(
         self,
         *,
@@ -693,11 +698,17 @@ class BackfillRequest(google.protobuf.message.Message):
     OVERLAP_POLICY_FIELD_NUMBER: builtins.int
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Time range to evaluate schedule in."""
+        """Time range to evaluate schedule in. Currently, this time range is
+        exclusive on start_time and inclusive on end_time. (This is admittedly
+        counterintuitive and it may change in the future, so to be safe, use a
+        start time strictly before a scheduled time.) Also note that an action
+        nominally scheduled in the interval but with jitter that pushes it after
+        end_time will not be included.
+        """
     @property
     def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType
-    """Override overlap policy for this request."""
+    """If set, override overlap policy for this request."""
     def __init__(
         self,
         *,
@@ -787,6 +798,8 @@ class ScheduleInfo(google.protobuf.message.Message):
     ACTION_COUNT_FIELD_NUMBER: builtins.int
     MISSED_CATCHUP_WINDOW_FIELD_NUMBER: builtins.int
     OVERLAP_SKIPPED_FIELD_NUMBER: builtins.int
+    BUFFER_DROPPED_FIELD_NUMBER: builtins.int
+    BUFFER_SIZE_FIELD_NUMBER: builtins.int
     RUNNING_WORKFLOWS_FIELD_NUMBER: builtins.int
     RECENT_ACTIONS_FIELD_NUMBER: builtins.int
     FUTURE_ACTION_TIMES_FIELD_NUMBER: builtins.int
@@ -799,6 +812,13 @@ class ScheduleInfo(google.protobuf.message.Message):
     """Number of times a scheduled action was skipped due to missing the catchup window."""
     overlap_skipped: builtins.int
     """Number of skipped actions due to overlap."""
+    buffer_dropped: builtins.int
+    """Number of dropped actions due to buffer limit."""
+    buffer_size: builtins.int
+    """Number of actions in the buffer. The buffer holds the actions that cannot
+    be immediately triggered (due to the overlap policy). These actions can be a result of
+    the normal schedule or a backfill.
+    """
     @property
     def running_workflows(
         self,
@@ -837,6 +857,8 @@ class ScheduleInfo(google.protobuf.message.Message):
         action_count: builtins.int = ...,
         missed_catchup_window: builtins.int = ...,
         overlap_skipped: builtins.int = ...,
+        buffer_dropped: builtins.int = ...,
+        buffer_size: builtins.int = ...,
         running_workflows: collections.abc.Iterable[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ]
@@ -862,6 +884,10 @@ class ScheduleInfo(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "action_count",
             b"action_count",
+            "buffer_dropped",
+            b"buffer_dropped",
+            "buffer_size",
+            b"buffer_size",
             "create_time",
             b"create_time",
             "future_action_times",

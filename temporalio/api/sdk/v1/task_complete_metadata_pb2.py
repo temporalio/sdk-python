@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n0temporal/api/sdk/v1/task_complete_metadata.proto\x12\x13temporal.api.sdk.v1"Q\n\x1dWorkflowTaskCompletedMetadata\x12\x17\n\x0f\x63ore_used_flags\x18\x01 \x03(\r\x12\x17\n\x0flang_used_flags\x18\x02 \x03(\rB\x87\x01\n\x16io.temporal.api.sdk.v1B\x19TaskCompleteMetadataProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3'
+    b'\n0temporal/api/sdk/v1/task_complete_metadata.proto\x12\x13temporal.api.sdk.v1"x\n\x1dWorkflowTaskCompletedMetadata\x12\x17\n\x0f\x63ore_used_flags\x18\x01 \x03(\r\x12\x17\n\x0flang_used_flags\x18\x02 \x03(\r\x12\x10\n\x08sdk_name\x18\x03 \x01(\t\x12\x13\n\x0bsdk_version\x18\x04 \x01(\tB\x87\x01\n\x16io.temporal.api.sdk.v1B\x19TaskCompleteMetadataProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3'
 )
 
 
@@ -36,5 +36,5 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\026io.temporal.api.sdk.v1B\031TaskCompleteMetadataProtoP\001Z\035go.temporal.io/api/sdk/v1;sdk\252\002\025Temporalio.Api.Sdk.V1\352\002\030Temporalio::Api::Sdk::V1"
     _WORKFLOWTASKCOMPLETEDMETADATA._serialized_start = 73
-    _WORKFLOWTASKCOMPLETEDMETADATA._serialized_end = 154
+    _WORKFLOWTASKCOMPLETEDMETADATA._serialized_end = 193
 # @@protoc_insertion_point(module_scope)

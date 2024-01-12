@@ -52,7 +52,7 @@ class _ResetReapplyTypeEnumTypeWrapper(
     RESET_REAPPLY_TYPE_NONE: _ResetReapplyType.ValueType  # 2
 
 class ResetReapplyType(_ResetReapplyType, metaclass=_ResetReapplyTypeEnumTypeWrapper):
-    """Reset reapplay(replay) options
+    """Reset reapply (replay) options
     * RESET_REAPPLY_TYPE_SIGNAL (default) - Signals are reapplied when workflow is reset
     * RESET_REAPPLY_TYPE_NONE - nothing is reapplied
     """
@@ -78,7 +78,7 @@ class _ResetTypeEnumTypeWrapper(
     """Resets to event of the last workflow task completed, or if it does not exist, the event after task scheduled."""
 
 class ResetType(_ResetType, metaclass=_ResetTypeEnumTypeWrapper):
-    """Reset type options"""
+    """Reset type options. Deprecated, see temporalio.api.common.v1.ResetOptions."""
 
 RESET_TYPE_UNSPECIFIED: ResetType.ValueType  # 0
 RESET_TYPE_FIRST_WORKFLOW_TASK: ResetType.ValueType  # 1
