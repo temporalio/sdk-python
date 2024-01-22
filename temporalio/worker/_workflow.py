@@ -215,7 +215,7 @@ class _WorkflowWorker:
                     )
                 except asyncio.TimeoutError:
                     raise RuntimeError(
-                        f"Potential deadlock detected, workflow didn't yield within {self._deadlock_timeout_seconds} second(s)"
+                        f"[TMPRL1101] Potential deadlock detected, workflow didn't yield within {self._deadlock_timeout_seconds} second(s)"
                     )
         except Exception as err:
             logger.exception(
