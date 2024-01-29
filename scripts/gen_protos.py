@@ -118,12 +118,16 @@ def fix_generated_output(base_path: Path):
             f.write("except ImportError:\n    pass")
 
 
-if __name__ == "__main__":
-    # Due to issues with the Python protobuf 3.x vs protobuf 4.x libraries, we
-    # must require that grpcio tools be on 1.48.x and protobuf be on 3.x for
-    # generation of protos. We can't check __version__ on the module (not
-    # present), and we can't use importlib.metadata due to its absence in 3.7,
-    # so we just run pip and check there.
+def check_proto_toolchain_versions():
+    """
+    Check protobuf and grpcio versions.
+
+    Due to issues with the Python protobuf 3.x vs protobuf 4.x libraries, we
+    must require that grpcio tools be on 1.48.x and protobuf be on 3.x for
+    generation of protos. We can't check __version__ on the module (not
+    present), and we can't use importlib.metadata due to its absence in 3.7,
+    so we just run pip and check there.
+    """
     proc = subprocess.run(
         ["pip", "list", "--format", "freeze"],
         check=True,
@@ -144,56 +148,61 @@ if __name__ == "__main__":
         "1.48."
     ), f"expected 1.48.x grpcio-tools, found {grpcio_tools_version}"
 
-    print("Generating protos...", file=sys.stderr)
-    with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir_raw:
-        temp_dir = Path(temp_dir_raw)
-        subprocess.check_call(
-            [
-                sys.executable,
-                "-mgrpc_tools.protoc",
-                f"--proto_path={api_proto_dir}",
-                f"--proto_path={core_proto_dir}",
-                f"--proto_path={testsrv_proto_dir}",
-                f"--proto_path={health_proto_dir}",
-                f"--proto_path={test_proto_dir}",
-                f"--proto_path={additional_proto_dir}",
-                f"--python_out={temp_dir}",
-                f"--grpc_python_out={temp_dir}",
-                f"--mypy_out={temp_dir}",
-                f"--mypy_grpc_out={temp_dir}",
-                *map(str, proto_paths),
-            ]
-        )
-        # Remove every _grpc.py file that isn't part of a Temporal "service"
-        for grpc_file in temp_dir.glob("**/*_grpc.py*"):
-            if (
-                len(grpc_file.parents) < 2
-                or grpc_file.parents[0].name != "v1"
-                or not grpc_file.parents[1].name.endswith("service")
-            ):
-                grpc_file.unlink()
-        # Apply fixes before moving code
-        fix_generated_output(temp_dir)
-        # Move protos
-        for p in (temp_dir / "temporal" / "api").iterdir():
-            shutil.rmtree(api_out_dir / p.name, ignore_errors=True)
-            p.replace(api_out_dir / p.name)
-        shutil.rmtree(api_out_dir / "dependencies", ignore_errors=True)
-        for p in (temp_dir / "temporal" / "sdk" / "core").iterdir():
-            shutil.rmtree(sdk_out_dir / p.name, ignore_errors=True)
-            p.replace(sdk_out_dir / p.name)
-        shutil.rmtree(sdk_out_dir / "health", ignore_errors=True)
-        (temp_dir / "health").replace(sdk_out_dir / "health")
-        # Move test protos
-        for v in ["__init__.py", "proto_message_pb2.py", "proto_message_pb2.pyi"]:
-            shutil.copy2(
-                temp_dir / "worker" / "workflow_sandbox" / "testmodules" / "proto" / v,
-                test_proto_dir
-                / "worker"
-                / "workflow_sandbox"
-                / "testmodules"
-                / "proto"
-                / v,
-            )
 
+def generate_protos(output_dir: Path):
+    subprocess.check_call(
+        [
+            sys.executable,
+            "-mgrpc_tools.protoc",
+            f"--proto_path={api_proto_dir}",
+            f"--proto_path={core_proto_dir}",
+            f"--proto_path={testsrv_proto_dir}",
+            f"--proto_path={health_proto_dir}",
+            f"--proto_path={test_proto_dir}",
+            f"--proto_path={additional_proto_dir}",
+            f"--python_out={output_dir}",
+            f"--grpc_python_out={output_dir}",
+            f"--mypy_out={output_dir}",
+            f"--mypy_grpc_out={output_dir}",
+            *map(str, proto_paths),
+        ]
+    )
+    # Remove every _grpc.py file that isn't part of a Temporal "service"
+    for grpc_file in output_dir.glob("**/*_grpc.py*"):
+        if (
+            len(grpc_file.parents) < 2
+            or grpc_file.parents[0].name != "v1"
+            or not grpc_file.parents[1].name.endswith("service")
+        ):
+            grpc_file.unlink()
+    # Apply fixes before moving code
+    fix_generated_output(output_dir)
+    # Move protos
+    for p in (output_dir / "temporal" / "api").iterdir():
+        shutil.rmtree(api_out_dir / p.name, ignore_errors=True)
+        p.replace(api_out_dir / p.name)
+    shutil.rmtree(api_out_dir / "dependencies", ignore_errors=True)
+    for p in (output_dir / "temporal" / "sdk" / "core").iterdir():
+        shutil.rmtree(sdk_out_dir / p.name, ignore_errors=True)
+        p.replace(sdk_out_dir / p.name)
+    shutil.rmtree(sdk_out_dir / "health", ignore_errors=True)
+    (output_dir / "health").replace(sdk_out_dir / "health")
+    # Move test protos
+    for v in ["__init__.py", "proto_message_pb2.py", "proto_message_pb2.pyi"]:
+        shutil.copy2(
+            output_dir / "worker" / "workflow_sandbox" / "testmodules" / "proto" / v,
+            test_proto_dir
+            / "worker"
+            / "workflow_sandbox"
+            / "testmodules"
+            / "proto"
+            / v,
+        )
+
+
+if __name__ == "__main__":
+    check_proto_toolchain_versions()
+    print("Generating protos...", file=sys.stderr)
+    with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
+        generate_protos(Path(temp_dir))
     print("Done", file=sys.stderr)
