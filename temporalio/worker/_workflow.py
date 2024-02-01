@@ -174,15 +174,25 @@ class _WorkflowWorker:
     ) -> None:
         global LOG_PROTOS
 
+        # Extract a couple of jobs from the activation
+        cache_remove_job = None
+        start_job = None
+        for job in act.jobs:
+            if job.HasField("remove_from_cache"):
+                cache_remove_job = job.remove_from_cache
+            elif job.HasField("start_workflow"):
+                start_job = job.start_workflow
+        cache_remove_only_activation = len(act.jobs) == 1 and cache_remove_job
+
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         completion.successful.SetInParent()
-        remove_job = None
         try:
-            # Decode the activation if there's a codec
-            if self._data_converter.payload_codec:
+            # Decode the activation if there's a codec and it's not a
+            # cache-remove-only activation
+            if self._data_converter.payload_codec and not cache_remove_only_activation:
                 await temporalio.bridge.worker.decode_activation(
                     act, self._data_converter.payload_codec
                 )
@@ -191,15 +201,21 @@ class _WorkflowWorker:
                 logger.debug("Received workflow activation:\n%s", act)
 
             # We only have to run if there are any non-remove-from-cache jobs
-            remove_job = next(
-                (j for j in act.jobs if j.HasField("remove_from_cache")), None
-            )
-            if len(act.jobs) > 1 or not remove_job:
+            if not cache_remove_only_activation:
                 # If the workflow is not running yet, create it
                 workflow = self._running_workflows.get(act.run_id)
                 if not workflow:
-                    workflow = self._create_workflow_instance(act)
+                    # Must have a start job to create instance
+                    if not start_job:
+                        raise RuntimeError(
+                            "Missing start workflow, workflow could have unexpectedly been removed from cache"
+                        )
+                    workflow = self._create_workflow_instance(act, start_job)
                     self._running_workflows[act.run_id] = workflow
+                elif start_job:
+                    # This should never happen
+                    logger.warn("Cache already exists for activation with start job")
+
                 # Run activation in separate thread so we can check if it's
                 # deadlocked
                 activate_task = asyncio.get_running_loop().run_in_executor(
@@ -241,8 +257,25 @@ class _WorkflowWorker:
         # Always set the run ID on the completion
         completion.run_id = act.run_id
 
-        # Encode the completion if there's a codec
-        if self._data_converter.payload_codec:
+        # If there is a remove-from-cache job, do so
+        if cache_remove_job:
+            if act.run_id in self._running_workflows:
+                logger.debug(
+                    "Evicting workflow with run ID %s, message: %s",
+                    act.run_id,
+                    cache_remove_job.message,
+                )
+                del self._running_workflows[act.run_id]
+            else:
+                logger.debug(
+                    "Eviction request on unknown workflow with run ID %s, message: %s",
+                    act.run_id,
+                    cache_remove_job.message,
+                )
+
+        # Encode the completion if there's a codec and it's not a
+        # cache-remove-only activation
+        if self._data_converter.payload_codec and not cache_remove_only_activation:
             try:
                 await temporalio.bridge.worker.encode_completion(
                     completion, self._data_converter.payload_codec
@@ -265,54 +298,30 @@ class _WorkflowWorker:
                 "Failed completing activation on workflow with run ID %s", act.run_id
             )
 
-        # If there is a remove-from-cache job, do so
-        if remove_job:
-            if act.run_id in self._running_workflows:
-                logger.debug(
-                    "Evicting workflow with run ID %s, message: %s",
-                    act.run_id,
-                    remove_job.remove_from_cache.message,
-                )
-                del self._running_workflows[act.run_id]
-            else:
-                logger.debug(
-                    "Eviction request on unknown workflow with run ID %s, message: %s",
-                    act.run_id,
-                    remove_job.remove_from_cache.message,
-                )
-            # If we are failing on eviction, set the error and shutdown the
-            # entire worker
-            if self._on_eviction_hook is not None:
-                try:
-                    self._on_eviction_hook(act.run_id, remove_job.remove_from_cache)
-                except Exception as e:
-                    self._throw_after_activation = e
-                    logger.debug("Shutting down worker on eviction")
-                    self._bridge_worker().initiate_shutdown()
+        # If there is a remove job and an eviction hook, run it
+        if cache_remove_job and self._on_eviction_hook is not None:
+            try:
+                self._on_eviction_hook(act.run_id, cache_remove_job)
+            except Exception as e:
+                self._throw_after_activation = e
+                logger.debug("Shutting down worker on eviction")
+                self._bridge_worker().initiate_shutdown()
 
     def _create_workflow_instance(
-        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
+        self,
+        act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+        start: temporalio.bridge.proto.workflow_activation.StartWorkflow,
     ) -> WorkflowInstance:
-        # First find the start workflow job
-        start_job = next((j for j in act.jobs if j.HasField("start_workflow")), None)
-        if not start_job:
-            raise RuntimeError(
-                "Missing start workflow, workflow could have unexpectedly been removed from cache"
-            )
-
         # Get the definition
-        defn = self._workflows.get(
-            start_job.start_workflow.workflow_type, self._dynamic_workflow
-        )
+        defn = self._workflows.get(start.workflow_type, self._dynamic_workflow)
         if not defn:
             workflow_names = ", ".join(sorted(self._workflows.keys()))
             raise temporalio.exceptions.ApplicationError(
-                f"Workflow class {start_job.start_workflow.workflow_type} is not registered on this worker, available workflows: {workflow_names}",
+                f"Workflow class {start.workflow_type} is not registered on this worker, available workflows: {workflow_names}",
                 type="NotFoundError",
             )
 
         # Build info
-        start = start_job.start_workflow
         parent: Optional[temporalio.workflow.ParentInfo] = None
         if start.HasField("parent_workflow_info"):
             parent = temporalio.workflow.ParentInfo(
