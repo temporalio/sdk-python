@@ -267,7 +267,7 @@ class _WorkflowWorker:
                 )
                 del self._running_workflows[act.run_id]
             else:
-                logger.debug(
+                logger.warn(
                     "Eviction request on unknown workflow with run ID %s, message: %s",
                     act.run_id,
                     cache_remove_job.message,
