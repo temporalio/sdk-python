@@ -633,7 +633,7 @@ def load_default_build_id(*, memoize: bool = True) -> str:
     # * Using the loader's get_code in rare cases can cause a compile()
 
     got_temporal_code = False
-    m = hashlib.md5()
+    m = hashlib.md5(usedforsecurity=False)
     for mod_name in sorted(sys.modules):
         # Try to read code
         code = _get_module_code(mod_name)
