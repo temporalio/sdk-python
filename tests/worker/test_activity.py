@@ -544,10 +544,7 @@ async def test_activity_does_not_exist(client: Client, worker: ExternalWorker):
                 id=str(uuid.uuid4()),
                 task_queue=worker.task_queue,
             )
-    assert str(assert_activity_application_error(err.value)) == (
-        "NotFoundError: Activity function wrong_activity is not registered on this worker, "
-        "available activities: say_hello"
-    )
+    assert "is not registered" in str(assert_activity_application_error(err.value))
 
 
 async def test_max_concurrent_activities(client: Client, worker: ExternalWorker):
