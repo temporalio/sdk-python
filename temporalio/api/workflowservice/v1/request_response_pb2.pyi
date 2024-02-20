@@ -41,6 +41,7 @@ import temporalio.api.enums.v1.namespace_pb2
 import temporalio.api.enums.v1.query_pb2
 import temporalio.api.enums.v1.reset_pb2
 import temporalio.api.enums.v1.task_queue_pb2
+import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.filter.v1.message_pb2
@@ -1050,7 +1051,9 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     """
     started_event_id: builtins.int
     """The id of the most recent workflow task started event, which will have been generated as a
-    result of this poll request being served.
+    result of this poll request being served. Will be zero if the task
+    does not contain any events which would advance history (no new WFT started).
+    Currently this can happen for queries.
     """
     attempt: builtins.int
     """Starting at 1, the number of attempts to complete this task by any worker."""
@@ -2737,7 +2740,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     request_id: builtins.str
     """Used to de-dupe reset requests"""
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """Reset reapplay(replay) options."""
+    """Reset reapply (replay) options."""
     def __init__(
         self,
         *,
@@ -3351,15 +3354,64 @@ global___CountWorkflowExecutionsRequest = CountWorkflowExecutionsRequest
 class CountWorkflowExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class AggregationGroup(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        GROUP_VALUES_FIELD_NUMBER: builtins.int
+        COUNT_FIELD_NUMBER: builtins.int
+        @property
+        def group_values(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            temporalio.api.common.v1.message_pb2.Payload
+        ]: ...
+        count: builtins.int
+        def __init__(
+            self,
+            *,
+            group_values: collections.abc.Iterable[
+                temporalio.api.common.v1.message_pb2.Payload
+            ]
+            | None = ...,
+            count: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "count", b"count", "group_values", b"group_values"
+            ],
+        ) -> None: ...
+
     COUNT_FIELD_NUMBER: builtins.int
+    GROUPS_FIELD_NUMBER: builtins.int
     count: builtins.int
+    """If `query` is not grouping by any field, the count is an approximate number
+    of workflows that matches the query.
+    If `query` is grouping by a field, the count is simply the sum of the counts
+    of the groups returned in the response. This number can be smaller than the
+    total number of workflows matching the query.
+    """
+    @property
+    def groups(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___CountWorkflowExecutionsResponse.AggregationGroup
+    ]:
+        """`groups` contains the groups if the request is grouping by a field.
+        The list might not be complete, and the counts of each group is approximate.
+        """
     def __init__(
         self,
         *,
         count: builtins.int = ...,
+        groups: collections.abc.Iterable[
+            global___CountWorkflowExecutionsResponse.AggregationGroup
+        ]
+        | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["count", b"count"]
+        self,
+        field_name: typing_extensions.Literal["count", b"count", "groups", b"groups"],
     ) -> None: ...
 
 global___CountWorkflowExecutionsResponse = CountWorkflowExecutionsResponse
@@ -3695,6 +3747,7 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     task_queue_type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
+    """If unspecified (TASK_QUEUE_TYPE_UNSPECIFIED), then default value (TASK_QUEUE_TYPE_WORKFLOW) will be used."""
     include_task_queue_status: builtins.bool
     def __init__(
         self,
@@ -3884,6 +3937,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         UPSERT_MEMO_FIELD_NUMBER: builtins.int
         EAGER_WORKFLOW_START_FIELD_NUMBER: builtins.int
         SDK_METADATA_FIELD_NUMBER: builtins.int
+        COUNT_GROUP_BY_EXECUTION_STATUS_FIELD_NUMBER: builtins.int
         signal_and_query_header: builtins.bool
         """True if signal and query headers are supported."""
         internal_error_differentiation: builtins.bool
@@ -3912,6 +3966,10 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         """True if the server knows about the sdk metadata field on WFT completions and will record
         it in history
         """
+        count_group_by_execution_status: builtins.bool
+        """True if the server supports count group by execution status
+        (-- api-linter: core::0140::prepositions=disabled --)
+        """
         def __init__(
             self,
             *,
@@ -3924,6 +3982,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
             upsert_memo: builtins.bool = ...,
             eager_workflow_start: builtins.bool = ...,
             sdk_metadata: builtins.bool = ...,
+            count_group_by_execution_status: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -3932,6 +3991,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
                 b"activity_failure_include_heartbeat",
                 "build_id_based_versioning",
                 b"build_id_based_versioning",
+                "count_group_by_execution_status",
+                b"count_group_by_execution_status",
                 "eager_workflow_start",
                 b"eager_workflow_start",
                 "encoded_failure_attributes",
@@ -4747,18 +4808,8 @@ global___UpdateWorkerBuildIdCompatibilityRequest = (
 class UpdateWorkerBuildIdCompatibilityResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    VERSION_SET_ID_FIELD_NUMBER: builtins.int
-    version_set_id: builtins.str
-    """The id of the compatible set that the updated version was added to, or exists in. Users don't
-    need to understand or care about this value, but it has value for debugging purposes.
-    """
     def __init__(
         self,
-        *,
-        version_set_id: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["version_set_id", b"version_set_id"]
     ) -> None: ...
 
 global___UpdateWorkerBuildIdCompatibilityResponse = (
@@ -5013,6 +5064,7 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
 
     UPDATE_REF_FIELD_NUMBER: builtins.int
     OUTCOME_FIELD_NUMBER: builtins.int
+    STAGE_FIELD_NUMBER: builtins.int
     @property
     def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
         """Enough information for subsequent poll calls if needed. Never null."""
@@ -5022,11 +5074,24 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
         has completed. If this response is being returned before the update has
         completed then this field will not be set.
         """
+    stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType
+    """The most advanced lifecycle stage that the Update is known to have
+    reached, where lifecycle stages are ordered
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED <
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED <
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED <
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED.
+    UNSPECIFIED will be returned if and only if the server's maximum wait
+    time was reached before the Update reached the stage specified in the
+    request WaitPolicy, and before the context deadline expired; clients may
+    may then retry the call as needed.
+    """
     def __init__(
         self,
         *,
         update_ref: temporalio.api.update.v1.message_pb2.UpdateRef | None = ...,
         outcome: temporalio.api.update.v1.message_pb2.Outcome | None = ...,
+        stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -5037,7 +5102,7 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "outcome", b"outcome", "update_ref", b"update_ref"
+            "outcome", b"outcome", "stage", b"stage", "update_ref", b"update_ref"
         ],
     ) -> None: ...
 
@@ -5051,6 +5116,7 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     JOB_ID_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
     EXECUTIONS_FIELD_NUMBER: builtins.int
+    MAX_OPERATIONS_PER_SECOND_FIELD_NUMBER: builtins.int
     TERMINATION_OPERATION_FIELD_NUMBER: builtins.int
     SIGNAL_OPERATION_FIELD_NUMBER: builtins.int
     CANCELLATION_OPERATION_FIELD_NUMBER: builtins.int
@@ -5060,7 +5126,7 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     """Namespace that contains the batch operation"""
     visibility_query: builtins.str
     """Visibility query defines the the group of workflow to apply the batch operation
-    This field and Executions are mutually exclusive
+    This field and `executions` are mutually exclusive
     """
     job_id: builtins.str
     """Job ID defines the unique ID for the batch job"""
@@ -5073,8 +5139,16 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         temporalio.api.common.v1.message_pb2.WorkflowExecution
     ]:
         """Executions to apply the batch operation
-        This field and VisibilityQuery are mutually exclusive
+        This field and `visibility_query` are mutually exclusive
         """
+    max_operations_per_second: builtins.float
+    """Limit for the number of operations processed per second within this batch.
+    Its purpose is to reduce the stress on the system caused by batch operations, which helps to prevent system
+    overload and minimize potential delays in executing ongoing tasks for user workers.
+    Note that when no explicit limit is provided, the server will operate according to its limit defined by the
+    dynamic configuration key `worker.batcherRPS`. This also applies if the value in this field exceeds the
+    server's configured limit.
+    """
     @property
     def termination_operation(
         self,
@@ -5106,6 +5180,7 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             temporalio.api.common.v1.message_pb2.WorkflowExecution
         ]
         | None = ...,
+        max_operations_per_second: builtins.float = ...,
         termination_operation: temporalio.api.batch.v1.message_pb2.BatchOperationTermination
         | None = ...,
         signal_operation: temporalio.api.batch.v1.message_pb2.BatchOperationSignal
@@ -5145,6 +5220,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"executions",
             "job_id",
             b"job_id",
+            "max_operations_per_second",
+            b"max_operations_per_second",
             "namespace",
             b"namespace",
             "operation",
@@ -5424,7 +5501,9 @@ class PollWorkflowExecutionUpdateRequest(google.protobuf.message.Message):
     """The identity of the worker/client who is polling this update outcome"""
     @property
     def wait_policy(self) -> temporalio.api.update.v1.message_pb2.WaitPolicy:
-        """Describes when this poll request should return a response"""
+        """Describes when this poll request should return a response.
+        Omit to request a non-blocking poll.
+        """
     def __init__(
         self,
         *,
@@ -5459,6 +5538,8 @@ class PollWorkflowExecutionUpdateResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     OUTCOME_FIELD_NUMBER: builtins.int
+    STAGE_FIELD_NUMBER: builtins.int
+    UPDATE_REF_FIELD_NUMBER: builtins.int
     @property
     def outcome(self) -> temporalio.api.update.v1.message_pb2.Outcome:
         """The outcome of the update if and only if the update has completed. If
@@ -5467,16 +5548,39 @@ class PollWorkflowExecutionUpdateResponse(google.protobuf.message.Message):
         UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED) then this field will
         not be set.
         """
+    stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType
+    """The most advanced lifecycle stage that the Update is known to have
+    reached, where lifecycle stages are ordered
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED <
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED <
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED <
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED.
+    UNSPECIFIED will be returned if and only if the server's maximum wait
+    time was reached before the Update reached the stage specified in the
+    request WaitPolicy, and before the context deadline expired; clients may
+    may then retry the call as needed.
+    """
+    @property
+    def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
+        """Sufficient information to address this update."""
     def __init__(
         self,
         *,
         outcome: temporalio.api.update.v1.message_pb2.Outcome | None = ...,
+        stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType = ...,
+        update_ref: temporalio.api.update.v1.message_pb2.UpdateRef | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["outcome", b"outcome"]
+        self,
+        field_name: typing_extensions.Literal[
+            "outcome", b"outcome", "update_ref", b"update_ref"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["outcome", b"outcome"]
+        self,
+        field_name: typing_extensions.Literal[
+            "outcome", b"outcome", "stage", b"stage", "update_ref", b"update_ref"
+        ],
     ) -> None: ...
 
 global___PollWorkflowExecutionUpdateResponse = PollWorkflowExecutionUpdateResponse

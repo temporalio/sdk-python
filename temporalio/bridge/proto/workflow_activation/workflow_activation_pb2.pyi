@@ -33,6 +33,33 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 class WorkflowActivation(google.protobuf.message.Message):
     """An instruction to the lang sdk to run some workflow code, whether for the first time or from
     a cached state.
+
+    ## Job ordering guarantees and semantics
+
+    Core will, by default, order jobs within the activation as follows:
+    `patches -> signals/updates -> other -> queries -> evictions`
+
+    This is because:
+    * Patches are expected to apply to the entire activation
+    * Signal and update handlers should be invoked before workflow routines are iterated. That is to
+      say before the users' main workflow function and anything spawned by it is allowed to continue.
+    * Queries always go last (and, in fact, always come in their own activation)
+
+    The downside of this reordering is that a signal or update handler may not observe that some
+    other event had already happened (ex: an activity completed) when it is first invoked, though it
+    will subsequently when workflow routines are driven. Core only does this reordering to make life
+    easier for languages that cannot explicitly control when workflow routines are iterated.
+    Languages that can explicitly control such iteration should prefer to apply all the jobs to state
+    (by resolving promises/futures, invoking handlers, etc as they iterate over the jobs) and then
+    only *after* that is done, drive the workflow routines.
+
+    ## Evictions
+
+    Activations that contain only a `remove_from_cache` job should not cause the workflow code
+    to be invoked and may be responded to with an empty command list. Eviction jobs may also
+    appear with other jobs, but will always appear last in the job list. In this case it is
+    expected that the workflow code will be invoked, and the response produced as normal, but
+    the caller should evict the run after doing so.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

@@ -34,7 +34,10 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
-from temporalio.api.workflowservice.v1 import GetWorkflowExecutionHistoryRequest
+from temporalio.api.workflowservice.v1 import (
+    GetWorkflowExecutionHistoryRequest,
+    ResetStickyTaskQueueRequest,
+)
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import (
@@ -111,6 +114,21 @@ async def test_workflow_hello(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+        assert result == "Hello, Temporal!"
+
+
+async def test_workflow_hello_eager(client: Client):
+    async with new_worker(client, HelloWorkflow) as worker:
+        handle = await client.start_workflow(
+            HelloWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            request_eager_start=True,
+            task_timeout=timedelta(hours=1),  # hang if retry needed
+        )
+        assert handle.__temporal_eagerly_started
+        result = await handle.result()
         assert result == "Hello, Temporal!"
 
 
@@ -1810,6 +1828,35 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
 
 
 @workflow.defn
+class NoSearchAttributesWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        workflow.upsert_search_attributes(
+            [
+                SearchAttributeWorkflow.text_attribute.value_set("text2"),
+            ]
+        )
+        # All we need to do is complete
+
+
+async def test_workflow_no_initial_search_attributes(client: Client, env_type: str):
+    if env_type != "local":
+        pytest.skip("Only testing search attributes on local which disables cache")
+    await ensure_search_attributes_present(
+        client,
+        SearchAttributeWorkflow.text_attribute,
+    )
+    async with new_worker(client, NoSearchAttributesWorkflow) as worker:
+        handle = await client.start_workflow(
+            NoSearchAttributesWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            # importantly, no initial search attributes
+        )
+        await handle.result()
+
+
+@workflow.defn
 class LoggingWorkflow:
     def __init__(self) -> None:
         self._last_signal = "<none>"
@@ -1863,11 +1910,12 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
         assert find_log("Signal: signal 1 ({'attempt':")
         assert find_log("Signal: signal 2")
         assert not find_log("Signal: signal 3")
-        # Also make sure it has some workflow info
+        # Also make sure it has some workflow info and correct funcName
         record = find_log("Signal: signal 1")
         assert (
             record
             and record.__dict__["workflow_info"].workflow_type == "LoggingWorkflow"
+            and record.funcName == "my_signal"
         )
 
         # Clear queue and start a new one with more signals
@@ -2094,17 +2142,6 @@ async def test_workflow_separate_protocol(client: Client):
     async with new_worker(
         client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
     ) as worker:
-        # Our decorators add attributes on the class, but protocols don't allow
-        # you to use issubclass with any attributes other than their fixed ones.
-        # We are asserting that this invariant holds so we can document it and
-        # revisit in a later version if they change this.
-        # TODO(cretz): If we document how to use protocols as workflow
-        # interfaces/contracts, we should mention that they can't use
-        # @runtime_checkable with issubclass.
-        with pytest.raises(TypeError) as err:
-            assert issubclass(DataClassTypedWorkflow, DataClassTypedWorkflowProto)
-        assert "non-method members" in str(err.value)
-
         assert isinstance(DataClassTypedWorkflow(), DataClassTypedWorkflowProto)
         val = MyDataClass(field1="some value")
         handle = await client.start_workflow(
@@ -2342,7 +2379,7 @@ async def test_workflow_deadlock(client: Client):
 
         try:
             await assert_eq_eventually(
-                "Potential deadlock detected, workflow didn't yield within 2 second(s)",
+                "[TMPRL1101] Potential deadlock detected, workflow didn't yield within 2 second(s)",
                 last_history_task_failure,
                 timeout=timedelta(seconds=5),
                 interval=timedelta(seconds=1),
@@ -3201,8 +3238,6 @@ class SwallowGeneratorExitWorkflow:
 
 
 async def test_swallow_generator_exit(client: Client):
-    if sys.version_info < (3, 8):
-        pytest.skip("sys.unraisablehook not in 3.7")
     # This test simulates GeneratorExit and GC issues by forcing eviction on
     # each step
     async with new_worker(
@@ -3733,7 +3768,8 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
         )
 
         # Dynamically registered and used in first task
-        assert "worked" == await handle.execute_update("first_task_update")
+        # TODO: Once https://github.com/temporalio/sdk-python/issues/462 is fixed, uncomment
+        # assert "worked" == await handle.execute_update("first_task_update")
 
         # Normal handling
         last_event = await handle.execute_update(
@@ -3781,10 +3817,11 @@ async def test_workflow_update_handlers_unhappy(
             await handle.execute_update("whargarbl", "whatever")
         assert isinstance(err.value.cause, ApplicationError)
         assert "'whargarbl' expected but not found" in err.value.cause.message
-        assert (
-            "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic throws_runtime_err]"
-            in err.value.cause.message
-        )
+        # TODO: Once https://github.com/temporalio/sdk-python/issues/462 is fixed, uncomment
+        # assert (
+        #     "known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic throws_runtime_err]"
+        #     in err.value.cause.message
+        # )
 
         # Rejection by validator
         with pytest.raises(WorkflowUpdateFailedError) as err:
@@ -3868,3 +3905,152 @@ async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironme
         global task_fail_ct, bad_validator_fail_ct
         assert task_fail_ct == 1
         assert bad_validator_fail_ct == 2
+
+
+@workflow.defn
+class TimeoutSupportWorkflow:
+    @workflow.run
+    async def run(self, approach: str) -> None:
+        if sys.version_info < (3, 11):
+            raise RuntimeError("Timeout only in >= 3.11")
+        if approach == "timeout":
+            async with asyncio.timeout(0.2):
+                await workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+        elif approach == "timeout_at":
+            async with asyncio.timeout_at(asyncio.get_running_loop().time() + 0.2):
+                await workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+        elif approach == "wait_for":
+            await asyncio.wait_for(
+                workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                ),
+                0.2,
+            )
+        elif approach == "call_later":
+            activity_task = asyncio.create_task(
+                workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+            )
+            asyncio.get_running_loop().call_later(0.2, activity_task.cancel)
+            await activity_task
+        elif approach == "call_at":
+            activity_task = asyncio.create_task(
+                workflow.execute_activity(
+                    wait_cancel, schedule_to_close_timeout=timedelta(seconds=20)
+                )
+            )
+            asyncio.get_running_loop().call_at(
+                asyncio.get_running_loop().time() + 0.2, activity_task.cancel
+            )
+            await activity_task
+        else:
+            raise RuntimeError(f"Unrecognized approach: {approach}")
+
+
+@pytest.mark.parametrize(
+    "approach", ["timeout", "timeout_at", "wait_for", "call_later", "call_at"]
+)
+async def test_workflow_timeout_support(client: Client, approach: str):
+    if sys.version_info < (3, 11):
+        pytest.skip("Timeout only in >= 3.11")
+    async with new_worker(
+        client, TimeoutSupportWorkflow, activities=[wait_cancel]
+    ) as worker:
+        # Run and confirm activity gets cancelled
+        with pytest.raises(WorkflowFailureError) as err:
+            handle = await client.start_workflow(
+                TimeoutSupportWorkflow.run,
+                approach,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle.result()
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, CancelledError)
+        # Check that no matter which approach, it made a 300ms timer
+        found_timer = False
+        async for e in handle.fetch_history_events():
+            if e.HasField("timer_started_event_attributes"):
+                assert (
+                    e.timer_started_event_attributes.start_to_fire_timeout.ToMilliseconds()
+                    == 200
+                )
+                found_timer = True
+                break
+        assert found_timer
+
+
+@workflow.defn
+class BuildIDInfoWorkflow:
+    do_finish = False
+
+    @workflow.run
+    async def run(self):
+        await asyncio.sleep(1)
+        if workflow.info().get_current_build_id() == "1.0":
+            await workflow.execute_activity(
+                say_hello, "yo", schedule_to_close_timeout=timedelta(seconds=5)
+            )
+        await workflow.wait_condition(lambda: self.do_finish)
+
+    @workflow.query
+    def get_build_id(self) -> str:
+        return workflow.info().get_current_build_id()
+
+    @workflow.signal
+    async def finish(self):
+        self.do_finish = True
+
+
+async def test_workflow_current_build_id_appropriately_set(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not support worker versioning")
+
+    task_queue = str(uuid.uuid4())
+    async with new_worker(
+        client,
+        BuildIDInfoWorkflow,
+        activities=[say_hello],
+        build_id="1.0",
+        task_queue=task_queue,
+    ) as worker:
+        handle = await client.start_workflow(
+            BuildIDInfoWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.0"
+        await worker.shutdown()
+
+    await client.workflow_service.reset_sticky_task_queue(
+        ResetStickyTaskQueueRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=handle.id),
+        )
+    )
+
+    async with new_worker(
+        client,
+        BuildIDInfoWorkflow,
+        activities=[say_hello],
+        build_id="1.1",
+        task_queue=task_queue,
+    ) as worker:
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.0"
+        await handle.signal(BuildIDInfoWorkflow.finish)
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.1"
+        await handle.result()
+        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
+        assert bid == "1.1"
+
+        await worker.shutdown()

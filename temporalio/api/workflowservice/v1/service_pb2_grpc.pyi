@@ -69,11 +69,6 @@ class WorkflowServiceStub:
     ]
     """UpdateNamespace is used to update the information and configuration of a registered
     namespace.
-
-    (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateNamespace RPC doesn't follow Google API format. --)
-    (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateNamespace RPC doesn't follow Google API format. --)
     """
     DeprecateNamespace: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
@@ -84,6 +79,9 @@ class WorkflowServiceStub:
     Once the namespace is deprecated it cannot be used to start new workflow executions. Existing
     workflow executions will continue to run on deprecated namespaces.
     Deprecated.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: Deprecated --)
     """
     StartWorkflowExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
@@ -120,6 +118,9 @@ class WorkflowServiceStub:
     tasks. The worker is expected to call `RespondWorkflowTaskCompleted` when it is done
     processing the task. The service will create a `WorkflowTaskStarted` event in the history for
     this task before handing it to the worker.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
     RespondWorkflowTaskCompleted: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
@@ -131,6 +132,9 @@ class WorkflowServiceStub:
     Completing a WorkflowTask will write a `WORKFLOW_TASK_COMPLETED` event to the workflow's
     history, along with events corresponding to whatever commands the SDK generated while
     executing the task (ex timer started, activity task scheduled, etc).
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
     RespondWorkflowTaskFailed: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
@@ -145,6 +149,9 @@ class WorkflowServiceStub:
 
     Temporal will only append first WorkflowTaskFailed event to the history of workflow execution
     for consecutive failures.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
     PollActivityTaskQueue: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
@@ -162,6 +169,9 @@ class WorkflowServiceStub:
     (`ACTIVITY_TASK_COMPLETED` / `ACTIVITY_TASK_FAILED` / `ACTIVITY_TASK_TIMED_OUT`) will both be
     written permanently to Workflow execution history when Activity is finished. This is done to
     avoid writing many events in the case of a failure/retry loop.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
     RecordActivityTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
@@ -307,21 +317,28 @@ class WorkflowServiceStub:
     WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
     WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
     terminated before deletion.
-    (-- api-linter: core::0135::method-signature=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-    (-- api-linter: core::0135::response-message-name=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: Workflow deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
     ListOpenWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
     ]
-    """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace."""
+    """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+    """
     ListClosedWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
     ]
-    """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace."""
+    """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+    """
     ListWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
@@ -336,7 +353,11 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
     ]
-    """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order."""
+    """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+    """
     CountWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
@@ -346,7 +367,11 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
     ]
-    """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs"""
+    """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose this search attribute API to HTTP (but may expose on OperatorService). --)
+    """
     RespondQueryTaskCompleted: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
@@ -356,6 +381,9 @@ class WorkflowServiceStub:
 
     Completing the query will unblock the corresponding client call to `QueryWorkflow` and return
     the query result a response.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
     ResetStickyTaskQueue: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
@@ -368,6 +396,9 @@ class WorkflowServiceStub:
     Things cleared are:
     1. StickyTaskQueue
     2. StickyScheduleToStartTimeout
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
     QueryWorkflow: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
@@ -398,18 +429,14 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
     ]
+    """(-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose this low-level API to HTTP. --)
+    """
     CreateSchedule: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
     ]
-    """Creates a new schedule.
-    (-- api-linter: core::0133::method-signature=disabled
-        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-    (-- api-linter: core::0133::response-message-name=disabled
-        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-    (-- api-linter: core::0133::http-uri-parent=disabled
-        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-    """
+    """Creates a new schedule."""
     DescribeSchedule: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
@@ -419,20 +446,12 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
     ]
-    """Changes the configuration or state of an existing schedule.
-    (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
-    (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
-    """
+    """Changes the configuration or state of an existing schedule."""
     PatchSchedule: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
     ]
-    """Makes a specific change to a schedule or triggers an immediate action.
-    (-- api-linter: core::0134::synonyms=disabled
-        aip.dev/not-precedent: we have both patch and update. --)
-    """
+    """Makes a specific change to a schedule or triggers an immediate action."""
     ListScheduleMatchingTimes: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
@@ -442,12 +461,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
     ]
-    """Deletes a schedule, removing it from the system.
-    (-- api-linter: core::0135::method-signature=disabled
-        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
-    (-- api-linter: core::0135::response-message-name=disabled
-        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
-    """
+    """Deletes a schedule, removing it from the system."""
     ListSchedules: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
@@ -470,10 +484,8 @@ class WorkflowServiceStub:
     NOTE: The number of task queues mapped to a single build id is limited by the `limit.taskQueuesPerBuildId`
     (default is 20), if this limit is exceeded this API will error with a FailedPrecondition.
 
-    (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
-    (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
     """
     GetWorkerBuildIdCompatibility: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
@@ -501,10 +513,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
     ]
-    """Invokes the specified update function on user workflow code.
-    (-- api-linter: core::0134=disabled
-        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
-    """
+    """Invokes the specified update function on user workflow code."""
     PollWorkflowExecutionUpdate: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
@@ -513,8 +522,9 @@ class WorkflowServiceStub:
     previously issued through the UpdateWorkflowExecution RPC. The effective
     timeout on this call will be shorter of the the caller-supplied gRPC
     timeout and the server's configured long-poll timeout.
-    (-- api-linter: core::0134=disabled
-        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We don't expose update polling API to HTTP in favor of a potential future non-blocking form. --)
     """
     StartBatchOperation: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
@@ -590,11 +600,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse:
         """UpdateNamespace is used to update the information and configuration of a registered
         namespace.
-
-        (-- api-linter: core::0134::method-signature=disabled
-            aip.dev/not-precedent: UpdateNamespace RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0134::response-message-name=disabled
-            aip.dev/not-precedent: UpdateNamespace RPC doesn't follow Google API format. --)
         """
     @abc.abstractmethod
     def DeprecateNamespace(
@@ -609,6 +614,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Once the namespace is deprecated it cannot be used to start new workflow executions. Existing
         workflow executions will continue to run on deprecated namespaces.
         Deprecated.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: Deprecated --)
         """
     @abc.abstractmethod
     def StartWorkflowExecution(
@@ -661,6 +669,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         tasks. The worker is expected to call `RespondWorkflowTaskCompleted` when it is done
         processing the task. The service will create a `WorkflowTaskStarted` event in the history for
         this task before handing it to the worker.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
     @abc.abstractmethod
     def RespondWorkflowTaskCompleted(
@@ -676,6 +687,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Completing a WorkflowTask will write a `WORKFLOW_TASK_COMPLETED` event to the workflow's
         history, along with events corresponding to whatever commands the SDK generated while
         executing the task (ex timer started, activity task scheduled, etc).
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
     @abc.abstractmethod
     def RespondWorkflowTaskFailed(
@@ -694,6 +708,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
 
         Temporal will only append first WorkflowTaskFailed event to the history of workflow execution
         for consecutive failures.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
     @abc.abstractmethod
     def PollActivityTaskQueue(
@@ -715,6 +732,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (`ACTIVITY_TASK_COMPLETED` / `ACTIVITY_TASK_FAILED` / `ACTIVITY_TASK_TIMED_OUT`) will both be
         written permanently to Workflow execution history when Activity is finished. This is done to
         avoid writing many events in the case of a failure/retry loop.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
     @abc.abstractmethod
     def RecordActivityTaskHeartbeat(
@@ -916,10 +936,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
         WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
         terminated before deletion.
-        (-- api-linter: core::0135::method-signature=disabled
-            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0135::response-message-name=disabled
-            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: Workflow deletion not exposed to HTTP, users should use cancel or terminate. --)
         """
     @abc.abstractmethod
     def ListOpenWorkflowExecutions(
@@ -929,7 +948,11 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> (
         temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse
     ):
-        """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace."""
+        """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+        """
     @abc.abstractmethod
     def ListClosedWorkflowExecutions(
         self,
@@ -938,7 +961,11 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> (
         temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse
     ):
-        """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace."""
+        """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+        """
     @abc.abstractmethod
     def ListWorkflowExecutions(
         self,
@@ -965,7 +992,11 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> (
         temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse
     ):
-        """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order."""
+        """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+        """
     @abc.abstractmethod
     def CountWorkflowExecutions(
         self,
@@ -983,7 +1014,11 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> (
         temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse
     ):
-        """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs"""
+        """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose this search attribute API to HTTP (but may expose on OperatorService). --)
+        """
     @abc.abstractmethod
     def RespondQueryTaskCompleted(
         self,
@@ -997,6 +1032,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
 
         Completing the query will unblock the corresponding client call to `QueryWorkflow` and return
         the query result a response.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
     @abc.abstractmethod
     def ResetStickyTaskQueue(
@@ -1013,6 +1051,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Things cleared are:
         1. StickyTaskQueue
         2. StickyScheduleToStartTimeout
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
     @abc.abstractmethod
     def QueryWorkflow(
@@ -1060,21 +1101,17 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> (
         temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse
-    ): ...
+    ):
+        """(-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose this low-level API to HTTP. --)
+        """
     @abc.abstractmethod
     def CreateSchedule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse:
-        """Creates a new schedule.
-        (-- api-linter: core::0133::method-signature=disabled
-            aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-        (-- api-linter: core::0133::response-message-name=disabled
-            aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-        (-- api-linter: core::0133::http-uri-parent=disabled
-            aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-        """
+        """Creates a new schedule."""
     @abc.abstractmethod
     def DescribeSchedule(
         self,
@@ -1090,22 +1127,14 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse:
-        """Changes the configuration or state of an existing schedule.
-        (-- api-linter: core::0134::response-message-name=disabled
-            aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0134::method-signature=disabled
-            aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
-        """
+        """Changes the configuration or state of an existing schedule."""
     @abc.abstractmethod
     def PatchSchedule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse:
-        """Makes a specific change to a schedule or triggers an immediate action.
-        (-- api-linter: core::0134::synonyms=disabled
-            aip.dev/not-precedent: we have both patch and update. --)
-        """
+        """Makes a specific change to a schedule or triggers an immediate action."""
     @abc.abstractmethod
     def ListScheduleMatchingTimes(
         self,
@@ -1121,12 +1150,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse:
-        """Deletes a schedule, removing it from the system.
-        (-- api-linter: core::0135::method-signature=disabled
-            aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
-        (-- api-linter: core::0135::response-message-name=disabled
-            aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
-        """
+        """Deletes a schedule, removing it from the system."""
     @abc.abstractmethod
     def ListSchedules(
         self,
@@ -1155,10 +1179,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         NOTE: The number of task queues mapped to a single build id is limited by the `limit.taskQueuesPerBuildId`
         (default is 20), if this limit is exceeded this API will error with a FailedPrecondition.
 
-        (-- api-linter: core::0134::response-message-name=disabled
-            aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0134::method-signature=disabled
-            aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
         """
     @abc.abstractmethod
     def GetWorkerBuildIdCompatibility(
@@ -1198,10 +1220,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> (
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse
     ):
-        """Invokes the specified update function on user workflow code.
-        (-- api-linter: core::0134=disabled
-            aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
-        """
+        """Invokes the specified update function on user workflow code."""
     @abc.abstractmethod
     def PollWorkflowExecutionUpdate(
         self,
@@ -1214,8 +1233,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         previously issued through the UpdateWorkflowExecution RPC. The effective
         timeout on this call will be shorter of the the caller-supplied gRPC
         timeout and the server's configured long-poll timeout.
-        (-- api-linter: core::0134=disabled
-            aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We don't expose update polling API to HTTP in favor of a potential future non-blocking form. --)
         """
     @abc.abstractmethod
     def StartBatchOperation(

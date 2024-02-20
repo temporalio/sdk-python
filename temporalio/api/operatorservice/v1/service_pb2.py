@@ -13,12 +13,14 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
+
 from temporalio.api.operatorservice.v1 import (
     request_response_pb2 as temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2,
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n-temporal/api/operatorservice/v1/service.proto\x12\x1ftemporal.api.operatorservice.v1\x1a\x36temporal/api/operatorservice/v1/request_response.proto2\x9d\x08\n\x0fOperatorService\x12\x92\x01\n\x13\x41\x64\x64SearchAttributes\x12;.temporal.api.operatorservice.v1.AddSearchAttributesRequest\x1a<.temporal.api.operatorservice.v1.AddSearchAttributesResponse"\x00\x12\x9b\x01\n\x16RemoveSearchAttributes\x12>.temporal.api.operatorservice.v1.RemoveSearchAttributesRequest\x1a?.temporal.api.operatorservice.v1.RemoveSearchAttributesResponse"\x00\x12\x95\x01\n\x14ListSearchAttributes\x12<.temporal.api.operatorservice.v1.ListSearchAttributesRequest\x1a=.temporal.api.operatorservice.v1.ListSearchAttributesResponse"\x00\x12\x86\x01\n\x0f\x44\x65leteNamespace\x12\x37.temporal.api.operatorservice.v1.DeleteNamespaceRequest\x1a\x38.temporal.api.operatorservice.v1.DeleteNamespaceResponse"\x00\x12\xa1\x01\n\x18\x41\x64\x64OrUpdateRemoteCluster\x12@.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterRequest\x1a\x41.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterResponse"\x00\x12\x92\x01\n\x13RemoveRemoteCluster\x12;.temporal.api.operatorservice.v1.RemoveRemoteClusterRequest\x1a<.temporal.api.operatorservice.v1.RemoveRemoteClusterResponse"\x00\x12}\n\x0cListClusters\x12\x34.temporal.api.operatorservice.v1.ListClustersRequest\x1a\x35.temporal.api.operatorservice.v1.ListClustersResponse"\x00\x42\xb6\x01\n"io.temporal.api.operatorservice.v1B\x0cServiceProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
+    b'\n-temporal/api/operatorservice/v1/service.proto\x12\x1ftemporal.api.operatorservice.v1\x1a\x36temporal/api/operatorservice/v1/request_response.proto\x1a\x1cgoogle/api/annotations.proto2\xd5\x08\n\x0fOperatorService\x12\x92\x01\n\x13\x41\x64\x64SearchAttributes\x12;.temporal.api.operatorservice.v1.AddSearchAttributesRequest\x1a<.temporal.api.operatorservice.v1.AddSearchAttributesResponse"\x00\x12\x9b\x01\n\x16RemoveSearchAttributes\x12>.temporal.api.operatorservice.v1.RemoveSearchAttributesRequest\x1a?.temporal.api.operatorservice.v1.RemoveSearchAttributesResponse"\x00\x12\xcd\x01\n\x14ListSearchAttributes\x12<.temporal.api.operatorservice.v1.ListSearchAttributesRequest\x1a=.temporal.api.operatorservice.v1.ListSearchAttributesResponse"8\x82\xd3\xe4\x93\x02\x32\x12\x30/api/v1/namespaces/{namespace}/search-attributes\x12\x86\x01\n\x0f\x44\x65leteNamespace\x12\x37.temporal.api.operatorservice.v1.DeleteNamespaceRequest\x1a\x38.temporal.api.operatorservice.v1.DeleteNamespaceResponse"\x00\x12\xa1\x01\n\x18\x41\x64\x64OrUpdateRemoteCluster\x12@.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterRequest\x1a\x41.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterResponse"\x00\x12\x92\x01\n\x13RemoveRemoteCluster\x12;.temporal.api.operatorservice.v1.RemoveRemoteClusterRequest\x1a<.temporal.api.operatorservice.v1.RemoveRemoteClusterResponse"\x00\x12}\n\x0cListClusters\x12\x34.temporal.api.operatorservice.v1.ListClustersRequest\x1a\x35.temporal.api.operatorservice.v1.ListClustersResponse"\x00\x42\xb6\x01\n"io.temporal.api.operatorservice.v1B\x0cServiceProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
 )
 
 
@@ -26,6 +28,12 @@ _OPERATORSERVICE = DESCRIPTOR.services_by_name["OperatorService"]
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n"io.temporal.api.operatorservice.v1B\014ServiceProtoP\001Z5go.temporal.io/api/operatorservice/v1;operatorservice\252\002!Temporalio.Api.OperatorService.V1\352\002$Temporalio::Api::OperatorService::V1'
-    _OPERATORSERVICE._serialized_start = 139
-    _OPERATORSERVICE._serialized_end = 1192
+    _OPERATORSERVICE.methods_by_name["ListSearchAttributes"]._options = None
+    _OPERATORSERVICE.methods_by_name[
+        "ListSearchAttributes"
+    ]._serialized_options = (
+        b"\202\323\344\223\0022\0220/api/v1/namespaces/{namespace}/search-attributes"
+    )
+    _OPERATORSERVICE._serialized_start = 169
+    _OPERATORSERVICE._serialized_end = 1278
 # @@protoc_insertion_point(module_scope)
