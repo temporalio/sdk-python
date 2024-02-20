@@ -82,7 +82,7 @@ class MethodAsyncSingleParam(
     """Generic callable type."""
 
     def __call__(
-        __self, self: ProtocolSelfType, __arg: ProtocolParamType
+        self, __self: ProtocolSelfType, __arg: ProtocolParamType, /
     ) -> Awaitable[ProtocolReturnType]:
         """Generic callable type callback."""
         ...
@@ -94,7 +94,7 @@ class MethodSyncSingleParam(
     """Generic callable type."""
 
     def __call__(
-        __self, self: ProtocolSelfType, __arg: ProtocolParamType
+        self, __self: ProtocolSelfType, __arg: ProtocolParamType, /
     ) -> ProtocolReturnType:
         """Generic callable type callback."""
         ...
@@ -104,7 +104,7 @@ class MethodSyncOrAsyncNoParam(Protocol[ProtocolSelfType, ProtocolReturnType]):
     """Generic callable type."""
 
     def __call__(
-        __self, self: ProtocolSelfType
+        self, __self: ProtocolSelfType
     ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
         """Generic callable type callback."""
         ...
@@ -116,7 +116,7 @@ class MethodSyncOrAsyncSingleParam(
     """Generic callable type."""
 
     def __call__(
-        __self, self: ProtocolSelfType, __param: ProtocolParamType
+        self, __self: ProtocolSelfType, __param: ProtocolParamType, /
     ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
         """Generic callable type callback."""
         ...

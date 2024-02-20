@@ -361,6 +361,15 @@ class Info:
             "workflow_type": self.workflow_type,
         }
 
+    def get_current_build_id(self) -> str:
+        """Get the Build ID of the worker which executed the current Workflow Task.
+
+        May be undefined if the task was completed by a worker without a Build ID. If this worker is the one executing
+        this task for the first time and has a Build ID set, then its ID will be used. This value may change over the
+        lifetime of the workflow run, but is deterministic and safe to use for branching.
+        """
+        return _Runtime.current().workflow_get_current_build_id()
+
     def get_current_history_length(self) -> int:
         """Get the current number of events in history.
 
@@ -455,6 +464,10 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_extern_functions(self) -> Mapping[str, Callable]:
+        ...
+
+    @abstractmethod
+    def workflow_get_current_build_id(self) -> str:
         ...
 
     @abstractmethod
@@ -1104,10 +1117,11 @@ class LoggerAdapter(logging.LoggerAdapter):
                     kwargs["extra"] = extra
         return (msg, kwargs)
 
-    def log(self, *args, **kwargs) -> None:
+    def isEnabledFor(self, level: int) -> bool:
         """Override to ignore replay logs."""
-        if self.log_during_replay or not unsafe.is_replaying():
-            super().log(*args, **kwargs)
+        if not self.log_during_replay and unsafe.is_replaying():
+            return False
+        return super().isEnabledFor(level)
 
     @property
     def base_logger(self) -> logging.Logger:

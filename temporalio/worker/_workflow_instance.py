@@ -19,6 +19,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Deque,
     Dict,
     Generator,
@@ -175,6 +176,7 @@ class _WorkflowInstanceImpl(
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time_ns = 0
         self._cancel_requested = False
+        self._current_build_id = ""
         self._current_history_length = 0
         self._current_history_size = 0
         self._continue_as_new_suggested = False
@@ -278,6 +280,7 @@ class _WorkflowInstanceImpl(
         )
         self._current_completion.successful.SetInParent()
         self._current_activation_error: Optional[Exception] = None
+        self._current_build_id = act.build_id_for_current_task
         self._current_history_length = act.history_length
         self._current_history_size = act.history_size_bytes
         self._continue_as_new_suggested = act.continue_as_new_suggested
@@ -865,6 +868,9 @@ class _WorkflowInstanceImpl(
     def workflow_extern_functions(self) -> Mapping[str, Callable]:
         return self._extern_functions
 
+    def workflow_get_current_build_id(self) -> str:
+        return self._current_build_id
+
     def workflow_get_current_history_length(self) -> int:
         return self._current_history_length
 
@@ -1242,7 +1248,7 @@ class _WorkflowInstanceImpl(
                 # To apply to typed search attributes we remove, replace, or add. We
                 # don't know any of the key types, so we do our best.
                 index = next(
-                    i for i, a in enumerate(mut_typed_attrs) if a.key.name == k
+                    (i for i, a in enumerate(mut_typed_attrs) if a.key.name == k), None
                 )
                 if not vals:
                     if index is not None:
@@ -1284,9 +1290,12 @@ class _WorkflowInstanceImpl(
 
                 # Update typed and untyped in info
                 index = next(
-                    i
-                    for i, a in enumerate(mut_typed_attrs)
-                    if a.key.name == update.key.name
+                    (
+                        i
+                        for i, a in enumerate(mut_typed_attrs)
+                        if a.key.name == update.key.name
+                    ),
+                    None,
                 )
                 if update.value is None:
                     # Delete
@@ -1300,7 +1309,7 @@ class _WorkflowInstanceImpl(
                         update.key, update.value
                     )
                     if index is None:
-                        mut_typed_attrs.append()
+                        mut_typed_attrs.append(pair)
                     else:
                         mut_typed_attrs[index] = pair
                     # Single-item list if not already a sequence for untyped
@@ -1767,6 +1776,25 @@ class _WorkflowInstanceImpl(
         self._pending_timers[seq] = handle
         return handle
 
+    def call_at(
+        self,
+        when: float,
+        callback: Callable[..., Any],
+        *args: Any,
+        context: Optional[contextvars.Context] = None,
+    ) -> asyncio.TimerHandle:
+        # We usually would not support fixed-future-time call (and we didn't
+        # previously), but 3.11 added asyncio.timeout which uses it and 3.12
+        # changed wait_for to use asyncio.timeout. We now simply count on users
+        # to only add to loop.time() and not an actual fixed point. Due to the
+        # fact that loop.time() is at a nanosecond level which floats can't
+        # always express well, we round to the nearest millisecond. We do this
+        # after the subtraction not before because this may be the result of a
+        # previous addition in Python code.
+        return self.call_later(
+            round(when - self.time(), 3), callback, *args, context=context
+        )
+
     def time(self) -> float:
         return self._time_ns / 1e9
 
@@ -2006,7 +2034,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self,
         instance: _WorkflowInstanceImpl,
         input: Union[StartActivityInput, StartLocalActivityInput],
-        fn: Awaitable[Any],
+        fn: Coroutine[Any, Any, Any],
     ) -> None:
         super().__init__(fn)
         self._instance = instance
@@ -2138,7 +2166,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         instance: _WorkflowInstanceImpl,
         seq: int,
         input: StartChildWorkflowInput,
-        fn: Awaitable[Any],
+        fn: Coroutine[Any, Any, Any],
     ) -> None:
         super().__init__(fn)
         self._instance = instance

@@ -266,14 +266,21 @@ class DeleteNamespaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
+    """Only one of namespace or namespace_id must be specified to identify namespace."""
+    namespace_id: builtins.str
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
+        namespace_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["namespace", b"namespace"]
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace", b"namespace", "namespace_id", b"namespace_id"
+        ],
     ) -> None: ...
 
 global___DeleteNamespaceRequest = DeleteNamespaceRequest

@@ -461,18 +461,24 @@ class ResetPoints(google.protobuf.message.Message):
 global___ResetPoints = ResetPoints
 
 class ResetPointInfo(google.protobuf.message.Message):
+    """ResetPointInfo records the workflow event id that is the first one processed by a given
+    build id or binary checksum. A new reset point will be created if either build id or binary
+    checksum changes (although in general only one or the other will be used at a time).
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    BUILD_ID_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     FIRST_WORKFLOW_TASK_COMPLETED_ID_FIELD_NUMBER: builtins.int
     CREATE_TIME_FIELD_NUMBER: builtins.int
     EXPIRE_TIME_FIELD_NUMBER: builtins.int
     RESETTABLE_FIELD_NUMBER: builtins.int
+    build_id: builtins.str
+    """Worker build id."""
     binary_checksum: builtins.str
-    """A worker binary version identifier, will be deprecated and superseded by a newer concept of
-    build_id.
-    """
+    """A worker binary version identifier (deprecated)."""
     run_id: builtins.str
     """The first run ID in the execution chain that was touched by this worker build."""
     first_workflow_task_completed_id: builtins.int
@@ -490,6 +496,7 @@ class ResetPointInfo(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        build_id: builtins.str = ...,
         binary_checksum: builtins.str = ...,
         run_id: builtins.str = ...,
         first_workflow_task_completed_id: builtins.int = ...,
@@ -508,6 +515,8 @@ class ResetPointInfo(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "binary_checksum",
             b"binary_checksum",
+            "build_id",
+            b"build_id",
             "create_time",
             b"create_time",
             "expire_time",

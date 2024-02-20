@@ -27,10 +27,12 @@ import builtins
 import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.empty_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import sys
 import temporalio.api.enums.v1.common_pb2
+import temporalio.api.enums.v1.reset_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -509,3 +511,95 @@ class WorkerVersionCapabilities(google.protobuf.message.Message):
     ) -> None: ...
 
 global___WorkerVersionCapabilities = WorkerVersionCapabilities
+
+class ResetOptions(google.protobuf.message.Message):
+    """Describes where and how to reset a workflow, used for batch reset currently
+    and may be used for single-workflow reset later.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FIRST_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
+    LAST_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
+    WORKFLOW_TASK_ID_FIELD_NUMBER: builtins.int
+    BUILD_ID_FIELD_NUMBER: builtins.int
+    RESET_REAPPLY_TYPE_FIELD_NUMBER: builtins.int
+    CURRENT_RUN_ONLY_FIELD_NUMBER: builtins.int
+    @property
+    def first_workflow_task(self) -> google.protobuf.empty_pb2.Empty:
+        """Resets to the first workflow task completed or started event."""
+    @property
+    def last_workflow_task(self) -> google.protobuf.empty_pb2.Empty:
+        """Resets to the last workflow task completed or started event."""
+    workflow_task_id: builtins.int
+    """The id of a specific `WORKFLOW_TASK_COMPLETED`,`WORKFLOW_TASK_TIMED_OUT`, `WORKFLOW_TASK_FAILED`, or
+    `WORKFLOW_TASK_STARTED` event to reset to.
+    Note that this option doesn't make sense when used as part of a batch request.
+    """
+    build_id: builtins.str
+    """Resets to the first workflow task processed by this build id.
+    If the workflow was not processed by the build id, or the workflow task can't be
+    determined, no reset will be performed.
+    Note that by default, this reset is allowed to be to a prior run in a chain of
+    continue-as-new.
+    """
+    reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
+    """History event reapply options."""
+    current_run_only: builtins.bool
+    """If true, limit the reset to only within the current run. (Applies to build_id targets and
+    possibly others in the future.)
+    """
+    def __init__(
+        self,
+        *,
+        first_workflow_task: google.protobuf.empty_pb2.Empty | None = ...,
+        last_workflow_task: google.protobuf.empty_pb2.Empty | None = ...,
+        workflow_task_id: builtins.int = ...,
+        build_id: builtins.str = ...,
+        reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType = ...,
+        current_run_only: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "build_id",
+            b"build_id",
+            "first_workflow_task",
+            b"first_workflow_task",
+            "last_workflow_task",
+            b"last_workflow_task",
+            "target",
+            b"target",
+            "workflow_task_id",
+            b"workflow_task_id",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "build_id",
+            b"build_id",
+            "current_run_only",
+            b"current_run_only",
+            "first_workflow_task",
+            b"first_workflow_task",
+            "last_workflow_task",
+            b"last_workflow_task",
+            "reset_reapply_type",
+            b"reset_reapply_type",
+            "target",
+            b"target",
+            "workflow_task_id",
+            b"workflow_task_id",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["target", b"target"]
+    ) -> (
+        typing_extensions.Literal[
+            "first_workflow_task", "last_workflow_task", "workflow_task_id", "build_id"
+        ]
+        | None
+    ): ...
+
+global___ResetOptions = ResetOptions

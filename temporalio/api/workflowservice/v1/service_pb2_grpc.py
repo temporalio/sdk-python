@@ -355,11 +355,6 @@ class WorkflowServiceServicer(object):
     def UpdateNamespace(self, request, context):
         """UpdateNamespace is used to update the information and configuration of a registered
         namespace.
-
-        (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateNamespace RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateNamespace RPC doesn't follow Google API format. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -371,6 +366,9 @@ class WorkflowServiceServicer(object):
         Once the namespace is deprecated it cannot be used to start new workflow executions. Existing
         workflow executions will continue to run on deprecated namespaces.
         Deprecated.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: Deprecated --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -411,6 +409,9 @@ class WorkflowServiceServicer(object):
         tasks. The worker is expected to call `RespondWorkflowTaskCompleted` when it is done
         processing the task. The service will create a `WorkflowTaskStarted` event in the history for
         this task before handing it to the worker.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -423,6 +424,9 @@ class WorkflowServiceServicer(object):
         Completing a WorkflowTask will write a `WORKFLOW_TASK_COMPLETED` event to the workflow's
         history, along with events corresponding to whatever commands the SDK generated while
         executing the task (ex timer started, activity task scheduled, etc).
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -438,6 +442,9 @@ class WorkflowServiceServicer(object):
 
         Temporal will only append first WorkflowTaskFailed event to the history of workflow execution
         for consecutive failures.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -456,6 +463,9 @@ class WorkflowServiceServicer(object):
         (`ACTIVITY_TASK_COMPLETED` / `ACTIVITY_TASK_FAILED` / `ACTIVITY_TASK_TIMED_OUT`) will both be
         written permanently to Workflow execution history when Activity is finished. This is done to
         avoid writing many events in the case of a failure/retry loop.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -615,23 +625,30 @@ class WorkflowServiceServicer(object):
         WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
         WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
         terminated before deletion.
-        (-- api-linter: core::0135::method-signature=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0135::response-message-name=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: Workflow deletion not exposed to HTTP, users should use cancel or terminate. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
     def ListOpenWorkflowExecutions(self, request, context):
-        """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace."""
+        """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
     def ListClosedWorkflowExecutions(self, request, context):
-        """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace."""
+        """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -649,7 +666,11 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def ScanWorkflowExecutions(self, request, context):
-        """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order."""
+        """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -661,7 +682,11 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def GetSearchAttributes(self, request, context):
-        """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs"""
+        """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose this search attribute API to HTTP (but may expose on OperatorService). --)
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -672,6 +697,9 @@ class WorkflowServiceServicer(object):
 
         Completing the query will unblock the corresponding client call to `QueryWorkflow` and return
         the query result a response.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -685,6 +713,9 @@ class WorkflowServiceServicer(object):
         Things cleared are:
         1. StickyTaskQueue
         2. StickyScheduleToStartTimeout
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -721,20 +752,15 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def ListTaskQueuePartitions(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """(-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose this low-level API to HTTP. --)
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
     def CreateSchedule(self, request, context):
-        """Creates a new schedule.
-        (-- api-linter: core::0133::method-signature=disabled
-        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-        (-- api-linter: core::0133::response-message-name=disabled
-        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-        (-- api-linter: core::0133::http-uri-parent=disabled
-        aip.dev/not-precedent: CreateSchedule doesn't follow Google API format --)
-        """
+        """Creates a new schedule."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -746,21 +772,13 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def UpdateSchedule(self, request, context):
-        """Changes the configuration or state of an existing schedule.
-        (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateSchedule RPC doesn't follow Google API format. --)
-        """
+        """Changes the configuration or state of an existing schedule."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
     def PatchSchedule(self, request, context):
-        """Makes a specific change to a schedule or triggers an immediate action.
-        (-- api-linter: core::0134::synonyms=disabled
-        aip.dev/not-precedent: we have both patch and update. --)
-        """
+        """Makes a specific change to a schedule or triggers an immediate action."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -772,12 +790,7 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def DeleteSchedule(self, request, context):
-        """Deletes a schedule, removing it from the system.
-        (-- api-linter: core::0135::method-signature=disabled
-        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
-        (-- api-linter: core::0135::response-message-name=disabled
-        aip.dev/not-precedent: DeleteSchedule doesn't follow Google API format --)
-        """
+        """Deletes a schedule, removing it from the system."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -802,10 +815,8 @@ class WorkflowServiceServicer(object):
         NOTE: The number of task queues mapped to a single build id is limited by the `limit.taskQueuesPerBuildId`
         (default is 20), if this limit is exceeded this API will error with a FailedPrecondition.
 
-        (-- api-linter: core::0134::response-message-name=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0134::method-signature=disabled
-        aip.dev/not-precedent: UpdateWorkerBuildIdCompatibility RPC doesn't follow Google API format. --)
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -836,10 +847,7 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def UpdateWorkflowExecution(self, request, context):
-        """Invokes the specified update function on user workflow code.
-        (-- api-linter: core::0134=disabled
-        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
-        """
+        """Invokes the specified update function on user workflow code."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -849,8 +857,9 @@ class WorkflowServiceServicer(object):
         previously issued through the UpdateWorkflowExecution RPC. The effective
         timeout on this call will be shorter of the the caller-supplied gRPC
         timeout and the server's configured long-poll timeout.
-        (-- api-linter: core::0134=disabled
-        aip.dev/not-precedent: UpdateWorkflowExecution doesn't follow Google API format --)
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We don't expose update polling API to HTTP in favor of a potential future non-blocking form. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")

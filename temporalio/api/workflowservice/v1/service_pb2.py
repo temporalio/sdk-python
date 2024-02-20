@@ -13,12 +13,14 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
+
 from temporalio.api.workflowservice.v1 import (
     request_response_pb2 as temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2,
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n-temporal/api/workflowservice/v1/service.proto\x12\x1ftemporal.api.workflowservice.v1\x1a\x36temporal/api/workflowservice/v1/request_response.proto2\xa5G\n\x0fWorkflowService\x12\x8c\x01\n\x11RegisterNamespace\x12\x39.temporal.api.workflowservice.v1.RegisterNamespaceRequest\x1a:.temporal.api.workflowservice.v1.RegisterNamespaceResponse"\x00\x12\x8c\x01\n\x11\x44\x65scribeNamespace\x12\x39.temporal.api.workflowservice.v1.DescribeNamespaceRequest\x1a:.temporal.api.workflowservice.v1.DescribeNamespaceResponse"\x00\x12\x83\x01\n\x0eListNamespaces\x12\x36.temporal.api.workflowservice.v1.ListNamespacesRequest\x1a\x37.temporal.api.workflowservice.v1.ListNamespacesResponse"\x00\x12\x86\x01\n\x0fUpdateNamespace\x12\x37.temporal.api.workflowservice.v1.UpdateNamespaceRequest\x1a\x38.temporal.api.workflowservice.v1.UpdateNamespaceResponse"\x00\x12\x8f\x01\n\x12\x44\x65precateNamespace\x12:.temporal.api.workflowservice.v1.DeprecateNamespaceRequest\x1a;.temporal.api.workflowservice.v1.DeprecateNamespaceResponse"\x00\x12\x9b\x01\n\x16StartWorkflowExecution\x12>.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest\x1a?.temporal.api.workflowservice.v1.StartWorkflowExecutionResponse"\x00\x12\xaa\x01\n\x1bGetWorkflowExecutionHistory\x12\x43.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest\x1a\x44.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse"\x00\x12\xbf\x01\n"GetWorkflowExecutionHistoryReverse\x12J.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseRequest\x1aK.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseResponse"\x00\x12\x98\x01\n\x15PollWorkflowTaskQueue\x12=.temporal.api.workflowservice.v1.PollWorkflowTaskQueueRequest\x1a>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse"\x00\x12\xad\x01\n\x1cRespondWorkflowTaskCompleted\x12\x44.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest\x1a\x45.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedResponse"\x00\x12\xa4\x01\n\x19RespondWorkflowTaskFailed\x12\x41.temporal.api.workflowservice.v1.RespondWorkflowTaskFailedRequest\x1a\x42.temporal.api.workflowservice.v1.RespondWorkflowTaskFailedResponse"\x00\x12\x98\x01\n\x15PollActivityTaskQueue\x12=.temporal.api.workflowservice.v1.PollActivityTaskQueueRequest\x1a>.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse"\x00\x12\xaa\x01\n\x1bRecordActivityTaskHeartbeat\x12\x43.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest\x1a\x44.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatResponse"\x00\x12\xb6\x01\n\x1fRecordActivityTaskHeartbeatById\x12G.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest\x1aH.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdResponse"\x00\x12\xad\x01\n\x1cRespondActivityTaskCompleted\x12\x44.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest\x1a\x45.temporal.api.workflowservice.v1.RespondActivityTaskCompletedResponse"\x00\x12\xb9\x01\n RespondActivityTaskCompletedById\x12H.temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest\x1aI.temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdResponse"\x00\x12\xa4\x01\n\x19RespondActivityTaskFailed\x12\x41.temporal.api.workflowservice.v1.RespondActivityTaskFailedRequest\x1a\x42.temporal.api.workflowservice.v1.RespondActivityTaskFailedResponse"\x00\x12\xb0\x01\n\x1dRespondActivityTaskFailedById\x12\x45.temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest\x1a\x46.temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdResponse"\x00\x12\xaa\x01\n\x1bRespondActivityTaskCanceled\x12\x43.temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest\x1a\x44.temporal.api.workflowservice.v1.RespondActivityTaskCanceledResponse"\x00\x12\xb6\x01\n\x1fRespondActivityTaskCanceledById\x12G.temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest\x1aH.temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdResponse"\x00\x12\xb3\x01\n\x1eRequestCancelWorkflowExecution\x12\x46.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest\x1aG.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse"\x00\x12\x9e\x01\n\x17SignalWorkflowExecution\x12?.temporal.api.workflowservice.v1.SignalWorkflowExecutionRequest\x1a@.temporal.api.workflowservice.v1.SignalWorkflowExecutionResponse"\x00\x12\xb9\x01\n SignalWithStartWorkflowExecution\x12H.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest\x1aI.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse"\x00\x12\x9b\x01\n\x16ResetWorkflowExecution\x12>.temporal.api.workflowservice.v1.ResetWorkflowExecutionRequest\x1a?.temporal.api.workflowservice.v1.ResetWorkflowExecutionResponse"\x00\x12\xa7\x01\n\x1aTerminateWorkflowExecution\x12\x42.temporal.api.workflowservice.v1.TerminateWorkflowExecutionRequest\x1a\x43.temporal.api.workflowservice.v1.TerminateWorkflowExecutionResponse"\x00\x12\x9e\x01\n\x17\x44\x65leteWorkflowExecution\x12?.temporal.api.workflowservice.v1.DeleteWorkflowExecutionRequest\x1a@.temporal.api.workflowservice.v1.DeleteWorkflowExecutionResponse"\x00\x12\xa7\x01\n\x1aListOpenWorkflowExecutions\x12\x42.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsRequest\x1a\x43.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse"\x00\x12\xad\x01\n\x1cListClosedWorkflowExecutions\x12\x44.temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsRequest\x1a\x45.temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsResponse"\x00\x12\x9b\x01\n\x16ListWorkflowExecutions\x12>.temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest\x1a?.temporal.api.workflowservice.v1.ListWorkflowExecutionsResponse"\x00\x12\xb3\x01\n\x1eListArchivedWorkflowExecutions\x12\x46.temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsRequest\x1aG.temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsResponse"\x00\x12\x9b\x01\n\x16ScanWorkflowExecutions\x12>.temporal.api.workflowservice.v1.ScanWorkflowExecutionsRequest\x1a?.temporal.api.workflowservice.v1.ScanWorkflowExecutionsResponse"\x00\x12\x9e\x01\n\x17\x43ountWorkflowExecutions\x12?.temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest\x1a@.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse"\x00\x12\x92\x01\n\x13GetSearchAttributes\x12;.temporal.api.workflowservice.v1.GetSearchAttributesRequest\x1a<.temporal.api.workflowservice.v1.GetSearchAttributesResponse"\x00\x12\xa4\x01\n\x19RespondQueryTaskCompleted\x12\x41.temporal.api.workflowservice.v1.RespondQueryTaskCompletedRequest\x1a\x42.temporal.api.workflowservice.v1.RespondQueryTaskCompletedResponse"\x00\x12\x95\x01\n\x14ResetStickyTaskQueue\x12<.temporal.api.workflowservice.v1.ResetStickyTaskQueueRequest\x1a=.temporal.api.workflowservice.v1.ResetStickyTaskQueueResponse"\x00\x12\x80\x01\n\rQueryWorkflow\x12\x35.temporal.api.workflowservice.v1.QueryWorkflowRequest\x1a\x36.temporal.api.workflowservice.v1.QueryWorkflowResponse"\x00\x12\xa4\x01\n\x19\x44\x65scribeWorkflowExecution\x12\x41.temporal.api.workflowservice.v1.DescribeWorkflowExecutionRequest\x1a\x42.temporal.api.workflowservice.v1.DescribeWorkflowExecutionResponse"\x00\x12\x8c\x01\n\x11\x44\x65scribeTaskQueue\x12\x39.temporal.api.workflowservice.v1.DescribeTaskQueueRequest\x1a:.temporal.api.workflowservice.v1.DescribeTaskQueueResponse"\x00\x12\x83\x01\n\x0eGetClusterInfo\x12\x36.temporal.api.workflowservice.v1.GetClusterInfoRequest\x1a\x37.temporal.api.workflowservice.v1.GetClusterInfoResponse"\x00\x12\x80\x01\n\rGetSystemInfo\x12\x35.temporal.api.workflowservice.v1.GetSystemInfoRequest\x1a\x36.temporal.api.workflowservice.v1.GetSystemInfoResponse"\x00\x12\x9e\x01\n\x17ListTaskQueuePartitions\x12?.temporal.api.workflowservice.v1.ListTaskQueuePartitionsRequest\x1a@.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse"\x00\x12\x83\x01\n\x0e\x43reateSchedule\x12\x36.temporal.api.workflowservice.v1.CreateScheduleRequest\x1a\x37.temporal.api.workflowservice.v1.CreateScheduleResponse"\x00\x12\x89\x01\n\x10\x44\x65scribeSchedule\x12\x38.temporal.api.workflowservice.v1.DescribeScheduleRequest\x1a\x39.temporal.api.workflowservice.v1.DescribeScheduleResponse"\x00\x12\x83\x01\n\x0eUpdateSchedule\x12\x36.temporal.api.workflowservice.v1.UpdateScheduleRequest\x1a\x37.temporal.api.workflowservice.v1.UpdateScheduleResponse"\x00\x12\x80\x01\n\rPatchSchedule\x12\x35.temporal.api.workflowservice.v1.PatchScheduleRequest\x1a\x36.temporal.api.workflowservice.v1.PatchScheduleResponse"\x00\x12\xa4\x01\n\x19ListScheduleMatchingTimes\x12\x41.temporal.api.workflowservice.v1.ListScheduleMatchingTimesRequest\x1a\x42.temporal.api.workflowservice.v1.ListScheduleMatchingTimesResponse"\x00\x12\x83\x01\n\x0e\x44\x65leteSchedule\x12\x36.temporal.api.workflowservice.v1.DeleteScheduleRequest\x1a\x37.temporal.api.workflowservice.v1.DeleteScheduleResponse"\x00\x12\x80\x01\n\rListSchedules\x12\x35.temporal.api.workflowservice.v1.ListSchedulesRequest\x1a\x36.temporal.api.workflowservice.v1.ListSchedulesResponse"\x00\x12\xb9\x01\n UpdateWorkerBuildIdCompatibility\x12H.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest\x1aI.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityResponse"\x00\x12\xb0\x01\n\x1dGetWorkerBuildIdCompatibility\x12\x45.temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityRequest\x1a\x46.temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityResponse"\x00\x12\xa4\x01\n\x19GetWorkerTaskReachability\x12\x41.temporal.api.workflowservice.v1.GetWorkerTaskReachabilityRequest\x1a\x42.temporal.api.workflowservice.v1.GetWorkerTaskReachabilityResponse"\x00\x12\x9e\x01\n\x17UpdateWorkflowExecution\x12?.temporal.api.workflowservice.v1.UpdateWorkflowExecutionRequest\x1a@.temporal.api.workflowservice.v1.UpdateWorkflowExecutionResponse"\x00\x12\xaa\x01\n\x1bPollWorkflowExecutionUpdate\x12\x43.temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest\x1a\x44.temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse"\x00\x12\x92\x01\n\x13StartBatchOperation\x12;.temporal.api.workflowservice.v1.StartBatchOperationRequest\x1a<.temporal.api.workflowservice.v1.StartBatchOperationResponse"\x00\x12\x8f\x01\n\x12StopBatchOperation\x12:.temporal.api.workflowservice.v1.StopBatchOperationRequest\x1a;.temporal.api.workflowservice.v1.StopBatchOperationResponse"\x00\x12\x9b\x01\n\x16\x44\x65scribeBatchOperation\x12>.temporal.api.workflowservice.v1.DescribeBatchOperationRequest\x1a?.temporal.api.workflowservice.v1.DescribeBatchOperationResponse"\x00\x12\x92\x01\n\x13ListBatchOperations\x12;.temporal.api.workflowservice.v1.ListBatchOperationsRequest\x1a<.temporal.api.workflowservice.v1.ListBatchOperationsResponse"\x00\x42\xb6\x01\n"io.temporal.api.workflowservice.v1B\x0cServiceProtoP\x01Z5go.temporal.io/api/workflowservice/v1;workflowservice\xaa\x02!Temporalio.Api.WorkflowService.V1\xea\x02$Temporalio::Api::WorkflowService::V1b\x06proto3'
+    b'\n-temporal/api/workflowservice/v1/service.proto\x12\x1ftemporal.api.workflowservice.v1\x1a\x36temporal/api/workflowservice/v1/request_response.proto\x1a\x1cgoogle/api/annotations.proto2\x8a]\n\x0fWorkflowService\x12\xa9\x01\n\x11RegisterNamespace\x12\x39.temporal.api.workflowservice.v1.RegisterNamespaceRequest\x1a:.temporal.api.workflowservice.v1.RegisterNamespaceResponse"\x1d\x82\xd3\xe4\x93\x02\x17"\x12/api/v1/namespaces:\x01*\x12\xb2\x01\n\x11\x44\x65scribeNamespace\x12\x39.temporal.api.workflowservice.v1.DescribeNamespaceRequest\x1a:.temporal.api.workflowservice.v1.DescribeNamespaceResponse"&\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1/namespaces/{namespace}\x12\x9d\x01\n\x0eListNamespaces\x12\x36.temporal.api.workflowservice.v1.ListNamespacesRequest\x1a\x37.temporal.api.workflowservice.v1.ListNamespacesResponse"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/namespaces\x12\xb6\x01\n\x0fUpdateNamespace\x12\x37.temporal.api.workflowservice.v1.UpdateNamespaceRequest\x1a\x38.temporal.api.workflowservice.v1.UpdateNamespaceResponse"0\x82\xd3\xe4\x93\x02*"%/api/v1/namespaces/{namespace}/update:\x01*\x12\x8f\x01\n\x12\x44\x65precateNamespace\x12:.temporal.api.workflowservice.v1.DeprecateNamespaceRequest\x1a;.temporal.api.workflowservice.v1.DeprecateNamespaceResponse"\x00\x12\xdc\x01\n\x16StartWorkflowExecution\x12>.temporal.api.workflowservice.v1.StartWorkflowExecutionRequest\x1a?.temporal.api.workflowservice.v1.StartWorkflowExecutionResponse"A\x82\xd3\xe4\x93\x02;"6/api/v1/namespaces/{namespace}/workflows/{workflow_id}:\x01*\x12\xfa\x01\n\x1bGetWorkflowExecutionHistory\x12\x43.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest\x1a\x44.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse"P\x82\xd3\xe4\x93\x02J\x12H/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}/history\x12\x97\x02\n"GetWorkflowExecutionHistoryReverse\x12J.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseRequest\x1aK.temporal.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseResponse"X\x82\xd3\xe4\x93\x02R\x12P/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}/history-reverse\x12\x98\x01\n\x15PollWorkflowTaskQueue\x12=.temporal.api.workflowservice.v1.PollWorkflowTaskQueueRequest\x1a>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse"\x00\x12\xad\x01\n\x1cRespondWorkflowTaskCompleted\x12\x44.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest\x1a\x45.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedResponse"\x00\x12\xa4\x01\n\x19RespondWorkflowTaskFailed\x12\x41.temporal.api.workflowservice.v1.RespondWorkflowTaskFailedRequest\x1a\x42.temporal.api.workflowservice.v1.RespondWorkflowTaskFailedResponse"\x00\x12\x98\x01\n\x15PollActivityTaskQueue\x12=.temporal.api.workflowservice.v1.PollActivityTaskQueueRequest\x1a>.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse"\x00\x12\xe8\x01\n\x1bRecordActivityTaskHeartbeat\x12\x43.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest\x1a\x44.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatResponse">\x82\xd3\xe4\x93\x02\x38"3/api/v1/namespaces/{namespace}/activities/heartbeat:\x01*\x12\xfa\x01\n\x1fRecordActivityTaskHeartbeatById\x12G.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest\x1aH.temporal.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdResponse"D\x82\xd3\xe4\x93\x02>"9/api/v1/namespaces/{namespace}/activities/heartbeat-by-id:\x01*\x12\xea\x01\n\x1cRespondActivityTaskCompleted\x12\x44.temporal.api.workflowservice.v1.RespondActivityTaskCompletedRequest\x1a\x45.temporal.api.workflowservice.v1.RespondActivityTaskCompletedResponse"=\x82\xd3\xe4\x93\x02\x37"2/api/v1/namespaces/{namespace}/activities/complete:\x01*\x12\xfc\x01\n RespondActivityTaskCompletedById\x12H.temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest\x1aI.temporal.api.workflowservice.v1.RespondActivityTaskCompletedByIdResponse"C\x82\xd3\xe4\x93\x02="8/api/v1/namespaces/{namespace}/activities/complete-by-id:\x01*\x12\xdd\x01\n\x19RespondActivityTaskFailed\x12\x41.temporal.api.workflowservice.v1.RespondActivityTaskFailedRequest\x1a\x42.temporal.api.workflowservice.v1.RespondActivityTaskFailedResponse"9\x82\xd3\xe4\x93\x02\x33"./api/v1/namespaces/{namespace}/activities/fail:\x01*\x12\xef\x01\n\x1dRespondActivityTaskFailedById\x12\x45.temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest\x1a\x46.temporal.api.workflowservice.v1.RespondActivityTaskFailedByIdResponse"?\x82\xd3\xe4\x93\x02\x39"4/api/v1/namespaces/{namespace}/activities/fail-by-id:\x01*\x12\xe5\x01\n\x1bRespondActivityTaskCanceled\x12\x43.temporal.api.workflowservice.v1.RespondActivityTaskCanceledRequest\x1a\x44.temporal.api.workflowservice.v1.RespondActivityTaskCanceledResponse";\x82\xd3\xe4\x93\x02\x35"0/api/v1/namespaces/{namespace}/activities/cancel:\x01*\x12\xf7\x01\n\x1fRespondActivityTaskCanceledById\x12G.temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest\x1aH.temporal.api.workflowservice.v1.RespondActivityTaskCanceledByIdResponse"A\x82\xd3\xe4\x93\x02;"6/api/v1/namespaces/{namespace}/activities/cancel-by-id:\x01*\x12\x8e\x02\n\x1eRequestCancelWorkflowExecution\x12\x46.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest\x1aG.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse"[\x82\xd3\xe4\x93\x02U"P/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/cancel:\x01*\x12\x87\x02\n\x17SignalWorkflowExecution\x12?.temporal.api.workflowservice.v1.SignalWorkflowExecutionRequest\x1a@.temporal.api.workflowservice.v1.SignalWorkflowExecutionResponse"i\x82\xd3\xe4\x93\x02\x63"^/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/signal/{signal_name}:\x01*\x12\x9a\x02\n SignalWithStartWorkflowExecution\x12H.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest\x1aI.temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse"a\x82\xd3\xe4\x93\x02["V/api/v1/namespaces/{namespace}/workflows/{workflow_id}/signal-with-start/{signal_name}:\x01*\x12\xf5\x01\n\x16ResetWorkflowExecution\x12>.temporal.api.workflowservice.v1.ResetWorkflowExecutionRequest\x1a?.temporal.api.workflowservice.v1.ResetWorkflowExecutionResponse"Z\x82\xd3\xe4\x93\x02T"O/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/reset:\x01*\x12\x85\x02\n\x1aTerminateWorkflowExecution\x12\x42.temporal.api.workflowservice.v1.TerminateWorkflowExecutionRequest\x1a\x43.temporal.api.workflowservice.v1.TerminateWorkflowExecutionResponse"^\x82\xd3\xe4\x93\x02X"S/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/terminate:\x01*\x12\x9e\x01\n\x17\x44\x65leteWorkflowExecution\x12?.temporal.api.workflowservice.v1.DeleteWorkflowExecutionRequest\x1a@.temporal.api.workflowservice.v1.DeleteWorkflowExecutionResponse"\x00\x12\xa7\x01\n\x1aListOpenWorkflowExecutions\x12\x42.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsRequest\x1a\x43.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse"\x00\x12\xad\x01\n\x1cListClosedWorkflowExecutions\x12\x44.temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsRequest\x1a\x45.temporal.api.workflowservice.v1.ListClosedWorkflowExecutionsResponse"\x00\x12\xcb\x01\n\x16ListWorkflowExecutions\x12>.temporal.api.workflowservice.v1.ListWorkflowExecutionsRequest\x1a?.temporal.api.workflowservice.v1.ListWorkflowExecutionsResponse"0\x82\xd3\xe4\x93\x02*\x12(/api/v1/namespaces/{namespace}/workflows\x12\xec\x01\n\x1eListArchivedWorkflowExecutions\x12\x46.temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsRequest\x1aG.temporal.api.workflowservice.v1.ListArchivedWorkflowExecutionsResponse"9\x82\xd3\xe4\x93\x02\x33\x12\x31/api/v1/namespaces/{namespace}/archived-workflows\x12\x9b\x01\n\x16ScanWorkflowExecutions\x12>.temporal.api.workflowservice.v1.ScanWorkflowExecutionsRequest\x1a?.temporal.api.workflowservice.v1.ScanWorkflowExecutionsResponse"\x00\x12\xd3\x01\n\x17\x43ountWorkflowExecutions\x12?.temporal.api.workflowservice.v1.CountWorkflowExecutionsRequest\x1a@.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse"5\x82\xd3\xe4\x93\x02/\x12-/api/v1/namespaces/{namespace}/workflow-count\x12\x92\x01\n\x13GetSearchAttributes\x12;.temporal.api.workflowservice.v1.GetSearchAttributesRequest\x1a<.temporal.api.workflowservice.v1.GetSearchAttributesResponse"\x00\x12\xa4\x01\n\x19RespondQueryTaskCompleted\x12\x41.temporal.api.workflowservice.v1.RespondQueryTaskCompletedRequest\x1a\x42.temporal.api.workflowservice.v1.RespondQueryTaskCompletedResponse"\x00\x12\x95\x01\n\x14ResetStickyTaskQueue\x12<.temporal.api.workflowservice.v1.ResetStickyTaskQueueRequest\x1a=.temporal.api.workflowservice.v1.ResetStickyTaskQueueResponse"\x00\x12\xe4\x01\n\rQueryWorkflow\x12\x35.temporal.api.workflowservice.v1.QueryWorkflowRequest\x1a\x36.temporal.api.workflowservice.v1.QueryWorkflowResponse"d\x82\xd3\xe4\x93\x02^"Y/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}/query/{query.query_type}:\x01*\x12\xec\x01\n\x19\x44\x65scribeWorkflowExecution\x12\x41.temporal.api.workflowservice.v1.DescribeWorkflowExecutionRequest\x1a\x42.temporal.api.workflowservice.v1.DescribeWorkflowExecutionResponse"H\x82\xd3\xe4\x93\x02\x42\x12@/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}\x12\xd0\x01\n\x11\x44\x65scribeTaskQueue\x12\x39.temporal.api.workflowservice.v1.DescribeTaskQueueRequest\x1a:.temporal.api.workflowservice.v1.DescribeTaskQueueResponse"D\x82\xd3\xe4\x93\x02>\x12</api/v1/namespaces/{namespace}/task-queues/{task_queue.name}\x12\x9f\x01\n\x0eGetClusterInfo\x12\x36.temporal.api.workflowservice.v1.GetClusterInfoRequest\x1a\x37.temporal.api.workflowservice.v1.GetClusterInfoResponse"\x1c\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/cluster-info\x12\x9b\x01\n\rGetSystemInfo\x12\x35.temporal.api.workflowservice.v1.GetSystemInfoRequest\x1a\x36.temporal.api.workflowservice.v1.GetSystemInfoResponse"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/api/v1/system-info\x12\x9e\x01\n\x17ListTaskQueuePartitions\x12?.temporal.api.workflowservice.v1.ListTaskQueuePartitionsRequest\x1a@.temporal.api.workflowservice.v1.ListTaskQueuePartitionsResponse"\x00\x12\xc4\x01\n\x0e\x43reateSchedule\x12\x36.temporal.api.workflowservice.v1.CreateScheduleRequest\x1a\x37.temporal.api.workflowservice.v1.CreateScheduleResponse"A\x82\xd3\xe4\x93\x02;"6/api/v1/namespaces/{namespace}/schedules/{schedule_id}:\x01*\x12\xc7\x01\n\x10\x44\x65scribeSchedule\x12\x38.temporal.api.workflowservice.v1.DescribeScheduleRequest\x1a\x39.temporal.api.workflowservice.v1.DescribeScheduleResponse">\x82\xd3\xe4\x93\x02\x38\x12\x36/api/v1/namespaces/{namespace}/schedules/{schedule_id}\x12\xcb\x01\n\x0eUpdateSchedule\x12\x36.temporal.api.workflowservice.v1.UpdateScheduleRequest\x1a\x37.temporal.api.workflowservice.v1.UpdateScheduleResponse"H\x82\xd3\xe4\x93\x02\x42"=/api/v1/namespaces/{namespace}/schedules/{schedule_id}/update:\x01*\x12\xc7\x01\n\rPatchSchedule\x12\x35.temporal.api.workflowservice.v1.PatchScheduleRequest\x1a\x36.temporal.api.workflowservice.v1.PatchScheduleResponse"G\x82\xd3\xe4\x93\x02\x41"</api/v1/namespaces/{namespace}/schedules/{schedule_id}/patch:\x01*\x12\xf1\x01\n\x19ListScheduleMatchingTimes\x12\x41.temporal.api.workflowservice.v1.ListScheduleMatchingTimesRequest\x1a\x42.temporal.api.workflowservice.v1.ListScheduleMatchingTimesResponse"M\x82\xd3\xe4\x93\x02G\x12\x45/api/v1/namespaces/{namespace}/schedules/{schedule_id}/matching-times\x12\xc1\x01\n\x0e\x44\x65leteSchedule\x12\x36.temporal.api.workflowservice.v1.DeleteScheduleRequest\x1a\x37.temporal.api.workflowservice.v1.DeleteScheduleResponse">\x82\xd3\xe4\x93\x02\x38*6/api/v1/namespaces/{namespace}/schedules/{schedule_id}\x12\xb0\x01\n\rListSchedules\x12\x35.temporal.api.workflowservice.v1.ListSchedulesRequest\x1a\x36.temporal.api.workflowservice.v1.ListSchedulesResponse"0\x82\xd3\xe4\x93\x02*\x12(/api/v1/namespaces/{namespace}/schedules\x12\xb9\x01\n UpdateWorkerBuildIdCompatibility\x12H.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest\x1aI.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityResponse"\x00\x12\x8d\x02\n\x1dGetWorkerBuildIdCompatibility\x12\x45.temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityRequest\x1a\x46.temporal.api.workflowservice.v1.GetWorkerBuildIdCompatibilityResponse"]\x82\xd3\xe4\x93\x02W\x12U/api/v1/namespaces/{namespace}/task-queues/{task_queue}/worker-build-id-compatibility\x12\xe3\x01\n\x19GetWorkerTaskReachability\x12\x41.temporal.api.workflowservice.v1.GetWorkerTaskReachabilityRequest\x1a\x42.temporal.api.workflowservice.v1.GetWorkerTaskReachabilityResponse"?\x82\xd3\xe4\x93\x02\x39\x12\x37/api/v1/namespaces/{namespace}/worker-task-reachability\x12\x8e\x02\n\x17UpdateWorkflowExecution\x12?.temporal.api.workflowservice.v1.UpdateWorkflowExecutionRequest\x1a@.temporal.api.workflowservice.v1.UpdateWorkflowExecutionResponse"p\x82\xd3\xe4\x93\x02j"e/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/update/{request.input.name}:\x01*\x12\xaa\x01\n\x1bPollWorkflowExecutionUpdate\x12\x43.temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest\x1a\x44.temporal.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse"\x00\x12\xd5\x01\n\x13StartBatchOperation\x12;.temporal.api.workflowservice.v1.StartBatchOperationRequest\x1a<.temporal.api.workflowservice.v1.StartBatchOperationResponse"C\x82\xd3\xe4\x93\x02="8/api/v1/namespaces/{namespace}/batch-operations/{job_id}:\x01*\x12\xd7\x01\n\x12StopBatchOperation\x12:.temporal.api.workflowservice.v1.StopBatchOperationRequest\x1a;.temporal.api.workflowservice.v1.StopBatchOperationResponse"H\x82\xd3\xe4\x93\x02\x42"=/api/v1/namespaces/{namespace}/batch-operations/{job_id}/stop:\x01*\x12\xdb\x01\n\x16\x44\x65scribeBatchOperation\x12>.temporal.api.workflowservice.v1.DescribeBatchOperationRequest\x1a?.temporal.api.workflowservice.v1.DescribeBatchOperationResponse"@\x82\xd3\xe4\x93\x02:\x12\x38/api/v1/namespaces/{namespace}/batch-operations/{job_id}\x12\xc9\x01\n\x13ListBatchOperations\x12;.temporal.api.workflowservice.v1.ListBatchOperationsRequest\x1a<.temporal.api.workflowservice.v1.ListBatchOperationsResponse"7\x82\xd3\xe4\x93\x02\x31\x12//api/v1/namespaces/{namespace}/batch-operationsB\xb6\x01\n"io.temporal.api.workflowservice.v1B\x0cServiceProtoP\x01Z5go.temporal.io/api/workflowservice/v1;workflowservice\xaa\x02!Temporalio.Api.WorkflowService.V1\xea\x02$Temporalio::Api::WorkflowService::V1b\x06proto3'
 )
 
 
@@ -26,6 +28,196 @@ _WORKFLOWSERVICE = DESCRIPTOR.services_by_name["WorkflowService"]
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n"io.temporal.api.workflowservice.v1B\014ServiceProtoP\001Z5go.temporal.io/api/workflowservice/v1;workflowservice\252\002!Temporalio.Api.WorkflowService.V1\352\002$Temporalio::Api::WorkflowService::V1'
-    _WORKFLOWSERVICE._serialized_start = 139
-    _WORKFLOWSERVICE._serialized_end = 9264
+    _WORKFLOWSERVICE.methods_by_name["RegisterNamespace"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RegisterNamespace"
+    ]._serialized_options = b'\202\323\344\223\002\027"\022/api/v1/namespaces:\001*'
+    _WORKFLOWSERVICE.methods_by_name["DescribeNamespace"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "DescribeNamespace"
+    ]._serialized_options = (
+        b"\202\323\344\223\002 \022\036/api/v1/namespaces/{namespace}"
+    )
+    _WORKFLOWSERVICE.methods_by_name["ListNamespaces"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "ListNamespaces"
+    ]._serialized_options = b"\202\323\344\223\002\024\022\022/api/v1/namespaces"
+    _WORKFLOWSERVICE.methods_by_name["UpdateNamespace"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "UpdateNamespace"
+    ]._serialized_options = (
+        b'\202\323\344\223\002*"%/api/v1/namespaces/{namespace}/update:\001*'
+    )
+    _WORKFLOWSERVICE.methods_by_name["StartWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "StartWorkflowExecution"
+    ]._serialized_options = b'\202\323\344\223\002;"6/api/v1/namespaces/{namespace}/workflows/{workflow_id}:\001*'
+    _WORKFLOWSERVICE.methods_by_name["GetWorkflowExecutionHistory"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "GetWorkflowExecutionHistory"
+    ]._serialized_options = b"\202\323\344\223\002J\022H/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}/history"
+    _WORKFLOWSERVICE.methods_by_name[
+        "GetWorkflowExecutionHistoryReverse"
+    ]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "GetWorkflowExecutionHistoryReverse"
+    ]._serialized_options = b"\202\323\344\223\002R\022P/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}/history-reverse"
+    _WORKFLOWSERVICE.methods_by_name["RecordActivityTaskHeartbeat"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RecordActivityTaskHeartbeat"
+    ]._serialized_options = b'\202\323\344\223\0028"3/api/v1/namespaces/{namespace}/activities/heartbeat:\001*'
+    _WORKFLOWSERVICE.methods_by_name["RecordActivityTaskHeartbeatById"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RecordActivityTaskHeartbeatById"
+    ]._serialized_options = b'\202\323\344\223\002>"9/api/v1/namespaces/{namespace}/activities/heartbeat-by-id:\001*'
+    _WORKFLOWSERVICE.methods_by_name["RespondActivityTaskCompleted"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RespondActivityTaskCompleted"
+    ]._serialized_options = b'\202\323\344\223\0027"2/api/v1/namespaces/{namespace}/activities/complete:\001*'
+    _WORKFLOWSERVICE.methods_by_name["RespondActivityTaskCompletedById"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RespondActivityTaskCompletedById"
+    ]._serialized_options = b'\202\323\344\223\002="8/api/v1/namespaces/{namespace}/activities/complete-by-id:\001*'
+    _WORKFLOWSERVICE.methods_by_name["RespondActivityTaskFailed"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RespondActivityTaskFailed"
+    ]._serialized_options = (
+        b'\202\323\344\223\0023"./api/v1/namespaces/{namespace}/activities/fail:\001*'
+    )
+    _WORKFLOWSERVICE.methods_by_name["RespondActivityTaskFailedById"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RespondActivityTaskFailedById"
+    ]._serialized_options = b'\202\323\344\223\0029"4/api/v1/namespaces/{namespace}/activities/fail-by-id:\001*'
+    _WORKFLOWSERVICE.methods_by_name["RespondActivityTaskCanceled"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RespondActivityTaskCanceled"
+    ]._serialized_options = (
+        b'\202\323\344\223\0025"0/api/v1/namespaces/{namespace}/activities/cancel:\001*'
+    )
+    _WORKFLOWSERVICE.methods_by_name["RespondActivityTaskCanceledById"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RespondActivityTaskCanceledById"
+    ]._serialized_options = b'\202\323\344\223\002;"6/api/v1/namespaces/{namespace}/activities/cancel-by-id:\001*'
+    _WORKFLOWSERVICE.methods_by_name["RequestCancelWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "RequestCancelWorkflowExecution"
+    ]._serialized_options = b'\202\323\344\223\002U"P/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/cancel:\001*'
+    _WORKFLOWSERVICE.methods_by_name["SignalWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "SignalWorkflowExecution"
+    ]._serialized_options = b'\202\323\344\223\002c"^/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/signal/{signal_name}:\001*'
+    _WORKFLOWSERVICE.methods_by_name["SignalWithStartWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "SignalWithStartWorkflowExecution"
+    ]._serialized_options = b'\202\323\344\223\002["V/api/v1/namespaces/{namespace}/workflows/{workflow_id}/signal-with-start/{signal_name}:\001*'
+    _WORKFLOWSERVICE.methods_by_name["ResetWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "ResetWorkflowExecution"
+    ]._serialized_options = b'\202\323\344\223\002T"O/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/reset:\001*'
+    _WORKFLOWSERVICE.methods_by_name["TerminateWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "TerminateWorkflowExecution"
+    ]._serialized_options = b'\202\323\344\223\002X"S/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/terminate:\001*'
+    _WORKFLOWSERVICE.methods_by_name["ListWorkflowExecutions"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "ListWorkflowExecutions"
+    ]._serialized_options = (
+        b"\202\323\344\223\002*\022(/api/v1/namespaces/{namespace}/workflows"
+    )
+    _WORKFLOWSERVICE.methods_by_name["ListArchivedWorkflowExecutions"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "ListArchivedWorkflowExecutions"
+    ]._serialized_options = (
+        b"\202\323\344\223\0023\0221/api/v1/namespaces/{namespace}/archived-workflows"
+    )
+    _WORKFLOWSERVICE.methods_by_name["CountWorkflowExecutions"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "CountWorkflowExecutions"
+    ]._serialized_options = (
+        b"\202\323\344\223\002/\022-/api/v1/namespaces/{namespace}/workflow-count"
+    )
+    _WORKFLOWSERVICE.methods_by_name["QueryWorkflow"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "QueryWorkflow"
+    ]._serialized_options = b'\202\323\344\223\002^"Y/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}/query/{query.query_type}:\001*'
+    _WORKFLOWSERVICE.methods_by_name["DescribeWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "DescribeWorkflowExecution"
+    ]._serialized_options = b"\202\323\344\223\002B\022@/api/v1/namespaces/{namespace}/workflows/{execution.workflow_id}"
+    _WORKFLOWSERVICE.methods_by_name["DescribeTaskQueue"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "DescribeTaskQueue"
+    ]._serialized_options = b"\202\323\344\223\002>\022</api/v1/namespaces/{namespace}/task-queues/{task_queue.name}"
+    _WORKFLOWSERVICE.methods_by_name["GetClusterInfo"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "GetClusterInfo"
+    ]._serialized_options = b"\202\323\344\223\002\026\022\024/api/v1/cluster-info"
+    _WORKFLOWSERVICE.methods_by_name["GetSystemInfo"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "GetSystemInfo"
+    ]._serialized_options = b"\202\323\344\223\002\025\022\023/api/v1/system-info"
+    _WORKFLOWSERVICE.methods_by_name["CreateSchedule"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "CreateSchedule"
+    ]._serialized_options = b'\202\323\344\223\002;"6/api/v1/namespaces/{namespace}/schedules/{schedule_id}:\001*'
+    _WORKFLOWSERVICE.methods_by_name["DescribeSchedule"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "DescribeSchedule"
+    ]._serialized_options = b"\202\323\344\223\0028\0226/api/v1/namespaces/{namespace}/schedules/{schedule_id}"
+    _WORKFLOWSERVICE.methods_by_name["UpdateSchedule"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "UpdateSchedule"
+    ]._serialized_options = b'\202\323\344\223\002B"=/api/v1/namespaces/{namespace}/schedules/{schedule_id}/update:\001*'
+    _WORKFLOWSERVICE.methods_by_name["PatchSchedule"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "PatchSchedule"
+    ]._serialized_options = b'\202\323\344\223\002A"</api/v1/namespaces/{namespace}/schedules/{schedule_id}/patch:\001*'
+    _WORKFLOWSERVICE.methods_by_name["ListScheduleMatchingTimes"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "ListScheduleMatchingTimes"
+    ]._serialized_options = b"\202\323\344\223\002G\022E/api/v1/namespaces/{namespace}/schedules/{schedule_id}/matching-times"
+    _WORKFLOWSERVICE.methods_by_name["DeleteSchedule"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "DeleteSchedule"
+    ]._serialized_options = (
+        b"\202\323\344\223\0028*6/api/v1/namespaces/{namespace}/schedules/{schedule_id}"
+    )
+    _WORKFLOWSERVICE.methods_by_name["ListSchedules"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "ListSchedules"
+    ]._serialized_options = (
+        b"\202\323\344\223\002*\022(/api/v1/namespaces/{namespace}/schedules"
+    )
+    _WORKFLOWSERVICE.methods_by_name["GetWorkerBuildIdCompatibility"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "GetWorkerBuildIdCompatibility"
+    ]._serialized_options = b"\202\323\344\223\002W\022U/api/v1/namespaces/{namespace}/task-queues/{task_queue}/worker-build-id-compatibility"
+    _WORKFLOWSERVICE.methods_by_name["GetWorkerTaskReachability"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "GetWorkerTaskReachability"
+    ]._serialized_options = b"\202\323\344\223\0029\0227/api/v1/namespaces/{namespace}/worker-task-reachability"
+    _WORKFLOWSERVICE.methods_by_name["UpdateWorkflowExecution"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "UpdateWorkflowExecution"
+    ]._serialized_options = b'\202\323\344\223\002j"e/api/v1/namespaces/{namespace}/workflows/{workflow_execution.workflow_id}/update/{request.input.name}:\001*'
+    _WORKFLOWSERVICE.methods_by_name["StartBatchOperation"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "StartBatchOperation"
+    ]._serialized_options = b'\202\323\344\223\002="8/api/v1/namespaces/{namespace}/batch-operations/{job_id}:\001*'
+    _WORKFLOWSERVICE.methods_by_name["StopBatchOperation"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "StopBatchOperation"
+    ]._serialized_options = b'\202\323\344\223\002B"=/api/v1/namespaces/{namespace}/batch-operations/{job_id}/stop:\001*'
+    _WORKFLOWSERVICE.methods_by_name["DescribeBatchOperation"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "DescribeBatchOperation"
+    ]._serialized_options = b"\202\323\344\223\002:\0228/api/v1/namespaces/{namespace}/batch-operations/{job_id}"
+    _WORKFLOWSERVICE.methods_by_name["ListBatchOperations"]._options = None
+    _WORKFLOWSERVICE.methods_by_name[
+        "ListBatchOperations"
+    ]._serialized_options = (
+        b"\202\323\344\223\0021\022//api/v1/namespaces/{namespace}/batch-operations"
+    )
+    _WORKFLOWSERVICE._serialized_start = 169
+    _WORKFLOWSERVICE._serialized_end = 12083
 # @@protoc_insertion_point(module_scope)

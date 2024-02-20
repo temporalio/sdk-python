@@ -287,6 +287,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
@@ -317,6 +318,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
@@ -349,6 +351,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> WorkflowHandle[SelfType, ReturnType]:
         ...
 
@@ -381,6 +384,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> WorkflowHandle[Any, Any]:
         ...
 
@@ -411,6 +415,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
         stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
@@ -445,6 +450,10 @@ class Client:
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
+            request_eager_start: Potentially reduce the latency to start this workflow by
+                encouraging the server to start it on a local worker running with
+                this same client.
+                This is currently experimental.
 
         Returns:
             A workflow handle to the started workflow.
@@ -492,6 +501,7 @@ class Client:
                 ret_type=result_type,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                request_eager_start=request_eager_start,
             )
         )
 
@@ -521,6 +531,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> ReturnType:
         ...
 
@@ -551,6 +562,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> ReturnType:
         ...
 
@@ -583,6 +595,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> ReturnType:
         ...
 
@@ -615,6 +628,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> Any:
         ...
 
@@ -645,6 +659,7 @@ class Client:
         start_signal_args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
     ) -> Any:
         """Start a workflow and wait for completion.
 
@@ -674,6 +689,7 @@ class Client:
                 start_signal_args=start_signal_args,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                request_eager_start=request_eager_start,
                 stack_level=3,
             )
         ).result()
@@ -1082,6 +1098,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self._result_run_id = result_run_id
         self._first_execution_run_id = first_execution_run_id
         self._result_type = result_type
+        self.__temporal_eagerly_started = False
 
     @property
     def id(self) -> str:
@@ -4282,6 +4299,7 @@ class StartWorkflowInput:
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
+    request_eager_start: bool
 
 
 @dataclass
@@ -4751,6 +4769,8 @@ class _ClientImpl(OutboundInterceptor):
                 )
         else:
             req = temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest()
+            req.request_eager_execution = input.request_eager_start
+
         req.namespace = self._client.namespace
         req.workflow_id = input.id
         req.workflow_type.name = input.workflow
@@ -4794,6 +4814,7 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
         ]
         first_execution_run_id = None
+        eagerly_started = False
         try:
             if isinstance(
                 req,
@@ -4813,6 +4834,7 @@ class _ClientImpl(OutboundInterceptor):
                     timeout=input.rpc_timeout,
                 )
                 first_execution_run_id = resp.run_id
+                eagerly_started = resp.HasField("eager_workflow_task")
         except RPCError as err:
             # If the status is ALREADY_EXISTS and the details can be extracted
             # as already started, use a different exception
@@ -4826,13 +4848,15 @@ class _ClientImpl(OutboundInterceptor):
                     )
             else:
                 raise
-        return WorkflowHandle(
+        handle: WorkflowHandle[Any, Any] = WorkflowHandle(
             self._client,
             req.workflow_id,
             result_run_id=resp.run_id,
             first_execution_run_id=first_execution_run_id,
             result_type=input.ret_type,
         )
+        setattr(handle, "__temporal_eagerly_started", eagerly_started)
+        return handle
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         await self._client.workflow_service.request_cancel_workflow_execution(
