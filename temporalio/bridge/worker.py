@@ -275,6 +275,8 @@ async def decode_activation(
                 val.metadata.clear()
                 val.metadata.update(new_payload.metadata)
                 val.data = new_payload.data
+        elif job.HasField("do_update"):
+            await _decode_payloads(job.do_update.input, codec)
 
 
 async def encode_completion(
@@ -322,3 +324,8 @@ async def encode_completion(
                 )
                 for val in command.start_child_workflow_execution.memo.values():
                     await _encode_payload(val, codec)
+            elif command.HasField("update_response"):
+                if command.update_response.HasField("completed"):
+                    await _encode_payload(command.update_response.completed, codec)
+                elif command.update_response.HasField("rejected"):
+                    await codec.encode_failure(command.update_response.rejected)

@@ -1467,7 +1467,7 @@ class SimpleCodec(PayloadCodec):
         return list(wrapper.payloads)
 
 
-async def test_workflow_with_codec(client: Client):
+async def test_workflow_with_codec(client: Client, env: WorkflowEnvironment):
     # Make client with this codec and run a couple of existing tests
     config = client.config()
     config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
@@ -1475,6 +1475,7 @@ async def test_workflow_with_codec(client: Client):
     await test_workflow_signal_and_query(client)
     await test_workflow_signal_and_query_errors(client)
     await test_workflow_simple_activity(client)
+    await test_workflow_update_handlers_happy(client, env)
 
 
 class CustomWorkflowRunner(WorkflowRunner):
