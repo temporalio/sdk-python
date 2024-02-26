@@ -127,6 +127,9 @@ impl ClientRef {
                 "delete_schedule" => {
                     rpc_call!(retry_client, call, delete_schedule)
                 }
+                "delete_workflow_execution" => {
+                    rpc_call!(retry_client, call, delete_workflow_execution)
+                }
                 "deprecate_namespace" => rpc_call!(retry_client, call, deprecate_namespace),
                 "describe_namespace" => rpc_call!(retry_client, call, describe_namespace),
                 "describe_schedule" => rpc_call!(retry_client, call, describe_schedule),
@@ -275,9 +278,6 @@ impl ClientRef {
                     rpc_call!(retry_client, call, add_search_attributes)
                 }
                 "delete_namespace" => rpc_call!(retry_client, call, delete_namespace),
-                "delete_workflow_execution" => {
-                    rpc_call!(retry_client, call, delete_workflow_execution)
-                }
                 "list_clusters" => rpc_call!(retry_client, call, list_clusters),
                 "list_search_attributes" => {
                     rpc_call!(retry_client, call, list_search_attributes)
