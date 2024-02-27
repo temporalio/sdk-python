@@ -101,7 +101,12 @@ class ApplicationError(FailureError):
 
     @property
     def non_retryable(self) -> bool:
-        """Whether the error is non-retryable."""
+        """Whether the error was set as non-retryable when created.
+
+        Note: This is not whether the error is non-retryable via other means
+        such as retry policy. This is just whether the error was marked
+        non-retryable upon creation by the user.
+        """
         return self._non_retryable
 
 
