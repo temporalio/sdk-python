@@ -34,6 +34,7 @@ import sys
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.event_type_pb2
 import temporalio.api.enums.v1.failed_cause_pb2
+import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
@@ -1600,6 +1601,7 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
     SKIP_GENERATE_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
+    EXTERNAL_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     signal_name: builtins.str
     """The name/type of the signal to fire"""
     @property
@@ -1614,6 +1616,11 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
         """
     skip_generate_workflow_task: builtins.bool
     """Indicates the signal did not generate a new workflow task when received."""
+    @property
+    def external_workflow_execution(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """When signal origin is a workflow execution, this field is set."""
     def __init__(
         self,
         *,
@@ -1622,14 +1629,25 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
         identity: builtins.str = ...,
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
         skip_generate_workflow_task: builtins.bool = ...,
+        external_workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal["header", b"header", "input", b"input"],
+        field_name: typing_extensions.Literal[
+            "external_workflow_execution",
+            b"external_workflow_execution",
+            "header",
+            b"header",
+            "input",
+            b"input",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "external_workflow_execution",
+            b"external_workflow_execution",
             "header",
             b"header",
             "identity",
@@ -3099,6 +3117,36 @@ global___WorkflowExecutionUpdateRejectedEventAttributes = (
     WorkflowExecutionUpdateRejectedEventAttributes
 )
 
+class WorkflowExecutionUpdateRequestedEventAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REQUEST_FIELD_NUMBER: builtins.int
+    ORIGIN_FIELD_NUMBER: builtins.int
+    @property
+    def request(self) -> temporalio.api.update.v1.message_pb2.Request:
+        """The update request associated with this event."""
+    origin: temporalio.api.enums.v1.update_pb2.UpdateRequestedEventOrigin.ValueType
+    """A record of why this event was written to history."""
+    def __init__(
+        self,
+        *,
+        request: temporalio.api.update.v1.message_pb2.Request | None = ...,
+        origin: temporalio.api.enums.v1.update_pb2.UpdateRequestedEventOrigin.ValueType = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["request", b"request"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "origin", b"origin", "request", b"request"
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionUpdateRequestedEventAttributes = (
+    WorkflowExecutionUpdateRequestedEventAttributes
+)
+
 class HistoryEvent(google.protobuf.message.Message):
     """History events are the method by which Temporal SDKs advance (or recreate) workflow state.
     See the `EventType` enum for more info about what each event is for.
@@ -3158,6 +3206,7 @@ class HistoryEvent(google.protobuf.message.Message):
     WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_PROPERTIES_MODIFIED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_UPDATE_REQUESTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
     @property
@@ -3355,6 +3404,10 @@ class HistoryEvent(google.protobuf.message.Message):
     def workflow_properties_modified_event_attributes(
         self,
     ) -> global___WorkflowPropertiesModifiedEventAttributes: ...
+    @property
+    def workflow_execution_update_requested_event_attributes(
+        self,
+    ) -> global___WorkflowExecutionUpdateRequestedEventAttributes: ...
     def __init__(
         self,
         *,
@@ -3455,6 +3508,8 @@ class HistoryEvent(google.protobuf.message.Message):
         | None = ...,
         workflow_properties_modified_event_attributes: global___WorkflowPropertiesModifiedEventAttributes
         | None = ...,
+        workflow_execution_update_requested_event_attributes: global___WorkflowExecutionUpdateRequestedEventAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -3541,6 +3596,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_update_completed_event_attributes",
             "workflow_execution_update_rejected_event_attributes",
             b"workflow_execution_update_rejected_event_attributes",
+            "workflow_execution_update_requested_event_attributes",
+            b"workflow_execution_update_requested_event_attributes",
             "workflow_properties_modified_event_attributes",
             b"workflow_properties_modified_event_attributes",
             "workflow_properties_modified_externally_event_attributes",
@@ -3652,6 +3709,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_update_completed_event_attributes",
             "workflow_execution_update_rejected_event_attributes",
             b"workflow_execution_update_rejected_event_attributes",
+            "workflow_execution_update_requested_event_attributes",
+            b"workflow_execution_update_requested_event_attributes",
             "workflow_properties_modified_event_attributes",
             b"workflow_properties_modified_event_attributes",
             "workflow_properties_modified_externally_event_attributes",
@@ -3718,6 +3777,7 @@ class HistoryEvent(google.protobuf.message.Message):
             "workflow_properties_modified_externally_event_attributes",
             "activity_properties_modified_externally_event_attributes",
             "workflow_properties_modified_event_attributes",
+            "workflow_execution_update_requested_event_attributes",
         ]
         | None
     ): ...

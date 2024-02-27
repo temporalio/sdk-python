@@ -96,3 +96,37 @@ UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED: UpdateWorkflowExecutionLife
 on a worker and has either been rejected or returned a value or an error.
 """
 global___UpdateWorkflowExecutionLifecycleStage = UpdateWorkflowExecutionLifecycleStage
+
+class _UpdateRequestedEventOrigin:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _UpdateRequestedEventOriginEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _UpdateRequestedEventOrigin.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    UPDATE_REQUESTED_EVENT_ORIGIN_UNSPECIFIED: _UpdateRequestedEventOrigin.ValueType  # 0
+    UPDATE_REQUESTED_EVENT_ORIGIN_REAPPLY: _UpdateRequestedEventOrigin.ValueType  # 1
+    """The UpdateRequested event was created when reapplying events during reset
+    or replication. I.e. an accepted update on one branch of workflow history
+    was converted into a requested update on a different branch.
+    """
+
+class UpdateRequestedEventOrigin(
+    _UpdateRequestedEventOrigin, metaclass=_UpdateRequestedEventOriginEnumTypeWrapper
+):
+    """UpdateRequestedEventOrigin records why an
+    WorkflowExecutionUpdateRequestedEvent was written to history. Note that not
+    all update requests result in a WorkflowExecutionUpdateRequestedEvent.
+    """
+
+UPDATE_REQUESTED_EVENT_ORIGIN_UNSPECIFIED: UpdateRequestedEventOrigin.ValueType  # 0
+UPDATE_REQUESTED_EVENT_ORIGIN_REAPPLY: UpdateRequestedEventOrigin.ValueType  # 1
+"""The UpdateRequested event was created when reapplying events during reset
+or replication. I.e. an accepted update on one branch of workflow history
+was converted into a requested update on a different branch.
+"""
+global___UpdateRequestedEventOrigin = UpdateRequestedEventOrigin

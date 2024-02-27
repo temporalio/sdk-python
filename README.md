@@ -472,7 +472,7 @@ with workflow.unsafe.imports_passed_through():
 
 @workflow.defn
 class GreetingWorkflow:
-    def __init__() -> None:
+    def __init__(self) -> None:
         self._current_greeting = "<unset>"
         self._greeting_info = GreetingInfo()
         self._greeting_info_update = asyncio.Event()
@@ -1307,6 +1307,7 @@ The Python SDK is built to work with Python 3.8 and newer. It is built using
 To build the SDK from source for use as a dependency, the following prerequisites are required:
 
 * [Python](https://www.python.org/) >= 3.8
+  * Make sure the latest version of `pip` is in use
 * [Rust](https://www.rust-lang.org/)
 * [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
 * [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
@@ -1325,7 +1326,7 @@ Use `poetry` to install the dependencies with `--no-root` to not install this pa
 it):
 
 ```bash
-poetry install --no-root
+poetry install --no-root --all-extras
 ```
 
 #### Build
@@ -1416,7 +1417,7 @@ installing dependencies, and generating the protobuf code:
 ```bash
 git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
-poetry install --no-root
+poetry install --no-root --all-extras
 ```
 
 Now compile the Rust extension in develop mode which is quicker than release mode:

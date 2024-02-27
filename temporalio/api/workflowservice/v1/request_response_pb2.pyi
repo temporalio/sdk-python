@@ -2727,6 +2727,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     WORKFLOW_TASK_FINISH_EVENT_ID_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
     RESET_REAPPLY_TYPE_FIELD_NUMBER: builtins.int
+    RESET_REAPPLY_EXCLUDE_TYPES_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def workflow_execution(
@@ -2740,7 +2741,16 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     request_id: builtins.str
     """Used to de-dupe reset requests"""
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """Reset reapply (replay) options."""
+    """Event types to be reapplied (deprecated)
+    Default: RESET_REAPPLY_TYPE_ALL_ELIGIBLE
+    """
+    @property
+    def reset_reapply_exclude_types(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        temporalio.api.enums.v1.reset_pb2.ResetReapplyExcludeType.ValueType
+    ]:
+        """Event types not to be reapplied"""
     def __init__(
         self,
         *,
@@ -2751,6 +2761,10 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
         workflow_task_finish_event_id: builtins.int = ...,
         request_id: builtins.str = ...,
         reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType = ...,
+        reset_reapply_exclude_types: collections.abc.Iterable[
+            temporalio.api.enums.v1.reset_pb2.ResetReapplyExcludeType.ValueType
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2767,6 +2781,8 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
             b"reason",
             "request_id",
             b"request_id",
+            "reset_reapply_exclude_types",
+            b"reset_reapply_exclude_types",
             "reset_reapply_type",
             b"reset_reapply_type",
             "workflow_execution",

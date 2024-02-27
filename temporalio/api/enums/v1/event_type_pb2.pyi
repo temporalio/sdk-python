@@ -200,6 +200,11 @@ class _EventTypeEnumTypeWrapper(
     """
     EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: _EventType.ValueType  # 46
     """Workflow properties modified by user workflow code"""
+    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REQUESTED: _EventType.ValueType  # 47
+    """An update was requested. Note that not all update requests result in this
+    event. See UpdateRequestedEventOrigin for situations in which this event
+    is created.
+    """
 
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
@@ -359,4 +364,9 @@ maintain determinism when using the command-based approach.
 """
 EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: EventType.ValueType  # 46
 """Workflow properties modified by user workflow code"""
+EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REQUESTED: EventType.ValueType  # 47
+"""An update was requested. Note that not all update requests result in this
+event. See UpdateRequestedEventOrigin for situations in which this event
+is created.
+"""
 global___EventType = EventType

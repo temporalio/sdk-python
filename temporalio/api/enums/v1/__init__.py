@@ -11,10 +11,13 @@ from .failed_cause_pb2 import (
 )
 from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
 from .query_pb2 import QueryRejectCondition, QueryResultType
-from .reset_pb2 import ResetReapplyType, ResetType
+from .reset_pb2 import ResetReapplyExcludeType, ResetReapplyType, ResetType
 from .schedule_pb2 import ScheduleOverlapPolicy
 from .task_queue_pb2 import TaskQueueKind, TaskQueueType, TaskReachability
-from .update_pb2 import UpdateWorkflowExecutionLifecycleStage
+from .update_pb2 import (
+    UpdateRequestedEventOrigin,
+    UpdateWorkflowExecutionLifecycleStage,
+)
 from .workflow_pb2 import (
     ContinueAsNewInitiator,
     HistoryEventFilterType,
@@ -45,6 +48,7 @@ __all__ = [
     "QueryRejectCondition",
     "QueryResultType",
     "ReplicationState",
+    "ResetReapplyExcludeType",
     "ResetReapplyType",
     "ResetType",
     "ResourceExhaustedCause",
@@ -57,6 +61,7 @@ __all__ = [
     "TaskQueueType",
     "TaskReachability",
     "TimeoutType",
+    "UpdateRequestedEventOrigin",
     "UpdateWorkflowExecutionLifecycleStage",
     "WorkflowExecutionStatus",
     "WorkflowIdReusePolicy",
