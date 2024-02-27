@@ -36,6 +36,35 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _ResetReapplyExcludeType:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ResetReapplyExcludeTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _ResetReapplyExcludeType.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    RESET_REAPPLY_EXCLUDE_TYPE_UNSPECIFIED: _ResetReapplyExcludeType.ValueType  # 0
+    RESET_REAPPLY_EXCLUDE_TYPE_SIGNAL: _ResetReapplyExcludeType.ValueType  # 1
+    """Exclude signals when reapplying events."""
+    RESET_REAPPLY_EXCLUDE_TYPE_UPDATE: _ResetReapplyExcludeType.ValueType  # 2
+    """Exclude updates when reapplying events."""
+
+class ResetReapplyExcludeType(
+    _ResetReapplyExcludeType, metaclass=_ResetReapplyExcludeTypeEnumTypeWrapper
+):
+    """Event types to exclude when reapplying events."""
+
+RESET_REAPPLY_EXCLUDE_TYPE_UNSPECIFIED: ResetReapplyExcludeType.ValueType  # 0
+RESET_REAPPLY_EXCLUDE_TYPE_SIGNAL: ResetReapplyExcludeType.ValueType  # 1
+"""Exclude signals when reapplying events."""
+RESET_REAPPLY_EXCLUDE_TYPE_UPDATE: ResetReapplyExcludeType.ValueType  # 2
+"""Exclude updates when reapplying events."""
+global___ResetReapplyExcludeType = ResetReapplyExcludeType
+
 class _ResetReapplyType:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
@@ -49,17 +78,25 @@ class _ResetReapplyTypeEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_REAPPLY_TYPE_UNSPECIFIED: _ResetReapplyType.ValueType  # 0
     RESET_REAPPLY_TYPE_SIGNAL: _ResetReapplyType.ValueType  # 1
+    """Signals are reapplied when workflow is reset."""
     RESET_REAPPLY_TYPE_NONE: _ResetReapplyType.ValueType  # 2
+    """No events are reapplied when workflow is reset."""
+    RESET_REAPPLY_TYPE_ALL_ELIGIBLE: _ResetReapplyType.ValueType  # 3
+    """All eligible events are reapplied when workflow is reset."""
 
 class ResetReapplyType(_ResetReapplyType, metaclass=_ResetReapplyTypeEnumTypeWrapper):
-    """Reset reapply (replay) options
-    * RESET_REAPPLY_TYPE_SIGNAL (default) - Signals are reapplied when workflow is reset
-    * RESET_REAPPLY_TYPE_NONE - nothing is reapplied
+    """Event types to include when reapplying events. Deprecated: applications
+    should use ResetReapplyExcludeType to specify exclusions from this set, and
+    new event types should be added to ResetReapplyExcludeType instead of here.
     """
 
 RESET_REAPPLY_TYPE_UNSPECIFIED: ResetReapplyType.ValueType  # 0
 RESET_REAPPLY_TYPE_SIGNAL: ResetReapplyType.ValueType  # 1
+"""Signals are reapplied when workflow is reset."""
 RESET_REAPPLY_TYPE_NONE: ResetReapplyType.ValueType  # 2
+"""No events are reapplied when workflow is reset."""
+RESET_REAPPLY_TYPE_ALL_ELIGIBLE: ResetReapplyType.ValueType  # 3
+"""All eligible events are reapplied when workflow is reset."""
 global___ResetReapplyType = ResetReapplyType
 
 class _ResetType:
