@@ -3847,7 +3847,7 @@ async def execute_child_workflow(
 ) -> Any:
     """Start a child workflow and wait for completion.
 
-    This is a shortcut for ``await`` :py:meth:`start_child_workflow`.
+    This is a shortcut for ``await (await`` :py:meth:`start_child_workflow` ``)``.
     """
     temporalio.common._warn_on_deprecated_search_attributes(search_attributes)
     # We call the runtime directly instead of top-level start_child_workflow to
