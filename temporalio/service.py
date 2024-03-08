@@ -120,6 +120,7 @@ class ConnectConfig:
     """Config for connecting to the server."""
 
     target_host: str
+    api_key: Optional[str] = None
     tls: Union[bool, TLSConfig] = False
     retry_config: Optional[RetryConfig] = None
     keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
@@ -161,6 +162,7 @@ class ConnectConfig:
 
         return temporalio.bridge.client.ClientConfig(
             target_url=target_url,
+            api_key=self.api_key,
             tls_config=tls_config,
             retry_config=self.retry_config._to_bridge_config()
             if self.retry_config
@@ -236,6 +238,11 @@ class ServiceClient(ABC):
     @abstractmethod
     def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
         """Update service client's RPC metadata."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_api_key(self, api_key: Optional[str]) -> None:
+        """Update service client's API key."""
         raise NotImplementedError
 
     @abstractmethod
@@ -739,6 +746,14 @@ class _BridgeServiceClient(ServiceClient):
         self._bridge_config.metadata = metadata
         if self._bridge_client:
             self._bridge_client.update_metadata(metadata)
+
+    def update_api_key(self, api_key: Optional[str]) -> None:
+        """Update Core client API key."""
+        # Mutate the bridge config and then only mutate the running client
+        # metadata if already connected
+        self._bridge_config.api_key = api_key
+        if self._bridge_client:
+            self._bridge_client.update_api_key(api_key)
 
     async def _rpc_call(
         self,

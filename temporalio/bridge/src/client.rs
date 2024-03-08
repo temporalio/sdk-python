@@ -1,4 +1,4 @@
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -23,6 +23,12 @@ type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
 pub struct ClientRef {
     pub(crate) retry_client: Client,
     runtime: runtime::Runtime,
+    headers: Arc<Mutex<ClientHeaders>>,
+}
+
+struct ClientHeaders {
+    user_provided: HashMap<String, String>,
+    api_key: Option<String>,
 }
 
 #[derive(FromPyObject)]
@@ -31,6 +37,7 @@ pub struct ClientConfig {
     client_name: String,
     client_version: String,
     metadata: HashMap<String, String>,
+    api_key: Option<String>,
     identity: String,
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
@@ -75,11 +82,10 @@ pub fn connect_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: ClientConfig,
 ) -> PyResult<&'a PyAny> {
-    let headers = if config.metadata.is_empty() {
-        None
-    } else {
-        Some(Arc::new(RwLock::new(config.metadata.clone())))
-    };
+    let headers = Arc::new(Mutex::new(ClientHeaders {
+        user_provided: config.metadata.clone(),
+        api_key: config.api_key.clone(),
+    }));
     let opts: ClientOptions = config.try_into()?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
@@ -87,13 +93,16 @@ pub fn connect_client<'a>(
             retry_client: opts
                 .connect_no_namespace(
                     runtime.core.telemetry().get_temporal_metric_meter(),
-                    headers,
+                    Some(Arc::new(RwLock::new(
+                        headers.clone().lock().combined_headers(),
+                    ))),
                 )
                 .await
                 .map_err(|err| {
                     PyRuntimeError::new_err(format!("Failed client connect: {}", err))
                 })?,
             runtime,
+            headers,
         })
     })
 }
@@ -111,7 +120,19 @@ macro_rules! rpc_call {
 #[pymethods]
 impl ClientRef {
     fn update_metadata(&self, headers: HashMap<String, String>) {
-        self.retry_client.get_client().set_headers(headers);
+        let mut guard = self.headers.lock();
+        guard.user_provided = headers;
+        self.retry_client
+            .get_client()
+            .set_headers(guard.combined_headers());
+    }
+
+    fn update_api_key(&self, api_key: Option<String>) {
+        let mut guard = self.headers.lock();
+        guard.api_key = api_key;
+        self.retry_client
+            .get_client()
+            .set_headers(guard.combined_headers());
     }
 
     fn call_workflow_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
@@ -339,6 +360,26 @@ impl ClientRef {
             let bytes: &[u8] = &bytes;
             Ok(Python::with_gil(|py| bytes.into_py(py)))
         })
+    }
+}
+
+impl ClientHeaders {
+    fn combined_headers(&self) -> HashMap<String, String> {
+        // Convert keys to lowercase since we need to clone anyways, it's
+        // already done internally, and we need to check for overwrite in next
+        // step (a case-insensitive contains-key is similar cost).
+        let mut combined = self
+            .user_provided
+            .iter()
+            .map(|(k, v)| (k.to_lowercase(), v.clone()))
+            .collect::<HashMap<String, String>>();
+        // Only overwrite auth header value if not set
+        if let Some(api_key) = &self.api_key {
+            if !combined.contains_key("authorization") {
+                combined.insert("authorization".to_owned(), format!("Bearer {}", api_key));
+            }
+        }
+        combined
     }
 }
 

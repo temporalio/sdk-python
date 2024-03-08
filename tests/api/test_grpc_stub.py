@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Mapping
 
 from google.protobuf.empty_pb2 import Empty
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -27,12 +28,6 @@ from temporalio.api.workflowservice.v1 import (
 from temporalio.client import Client
 
 
-def assert_metadata(context: ServicerContext, **kwargs) -> None:
-    metadata = dict(context.invocation_metadata())
-    for k, v in kwargs.items():
-        assert metadata.get(k) == v
-
-
 def assert_time_remaining(context: ServicerContext, expected: int) -> None:
     # Give or take 5 seconds
     assert expected - 5 <= context.time_remaining() <= expected + 5
@@ -41,14 +36,18 @@ def assert_time_remaining(context: ServicerContext, expected: int) -> None:
 class SimpleWorkflowServer(WorkflowServiceServicer):
     def __init__(self) -> None:
         super().__init__()
-        self.expected_client_key_value = "client_value"
+        self.last_metadata: Mapping[str, str] = {}
+
+    def assert_last_metadata(self, expected: Mapping[str, str]) -> None:
+        for k, v in expected.items():
+            assert self.last_metadata.get(k) == v
 
     async def GetSystemInfo(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
         self,
         request: GetSystemInfoRequest,
         context: ServicerContext,
     ) -> GetSystemInfoResponse:
-        assert_metadata(context, client_key=self.expected_client_key_value)
+        self.last_metadata = dict(context.invocation_metadata())
         return GetSystemInfoResponse()
 
     async def CountWorkflowExecutions(  # type: ignore # https://github.com/nipunn1313/mypy-protobuf/issues/216
@@ -56,9 +55,7 @@ class SimpleWorkflowServer(WorkflowServiceServicer):
         request: CountWorkflowExecutionsRequest,
         context: ServicerContext,
     ) -> CountWorkflowExecutionsResponse:
-        assert_metadata(
-            context, client_key=self.expected_client_key_value, rpc_key="rpc_value"
-        )
+        self.last_metadata = dict(context.invocation_metadata())
         assert_time_remaining(context, 123)
         assert request.namespace == "my namespace"
         assert request.query == "my query"
@@ -71,7 +68,6 @@ class SimpleOperatorServer(OperatorServiceServicer):
         request: DeleteNamespaceRequest,
         context: ServicerContext,
     ) -> DeleteNamespaceResponse:
-        assert_metadata(context, client_key="client_value", rpc_key="rpc_value")
         assert_time_remaining(context, 123)
         assert request.namespace == "my namespace"
         return DeleteNamespaceResponse(deleted_namespace="my namespace response")
@@ -83,7 +79,6 @@ class SimpleTestServer(TestServiceServicer):
         request: Empty,
         context: ServicerContext,
     ) -> GetCurrentTimeResponse:
-        assert_metadata(context, client_key="client_value", rpc_key="rpc_value")
         assert_time_remaining(context, 123)
         return GetCurrentTimeResponse(time=Timestamp(seconds=123))
 
@@ -101,34 +96,88 @@ async def test_python_grpc_stub():
     await server.start()
 
     # Use our client to make a call to each service
-    client = await Client.connect(
-        f"localhost:{port}", rpc_metadata={"client_key": "client_value"}
-    )
-    metadata = {"rpc_key": "rpc_value"}
+    client = await Client.connect(f"localhost:{port}")
     timeout = timedelta(seconds=123)
     count_resp = await client.workflow_service.count_workflow_executions(
         CountWorkflowExecutionsRequest(namespace="my namespace", query="my query"),
-        metadata=metadata,
         timeout=timeout,
     )
     assert count_resp.count == 123
     del_resp = await client.operator_service.delete_namespace(
         DeleteNamespaceRequest(namespace="my namespace"),
-        metadata=metadata,
         timeout=timeout,
     )
     assert del_resp.deleted_namespace == "my namespace response"
-    time_resp = await client.test_service.get_current_time(
-        Empty(), metadata=metadata, timeout=timeout
-    )
+    time_resp = await client.test_service.get_current_time(Empty(), timeout=timeout)
     assert time_resp.time.seconds == 123
 
-    # Make another call to get system info after changing the client-level
-    # header
-    new_metadata = dict(client.rpc_metadata)
-    new_metadata["client_key"] = "changed_value"
-    client.rpc_metadata = new_metadata
-    workflow_server.expected_client_key_value = "changed_value"
+    await server.stop(grace=None)
+
+
+async def test_grpc_metadata():
+    # Start server
+    server = grpc_server()
+    workflow_server = SimpleWorkflowServer()  # type: ignore[abstract]
+    add_WorkflowServiceServicer_to_server(workflow_server, server)
+    port = server.add_insecure_port("[::]:0")
+    await server.start()
+
+    # Connect and confirm metadata of get system info call
+    client = await Client.connect(
+        f"localhost:{port}",
+        api_key="my-api-key",
+        rpc_metadata={"my-meta-key": "my-meta-val"},
+    )
+    workflow_server.assert_last_metadata(
+        {
+            "authorization": "Bearer my-api-key",
+            "my-meta-key": "my-meta-val",
+        }
+    )
+
+    # Overwrite API key via client RPC metadata, confirm there
+    client.rpc_metadata = {
+        "authorization": "my-auth-val1",
+        "my-meta-key": "my-meta-val",
+    }
     await client.workflow_service.get_system_info(GetSystemInfoRequest())
+    workflow_server.assert_last_metadata(
+        {
+            "authorization": "my-auth-val1",
+            "my-meta-key": "my-meta-val",
+        }
+    )
+    client.rpc_metadata = {"my-meta-key": "my-meta-val"}
+
+    # Overwrite API key via call RPC metadata, confirm there
+    await client.workflow_service.get_system_info(
+        GetSystemInfoRequest(), metadata={"authorization": "my-auth-val2"}
+    )
+    workflow_server.assert_last_metadata(
+        {
+            "authorization": "my-auth-val2",
+            "my-meta-key": "my-meta-val",
+        }
+    )
+
+    # Update API key, confirm updated
+    client.api_key = "my-new-api-key"
+    await client.workflow_service.get_system_info(GetSystemInfoRequest())
+    workflow_server.assert_last_metadata(
+        {
+            "authorization": "Bearer my-new-api-key",
+            "my-meta-key": "my-meta-val",
+        }
+    )
+
+    # Remove API key, confirm removed
+    client.api_key = None
+    await client.workflow_service.get_system_info(GetSystemInfoRequest())
+    workflow_server.assert_last_metadata(
+        {
+            "my-meta-key": "my-meta-val",
+        }
+    )
+    assert "authorization" not in workflow_server.last_metadata
 
     await server.stop(grace=None)
