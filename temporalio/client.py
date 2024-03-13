@@ -97,6 +97,7 @@ class Client:
         target_host: str,
         *,
         namespace: str = "default",
+        api_key: Optional[str] = None,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
@@ -116,6 +117,9 @@ class Client:
             target_host: ``host:port`` for the Temporal server. For local
                 development, this is often "localhost:7233".
             namespace: Namespace to use for client calls.
+            api_key: API key for Temporal. This becomes the "Authorization"
+                HTTP header with "Bearer " prepended. This is only set if RPC
+                metadata doesn't already have an "authorization" key.
             data_converter: Data converter to use for all data conversions
                 to/from payloads.
             interceptors: Set of interceptors that are chained together to allow
@@ -152,6 +156,7 @@ class Client:
         """
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
+            api_key=api_key,
             tls=tls,
             retry_config=retry_config,
             keep_alive_config=keep_alive_config,
@@ -260,6 +265,22 @@ class Client:
         # Update config and perform update
         self.service_client.config.rpc_metadata = value
         self.service_client.update_rpc_metadata(value)
+
+    @property
+    def api_key(self) -> Optional[str]:
+        """API key for every call made by this client."""
+        return self.service_client.config.api_key
+
+    @api_key.setter
+    def api_key(self, value: Optional[str]) -> None:
+        """Update the API key for this client.
+
+        This is only set if RPCmetadata doesn't already have an "authorization"
+        key.
+        """
+        # Update config and perform update
+        self.service_client.config.api_key = value
+        self.service_client.update_api_key(value)
 
     # Overload for no-param workflow
     @overload

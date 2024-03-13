@@ -52,6 +52,7 @@ class ClientConfig:
 
     target_url: str
     metadata: Mapping[str, str]
+    api_key: Optional[str]
     identity: str
     tls_config: Optional[ClientTlsConfig]
     retry_config: Optional[ClientRetryConfig]
@@ -101,6 +102,10 @@ class Client:
     def update_metadata(self, metadata: Mapping[str, str]) -> None:
         """Update underlying metadata on Core client."""
         self._ref.update_metadata(metadata)
+
+    def update_api_key(self, api_key: Optional[str]) -> None:
+        """Update underlying API key on Core client."""
+        self._ref.update_api_key(api_key)
 
     async def call(
         self,

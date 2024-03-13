@@ -1,9 +1,7 @@
-use parking_lot::RwLock;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::Duration;
 use temporal_client::{
     ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
@@ -31,6 +29,7 @@ pub struct ClientConfig {
     client_name: String,
     client_version: String,
     metadata: HashMap<String, String>,
+    api_key: Option<String>,
     identity: String,
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
@@ -75,20 +74,12 @@ pub fn connect_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: ClientConfig,
 ) -> PyResult<&'a PyAny> {
-    let headers = if config.metadata.is_empty() {
-        None
-    } else {
-        Some(Arc::new(RwLock::new(config.metadata.clone())))
-    };
     let opts: ClientOptions = config.try_into()?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(ClientRef {
             retry_client: opts
-                .connect_no_namespace(
-                    runtime.core.telemetry().get_temporal_metric_meter(),
-                    headers,
-                )
+                .connect_no_namespace(runtime.core.telemetry().get_temporal_metric_meter())
                 .await
                 .map_err(|err| {
                     PyRuntimeError::new_err(format!("Failed client connect: {}", err))
@@ -112,6 +103,10 @@ macro_rules! rpc_call {
 impl ClientRef {
     fn update_metadata(&self, headers: HashMap<String, String>) {
         self.retry_client.get_client().set_headers(headers);
+    }
+
+    fn update_api_key(&self, api_key: Option<String>) {
+        self.retry_client.get_client().set_api_key(api_key);
     }
 
     fn call_workflow_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
@@ -396,7 +391,9 @@ impl TryFrom<ClientConfig> for ClientOptions {
                 opts.retry_config
                     .map_or(RetryConfig::default(), |c| c.into()),
             )
-            .keep_alive(opts.keep_alive_config.map(Into::into));
+            .keep_alive(opts.keep_alive_config.map(Into::into))
+            .headers(Some(opts.metadata))
+            .api_key(opts.api_key);
         // Builder does not allow us to set option here, so we have to make
         // a conditional to even call it
         if let Some(tls_config) = opts.tls_config {
