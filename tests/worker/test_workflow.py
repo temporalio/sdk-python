@@ -1915,7 +1915,8 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
         record = find_log("Signal: signal 1")
         assert (
             record
-            and record.__dict__["workflow_info"].workflow_type == "LoggingWorkflow"
+            and record.__dict__["temporal_workflow"]["workflow_type"]
+            == "LoggingWorkflow"
             and record.funcName == "my_signal"
         )
 

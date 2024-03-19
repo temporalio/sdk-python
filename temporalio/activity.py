@@ -427,9 +427,14 @@ class LoggerAdapter(logging.LoggerAdapter):
         activity_info_on_message: Boolean for whether a string representation of
             a dict of some activity info will be appended to each message.
             Default is True.
-        activity_info_on_extra: Boolean for whether an ``activity_info`` value
-            will be added to the ``extra`` dictionary, making it present on the
-            ``LogRecord.__dict__`` for use by others.
+        activity_info_on_extra: Boolean for whether a ``temporal_activity``
+            dictionary value will be added to the ``extra`` dictionary with some
+            activity info, making it present on the ``LogRecord.__dict__`` for
+            use by others. Default is True.
+        full_activity_info_on_extra: Boolean for whether an ``activity_info``
+            value will be added to the ``extra`` dictionary with the entire
+            activity info, making it present on the ``LogRecord.__dict__`` for
+            use by others. Default is False.
     """
 
     def __init__(
@@ -439,17 +444,27 @@ class LoggerAdapter(logging.LoggerAdapter):
         super().__init__(logger, extra or {})
         self.activity_info_on_message = True
         self.activity_info_on_extra = True
+        self.full_activity_info_on_extra = False
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> Tuple[Any, MutableMapping[str, Any]]:
         """Override to add activity details."""
-        if self.activity_info_on_message or self.activity_info_on_extra:
+        if (
+            self.activity_info_on_message
+            or self.activity_info_on_extra
+            or self.full_activity_info_on_extra
+        ):
             context = _current_context.get(None)
             if context:
                 if self.activity_info_on_message:
                     msg = f"{msg} ({context.logger_details})"
                 if self.activity_info_on_extra:
+                    # Extra can be absent or None, this handles both
+                    extra = kwargs.get("extra", None) or {}
+                    extra["temporal_activity"] = context._logger_details
+                    kwargs["extra"] = extra
+                if self.full_activity_info_on_extra:
                     # Extra can be absent or None, this handles both
                     extra = kwargs.get("extra", None) or {}
                     extra["activity_info"] = context.info()
