@@ -462,8 +462,7 @@ class Client:
                 dictionary form of this is deprecated, use
                 :py:class:`temporalio.common.TypedSearchAttributes`.
             start_delay: Amount of time to wait before starting the workflow.
-                This does not work with ``cron_schedule``. This is currently
-                experimental.
+                This does not work with ``cron_schedule``.
             start_signal: If present, this signal is sent as signal-with-start
                 instead of traditional workflow start.
             start_signal_args: Arguments for start_signal if start_signal
