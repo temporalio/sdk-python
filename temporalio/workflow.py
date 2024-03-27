@@ -1085,9 +1085,14 @@ class LoggerAdapter(logging.LoggerAdapter):
         workflow_info_on_message: Boolean for whether a string representation of
             a dict of some workflow info will be appended to each message.
             Default is True.
-        workflow_info_on_extra: Boolean for whether a ``workflow_info`` value
-            will be added to the ``extra`` dictionary, making it present on the
-            ``LogRecord.__dict__`` for use by others.
+        workflow_info_on_extra: Boolean for whether a ``temporal_workflow``
+            dictionary value will be added to the ``extra`` dictionary with some
+            workflow info, making it present on the ``LogRecord.__dict__`` for
+            use by others. Default is True.
+        full_workflow_info_on_extra: Boolean for whether a ``workflow_info``
+            value will be added to the ``extra`` dictionary with the entire
+            workflow info, making it present on the ``LogRecord.__dict__`` for
+            use by others. Default is False.
         log_during_replay: Boolean for whether logs should occur during replay.
             Default is False.
     """
@@ -1099,18 +1104,28 @@ class LoggerAdapter(logging.LoggerAdapter):
         super().__init__(logger, extra or {})
         self.workflow_info_on_message = True
         self.workflow_info_on_extra = True
+        self.full_workflow_info_on_extra = False
         self.log_during_replay = False
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> Tuple[Any, MutableMapping[str, Any]]:
         """Override to add workflow details."""
-        if self.workflow_info_on_message or self.workflow_info_on_extra:
+        if (
+            self.workflow_info_on_message
+            or self.workflow_info_on_extra
+            or self.full_workflow_info_on_extra
+        ):
             runtime = _Runtime.maybe_current()
             if runtime:
                 if self.workflow_info_on_message:
                     msg = f"{msg} ({runtime.logger_details})"
                 if self.workflow_info_on_extra:
+                    # Extra can be absent or None, this handles both
+                    extra = kwargs.get("extra", None) or {}
+                    extra["temporal_workflow"] = runtime.logger_details
+                    kwargs["extra"] = extra
+                if self.full_workflow_info_on_extra:
                     # Extra can be absent or None, this handles both
                     extra = kwargs.get("extra", None) or {}
                     extra["workflow_info"] = runtime.workflow_info()
