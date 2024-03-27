@@ -1883,6 +1883,7 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
     workflow.logger.base_logger.addHandler(handler)
     prev_level = workflow.logger.base_logger.level
     workflow.logger.base_logger.setLevel(logging.INFO)
+    workflow.logger.full_workflow_info_on_extra = True
 
     def find_log(starts_with: str) -> Optional[logging.LogRecord]:
         for record in cast(List[logging.LogRecord], log_queue.queue):
@@ -1919,6 +1920,8 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
             == "LoggingWorkflow"
             and record.funcName == "my_signal"
         )
+        # Since we enabled full info, make sure it's there
+        assert isinstance(record.__dict__["workflow_info"], workflow.Info)
 
         # Clear queue and start a new one with more signals
         log_queue.queue.clear()
