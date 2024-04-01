@@ -249,6 +249,7 @@ class OpenTelemetryConfig:
     metric_temporality: OpenTelemetryMetricTemporality = (
         OpenTelemetryMetricTemporality.CUMULATIVE
     )
+    durations_as_seconds: bool = False
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.OpenTelemetryConfig:
         return temporalio.bridge.runtime.OpenTelemetryConfig(
@@ -259,6 +260,7 @@ class OpenTelemetryConfig:
             else round(self.metric_periodicity.total_seconds() * 1000),
             metric_temporality_delta=self.metric_temporality
             == OpenTelemetryMetricTemporality.DELTA,
+            durations_as_seconds=self.durations_as_seconds,
         )
 
 
@@ -269,12 +271,14 @@ class PrometheusConfig:
     bind_address: str
     counters_total_suffix: bool = False
     unit_suffix: bool = False
+    durations_as_seconds: bool = False
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.PrometheusConfig:
         return temporalio.bridge.runtime.PrometheusConfig(
             bind_address=self.bind_address,
             counters_total_suffix=self.counters_total_suffix,
             unit_suffix=self.unit_suffix,
+            durations_as_seconds=self.durations_as_seconds,
         )
 
 
