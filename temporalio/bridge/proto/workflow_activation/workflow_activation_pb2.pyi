@@ -44,6 +44,7 @@ class WorkflowActivation(google.protobuf.message.Message):
     * Signal and update handlers should be invoked before workflow routines are iterated. That is to
       say before the users' main workflow function and anything spawned by it is allowed to continue.
     * Queries always go last (and, in fact, always come in their own activation)
+    * Evictions also always come in their own activation
 
     The downside of this reordering is that a signal or update handler may not observe that some
     other event had already happened (ex: an activity completed) when it is first invoked, though it
@@ -55,11 +56,9 @@ class WorkflowActivation(google.protobuf.message.Message):
 
     ## Evictions
 
-    Activations that contain only a `remove_from_cache` job should not cause the workflow code
-    to be invoked and may be responded to with an empty command list. Eviction jobs may also
-    appear with other jobs, but will always appear last in the job list. In this case it is
-    expected that the workflow code will be invoked, and the response produced as normal, but
-    the caller should evict the run after doing so.
+    Evictions appear as an activations that contains only a `remove_from_cache` job. Such activations
+    should not cause the workflow code to be invoked and may be responded to with an empty command
+    list.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -180,7 +179,9 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         """Workflow was reset. The randomness seed must be updated."""
     @property
     def query_workflow(self) -> global___QueryWorkflow:
-        """A request to query the workflow was received."""
+        """A request to query the workflow was received. It is guaranteed that queries (one or more)
+        always come in their own activation after other mutating jobs.
+        """
     @property
     def cancel_workflow(self) -> global___CancelWorkflow:
         """A request to cancel the workflow was received."""
@@ -221,11 +222,9 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         """A request to handle a workflow update."""
     @property
     def remove_from_cache(self) -> global___RemoveFromCache:
-        """Remove the workflow identified by the [WorkflowActivation] containing this job from the cache
-        after performing the activation.
-
-        If other job variant are present in the list, this variant will be the last job in the
-        job list. The string value is a reason for eviction.
+        """Remove the workflow identified by the [WorkflowActivation] containing this job from the
+        cache after performing the activation. It is guaranteed that this will be the only job
+        in the activation if present.
         """
     def __init__(
         self,
