@@ -74,6 +74,7 @@ pub struct OpenTelemetryConfig {
     headers: HashMap<String, String>,
     metric_periodicity_millis: Option<u64>,
     metric_temporality_delta: bool,
+    durations_as_seconds: bool,
 }
 
 #[derive(FromPyObject)]
@@ -81,6 +82,7 @@ pub struct PrometheusConfig {
     bind_address: String,
     counters_total_suffix: bool,
     unit_suffix: bool,
+    durations_as_seconds: bool,
 }
 
 const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
@@ -305,7 +307,8 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
                         PyValueError::new_err(format!("Invalid OTel URL: {}", err))
                     })?,
                 )
-                .headers(otel_conf.headers);
+                .headers(otel_conf.headers)
+                .use_seconds_for_durations(otel_conf.durations_as_seconds);
             if let Some(period) = otel_conf.metric_periodicity_millis {
                 build.metric_periodicity(Duration::from_millis(period));
             }
@@ -331,7 +334,8 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
                     })?,
                 )
                 .counters_total_suffix(prom_conf.counters_total_suffix)
-                .unit_suffix(prom_conf.unit_suffix);
+                .unit_suffix(prom_conf.unit_suffix)
+                .use_seconds_for_durations(prom_conf.durations_as_seconds);
             if let Some(global_tags) = conf.global_tags {
                 build.global_tags(global_tags);
             }

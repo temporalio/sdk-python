@@ -68,6 +68,7 @@ class OpenTelemetryConfig:
     headers: Mapping[str, str]
     metric_periodicity_millis: Optional[int]
     metric_temporality_delta: bool
+    durations_as_seconds: bool
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ class PrometheusConfig:
     bind_address: str
     counters_total_suffix: bool
     unit_suffix: bool
+    durations_as_seconds: bool
 
 
 @dataclass(frozen=True)

@@ -186,9 +186,24 @@ pub struct BufferedMetricUpdate {
     #[pyo3(get)]
     pub metric: Py<BufferedMetric>,
     #[pyo3(get)]
-    pub value: u64,
+    pub value: BufferedMetricUpdateValue,
     #[pyo3(get)]
     pub attributes: Py<PyDict>,
+}
+
+#[derive(Clone)]
+pub struct BufferedMetricUpdateValue(metrics::MetricUpdateVal);
+
+impl IntoPy<PyObject> for BufferedMetricUpdateValue {
+    fn into_py(self, py: Python) -> PyObject {
+        match self.0 {
+            metrics::MetricUpdateVal::Delta(v) => v.into_py(py),
+            metrics::MetricUpdateVal::DeltaF64(v) => v.into_py(py),
+            metrics::MetricUpdateVal::Value(v) => v.into_py(py),
+            metrics::MetricUpdateVal::ValueF64(v) => v.into_py(py),
+            metrics::MetricUpdateVal::Duration(v) => v.as_millis().into_py(py),
+        }
+    }
 }
 
 // WARNING: This must match temporalio.runtime.BufferedMetric protocol
@@ -252,8 +267,10 @@ fn convert_metric_event<'p>(
                             .map(|s| s.to_string()),
                         kind: match kind {
                             metrics::MetricKind::Counter => 0,
-                            metrics::MetricKind::Gauge => 1,
-                            metrics::MetricKind::Histogram => 2,
+                            metrics::MetricKind::Gauge | metrics::MetricKind::GaugeF64 => 1,
+                            metrics::MetricKind::Histogram
+                            | metrics::MetricKind::HistogramF64
+                            | metrics::MetricKind::HistogramDuration => 2,
                         },
                     },
                 )
@@ -307,10 +324,7 @@ fn convert_metric_event<'p>(
             update,
         } => Some(BufferedMetricUpdate {
             metric: instrument.get().clone().0.clone(),
-            value: match update {
-                metrics::MetricUpdateVal::Delta(v) => v,
-                metrics::MetricUpdateVal::Value(v) => v,
-            },
+            value: BufferedMetricUpdateValue(update),
             attributes: attributes
                 .get()
                 .clone()
