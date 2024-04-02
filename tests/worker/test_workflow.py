@@ -3247,6 +3247,11 @@ class CacheEvictionTearDownWorkflow:
                 workflow.execute_child_workflow(WaitForeverWorkflow.run)
             ),
             asyncio.create_task(asyncio.sleep(1000)),
+            asyncio.shield(
+                workflow.execute_activity(
+                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
+                )
+            ),
         ]
         gather_fut = asyncio.gather(*tasks, return_exceptions=True)
         try:
