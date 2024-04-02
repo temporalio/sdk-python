@@ -2358,7 +2358,10 @@ class DeadlockedWorkflow:
 
 
 async def test_workflow_deadlock(client: Client):
-    async with new_worker(client, DeadlockedWorkflow) as worker:
+    # Disable safe eviction so the worker can complete
+    async with new_worker(
+        client, DeadlockedWorkflow, disable_safe_workflow_eviction=True
+    ) as worker:
         deadlock_thread_event.clear()
         handle = await client.start_workflow(
             DeadlockedWorkflow.run,
@@ -3219,18 +3222,33 @@ async def wait_forever_activity() -> None:
 
 
 @workflow.defn
+class WaitForeverWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await asyncio.Future()
+
+
+@workflow.defn
 class CacheEvictionTearDownWorkflow:
     def __init__(self) -> None:
         self._signal_count = 0
 
     @workflow.run
     async def run(self) -> None:
-        # Start an activity in the background that never completes
-        asyncio.create_task(
-            workflow.execute_activity(
-                wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
-            )
-        )
+        # Start several things in background. This is just to show that eviction
+        # can work even with these things running.
+        tasks = [
+            asyncio.create_task(
+                workflow.execute_activity(
+                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
+                )
+            ),
+            asyncio.create_task(
+                workflow.execute_child_workflow(WaitForeverWorkflow.run)
+            ),
+            asyncio.create_task(asyncio.sleep(1000)),
+        ]
+        gather_fut = asyncio.gather(*tasks, return_exceptions=True)
         try:
             # Wait for signal count to reach 2
             await asyncio.sleep(0.01)
@@ -3240,6 +3258,10 @@ class CacheEvictionTearDownWorkflow:
             # should be ignored
             await asyncio.sleep(0.01)
             await workflow.wait_condition(lambda: self._signal_count > 2)
+            # Cancel gather tasks and wait on them, but ignore the errors
+            for task in tasks:
+                task.cancel()
+            await gather_fut
 
     @workflow.signal
     async def signal(self) -> None:
@@ -3258,6 +3280,7 @@ async def test_cache_eviction_tear_down(client: Client):
     async with new_worker(
         client,
         CacheEvictionTearDownWorkflow,
+        WaitForeverWorkflow,
         activities=[wait_forever_activity],
         max_cached_workflows=0,
     ) as worker:

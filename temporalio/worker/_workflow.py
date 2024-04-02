@@ -36,7 +36,7 @@ from ._workflow_instance import (
 logger = logging.getLogger(__name__)
 
 # Set to true to log all activations and completions
-LOG_PROTOS = True
+LOG_PROTOS = False
 
 
 class _WorkflowWorker:
@@ -60,6 +60,7 @@ class _WorkflowWorker:
                 [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
             ]
         ],
+        disable_safe_eviction: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -91,6 +92,7 @@ class _WorkflowWorker:
         self._running_workflows: Dict[str, WorkflowInstance] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
+        self._disable_safe_eviction = disable_safe_eviction
         self._throw_after_activation: Optional[Exception] = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
@@ -98,6 +100,9 @@ class _WorkflowWorker:
         self._deadlock_timeout_seconds = (
             None if debug_mode or os.environ.get("TEMPORAL_DEBUG") else 2
         )
+
+        # Keep track of workflows that could not be evicted
+        self._could_not_evict_count = 0
 
         # Validate and build workflow dict
         self._workflows: Dict[str, temporalio.workflow._Definition] = {}
@@ -155,6 +160,13 @@ class _WorkflowWorker:
         if self._throw_after_activation:
             raise self._throw_after_activation
 
+    def notify_shutdown(self) -> None:
+        if self._could_not_evict_count:
+            logger.warn(
+                f"Shutting down workflow worker, but {self._could_not_evict_count} "
+                + "workflow(s) could not be evicted previously, so the shutdown will hang"
+            )
+
     # Only call this if run() raised an error
     async def drain_poll_queue(self) -> None:
         while True:
@@ -199,8 +211,11 @@ class _WorkflowWorker:
                 logger.debug("Received workflow activation:\n%s", act)
 
             # If the workflow is not running yet and this isn't a cache remove
-            # job, create it
-            workflow = self._running_workflows.get(act.run_id)
+            # job, create it. We do not even fetch a workflow if it's a cache
+            # remove job and safe evictions are enabled
+            workflow = None
+            if not cache_remove_job or not self._disable_safe_eviction:
+                workflow = self._running_workflows.get(act.run_id)
             if not workflow and not cache_remove_job:
                 # Must have a start job to create instance
                 if not start_job:
@@ -240,6 +255,7 @@ class _WorkflowWorker:
             # try the eviction until it succeeds?
             if cache_remove_job:
                 logger.exception("Failed running eviction job, not evicting")
+                self._could_not_evict_count += 1
                 return
 
             logger.exception(

@@ -45,6 +45,7 @@ class Replayer:
         identity: Optional[str] = None,
         debug_mode: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
+        disable_safe_workflow_eviction: bool = False,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -67,6 +68,7 @@ class Replayer:
             identity=identity,
             debug_mode=debug_mode,
             runtime=runtime,
+            disable_safe_workflow_eviction=disable_safe_workflow_eviction,
         )
 
     def config(self) -> ReplayerConfig:
@@ -228,6 +230,9 @@ class Replayer:
                     metric_meter=runtime.metric_meter,
                     on_eviction_hook=on_eviction_hook,
                     disable_eager_activity_execution=False,
+                    disable_safe_eviction=self._config[
+                        "disable_safe_workflow_eviction"
+                    ],
                 ).run()
             )
 
@@ -298,6 +303,7 @@ class ReplayerConfig(TypedDict, total=False):
     identity: Optional[str]
     debug_mode: bool
     runtime: Optional[temporalio.runtime.Runtime]
+    disable_safe_workflow_eviction: bool
 
 
 @dataclass(frozen=True)
