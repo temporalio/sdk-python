@@ -814,7 +814,7 @@ async def test_activity_logging(client: Client, worker: ExternalWorker):
     assert records[-1].message.startswith(
         "Called with arg: Temporal ({'activity_id': '"
     )
-    assert records[-1].__dict__["activity_info"].activity_type == "say_hello"
+    assert records[-1].__dict__["temporal_activity"]["activity_type"] == "say_hello"
 
 
 async def test_activity_worker_shutdown(client: Client, worker: ExternalWorker):
