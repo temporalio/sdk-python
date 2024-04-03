@@ -3252,8 +3252,11 @@ class CacheEvictionTearDownWorkflow:
                     wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
                 )
             ),
+            asyncio.create_task(workflow.wait_condition(lambda: False)),
         ]
         gather_fut = asyncio.gather(*tasks, return_exceptions=True)
+        # Let's also start something in the background that we never wait on
+        asyncio.create_task(asyncio.sleep(1000))
         try:
             # Wait for signal count to reach 2
             await asyncio.sleep(0.01)
