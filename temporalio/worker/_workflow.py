@@ -60,6 +60,7 @@ class _WorkflowWorker:
                 [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
             ]
         ],
+        disable_safe_eviction: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -91,6 +92,7 @@ class _WorkflowWorker:
         self._running_workflows: Dict[str, WorkflowInstance] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
+        self._disable_safe_eviction = disable_safe_eviction
         self._throw_after_activation: Optional[Exception] = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
@@ -98,6 +100,9 @@ class _WorkflowWorker:
         self._deadlock_timeout_seconds = (
             None if debug_mode or os.environ.get("TEMPORAL_DEBUG") else 2
         )
+
+        # Keep track of workflows that could not be evicted
+        self._could_not_evict_count = 0
 
         # Validate and build workflow dict
         self._workflows: Dict[str, temporalio.workflow._Definition] = {}
@@ -155,6 +160,13 @@ class _WorkflowWorker:
         if self._throw_after_activation:
             raise self._throw_after_activation
 
+    def notify_shutdown(self) -> None:
+        if self._could_not_evict_count:
+            logger.warn(
+                f"Shutting down workflow worker, but {self._could_not_evict_count} "
+                + "workflow(s) could not be evicted previously, so the shutdown will hang"
+            )
+
     # Only call this if run() raised an error
     async def drain_poll_queue(self) -> None:
         while True:
@@ -182,7 +194,6 @@ class _WorkflowWorker:
                 cache_remove_job = job.remove_from_cache
             elif job.HasField("start_workflow"):
                 start_job = job.start_workflow
-        cache_remove_only_activation = len(act.jobs) == 1 and cache_remove_job
 
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
@@ -190,9 +201,8 @@ class _WorkflowWorker:
         )
         completion.successful.SetInParent()
         try:
-            # Decode the activation if there's a codec and it's not a
-            # cache-remove-only activation
-            if self._data_converter.payload_codec and not cache_remove_only_activation:
+            # Decode the activation if there's a codec and not cache remove job
+            if self._data_converter.payload_codec and not cache_remove_job:
                 await temporalio.bridge.worker.decode_activation(
                     act, self._data_converter.payload_codec
                 )
@@ -200,24 +210,27 @@ class _WorkflowWorker:
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
 
-            # We only have to run if there are any non-remove-from-cache jobs
-            if not cache_remove_only_activation:
-                # If the workflow is not running yet, create it
+            # If the workflow is not running yet and this isn't a cache remove
+            # job, create it. We do not even fetch a workflow if it's a cache
+            # remove job and safe evictions are enabled
+            workflow = None
+            if not cache_remove_job or not self._disable_safe_eviction:
                 workflow = self._running_workflows.get(act.run_id)
-                if not workflow:
-                    # Must have a start job to create instance
-                    if not start_job:
-                        raise RuntimeError(
-                            "Missing start workflow, workflow could have unexpectedly been removed from cache"
-                        )
-                    workflow = self._create_workflow_instance(act, start_job)
-                    self._running_workflows[act.run_id] = workflow
-                elif start_job:
-                    # This should never happen
-                    logger.warn("Cache already exists for activation with start job")
+            if not workflow and not cache_remove_job:
+                # Must have a start job to create instance
+                if not start_job:
+                    raise RuntimeError(
+                        "Missing start workflow, workflow could have unexpectedly been removed from cache"
+                    )
+                workflow = self._create_workflow_instance(act, start_job)
+                self._running_workflows[act.run_id] = workflow
+            elif start_job:
+                # This should never happen
+                logger.warn("Cache already exists for activation with start job")
 
-                # Run activation in separate thread so we can check if it's
-                # deadlocked
+            # Run activation in separate thread so we can check if it's
+            # deadlocked
+            if workflow:
                 activate_task = asyncio.get_running_loop().run_in_executor(
                     self._workflow_task_executor,
                     workflow.activate,
@@ -234,6 +247,17 @@ class _WorkflowWorker:
                         f"[TMPRL1101] Potential deadlock detected, workflow didn't yield within {self._deadlock_timeout_seconds} second(s)"
                     )
         except Exception as err:
+            # We cannot fail a cache eviction, we must just log and not complete
+            # the activation (failed or otherwise). This should only happen in
+            # cases of deadlock or tasks not properly completing, and yes this
+            # means that a slot is forever taken.
+            # TODO(cretz): Should we build a complex mechanism to continually
+            # try the eviction until it succeeds?
+            if cache_remove_job:
+                logger.exception("Failed running eviction job, not evicting")
+                self._could_not_evict_count += 1
+                return
+
             logger.exception(
                 "Failed handling activation on workflow with run ID %s", act.run_id
             )
@@ -257,7 +281,9 @@ class _WorkflowWorker:
         # Always set the run ID on the completion
         completion.run_id = act.run_id
 
-        # If there is a remove-from-cache job, do so
+        # If there is a remove-from-cache job, do so. We don't need to log a
+        # warning if there's not, because create workflow failing for
+        # unregistered workflow still triggers cache remove job
         if cache_remove_job:
             if act.run_id in self._running_workflows:
                 logger.debug(
@@ -266,16 +292,9 @@ class _WorkflowWorker:
                     cache_remove_job.message,
                 )
                 del self._running_workflows[act.run_id]
-            else:
-                logger.warn(
-                    "Eviction request on unknown workflow with run ID %s, message: %s",
-                    act.run_id,
-                    cache_remove_job.message,
-                )
 
-        # Encode the completion if there's a codec and it's not a
-        # cache-remove-only activation
-        if self._data_converter.payload_codec and not cache_remove_only_activation:
+        # Encode the completion if there's a codec and not cache remove job
+        if self._data_converter.payload_codec and not cache_remove_job:
             try:
                 await temporalio.bridge.worker.encode_completion(
                     completion, self._data_converter.payload_codec

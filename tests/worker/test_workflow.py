@@ -2362,7 +2362,10 @@ class DeadlockedWorkflow:
 
 
 async def test_workflow_deadlock(client: Client):
-    async with new_worker(client, DeadlockedWorkflow) as worker:
+    # Disable safe eviction so the worker can complete
+    async with new_worker(
+        client, DeadlockedWorkflow, disable_safe_workflow_eviction=True
+    ) as worker:
         deadlock_thread_event.clear()
         handle = await client.start_workflow(
             DeadlockedWorkflow.run,
@@ -3217,21 +3220,60 @@ async def test_manual_result_type(client: Client):
         assert res4 == ManualResultType(some_string="from-query")
 
 
+@activity.defn
+async def wait_forever_activity() -> None:
+    await asyncio.Future()
+
+
 @workflow.defn
-class SwallowGeneratorExitWorkflow:
+class WaitForeverWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await asyncio.Future()
+
+
+@workflow.defn
+class CacheEvictionTearDownWorkflow:
     def __init__(self) -> None:
         self._signal_count = 0
 
     @workflow.run
     async def run(self) -> None:
+        # Start several things in background. This is just to show that eviction
+        # can work even with these things running.
+        tasks = [
+            asyncio.create_task(
+                workflow.execute_activity(
+                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
+                )
+            ),
+            asyncio.create_task(
+                workflow.execute_child_workflow(WaitForeverWorkflow.run)
+            ),
+            asyncio.create_task(asyncio.sleep(1000)),
+            asyncio.shield(
+                workflow.execute_activity(
+                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
+                )
+            ),
+            asyncio.create_task(workflow.wait_condition(lambda: False)),
+        ]
+        gather_fut = asyncio.gather(*tasks, return_exceptions=True)
+        # Let's also start something in the background that we never wait on
+        asyncio.create_task(asyncio.sleep(1000))
         try:
             # Wait for signal count to reach 2
+            await asyncio.sleep(0.01)
             await workflow.wait_condition(lambda: self._signal_count > 1)
         finally:
-            # This finally, on eviction, is actually called because the above
-            # await raises GeneratorExit. Then this will raise a
-            # _NotInWorkflowEventLoopError swallowing that.
+            # This finally, on eviction, is actually called but the command
+            # should be ignored
+            await asyncio.sleep(0.01)
             await workflow.wait_condition(lambda: self._signal_count > 2)
+            # Cancel gather tasks and wait on them, but ignore the errors
+            for task in tasks:
+                task.cancel()
+            await gather_fut
 
     @workflow.signal
     async def signal(self) -> None:
@@ -3242,11 +3284,17 @@ class SwallowGeneratorExitWorkflow:
         return self._signal_count
 
 
-async def test_swallow_generator_exit(client: Client):
-    # This test simulates GeneratorExit and GC issues by forcing eviction on
-    # each step
+async def test_cache_eviction_tear_down(client: Client):
+    # This test simulates forcing eviction. This used to raise GeneratorExit on
+    # GC which triggered the finally which could run on any thread Python
+    # chooses, but now we expect eviction to properly tear down tasks and
+    # therefore we cancel them
     async with new_worker(
-        client, SwallowGeneratorExitWorkflow, max_cached_workflows=0
+        client,
+        CacheEvictionTearDownWorkflow,
+        WaitForeverWorkflow,
+        activities=[wait_forever_activity],
+        max_cached_workflows=0,
     ) as worker:
         # Put a hook to catch unraisable exceptions
         old_hook = sys.unraisablehook
@@ -3254,25 +3302,25 @@ async def test_swallow_generator_exit(client: Client):
         sys.unraisablehook = hook_calls.append
         try:
             handle = await client.start_workflow(
-                SwallowGeneratorExitWorkflow.run,
+                CacheEvictionTearDownWorkflow.run,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
 
             async def signal_count() -> int:
-                return await handle.query(SwallowGeneratorExitWorkflow.signal_count)
+                return await handle.query(CacheEvictionTearDownWorkflow.signal_count)
 
             # Confirm signal count as 0
             await assert_eq_eventually(0, signal_count)
 
             # Send signal and confirm it's at 1
-            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await handle.signal(CacheEvictionTearDownWorkflow.signal)
             await assert_eq_eventually(1, signal_count)
 
-            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await handle.signal(CacheEvictionTearDownWorkflow.signal)
             await assert_eq_eventually(2, signal_count)
 
-            await handle.signal(SwallowGeneratorExitWorkflow.signal)
+            await handle.signal(CacheEvictionTearDownWorkflow.signal)
             await assert_eq_eventually(3, signal_count)
 
             await handle.result()

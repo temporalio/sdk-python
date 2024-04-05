@@ -70,6 +70,9 @@ from ._interceptor import (
 
 logger = logging.getLogger(__name__)
 
+# Set to true to log all cases where we're ignoring things during delete
+LOG_IGNORE_DURING_DELETE = False
+
 
 class WorkflowRunner(ABC):
     """Abstract runner for workflows that creates workflow instances to run.
@@ -254,18 +257,12 @@ class _WorkflowInstanceImpl(
         # Set ourselves on our own loop
         temporalio.workflow._Runtime.set_on_loop(self, self)
 
-        # After GC, Python raises GeneratorExit calls from all awaiting tasks.
-        # Then in a finally of such an await, another exception can swallow
-        # these causing even more issues. We will set ourselves as deleted so we
-        # can check in some places to swallow these errors on tear down.
+        # When we evict, we have to mark the workflow as deleting so we don't
+        # add any commands and we swallow exceptions on tear down
         self._deleting = False
 
         # We only create the metric meter lazily
         self._metric_meter: Optional[_ReplaySafeMetricMeter] = None
-
-    def __del__(self) -> None:
-        # We have confirmed there are no super() versions of __del__
-        self._deleting = True
 
     #### Activation functions ####
     # These are in alphabetical order and besides "activate", all other calls
@@ -316,16 +313,38 @@ class _WorkflowInstanceImpl(
                 # be checked in patch jobs (first index) or query jobs (last
                 # index).
                 self._run_once(check_conditions=index == 1 or index == 2)
-        except temporalio.exceptions.FailureError as err:
+        except Exception as err:
             # We want failure errors during activation, like those that can
             # happen during payload conversion, to fail the workflow not the
             # task
-            try:
-                self._set_workflow_failure(err)
-            except Exception as inner_err:
-                activation_err = inner_err
-        except Exception as err:
-            activation_err = err
+            if isinstance(err, temporalio.exceptions.FailureError):
+                try:
+                    self._set_workflow_failure(err)
+                except Exception as inner_err:
+                    activation_err = inner_err
+            else:
+                # Otherwise all exceptions are activation errors
+                activation_err = err
+            # If we're deleting, swallow any activation error
+            if self._deleting:
+                if LOG_IGNORE_DURING_DELETE:
+                    logger.debug(
+                        "Ignoring exception while deleting workflow", exc_info=True
+                    )
+                activation_err = None
+
+        # If we're deleting, there better be no more tasks. It is important for
+        # the integrity of the system that we check this. If there are tasks
+        # remaining, they and any associated coroutines will get garbage
+        # collected which can trigger a GeneratorExit exception thrown in the
+        # coroutine which can cause it to wakeup on a different thread which may
+        # have a different workflow/event-loop going.
+        if self._deleting and self._tasks:
+            raise RuntimeError(
+                f"Cache removal processed, but {len(self._tasks)} tasks remain. "
+                + f"Stack traces below:\n\n{self._stack_trace()}"
+            )
+
         if activation_err:
             logger.warning(
                 f"Failed activation on workflow {self._info.workflow_type} with ID {self._info.workflow_id} and run ID {self._info.run_id}",
@@ -381,8 +400,7 @@ class _WorkflowInstanceImpl(
         elif job.HasField("notify_has_patch"):
             self._apply_notify_has_patch(job.notify_has_patch)
         elif job.HasField("remove_from_cache"):
-            # Ignore, handled externally
-            pass
+            self._apply_remove_from_cache(job.remove_from_cache)
         elif job.HasField("resolve_activity"):
             self._apply_resolve_activity(job.resolve_activity)
         elif job.HasField("resolve_child_workflow_execution"):
@@ -516,19 +534,13 @@ class _WorkflowInstanceImpl(
                     self._current_activation_error = err
                     return
             except BaseException as err:
-                # During tear down, generator exit and no-runtime exceptions can appear
-                if not self._deleting:
-                    raise
-                if not isinstance(
-                    err,
-                    (
-                        GeneratorExit,
-                        temporalio.workflow._NotInWorkflowEventLoopError,
-                    ),
-                ):
-                    logger.debug(
-                        "Ignoring exception while deleting workflow", exc_info=True
-                    )
+                if self._deleting:
+                    if LOG_IGNORE_DURING_DELETE:
+                        logger.debug(
+                            "Ignoring exception while deleting workflow", exc_info=True
+                        )
+                    return
+                raise
 
         self.create_task(
             run_update(),
@@ -604,6 +616,15 @@ class _WorkflowInstanceImpl(
         self, job: temporalio.bridge.proto.workflow_activation.NotifyHasPatch
     ) -> None:
         self._patches_notified.add(job.patch_id)
+
+    def _apply_remove_from_cache(
+        self, job: temporalio.bridge.proto.workflow_activation.RemoveFromCache
+    ) -> None:
+        self._deleting = True
+        self._cancel_requested = True
+        # Cancel everything
+        for task in self._tasks:
+            task.cancel()
 
     def _apply_resolve_activity(
         self, job: temporalio.bridge.proto.workflow_activation.ResolveActivity
@@ -774,17 +795,14 @@ class _WorkflowInstanceImpl(
                     )
                 command = self._add_command()
                 command.complete_workflow_execution.result.CopyFrom(result_payloads[0])
-            except BaseException as err:
-                # During tear down, generator exit and event loop exceptions can occur
-                if not self._deleting:
-                    raise
-                if not isinstance(
-                    err,
-                    (GeneratorExit, temporalio.workflow._NotInWorkflowEventLoopError),
-                ):
-                    logger.debug(
-                        "Ignoring exception while deleting workflow", exc_info=True
-                    )
+            except Exception:
+                if self._deleting:
+                    if LOG_IGNORE_DURING_DELETE:
+                        logger.debug(
+                            "Ignoring exception while deleting workflow", exc_info=True
+                        )
+                    return
+                raise
 
         # Set arg types, using raw values for dynamic
         arg_types = self._defn.arg_types
@@ -1477,7 +1495,11 @@ class _WorkflowInstanceImpl(
         finally:
             self._read_only = prev_val
 
-    def _assert_not_read_only(self, action_attempted: str) -> None:
+    def _assert_not_read_only(
+        self, action_attempted: str, *, allow_during_delete: bool = False
+    ) -> None:
+        if self._deleting and not allow_during_delete:
+            raise RuntimeError(f"Ignoring {action_attempted} while deleting")
         if self._read_only:
             raise temporalio.workflow.ReadOnlyContextError(
                 f"While in read-only function, action attempted: {action_attempted}"
@@ -1620,9 +1642,9 @@ class _WorkflowInstanceImpl(
                     handle = self._ready.popleft()
                     handle._run()
 
-                    # Must throw here. Only really set inside
+                    # Must throw here if not deleting. Only really set inside
                     # _run_top_level_workflow_function.
-                    if self._current_activation_error:
+                    if self._current_activation_error and not self._deleting:
                         raise self._current_activation_error
 
                 # Check conditions which may add to the ready list. Also remove
@@ -1645,12 +1667,23 @@ class _WorkflowInstanceImpl(
         except _ContinueAsNewError as err:
             logger.debug("Workflow requested continue as new")
             err._apply_command(self._add_command())
-
-        # Note in some Python versions, cancelled error does not extend
-        # exception
-        # TODO(cretz): Should I fail the task on BaseException too (e.g.
-        # KeyboardInterrupt)?
         except (Exception, asyncio.CancelledError) as err:
+            # During tear down we can ignore exceptions. Technically the
+            # command-adding done later would throw a not-in-workflow exception
+            # we'd ignore later, but it's better to preempt it
+            if self._deleting:
+                if LOG_IGNORE_DURING_DELETE:
+                    logger.debug(
+                        "Ignoring exception while deleting workflow", exc_info=True
+                    )
+                return
+
+            # Handle continue as new
+            if isinstance(err, _ContinueAsNewError):
+                logger.debug("Workflow requested continue as new")
+                err._apply_command(self._add_command())
+                return
+
             logger.debug(
                 f"Workflow raised failure with run ID {self._info.run_id}",
                 exc_info=True,
@@ -1676,16 +1709,6 @@ class _WorkflowInstanceImpl(
             else:
                 # All other exceptions fail the task
                 self._current_activation_error = err
-        except BaseException as err:
-            # During tear down, generator exit and no-runtime exceptions can appear
-            if not self._deleting:
-                raise
-            if not isinstance(
-                err, (GeneratorExit, temporalio.workflow._NotInWorkflowEventLoopError)
-            ):
-                logger.debug(
-                    "Ignoring exception while deleting workflow", exc_info=True
-                )
 
     def _set_workflow_failure(self, err: temporalio.exceptions.FailureError) -> None:
         # All other failure errors fail the workflow
@@ -1752,7 +1775,9 @@ class _WorkflowInstanceImpl(
         *args: Any,
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.Handle:
-        self._assert_not_read_only("schedule task")
+        # We need to allow this during delete because this is how tasks schedule
+        # entire cancellation calls
+        self._assert_not_read_only("schedule task", allow_during_delete=True)
         handle = asyncio.Handle(callback, args, self, context)
         self._ready.append(handle)
         return handle
@@ -1856,6 +1881,9 @@ class _WorkflowInstanceImpl(
         logger.error("\n".join(log_lines), exc_info=exc_info)
 
     def call_exception_handler(self, context: _Context) -> None:
+        # Do nothing with any uncaught exceptions while deleting
+        if self._deleting:
+            return
         # Copied and slightly modified from
         # asyncio.BaseEventLoop.call_exception_handler
         if self._exception_handler is None:
@@ -2045,12 +2073,15 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         instance._register_task(self, name=f"activity: {input.activity}")
 
     def cancel(self, msg: Optional[Any] = None) -> bool:
-        self._instance._assert_not_read_only("cancel activity handle")
-        # We override this because if it's not yet started and not done, we need
-        # to send a cancel command because the async function won't run to trap
-        # the cancel (i.e. cancelled before started)
-        if not self._started and not self.done():
-            self._apply_cancel_command(self._instance._add_command())
+        # Allow the cancel to go through for the task even if we're deleting,
+        # just don't do any commands
+        if not self._instance._deleting:
+            self._instance._assert_not_read_only("cancel activity handle")
+            # We override this because if it's not yet started and not done, we need
+            # to send a cancel command because the async function won't run to trap
+            # the cancel (i.e. cancelled before started)
+            if not self._started and not self.done():
+                self._apply_cancel_command(self._instance._add_command())
         # Message not supported in older versions
         if sys.version_info < (3, 9):
             return super().cancel()

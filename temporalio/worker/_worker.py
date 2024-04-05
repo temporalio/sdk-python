@@ -78,6 +78,7 @@ class Worker:
         disable_eager_activity_execution: bool = False,
         on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,
         use_worker_versioning: bool = False,
+        disable_safe_workflow_eviction: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -183,11 +184,19 @@ class Worker:
             on_fatal_error: An async function that can handle a failure before
                 the worker shutdown commences. This cannot stop the shutdown and
                 any exception raised is logged and ignored.
-            use_worker_versioning: If true, the `build_id` argument must be specified, and this
-                worker opts into the worker versioning feature. This ensures it only receives
-                workflow tasks for workflows which it claims to be compatible with.
-
-                For more information, see https://docs.temporal.io/workers#worker-versioning
+            use_worker_versioning: If true, the `build_id` argument must be
+                specified, and this worker opts into the worker versioning
+                feature. This ensures it only receives workflow tasks for
+                workflows which it claims to be compatible with. For more
+                information, see
+                https://docs.temporal.io/workers#worker-versioning.
+            disable_safe_workflow_eviction: If true, instead of letting the
+                workflow collect its tasks properly, the worker will simply let
+                the Python garbage collector collect the tasks. WARNING: Users
+                should not set this value to true. The garbage collector will
+                throw ``GeneratorExit`` in coroutines causing them to to wake up
+                in different threads and run ``finally`` and other code in the
+                wrong workflow environment.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
@@ -254,6 +263,7 @@ class Worker:
             disable_eager_activity_execution=disable_eager_activity_execution,
             on_fatal_error=on_fatal_error,
             use_worker_versioning=use_worker_versioning,
+            disable_safe_workflow_eviction=disable_safe_workflow_eviction,
         )
         self._started = False
         self._shutdown_event = asyncio.Event()
@@ -303,6 +313,7 @@ class Worker:
                 disable_eager_activity_execution=disable_eager_activity_execution,
                 metric_meter=runtime.metric_meter,
                 on_eviction_hook=None,
+                disable_safe_eviction=disable_safe_workflow_eviction,
             )
 
         # We need an already connected client
@@ -473,9 +484,11 @@ class Worker:
             assert self._workflow_worker
             tasks[2] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
 
-        # Set worker-shutdown event
+        # Notify shutdown occurring
         if self._activity_worker:
             self._activity_worker.notify_shutdown()
+        if self._workflow_worker:
+            self._workflow_worker.notify_shutdown()
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks)
@@ -597,6 +610,7 @@ class WorkerConfig(TypedDict, total=False):
     disable_eager_activity_execution: bool
     on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]]
     use_worker_versioning: bool
+    disable_safe_workflow_eviction: bool
 
 
 _default_build_id: Optional[str] = None
