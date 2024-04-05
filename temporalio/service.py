@@ -122,7 +122,7 @@ class HttpConnectProxyConfig:
     target_host: str
     """Target host:port for the HTTP CONNECT proxy."""
     basic_auth: Optional[Tuple[str, str]] = None
-    """Basic auth for the HTTP CONNECT proxy if any."""
+    """Basic auth for the HTTP CONNECT proxy if any as a user/pass tuple."""
 
     def _to_bridge_config(
         self,
