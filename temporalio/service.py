@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum
-from typing import ClassVar, Generic, Mapping, Optional, Type, TypeVar, Union
+from typing import ClassVar, Generic, Mapping, Optional, Tuple, Type, TypeVar, Union
 
 import google.protobuf.empty_pb2
 import google.protobuf.message
@@ -115,6 +115,24 @@ class KeepAliveConfig:
 KeepAliveConfig.default = KeepAliveConfig()
 
 
+@dataclass(frozen=True)
+class HttpConnectProxyConfig:
+    """Configuration for HTTP CONNECT proxy for client connections."""
+
+    target_host: str
+    """Target host:port for the HTTP CONNECT proxy."""
+    basic_auth: Optional[Tuple[str, str]] = None
+    """Basic auth for the HTTP CONNECT proxy if any."""
+
+    def _to_bridge_config(
+        self,
+    ) -> temporalio.bridge.client.ClientHttpConnectProxyConfig:
+        return temporalio.bridge.client.ClientHttpConnectProxyConfig(
+            target_host=self.target_host,
+            basic_auth=self.basic_auth,
+        )
+
+
 @dataclass
 class ConnectConfig:
     """Config for connecting to the server."""
@@ -128,6 +146,7 @@ class ConnectConfig:
     identity: str = ""
     lazy: bool = False
     runtime: Optional[temporalio.runtime.Runtime] = None
+    http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -174,6 +193,9 @@ class ConnectConfig:
             identity=self.identity,
             client_name="temporal-python",
             client_version=__version__,
+            http_connect_proxy_config=self.http_connect_proxy_config._to_bridge_config()
+            if self.http_connect_proxy_config
+            else None,
         )
 
 
