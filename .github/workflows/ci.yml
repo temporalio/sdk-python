@@ -94,3 +94,4 @@ jobs:
       python-repo-path: ${{github.event.pull_request.head.repo.full_name}}
       version: ${{github.event.pull_request.head.ref}}
       version-is-repo-ref: true
+      features-repo-ref: http-connect-proxy-python

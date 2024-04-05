@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Mapping, Optional, Type, TypeVar
+from typing import Mapping, Optional, Tuple, Type, TypeVar
 
 import google.protobuf.message
 
@@ -47,6 +47,14 @@ class ClientKeepAliveConfig:
 
 
 @dataclass
+class ClientHttpConnectProxyConfig:
+    """Python representation of the Rust struct for configuring HTTP proxy."""
+
+    target_host: str
+    basic_auth: Optional[Tuple[str, str]]
+
+
+@dataclass
 class ClientConfig:
     """Python representation of the Rust struct for configuring the client."""
 
@@ -59,6 +67,7 @@ class ClientConfig:
     keep_alive_config: Optional[ClientKeepAliveConfig]
     client_name: str
     client_version: str
+    http_connect_proxy_config: Optional[ClientHttpConnectProxyConfig]
 
 
 @dataclass
