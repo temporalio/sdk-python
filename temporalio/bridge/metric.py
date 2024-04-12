@@ -75,6 +75,46 @@ class MetricHistogram:
         self._ref.record(value, attrs._ref)
 
 
+class MetricHistogramFloat:
+    """Metric histogram using SDK Core."""
+
+    def __init__(
+        self,
+        meter: MetricMeter,
+        name: str,
+        description: Optional[str],
+        unit: Optional[str],
+    ) -> None:
+        """Initialize histogram."""
+        self._ref = meter._ref.new_histogram_float(name, description, unit)
+
+    def record(self, value: float, attrs: MetricAttributes) -> None:
+        """Record value on histogram."""
+        if value < 0:
+            raise ValueError("Metric value must be non-negative value")
+        self._ref.record(value, attrs._ref)
+
+
+class MetricHistogramDuration:
+    """Metric histogram using SDK Core."""
+
+    def __init__(
+        self,
+        meter: MetricMeter,
+        name: str,
+        description: Optional[str],
+        unit: Optional[str],
+    ) -> None:
+        """Initialize histogram."""
+        self._ref = meter._ref.new_histogram_duration(name, description, unit)
+
+    def record(self, value_ms: int, attrs: MetricAttributes) -> None:
+        """Record value on histogram."""
+        if value_ms < 0:
+            raise ValueError("Metric value must be non-negative value")
+        self._ref.record(value_ms, attrs._ref)
+
+
 class MetricGauge:
     """Metric gauge using SDK Core."""
 
@@ -89,6 +129,26 @@ class MetricGauge:
         self._ref = meter._ref.new_gauge(name, description, unit)
 
     def set(self, value: int, attrs: MetricAttributes) -> None:
+        """Set value on gauge."""
+        if value < 0:
+            raise ValueError("Metric value must be non-negative value")
+        self._ref.set(value, attrs._ref)
+
+
+class MetricGaugeFloat:
+    """Metric gauge using SDK Core."""
+
+    def __init__(
+        self,
+        meter: MetricMeter,
+        name: str,
+        description: Optional[str],
+        unit: Optional[str],
+    ) -> None:
+        """Initialize gauge."""
+        self._ref = meter._ref.new_gauge_float(name, description, unit)
+
+    def set(self, value: float, attrs: MetricAttributes) -> None:
         """Set value on gauge."""
         if value < 0:
             raise ValueError("Metric value must be non-negative value")

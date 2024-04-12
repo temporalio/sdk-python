@@ -30,7 +30,7 @@ from typing import (
 )
 
 import google.protobuf.internal.containers
-from typing_extensions import ClassVar, NamedTuple, TypeAlias, get_origin
+from typing_extensions import ClassVar, NamedTuple, Self, TypeAlias, get_origin
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -578,9 +578,60 @@ class MetricMeter(ABC):
         ...
 
     @abstractmethod
+    def create_histogram_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricHistogramFloat:
+        """Create a histogram metric for recording values.
+
+        Args:
+            name: Name for the metric.
+            description: Optional description for the metric.
+            unit: Optional unit for the metric.
+
+        Returns:
+            Histogram metric.
+        """
+        ...
+
+    @abstractmethod
+    def create_histogram_timedelta(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricHistogramTimedelta:
+        """Create a histogram metric for recording values.
+
+        Note, duration precision is millisecond. Also note, if "unit" is set as
+        "duration", it will be converted to "ms" or "s" on the way out.
+
+        Args:
+            name: Name for the metric.
+            description: Optional description for the metric.
+            unit: Optional unit for the metric.
+
+        Returns:
+            Histogram metric.
+        """
+        ...
+
+    @abstractmethod
     def create_gauge(
         self, name: str, description: Optional[str] = None, unit: Optional[str] = None
     ) -> MetricGauge:
+        """Create a gauge metric for setting values.
+
+        Args:
+            name: Name for the metric.
+            description: Optional description for the metric.
+            unit: Optional unit for the metric.
+
+        Returns:
+            Gauge metric.
+        """
+        ...
+
+    @abstractmethod
+    def create_gauge_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricGaugeFloat:
         """Create a gauge metric for setting values.
 
         Args:
@@ -613,8 +664,8 @@ class MetricMeter(ABC):
         ...
 
 
-class MetricCounter(ABC):
-    """Counter metric created by a metric meter."""
+class MetricCommon(ABC):
+    """Base for all metrics."""
 
     @property
     @abstractmethod
@@ -633,6 +684,29 @@ class MetricCounter(ABC):
     def unit(self) -> Optional[str]:
         """Unit for the metric if any."""
         ...
+
+    @abstractmethod
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> Self:
+        """Create a new metric with the given attributes appended to the
+        current set.
+
+        Args:
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Returns:
+            New metric.
+
+        Raises:
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+
+class MetricCounter(MetricCommon):
+    """Counter metric created by a metric meter."""
 
     @abstractmethod
     def add(
@@ -651,46 +725,9 @@ class MetricCounter(ABC):
         """
         ...
 
-    @abstractmethod
-    def with_additional_attributes(
-        self, additional_attributes: MetricAttributes
-    ) -> MetricCounter:
-        """Create a new counter with the given attributes appended to the
-        current set.
 
-        Args:
-            additional_attributes: Additional attributes to append to the
-                current set.
-
-        Returns:
-            New counter.
-
-        Raises:
-            TypeError: Attribute values are not the expected type.
-        """
-        ...
-
-
-class MetricHistogram(ABC):
+class MetricHistogram(MetricCommon):
     """Histogram metric created by a metric meter."""
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Name for the metric."""
-        ...
-
-    @property
-    @abstractmethod
-    def description(self) -> Optional[str]:
-        """Description for the metric if any."""
-        ...
-
-    @property
-    @abstractmethod
-    def unit(self) -> Optional[str]:
-        """Unit for the metric if any."""
-        ...
 
     @abstractmethod
     def record(
@@ -709,46 +746,53 @@ class MetricHistogram(ABC):
         """
         ...
 
+
+class MetricHistogramFloat(MetricCommon):
+    """Histogram metric created by a metric meter."""
+
     @abstractmethod
-    def with_additional_attributes(
-        self, additional_attributes: MetricAttributes
-    ) -> MetricHistogram:
-        """Create a new histogram with the given attributes appended to the
-        current set.
+    def record(
+        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        """Record a value on the histogram.
 
         Args:
+            value: A non-negative float to record.
             additional_attributes: Additional attributes to append to the
                 current set.
 
-        Returns:
-            New histogram.
-
         Raises:
+            ValueError: Value is negative.
             TypeError: Attribute values are not the expected type.
         """
         ...
 
 
-class MetricGauge(ABC):
+class MetricHistogramTimedelta(MetricCommon):
+    """Histogram metric created by a metric meter."""
+
+    @abstractmethod
+    def record(
+        self, value: timedelta, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        """Record a value on the histogram.
+
+        Note, duration precision is millisecond.
+
+        Args:
+            value: A non-negative timedelta to record.
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Raises:
+            ValueError: Value is negative.
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+
+class MetricGauge(MetricCommon):
     """Gauge metric created by a metric meter."""
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Name for the metric."""
-        ...
-
-    @property
-    @abstractmethod
-    def description(self) -> Optional[str]:
-        """Description for the metric if any."""
-        ...
-
-    @property
-    @abstractmethod
-    def unit(self) -> Optional[str]:
-        """Unit for the metric if any."""
-        ...
 
     @abstractmethod
     def set(
@@ -767,21 +811,23 @@ class MetricGauge(ABC):
         """
         ...
 
+
+class MetricGaugeFloat(MetricCommon):
+    """Gauge metric created by a metric meter."""
+
     @abstractmethod
-    def with_additional_attributes(
-        self, additional_attributes: MetricAttributes
-    ) -> MetricGauge:
-        """Create a new gauge with the given attributes appended to the
-        current set.
+    def set(
+        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        """Set a value on the gauge.
 
         Args:
+            value: A non-negative float to set.
             additional_attributes: Additional attributes to append to the
                 current set.
 
-        Returns:
-            New gauge.
-
         Raises:
+            ValueError: Value is negative.
             TypeError: Attribute values are not the expected type.
         """
         ...
@@ -798,10 +844,25 @@ class _NoopMetricMeter(MetricMeter):
     ) -> MetricHistogram:
         return _NoopMetricHistogram(name, description, unit)
 
+    def create_histogram_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricHistogramFloat:
+        return _NoopMetricHistogramFloat(name, description, unit)
+
+    def create_histogram_timedelta(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricHistogramTimedelta:
+        return _NoopMetricHistogramTimedelta(name, description, unit)
+
     def create_gauge(
         self, name: str, description: Optional[str] = None, unit: Optional[str] = None
     ) -> MetricGauge:
         return _NoopMetricGauge(name, description, unit)
+
+    def create_gauge_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> MetricGaugeFloat:
+        return _NoopMetricGaugeFloat(name, description, unit)
 
     def with_additional_attributes(
         self, additional_attributes: MetricAttributes
@@ -809,7 +870,7 @@ class _NoopMetricMeter(MetricMeter):
         return self
 
 
-class _NoopMetric:
+class _NoopMetric(MetricCommon):
     def __init__(
         self, name: str, description: Optional[str], unit: Optional[str]
     ) -> None:
@@ -829,41 +890,52 @@ class _NoopMetric:
     def unit(self) -> Optional[str]:
         return self._unit
 
+    def with_additional_attributes(
+        self, additional_attributes: MetricAttributes
+    ) -> Self:
+        return self
 
-class _NoopMetricCounter(_NoopMetric, MetricCounter):
+
+class _NoopMetricCounter(MetricCounter, _NoopMetric):
     def add(
         self, value: int, additional_attributes: Optional[MetricAttributes] = None
     ) -> None:
         pass
 
-    def with_additional_attributes(
-        self, additional_attributes: MetricAttributes
-    ) -> MetricCounter:
-        return self
 
-
-class _NoopMetricHistogram(_NoopMetric, MetricHistogram):
+class _NoopMetricHistogram(MetricHistogram, _NoopMetric):
     def record(
         self, value: int, additional_attributes: Optional[MetricAttributes] = None
     ) -> None:
         pass
 
-    def with_additional_attributes(
-        self, additional_attributes: MetricAttributes
-    ) -> MetricHistogram:
-        return self
+
+class _NoopMetricHistogramFloat(MetricHistogramFloat, _NoopMetric):
+    def record(
+        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        pass
 
 
-class _NoopMetricGauge(_NoopMetric, MetricGauge):
+class _NoopMetricHistogramTimedelta(MetricHistogramTimedelta, _NoopMetric):
+    def record(
+        self, value: timedelta, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        pass
+
+
+class _NoopMetricGauge(MetricGauge, _NoopMetric):
     def set(
         self, value: int, additional_attributes: Optional[MetricAttributes] = None
     ) -> None:
         pass
 
-    def with_additional_attributes(
-        self, additional_attributes: MetricAttributes
-    ) -> MetricGauge:
-        return self
+
+class _NoopMetricGaugeFloat(MetricGaugeFloat, _NoopMetric):
+    def set(
+        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+    ) -> None:
+        pass
 
 
 MetricMeter.noop = _NoopMetricMeter()

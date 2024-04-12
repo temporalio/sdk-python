@@ -19,7 +19,10 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<metric::MetricAttributesRef>()?;
     m.add_class::<metric::MetricCounterRef>()?;
     m.add_class::<metric::MetricHistogramRef>()?;
+    m.add_class::<metric::MetricHistogramFloatRef>()?;
+    m.add_class::<metric::MetricHistogramDurationRef>()?;
     m.add_class::<metric::MetricGaugeRef>()?;
+    m.add_class::<metric::MetricGaugeFloatRef>()?;
     m.add_class::<metric::BufferedMetricUpdate>()?;
     m.add_class::<metric::BufferedMetric>()?;
     m.add_function(wrap_pyfunction!(new_metric_meter, m)?)?;
