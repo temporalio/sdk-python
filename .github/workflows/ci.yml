@@ -55,6 +55,18 @@ jobs:
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
 
+      # I'm not sure either this would actually catch the zombie processes that
+      # were left by Python 3.7, and therefore, if this check is even pertinent.
+      # Depending on how GHA works internally, it is possible that on completion
+      # of the parent process (`poe`), the zombie children get reaped by the
+      # `init` process, which will immedaite call wait on these, thus freeing
+      # them out of the zombie state; that's the correct behavior of a full
+      # blown Linux system. But most Docker containers don't have `init`
+      # running, so zombies don't get reaped.
+      - name: Assert there is no zombie processes
+        run: ps aux | awk '{if($8=="Z") print}' | grep . && exit 1 || exit 0
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+
       # Confirm protos are already generated properly with older protobuf
       # library and run test with that older version. We must downgrade protobuf
       # so we can generate 3.x and 4.x compatible API. We have to use older
