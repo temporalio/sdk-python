@@ -6,7 +6,7 @@ use std::time::Duration;
 use temporal_client::{
     ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
     ConfiguredClient, HealthService, OperatorService, RetryClient, RetryConfig,
-    TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
+    TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService, HttpConnectProxyOptions,
 };
 use tonic::metadata::MetadataKey;
 use url::Url;
@@ -34,6 +34,7 @@ pub struct ClientConfig {
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
     keep_alive_config: Option<ClientKeepAliveConfig>,
+    http_connect_proxy_config: Option<ClientHttpConnectProxyConfig>,
 }
 
 #[derive(FromPyObject)]
@@ -58,6 +59,12 @@ struct ClientRetryConfig {
 struct ClientKeepAliveConfig {
     pub interval_millis: u64,
     pub timeout_millis: u64,
+}
+
+#[derive(FromPyObject)]
+struct ClientHttpConnectProxyConfig {
+    pub target_host: String,
+    pub basic_auth: Option<(String, String)>,
 }
 
 #[derive(FromPyObject)]
@@ -392,6 +399,7 @@ impl TryFrom<ClientConfig> for ClientOptions {
                     .map_or(RetryConfig::default(), |c| c.into()),
             )
             .keep_alive(opts.keep_alive_config.map(Into::into))
+            .http_connect_proxy(opts.http_connect_proxy_config.map(Into::into))
             .headers(Some(opts.metadata))
             .api_key(opts.api_key);
         // Builder does not allow us to set option here, so we have to make
@@ -448,6 +456,15 @@ impl From<ClientKeepAliveConfig> for CoreClientKeepAliveConfig {
         CoreClientKeepAliveConfig {
             interval: Duration::from_millis(conf.interval_millis),
             timeout: Duration::from_millis(conf.timeout_millis),
+        }
+    }
+}
+
+impl From<ClientHttpConnectProxyConfig> for HttpConnectProxyOptions {
+    fn from(conf: ClientHttpConnectProxyConfig) -> Self {
+        HttpConnectProxyOptions {
+            target_addr: conf.target_host,
+            basic_auth: conf.basic_auth,
         }
     }
 }

@@ -54,6 +54,7 @@ import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.service import (
+    HttpConnectProxyConfig,
     KeepAliveConfig,
     RetryConfig,
     RPCError,
@@ -110,6 +111,7 @@ class Client:
         identity: Optional[str] = None,
         lazy: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
+        http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None,
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -153,6 +155,7 @@ class Client:
                 attempted or a worker is created with it. Lazy clients cannot be
                 used for workers.
             runtime: The runtime for this client, or the default if unset.
+            http_connect_proxy_config: Configuration for HTTP CONNECT proxy.
         """
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
@@ -164,6 +167,7 @@ class Client:
             identity=identity or "",
             lazy=lazy,
             runtime=runtime,
+            http_connect_proxy_config=http_connect_proxy_config,
         )
         return Client(
             await temporalio.service.ServiceClient.connect(connect_config),
