@@ -41,9 +41,10 @@ def test_bridge_runtime_raise_in_thread():
     assert not thread.is_alive()
     assert type(exc_in_thread) is SomeException
 
+
 def test_intentionally_create_zombie_processes():
     # Only run this on Unix-based systems
-    if os.name == 'posix':
+    if os.platform == "linux":
         bash_command = "(A=$BASHPID && ( kill -STOP $A ))"
         process = subprocess.Popen(bash_command, stdout=subprocess.PIPE, shell=True)
         output, error = process.communicate()
