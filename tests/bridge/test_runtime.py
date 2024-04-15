@@ -1,5 +1,3 @@
-import subprocess
-import sys
 from threading import Event, Thread
 from time import sleep
 from typing import Optional
@@ -40,11 +38,3 @@ def test_bridge_runtime_raise_in_thread():
     thread.join(5)
     assert not thread.is_alive()
     assert type(exc_in_thread) is SomeException
-
-
-def test_intentionally_create_zombie_processes():
-    # Only run this on Unix-based systems
-    if sys.platform == "linux":
-        bash_command = "(A=$BASHPID && ( kill -STOP $A ))"
-        process = subprocess.Popen(bash_command, stdout=subprocess.PIPE, shell=True)
-        output, error = process.communicate()

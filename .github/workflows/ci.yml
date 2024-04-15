@@ -50,21 +50,17 @@ jobs:
       - run: poetry install --no-root --all-extras
       - run: poe lint
       - run: poe build-develop
+
+      - name: Monitor creation of zombie processes
+        run: nohup ./scripts/list-zombies.sh &
+
       - run: poe test -s -o log_cli_level=DEBUG
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
 
-      # I'm not sure either this would actually catch the zombie processes that
-      # were left by Python 3.7, and therefore, if this check is even pertinent.
-      # Depending on how GHA works internally, it is possible that on completion
-      # of the parent process (`poe`), the zombie children get reaped by the
-      # `init` process, which will immedaite call wait on these, thus freeing
-      # them out of the zombie state; that's the correct behavior of a full
-      # blown Linux system. But most Docker containers don't have `init`
-      # running, so zombies don't get reaped.
       - name: Assert there is no zombie processes
-        run: ps aux | awk '{if($8=="Z") print}' | grep . && exit 1 || exit 0
+        run: kill $(cat pid) ; cat zombies.log ; grep -qv "^// " zombies.log
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
 
       # Confirm protos are already generated properly with older protobuf
