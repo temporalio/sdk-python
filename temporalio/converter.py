@@ -1341,6 +1341,15 @@ def decode_typed_search_attributes(
     return temporalio.common.TypedSearchAttributes(pairs)
 
 
+def _decode_search_attribute_value(
+    payload: temporalio.api.common.v1.Payload,
+) -> temporalio.common.SearchAttributeValue:
+    val = default().payload_converter.from_payload(payload)
+    if isinstance(val, str) and payload.metadata.get("type") == b"Datetime":
+        val = _get_iso_datetime_parser()(val)
+    return val  # type: ignore
+
+
 def value_to_type(
     hint: Type,
     value: Any,

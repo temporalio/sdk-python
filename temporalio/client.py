@@ -819,6 +819,30 @@ class Client:
             )
         )
 
+    async def count_workflows(
+        self,
+        query: Optional[str] = None,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> WorkflowExecutionCount:
+        """Count workflows.
+
+        Args:
+            query: A Temporal visibility filter. See Temporal documentation
+                concerning visibility list filters.
+            rpc_metadata: Headers used on each RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call.
+
+        Returns:
+            Count of workflows.
+        """
+        return await self._impl.count_workflows(
+            CountWorkflowsInput(
+                query=query, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            )
+        )
+
     @overload
     def get_async_activity_handle(
         self, *, workflow_id: str, run_id: Optional[str], activity_id: str
@@ -2308,6 +2332,57 @@ class WorkflowExecutionStatus(IntEnum):
     TIMED_OUT = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
     )
+
+
+@dataclass
+class WorkflowExecutionCount:
+    """Representation of a count from a count workflows call."""
+
+    count: int
+    """Approximate number of workflows matching the original query.
+    
+    If the query had a group-by clause, this is simply the sum of all the counts
+    in py:attr:`groups`.
+    """
+
+    groups: Sequence[WorkflowExecutionCountAggregationGroup]
+    """Groups if the query had a group-by clause, or empty if not."""
+
+    @staticmethod
+    def _from_raw(
+        raw: temporalio.api.workflowservice.v1.CountWorkflowExecutionsResponse,
+    ) -> WorkflowExecutionCount:
+        return WorkflowExecutionCount(
+            count=raw.count,
+            groups=[
+                WorkflowExecutionCountAggregationGroup._from_raw(g) for g in raw.groups
+            ],
+        )
+
+
+@dataclass
+class WorkflowExecutionCountAggregationGroup:
+    """Aggregation group if the workflow count query had a group-by clause."""
+
+    count: int
+    """Approximate number of workflows matching the original query for this
+    group.
+    """
+
+    group_values: Sequence[temporalio.common.SearchAttributeValue]
+    """Search attribute values for this group."""
+
+    @staticmethod
+    def _from_raw(
+        raw: temporalio.api.workflowservice.v1.CountWorkflowExecutionsResponse.AggregationGroup,
+    ) -> WorkflowExecutionCountAggregationGroup:
+        return WorkflowExecutionCountAggregationGroup(
+            count=raw.count,
+            group_values=[
+                temporalio.converter._decode_search_attribute_value(v)
+                for v in raw.group_values
+            ],
+        )
 
 
 class WorkflowExecutionAsyncIterator:
@@ -4374,6 +4449,15 @@ class ListWorkflowsInput:
 
 
 @dataclass
+class CountWorkflowsInput:
+    """Input for :py:meth:`OutboundInterceptor.count_workflows`."""
+
+    query: Optional[str]
+    rpc_metadata: Mapping[str, str]
+    rpc_timeout: Optional[timedelta]
+
+
+@dataclass
 class QueryWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.query_workflow`."""
 
@@ -4669,6 +4753,12 @@ class OutboundInterceptor:
         """Called for every :py:meth:`Client.list_workflows` call."""
         return self.next.list_workflows(input)
 
+    async def count_workflows(
+        self, input: CountWorkflowsInput
+    ) -> WorkflowExecutionCount:
+        """Called for every :py:meth:`Client.count_workflows` call."""
+        return await self.next.count_workflows(input)
+
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
         """Called for every :py:meth:`WorkflowHandle.query` call."""
         return await self.next.query_workflow(input)
@@ -4927,6 +5017,21 @@ class _ClientImpl(OutboundInterceptor):
         self, input: ListWorkflowsInput
     ) -> WorkflowExecutionAsyncIterator:
         return WorkflowExecutionAsyncIterator(self._client, input)
+
+    async def count_workflows(
+        self, input: CountWorkflowsInput
+    ) -> WorkflowExecutionCount:
+        return WorkflowExecutionCount._from_raw(
+            await self._client.workflow_service.count_workflow_executions(
+                temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest(
+                    namespace=self._client.namespace,
+                    query=input.query or "",
+                ),
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        )
 
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
         req = temporalio.api.workflowservice.v1.QueryWorkflowRequest(
