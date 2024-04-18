@@ -5,8 +5,8 @@ use std::str::FromStr;
 use std::time::Duration;
 use temporal_client::{
     ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
-    ConfiguredClient, HealthService, OperatorService, RetryClient, RetryConfig,
-    TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService, HttpConnectProxyOptions,
+    ConfiguredClient, HealthService, HttpConnectProxyOptions, OperatorService, RetryClient,
+    RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
 };
 use tonic::metadata::MetadataKey;
 use url::Url;
