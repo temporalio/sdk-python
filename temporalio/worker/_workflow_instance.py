@@ -23,6 +23,7 @@ from typing import (
     Deque,
     Dict,
     Generator,
+    Generic,
     Iterator,
     List,
     Mapping,
@@ -38,7 +39,7 @@ from typing import (
     cast,
 )
 
-from typing_extensions import TypeAlias, TypedDict
+from typing_extensions import Self, TypeAlias, TypedDict
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -2448,11 +2449,32 @@ class _ReplaySafeMetricMeter(temporalio.common.MetricMeter):
             self._underlying.create_histogram(name, description, unit)
         )
 
+    def create_histogram_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricHistogramFloat:
+        return _ReplaySafeMetricHistogramFloat(
+            self._underlying.create_histogram_float(name, description, unit)
+        )
+
+    def create_histogram_timedelta(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricHistogramTimedelta:
+        return _ReplaySafeMetricHistogramTimedelta(
+            self._underlying.create_histogram_timedelta(name, description, unit)
+        )
+
     def create_gauge(
         self, name: str, description: Optional[str] = None, unit: Optional[str] = None
     ) -> temporalio.common.MetricGauge:
         return _ReplaySafeMetricGauge(
             self._underlying.create_gauge(name, description, unit)
+        )
+
+    def create_gauge_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricGaugeFloat:
+        return _ReplaySafeMetricGaugeFloat(
+            self._underlying.create_gauge_float(name, description, unit)
         )
 
     def with_additional_attributes(
@@ -2463,8 +2485,11 @@ class _ReplaySafeMetricMeter(temporalio.common.MetricMeter):
         )
 
 
-class _ReplaySafeMetricCounter(temporalio.common.MetricCounter):
-    def __init__(self, underlying: temporalio.common.MetricCounter) -> None:
+_MetricType = TypeVar("_MetricType", bound=temporalio.common.MetricCommon)
+
+
+class _ReplaySafeMetricCommon(temporalio.common.MetricCommon, Generic[_MetricType]):
+    def __init__(self, underlying: _MetricType) -> None:
         self._underlying = underlying
 
     @property
@@ -2479,6 +2504,18 @@ class _ReplaySafeMetricCounter(temporalio.common.MetricCounter):
     def unit(self) -> Optional[str]:
         return self._underlying.unit
 
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> Self:
+        return self.__class__(
+            self._underlying.with_additional_attributes(additional_attributes)
+        )
+
+
+class _ReplaySafeMetricCounter(
+    temporalio.common.MetricCounter,
+    _ReplaySafeMetricCommon[temporalio.common.MetricCounter],
+):
     def add(
         self,
         value: int,
@@ -2487,30 +2524,11 @@ class _ReplaySafeMetricCounter(temporalio.common.MetricCounter):
         if not temporalio.workflow.unsafe.is_replaying():
             self._underlying.add(value, additional_attributes)
 
-    def with_additional_attributes(
-        self, additional_attributes: temporalio.common.MetricAttributes
-    ) -> temporalio.common.MetricCounter:
-        return _ReplaySafeMetricCounter(
-            self._underlying.with_additional_attributes(additional_attributes)
-        )
 
-
-class _ReplaySafeMetricHistogram(temporalio.common.MetricHistogram):
-    def __init__(self, underlying: temporalio.common.MetricHistogram) -> None:
-        self._underlying = underlying
-
-    @property
-    def name(self) -> str:
-        return self._underlying.name
-
-    @property
-    def description(self) -> Optional[str]:
-        return self._underlying.description
-
-    @property
-    def unit(self) -> Optional[str]:
-        return self._underlying.unit
-
+class _ReplaySafeMetricHistogram(
+    temporalio.common.MetricHistogram,
+    _ReplaySafeMetricCommon[temporalio.common.MetricHistogram],
+):
     def record(
         self,
         value: int,
@@ -2519,30 +2537,37 @@ class _ReplaySafeMetricHistogram(temporalio.common.MetricHistogram):
         if not temporalio.workflow.unsafe.is_replaying():
             self._underlying.record(value, additional_attributes)
 
-    def with_additional_attributes(
-        self, additional_attributes: temporalio.common.MetricAttributes
-    ) -> temporalio.common.MetricHistogram:
-        return _ReplaySafeMetricHistogram(
-            self._underlying.with_additional_attributes(additional_attributes)
-        )
+
+class _ReplaySafeMetricHistogramFloat(
+    temporalio.common.MetricHistogramFloat,
+    _ReplaySafeMetricCommon[temporalio.common.MetricHistogramFloat],
+):
+    def record(
+        self,
+        value: float,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if not temporalio.workflow.unsafe.is_replaying():
+            self._underlying.record(value, additional_attributes)
 
 
-class _ReplaySafeMetricGauge(temporalio.common.MetricGauge):
-    def __init__(self, underlying: temporalio.common.MetricGauge) -> None:
-        self._underlying = underlying
+class _ReplaySafeMetricHistogramTimedelta(
+    temporalio.common.MetricHistogramTimedelta,
+    _ReplaySafeMetricCommon[temporalio.common.MetricHistogramTimedelta],
+):
+    def record(
+        self,
+        value: timedelta,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if not temporalio.workflow.unsafe.is_replaying():
+            self._underlying.record(value, additional_attributes)
 
-    @property
-    def name(self) -> str:
-        return self._underlying.name
 
-    @property
-    def description(self) -> Optional[str]:
-        return self._underlying.description
-
-    @property
-    def unit(self) -> Optional[str]:
-        return self._underlying.unit
-
+class _ReplaySafeMetricGauge(
+    temporalio.common.MetricGauge,
+    _ReplaySafeMetricCommon[temporalio.common.MetricGauge],
+):
     def set(
         self,
         value: int,
@@ -2551,9 +2576,15 @@ class _ReplaySafeMetricGauge(temporalio.common.MetricGauge):
         if not temporalio.workflow.unsafe.is_replaying():
             self._underlying.set(value, additional_attributes)
 
-    def with_additional_attributes(
-        self, additional_attributes: temporalio.common.MetricAttributes
-    ) -> temporalio.common.MetricGauge:
-        return _ReplaySafeMetricGauge(
-            self._underlying.with_additional_attributes(additional_attributes)
-        )
+
+class _ReplaySafeMetricGaugeFloat(
+    temporalio.common.MetricGaugeFloat,
+    _ReplaySafeMetricCommon[temporalio.common.MetricGaugeFloat],
+):
+    def set(
+        self,
+        value: float,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if not temporalio.workflow.unsafe.is_replaying():
+            self._underlying.set(value, additional_attributes)

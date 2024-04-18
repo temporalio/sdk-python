@@ -80,6 +80,7 @@ from temporalio.runtime import (
     BUFFERED_METRIC_KIND_COUNTER,
     BUFFERED_METRIC_KIND_HISTOGRAM,
     MetricBuffer,
+    MetricBufferDurationFormat,
     PrometheusConfig,
     Runtime,
     TelemetryConfig,
@@ -3791,6 +3792,76 @@ async def test_workflow_buffered_metrics(client: Client):
         and update.attributes["workflow_type"] == "CustomMetricsWorkflow"
         and update.value == 1
         for update in updates
+    )
+
+
+async def test_workflow_metrics_other_types(client: Client):
+    async def do_stuff(buffer: MetricBuffer) -> None:
+        runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
+        new_client = await Client.connect(
+            client.service_client.config.target_host,
+            namespace=client.namespace,
+            runtime=runtime,
+        )
+        async with new_worker(new_client, HelloWorkflow) as worker:
+            await new_client.execute_workflow(
+                HelloWorkflow.run,
+                "Temporal",
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        # Also, add some manual types beyond the defaults tested in other tests
+        runtime.metric_meter.create_histogram_float("my-histogram-float").record(1.23)
+        runtime.metric_meter.create_histogram_timedelta(
+            "my-histogram-timedelta"
+        ).record(timedelta(days=2, seconds=3, milliseconds=4))
+        runtime.metric_meter.create_gauge_float("my-gauge-float").set(4.56)
+
+    # Create a buffer, do stuff, check the metrics
+    buffer = MetricBuffer(10000)
+    await do_stuff(buffer)
+    updates = buffer.retrieve_updates()
+    assert any(
+        u.metric.name == "temporal_workflow_task_execution_latency"
+        # Took more than 3ms
+        and u.value > 3 and isinstance(u.value, int) and u.metric.unit == "ms"
+        for u in updates
+    )
+    assert any(
+        u.metric.name == "my-histogram-float"
+        and u.value == 1.23
+        and isinstance(u.value, float)
+        for u in updates
+    )
+    assert any(
+        u.metric.name == "my-histogram-timedelta"
+        and u.value
+        == int(timedelta(days=2, seconds=3, milliseconds=4).total_seconds() * 1000)
+        and isinstance(u.value, int)
+        for u in updates
+    )
+    assert any(
+        u.metric.name == "my-gauge-float"
+        and u.value == 4.56
+        and isinstance(u.value, float)
+        for u in updates
+    )
+
+    # Do it again with seconds
+    buffer = MetricBuffer(10000, duration_format=MetricBufferDurationFormat.SECONDS)
+    await do_stuff(buffer)
+    updates = buffer.retrieve_updates()
+    assert any(
+        u.metric.name == "temporal_workflow_task_execution_latency"
+        # Took less than 3s
+        and u.value < 3 and isinstance(u.value, float) and u.metric.unit == "s"
+        for u in updates
+    )
+    assert any(
+        u.metric.name == "my-histogram-timedelta"
+        and u.value == timedelta(days=2, seconds=3, milliseconds=4).total_seconds()
+        and isinstance(u.value, float)
+        for u in updates
     )
 
 
