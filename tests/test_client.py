@@ -3,7 +3,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, cast
 
 import pytest
 from google.protobuf import json_format
@@ -60,6 +60,8 @@ from temporalio.client import (
     TaskReachabilityType,
     TerminateWorkflowInput,
     WorkflowContinuedAsNewError,
+    WorkflowExecutionCount,
+    WorkflowExecutionCountAggregationGroup,
     WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
@@ -567,6 +569,59 @@ async def test_list_workflows_and_fetch_history(
         ]
     )
     assert actual_id_and_input == expected_id_and_input
+
+
+@workflow.defn
+class CountableWorkflow:
+    @workflow.run
+    async def run(self, wait_forever: bool) -> None:
+        await workflow.wait_condition(lambda: not wait_forever)
+
+
+async def test_count_workflows(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support newer workflow listing")
+
+    # 3 workflows that complete, 2 that don't
+    async with new_worker(client, CountableWorkflow) as worker:
+        for _ in range(3):
+            await client.execute_workflow(
+                CountableWorkflow.run,
+                False,
+                id=f"id-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        for _ in range(2):
+            await client.start_workflow(
+                CountableWorkflow.run,
+                True,
+                id=f"id-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+    async def fetch_count() -> WorkflowExecutionCount:
+        resp = await client.count_workflows(
+            f"TaskQueue = '{worker.task_queue}' GROUP BY ExecutionStatus"
+        )
+        cast(List[WorkflowExecutionCountAggregationGroup], resp.groups).sort(
+            key=lambda g: g.count
+        )
+        return resp
+
+    await assert_eq_eventually(
+        WorkflowExecutionCount(
+            count=5,
+            groups=[
+                WorkflowExecutionCountAggregationGroup(
+                    count=2, group_values=["Running"]
+                ),
+                WorkflowExecutionCountAggregationGroup(
+                    count=3, group_values=["Completed"]
+                ),
+            ],
+        ),
+        fetch_count,
+    )
 
 
 def test_history_from_json():
