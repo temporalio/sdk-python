@@ -27,9 +27,9 @@ class Runtime:
         """Create SDK Core runtime."""
         self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(telemetry)
 
-    def retrieve_buffered_metrics(self) -> Sequence[Any]:
+    def retrieve_buffered_metrics(self, durations_as_seconds: bool) -> Sequence[Any]:
         """Get buffered metrics."""
-        return self._ref.retrieve_buffered_metrics()
+        return self._ref.retrieve_buffered_metrics(durations_as_seconds)
 
     def write_test_info_log(self, message: str, extra_data: str) -> None:
         """Write a test core log at INFO level."""

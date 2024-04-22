@@ -42,7 +42,7 @@ typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^23.1.0"
-cibuildwheel = "^2.16.0"
+cibuildwheel = "^2.17.0"
 grpcio-tools = "^1.48.0"
 isort = "^5.11.5"
 mypy = "^1.0.0"
@@ -110,8 +110,11 @@ timeout = 600
 timeout_func_only = true
 
 [tool.cibuildwheel]
-# We only want the 3.8 64-bit build of each type
-build = "cp38-win_amd64 cp38-manylinux_x86_64 cp38-manylinux_aarch64 cp38-macosx_x86_64 cp38-macosx_arm64"
+# We only want the 3.8 64-bit build of each type. However, due to
+# https://github.com/pypa/cibuildwheel/issues/1278, we have to build macOS as
+# 3.9 until that is fixed. Our fix-wheel process will rename it to 3.8 and we
+# have manually confirmed this works with 3.8.
+build = "cp38-win_amd64 cp38-manylinux_x86_64 cp38-manylinux_aarch64 cp38-macosx_x86_64 cp39-macosx_arm64"
 build-verbosity = "1"
 
 [tool.cibuildwheel.linux]

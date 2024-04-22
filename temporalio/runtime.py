@@ -10,9 +10,18 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import ClassVar, Mapping, NewType, Optional, Sequence, Union
+from typing import (
+    ClassVar,
+    Generic,
+    Mapping,
+    NewType,
+    Optional,
+    Sequence,
+    TypeVar,
+    Union,
+)
 
-from typing_extensions import Protocol
+from typing_extensions import Protocol, Self
 
 import temporalio.bridge.metric
 import temporalio.bridge.runtime
@@ -282,6 +291,16 @@ class PrometheusConfig:
         )
 
 
+class MetricBufferDurationFormat(Enum):
+    """How durations are represented for metrics buffers."""
+
+    MILLISECONDS = 1
+    """Durations are millisecond integers."""
+
+    SECONDS = 2
+    """Durations are second floats."""
+
+
 class MetricBuffer:
     """A buffer that can be set on :py:class:`TelemetryConfig` to record
     metrics instead of ignoring/exporting them.
@@ -293,7 +312,11 @@ class MetricBuffer:
         logged.
     """
 
-    def __init__(self, buffer_size: int) -> None:
+    def __init__(
+        self,
+        buffer_size: int,
+        duration_format: MetricBufferDurationFormat = MetricBufferDurationFormat.MILLISECONDS,
+    ) -> None:
         """Create a buffer with the given size.
 
         .. warning::
@@ -303,9 +326,13 @@ class MetricBuffer:
         Args:
             buffer_size: Size of the buffer. Set this to a large value. A value
                 in the tens of thousands or higher is plenty reasonable.
+            duration_format: Which duration format to use.
         """
         self._buffer_size = buffer_size
         self._runtime: Optional[Runtime] = None
+        self._durations_as_seconds = (
+            duration_format == MetricBufferDurationFormat.SECONDS
+        )
 
     def retrieve_updates(self) -> Sequence[BufferedMetricUpdate]:
         """Drain the buffer and return all metric updates.
@@ -319,7 +346,9 @@ class MetricBuffer:
         """
         if not self._runtime:
             raise RuntimeError("Attempting to retrieve updates before runtime created")
-        return self._runtime._core_runtime.retrieve_buffered_metrics()
+        return self._runtime._core_runtime.retrieve_buffered_metrics(
+            self._durations_as_seconds
+        )
 
 
 @dataclass(frozen=True)
@@ -485,6 +514,32 @@ class _MetricMeter(temporalio.common.MetricMeter):
             self._core_attrs,
         )
 
+    def create_histogram_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricHistogramFloat:
+        return _MetricHistogramFloat(
+            name,
+            description,
+            unit,
+            temporalio.bridge.metric.MetricHistogramFloat(
+                self._core_meter, name, description, unit
+            ),
+            self._core_attrs,
+        )
+
+    def create_histogram_timedelta(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricHistogramTimedelta:
+        return _MetricHistogramTimedelta(
+            name,
+            description,
+            unit,
+            temporalio.bridge.metric.MetricHistogramDuration(
+                self._core_meter, name, description, unit
+            ),
+            self._core_attrs,
+        )
+
     def create_gauge(
         self, name: str, description: Optional[str] = None, unit: Optional[str] = None
     ) -> temporalio.common.MetricGauge:
@@ -493,6 +548,19 @@ class _MetricMeter(temporalio.common.MetricMeter):
             description,
             unit,
             temporalio.bridge.metric.MetricGauge(
+                self._core_meter, name, description, unit
+            ),
+            self._core_attrs,
+        )
+
+    def create_gauge_float(
+        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+    ) -> temporalio.common.MetricGaugeFloat:
+        return _MetricGaugeFloat(
+            name,
+            description,
+            unit,
+            temporalio.bridge.metric.MetricGaugeFloat(
                 self._core_meter, name, description, unit
             ),
             self._core_attrs,
@@ -507,13 +575,16 @@ class _MetricMeter(temporalio.common.MetricMeter):
         )
 
 
-class _MetricCounter(temporalio.common.MetricCounter):
+_CoreMetricType = TypeVar("_CoreMetricType")
+
+
+class _MetricCommon(temporalio.common.MetricCommon, Generic[_CoreMetricType]):
     def __init__(
         self,
         name: str,
         description: Optional[str],
         unit: Optional[str],
-        core_metric: temporalio.bridge.metric.MetricCounter,
+        core_metric: _CoreMetricType,
         core_attrs: temporalio.bridge.metric.MetricAttributes,
     ) -> None:
         self._name = name
@@ -534,6 +605,22 @@ class _MetricCounter(temporalio.common.MetricCounter):
     def unit(self) -> Optional[str]:
         return self._unit
 
+    def with_additional_attributes(
+        self, additional_attributes: temporalio.common.MetricAttributes
+    ) -> Self:
+        return self.__class__(
+            self._name,
+            self._description,
+            self._unit,
+            self._core_metric,
+            self._core_attrs.with_additional_attributes(additional_attributes),
+        )
+
+
+class _MetricCounter(
+    temporalio.common.MetricCounter,
+    _MetricCommon[temporalio.bridge.metric.MetricCounter],
+):
     def add(
         self,
         value: int,
@@ -546,45 +633,11 @@ class _MetricCounter(temporalio.common.MetricCounter):
             core_attrs = core_attrs.with_additional_attributes(additional_attributes)
         self._core_metric.add(value, core_attrs)
 
-    def with_additional_attributes(
-        self, additional_attributes: temporalio.common.MetricAttributes
-    ) -> temporalio.common.MetricCounter:
-        return _MetricCounter(
-            self._name,
-            self._description,
-            self._unit,
-            self._core_metric,
-            self._core_attrs.with_additional_attributes(additional_attributes),
-        )
 
-
-class _MetricHistogram(temporalio.common.MetricHistogram):
-    def __init__(
-        self,
-        name: str,
-        description: Optional[str],
-        unit: Optional[str],
-        core_metric: temporalio.bridge.metric.MetricHistogram,
-        core_attrs: temporalio.bridge.metric.MetricAttributes,
-    ) -> None:
-        self._name = name
-        self._description = description
-        self._unit = unit
-        self._core_metric = core_metric
-        self._core_attrs = core_attrs
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def description(self) -> Optional[str]:
-        return self._description
-
-    @property
-    def unit(self) -> Optional[str]:
-        return self._unit
-
+class _MetricHistogram(
+    temporalio.common.MetricHistogram,
+    _MetricCommon[temporalio.bridge.metric.MetricHistogram],
+):
     def record(
         self,
         value: int,
@@ -597,45 +650,49 @@ class _MetricHistogram(temporalio.common.MetricHistogram):
             core_attrs = core_attrs.with_additional_attributes(additional_attributes)
         self._core_metric.record(value, core_attrs)
 
-    def with_additional_attributes(
-        self, additional_attributes: temporalio.common.MetricAttributes
-    ) -> temporalio.common.MetricHistogram:
-        return _MetricHistogram(
-            self._name,
-            self._description,
-            self._unit,
-            self._core_metric,
-            self._core_attrs.with_additional_attributes(additional_attributes),
+
+class _MetricHistogramFloat(
+    temporalio.common.MetricHistogramFloat,
+    _MetricCommon[temporalio.bridge.metric.MetricHistogramFloat],
+):
+    def record(
+        self,
+        value: float,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if value < 0:
+            raise ValueError("Metric value cannot be negative")
+        core_attrs = self._core_attrs
+        if additional_attributes:
+            core_attrs = core_attrs.with_additional_attributes(additional_attributes)
+        self._core_metric.record(value, core_attrs)
+
+
+class _MetricHistogramTimedelta(
+    temporalio.common.MetricHistogramTimedelta,
+    _MetricCommon[temporalio.bridge.metric.MetricHistogramDuration],
+):
+    def record(
+        self,
+        value: timedelta,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if value.days < 0:
+            raise ValueError("Metric value cannot be negative")
+        core_attrs = self._core_attrs
+        if additional_attributes:
+            core_attrs = core_attrs.with_additional_attributes(additional_attributes)
+        self._core_metric.record(
+            (value.days * 86400 * 1000)
+            + (value.seconds * 1000)
+            + (value.microseconds // 1000),
+            core_attrs,
         )
 
 
-class _MetricGauge(temporalio.common.MetricGauge):
-    def __init__(
-        self,
-        name: str,
-        description: Optional[str],
-        unit: Optional[str],
-        core_metric: temporalio.bridge.metric.MetricGauge,
-        core_attrs: temporalio.bridge.metric.MetricAttributes,
-    ) -> None:
-        self._name = name
-        self._description = description
-        self._unit = unit
-        self._core_metric = core_metric
-        self._core_attrs = core_attrs
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def description(self) -> Optional[str]:
-        return self._description
-
-    @property
-    def unit(self) -> Optional[str]:
-        return self._unit
-
+class _MetricGauge(
+    temporalio.common.MetricGauge, _MetricCommon[temporalio.bridge.metric.MetricGauge]
+):
     def set(
         self,
         value: int,
@@ -648,13 +705,19 @@ class _MetricGauge(temporalio.common.MetricGauge):
             core_attrs = core_attrs.with_additional_attributes(additional_attributes)
         self._core_metric.set(value, core_attrs)
 
-    def with_additional_attributes(
-        self, additional_attributes: temporalio.common.MetricAttributes
-    ) -> temporalio.common.MetricGauge:
-        return _MetricGauge(
-            self._name,
-            self._description,
-            self._unit,
-            self._core_metric,
-            self._core_attrs.with_additional_attributes(additional_attributes),
-        )
+
+class _MetricGaugeFloat(
+    temporalio.common.MetricGaugeFloat,
+    _MetricCommon[temporalio.bridge.metric.MetricGaugeFloat],
+):
+    def set(
+        self,
+        value: float,
+        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+    ) -> None:
+        if value < 0:
+            raise ValueError("Metric value cannot be negative")
+        core_attrs = self._core_attrs
+        if additional_attributes:
+            core_attrs = core_attrs.with_additional_attributes(additional_attributes)
+        self._core_metric.set(value, core_attrs)

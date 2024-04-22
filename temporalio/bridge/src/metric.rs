@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
 use pyo3::prelude::*;
@@ -33,8 +34,23 @@ pub struct MetricHistogramRef {
 }
 
 #[pyclass]
+pub struct MetricHistogramFloatRef {
+    histogram: Arc<dyn metrics::HistogramF64>,
+}
+
+#[pyclass]
+pub struct MetricHistogramDurationRef {
+    histogram: Arc<dyn metrics::HistogramDuration>,
+}
+
+#[pyclass]
 pub struct MetricGaugeRef {
     gauge: Arc<dyn metrics::Gauge>,
+}
+
+#[pyclass]
+pub struct MetricGaugeFloatRef {
+    gauge: Arc<dyn metrics::GaugeF64>,
 }
 
 pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
@@ -84,6 +100,36 @@ impl MetricMeterRef {
         }
     }
 
+    fn new_histogram_float(
+        &self,
+        name: String,
+        description: Option<String>,
+        unit: Option<String>,
+    ) -> MetricHistogramFloatRef {
+        MetricHistogramFloatRef {
+            histogram: self.meter.inner.histogram_f64(build_metric_parameters(
+                name,
+                description,
+                unit,
+            )),
+        }
+    }
+
+    fn new_histogram_duration(
+        &self,
+        name: String,
+        description: Option<String>,
+        unit: Option<String>,
+    ) -> MetricHistogramDurationRef {
+        MetricHistogramDurationRef {
+            histogram: self.meter.inner.histogram_duration(build_metric_parameters(
+                name,
+                description,
+                unit,
+            )),
+        }
+    }
+
     fn new_gauge(
         &self,
         name: String,
@@ -95,6 +141,20 @@ impl MetricMeterRef {
                 .meter
                 .inner
                 .gauge(build_metric_parameters(name, description, unit)),
+        }
+    }
+
+    fn new_gauge_float(
+        &self,
+        name: String,
+        description: Option<String>,
+        unit: Option<String>,
+    ) -> MetricGaugeFloatRef {
+        MetricGaugeFloatRef {
+            gauge: self
+                .meter
+                .inner
+                .gauge_f64(build_metric_parameters(name, description, unit)),
         }
     }
 }
@@ -114,8 +174,30 @@ impl MetricHistogramRef {
 }
 
 #[pymethods]
+impl MetricHistogramFloatRef {
+    fn record(&self, value: f64, attrs_ref: &MetricAttributesRef) {
+        self.histogram.record(value, &attrs_ref.attrs);
+    }
+}
+
+#[pymethods]
+impl MetricHistogramDurationRef {
+    fn record(&self, value_ms: u64, attrs_ref: &MetricAttributesRef) {
+        self.histogram
+            .record(Duration::from_millis(value_ms), &attrs_ref.attrs);
+    }
+}
+
+#[pymethods]
 impl MetricGaugeRef {
     fn set(&self, value: u64, attrs_ref: &MetricAttributesRef) {
+        self.gauge.record(value, &attrs_ref.attrs);
+    }
+}
+
+#[pymethods]
+impl MetricGaugeFloatRef {
+    fn set(&self, value: f64, attrs_ref: &MetricAttributesRef) {
         self.gauge.record(value, &attrs_ref.attrs);
     }
 }
@@ -192,16 +274,18 @@ pub struct BufferedMetricUpdate {
 }
 
 #[derive(Clone)]
-pub struct BufferedMetricUpdateValue(metrics::MetricUpdateVal);
+pub enum BufferedMetricUpdateValue {
+    U64(u64),
+    U128(u128),
+    F64(f64),
+}
 
 impl IntoPy<PyObject> for BufferedMetricUpdateValue {
     fn into_py(self, py: Python) -> PyObject {
-        match self.0 {
-            metrics::MetricUpdateVal::Delta(v) => v.into_py(py),
-            metrics::MetricUpdateVal::DeltaF64(v) => v.into_py(py),
-            metrics::MetricUpdateVal::Value(v) => v.into_py(py),
-            metrics::MetricUpdateVal::ValueF64(v) => v.into_py(py),
-            metrics::MetricUpdateVal::Duration(v) => v.as_millis().into_py(py),
+        match self {
+            BufferedMetricUpdateValue::U64(v) => v.into_py(py),
+            BufferedMetricUpdateValue::U128(v) => v.into_py(py),
+            BufferedMetricUpdateValue::F64(v) => v.into_py(py),
         }
     }
 }
@@ -236,16 +320,18 @@ impl CustomMetricAttributes for BufferedMetricAttributes {
 pub fn convert_metric_events<'p>(
     py: Python<'p>,
     events: Vec<MetricEvent<BufferedMetricRef>>,
+    durations_as_seconds: bool,
 ) -> Vec<BufferedMetricUpdate> {
     events
         .into_iter()
-        .filter_map(|e| convert_metric_event(py, e))
+        .filter_map(|e| convert_metric_event(py, e, durations_as_seconds))
         .collect()
 }
 
 fn convert_metric_event<'p>(
     py: Python<'p>,
     event: MetricEvent<BufferedMetricRef>,
+    durations_as_seconds: bool,
 ) -> Option<BufferedMetricUpdate> {
     match event {
         // Create the metric and put it on the lazy ref
@@ -262,9 +348,19 @@ fn convert_metric_event<'p>(
                         description: Some(params.description)
                             .filter(|s| !s.is_empty())
                             .map(|s| s.to_string()),
-                        unit: Some(params.unit)
-                            .filter(|s| !s.is_empty())
-                            .map(|s| s.to_string()),
+                        unit: if matches!(kind, metrics::MetricKind::HistogramDuration)
+                            && params.unit == "duration"
+                        {
+                            if durations_as_seconds {
+                                Some("s".to_owned())
+                            } else {
+                                Some("ms".to_owned())
+                            }
+                        } else if params.unit.is_empty() {
+                            None
+                        } else {
+                            Some(params.unit.to_string())
+                        },
                         kind: match kind {
                             metrics::MetricKind::Counter => 0,
                             metrics::MetricKind::Gauge | metrics::MetricKind::GaugeF64 => 1,
@@ -324,7 +420,18 @@ fn convert_metric_event<'p>(
             update,
         } => Some(BufferedMetricUpdate {
             metric: instrument.get().clone().0.clone(),
-            value: BufferedMetricUpdateValue(update),
+            value: match update {
+                metrics::MetricUpdateVal::Duration(v) if durations_as_seconds => {
+                    BufferedMetricUpdateValue::F64(v.as_secs_f64())
+                }
+                metrics::MetricUpdateVal::Duration(v) => {
+                    BufferedMetricUpdateValue::U128(v.as_millis())
+                }
+                metrics::MetricUpdateVal::Delta(v) => BufferedMetricUpdateValue::U64(v),
+                metrics::MetricUpdateVal::DeltaF64(v) => BufferedMetricUpdateValue::F64(v),
+                metrics::MetricUpdateVal::Value(v) => BufferedMetricUpdateValue::U64(v),
+                metrics::MetricUpdateVal::ValueF64(v) => BufferedMetricUpdateValue::F64(v),
+            },
             attributes: attributes
                 .get()
                 .clone()
