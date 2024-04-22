@@ -61,8 +61,10 @@ jobs:
         run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
 
       - name: Assert there are no zombie processes
-        run: kill $(cat pid)
+        run: |
+          kill $(cat pid)
           grep -v "^// " zombies.log
+        continue-on-error: false
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
 
       # Confirm protos are already generated properly with older protobuf
