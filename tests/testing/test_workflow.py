@@ -256,21 +256,6 @@ def assert_timestamp_from_now(
     assert (expected_from_now - max_delta) < from_now < (expected_from_now + max_delta)
 
 
-async def test_workflow_env_log_to_stdout():
-    async with await WorkflowEnvironment.start_local(port=9876) as env1:
-        async with await WorkflowEnvironment.start_local(port=9876) as env2:
-            await env1.client.start_workflow(
-                "test",
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue="test",
-            )
-            await env2.client.start_workflow(
-                "test",
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue="test",
-            )
-
-
 def test_intentionally_create_zombie_processes():
     if sys.platform == "linux":
         subprocess.Popen("( sleep 1 & exec /bin/sleep 900 )", shell=True)

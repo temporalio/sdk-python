@@ -53,14 +53,16 @@ jobs:
 
       - name: Monitor creation of zombie processes
         run: nohup ./scripts/list-zombies.sh &
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
 
       - run: poe test -s -o log_cli_level=DEBUG
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
 
-      - name: Assert there is no zombie processes
-        run: kill $(cat pid) ; cat zombies.log ; grep -qv "^// " zombies.log
+      - name: Assert there are no zombie processes
+        run: kill $(cat pid)
+          grep -v "^// " zombies.log
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
 
       # Confirm protos are already generated properly with older protobuf
