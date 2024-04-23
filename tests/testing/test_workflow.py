@@ -256,9 +256,7 @@ def assert_timestamp_from_now(
     assert (expected_from_now - max_delta) < from_now < (expected_from_now + max_delta)
 
 
-#
-#
 # Intentionally create zombie processes, to assert that the
-# def test_intentionally_create_zombie_processes():
-#    if sys.platform == "linux":
-#        subprocess.Popen("( sleep 1 & exec /bin/sleep 900 )", shell=True)
+def test_intentionally_create_zombie_processes():
+    if sys.platform == "linux":
+        subprocess.Popen("( sleep 1 & exec /bin/sleep 900 )", shell=True)
