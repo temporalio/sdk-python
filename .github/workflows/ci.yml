@@ -80,7 +80,7 @@ jobs:
           # The test suite intentionally creates zombie processes using the
           # 'sleep' command. If they are not listed here, this would indicate
           # there's something wrong with the zombie checker.
-          if grep -v "^// " zombies.log | grep -q "sleep" ; then
+          if ! grep -v "^// " zombies.log | grep -q "sleep" ; then
             echo "" >&2
             echo "Expected to find intentional 'sleep' zombies processes" >&2
             exit 1

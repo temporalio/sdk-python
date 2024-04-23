@@ -258,6 +258,7 @@ def assert_timestamp_from_now(
 
 #
 #
+# Intentionally create zombie processes, to assert that the
 # def test_intentionally_create_zombie_processes():
 #    if sys.platform == "linux":
 #        subprocess.Popen("( sleep 1 & exec /bin/sleep 900 )", shell=True)
