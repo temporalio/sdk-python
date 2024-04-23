@@ -76,6 +76,7 @@ def env_type(request: pytest.FixtureRequest) -> str:
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
         env = await WorkflowEnvironment.start_local(
+            dev_server_download_version="v0.12.0-rc.3",
             dev_server_extra_args=[
                 "--dynamic-config-value",
                 "system.forceSearchAttributesCacheRefreshOnRead=true",
@@ -83,7 +84,7 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
                 "--dynamic-config-value",
                 "system.enableEagerWorkflowStart=true",
-            ]
+            ],
         )
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
