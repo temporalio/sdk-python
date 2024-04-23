@@ -74,7 +74,22 @@ jobs:
       - name: Assert there are no zombie processes
         run: |
           kill $(cat pid)
-          grep -v "^// " zombies.log
+          echo "::group::Zombies Log File"
+          cat zombies.log
+          echo "::endgroup::"
+          # The test suite intentionally creates zombie processes using the
+          # 'sleep' command. If they are not listed here, this would indicate
+          # there's something wrong with the zombie checker.
+          if grep -v "^// " zombies.log | grep -q "sleep" ; then
+            echo "" >&2
+            echo "Expected to find intentional 'sleep' zombies processes" >&2
+            exit 1
+          fi
+          if grep -v "^// " zombies.log | grep -v "sleep" | grep -q . ; then
+            echo "" >&2
+            echo "Expected to find no unintentional zombies processes" >&2
+            exit 1
+          fi
         continue-on-error: false
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
 
