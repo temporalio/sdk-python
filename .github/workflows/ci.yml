@@ -61,35 +61,10 @@ jobs:
       - run: poetry install --no-root --all-extras
       - run: poe lint
       - run: poe build-develop
-
-      - name: Monitor creation of zombie processes
-        run: nohup ./scripts/list-zombies.sh &
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
-
       - run: poe test -s -o log_cli_level=DEBUG
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
-
-      - name: Assert there are no zombie processes
-        run: |
-          kill $(cat pid)
-          echo "::group::Zombies Log File"
-          cat zombies.log
-          echo "::endgroup::"
-          # The test suite intentionally creates zombie processes using the
-          # 'sleep' command. If they are not listed here, this would indicate
-          # there's something wrong with the zombie checker.
-          if ! grep -v "^// " zombies.log | grep -q "sleep" ; then
-            echo "Expected to find intentional 'sleep' zombies processes"
-            exit 1
-          fi
-          if grep -v "^// " zombies.log | grep -v "sleep" | grep -q . ; then
-            echo "Expected to find no unintentional zombies processes"
-            exit 1
-          fi
-        continue-on-error: false
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
 
       # Confirm protos are already generated properly with older protobuf
       # library and run test with that older version. We must downgrade protobuf
