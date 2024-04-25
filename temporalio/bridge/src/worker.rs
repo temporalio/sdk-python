@@ -2,10 +2,13 @@ use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
+use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
@@ -45,6 +48,8 @@ pub struct WorkerConfig {
     max_task_queue_activities_per_second: Option<f64>,
     graceful_shutdown_period_millis: u64,
     use_worker_versioning: bool,
+    nondeterminism_as_workflow_fail: bool,
+    nondeterminism_as_workflow_fail_for_types: HashSet<String>,
 }
 
 macro_rules! enter_sync {
@@ -234,6 +239,22 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             // always set it even if 0.
             .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
             .use_worker_versioning(conf.use_worker_versioning)
+            .workflow_failure_errors(if conf.nondeterminism_as_workflow_fail {
+                HashSet::from([WorkflowErrorType::Nondeterminism])
+            } else {
+                HashSet::new()
+            })
+            .workflow_types_to_failure_errors(
+                conf.nondeterminism_as_workflow_fail_for_types
+                    .iter()
+                    .map(|s| {
+                        (
+                            s.to_owned(),
+                            HashSet::from([WorkflowErrorType::Nondeterminism]),
+                        )
+                    })
+                    .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
+            )
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
     }

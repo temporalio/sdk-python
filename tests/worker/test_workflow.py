@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from enum import IntEnum
 from typing import (
     Any,
     Awaitable,
@@ -22,6 +23,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     Union,
     cast,
 )
@@ -51,6 +53,7 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowQueryFailedError,
     WorkflowUpdateFailedError,
+    WorkflowUpdateHandle,
 )
 from temporalio.common import (
     RawValue,
@@ -73,6 +76,7 @@ from temporalio.exceptions import (
     ApplicationError,
     CancelledError,
     ChildWorkflowError,
+    TemporalError,
     TimeoutError,
     WorkflowAlreadyStartedError,
 )
@@ -4253,3 +4257,257 @@ async def test_workflow_current_build_id_appropriately_set(
         assert bid == "1.1"
 
         await worker.shutdown()
+
+
+class FailureTypesScenario(IntEnum):
+    THROW_CUSTOM_EXCEPTION = 1
+    CAUSE_NON_DETERMINISM = 2
+    WAIT_FOREVER = 3
+
+
+class FailureTypesCustomException(Exception):
+    ...
+
+
+class FailureTypesWorkflowBase(ABC):
+    async def run(self, scenario: FailureTypesScenario) -> None:
+        await self._apply_scenario(scenario)
+
+    @workflow.signal
+    async def signal(self, scenario: FailureTypesScenario) -> None:
+        await self._apply_scenario(scenario)
+
+    @workflow.update
+    async def update(self, scenario: FailureTypesScenario) -> None:
+        # We have to rollover the task so the task failure isn't treated as
+        # non-acceptance
+        await asyncio.sleep(0.01)
+        await self._apply_scenario(scenario)
+
+    async def _apply_scenario(self, scenario: FailureTypesScenario) -> None:
+        if scenario == FailureTypesScenario.THROW_CUSTOM_EXCEPTION:
+            raise FailureTypesCustomException("Intentional exception")
+        elif scenario == FailureTypesScenario.CAUSE_NON_DETERMINISM:
+            if not workflow.unsafe.is_replaying():
+                await asyncio.sleep(0.01)
+        elif scenario == FailureTypesScenario.WAIT_FOREVER:
+            await workflow.wait_condition(lambda: False)
+
+
+@workflow.defn
+class FailureTypesUnconfiguredWorkflow(FailureTypesWorkflowBase):
+    @workflow.run
+    async def run(self, scenario: FailureTypesScenario) -> None:
+        await super().run(scenario)
+
+
+@workflow.defn(
+    failure_exception_types=[FailureTypesCustomException, workflow.NondeterminismError]
+)
+class FailureTypesConfiguredExplicitlyWorkflow(FailureTypesWorkflowBase):
+    @workflow.run
+    async def run(self, scenario: FailureTypesScenario) -> None:
+        await super().run(scenario)
+
+
+@workflow.defn(failure_exception_types=[Exception])
+class FailureTypesConfiguredInheritedWorkflow(FailureTypesWorkflowBase):
+    @workflow.run
+    async def run(self, scenario: FailureTypesScenario) -> None:
+        await super().run(scenario)
+
+
+async def test_workflow_failure_types_configured(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+
+    # Asserter for a single scenario
+    async def assert_scenario(
+        workflow: Type[FailureTypesWorkflowBase],
+        *,
+        expect_task_fail: bool,
+        fail_message_contains: str,
+        worker_level_failure_exception_type: Optional[Type[Exception]] = None,
+        workflow_scenario: Optional[FailureTypesScenario] = None,
+        signal_scenario: Optional[FailureTypesScenario] = None,
+        update_scenario: Optional[FailureTypesScenario] = None,
+    ) -> None:
+        logging.debug(
+            f"Asserting scenario %s",
+            {
+                "workflow": workflow,
+                "expect_task_fail": expect_task_fail,
+                "fail_message_contains": fail_message_contains,
+                "worker_level_failure_exception_type": worker_level_failure_exception_type,
+                "workflow_scenario": workflow_scenario,
+                "signal_scenario": signal_scenario,
+                "update_scenario": update_scenario,
+            },
+        )
+        async with new_worker(
+            client,
+            workflow,
+            max_cached_workflows=0,
+            workflow_failure_exception_types=[worker_level_failure_exception_type]
+            if worker_level_failure_exception_type
+            else [],
+        ) as worker:
+            # Start workflow
+            handle = await client.start_workflow(
+                workflow.run,
+                workflow_scenario or FailureTypesScenario.WAIT_FOREVER,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            if signal_scenario:
+                await handle.signal(workflow.signal, signal_scenario)
+            update_handle: Optional[WorkflowUpdateHandle[Any]] = None
+            if update_scenario:
+                update_handle = await handle.start_update(
+                    workflow.update, update_scenario, id="my-update-1"
+                )
+
+            # Expect task or exception fail
+            if expect_task_fail:
+
+                async def has_expected_task_fail() -> bool:
+                    async for e in handle.fetch_history_events():
+                        if (
+                            e.HasField("workflow_task_failed_event_attributes")
+                            and fail_message_contains
+                            in e.workflow_task_failed_event_attributes.failure.message
+                        ):
+                            return True
+                    return False
+
+                await assert_eq_eventually(True, has_expected_task_fail)
+            else:
+                with pytest.raises(TemporalError) as err:
+                    # Update does not throw on non-determinism, the workflow
+                    # does instead
+                    if (
+                        update_handle
+                        and update_scenario
+                        == FailureTypesScenario.THROW_CUSTOM_EXCEPTION
+                    ):
+                        await update_handle.result()
+                    else:
+                        await handle.result()
+                assert isinstance(err.value.cause, ApplicationError)
+                assert fail_message_contains in err.value.cause.message
+
+    # Run a scenario
+    async def run_scenario(
+        workflow: Type[FailureTypesWorkflowBase],
+        scenario: FailureTypesScenario,
+        *,
+        expect_task_fail: bool = False,
+        worker_level_failure_exception_type: Optional[Type[Exception]] = None,
+    ) -> None:
+        # Run for workflow, signal, and update
+        fail_message_contains = (
+            "Intentional exception"
+            if scenario == FailureTypesScenario.THROW_CUSTOM_EXCEPTION
+            else "Nondeterminism"
+        )
+        await assert_scenario(
+            workflow,
+            expect_task_fail=expect_task_fail,
+            fail_message_contains=fail_message_contains,
+            worker_level_failure_exception_type=worker_level_failure_exception_type,
+            workflow_scenario=scenario,
+        )
+        await assert_scenario(
+            workflow,
+            expect_task_fail=expect_task_fail,
+            fail_message_contains=fail_message_contains,
+            worker_level_failure_exception_type=worker_level_failure_exception_type,
+            signal_scenario=scenario,
+        )
+        await assert_scenario(
+            workflow,
+            expect_task_fail=expect_task_fail,
+            fail_message_contains=fail_message_contains,
+            worker_level_failure_exception_type=worker_level_failure_exception_type,
+            update_scenario=scenario,
+        )
+
+    # Run all tasks concurrently
+    await asyncio.gather(
+        # When unconfigured completely, confirm task fails as normal
+        run_scenario(
+            FailureTypesUnconfiguredWorkflow,
+            FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
+            expect_task_fail=True,
+        ),
+        run_scenario(
+            FailureTypesUnconfiguredWorkflow,
+            FailureTypesScenario.CAUSE_NON_DETERMINISM,
+            expect_task_fail=True,
+        ),
+        # When configured at the worker level explicitly, confirm not task fail
+        # but rather expected exceptions
+        run_scenario(
+            FailureTypesUnconfiguredWorkflow,
+            FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
+            worker_level_failure_exception_type=FailureTypesCustomException,
+        ),
+        run_scenario(
+            FailureTypesUnconfiguredWorkflow,
+            FailureTypesScenario.CAUSE_NON_DETERMINISM,
+            worker_level_failure_exception_type=workflow.NondeterminismError,
+        ),
+        # When configured at the worker level inherited
+        run_scenario(
+            FailureTypesUnconfiguredWorkflow,
+            FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
+            worker_level_failure_exception_type=Exception,
+        ),
+        run_scenario(
+            FailureTypesUnconfiguredWorkflow,
+            FailureTypesScenario.CAUSE_NON_DETERMINISM,
+            worker_level_failure_exception_type=Exception,
+        ),
+        # When configured at the workflow level explicitly
+        run_scenario(
+            FailureTypesConfiguredExplicitlyWorkflow,
+            FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
+        ),
+        run_scenario(
+            FailureTypesConfiguredExplicitlyWorkflow,
+            FailureTypesScenario.CAUSE_NON_DETERMINISM,
+        ),
+        # When configured at the workflow level inherited
+        run_scenario(
+            FailureTypesConfiguredInheritedWorkflow,
+            FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
+        ),
+        run_scenario(
+            FailureTypesConfiguredInheritedWorkflow,
+            FailureTypesScenario.CAUSE_NON_DETERMINISM,
+        ),
+    )
+
+
+@workflow.defn(failure_exception_types=[Exception])
+class FailOnBadInputWorkflow:
+    @workflow.run
+    async def run(self, param: str) -> None:
+        pass
+
+
+async def test_workflow_fail_on_bad_input(client: Client):
+    with pytest.raises(WorkflowFailureError) as err:
+        async with new_worker(client, FailOnBadInputWorkflow) as worker:
+            await client.execute_workflow(
+                "FailOnBadInputWorkflow",
+                123,
+                id=f"wf-{uuid}",
+                task_queue=worker.task_queue,
+            )
+    assert isinstance(err.value.cause, ApplicationError)
+    assert "Failed decoding arguments" in err.value.cause.message

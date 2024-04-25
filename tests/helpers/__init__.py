@@ -25,6 +25,7 @@ def new_worker(
     task_queue: Optional[str] = None,
     workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
     max_cached_workflows: int = 1000,
+    workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
     **kwargs,
 ) -> Worker:
     return Worker(
@@ -34,6 +35,7 @@ def new_worker(
         activities=activities,
         workflow_runner=workflow_runner,
         max_cached_workflows=max_cached_workflows,
+        workflow_failure_exception_types=workflow_failure_exception_types,
         **kwargs,
     )
 

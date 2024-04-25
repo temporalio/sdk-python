@@ -118,6 +118,7 @@ def test_workflow_defn_good():
             ),
         },
         sandboxed=True,
+        failure_exception_types=[],
     )
 
 

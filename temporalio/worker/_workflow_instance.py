@@ -107,6 +107,17 @@ class WorkflowRunner(ABC):
         """
         raise NotImplementedError
 
+    def set_worker_level_failure_exception_types(
+        self, types: Sequence[Type[BaseException]]
+    ) -> None:
+        """Set worker-level failure exception types that will be used to
+        validate in the sandbox when calling ``prepare_workflow``.
+
+        Args:
+            types: Exception types.
+        """
+        pass
+
 
 @dataclass(frozen=True)
 class WorkflowInstanceDetails:
@@ -120,6 +131,7 @@ class WorkflowInstanceDetails:
     randomness_seed: int
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
+    worker_level_failure_exception_types: Sequence[Type[BaseException]]
 
 
 class WorkflowInstance(ABC):
@@ -177,6 +189,9 @@ class _WorkflowInstanceImpl(
         self._info = det.info
         self._extern_functions = det.extern_functions
         self._disable_eager_activity_execution = det.disable_eager_activity_execution
+        self._worker_level_failure_exception_types = (
+            det.worker_level_failure_exception_types
+        )
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time_ns = 0
         self._cancel_requested = False
@@ -315,10 +330,10 @@ class _WorkflowInstanceImpl(
                 # index).
                 self._run_once(check_conditions=index == 1 or index == 2)
         except Exception as err:
-            # We want failure errors during activation, like those that can
-            # happen during payload conversion, to fail the workflow not the
+            # We want some errors during activation, like those that can happen
+            # during payload conversion, to be able to fail the workflow not the
             # task
-            if isinstance(err, temporalio.exceptions.FailureError):
+            if self._is_workflow_failure_exception(err):
                 try:
                     self._set_workflow_failure(err)
                 except Exception as inner_err:
@@ -515,12 +530,10 @@ class _WorkflowInstanceImpl(
                 if isinstance(err, temporalio.workflow.ReadOnlyContextError):
                     self._current_activation_error = err
                     return
-                # Temporal errors always fail the update. Other errors fail it during validation, but the task during
-                # handling.
-                if (
-                    isinstance(err, temporalio.exceptions.FailureError)
-                    or not past_validation
-                ):
+                # Validation failures are always update failures. We reuse
+                # workflow failure logic to decide task failure vs update
+                # failure after validation.
+                if not past_validation or self._is_workflow_failure_exception(err):
                     if command is None:
                         command = self._add_command()
                         command.update_response.protocol_instance_id = (
@@ -1549,6 +1562,19 @@ class _WorkflowInstanceImpl(
         except Exception as err:
             raise RuntimeError("Failed decoding arguments") from err
 
+    def _is_workflow_failure_exception(self, err: BaseException) -> bool:
+        # An exception is a failure instead of a task fail if it's already a
+        # failure error or if it is an instance of any of the failure types in
+        # the worker or workflow-level setting
+        return (
+            isinstance(err, temporalio.exceptions.FailureError)
+            or any(isinstance(err, typ) for typ in self._defn.failure_exception_types)
+            or any(
+                isinstance(err, typ)
+                for typ in self._worker_level_failure_exception_types
+            )
+        )
+
     def _next_seq(self, type: str) -> int:
         seq = self._curr_seqs.get(type, 0) + 1
         self._curr_seqs[type] = seq
@@ -1705,14 +1731,14 @@ class _WorkflowInstanceImpl(
                 err
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
-            elif isinstance(err, temporalio.exceptions.FailureError):
+            elif self._is_workflow_failure_exception(err):
                 # All other failure errors fail the workflow
                 self._set_workflow_failure(err)
             else:
                 # All other exceptions fail the task
                 self._current_activation_error = err
 
-    def _set_workflow_failure(self, err: temporalio.exceptions.FailureError) -> None:
+    def _set_workflow_failure(self, err: BaseException) -> None:
         # All other failure errors fail the workflow
         failure = self._add_command().fail_workflow_execution.failure
         failure.SetInParent()

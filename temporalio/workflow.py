@@ -83,7 +83,10 @@ def defn(cls: ClassType) -> ClassType:
 
 @overload
 def defn(
-    *, name: Optional[str] = None, sandboxed: bool = True
+    *,
+    name: Optional[str] = None,
+    sandboxed: bool = True,
+    failure_exception_types: Sequence[Type[BaseException]] = [],
 ) -> Callable[[ClassType], ClassType]:
     ...
 
@@ -101,6 +104,7 @@ def defn(
     name: Optional[str] = None,
     sandboxed: bool = True,
     dynamic: bool = False,
+    failure_exception_types: Sequence[Type[BaseException]] = [],
 ):
     """Decorator for workflow classes.
 
@@ -116,6 +120,12 @@ def defn(
         dynamic: If true, this activity will be dynamic. Dynamic workflows have
             to accept a single 'Sequence[RawValue]' parameter. This cannot be
             set to true if name is present.
+        failure_exception_types: The types of exceptions that, if a
+            workflow-thrown exception extends, will cause the workflow/update to
+            fail instead of suspending the workflow via task failure. These are
+            applied in addition to ones set on the worker constructor. If
+            ``Exception`` is set, it effectively will fail a workflow/update in
+            all user exception cases. WARNING: This setting is experimental.
     """
 
     def decorator(cls: ClassType) -> ClassType:
@@ -124,6 +134,7 @@ def defn(
             cls,
             workflow_name=name or cls.__name__ if not dynamic else None,
             sandboxed=sandboxed,
+            failure_exception_types=failure_exception_types,
         )
         return cls
 
@@ -1162,6 +1173,7 @@ class _Definition:
     queries: Mapping[Optional[str], _QueryDefinition]
     updates: Mapping[Optional[str], _UpdateDefinition]
     sandboxed: bool
+    failure_exception_types: Sequence[Type[BaseException]]
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
@@ -1200,7 +1212,11 @@ class _Definition:
 
     @staticmethod
     def _apply_to_class(
-        cls: Type, *, workflow_name: Optional[str], sandboxed: bool
+        cls: Type,
+        *,
+        workflow_name: Optional[str],
+        sandboxed: bool,
+        failure_exception_types: Sequence[Type[BaseException]],
     ) -> None:
         # Check it's not being doubly applied
         if _Definition.from_class(cls):
@@ -1323,6 +1339,7 @@ class _Definition:
             queries=queries,
             updates=updates,
             sandboxed=sandboxed,
+            failure_exception_types=failure_exception_types,
         )
         setattr(cls, "__temporal_workflow_definition", defn)
         setattr(run_fn, "__temporal_workflow_definition", defn)

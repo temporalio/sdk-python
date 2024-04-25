@@ -722,7 +722,8 @@ While running in a workflow, in addition to features documented elsewhere, the f
 
 #### Exceptions
 
-* Workflows can raise exceptions to fail the workflow or the "workflow task" (i.e. suspend the workflow retrying).
+* Workflows/updates can raise exceptions to fail the workflow or the "workflow task" (i.e. suspend the workflow
+  retrying).
 * Exceptions that are instances of `temporalio.exceptions.FailureError` will fail the workflow with that exception
   * For failing the workflow explicitly with a user exception, use `temporalio.exceptions.ApplicationError`. This can
     be marked non-retryable or include details as needed.
@@ -731,6 +732,13 @@ While running in a workflow, in addition to features documented elsewhere, the f
 * All other exceptions fail the "workflow task" which means the workflow will continually retry until the workflow is
   fixed. This is helpful for bad code or other non-predictable exceptions. To actually fail the workflow, use an
   `ApplicationError` as mentioned above.
+
+This default can be changed by providing a list of exception types to `workflow_failure_exception_types` when creating a
+`Worker` or `failure_exception_types` on the `@workflow.defn` decorator. If a workflow-thrown exception is an instance
+of any type in either list, it will fail the workflow instead of the task. This means a value of `[Exception]` will
+cause every exception to fail the workflow instead of the task. Also, as a special case, if
+`temporalio.workflow.NondeterminismError` (or any superclass of it) is set, non-deterministic exceptions will fail the
+workflow. WARNING: These settings are experimental.
 
 #### External Workflows
 

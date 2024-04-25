@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 import os
 from datetime import timezone
-from typing import Callable, Dict, List, MutableMapping, Optional, Sequence, Type
+from typing import Callable, Dict, List, MutableMapping, Optional, Sequence, Set, Type
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -52,6 +52,7 @@ class _WorkflowWorker:
         unsandboxed_workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
+        workflow_failure_exception_types: Sequence[Type[BaseException]],
         debug_mode: bool,
         disable_eager_activity_execution: bool,
         metric_meter: temporalio.common.MetricMeter,
@@ -89,6 +90,7 @@ class _WorkflowWorker:
         self._extern_functions.update(
             **_WorkflowExternFunctions(__temporal_get_metric_meter=lambda: metric_meter)
         )
+        self._workflow_failure_exception_types = workflow_failure_exception_types
         self._running_workflows: Dict[str, WorkflowInstance] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
@@ -103,6 +105,11 @@ class _WorkflowWorker:
 
         # Keep track of workflows that could not be evicted
         self._could_not_evict_count = 0
+
+        # Set the worker-level failure exception types into the runner
+        workflow_runner.set_worker_level_failure_exception_types(
+            workflow_failure_exception_types
+        )
 
         # Validate and build workflow dict
         self._workflows: Dict[str, temporalio.workflow._Definition] = {}
@@ -389,8 +396,25 @@ class _WorkflowWorker:
             randomness_seed=start.randomness_seed,
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
+            worker_level_failure_exception_types=self._workflow_failure_exception_types,
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)
         else:
             return self._unsandboxed_workflow_runner.create_instance(det)
+
+    def nondeterminism_as_workflow_fail(self) -> bool:
+        return any(
+            issubclass(temporalio.workflow.NondeterminismError, typ)
+            for typ in self._workflow_failure_exception_types
+        )
+
+    def nondeterminism_as_workflow_fail_for_types(self) -> Set[str]:
+        return set(
+            k
+            for k, v in self._workflows.items()
+            if any(
+                issubclass(temporalio.workflow.NondeterminismError, typ)
+                for typ in v.failure_exception_types
+            )
+        )

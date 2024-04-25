@@ -73,6 +73,7 @@ class Worker:
         max_activities_per_second: Optional[float] = None,
         max_task_queue_activities_per_second: Optional[float] = None,
         graceful_shutdown_timeout: timedelta = timedelta(),
+        workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
         shared_state_manager: Optional[SharedStateManager] = None,
         debug_mode: bool = False,
         disable_eager_activity_execution: bool = False,
@@ -167,6 +168,13 @@ class Worker:
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
+            workflow_failure_exception_types: The types of exceptions that, if a
+                workflow-thrown exception extends, will cause the
+                workflow/update to fail instead of suspending the workflow via
+                task failure. These are applied in addition to ones set on the
+                ``workflow.defn`` decorator. If ``Exception`` is set, it
+                effectively will fail a workflow/update in all user exception
+                cases. WARNING: This setting is experimental.
             shared_state_manager: Used for obtaining cross-process friendly
                 synchronization primitives. This is required for non-async
                 activities where the activity_executor is not a
@@ -258,6 +266,7 @@ class Worker:
             max_activities_per_second=max_activities_per_second,
             max_task_queue_activities_per_second=max_task_queue_activities_per_second,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
+            workflow_failure_exception_types=workflow_failure_exception_types,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
             disable_eager_activity_execution=disable_eager_activity_execution,
@@ -309,6 +318,7 @@ class Worker:
                 unsandboxed_workflow_runner=unsandboxed_workflow_runner,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
+                workflow_failure_exception_types=workflow_failure_exception_types,
                 debug_mode=debug_mode,
                 disable_eager_activity_execution=disable_eager_activity_execution,
                 metric_meter=runtime.metric_meter,
@@ -366,6 +376,14 @@ class Worker:
                     1000 * graceful_shutdown_timeout.total_seconds()
                 ),
                 use_worker_versioning=use_worker_versioning,
+                # Need to tell core whether we want to consider all
+                # non-determinism exceptions as workflow fail, and whether we do
+                # per workflow type
+                nondeterminism_as_workflow_fail=self._workflow_worker is not None
+                and self._workflow_worker.nondeterminism_as_workflow_fail(),
+                nondeterminism_as_workflow_fail_for_types=self._workflow_worker.nondeterminism_as_workflow_fail_for_types()
+                if self._workflow_worker
+                else set(),
             ),
         )
 
@@ -605,6 +623,7 @@ class WorkerConfig(TypedDict, total=False):
     max_activities_per_second: Optional[float]
     max_task_queue_activities_per_second: Optional[float]
     graceful_shutdown_timeout: timedelta
+    workflow_failure_exception_types: Sequence[Type[BaseException]]
     shared_state_manager: Optional[SharedStateManager]
     debug_mode: bool
     disable_eager_activity_execution: bool
