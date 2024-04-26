@@ -723,7 +723,7 @@ While running in a workflow, in addition to features documented elsewhere, the f
 #### Exceptions
 
 * Workflows/updates can raise exceptions to fail the workflow or the "workflow task" (i.e. suspend the workflow
-  retrying).
+  in a retrying state).
 * Exceptions that are instances of `temporalio.exceptions.FailureError` will fail the workflow with that exception
   * For failing the workflow explicitly with a user exception, use `temporalio.exceptions.ApplicationError`. This can
     be marked non-retryable or include details as needed.

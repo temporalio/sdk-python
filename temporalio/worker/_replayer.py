@@ -216,6 +216,11 @@ class Replayer:
                     task_queue=task_queue,
                     build_id=self._config["build_id"] or load_default_build_id(),
                     identity_override=self._config["identity"],
+                    # Need to tell core whether we want to consider all
+                    # non-determinism exceptions as workflow fail, and whether we do
+                    # per workflow type
+                    nondeterminism_as_workflow_fail=workflow_worker.nondeterminism_as_workflow_fail(),
+                    nondeterminism_as_workflow_fail_for_types=workflow_worker.nondeterminism_as_workflow_fail_for_types(),
                     # All values below are ignored but required by Core
                     max_cached_workflows=2,
                     max_outstanding_workflow_tasks=2,
@@ -232,11 +237,6 @@ class Replayer:
                     max_task_queue_activities_per_second=None,
                     graceful_shutdown_period_millis=0,
                     use_worker_versioning=False,
-                    # Need to tell core whether we want to consider all
-                    # non-determinism exceptions as workflow fail, and whether we do
-                    # per workflow type
-                    nondeterminism_as_workflow_fail=workflow_worker.nondeterminism_as_workflow_fail(),
-                    nondeterminism_as_workflow_fail_for_types=workflow_worker.nondeterminism_as_workflow_fail_for_types(),
                 ),
             )
             # Start worker
