@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Type
+from typing import Any, Sequence, Type
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
@@ -68,6 +68,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         super().__init__()
         self._runner_class = runner_class
         self._restrictions = restrictions
+        self._worker_level_failure_exception_types: Sequence[type[BaseException]] = []
 
     def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
         """Implements :py:meth:`WorkflowRunner.prepare_workflow`."""
@@ -83,12 +84,19 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 randomness_seed=-1,
                 extern_functions={},
                 disable_eager_activity_execution=False,
+                worker_level_failure_exception_types=self._worker_level_failure_exception_types,
             ),
         )
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Implements :py:meth:`WorkflowRunner.create_instance`."""
         return _Instance(det, self._runner_class, self._restrictions)
+
+    def set_worker_level_failure_exception_types(
+        self, types: Sequence[type[BaseException]]
+    ) -> None:
+        """Implements :py:meth:`WorkflowRunner.set_worker_level_failure_exception_types`."""
+        self._worker_level_failure_exception_types = types
 
 
 # Implements in_sandbox._ExternEnvironment. Some of these calls are called from

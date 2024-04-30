@@ -6,7 +6,16 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Awaitable,
+    Callable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+)
 
 import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
@@ -48,6 +57,8 @@ class WorkerConfig:
     max_task_queue_activities_per_second: Optional[float]
     graceful_shutdown_period_millis: int
     use_worker_versioning: bool
+    nondeterminism_as_workflow_fail: bool
+    nondeterminism_as_workflow_fail_for_types: Set[str]
 
 
 class Worker:
