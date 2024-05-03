@@ -132,6 +132,10 @@ class Worker:
         """Request a workflow be evicted."""
         self._ref.request_workflow_eviction(run_id)
 
+    def replace_client(self, client: temporalio.bridge.client.Client) -> None:
+        """Replace the worker client."""
+        self._ref.replace_client(client._ref)
+
     def initiate_shutdown(self) -> None:
         """Start shutdown of the worker."""
         self._ref.initiate_shutdown()
