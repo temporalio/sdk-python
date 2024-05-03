@@ -187,7 +187,7 @@ impl WorkerRef {
     fn replace_client(&self, client: &client::ClientRef) {
         self.worker
             .as_ref()
-            .unwrap()
+            .expect("missing worker")
             .replace_client(client.retry_client.clone().into_inner());
     }
 
