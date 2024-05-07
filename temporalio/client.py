@@ -1155,8 +1155,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     @property
     def run_id(self) -> Optional[str]:
-        """Run ID used for :py:meth:`signal` and :py:meth:`query` calls if
-        present to ensure the query or signal happen on this exact run.
+        """Run ID used for :py:meth:`signal`, :py:meth:`query`, and
+        :py:meth:`update` calls if present to ensure the signal/query/update
+        happen on this exact run.
 
         This is only created via :py:meth:`Client.get_workflow_handle`.
         :py:meth:`Client.start_workflow` will not set this value.
@@ -1858,8 +1859,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             update,
             arg,
             args=args,
+            wait_for_stage=WorkflowUpdateWaitStage.COMPLETED,
             id=id,
-            wait_for_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED,
             result_type=result_type,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
@@ -1872,6 +1873,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
+        wait_for_stage: WorkflowUpdateWaitStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1887,6 +1889,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         arg: ParamType,
         *,
+        wait_for_stage: WorkflowUpdateWaitStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1902,6 +1905,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         *,
         args: MultiParamSpec.args,
+        wait_for_stage: WorkflowUpdateWaitStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1915,6 +1919,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: str,
         arg: Any = temporalio.common._arg_unset,
         *,
+        wait_for_stage: WorkflowUpdateWaitStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
@@ -1928,6 +1933,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
+        wait_for_stage: WorkflowUpdateWaitStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
@@ -1950,6 +1956,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Args:
             update: Update function or name on the workflow.
             arg: Single argument to the update.
+            wait_for_stage: Required stage to wait until returning. ADMITTED is
+                not currently supported.
             args: Multiple arguments to the update. Cannot be set if arg is.
             id: ID of the update. If not set, the default is a new UUID.
             result_type: For string updates, this can set the specific result
@@ -1964,9 +1972,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         return await self._start_update(
             update,
             arg,
+            wait_for_stage=wait_for_stage,
             args=args,
             id=id,
-            wait_for_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED,
             result_type=result_type,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
@@ -1977,13 +1985,15 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
+        wait_for_stage: WorkflowUpdateWaitStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
-        wait_for_stage: temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType = temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED,
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]:
+        if wait_for_stage == WorkflowUpdateWaitStage.ADMITTED:
+            raise ValueError("ADMITTED wait stage not supported")
         update_name: str
         ret_type = result_type
         if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
@@ -2000,7 +2010,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             StartWorkflowUpdateInput(
                 id=self._id,
                 run_id=self._run_id,
-                update_id=id or uuid.uuid4(),
+                update_id=id,
                 update=update_name,
                 args=temporalio.common._arg_or_args(arg, args),
                 headers={},
@@ -2009,6 +2019,68 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 rpc_timeout=rpc_timeout,
                 wait_for_stage=wait_for_stage,
             )
+        )
+
+    def get_update_handle(
+        self,
+        id: str,
+        *,
+        workflow_run_id: Optional[str] = None,
+        result_type: Optional[Type] = None,
+    ) -> WorkflowUpdateHandle[Any]:
+        """Get a handle for an update. The handle can be used to wait on the
+        update result.
+
+        Users may prefer the more typesafe :py:meth:`get_update_handle_for`
+        which accepts an update definition.
+
+        .. warning::
+           This API is experimental
+
+        Args:
+            id: Update ID to get a handle to.
+            workflow_run_id: Run ID to tie the handle to. If this is not set,
+                the :py:attr:`run_id` will be used.
+            result_type: The result type to deserialize into if known.
+
+        Returns:
+            The update handle.
+        """
+        return WorkflowUpdateHandle(
+            self._client,
+            id,
+            self._id,
+            workflow_run_id=workflow_run_id or self._run_id,
+            result_type=result_type,
+        )
+
+    def get_update_handle_for(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[Any, LocalReturnType],
+        id: str,
+        *,
+        workflow_run_id: Optional[str] = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]:
+        """Get a typed handle for an update. The handle can be used to wait on
+        the update result.
+
+        This is the same as :py:meth:`get_update_handle` but typed.
+
+        .. warning::
+           This API is experimental
+
+        Args:
+            update: The update method to use for typing the handle.
+            id: Update ID to get a handle to.
+            workflow_run_id: Run ID to tie the handle to. If this is not set,
+                the :py:attr:`run_id` will be used.
+            result_type: The result type to deserialize into if known.
+
+        Returns:
+            The update handle.
+        """
+        return self.get_update_handle(
+            id, workflow_run_id=workflow_run_id, result_type=update._defn.ret_type
         )
 
 
@@ -4235,15 +4307,38 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
             WorkflowUpdateFailedError: If the update failed
             RPCError: Update result could not be fetched for some other reason.
         """
-        if self._known_outcome is not None:
-            outcome = self._known_outcome
-            return await _update_outcome_to_result(
-                outcome,
-                self.id,
-                self._client.data_converter,
-                self._result_type,
-            )
+        # Poll until outcome reached
+        await self._poll_until_outcome(
+            rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+        )
 
+        # Convert outcome to failure or value
+        assert self._known_outcome
+        if self._known_outcome.HasField("failure"):
+            raise WorkflowUpdateFailedError(
+                await self._client.data_converter.decode_failure(
+                    self._known_outcome.failure
+                ),
+            )
+        if not self._known_outcome.success.payloads:
+            return None  # type: ignore
+        type_hints = [self._result_type] if self._result_type else None
+        results = await self._client.data_converter.decode(
+            self._known_outcome.success.payloads, type_hints
+        )
+        if not results:
+            return None  # type: ignore
+        elif len(results) > 1:
+            warnings.warn(f"Expected single update result, got {len(results)}")
+        return results[0]
+
+    async def _poll_until_outcome(
+        self,
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        if self._known_outcome:
+            return
         req = temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest(
             namespace=self._client.namespace,
             update_ref=temporalio.api.update.v1.UpdateRef(
@@ -4259,27 +4354,33 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
             ),
         )
 
-        # Continue polling as long as we have either an empty response, or an *rpc* timeout
+        # Continue polling as long as we have no outcome
         while True:
-            try:
-                res = (
-                    await self._client.workflow_service.poll_workflow_execution_update(
-                        req,
-                        retry=True,
-                        metadata=rpc_metadata,
-                        timeout=rpc_timeout,
-                    )
-                )
-                if res.HasField("outcome"):
-                    return await _update_outcome_to_result(
-                        res.outcome,
-                        self.id,
-                        self._client.data_converter,
-                        self._result_type,
-                    )
-            except RPCError as err:
-                if err.status != RPCStatusCode.DEADLINE_EXCEEDED:
-                    raise
+            res = await self._client.workflow_service.poll_workflow_execution_update(
+                req,
+                retry=True,
+                metadata=rpc_metadata,
+                timeout=rpc_timeout,
+            )
+            if res.HasField("outcome"):
+                self._known_outcome = res.outcome
+                return
+
+
+class WorkflowUpdateWaitStage(IntEnum):
+    """Stage to wait for workflow update to reach before returning from
+    ``start_update``.
+    """
+
+    ADMITTED = int(
+        temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED
+    )
+    ACCEPTED = int(
+        temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED
+    )
+    COMPLETED = int(
+        temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED
+    )
 
 
 class WorkflowFailureError(temporalio.exceptions.TemporalError):
@@ -4508,9 +4609,7 @@ class StartWorkflowUpdateInput:
     update_id: Optional[str]
     update: str
     args: Sequence[Any]
-    wait_for_stage: Optional[
-        temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType
-    ]
+    wait_for_stage: WorkflowUpdateWaitStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
@@ -5125,11 +5224,7 @@ class _ClientImpl(OutboundInterceptor):
     async def start_workflow_update(
         self, input: StartWorkflowUpdateInput
     ) -> WorkflowUpdateHandle[Any]:
-        wait_policy = (
-            temporalio.api.update.v1.WaitPolicy(lifecycle_stage=input.wait_for_stage)
-            if input.wait_for_stage is not None
-            else None
-        )
+        # Build request
         req = temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest(
             namespace=self._client.namespace,
             workflow_execution=temporalio.api.common.v1.WorkflowExecution(
@@ -5138,14 +5233,18 @@ class _ClientImpl(OutboundInterceptor):
             ),
             request=temporalio.api.update.v1.Request(
                 meta=temporalio.api.update.v1.Meta(
-                    update_id=input.update_id or "",
+                    update_id=input.update_id or str(uuid.uuid4()),
                     identity=self._client.identity,
                 ),
                 input=temporalio.api.update.v1.Input(
                     name=input.update,
                 ),
             ),
-            wait_policy=wait_policy,
+            wait_policy=temporalio.api.update.v1.WaitPolicy(
+                lifecycle_stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.ValueType(
+                    input.wait_for_stage
+                )
+            ),
         )
         if input.args:
             req.request.input.args.payloads.extend(
@@ -5155,25 +5254,36 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.common._apply_headers(
                 input.headers, req.request.input.header.fields
             )
-        try:
+
+        # Repeatedly try to invoke start until the update reaches user-provided
+        # wait stage or is at least ACCEPTED (as of the time of this writing,
+        # the user cannot specify sooner than ACCEPTED)
+        resp: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse
+        while True:
             resp = await self._client.workflow_service.update_workflow_execution(
                 req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
             )
-        except RPCError as err:
-            raise
+            if (
+                resp.stage >= req.wait_policy.lifecycle_stage
+                or resp.stage
+                >= temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED
+            ):
+                break
 
-        determined_id = resp.update_ref.update_id
-        update_handle: WorkflowUpdateHandle[Any] = WorkflowUpdateHandle(
+        # Build the handle. If the user's wait stage is COMPLETED, make sure we
+        # poll for result.
+        handle: WorkflowUpdateHandle[Any] = WorkflowUpdateHandle(
             client=self._client,
-            id=determined_id,
+            id=req.request.meta.update_id,
             workflow_id=input.id,
             workflow_run_id=input.run_id,
             result_type=input.ret_type,
         )
         if resp.HasField("outcome"):
-            update_handle._known_outcome = resp.outcome
-
-        return update_handle
+            handle._known_outcome = resp.outcome
+        if input.wait_for_stage == WorkflowUpdateWaitStage.COMPLETED:
+            await handle._poll_until_outcome()
+        return handle
 
     ### Async activity calls
 
@@ -5698,27 +5808,6 @@ def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
             for child_item in child:
                 if isinstance(child_item, dict):
                     _fix_history_enum(prefix, child_item, *attrs[1:])
-
-
-async def _update_outcome_to_result(
-    outcome: temporalio.api.update.v1.Outcome,
-    id: str,
-    converter: temporalio.converter.DataConverter,
-    rtype: Optional[Type],
-) -> Any:
-    if outcome.HasField("failure"):
-        raise WorkflowUpdateFailedError(
-            await converter.decode_failure(outcome.failure),
-        )
-    if not outcome.success.payloads:
-        return None
-    type_hints = [rtype] if rtype else None
-    results = await converter.decode(outcome.success.payloads, type_hints)
-    if not results:
-        return None
-    elif len(results) > 1:
-        warnings.warn(f"Expected single update result, got {len(results)}")
-    return results[0]
 
 
 @dataclass(frozen=True)

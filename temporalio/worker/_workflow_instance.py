@@ -302,15 +302,15 @@ class _WorkflowInstanceImpl(
 
         activation_err: Optional[Exception] = None
         try:
-            # Split into job sets with patches, then signals, then non-queries, then
-            # queries
+            # Split into job sets with patches, then signals + updates, then
+            # non-queries, then queries
             job_sets: List[
                 List[temporalio.bridge.proto.workflow_activation.WorkflowActivationJob]
             ] = [[], [], [], []]
             for job in act.jobs:
                 if job.HasField("notify_has_patch"):
                     job_sets[0].append(job)
-                elif job.HasField("signal_workflow"):
+                elif job.HasField("signal_workflow") or job.HasField("do_update"):
                     job_sets[1].append(job)
                 elif not job.HasField("query_workflow"):
                     job_sets[2].append(job)
