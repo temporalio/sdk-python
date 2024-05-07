@@ -1843,7 +1843,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             update: Update function or name on the workflow.
             arg: Single argument to the update.
             args: Multiple arguments to the update. Cannot be set if arg is.
-            id: ID of the update. If not set, the server will set a UUID as the ID.
+            id: ID of the update. If not set, the default is a new UUID.
             result_type: For string updates, this can set the specific result
                 type hint to deserialize into.
             rpc_metadata: Headers used on the RPC call. Keys here override
@@ -1951,7 +1951,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             update: Update function or name on the workflow.
             arg: Single argument to the update.
             args: Multiple arguments to the update. Cannot be set if arg is.
-            id: ID of the update. If not set, the server will set a UUID as the ID.
+            id: ID of the update. If not set, the default is a new UUID.
             result_type: For string updates, this can set the specific result
                 type hint to deserialize into.
             rpc_metadata: Headers used on the RPC call. Keys here override
@@ -2000,7 +2000,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             StartWorkflowUpdateInput(
                 id=self._id,
                 run_id=self._run_id,
-                update_id=id,
+                update_id=id or uuid.uuid4(),
                 update=update_name,
                 args=temporalio.common._arg_or_args(arg, args),
                 headers={},
