@@ -3412,6 +3412,52 @@ async def test_cache_eviction_tear_down(client: Client):
 
 
 @dataclass
+class CapturedEvictionException:
+    is_replaying: bool
+    exception: BaseException
+
+
+captured_eviction_exceptions: List[CapturedEvictionException] = []
+
+
+@workflow.defn(sandboxed=False)
+class EvictionCaptureExceptionWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Going to sleep so we can force eviction
+        try:
+            await asyncio.sleep(0.01)
+        except BaseException as err:
+            captured_eviction_exceptions.append(
+                CapturedEvictionException(
+                    is_replaying=workflow.unsafe.is_replaying(), exception=err
+                )
+            )
+
+
+async def test_workflow_eviction_exception(client: Client):
+    assert not captured_eviction_exceptions
+
+    # Run workflow with no cache (forces eviction every step)
+    async with new_worker(
+        client, EvictionCaptureExceptionWorkflow, max_cached_workflows=0
+    ) as worker:
+        await client.execute_workflow(
+            EvictionCaptureExceptionWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Confirm expected eviction replaying state and exception type
+    assert len(captured_eviction_exceptions) == 1
+    assert captured_eviction_exceptions[0].is_replaying
+    assert (
+        type(captured_eviction_exceptions[0].exception).__name__
+        == "_WorkflowBeingEvictedError"
+    )
+
+
+@dataclass
 class DynamicWorkflowValue:
     some_string: str
 
