@@ -1859,7 +1859,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             update,
             arg,
             args=args,
-            wait_for_stage=WorkflowUpdateWaitStage.COMPLETED,
+            wait_for_stage=WorkflowUpdateLifecycleStage.COMPLETED,
             id=id,
             result_type=result_type,
             rpc_metadata=rpc_metadata,
@@ -1873,7 +1873,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
-        wait_for_stage: WorkflowUpdateWaitStage,
+        wait_for_stage: WorkflowUpdateLifecycleStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1889,7 +1889,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         arg: ParamType,
         *,
-        wait_for_stage: WorkflowUpdateWaitStage,
+        wait_for_stage: WorkflowUpdateLifecycleStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1905,7 +1905,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         *,
         args: MultiParamSpec.args,
-        wait_for_stage: WorkflowUpdateWaitStage,
+        wait_for_stage: WorkflowUpdateLifecycleStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1919,7 +1919,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        wait_for_stage: WorkflowUpdateWaitStage,
+        wait_for_stage: WorkflowUpdateLifecycleStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
@@ -1933,7 +1933,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        wait_for_stage: WorkflowUpdateWaitStage,
+        wait_for_stage: WorkflowUpdateLifecycleStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
@@ -1985,14 +1985,14 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        wait_for_stage: WorkflowUpdateWaitStage,
+        wait_for_stage: WorkflowUpdateLifecycleStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]:
-        if wait_for_stage == WorkflowUpdateWaitStage.ADMITTED:
+        if wait_for_stage == WorkflowUpdateLifecycleStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
         update_name: str
         ret_type = result_type
@@ -4367,7 +4367,7 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
                 return
 
 
-class WorkflowUpdateWaitStage(IntEnum):
+class WorkflowUpdateLifecycleStage(IntEnum):
     """Stage to wait for workflow update to reach before returning from
     ``start_update``.
     """
@@ -4609,7 +4609,7 @@ class StartWorkflowUpdateInput:
     update_id: Optional[str]
     update: str
     args: Sequence[Any]
-    wait_for_stage: WorkflowUpdateWaitStage
+    wait_for_stage: WorkflowUpdateLifecycleStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
@@ -5281,7 +5281,7 @@ class _ClientImpl(OutboundInterceptor):
         )
         if resp.HasField("outcome"):
             handle._known_outcome = resp.outcome
-        if input.wait_for_stage == WorkflowUpdateWaitStage.COMPLETED:
+        if input.wait_for_stage == WorkflowUpdateLifecycleStage.COMPLETED:
             await handle._poll_until_outcome()
         return handle
 
