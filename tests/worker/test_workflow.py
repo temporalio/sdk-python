@@ -54,7 +54,7 @@ from temporalio.client import (
     WorkflowQueryFailedError,
     WorkflowUpdateFailedError,
     WorkflowUpdateHandle,
-    WorkflowUpdateLifecycleStage,
+    WorkflowUpdateStage,
 )
 from temporalio.common import (
     RawValue,
@@ -4212,7 +4212,7 @@ async def test_workflow_update_separate_handle(
         # Start an update waiting on accepted
         update_handle_1 = await handle.start_update(
             UpdateSeparateHandleWorkflow.update,
-            wait_for_stage=WorkflowUpdateLifecycleStage.ACCEPTED,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
         )
 
         # Create another handle and have them both wait for update complete
@@ -4489,7 +4489,7 @@ async def test_workflow_failure_types_configured(
                 update_handle = await handle.start_update(
                     workflow.update,
                     update_scenario,
-                    wait_for_stage=WorkflowUpdateLifecycleStage.ACCEPTED,
+                    wait_for_stage=WorkflowUpdateStage.ACCEPTED,
                     id="my-update-1",
                 )
 
