@@ -1485,6 +1485,24 @@ async def test_workflow_with_codec(client: Client, env: WorkflowEnvironment):
     await test_workflow_update_handlers_happy(client, env)
 
 
+class PassThroughCodec(PayloadCodec):
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        return list(payloads)
+
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        return list(payloads)
+
+
+async def test_workflow_with_passthrough_codec(client: Client):
+    # Make client with this codec and run the activity test. This used to fail
+    # because there was a bug where the codec couldn't reuse the passed-in
+    # payloads.
+    config = client.config()
+    config["data_converter"] = DataConverter(payload_codec=PassThroughCodec())
+    client = Client(**config)
+    await test_workflow_simple_activity(client)
+
+
 class CustomWorkflowRunner(WorkflowRunner):
     def __init__(self) -> None:
         super().__init__()
