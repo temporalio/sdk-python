@@ -1486,6 +1486,24 @@ async def test_workflow_with_codec(client: Client, env: WorkflowEnvironment):
     await test_workflow_update_handlers_happy(client, env)
 
 
+class PassThroughCodec(PayloadCodec):
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        return list(payloads)
+
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        return list(payloads)
+
+
+async def test_workflow_with_passthrough_codec(client: Client):
+    # Make client with this codec and run the activity test. This used to fail
+    # because there was a bug where the codec couldn't reuse the passed-in
+    # payloads.
+    config = client.config()
+    config["data_converter"] = DataConverter(payload_codec=PassThroughCodec())
+    client = Client(**config)
+    await test_workflow_simple_activity(client)
+
+
 class CustomWorkflowRunner(WorkflowRunner):
     def __init__(self) -> None:
         super().__init__()
@@ -3410,6 +3428,52 @@ async def test_cache_eviction_tear_down(client: Client):
 
         # Confirm no unraisable exceptions
         assert not hook_calls
+
+
+@dataclass
+class CapturedEvictionException:
+    is_replaying: bool
+    exception: BaseException
+
+
+captured_eviction_exceptions: List[CapturedEvictionException] = []
+
+
+@workflow.defn(sandboxed=False)
+class EvictionCaptureExceptionWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Going to sleep so we can force eviction
+        try:
+            await asyncio.sleep(0.01)
+        except BaseException as err:
+            captured_eviction_exceptions.append(
+                CapturedEvictionException(
+                    is_replaying=workflow.unsafe.is_replaying(), exception=err
+                )
+            )
+
+
+async def test_workflow_eviction_exception(client: Client):
+    assert not captured_eviction_exceptions
+
+    # Run workflow with no cache (forces eviction every step)
+    async with new_worker(
+        client, EvictionCaptureExceptionWorkflow, max_cached_workflows=0
+    ) as worker:
+        await client.execute_workflow(
+            EvictionCaptureExceptionWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Confirm expected eviction replaying state and exception type
+    assert len(captured_eviction_exceptions) == 1
+    assert captured_eviction_exceptions[0].is_replaying
+    assert (
+        type(captured_eviction_exceptions[0].exception).__name__
+        == "_WorkflowBeingEvictedError"
+    )
 
 
 @dataclass

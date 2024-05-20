@@ -637,6 +637,9 @@ class _WorkflowInstanceImpl(
     ) -> None:
         self._deleting = True
         self._cancel_requested = True
+        # We consider eviction to be under replay so that certain code like
+        # logging that avoids replaying doesn't run during eviction either
+        self._is_replaying = True
         # Cancel everything
         for task in self._tasks:
             task.cancel()
@@ -1514,7 +1517,9 @@ class _WorkflowInstanceImpl(
         self, action_attempted: str, *, allow_during_delete: bool = False
     ) -> None:
         if self._deleting and not allow_during_delete:
-            raise RuntimeError(f"Ignoring {action_attempted} while deleting")
+            raise _WorkflowBeingEvictedError(
+                f"Ignoring {action_attempted} while evicting workflow. This is not an error."
+            )
         if self._read_only:
             raise temporalio.workflow.ReadOnlyContextError(
                 f"While in read-only function, action attempted: {action_attempted}"
@@ -2614,3 +2619,7 @@ class _ReplaySafeMetricGaugeFloat(
     ) -> None:
         if not temporalio.workflow.unsafe.is_replaying():
             self._underlying.set(value, additional_attributes)
+
+
+class _WorkflowBeingEvictedError(BaseException):
+    pass

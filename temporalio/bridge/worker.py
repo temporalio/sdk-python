@@ -175,6 +175,8 @@ async def _apply_to_payloads(
     if len(payloads) == 0:
         return
     new_payloads = await cb(payloads)
+    if new_payloads is payloads:
+        return
     del payloads[:]
     # TODO(cretz): Copy too expensive?
     payloads.extend(new_payloads)
@@ -189,9 +191,7 @@ async def _apply_to_payload(
 ) -> None:
     """Apply API payload callback to payload."""
     new_payload = (await cb([payload]))[0]
-    payload.metadata.clear()
-    payload.metadata.update(new_payload.metadata)
-    payload.data = new_payload.data
+    payload.CopyFrom(new_payload)
 
 
 async def _decode_payloads(
