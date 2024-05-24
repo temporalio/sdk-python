@@ -54,6 +54,7 @@ from temporalio.client import (
     WorkflowQueryFailedError,
     WorkflowUpdateFailedError,
     WorkflowUpdateHandle,
+    WorkflowUpdateStage,
 )
 from temporalio.common import (
     RawValue,
@@ -4235,6 +4236,124 @@ async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironme
 
 
 @workflow.defn
+class ImmediatelyCompleteUpdateAndWorkflow:
+    def __init__(self) -> None:
+        self._got_update = "no"
+
+    @workflow.run
+    async def run(self) -> str:
+        return "workflow-done"
+
+    @workflow.update
+    async def update(self) -> str:
+        self._got_update = "yes"
+        return "update-done"
+
+    @workflow.query
+    def got_update(self) -> str:
+        return self._got_update
+
+
+async def test_workflow_update_before_worker_start(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    # In order to confirm that all started workflows get updates before the
+    # workflow completes, this test will start a workflow and start an update.
+    # Only then will it start the worker to process both in the task. The
+    # workflow and update should both succeed properly. This also invokes a
+    # query to confirm update mutation. We do this with the cache off to confirm
+    # replay behavior.
+
+    # Start workflow
+    task_queue = f"tq-{uuid.uuid4()}"
+    handle = await client.start_workflow(
+        ImmediatelyCompleteUpdateAndWorkflow.run,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+
+    # Execute update in background
+    update_task = asyncio.create_task(
+        handle.execute_update(ImmediatelyCompleteUpdateAndWorkflow.update)
+    )
+
+    # Start no-cache worker on the task queue
+    async with new_worker(
+        client,
+        ImmediatelyCompleteUpdateAndWorkflow,
+        task_queue=task_queue,
+        max_cached_workflows=0,
+    ):
+        # Confirm workflow completed as expected
+        assert "workflow-done" == await handle.result()
+        assert "update-done" == await update_task
+        assert "yes" == await handle.query(
+            ImmediatelyCompleteUpdateAndWorkflow.got_update
+        )
+
+
+@workflow.defn
+class UpdateSeparateHandleWorkflow:
+    def __init__(self) -> None:
+        self._complete = False
+        self._complete_update = False
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self._complete)
+        return "workflow-done"
+
+    @workflow.update
+    async def update(self) -> str:
+        await workflow.wait_condition(lambda: self._complete_update)
+        self._complete = True
+        return "update-done"
+
+    @workflow.signal
+    async def signal(self) -> None:
+        self._complete_update = True
+
+
+async def test_workflow_update_separate_handle(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    async with new_worker(client, UpdateSeparateHandleWorkflow) as worker:
+        # Start the workflow
+        handle = await client.start_workflow(
+            UpdateSeparateHandleWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Start an update waiting on accepted
+        update_handle_1 = await handle.start_update(
+            UpdateSeparateHandleWorkflow.update,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+        )
+
+        # Create another handle and have them both wait for update complete
+        update_handle_2 = client.get_workflow_handle(
+            handle.id, run_id=handle.result_run_id
+        ).get_update_handle_for(UpdateSeparateHandleWorkflow.update, update_handle_1.id)
+        update_handle_task1 = asyncio.create_task(update_handle_1.result())
+        update_handle_task2 = asyncio.create_task(update_handle_2.result())
+
+        # Signal completion and confirm all completed as expected
+        await handle.signal(UpdateSeparateHandleWorkflow.signal)
+        assert "update-done" == await update_handle_task1
+        assert "update-done" == await update_handle_task2
+        assert "workflow-done" == await handle.result()
+
+
+@workflow.defn
 class TimeoutSupportWorkflow:
     @workflow.run
     async def run(self, approach: str) -> None:
@@ -4492,7 +4611,10 @@ async def test_workflow_failure_types_configured(
             update_handle: Optional[WorkflowUpdateHandle[Any]] = None
             if update_scenario:
                 update_handle = await handle.start_update(
-                    workflow.update, update_scenario, id="my-update-1"
+                    workflow.update,
+                    update_scenario,
+                    wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+                    id="my-update-1",
                 )
 
             # Expect task or exception fail
@@ -4508,7 +4630,9 @@ async def test_workflow_failure_types_configured(
                             return True
                     return False
 
-                await assert_eq_eventually(True, has_expected_task_fail)
+                await assert_eq_eventually(
+                    True, has_expected_task_fail, timeout=timedelta(seconds=20)
+                )
             else:
                 with pytest.raises(TemporalError) as err:
                     # Update does not throw on non-determinism, the workflow
