@@ -4378,7 +4378,7 @@ def as_completed(
     if asyncio.isfuture(fs) or asyncio.iscoroutine(fs):
         raise TypeError(f"expect an iterable of futures, not {type(fs).__name__}")
 
-    done = asyncio.Queue[Optional[asyncio.Future]]()
+    done: asyncio.Queue[Optional[asyncio.Future]] = asyncio.Queue()
 
     loop = asyncio.get_event_loop()
     todo: List[asyncio.Future] = [asyncio.ensure_future(f, loop=loop) for f in list(fs)]
