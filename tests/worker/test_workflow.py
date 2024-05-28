@@ -4759,3 +4759,84 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             # Terminate both
             await handle1.terminate()
             await handle2.terminate()
+
+
+@activity.defn(dynamic=True)
+async def return_name_activity(args: Sequence[RawValue]) -> str:
+    return activity.info().activity_type
+
+
+@workflow.defn
+class AsCompletedWorkflow:
+    @workflow.run
+    async def run(self) -> List[str]:
+        # Lazily start 10 different activities and wait for each completed
+        tasks = [
+            workflow.execute_activity(
+                f"my-activity-{i}", start_to_close_timeout=timedelta(seconds=1)
+            )
+            for i in range(10)
+        ]
+
+        # Using asyncio.as_completed like below almost always fails with
+        # non-determinism error because it uses sets internally, but we can't
+        # assert on that because it could _technically_ pass though unlikely:
+        # return [await task for task in asyncio.as_completed(tasks)]
+
+        return [await task for task in workflow.as_completed(tasks)]
+
+
+async def test_workflow_as_completed_utility(client: Client):
+    # Disable cache to force replay
+    async with new_worker(
+        client,
+        AsCompletedWorkflow,
+        activities=[return_name_activity],
+        max_cached_workflows=0,
+    ) as worker:
+        # This would fail if we used asyncio.as_completed in the workflow
+        result = await client.execute_workflow(
+            AsCompletedWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert len(result) == 10
+
+
+@workflow.defn
+class WaitWorkflow:
+    @workflow.run
+    async def run(self) -> List[str]:
+        # Create 10 tasks that return activity names, wait on them, then execute
+        # the activities
+        async def new_activity_name(index: int) -> str:
+            return f"my-activity-{index}"
+
+        name_tasks = [asyncio.create_task(new_activity_name(i)) for i in range(10)]
+
+        # Using asyncio.wait like below almost always fails with non-determinism
+        # error because it returns sets, but we can't assert on that because it
+        # could _technically_ pass though unlikely:
+        # done, _ = await asyncio.wait(name_tasks)
+
+        done, _ = await workflow.wait(name_tasks)
+        return [
+            await workflow.execute_activity(
+                await activity_name, start_to_close_timeout=timedelta(seconds=1)
+            )
+            for activity_name in done
+        ]
+
+
+async def test_workflow_wait_utility(client: Client):
+    # Disable cache to force replay
+    async with new_worker(
+        client, WaitWorkflow, activities=[return_name_activity], max_cached_workflows=0
+    ) as worker:
+        # This would fail if we used asyncio.wait in the workflow
+        result = await client.execute_workflow(
+            WaitWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert len(result) == 10

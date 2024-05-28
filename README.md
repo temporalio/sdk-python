@@ -61,7 +61,8 @@ informal introduction to the features and their implementation.
       - [Invoking Child Workflows](#invoking-child-workflows)
       - [Timers](#timers)
       - [Conditions](#conditions)
-      - [Asyncio and Cancellation](#asyncio-and-cancellation)
+      - [Asyncio and Determinism](#asyncio-and-determinism)
+      - [Asyncio Cancellation](#asyncio-cancellation)
       - [Workflow Utilities](#workflow-utilities)
       - [Exceptions](#exceptions)
       - [External Workflows](#external-workflows)
@@ -550,8 +551,9 @@ Some things to note about the above workflow code:
 * This workflow continually updates the queryable current greeting when signalled and can complete with the greeting on
   a different signal
 * Workflows are always classes and must have a single `@workflow.run` which is an `async def` function
-* Workflow code must be deterministic. This means no threading, no randomness, no external calls to processes, no
-  network IO, and no global state mutation. All code must run in the implicit `asyncio` event loop and be deterministic.
+* Workflow code must be deterministic. This means no `set` iteration, threading, no randomness, no external calls to
+  processes, no network IO, and no global state mutation. All code must run in the implicit `asyncio` event loop and be
+  deterministic. Also see the [Asyncio and Determinism](#asyncio-and-determinism) section later.
 * `@activity.defn` is explained in a later section. For normal simple string concatenation, this would just be done in
   the workflow. The activity is for demonstration purposes only.
 * `workflow.execute_activity(create_greeting_activity, ...` is actually a typed signature, and MyPy will fail if the
@@ -678,15 +680,25 @@ Some things to note about the above code:
 * A `timeout` can optionally be provided which will throw a `asyncio.TimeoutError` if reached (internally backed by
   `asyncio.wait_for` which uses a timer)
 
-#### Asyncio and Cancellation
+#### Asyncio and Determinism
 
-Workflows are backed by a custom [asyncio](https://docs.python.org/3/library/asyncio.html) event loop. This means many
-of the common `asyncio` calls work as normal. Some asyncio features are disabled such as:
+Workflows must be deterministic. Workflows are backed by a custom
+[asyncio](https://docs.python.org/3/library/asyncio.html) event loop. This means many of the common `asyncio` calls work
+as normal. Some asyncio features are disabled such as:
 
 * Thread related calls such as `to_thread()`, `run_coroutine_threadsafe()`, `loop.run_in_executor()`, etc
 * Calls that alter the event loop such as `loop.close()`, `loop.stop()`, `loop.run_forever()`,
   `loop.set_task_factory()`, etc
 * Calls that use anything external such as networking, subprocesses, disk IO, etc
+
+Also, there are some `asyncio` utilities that internally use `set()` which can make them non-deterministic from one
+worker to the next. Therefore the following `asyncio` functions have `workflow`-module alternatives that are
+deterministic:
+
+* `asyncio.as_completed()` - use `workflow.as_completed()`
+* `asyncio.wait()` - use `workflow.wait()`
+
+#### Asyncio Cancellation
 
 Cancellation is done the same way as `asyncio`. Specifically, a task can be requested to be cancelled but does not
 necessarily have to respect that cancellation immediately. This also means that `asyncio.shield()` can be used to
