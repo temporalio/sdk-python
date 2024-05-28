@@ -261,7 +261,10 @@ class _WorkflowWorker:
             # TODO(cretz): Should we build a complex mechanism to continually
             # try the eviction until it succeeds?
             if cache_remove_job:
-                logger.exception("Failed running eviction job, not evicting")
+                logger.exception(
+                    "Failed running eviction job, not evicting. "
+                    + "Since eviction could not be processed, this worker cannot complete and the slot will remain forever used."
+                )
                 self._could_not_evict_count += 1
                 return
 

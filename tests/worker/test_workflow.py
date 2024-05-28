@@ -2467,6 +2467,8 @@ async def test_workflow_deadlock(client: Client):
     async with new_worker(
         client, DeadlockedWorkflow, disable_safe_workflow_eviction=True
     ) as worker:
+        if worker._workflow_worker:
+            worker._workflow_worker._deadlock_timeout_seconds = 1
         deadlock_thread_event.clear()
         handle = await client.start_workflow(
             DeadlockedWorkflow.run,
@@ -2488,13 +2490,71 @@ async def test_workflow_deadlock(client: Client):
 
         try:
             await assert_eq_eventually(
-                "[TMPRL1101] Potential deadlock detected, workflow didn't yield within 2 second(s)",
+                "[TMPRL1101] Potential deadlock detected, workflow didn't yield within 1 second(s)",
                 last_history_task_failure,
                 timeout=timedelta(seconds=5),
                 interval=timedelta(seconds=1),
             )
         finally:
             deadlock_thread_event.set()
+
+
+@workflow.defn
+class EvictionDeadlockWorkflow:
+    def __init__(self) -> None:
+        self.val = 1
+
+    async def wait_until_positive(self):
+        while True:
+            await workflow.wait_condition(lambda: self.val > 0)
+            self.val = -self.val
+
+    async def wait_until_negative(self):
+        while True:
+            await workflow.wait_condition(lambda: self.val < 0)
+            self.val = -self.val
+
+    @workflow.run
+    async def run(self):
+        await asyncio.gather(self.wait_until_negative(), self.wait_until_positive())
+
+
+async def test_workflow_eviction_deadlock(client: Client):
+    # We are running the worker, but we can't ever shut it down on eviction
+    # error so we send shutdown in the background and leave this worker dangling
+    worker = new_worker(client, EvictionDeadlockWorkflow)
+    if worker._workflow_worker:
+        worker._workflow_worker._deadlock_timeout_seconds = 1
+    worker_task = asyncio.create_task(worker.run())
+
+    # Run workflow that deadlocks
+    handle = await client.start_workflow(
+        EvictionDeadlockWorkflow.run,
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=worker.task_queue,
+    )
+
+    async def last_history_task_failure() -> str:
+        resp = await client.workflow_service.get_workflow_execution_history(
+            GetWorkflowExecutionHistoryRequest(
+                namespace=client.namespace,
+                execution=WorkflowExecution(workflow_id=handle.id),
+            ),
+        )
+        for event in reversed(resp.history.events):
+            if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
+                return event.workflow_task_failed_event_attributes.failure.message
+        return "<no failure>"
+
+    await assert_eq_eventually(
+        "[TMPRL1101] Potential deadlock detected, workflow didn't yield within 1 second(s)",
+        last_history_task_failure,
+        timeout=timedelta(seconds=5),
+        interval=timedelta(seconds=1),
+    )
+
+    # Send cancel but don't wait
+    worker_task.cancel()
 
 
 class PatchWorkflowBase:

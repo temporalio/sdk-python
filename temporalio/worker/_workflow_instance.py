@@ -357,7 +357,7 @@ class _WorkflowInstanceImpl(
         # have a different workflow/event-loop going.
         if self._deleting and self._tasks:
             raise RuntimeError(
-                f"Cache removal processed, but {len(self._tasks)} tasks remain. "
+                f"Eviction processed, but {len(self._tasks)} tasks remain. "
                 + f"Stack traces below:\n\n{self._stack_trace()}"
             )
 
@@ -1776,7 +1776,7 @@ class _WorkflowInstanceImpl(
 
     def _stack_trace(self) -> str:
         stacks = []
-        for task in self._tasks:
+        for task in list(self._tasks):
             # TODO(cretz): These stacks are not very clean currently
             frames = []
             for frame in task.get_stack():
