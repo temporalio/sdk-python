@@ -38,8 +38,10 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
+from temporalio.api.update.v1 import UpdateRef
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
+    PollWorkflowExecutionUpdateRequest,
     ResetStickyTaskQueueRequest,
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
@@ -4216,10 +4218,35 @@ async def test_workflow_update_before_worker_start(
         task_queue=task_queue,
     )
 
+    async def update_exists() -> bool:
+        try:
+            await client.workflow_service.poll_workflow_execution_update(
+                PollWorkflowExecutionUpdateRequest(
+                    namespace=client.namespace,
+                    update_ref=UpdateRef(
+                        workflow_execution=WorkflowExecution(workflow_id=handle.id),
+                        update_id="my-update",
+                    ),
+                )
+            )
+            return True
+        except RPCError as err:
+            if err.status != RPCStatusCode.NOT_FOUND:
+                raise
+            return False
+
+    # Confirm update not there
+    assert not await update_exists()
+
     # Execute update in background
     update_task = asyncio.create_task(
-        handle.execute_update(ImmediatelyCompleteUpdateAndWorkflow.update)
+        handle.execute_update(
+            ImmediatelyCompleteUpdateAndWorkflow.update, id="my-update"
+        )
     )
+
+    # Wait until update exists
+    await assert_eq_eventually(True, update_exists)
 
     # Start no-cache worker on the task queue
     async with new_worker(
