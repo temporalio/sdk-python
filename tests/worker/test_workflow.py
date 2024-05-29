@@ -2065,7 +2065,7 @@ class StackTraceWorkflow:
             ),
             self.never_completing_coroutine(),
         ]
-        await asyncio.wait([asyncio.create_task(v) for v in awaitables])
+        await workflow.wait([asyncio.create_task(v) for v in awaitables])
 
     async def never_completing_coroutine(self) -> None:
         self._status = "waiting"
