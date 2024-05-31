@@ -71,34 +71,6 @@ from ._interceptor import (
 
 from temporalio.service import __version__
 
-@dataclass
-class SDKInfo:
-    name    : str
-    version : str
-        
-@dataclass
-class FileSlice:
-    content    : str
-    lineOffset : int
-
-@dataclass
-class FileLocation:
-    filePath     : str
-    line         : Optional[int] = -1
-    column       : Optional[int] = -1
-    functionName : Optional[str] = None
-        
-@dataclass
-class StackTrace:
-    locations : list[FileLocation]
-        
-@dataclass
-class EnhancedStackTrace:
-    sdk     : SDKInfo
-    sources : dict[str, FileSlice]
-    stacks  : list[StackTrace]
-
-
 logger = logging.getLogger(__name__)
 
 # Set to true to log all cases where we're ignoring things during delete
@@ -285,7 +257,7 @@ class _WorkflowInstanceImpl(
             fn=self._enhanced_stack_trace,
             is_method=False,
             arg_types=[],
-            ret_type=EnhancedStackTrace,
+            ret_type=temporalio.common._EnhancedStackTrace,
         )
 
         # Maintain buffered signals for later-added dynamic handlers
@@ -1829,8 +1801,8 @@ class _WorkflowInstanceImpl(
             )
         return "\n\n".join(stacks)
     
-    def _enhanced_stack_trace(self) -> EnhancedStackTrace:
-        sdk = SDKInfo("sdk-python", __version__)
+    def _enhanced_stack_trace(self) -> temporalio.common._EnhancedStackTrace:
+        sdk = temporalio.common._SDKInfo("sdk-python", __version__)
 
         sources = dict()
         stacks = []
@@ -1851,14 +1823,14 @@ class _WorkflowInstanceImpl(
                 except Exception:
                     code = "Generic Error.\n\n%s" % traceback.format_exc()
                 
-                file_slice = FileSlice(code, line_number)
-                file_location = FileLocation(filename, line = line_number, functionName = func_name)
+                file_slice = temporalio.common._FileSlice(code, line_number)
+                file_location = temporalio.common._FileLocation(filename, line = line_number, functionName = func_name)
                 
                 sources["%s %d" % (filename, line_number)] = file_slice
                 stacks.append(file_location)
                 
                 
-        est = EnhancedStackTrace(sdk, sources, stacks)
+        est = temporalio.common._EnhancedStackTrace(sdk, sources, stacks)
         return est
 
     #### asyncio.AbstractEventLoop function impls ####
