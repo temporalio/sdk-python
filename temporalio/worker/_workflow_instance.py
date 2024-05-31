@@ -69,6 +69,36 @@ from ._interceptor import (
     WorkflowOutboundInterceptor,
 )
 
+from temporalio.service import __version__
+
+@dataclass
+class SDKInfo:
+    name    : str
+    version : str
+        
+@dataclass
+class FileSlice:
+    content    : str
+    lineOffset : int
+
+@dataclass
+class FileLocation:
+    filePath     : str
+    line         : Optional[int] = -1
+    column       : Optional[int] = -1
+    functionName : Optional[str] = None
+        
+@dataclass
+class StackTrace:
+    locations : list[FileLocation]
+        
+@dataclass
+class EnhancedStackTrace:
+    sdk     : SDKInfo
+    sources : dict[str, FileSlice]
+    stacks  : list[StackTrace]
+
+
 logger = logging.getLogger(__name__)
 
 # Set to true to log all cases where we're ignoring things during delete
@@ -248,6 +278,14 @@ class _WorkflowInstanceImpl(
             is_method=False,
             arg_types=[],
             ret_type=str,
+        )
+
+        self._queries["__enhanced_stack_trace"] = temporalio.workflow._QueryDefinition(
+            name="__enhanced_stack_trace",
+            fn=self._enhanced_stack_trace,
+            is_method=False,
+            arg_types=[],
+            ret_type=EnhancedStackTrace,
         )
 
         # Maintain buffered signals for later-added dynamic handlers
@@ -1790,6 +1828,38 @@ class _WorkflowInstanceImpl(
                 + "\n".join(traceback.format_list(frames))
             )
         return "\n\n".join(stacks)
+    
+    def _enhanced_stack_trace(self) -> EnhancedStackTrace:
+        sdk = SDKInfo("sdk-python", __version__)
+
+        sources = dict()
+        stacks = []
+        
+        for task in list(self._tasks):
+            for frame in task.get_stack():
+                filename = frame.f_code.co_filename
+                line_number = frame.f_lineno
+                func_name = frame.f_code.co_name
+                
+                try:
+                    source = inspect.getsourcelines(frame)
+                    code = ''.join(source[0])
+                    line_number = int(source[1])
+                except OSError as ose:
+                    code = "Cannot access code.\n---\n%s" % ose.strerror
+                    # TODO possibly include sentinel/property for success of src scrape? work out with ui
+                except Exception:
+                    code = "Generic Error.\n\n%s" % traceback.format_exc()
+                
+                file_slice = FileSlice(code, line_number)
+                file_location = FileLocation(filename, line = line_number, functionName = func_name)
+                
+                sources["%s %d" % (filename, line_number)] = file_slice
+                stacks.append(file_location)
+                
+                
+        est = EnhancedStackTrace(sdk, sources, stacks)
+        return est
 
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many

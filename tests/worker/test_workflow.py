@@ -92,7 +92,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
 )
-from temporalio.service import RPCError, RPCStatusCode
+from temporalio.service import RPCError, RPCStatusCode, __version__
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
@@ -494,7 +494,7 @@ async def test_workflow_signal_and_query_errors(client: Client):
             await handle.query("non-existent query")
         assert str(rpc_err.value) == (
             "Query handler for 'non-existent query' expected but not found,"
-            " known queries: [__stack_trace bad_query other_query]"
+            " known queries: [__enhanced_stack_trace __stack_trace bad_query other_query]"
         )
 
 
@@ -2096,6 +2096,30 @@ async def test_workflow_stack_trace(client: Client):
         trace = await handle.query("__stack_trace")
         # TODO(cretz): Do more specific checks once we clean up traces
         assert "never_completing_coroutine" in trace
+
+async def test_workflow_enhanced_stack_trace(client: Client):
+    async with new_worker(
+        client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+    ) as worker:
+        handle = await client.start_workflow(
+            StackTraceWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Wait until waiting
+        async def status() -> str:
+            return await handle.query(StackTraceWorkflow.status)
+
+        await assert_eq_eventually("waiting", status)
+
+        # Send stack trace query
+        trace = await handle.query("__enhanced_stack_trace")
+        
+        assert "never_completing_coroutine" in [ stack['functionName'] for stack in trace['stacks'] ]
+        # first line of never_completing_coroutine
+        assert 'self._status = "waiting"' in str(trace['sources'])
+        assert trace['sdk']['version'] == __version__
 
 
 @dataclass
