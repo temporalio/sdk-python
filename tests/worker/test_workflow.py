@@ -2122,7 +2122,9 @@ async def test_workflow_enhanced_stack_trace(client: Client):
         trace = await handle.query("__enhanced_stack_trace")
 
         assert "never_completing_coroutine" in [
-            stack["functionName"] for stack in trace["stacks"]
+            loc["functionName"]
+            for stack in trace["stacks"]
+            for loc in stack["locations"]
         ]
         # first line of never_completing_coroutine
         assert 'self._status = "waiting"' in str(trace["sources"])
@@ -2145,12 +2147,21 @@ async def test_workflow_enhanced_stack_trace(client: Client):
         trace = await handle.query("__enhanced_stack_trace")
 
         assert "never_completing_coroutine" in [
-            stack["functionName"] for stack in trace["stacks"]
+            loc["functionName"]
+            for stack in trace["stacks"]
+            for loc in stack["locations"]
         ]
-        assert 'self._status = "waiting" # with external comment' in str(
-            trace["sources"]
+
+        fn = None
+        for source in trace["sources"].keys():
+            if source.endswith("externalstacktrace.py 53"):
+                fn = source
+
+        assert fn != None
+        assert (
+            'self._status = "waiting"  # with external comment'
+            in trace["sources"][fn]["content"]
         )
-        assert "externalstacktrace.py" in str(trace["sources"])
         assert trace["sdk"]["version"] == __version__
 
 

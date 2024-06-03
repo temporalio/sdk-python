@@ -1807,6 +1807,7 @@ class _WorkflowInstanceImpl(
         stacks = []
 
         for task in list(self._tasks):
+            locations = []
             for frame in task.get_stack():
                 filename = frame.f_code.co_filename
                 line_number = frame.f_lineno
@@ -1828,7 +1829,9 @@ class _WorkflowInstanceImpl(
                 )
 
                 sources["%s %d" % (filename, line_number)] = file_slice
-                stacks.append(file_location)
+                locations.append(file_location)
+
+            stacks.append(temporalio.common._StackTrace(locations))
 
         est = temporalio.common._EnhancedStackTrace(sdk, sources, stacks)
         return est
