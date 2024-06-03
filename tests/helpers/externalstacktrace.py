@@ -17,7 +17,7 @@ class ExternalLongSleepWorkflow:
 
 
 @activity.defn
-async def wait_cancel() -> str:
+async def external_wait_cancel() -> str:
     try:
         if activity.info().is_local:
             await asyncio.sleep(1000)
@@ -41,7 +41,7 @@ class ExternalStackTraceWorkflow:
         awaitables = [
             asyncio.sleep(1000),
             workflow.execute_activity(
-                wait_cancel, schedule_to_close_timeout=timedelta(seconds=1000)
+                external_wait_cancel, schedule_to_close_timeout=timedelta(seconds=1000)
             ),
             workflow.execute_child_workflow(
                 ExternalLongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child"
