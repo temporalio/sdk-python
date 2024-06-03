@@ -1045,29 +1045,34 @@ def _type_hints_from_func(
         args.append(arg_hint)  # type: ignore
     return args, ret
 
+
 @dataclass
 class _SDKInfo:
-    name    : str
-    version : str
-        
+    name: str
+    version: str
+
+
 @dataclass
 class _FileSlice:
-    content    : str
-    lineOffset : int
+    content: str
+    lineOffset: int
+
 
 @dataclass
 class _FileLocation:
-    filePath     : str
-    line         : Optional[int] = -1
-    column       : Optional[int] = -1
-    functionName : Optional[str] = None
-        
+    filePath: str
+    line: Optional[int] = -1
+    column: Optional[int] = -1
+    functionName: Optional[str] = None
+
+
 @dataclass
 class _StackTrace:
-    locations : list[_FileLocation]
-        
+    locations: list[_FileLocation]
+
+
 @dataclass
 class _EnhancedStackTrace:
-    sdk     : _SDKInfo
-    sources : dict[str, _FileSlice]
-    stacks  : list[_StackTrace]
+    sdk: _SDKInfo
+    sources: dict[str, _FileSlice]
+    stacks: list[_StackTrace]

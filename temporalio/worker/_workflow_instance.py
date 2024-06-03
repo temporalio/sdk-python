@@ -53,6 +53,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
+from temporalio.service import __version__
 
 from ._interceptor import (
     ContinueAsNewInput,
@@ -68,8 +69,6 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
-
-from temporalio.service import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -1800,36 +1799,37 @@ class _WorkflowInstanceImpl(
                 + "\n".join(traceback.format_list(frames))
             )
         return "\n\n".join(stacks)
-    
+
     def _enhanced_stack_trace(self) -> temporalio.common._EnhancedStackTrace:
         sdk = temporalio.common._SDKInfo("sdk-python", __version__)
 
         sources = dict()
         stacks = []
-        
+
         for task in list(self._tasks):
             for frame in task.get_stack():
                 filename = frame.f_code.co_filename
                 line_number = frame.f_lineno
                 func_name = frame.f_code.co_name
-                
+
                 try:
                     source = inspect.getsourcelines(frame)
-                    code = ''.join(source[0])
+                    code = "".join(source[0])
                     line_number = int(source[1])
                 except OSError as ose:
                     code = "Cannot access code.\n---\n%s" % ose.strerror
                     # TODO possibly include sentinel/property for success of src scrape? work out with ui
                 except Exception:
                     code = "Generic Error.\n\n%s" % traceback.format_exc()
-                
+
                 file_slice = temporalio.common._FileSlice(code, line_number)
-                file_location = temporalio.common._FileLocation(filename, line = line_number, functionName = func_name)
-                
+                file_location = temporalio.common._FileLocation(
+                    filename, line=line_number, functionName=func_name
+                )
+
                 sources["%s %d" % (filename, line_number)] = file_slice
                 stacks.append(file_location)
-                
-                
+
         est = temporalio.common._EnhancedStackTrace(sdk, sources, stacks)
         return est
 

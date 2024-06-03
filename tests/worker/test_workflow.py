@@ -107,7 +107,11 @@ from tests.helpers import (
     find_free_port,
     new_worker,
 )
-from tests.helpers.externalstacktrace import ExternalStackTraceWorkflow, ExternalLongSleepWorkflow
+from tests.helpers.externalstacktrace import (
+    ExternalLongSleepWorkflow,
+    ExternalStackTraceWorkflow,
+)
+
 
 @workflow.defn
 class HelloWorkflow:
@@ -2097,6 +2101,7 @@ async def test_workflow_stack_trace(client: Client):
         # TODO(cretz): Do more specific checks once we clean up traces
         assert "never_completing_coroutine" in trace
 
+
 async def test_workflow_enhanced_stack_trace(client: Client):
     async with new_worker(
         client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
@@ -2115,29 +2120,38 @@ async def test_workflow_enhanced_stack_trace(client: Client):
 
         # Send stack trace query
         trace = await handle.query("__enhanced_stack_trace")
-        
-        assert "never_completing_coroutine" in [ stack['functionName'] for stack in trace['stacks'] ]
+
+        assert "never_completing_coroutine" in [
+            stack["functionName"] for stack in trace["stacks"]
+        ]
         # first line of never_completing_coroutine
-        assert 'self._status = "waiting"' in str(trace['sources'])
-        assert trace['sdk']['version'] == __version__
+        assert 'self._status = "waiting"' in str(trace["sources"])
+        assert trace["sdk"]["version"] == __version__
 
     async with new_worker(
-        client, ExternalStackTraceWorkflow, ExternalLongSleepWorkflow, activities=[wait_cancel]
+        client,
+        ExternalStackTraceWorkflow,
+        ExternalLongSleepWorkflow,
+        activities=[wait_cancel],
     ) as worker:
         handle = await client.start_workflow(
             ExternalStackTraceWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue
+            task_queue=worker.task_queue,
         )
 
         await assert_eq_eventually("waiting", status)
 
         trace = await handle.query("__enhanced_stack_trace")
 
-        assert "never_completing_coroutine" in [ stack['functionName'] for stack in trace['stacks'] ]
-        assert 'self._status = "waiting" # with external comment' in str(trace['sources'])
-        assert 'externalstacktrace.py' in str(trace['sources'])
-        assert trace['sdk']['version'] == __version__
+        assert "never_completing_coroutine" in [
+            stack["functionName"] for stack in trace["stacks"]
+        ]
+        assert 'self._status = "waiting" # with external comment' in str(
+            trace["sources"]
+        )
+        assert "externalstacktrace.py" in str(trace["sources"])
+        assert trace["sdk"]["version"] == __version__
 
 
 @dataclass

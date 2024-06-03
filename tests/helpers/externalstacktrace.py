@@ -1,7 +1,8 @@
-from datetime import timedelta
 import asyncio
+from datetime import timedelta
 
-from temporalio import workflow, activity
+from temporalio import activity, workflow
+
 
 @workflow.defn
 class ExternalLongSleepWorkflow:
@@ -13,6 +14,7 @@ class ExternalLongSleepWorkflow:
     @workflow.query
     def started(self) -> bool:
         return self._started
+
 
 @activity.defn
 async def wait_cancel() -> str:
@@ -26,6 +28,7 @@ async def wait_cancel() -> str:
         return "Manually stopped"
     except asyncio.CancelledError:
         return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
+
 
 @workflow.defn
 class ExternalStackTraceWorkflow:
@@ -48,7 +51,7 @@ class ExternalStackTraceWorkflow:
         await asyncio.wait([asyncio.create_task(v) for v in awaitables])
 
     async def never_completing_coroutine(self) -> None:
-        self._status = "waiting" # with external comment
+        self._status = "waiting"  # with external comment
         await workflow.wait_condition(lambda: False)
 
     @workflow.query
