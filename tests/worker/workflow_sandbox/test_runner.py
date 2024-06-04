@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import functools
 import inspect
@@ -428,6 +429,46 @@ async def test_workflow_sandbox_known_issues(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
+
+@workflow.defn
+class BadAsyncioWorkflow:
+    @workflow.run
+    async def run(self) -> List[str]:
+        # Two known bad asyncio task calls, as_completed and wait
+        async def return_value(value: str) -> str:
+            return value
+
+        ret = []
+        for coro in asyncio.as_completed([return_value("val1"), return_value("val2")]):
+            ret.append(await coro)
+        done, _ = await asyncio.wait(
+            [
+                asyncio.create_task(return_value("val3")),
+                asyncio.create_task(return_value("val4")),
+            ]
+        )
+        for task in done:
+            ret.append(await task)
+        return ret
+
+
+async def test_workflow_sandbox_bad_asyncio(client: Client):
+    async with new_worker(client, BadAsyncioWorkflow) as worker:
+        # We currently warn on this
+        with pytest.warns(UserWarning) as warnings:
+            result = await client.execute_workflow(
+                BadAsyncioWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert "val1" in result[:2]
+        assert "val2" in result[:2]
+        assert "val3" in result[2:]
+        assert "val4" in result[2:]
+        assert len(warnings) == 2
+        assert "asyncio.as_completed()" in str(warnings[0].message)
+        assert "asyncio.wait()" in str(warnings[1].message)
 
 
 def new_worker(
