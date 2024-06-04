@@ -113,3 +113,123 @@ SEVERITY_HIGH: Severity.ValueType  # 1
 SEVERITY_MEDIUM: Severity.ValueType  # 2
 SEVERITY_LOW: Severity.ValueType  # 3
 global___Severity = Severity
+
+class _CallbackState:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _CallbackStateEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _CallbackState.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    CALLBACK_STATE_UNSPECIFIED: _CallbackState.ValueType  # 0
+    """Default value, unspecified state."""
+    CALLBACK_STATE_STANDBY: _CallbackState.ValueType  # 1
+    """Callback is standing by, waiting to be triggered."""
+    CALLBACK_STATE_SCHEDULED: _CallbackState.ValueType  # 2
+    """Callback is in the queue waiting to be executed or is currently executing."""
+    CALLBACK_STATE_BACKING_OFF: _CallbackState.ValueType  # 3
+    """Callback has failed with a retryable error and is backing off before the next attempt."""
+    CALLBACK_STATE_FAILED: _CallbackState.ValueType  # 4
+    """Callback has failed."""
+    CALLBACK_STATE_SUCCEEDED: _CallbackState.ValueType  # 5
+    """Callback has succeeded."""
+
+class CallbackState(_CallbackState, metaclass=_CallbackStateEnumTypeWrapper):
+    """State of a callback."""
+
+CALLBACK_STATE_UNSPECIFIED: CallbackState.ValueType  # 0
+"""Default value, unspecified state."""
+CALLBACK_STATE_STANDBY: CallbackState.ValueType  # 1
+"""Callback is standing by, waiting to be triggered."""
+CALLBACK_STATE_SCHEDULED: CallbackState.ValueType  # 2
+"""Callback is in the queue waiting to be executed or is currently executing."""
+CALLBACK_STATE_BACKING_OFF: CallbackState.ValueType  # 3
+"""Callback has failed with a retryable error and is backing off before the next attempt."""
+CALLBACK_STATE_FAILED: CallbackState.ValueType  # 4
+"""Callback has failed."""
+CALLBACK_STATE_SUCCEEDED: CallbackState.ValueType  # 5
+"""Callback has succeeded."""
+global___CallbackState = CallbackState
+
+class _PendingNexusOperationState:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _PendingNexusOperationStateEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _PendingNexusOperationState.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    PENDING_NEXUS_OPERATION_STATE_UNSPECIFIED: _PendingNexusOperationState.ValueType  # 0
+    """Default value, unspecified state."""
+    PENDING_NEXUS_OPERATION_STATE_SCHEDULED: _PendingNexusOperationState.ValueType  # 1
+    """Operation is in the queue waiting to be executed or is currently executing."""
+    PENDING_NEXUS_OPERATION_STATE_BACKING_OFF: _PendingNexusOperationState.ValueType  # 2
+    """Operation has failed with a retryable error and is backing off before the next attempt."""
+    PENDING_NEXUS_OPERATION_STATE_STARTED: _PendingNexusOperationState.ValueType  # 3
+    """Operation was started and will complete asynchronously."""
+
+class PendingNexusOperationState(
+    _PendingNexusOperationState, metaclass=_PendingNexusOperationStateEnumTypeWrapper
+):
+    """State of a pending Nexus operation."""
+
+PENDING_NEXUS_OPERATION_STATE_UNSPECIFIED: PendingNexusOperationState.ValueType  # 0
+"""Default value, unspecified state."""
+PENDING_NEXUS_OPERATION_STATE_SCHEDULED: PendingNexusOperationState.ValueType  # 1
+"""Operation is in the queue waiting to be executed or is currently executing."""
+PENDING_NEXUS_OPERATION_STATE_BACKING_OFF: PendingNexusOperationState.ValueType  # 2
+"""Operation has failed with a retryable error and is backing off before the next attempt."""
+PENDING_NEXUS_OPERATION_STATE_STARTED: PendingNexusOperationState.ValueType  # 3
+"""Operation was started and will complete asynchronously."""
+global___PendingNexusOperationState = PendingNexusOperationState
+
+class _NexusOperationCancellationState:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _NexusOperationCancellationStateEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _NexusOperationCancellationState.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: _NexusOperationCancellationState.ValueType  # 0
+    """Default value, unspecified state."""
+    NEXUS_OPERATION_CANCELLATION_STATE_SCHEDULED: _NexusOperationCancellationState.ValueType  # 1
+    """Cancellation request is in the queue waiting to be executed or is currently executing."""
+    NEXUS_OPERATION_CANCELLATION_STATE_BACKING_OFF: _NexusOperationCancellationState.ValueType  # 2
+    """Cancellation request has failed with a retryable error and is backing off before the next attempt."""
+    NEXUS_OPERATION_CANCELLATION_STATE_SUCCEEDED: _NexusOperationCancellationState.ValueType  # 3
+    """Cancellation request succeeded."""
+    NEXUS_OPERATION_CANCELLATION_STATE_FAILED: _NexusOperationCancellationState.ValueType  # 4
+    """Cancellation request failed with a non-retryable error."""
+    NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT: _NexusOperationCancellationState.ValueType  # 5
+    """The associated operation timed out - exceeded the user supplied schedule-to-close timeout."""
+
+class NexusOperationCancellationState(
+    _NexusOperationCancellationState,
+    metaclass=_NexusOperationCancellationStateEnumTypeWrapper,
+):
+    """State of a Nexus operation cancellation."""
+
+NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: NexusOperationCancellationState.ValueType  # 0
+"""Default value, unspecified state."""
+NEXUS_OPERATION_CANCELLATION_STATE_SCHEDULED: NexusOperationCancellationState.ValueType  # 1
+"""Cancellation request is in the queue waiting to be executed or is currently executing."""
+NEXUS_OPERATION_CANCELLATION_STATE_BACKING_OFF: NexusOperationCancellationState.ValueType  # 2
+"""Cancellation request has failed with a retryable error and is backing off before the next attempt."""
+NEXUS_OPERATION_CANCELLATION_STATE_SUCCEEDED: NexusOperationCancellationState.ValueType  # 3
+"""Cancellation request succeeded."""
+NEXUS_OPERATION_CANCELLATION_STATE_FAILED: NexusOperationCancellationState.ValueType  # 4
+"""Cancellation request failed with a non-retryable error."""
+NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT: NexusOperationCancellationState.ValueType  # 5
+"""The associated operation timed out - exceeded the user supplied schedule-to-close timeout."""
+global___NexusOperationCancellationState = NexusOperationCancellationState

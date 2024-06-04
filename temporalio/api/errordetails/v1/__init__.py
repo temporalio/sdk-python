@@ -1,6 +1,7 @@
 from .message_pb2 import (
     CancellationAlreadyRequestedFailure,
     ClientVersionNotSupportedFailure,
+    MultiOperationExecutionFailure,
     NamespaceAlreadyExistsFailure,
     NamespaceInvalidStateFailure,
     NamespaceNotActiveFailure,
@@ -19,6 +20,7 @@ from .message_pb2 import (
 __all__ = [
     "CancellationAlreadyRequestedFailure",
     "ClientVersionNotSupportedFailure",
+    "MultiOperationExecutionFailure",
     "NamespaceAlreadyExistsFailure",
     "NamespaceInvalidStateFailure",
     "NamespaceNotActiveFailure",

@@ -494,6 +494,7 @@ class SchedulePolicies(google.protobuf.message.Message):
     OVERLAP_POLICY_FIELD_NUMBER: builtins.int
     CATCHUP_WINDOW_FIELD_NUMBER: builtins.int
     PAUSE_ON_FAILURE_FIELD_NUMBER: builtins.int
+    KEEP_ORIGINAL_WORKFLOW_ID_FIELD_NUMBER: builtins.int
     overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType
     """Policy for overlaps.
     Note that this can be changed after a schedule has taken some actions,
@@ -513,12 +514,17 @@ class SchedulePolicies(google.protobuf.message.Message):
     This applies after retry policies: the full chain of retries must fail to
     trigger a pause here.
     """
+    keep_original_workflow_id: builtins.bool
+    """If true, and the action would start a workflow, a timestamp will not be
+    appended to the scheduled workflow id.
+    """
     def __init__(
         self,
         *,
         overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType = ...,
         catchup_window: google.protobuf.duration_pb2.Duration | None = ...,
         pause_on_failure: builtins.bool = ...,
+        keep_original_workflow_id: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["catchup_window", b"catchup_window"]
@@ -528,6 +534,8 @@ class SchedulePolicies(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "catchup_window",
             b"catchup_window",
+            "keep_original_workflow_id",
+            b"keep_original_workflow_id",
             "overlap_policy",
             b"overlap_policy",
             "pause_on_failure",

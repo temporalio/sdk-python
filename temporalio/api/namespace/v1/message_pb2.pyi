@@ -61,12 +61,46 @@ class NamespaceInfo(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    class Capabilities(google.protobuf.message.Message):
+        """Namespace capability details. Should contain what features are enabled in a namespace."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        EAGER_WORKFLOW_START_FIELD_NUMBER: builtins.int
+        SYNC_UPDATE_FIELD_NUMBER: builtins.int
+        ASYNC_UPDATE_FIELD_NUMBER: builtins.int
+        eager_workflow_start: builtins.bool
+        """True if the namespace supports eager workflow start."""
+        sync_update: builtins.bool
+        """True if the namespace supports sync update"""
+        async_update: builtins.bool
+        """True if the namespace supports async update"""
+        def __init__(
+            self,
+            *,
+            eager_workflow_start: builtins.bool = ...,
+            sync_update: builtins.bool = ...,
+            async_update: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "async_update",
+                b"async_update",
+                "eager_workflow_start",
+                b"eager_workflow_start",
+                "sync_update",
+                b"sync_update",
+            ],
+        ) -> None: ...
+
     NAME_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     OWNER_EMAIL_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
+    CAPABILITIES_FIELD_NUMBER: builtins.int
     SUPPORTS_SCHEDULES_FIELD_NUMBER: builtins.int
     name: builtins.str
     state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
@@ -78,6 +112,9 @@ class NamespaceInfo(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """A key-value map for any customized purpose."""
     id: builtins.str
+    @property
+    def capabilities(self) -> global___NamespaceInfo.Capabilities:
+        """All capabilities the namespace supports."""
     supports_schedules: builtins.bool
     """Whether scheduled workflows are supported on this namespace. This is only needed
     temporarily while the feature is experimental, so we can give it a high tag.
@@ -91,11 +128,17 @@ class NamespaceInfo(google.protobuf.message.Message):
         owner_email: builtins.str = ...,
         data: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         id: builtins.str = ...,
+        capabilities: global___NamespaceInfo.Capabilities | None = ...,
         supports_schedules: builtins.bool = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["capabilities", b"capabilities"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "capabilities",
+            b"capabilities",
             "data",
             b"data",
             "description",

@@ -59,15 +59,19 @@ class _WorkflowIdReusePolicyEnumTypeWrapper(
     could potentially change the policy, allowing re-use of the workflow id.
     """
     WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING: _WorkflowIdReusePolicy.ValueType  # 4
-    """If a workflow is running using the same workflow ID, terminate it and start a new one.
-    If no running workflow, then the behavior is the same as ALLOW_DUPLICATE
+    """This option belongs in WorkflowIdConflictPolicy but is here for backwards compatibility.
+    If specified, it acts like ALLOW_DUPLICATE, but also the WorkflowId*Conflict*Policy on
+    the request is treated as WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING.
+    If no running workflow, then the behavior is the same as ALLOW_DUPLICATE.
     """
 
 class WorkflowIdReusePolicy(
     _WorkflowIdReusePolicy, metaclass=_WorkflowIdReusePolicyEnumTypeWrapper
 ):
-    """Defines how new runs of a workflow with a particular ID may or may not be allowed. Note that
-    it is *never* valid to have two actively running instances of the same workflow id.
+    """Defines whether to allow re-using a workflow id from a previously *closed* workflow.
+    If the request is denied, a `WorkflowExecutionAlreadyStartedFailure` is returned.
+
+    See `WorkflowIdConflictPolicy` for handling workflow id duplication with a *running* workflow.
     """
 
 WORKFLOW_ID_REUSE_POLICY_UNSPECIFIED: WorkflowIdReusePolicy.ValueType  # 0
@@ -82,10 +86,49 @@ WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE: WorkflowIdReusePolicy.ValueType  # 3
 could potentially change the policy, allowing re-use of the workflow id.
 """
 WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING: WorkflowIdReusePolicy.ValueType  # 4
-"""If a workflow is running using the same workflow ID, terminate it and start a new one.
-If no running workflow, then the behavior is the same as ALLOW_DUPLICATE
+"""This option belongs in WorkflowIdConflictPolicy but is here for backwards compatibility.
+If specified, it acts like ALLOW_DUPLICATE, but also the WorkflowId*Conflict*Policy on
+the request is treated as WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING.
+If no running workflow, then the behavior is the same as ALLOW_DUPLICATE.
 """
 global___WorkflowIdReusePolicy = WorkflowIdReusePolicy
+
+class _WorkflowIdConflictPolicy:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _WorkflowIdConflictPolicyEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _WorkflowIdConflictPolicy.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    WORKFLOW_ID_CONFLICT_POLICY_UNSPECIFIED: _WorkflowIdConflictPolicy.ValueType  # 0
+    WORKFLOW_ID_CONFLICT_POLICY_FAIL: _WorkflowIdConflictPolicy.ValueType  # 1
+    """Don't start a new workflow; instead return `WorkflowExecutionAlreadyStartedFailure`."""
+    WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING: _WorkflowIdConflictPolicy.ValueType  # 2
+    """Don't start a new workflow; instead return a workflow handle for the running workflow."""
+    WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING: _WorkflowIdConflictPolicy.ValueType  # 3
+    """Terminate the running workflow before starting a new one."""
+
+class WorkflowIdConflictPolicy(
+    _WorkflowIdConflictPolicy, metaclass=_WorkflowIdConflictPolicyEnumTypeWrapper
+):
+    """Defines what to do when trying to start a workflow with the same workflow id as a *running* workflow.
+    Note that it is *never* valid to have two actively running instances of the same workflow id.
+
+    See `WorkflowIdReusePolicy` for handling workflow id duplication with a *closed* workflow.
+    """
+
+WORKFLOW_ID_CONFLICT_POLICY_UNSPECIFIED: WorkflowIdConflictPolicy.ValueType  # 0
+WORKFLOW_ID_CONFLICT_POLICY_FAIL: WorkflowIdConflictPolicy.ValueType  # 1
+"""Don't start a new workflow; instead return `WorkflowExecutionAlreadyStartedFailure`."""
+WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING: WorkflowIdConflictPolicy.ValueType  # 2
+"""Don't start a new workflow; instead return a workflow handle for the running workflow."""
+WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING: WorkflowIdConflictPolicy.ValueType  # 3
+"""Terminate the running workflow before starting a new one."""
+global___WorkflowIdConflictPolicy = WorkflowIdConflictPolicy
 
 class _ParentClosePolicy:
     ValueType = typing.NewType("ValueType", builtins.int)

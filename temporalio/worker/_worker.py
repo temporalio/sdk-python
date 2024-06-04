@@ -439,6 +439,9 @@ class Worker:
         also cancel the shutdown process. Therefore users are encouraged to use
         explicit shutdown instead.
         """
+        # Eagerly validate which will do a namespace check in Core
+        await self._bridge_worker.validate()
+
         if self._started:
             raise RuntimeError("Already started")
         self._started = True

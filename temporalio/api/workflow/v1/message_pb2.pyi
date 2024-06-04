@@ -27,11 +27,13 @@ import builtins
 import collections.abc
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.empty_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import sys
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
@@ -62,6 +64,10 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     MOST_RECENT_WORKER_VERSION_STAMP_FIELD_NUMBER: builtins.int
+    EXECUTION_DURATION_FIELD_NUMBER: builtins.int
+    ROOT_EXECUTION_FIELD_NUMBER: builtins.int
+    ASSIGNED_BUILD_ID_FIELD_NUMBER: builtins.int
+    INHERITED_BUILD_ID_FIELD_NUMBER: builtins.int
     @property
     def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     @property
@@ -95,6 +101,43 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
         """If set, the most recent worker version stamp that appeared in a workflow task completion"""
+    @property
+    def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Workflow execution duration is defined as difference between close time and execution time.
+        This field is only populated if the workflow is closed.
+        """
+    @property
+    def root_execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """Contains information about the root workflow execution.
+        The root workflow execution is defined as follows:
+        1. A workflow without parent workflow is its own root workflow.
+        2. A workflow that has a parent workflow has the same root workflow as its parent workflow.
+        Note: workflows continued as new or reseted may or may not have parents, check examples below.
+
+        Examples:
+          Scenario 1: Workflow W1 starts child workflow W2, and W2 starts child workflow W3.
+            - The root workflow of all three workflows is W1.
+          Scenario 2: Workflow W1 starts child workflow W2, and W2 continued as new W3.
+            - The root workflow of all three workflows is W1.
+          Scenario 3: Workflow W1 continued as new W2.
+            - The root workflow of W1 is W1 and the root workflow of W2 is W2.
+          Scenario 4: Workflow W1 starts child workflow W2, and W2 is reseted, creating W3
+            - The root workflow of all three workflows is W1.
+          Scenario 5: Workflow W1 is reseted, creating W2.
+            - The root workflow of W1 is W1 and the root workflow of W2 is W2.
+        """
+    assigned_build_id: builtins.str
+    """The currently assigned build ID for this execution. Presence of this value means worker versioning is used
+    for this execution. Assigned build ID is selected based on Worker Versioning Assignment Rules
+    when the first workflow task of the execution is scheduled. If the first workflow task fails and is scheduled
+    again, the assigned build ID may change according to the latest versioning rules.
+    Assigned build ID can also change in the middle of a execution if Compatible Redirect Rules are applied to
+    this execution.
+    """
+    inherited_build_id: builtins.str
+    """Build ID inherited from a previous/parent execution. If present, assigned_build_id will be set to this, instead
+    of using the assignment rules.
+    """
     def __init__(
         self,
         *,
@@ -117,6 +160,11 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
         history_size_bytes: builtins.int = ...,
         most_recent_worker_version_stamp: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
+        execution_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        root_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
+        assigned_build_id: builtins.str = ...,
+        inherited_build_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -127,6 +175,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"close_time",
             "execution",
             b"execution",
+            "execution_duration",
+            b"execution_duration",
             "execution_time",
             b"execution_time",
             "memo",
@@ -135,6 +185,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"most_recent_worker_version_stamp",
             "parent_execution",
             b"parent_execution",
+            "root_execution",
+            b"root_execution",
             "search_attributes",
             b"search_attributes",
             "start_time",
@@ -146,18 +198,24 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "assigned_build_id",
+            b"assigned_build_id",
             "auto_reset_points",
             b"auto_reset_points",
             "close_time",
             b"close_time",
             "execution",
             b"execution",
+            "execution_duration",
+            b"execution_duration",
             "execution_time",
             b"execution_time",
             "history_length",
             b"history_length",
             "history_size_bytes",
             b"history_size_bytes",
+            "inherited_build_id",
+            b"inherited_build_id",
             "memo",
             b"memo",
             "most_recent_worker_version_stamp",
@@ -166,6 +224,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"parent_execution",
             "parent_namespace_id",
             b"parent_namespace_id",
+            "root_execution",
+            b"root_execution",
             "search_attributes",
             b"search_attributes",
             "start_time",
@@ -253,6 +313,9 @@ class PendingActivityInfo(google.protobuf.message.Message):
     EXPIRATION_TIME_FIELD_NUMBER: builtins.int
     LAST_FAILURE_FIELD_NUMBER: builtins.int
     LAST_WORKER_IDENTITY_FIELD_NUMBER: builtins.int
+    USE_WORKFLOW_BUILD_ID_FIELD_NUMBER: builtins.int
+    LAST_INDEPENDENTLY_ASSIGNED_BUILD_ID_FIELD_NUMBER: builtins.int
+    LAST_WORKER_VERSION_STAMP_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
@@ -272,6 +335,20 @@ class PendingActivityInfo(google.protobuf.message.Message):
     @property
     def last_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     last_worker_identity: builtins.str
+    @property
+    def use_workflow_build_id(self) -> google.protobuf.empty_pb2.Empty:
+        """When present, it means this activity is assigned to the build ID of its workflow."""
+    last_independently_assigned_build_id: builtins.str
+    """This means the activity is independently versioned and not bound to the build ID of its workflow.
+    The activity will use the build id in this field instead.
+    If the task fails and is scheduled again, the assigned build ID may change according to the latest versioning
+    rules.
+    """
+    @property
+    def last_worker_version_stamp(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
+        """The version stamp of the worker to whom this activity was most recently dispatched"""
     def __init__(
         self,
         *,
@@ -287,12 +364,18 @@ class PendingActivityInfo(google.protobuf.message.Message):
         expiration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
         last_worker_identity: builtins.str = ...,
+        use_workflow_build_id: google.protobuf.empty_pb2.Empty | None = ...,
+        last_independently_assigned_build_id: builtins.str = ...,
+        last_worker_version_stamp: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "activity_type",
             b"activity_type",
+            "assigned_build_id",
+            b"assigned_build_id",
             "expiration_time",
             b"expiration_time",
             "heartbeat_details",
@@ -301,10 +384,16 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"last_failure",
             "last_heartbeat_time",
             b"last_heartbeat_time",
+            "last_independently_assigned_build_id",
+            b"last_independently_assigned_build_id",
             "last_started_time",
             b"last_started_time",
+            "last_worker_version_stamp",
+            b"last_worker_version_stamp",
             "scheduled_time",
             b"scheduled_time",
+            "use_workflow_build_id",
+            b"use_workflow_build_id",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -314,6 +403,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"activity_id",
             "activity_type",
             b"activity_type",
+            "assigned_build_id",
+            b"assigned_build_id",
             "attempt",
             b"attempt",
             "expiration_time",
@@ -324,18 +415,35 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"last_failure",
             "last_heartbeat_time",
             b"last_heartbeat_time",
+            "last_independently_assigned_build_id",
+            b"last_independently_assigned_build_id",
             "last_started_time",
             b"last_started_time",
             "last_worker_identity",
             b"last_worker_identity",
+            "last_worker_version_stamp",
+            b"last_worker_version_stamp",
             "maximum_attempts",
             b"maximum_attempts",
             "scheduled_time",
             b"scheduled_time",
             "state",
             b"state",
+            "use_workflow_build_id",
+            b"use_workflow_build_id",
         ],
     ) -> None: ...
+    def WhichOneof(
+        self,
+        oneof_group: typing_extensions.Literal[
+            "assigned_build_id", b"assigned_build_id"
+        ],
+    ) -> (
+        typing_extensions.Literal[
+            "use_workflow_build_id", "last_independently_assigned_build_id"
+        ]
+        | None
+    ): ...
 
 global___PendingActivityInfo = PendingActivityInfo
 
@@ -660,3 +768,326 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___NewWorkflowExecutionInfo = NewWorkflowExecutionInfo
+
+class CallbackInfo(google.protobuf.message.Message):
+    """CallbackInfo contains the state of an attached workflow callback."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class WorkflowClosed(google.protobuf.message.Message):
+        """Trigger for when the workflow is closed."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    class Trigger(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        WORKFLOW_CLOSED_FIELD_NUMBER: builtins.int
+        @property
+        def workflow_closed(self) -> global___CallbackInfo.WorkflowClosed: ...
+        def __init__(
+            self,
+            *,
+            workflow_closed: global___CallbackInfo.WorkflowClosed | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "variant", b"variant", "workflow_closed", b"workflow_closed"
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "variant", b"variant", "workflow_closed", b"workflow_closed"
+            ],
+        ) -> None: ...
+        def WhichOneof(
+            self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+        ) -> typing_extensions.Literal["workflow_closed"] | None: ...
+
+    CALLBACK_FIELD_NUMBER: builtins.int
+    TRIGGER_FIELD_NUMBER: builtins.int
+    REGISTRATION_TIME_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
+    NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    @property
+    def callback(self) -> temporalio.api.common.v1.message_pb2.Callback:
+        """Information on how this callback should be invoked (e.g. its URL and type)."""
+    @property
+    def trigger(self) -> global___CallbackInfo.Trigger:
+        """Trigger for this callback."""
+    @property
+    def registration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the callback was registered."""
+    state: temporalio.api.enums.v1.common_pb2.CallbackState.ValueType
+    attempt: builtins.int
+    """The number of attempts made to deliver the callback.
+    This number represents a minimum bound since the attempt is incremented after the callback request completes.
+    """
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+    def __init__(
+        self,
+        *,
+        callback: temporalio.api.common.v1.message_pb2.Callback | None = ...,
+        trigger: global___CallbackInfo.Trigger | None = ...,
+        registration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        state: temporalio.api.enums.v1.common_pb2.CallbackState.ValueType = ...,
+        attempt: builtins.int = ...,
+        last_attempt_complete_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        last_attempt_failure: temporalio.api.failure.v1.message_pb2.Failure
+        | None = ...,
+        next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "callback",
+            b"callback",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "registration_time",
+            b"registration_time",
+            "trigger",
+            b"trigger",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attempt",
+            b"attempt",
+            "callback",
+            b"callback",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "registration_time",
+            b"registration_time",
+            "state",
+            b"state",
+            "trigger",
+            b"trigger",
+        ],
+    ) -> None: ...
+
+global___CallbackInfo = CallbackInfo
+
+class PendingNexusOperationInfo(google.protobuf.message.Message):
+    """PendingNexusOperationInfo contains the state of a pending Nexus operation."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    OPERATION_ID_FIELD_NUMBER: builtins.int
+    SCHEDULE_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
+    SCHEDULED_TIME_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
+    NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    CANCELLATION_INFO_FIELD_NUMBER: builtins.int
+    endpoint: builtins.str
+    """Endpoint name.
+    Resolved to a URL via the cluster's endpoint registry.
+    """
+    service: builtins.str
+    """Service name."""
+    operation: builtins.str
+    """Operation name."""
+    operation_id: builtins.str
+    """Operation ID. Only set for asynchronous operations after a successful StartOperation call."""
+    @property
+    def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-close timeout for this operation.
+        This is the only timeout settable by a workflow.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    @property
+    def scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the operation was scheduled."""
+    state: temporalio.api.enums.v1.common_pb2.PendingNexusOperationState.ValueType
+    attempt: builtins.int
+    """The number of attempts made to deliver the start operation request.
+    This number represents a minimum bound since the attempt is incremented after the request completes.
+    """
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+    @property
+    def cancellation_info(self) -> global___NexusOperationCancellationInfo: ...
+    def __init__(
+        self,
+        *,
+        endpoint: builtins.str = ...,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+        operation_id: builtins.str = ...,
+        schedule_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        state: temporalio.api.enums.v1.common_pb2.PendingNexusOperationState.ValueType = ...,
+        attempt: builtins.int = ...,
+        last_attempt_complete_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        last_attempt_failure: temporalio.api.failure.v1.message_pb2.Failure
+        | None = ...,
+        next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        cancellation_info: global___NexusOperationCancellationInfo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancellation_info",
+            b"cancellation_info",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "schedule_to_close_timeout",
+            b"schedule_to_close_timeout",
+            "scheduled_time",
+            b"scheduled_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attempt",
+            b"attempt",
+            "cancellation_info",
+            b"cancellation_info",
+            "endpoint",
+            b"endpoint",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "operation",
+            b"operation",
+            "operation_id",
+            b"operation_id",
+            "schedule_to_close_timeout",
+            b"schedule_to_close_timeout",
+            "scheduled_time",
+            b"scheduled_time",
+            "service",
+            b"service",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
+
+global___PendingNexusOperationInfo = PendingNexusOperationInfo
+
+class NexusOperationCancellationInfo(google.protobuf.message.Message):
+    """NexusOperationCancellationInfo contains the state of a nexus operation cancellation."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REQUESTED_TIME_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
+    NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    @property
+    def requested_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when cancellation was requested."""
+    state: temporalio.api.enums.v1.common_pb2.NexusOperationCancellationState.ValueType
+    attempt: builtins.int
+    """The number of attempts made to deliver the cancel operation request.
+    This number represents a minimum bound since the attempt is incremented after the request completes.
+    """
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+    def __init__(
+        self,
+        *,
+        requested_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        state: temporalio.api.enums.v1.common_pb2.NexusOperationCancellationState.ValueType = ...,
+        attempt: builtins.int = ...,
+        last_attempt_complete_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        last_attempt_failure: temporalio.api.failure.v1.message_pb2.Failure
+        | None = ...,
+        next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "requested_time",
+            b"requested_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attempt",
+            b"attempt",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "requested_time",
+            b"requested_time",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
+
+global___NexusOperationCancellationInfo = NexusOperationCancellationInfo

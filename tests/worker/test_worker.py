@@ -214,6 +214,20 @@ async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
             await wf2.result()
 
 
+async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server does not appear to fail on invalid namespace")
+    # Try to run a worker on an invalid namespace
+    config = client.config()
+    config["namespace"] = "does-not-exist"
+    client = Client(**config)
+    with pytest.raises(RuntimeError) as err:
+        await Worker(
+            client, task_queue=f"tq-{uuid.uuid4()}", workflows=[NeverRunWorkflow]
+        ).run()
+    assert str(err.value).startswith("Worker validation failed")
+
+
 def create_worker(
     client: Client,
     on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,

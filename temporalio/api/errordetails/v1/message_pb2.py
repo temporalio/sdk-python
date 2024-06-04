@@ -13,6 +13,8 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import any_pb2 as google_dot_protobuf_dot_any__pb2
+
 from temporalio.api.common.v1 import (
     message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
 )
@@ -24,7 +26,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n*temporal/api/errordetails/v1/message.proto\x12\x1ctemporal.api.errordetails.v1\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a%temporal/api/enums/v1/namespace.proto"B\n\x0fNotFoundFailure\x12\x17\n\x0f\x63urrent_cluster\x18\x01 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x02 \x01(\t"R\n&WorkflowExecutionAlreadyStartedFailure\x12\x18\n\x10start_request_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"_\n\x19NamespaceNotActiveFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x63urrent_cluster\x18\x02 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x03 \x01(\t"\xa6\x01\n\x1cNamespaceInvalidStateFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12=\n\x0e\x61llowed_states\x18\x03 \x03(\x0e\x32%.temporal.api.enums.v1.NamespaceState"-\n\x18NamespaceNotFoundFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t"\x1f\n\x1dNamespaceAlreadyExistsFailure"k\n ClientVersionNotSupportedFailure\x12\x16\n\x0e\x63lient_version\x18\x01 \x01(\t\x12\x13\n\x0b\x63lient_name\x18\x02 \x01(\t\x12\x1a\n\x12supported_versions\x18\x03 \x01(\t"d\n ServerVersionNotSupportedFailure\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12(\n client_supported_server_versions\x18\x02 \x01(\t"%\n#CancellationAlreadyRequestedFailure"\x14\n\x12QueryFailedFailure")\n\x17PermissionDeniedFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t"X\n\x18ResourceExhaustedFailure\x12<\n\x05\x63\x61use\x18\x01 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedCause"v\n\x15SystemWorkflowFailure\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x16\n\x0eworkflow_error\x18\x02 \x01(\t"\x19\n\x17WorkflowNotReadyFailure"3\n\x17NewerBuildExistsFailure\x12\x18\n\x10\x64\x65\x66\x61ult_build_id\x18\x01 \x01(\tB\xa7\x01\n\x1fio.temporal.api.errordetails.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/errordetails/v1;errordetails\xaa\x02\x1eTemporalio.Api.ErrorDetails.V1\xea\x02!Temporalio::Api::ErrorDetails::V1b\x06proto3'
+    b'\n*temporal/api/errordetails/v1/message.proto\x12\x1ctemporal.api.errordetails.v1\x1a\x19google/protobuf/any.proto\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a%temporal/api/enums/v1/namespace.proto"B\n\x0fNotFoundFailure\x12\x17\n\x0f\x63urrent_cluster\x18\x01 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x02 \x01(\t"R\n&WorkflowExecutionAlreadyStartedFailure\x12\x18\n\x10start_request_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"_\n\x19NamespaceNotActiveFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x63urrent_cluster\x18\x02 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x03 \x01(\t"\xa6\x01\n\x1cNamespaceInvalidStateFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12=\n\x0e\x61llowed_states\x18\x03 \x03(\x0e\x32%.temporal.api.enums.v1.NamespaceState"-\n\x18NamespaceNotFoundFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t"\x1f\n\x1dNamespaceAlreadyExistsFailure"k\n ClientVersionNotSupportedFailure\x12\x16\n\x0e\x63lient_version\x18\x01 \x01(\t\x12\x13\n\x0b\x63lient_name\x18\x02 \x01(\t\x12\x1a\n\x12supported_versions\x18\x03 \x01(\t"d\n ServerVersionNotSupportedFailure\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12(\n client_supported_server_versions\x18\x02 \x01(\t"%\n#CancellationAlreadyRequestedFailure"\x14\n\x12QueryFailedFailure")\n\x17PermissionDeniedFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t"\x96\x01\n\x18ResourceExhaustedFailure\x12<\n\x05\x63\x61use\x18\x01 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedCause\x12<\n\x05scope\x18\x02 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedScope"v\n\x15SystemWorkflowFailure\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x16\n\x0eworkflow_error\x18\x02 \x01(\t"\x19\n\x17WorkflowNotReadyFailure"3\n\x17NewerBuildExistsFailure\x12\x18\n\x10\x64\x65\x66\x61ult_build_id\x18\x01 \x01(\t"\xd9\x01\n\x1eMultiOperationExecutionFailure\x12^\n\x08statuses\x18\x01 \x03(\x0b\x32L.temporal.api.errordetails.v1.MultiOperationExecutionFailure.OperationStatus\x1aW\n\x0fOperationStatus\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12%\n\x07\x64\x65tails\x18\x03 \x03(\x0b\x32\x14.google.protobuf.AnyB\xa7\x01\n\x1fio.temporal.api.errordetails.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/errordetails/v1;errordetails\xaa\x02\x1eTemporalio.Api.ErrorDetails.V1\xea\x02!Temporalio::Api::ErrorDetails::V1b\x06proto3'
 )
 
 
@@ -57,6 +59,12 @@ _RESOURCEEXHAUSTEDFAILURE = DESCRIPTOR.message_types_by_name["ResourceExhaustedF
 _SYSTEMWORKFLOWFAILURE = DESCRIPTOR.message_types_by_name["SystemWorkflowFailure"]
 _WORKFLOWNOTREADYFAILURE = DESCRIPTOR.message_types_by_name["WorkflowNotReadyFailure"]
 _NEWERBUILDEXISTSFAILURE = DESCRIPTOR.message_types_by_name["NewerBuildExistsFailure"]
+_MULTIOPERATIONEXECUTIONFAILURE = DESCRIPTOR.message_types_by_name[
+    "MultiOperationExecutionFailure"
+]
+_MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS = (
+    _MULTIOPERATIONEXECUTIONFAILURE.nested_types_by_name["OperationStatus"]
+)
 NotFoundFailure = _reflection.GeneratedProtocolMessageType(
     "NotFoundFailure",
     (_message.Message,),
@@ -222,37 +230,62 @@ NewerBuildExistsFailure = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(NewerBuildExistsFailure)
 
+MultiOperationExecutionFailure = _reflection.GeneratedProtocolMessageType(
+    "MultiOperationExecutionFailure",
+    (_message.Message,),
+    {
+        "OperationStatus": _reflection.GeneratedProtocolMessageType(
+            "OperationStatus",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS,
+                "__module__": "temporal.api.errordetails.v1.message_pb2"
+                # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.MultiOperationExecutionFailure.OperationStatus)
+            },
+        ),
+        "DESCRIPTOR": _MULTIOPERATIONEXECUTIONFAILURE,
+        "__module__": "temporal.api.errordetails.v1.message_pb2"
+        # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.MultiOperationExecutionFailure)
+    },
+)
+_sym_db.RegisterMessage(MultiOperationExecutionFailure)
+_sym_db.RegisterMessage(MultiOperationExecutionFailure.OperationStatus)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\037io.temporal.api.errordetails.v1B\014MessageProtoP\001Z/go.temporal.io/api/errordetails/v1;errordetails\252\002\036Temporalio.Api.ErrorDetails.V1\352\002!Temporalio::Api::ErrorDetails::V1"
-    _NOTFOUNDFAILURE._serialized_start = 195
-    _NOTFOUNDFAILURE._serialized_end = 261
-    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_start = 263
-    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_end = 345
-    _NAMESPACENOTACTIVEFAILURE._serialized_start = 347
-    _NAMESPACENOTACTIVEFAILURE._serialized_end = 442
-    _NAMESPACEINVALIDSTATEFAILURE._serialized_start = 445
-    _NAMESPACEINVALIDSTATEFAILURE._serialized_end = 611
-    _NAMESPACENOTFOUNDFAILURE._serialized_start = 613
-    _NAMESPACENOTFOUNDFAILURE._serialized_end = 658
-    _NAMESPACEALREADYEXISTSFAILURE._serialized_start = 660
-    _NAMESPACEALREADYEXISTSFAILURE._serialized_end = 691
-    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_start = 693
-    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_end = 800
-    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_start = 802
-    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_end = 902
-    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_start = 904
-    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_end = 941
-    _QUERYFAILEDFAILURE._serialized_start = 943
-    _QUERYFAILEDFAILURE._serialized_end = 963
-    _PERMISSIONDENIEDFAILURE._serialized_start = 965
-    _PERMISSIONDENIEDFAILURE._serialized_end = 1006
-    _RESOURCEEXHAUSTEDFAILURE._serialized_start = 1008
-    _RESOURCEEXHAUSTEDFAILURE._serialized_end = 1096
-    _SYSTEMWORKFLOWFAILURE._serialized_start = 1098
-    _SYSTEMWORKFLOWFAILURE._serialized_end = 1216
-    _WORKFLOWNOTREADYFAILURE._serialized_start = 1218
-    _WORKFLOWNOTREADYFAILURE._serialized_end = 1243
-    _NEWERBUILDEXISTSFAILURE._serialized_start = 1245
-    _NEWERBUILDEXISTSFAILURE._serialized_end = 1296
+    _NOTFOUNDFAILURE._serialized_start = 222
+    _NOTFOUNDFAILURE._serialized_end = 288
+    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_start = 290
+    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_end = 372
+    _NAMESPACENOTACTIVEFAILURE._serialized_start = 374
+    _NAMESPACENOTACTIVEFAILURE._serialized_end = 469
+    _NAMESPACEINVALIDSTATEFAILURE._serialized_start = 472
+    _NAMESPACEINVALIDSTATEFAILURE._serialized_end = 638
+    _NAMESPACENOTFOUNDFAILURE._serialized_start = 640
+    _NAMESPACENOTFOUNDFAILURE._serialized_end = 685
+    _NAMESPACEALREADYEXISTSFAILURE._serialized_start = 687
+    _NAMESPACEALREADYEXISTSFAILURE._serialized_end = 718
+    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_start = 720
+    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_end = 827
+    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_start = 829
+    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_end = 929
+    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_start = 931
+    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_end = 968
+    _QUERYFAILEDFAILURE._serialized_start = 970
+    _QUERYFAILEDFAILURE._serialized_end = 990
+    _PERMISSIONDENIEDFAILURE._serialized_start = 992
+    _PERMISSIONDENIEDFAILURE._serialized_end = 1033
+    _RESOURCEEXHAUSTEDFAILURE._serialized_start = 1036
+    _RESOURCEEXHAUSTEDFAILURE._serialized_end = 1186
+    _SYSTEMWORKFLOWFAILURE._serialized_start = 1188
+    _SYSTEMWORKFLOWFAILURE._serialized_end = 1306
+    _WORKFLOWNOTREADYFAILURE._serialized_start = 1308
+    _WORKFLOWNOTREADYFAILURE._serialized_end = 1333
+    _NEWERBUILDEXISTSFAILURE._serialized_start = 1335
+    _NEWERBUILDEXISTSFAILURE._serialized_end = 1386
+    _MULTIOPERATIONEXECUTIONFAILURE._serialized_start = 1389
+    _MULTIOPERATIONEXECUTIONFAILURE._serialized_end = 1606
+    _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS._serialized_start = 1519
+    _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS._serialized_end = 1606
 # @@protoc_insertion_point(module_scope)

@@ -61,6 +61,8 @@ class _CommandTypeEnumTypeWrapper(
     COMMAND_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: _CommandType.ValueType  # 13
     COMMAND_TYPE_PROTOCOL_MESSAGE: _CommandType.ValueType  # 14
     COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES: _CommandType.ValueType  # 16
+    COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION: _CommandType.ValueType  # 17
+    COMMAND_TYPE_REQUEST_CANCEL_NEXUS_OPERATION: _CommandType.ValueType  # 18
 
 class CommandType(_CommandType, metaclass=_CommandTypeEnumTypeWrapper):
     """Whenever this list of command types is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering."""
@@ -81,4 +83,6 @@ COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION: CommandType.ValueType  # 12
 COMMAND_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: CommandType.ValueType  # 13
 COMMAND_TYPE_PROTOCOL_MESSAGE: CommandType.ValueType  # 14
 COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES: CommandType.ValueType  # 16
+COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION: CommandType.ValueType  # 17
+COMMAND_TYPE_REQUEST_CANCEL_NEXUS_OPERATION: CommandType.ValueType  # 18
 global___CommandType = CommandType

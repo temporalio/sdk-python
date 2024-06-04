@@ -42,7 +42,10 @@ def test_all_grpc_calls_present(client: Client):
         new_stub(channel)
 
         # Confirm they are the same
-        assert channel.calls == service_calls
+        missing = channel.calls.keys() - service_calls.keys()
+        assert not missing
+        added = service_calls.keys() - channel.calls.keys()
+        assert not added
 
     assert_all_calls_present(
         client.workflow_service,

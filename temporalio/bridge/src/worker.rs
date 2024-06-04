@@ -104,6 +104,15 @@ pub fn new_replay_worker<'a>(
 
 #[pymethods]
 impl WorkerRef {
+    fn validate<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let worker = self.worker.as_ref().unwrap().clone();
+        self.runtime.future_into_py(py, async move {
+            worker.validate().await.map_err(|err| {
+                PyRuntimeError::new_err(format!("Worker validation failed: {}", err))
+            })
+        })
+    }
+
     fn poll_workflow_activation<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {

@@ -62,12 +62,7 @@ class OperatorServiceStub:
         temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
         temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
     ]
-    """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources.
-    (-- api-linter: core::0135::method-signature=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-    (-- api-linter: core::0135::response-message-name=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-    """
+    """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
     AddOrUpdateRemoteCluster: grpc.UnaryUnaryMultiCallable[
         temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
         temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
@@ -83,6 +78,43 @@ class OperatorServiceStub:
         temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
     ]
     """ListClusters returns information about Temporal clusters."""
+    GetNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+    ]
+    """Get a registered Nexus endpoint by ID. The returned version can be used for optimistic updates."""
+    CreateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+    ]
+    """Create a Nexus endpoint. This will fail if an endpoint with the same name is already registered with a status of
+    ALREADY_EXISTS.
+    Returns the created endpoint with its initial version. You may use this version for subsequent updates.
+    """
+    UpdateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+    ]
+    """Optimistically update a Nexus endpoint based on provided version as obtained via the `GetNexusEndpoint` or
+    `ListNexusEndpointResponse` APIs. This will fail with a status of FAILED_PRECONDITION if the version does not
+    match.
+    Returns the updated endpoint with its updated version. You may use this version for subsequent updates. You don't
+    need to increment the version yourself. The server will increment the version for you after each update.
+    """
+    DeleteNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+    ]
+    """Delete an incoming Nexus service by ID."""
+    ListNexusEndpoints: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+    ]
+    """List all Nexus endpoints for the cluster, sorted by ID in ascending order. Set page_token in the request to the
+    next_page_token field of the previous response to get the next page of results. An empty next_page_token
+    indicates that there are no more results. During pagination, a newly added service with an ID lexicographically
+    earlier than the previous page's last endpoint's ID may be missed.
+    """
 
 class OperatorServiceServicer(metaclass=abc.ABCMeta):
     """OperatorService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -132,12 +164,7 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse:
-        """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources.
-        (-- api-linter: core::0135::method-signature=disabled
-            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-        (-- api-linter: core::0135::response-message-name=disabled
-            aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-        """
+        """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
     @abc.abstractmethod
     def AddOrUpdateRemoteCluster(
         self,
@@ -163,6 +190,63 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse:
         """ListClusters returns information about Temporal clusters."""
+    @abc.abstractmethod
+    def GetNexusEndpoint(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse
+    ):
+        """Get a registered Nexus endpoint by ID. The returned version can be used for optimistic updates."""
+    @abc.abstractmethod
+    def CreateNexusEndpoint(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse
+    ):
+        """Create a Nexus endpoint. This will fail if an endpoint with the same name is already registered with a status of
+        ALREADY_EXISTS.
+        Returns the created endpoint with its initial version. You may use this version for subsequent updates.
+        """
+    @abc.abstractmethod
+    def UpdateNexusEndpoint(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse
+    ):
+        """Optimistically update a Nexus endpoint based on provided version as obtained via the `GetNexusEndpoint` or
+        `ListNexusEndpointResponse` APIs. This will fail with a status of FAILED_PRECONDITION if the version does not
+        match.
+        Returns the updated endpoint with its updated version. You may use this version for subsequent updates. You don't
+        need to increment the version yourself. The server will increment the version for you after each update.
+        """
+    @abc.abstractmethod
+    def DeleteNexusEndpoint(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse
+    ):
+        """Delete an incoming Nexus service by ID."""
+    @abc.abstractmethod
+    def ListNexusEndpoints(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse
+    ):
+        """List all Nexus endpoints for the cluster, sorted by ID in ascending order. Set page_token in the request to the
+        next_page_token field of the previous response to get the next page of results. An empty next_page_token
+        indicates that there are no more results. During pagination, a newly added service with an ID lexicographically
+        earlier than the previous page's last endpoint's ID may be missed.
+        """
 
 def add_OperatorServiceServicer_to_server(
     servicer: OperatorServiceServicer, server: grpc.Server

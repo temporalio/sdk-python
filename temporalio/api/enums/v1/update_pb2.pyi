@@ -97,36 +97,35 @@ on a worker and has either been rejected or returned a value or an error.
 """
 global___UpdateWorkflowExecutionLifecycleStage = UpdateWorkflowExecutionLifecycleStage
 
-class _UpdateRequestedEventOrigin:
+class _UpdateAdmittedEventOrigin:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _UpdateRequestedEventOriginEnumTypeWrapper(
+class _UpdateAdmittedEventOriginEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
-        _UpdateRequestedEventOrigin.ValueType
+        _UpdateAdmittedEventOrigin.ValueType
     ],
     builtins.type,
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    UPDATE_REQUESTED_EVENT_ORIGIN_UNSPECIFIED: _UpdateRequestedEventOrigin.ValueType  # 0
-    UPDATE_REQUESTED_EVENT_ORIGIN_REAPPLY: _UpdateRequestedEventOrigin.ValueType  # 1
-    """The UpdateRequested event was created when reapplying events during reset
+    UPDATE_ADMITTED_EVENT_ORIGIN_UNSPECIFIED: _UpdateAdmittedEventOrigin.ValueType  # 0
+    UPDATE_ADMITTED_EVENT_ORIGIN_REAPPLY: _UpdateAdmittedEventOrigin.ValueType  # 1
+    """The UpdateAdmitted event was created when reapplying events during reset
     or replication. I.e. an accepted update on one branch of workflow history
-    was converted into a requested update on a different branch.
+    was converted into an admitted update on a different branch.
     """
 
-class UpdateRequestedEventOrigin(
-    _UpdateRequestedEventOrigin, metaclass=_UpdateRequestedEventOriginEnumTypeWrapper
+class UpdateAdmittedEventOrigin(
+    _UpdateAdmittedEventOrigin, metaclass=_UpdateAdmittedEventOriginEnumTypeWrapper
 ):
-    """UpdateRequestedEventOrigin records why an
-    WorkflowExecutionUpdateRequestedEvent was written to history. Note that not
-    all update requests result in a WorkflowExecutionUpdateRequestedEvent.
+    """Records why a WorkflowExecutionUpdateAdmittedEvent was written to history.
+    Note that not all admitted updates result in this event.
     """
 
-UPDATE_REQUESTED_EVENT_ORIGIN_UNSPECIFIED: UpdateRequestedEventOrigin.ValueType  # 0
-UPDATE_REQUESTED_EVENT_ORIGIN_REAPPLY: UpdateRequestedEventOrigin.ValueType  # 1
-"""The UpdateRequested event was created when reapplying events during reset
+UPDATE_ADMITTED_EVENT_ORIGIN_UNSPECIFIED: UpdateAdmittedEventOrigin.ValueType  # 0
+UPDATE_ADMITTED_EVENT_ORIGIN_REAPPLY: UpdateAdmittedEventOrigin.ValueType  # 1
+"""The UpdateAdmitted event was created when reapplying events during reset
 or replication. I.e. an accepted update on one branch of workflow history
-was converted into a requested update on a different branch.
+was converted into an admitted update on a different branch.
 """
-global___UpdateRequestedEventOrigin = UpdateRequestedEventOrigin
+global___UpdateAdmittedEventOrigin = UpdateAdmittedEventOrigin
