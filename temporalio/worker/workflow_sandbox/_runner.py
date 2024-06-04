@@ -173,4 +173,4 @@ class _Instance(WorkflowInstance):
         finally:
             temporalio.workflow.unsafe._set_in_sandbox(False)
             for k, v in extra_globals.items():
-                del self.globals_and_locals[k]
+                self.globals_and_locals.pop(k, None)
