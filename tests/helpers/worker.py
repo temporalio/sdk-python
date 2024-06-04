@@ -196,7 +196,7 @@ class KitchenSinkWorkflow:
             for i in range(opt.count or 1):
                 pending_tasks.append(asyncio.create_task(run_activity(i)))
             # Wait on them all and raise error if one happened
-            done, _ = await asyncio.wait(
+            done, _ = await workflow.wait(
                 pending_tasks, return_when=asyncio.FIRST_EXCEPTION
             )
             for task in done:

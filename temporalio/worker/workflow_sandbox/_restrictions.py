@@ -14,6 +14,7 @@ import math
 import operator
 import random
 import types
+import warnings
 from copy import copy, deepcopy
 from dataclasses import dataclass
 from typing import (
@@ -49,15 +50,25 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
         qualified_name: Fully qualified name of what was accessed.
     """
 
-    def __init__(self, qualified_name: str) -> None:
+    def __init__(
+        self, qualified_name: str, *, override_message: Optional[str] = None
+    ) -> None:
         """Create restricted workflow access error."""
         super().__init__(
+            override_message
+            or RestrictedWorkflowAccessError.default_message(qualified_name)
+        )
+        self.qualified_name = qualified_name
+
+    @staticmethod
+    def default_message(qualified_name: str) -> str:
+        """Get default message for restricted access."""
+        return (
             f"Cannot access {qualified_name} from inside a workflow. "
             "If this is code from a module not used in a workflow or known to "
             "only be used deterministically from a workflow, mark the import "
             "as pass through."
         )
-        self.qualified_name = qualified_name
 
 
 @dataclass(frozen=True)
@@ -182,6 +193,20 @@ class SandboxMatcher:
     time.
     """
 
+    leaf_message: Optional[str] = None
+    """
+    Override message to use in error/warning. Defaults to a common message.
+    This is only applicable to leafs, so this must only be set when
+    ``match_self`` is ``True`` and this matcher is on ``children`` of a parent.
+    """
+
+    leaf_warning: Optional[Type[Warning]] = None
+    """
+    If set, issues a warning instead of raising an error. This is only
+    applicable to leafs, so this must only be set when ``match_self`` is
+    ``True`` and this matcher is on ``children`` of a parent.
+    """
+
     all: ClassVar[SandboxMatcher]
     """Shortcut for an always-matched matcher."""
 
@@ -197,6 +222,50 @@ class SandboxMatcher:
     all_uses_runtime: ClassVar[SandboxMatcher]
     """Shortcut for a matcher that matches any :py:attr:`use` at runtime."""
 
+    def __post_init__(self):
+        """Post initialization validations."""
+        if self.leaf_message and not self.match_self:
+            raise ValueError("Cannot set leaf_message without match_self")
+        if self.leaf_warning and not self.match_self:
+            raise ValueError("Cannot set leaf_warning without match_self")
+
+    def access_matcher(
+        self, context: RestrictionContext, *child_path: str, include_use: bool = False
+    ) -> Optional[SandboxMatcher]:
+        """Perform a match check and return matcher.
+
+        Args:
+            context: Current restriction context.
+            child_path: Full path to the child being accessed.
+            include_use: Whether to include the :py:attr:`use` set in the check.
+
+        Returns:
+            The matcher if matched.
+        """
+        # We prefer to avoid recursion
+        matcher = self
+        for v in child_path:
+            # Does not match if this is runtime only and we're not runtime
+            if not context.is_runtime and matcher.only_runtime:
+                return None
+
+            # Considered matched if self matches or access matches. Note, "use"
+            # does not match by default because we allow it to be accessed but
+            # not used.
+            if matcher.match_self or v in matcher.access or "*" in matcher.access:
+                return matcher
+            if include_use and (v in matcher.use or "*" in matcher.use):
+                return matcher
+            child_matcher = matcher.children.get(v) or matcher.children.get("*")
+            if not child_matcher:
+                return None
+            matcher = child_matcher
+        if not context.is_runtime and matcher.only_runtime:
+            return None
+        if not matcher.match_self:
+            return None
+        return matcher
+
     def match_access(
         self, context: RestrictionContext, *child_path: str, include_use: bool = False
     ) -> bool:
@@ -210,27 +279,10 @@ class SandboxMatcher:
         Returns:
             ``True`` if matched.
         """
-        # We prefer to avoid recursion
-        matcher = self
-        for v in child_path:
-            # Does not match if this is runtime only and we're not runtime
-            if not context.is_runtime and matcher.only_runtime:
-                return False
-
-            # Considered matched if self matches or access matches. Note, "use"
-            # does not match by default because we allow it to be accessed but
-            # not used.
-            if matcher.match_self or v in matcher.access or "*" in matcher.access:
-                return True
-            if include_use and (v in matcher.use or "*" in matcher.use):
-                return True
-            child_matcher = matcher.children.get(v) or matcher.children.get("*")
-            if not child_matcher:
-                return False
-            matcher = child_matcher
-        if not context.is_runtime and matcher.only_runtime:
-            return False
-        return matcher.match_self
+        return (
+            self.access_matcher(context, *child_path, include_use=include_use)
+            is not None
+        )
 
     def child_matcher(self, *child_path: str) -> Optional[SandboxMatcher]:
         """Return a child matcher for the given path.
@@ -273,6 +325,10 @@ class SandboxMatcher:
         """Combine this matcher with another."""
         if self.only_runtime != other.only_runtime:
             raise ValueError("Cannot combine only-runtime and non-only-runtime")
+        if self.leaf_message != other.leaf_message:
+            raise ValueError("Cannot combine different messages")
+        if self.leaf_warning != other.leaf_warning:
+            raise ValueError("Cannot combine different warning values")
         if self.match_self or other.match_self:
             return SandboxMatcher.all
         new_children = dict(self.children) if self.children else {}
@@ -287,6 +343,8 @@ class SandboxMatcher:
             use=self.use | other.use,
             children=new_children,
             only_runtime=self.only_runtime,
+            leaf_message=self.leaf_message,
+            leaf_warning=self.leaf_warning,
         )
 
     def with_child_unrestricted(self, *child_path: str) -> SandboxMatcher:
@@ -456,6 +514,28 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
             # Too many things use open() at import time, e.g. pytest's assertion
             # rewriter
             only_runtime=True,
+        ),
+        "asyncio": SandboxMatcher(
+            children={
+                "as_completed": SandboxMatcher(
+                    children={
+                        "__call__": SandboxMatcher(
+                            match_self=True,
+                            leaf_warning=UserWarning,
+                            leaf_message="asyncio.as_completed() is non-deterministic, use workflow.as_completed() instead",
+                        )
+                    },
+                ),
+                "wait": SandboxMatcher(
+                    children={
+                        "__call__": SandboxMatcher(
+                            match_self=True,
+                            leaf_warning=UserWarning,
+                            leaf_message="asyncio.wait() is non-deterministic, use workflow.wait() instead",
+                        )
+                    },
+                ),
+            }
         ),
         # TODO(cretz): Fix issues with class extensions on restricted proxy
         # "argparse": SandboxMatcher.all_uses_runtime,
@@ -689,12 +769,23 @@ class _RestrictionState:
     matcher: SandboxMatcher
 
     def assert_child_not_restricted(self, name: str) -> None:
-        if (
-            self.matcher.match_access(self.context, name)
-            and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
-        ):
-            logger.warning("%s on %s restricted", name, self.name)
-            raise RestrictedWorkflowAccessError(f"{self.name}.{name}")
+        if temporalio.workflow.unsafe.is_sandbox_unrestricted():
+            return
+        matcher = self.matcher.access_matcher(self.context, name)
+        if not matcher:
+            return
+        logger.warning("%s on %s restricted", name, self.name)
+        # Issue warning instead of error if configured to do so
+        if matcher.leaf_warning:
+            warnings.warn(
+                matcher.leaf_message
+                or RestrictedWorkflowAccessError.default_message(f"{self.name}.{name}"),
+                matcher.leaf_warning,
+            )
+        else:
+            raise RestrictedWorkflowAccessError(
+                f"{self.name}.{name}", override_message=matcher.leaf_message
+            )
 
     def set_on_proxy(self, v: _RestrictedProxy) -> None:
         # To prevent recursion, must use __setattr__ on object to set the
