@@ -79,7 +79,7 @@ jobs:
           poetry add "protobuf<4"
           poe gen-protos
           poe format
-          [[ -z $(git status --porcelain temporalio) ]] || (git diff; echo "Protos changed"; exit 1)
+          [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
           poe test -s -o log_cli_level=DEBUG
 
       # Do docs stuff (only on one host)

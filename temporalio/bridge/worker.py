@@ -91,6 +91,10 @@ class Worker:
         """Create SDK core worker from a bridge worker."""
         self._ref = ref
 
+    async def validate(self) -> None:
+        """Validate the bridge worker."""
+        await self._ref.validate()
+
     async def poll_workflow_activation(
         self,
     ) -> temporalio.bridge.proto.workflow_activation.WorkflowActivation:

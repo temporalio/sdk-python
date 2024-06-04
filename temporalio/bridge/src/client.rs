@@ -139,6 +139,7 @@ impl ClientRef {
                 "describe_workflow_execution" => {
                     rpc_call!(retry_client, call, describe_workflow_execution)
                 }
+                "execute_multi_operation" => rpc_call!(retry_client, call, execute_multi_operation),
                 "get_cluster_info" => rpc_call!(retry_client, call, get_cluster_info),
                 "get_search_attributes" => {
                     rpc_call!(retry_client, call, get_search_attributes)
@@ -149,6 +150,9 @@ impl ClientRef {
                 }
                 "get_worker_task_reachability" => {
                     rpc_call!(retry_client, call, get_worker_task_reachability)
+                }
+                "get_worker_versioning_rules" => {
+                    rpc_call!(retry_client, call, get_worker_versioning_rules)
                 }
                 "get_workflow_execution_history" => {
                     rpc_call!(retry_client, call, get_workflow_execution_history)
@@ -184,6 +188,7 @@ impl ClientRef {
                 "poll_activity_task_queue" => {
                     rpc_call!(retry_client, call, poll_activity_task_queue)
                 }
+                "poll_nexus_task_queue" => rpc_call!(retry_client, call, poll_nexus_task_queue),
                 "poll_workflow_execution_update" => {
                     rpc_call!(retry_client, call, poll_workflow_execution_update)
                 }
@@ -225,6 +230,12 @@ impl ClientRef {
                 "respond_activity_task_failed_by_id" => {
                     rpc_call!(retry_client, call, respond_activity_task_failed_by_id)
                 }
+                "respond_nexus_task_completed" => {
+                    rpc_call!(retry_client, call, respond_nexus_task_completed)
+                }
+                "respond_nexus_task_failed" => {
+                    rpc_call!(retry_client, call, respond_nexus_task_failed)
+                }
                 "respond_query_task_completed" => {
                     rpc_call!(retry_client, call, respond_query_task_completed)
                 }
@@ -257,6 +268,9 @@ impl ClientRef {
                 "update_worker_build_id_compatibility" => {
                     rpc_call!(retry_client, call, update_worker_build_id_compatibility)
                 }
+                "update_worker_versioning_rules" => {
+                    rpc_call!(retry_client, call, update_worker_versioning_rules)
+                }
                 _ => {
                     return Err(PyValueError::new_err(format!(
                         "Unknown RPC call {}",
@@ -279,8 +293,12 @@ impl ClientRef {
                 "add_search_attributes" => {
                     rpc_call!(retry_client, call, add_search_attributes)
                 }
+                "create_nexus_endpoint" => rpc_call!(retry_client, call, create_nexus_endpoint),
                 "delete_namespace" => rpc_call!(retry_client, call, delete_namespace),
+                "delete_nexus_endpoint" => rpc_call!(retry_client, call, delete_nexus_endpoint),
+                "get_nexus_endpoint" => rpc_call!(retry_client, call, get_nexus_endpoint),
                 "list_clusters" => rpc_call!(retry_client, call, list_clusters),
+                "list_nexus_endpoints" => rpc_call!(retry_client, call, list_nexus_endpoints),
                 "list_search_attributes" => {
                     rpc_call!(retry_client, call, list_search_attributes)
                 }
@@ -290,6 +308,7 @@ impl ClientRef {
                 "remove_search_attributes" => {
                     rpc_call!(retry_client, call, remove_search_attributes)
                 }
+                "update_nexus_endpoint" => rpc_call!(retry_client, call, update_nexus_endpoint),
                 _ => {
                     return Err(PyValueError::new_err(format!(
                         "Unknown RPC call {}",

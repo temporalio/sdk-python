@@ -1477,10 +1477,10 @@ to `1` prior to running tests.
 Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore `pyproject.toml` and
 run `poetry update protobuf grpcio-tools`.
 
-For a less system-intrusive approach, you can:
+For a less system-intrusive approach, you can (note this approach [may have a bug](https://github.com/temporalio/sdk-python/issues/543)):
 ```shell
 docker build -f scripts/_proto/Dockerfile .
-docker run -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
+docker run --rm -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
 poe format
 ```
 

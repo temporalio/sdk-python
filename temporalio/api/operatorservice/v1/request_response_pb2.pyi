@@ -26,10 +26,12 @@ THE SOFTWARE.
 import builtins
 import collections.abc
 import google.protobuf.descriptor
+import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import sys
 import temporalio.api.enums.v1.common_pb2
+import temporalio.api.nexus.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -257,29 +259,41 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
 global___ListSearchAttributesResponse = ListSearchAttributesResponse
 
 class DeleteNamespaceRequest(google.protobuf.message.Message):
-    """(-- api-linter: core::0135::request-unknown-fields=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-    (-- api-linter: core::0135::request-name-required=disabled
-        aip.dev/not-precedent: DeleteNamespace RPC doesn't follow Google API format. --)
-    """
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     NAMESPACE_ID_FIELD_NUMBER: builtins.int
+    NAMESPACE_DELETE_DELAY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Only one of namespace or namespace_id must be specified to identify namespace."""
     namespace_id: builtins.str
+    @property
+    def namespace_delete_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """If provided, the deletion of namespace info will be delayed for the given duration (0 means no delay).
+        If not provided, the default delay configured in the cluster will be used.
+        """
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         namespace_id: builtins.str = ...,
+        namespace_delete_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace_delete_delay", b"namespace_delete_delay"
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "namespace", b"namespace", "namespace_id", b"namespace_id"
+            "namespace",
+            b"namespace",
+            "namespace_delete_delay",
+            b"namespace_delete_delay",
+            "namespace_id",
+            b"namespace_id",
         ],
     ) -> None: ...
 
@@ -310,15 +324,21 @@ class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
 
     FRONTEND_ADDRESS_FIELD_NUMBER: builtins.int
     ENABLE_REMOTE_CLUSTER_CONNECTION_FIELD_NUMBER: builtins.int
+    FRONTEND_HTTP_ADDRESS_FIELD_NUMBER: builtins.int
     frontend_address: builtins.str
-    """Frontend Address is a cross cluster accessible address."""
+    """Frontend Address is a cross cluster accessible address for gRPC traffic. This field is required."""
     enable_remote_cluster_connection: builtins.bool
     """Flag to enable / disable the cross cluster connection."""
+    frontend_http_address: builtins.str
+    """Frontend HTTP Address is a cross cluster accessible address for HTTP traffic. This field is optional. If not provided
+     on update, the existing HTTP address will be removed.
+    """
     def __init__(
         self,
         *,
         frontend_address: builtins.str = ...,
         enable_remote_cluster_connection: builtins.bool = ...,
+        frontend_http_address: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -327,6 +347,8 @@ class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
             b"enable_remote_cluster_connection",
             "frontend_address",
             b"frontend_address",
+            "frontend_http_address",
+            b"frontend_http_address",
         ],
     ) -> None: ...
 
@@ -423,6 +445,7 @@ class ClusterMetadata(google.protobuf.message.Message):
     CLUSTER_NAME_FIELD_NUMBER: builtins.int
     CLUSTER_ID_FIELD_NUMBER: builtins.int
     ADDRESS_FIELD_NUMBER: builtins.int
+    HTTP_ADDRESS_FIELD_NUMBER: builtins.int
     INITIAL_FAILOVER_VERSION_FIELD_NUMBER: builtins.int
     HISTORY_SHARD_COUNT_FIELD_NUMBER: builtins.int
     IS_CONNECTION_ENABLED_FIELD_NUMBER: builtins.int
@@ -431,7 +454,9 @@ class ClusterMetadata(google.protobuf.message.Message):
     cluster_id: builtins.str
     """Id of the cluster."""
     address: builtins.str
-    """Cluster accessible address."""
+    """gRPC address."""
+    http_address: builtins.str
+    """HTTP address, if one exists."""
     initial_failover_version: builtins.int
     """A unique failover version across all connected clusters."""
     history_shard_count: builtins.int
@@ -444,6 +469,7 @@ class ClusterMetadata(google.protobuf.message.Message):
         cluster_name: builtins.str = ...,
         cluster_id: builtins.str = ...,
         address: builtins.str = ...,
+        http_address: builtins.str = ...,
         initial_failover_version: builtins.int = ...,
         history_shard_count: builtins.int = ...,
         is_connection_enabled: builtins.bool = ...,
@@ -459,6 +485,8 @@ class ClusterMetadata(google.protobuf.message.Message):
             b"cluster_name",
             "history_shard_count",
             b"history_shard_count",
+            "http_address",
+            b"http_address",
             "initial_failover_version",
             b"initial_failover_version",
             "is_connection_enabled",
@@ -467,3 +495,233 @@ class ClusterMetadata(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ClusterMetadata = ClusterMetadata
+
+class GetNexusEndpointRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """Server-generated unique endpoint ID."""
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["id", b"id"]
+    ) -> None: ...
+
+global___GetNexusEndpointRequest = GetNexusEndpointRequest
+
+class GetNexusEndpointResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    @property
+    def endpoint(self) -> temporalio.api.nexus.v1.message_pb2.Endpoint: ...
+    def __init__(
+        self,
+        *,
+        endpoint: temporalio.api.nexus.v1.message_pb2.Endpoint | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+    ) -> None: ...
+
+global___GetNexusEndpointResponse = GetNexusEndpointResponse
+
+class CreateNexusEndpointRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPEC_FIELD_NUMBER: builtins.int
+    @property
+    def spec(self) -> temporalio.api.nexus.v1.message_pb2.EndpointSpec:
+        """Endpoint definition to create."""
+    def __init__(
+        self,
+        *,
+        spec: temporalio.api.nexus.v1.message_pb2.EndpointSpec | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> None: ...
+
+global___CreateNexusEndpointRequest = CreateNexusEndpointRequest
+
+class CreateNexusEndpointResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    @property
+    def endpoint(self) -> temporalio.api.nexus.v1.message_pb2.Endpoint:
+        """Data post acceptance. Can be used to issue additional updates to this record."""
+    def __init__(
+        self,
+        *,
+        endpoint: temporalio.api.nexus.v1.message_pb2.Endpoint | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+    ) -> None: ...
+
+global___CreateNexusEndpointResponse = CreateNexusEndpointResponse
+
+class UpdateNexusEndpointRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """Server-generated unique endpoint ID."""
+    version: builtins.int
+    """Data version for this endpoint. Must match current version."""
+    @property
+    def spec(self) -> temporalio.api.nexus.v1.message_pb2.EndpointSpec: ...
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        version: builtins.int = ...,
+        spec: temporalio.api.nexus.v1.message_pb2.EndpointSpec | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "id", b"id", "spec", b"spec", "version", b"version"
+        ],
+    ) -> None: ...
+
+global___UpdateNexusEndpointRequest = UpdateNexusEndpointRequest
+
+class UpdateNexusEndpointResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    @property
+    def endpoint(self) -> temporalio.api.nexus.v1.message_pb2.Endpoint:
+        """Data post acceptance. Can be used to issue additional updates to this record."""
+    def __init__(
+        self,
+        *,
+        endpoint: temporalio.api.nexus.v1.message_pb2.Endpoint | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+    ) -> None: ...
+
+global___UpdateNexusEndpointResponse = UpdateNexusEndpointResponse
+
+class DeleteNexusEndpointRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """Server-generated unique endpoint ID."""
+    version: builtins.int
+    """Data version for this endpoint. Must match current version."""
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        version: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["id", b"id", "version", b"version"]
+    ) -> None: ...
+
+global___DeleteNexusEndpointRequest = DeleteNexusEndpointRequest
+
+class DeleteNexusEndpointResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteNexusEndpointResponse = DeleteNexusEndpointResponse
+
+class ListNexusEndpointsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    page_size: builtins.int
+    next_page_token: builtins.bytes
+    """To get the next page, pass in `ListNexusEndpointsResponse.next_page_token` from the previous page's
+    response, the token will be empty if there's no other page.
+    Note: the last page may be empty if the total number of endpoints registered is a multiple of the page size.
+    """
+    name: builtins.str
+    """Name of the incoming endpoint to filter on - optional. Specifying this will result in zero or one results.
+    (-- api-linter: core::203::field-behavior-required=disabled
+        aip.dev/not-precedent: Not following linter rules. --)
+    """
+    def __init__(
+        self,
+        *,
+        page_size: builtins.int = ...,
+        next_page_token: builtins.bytes = ...,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "name",
+            b"name",
+            "next_page_token",
+            b"next_page_token",
+            "page_size",
+            b"page_size",
+        ],
+    ) -> None: ...
+
+global___ListNexusEndpointsRequest = ListNexusEndpointsRequest
+
+class ListNexusEndpointsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    ENDPOINTS_FIELD_NUMBER: builtins.int
+    next_page_token: builtins.bytes
+    """Token for getting the next page."""
+    @property
+    def endpoints(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.nexus.v1.message_pb2.Endpoint
+    ]: ...
+    def __init__(
+        self,
+        *,
+        next_page_token: builtins.bytes = ...,
+        endpoints: collections.abc.Iterable[
+            temporalio.api.nexus.v1.message_pb2.Endpoint
+        ]
+        | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "endpoints", b"endpoints", "next_page_token", b"next_page_token"
+        ],
+    ) -> None: ...
+
+global___ListNexusEndpointsResponse = ListNexusEndpointsResponse

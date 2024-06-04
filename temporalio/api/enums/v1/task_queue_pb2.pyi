@@ -104,6 +104,8 @@ class _TaskQueueTypeEnumTypeWrapper(
     """Workflow type of task queue."""
     TASK_QUEUE_TYPE_ACTIVITY: _TaskQueueType.ValueType  # 2
     """Activity type of task queue."""
+    TASK_QUEUE_TYPE_NEXUS: _TaskQueueType.ValueType  # 3
+    """Task queue type for dispatching Nexus requests."""
 
 class TaskQueueType(_TaskQueueType, metaclass=_TaskQueueTypeEnumTypeWrapper): ...
 
@@ -112,6 +114,8 @@ TASK_QUEUE_TYPE_WORKFLOW: TaskQueueType.ValueType  # 1
 """Workflow type of task queue."""
 TASK_QUEUE_TYPE_ACTIVITY: TaskQueueType.ValueType  # 2
 """Activity type of task queue."""
+TASK_QUEUE_TYPE_NEXUS: TaskQueueType.ValueType  # 3
+"""Task queue type for dispatching Nexus requests."""
 global___TaskQueueType = TaskQueueType
 
 class _TaskReachability:
@@ -145,6 +149,7 @@ class _TaskReachabilityEnumTypeWrapper(
 class TaskReachability(_TaskReachability, metaclass=_TaskReachabilityEnumTypeWrapper):
     """Specifies which category of tasks may reach a worker on a versioned task queue.
     Used both in a reachability query and its response.
+    Deprecated.
     """
 
 TASK_REACHABILITY_UNSPECIFIED: TaskReachability.ValueType  # 0
@@ -164,3 +169,84 @@ TASK_REACHABILITY_CLOSED_WORKFLOWS: TaskReachability.ValueType  # 4
 retired dependending on application requirements. For example, if there's no need to query closed workflows.
 """
 global___TaskReachability = TaskReachability
+
+class _BuildIdTaskReachability:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _BuildIdTaskReachabilityEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _BuildIdTaskReachability.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    BUILD_ID_TASK_REACHABILITY_UNSPECIFIED: _BuildIdTaskReachability.ValueType  # 0
+    """Task reachability is not reported"""
+    BUILD_ID_TASK_REACHABILITY_REACHABLE: _BuildIdTaskReachability.ValueType  # 1
+    """Build ID may be used by new workflows or activities (base on versioning rules), or there are
+    open workflows or backlogged activities assigned to it.
+    """
+    BUILD_ID_TASK_REACHABILITY_CLOSED_WORKFLOWS_ONLY: _BuildIdTaskReachability.ValueType  # 2
+    """Build ID does not have open workflows and is not reachable by new workflows,
+    but MAY have closed workflows within the namespace retention period.
+    Not applicable to activity-only task queues.
+    """
+    BUILD_ID_TASK_REACHABILITY_UNREACHABLE: _BuildIdTaskReachability.ValueType  # 3
+    """Build ID is not used for new executions, nor it has been used by any existing execution
+    within the retention period.
+    """
+
+class BuildIdTaskReachability(
+    _BuildIdTaskReachability, metaclass=_BuildIdTaskReachabilityEnumTypeWrapper
+):
+    """Specifies which category of tasks may reach a versioned worker of a certain Build ID.
+    Note: future activities who inherit their workflow's Build ID but not its Task Queue will not be
+    accounted for reachability as server cannot not know if they'll happen as they do not use
+    assignment rules of their Task Queue. Same goes for Child Workflows or Continue-As-New Workflows
+    who inherit the parent/previous workflow's Build ID but not its Task Queue. In those cases, make
+    sure to query reachability for the parent/previous workflow's Task Queue as well.
+    """
+
+BUILD_ID_TASK_REACHABILITY_UNSPECIFIED: BuildIdTaskReachability.ValueType  # 0
+"""Task reachability is not reported"""
+BUILD_ID_TASK_REACHABILITY_REACHABLE: BuildIdTaskReachability.ValueType  # 1
+"""Build ID may be used by new workflows or activities (base on versioning rules), or there are
+open workflows or backlogged activities assigned to it.
+"""
+BUILD_ID_TASK_REACHABILITY_CLOSED_WORKFLOWS_ONLY: BuildIdTaskReachability.ValueType  # 2
+"""Build ID does not have open workflows and is not reachable by new workflows,
+but MAY have closed workflows within the namespace retention period.
+Not applicable to activity-only task queues.
+"""
+BUILD_ID_TASK_REACHABILITY_UNREACHABLE: BuildIdTaskReachability.ValueType  # 3
+"""Build ID is not used for new executions, nor it has been used by any existing execution
+within the retention period.
+"""
+global___BuildIdTaskReachability = BuildIdTaskReachability
+
+class _DescribeTaskQueueMode:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _DescribeTaskQueueModeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _DescribeTaskQueueMode.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    DESCRIBE_TASK_QUEUE_MODE_UNSPECIFIED: _DescribeTaskQueueMode.ValueType  # 0
+    """Unspecified means legacy behavior."""
+    DESCRIBE_TASK_QUEUE_MODE_ENHANCED: _DescribeTaskQueueMode.ValueType  # 1
+    """Enhanced mode reports aggregated results for all partitions, supports Build IDs, and reports richer info."""
+
+class DescribeTaskQueueMode(
+    _DescribeTaskQueueMode, metaclass=_DescribeTaskQueueModeEnumTypeWrapper
+): ...
+
+DESCRIBE_TASK_QUEUE_MODE_UNSPECIFIED: DescribeTaskQueueMode.ValueType  # 0
+"""Unspecified means legacy behavior."""
+DESCRIBE_TASK_QUEUE_MODE_ENHANCED: DescribeTaskQueueMode.ValueType  # 1
+"""Enhanced mode reports aggregated results for all partitions, supports Build IDs, and reports richer info."""
+global___DescribeTaskQueueMode = DescribeTaskQueueMode

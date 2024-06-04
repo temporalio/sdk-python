@@ -110,6 +110,17 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
     """
     WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_UPDATE: _WorkflowTaskFailedCause.ValueType  # 31
     """Similar to WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_COMMAND, but for updates."""
+    WORKFLOW_TASK_FAILED_CAUSE_BAD_SCHEDULE_NEXUS_OPERATION_ATTRIBUTES: _WorkflowTaskFailedCause.ValueType  # 32
+    """A workflow task completed with an invalid ScheduleNexusOperation command."""
+    WORKFLOW_TASK_FAILED_CAUSE_PENDING_NEXUS_OPERATIONS_LIMIT_EXCEEDED: _WorkflowTaskFailedCause.ValueType  # 33
+    """A workflow task completed requesting to schedule a Nexus Operation exceeding the server configured limit."""
+    WORKFLOW_TASK_FAILED_CAUSE_BAD_REQUEST_CANCEL_NEXUS_OPERATION_ATTRIBUTES: _WorkflowTaskFailedCause.ValueType  # 34
+    """A workflow task completed with an invalid RequestCancelNexusOperation command."""
+    WORKFLOW_TASK_FAILED_CAUSE_FEATURE_DISABLED: _WorkflowTaskFailedCause.ValueType  # 35
+    """A workflow task completed requesting a feature that's disabled on the server (either system wide or - typically -
+    for the workflow's namespace).
+    Check the workflow task failure message for more information.
+    """
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -181,6 +192,17 @@ has wrong format, or missing required fields.
 """
 WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_UPDATE: WorkflowTaskFailedCause.ValueType  # 31
 """Similar to WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_COMMAND, but for updates."""
+WORKFLOW_TASK_FAILED_CAUSE_BAD_SCHEDULE_NEXUS_OPERATION_ATTRIBUTES: WorkflowTaskFailedCause.ValueType  # 32
+"""A workflow task completed with an invalid ScheduleNexusOperation command."""
+WORKFLOW_TASK_FAILED_CAUSE_PENDING_NEXUS_OPERATIONS_LIMIT_EXCEEDED: WorkflowTaskFailedCause.ValueType  # 33
+"""A workflow task completed requesting to schedule a Nexus Operation exceeding the server configured limit."""
+WORKFLOW_TASK_FAILED_CAUSE_BAD_REQUEST_CANCEL_NEXUS_OPERATION_ATTRIBUTES: WorkflowTaskFailedCause.ValueType  # 34
+"""A workflow task completed with an invalid RequestCancelNexusOperation command."""
+WORKFLOW_TASK_FAILED_CAUSE_FEATURE_DISABLED: WorkflowTaskFailedCause.ValueType  # 35
+"""A workflow task completed requesting a feature that's disabled on the server (either system wide or - typically -
+for the workflow's namespace).
+Check the workflow task failure message for more information.
+"""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:
@@ -309,3 +331,31 @@ RESOURCE_EXHAUSTED_CAUSE_BUSY_WORKFLOW: ResourceExhaustedCause.ValueType  # 5
 RESOURCE_EXHAUSTED_CAUSE_APS_LIMIT: ResourceExhaustedCause.ValueType  # 6
 """Caller exceeds action per second limit."""
 global___ResourceExhaustedCause = ResourceExhaustedCause
+
+class _ResourceExhaustedScope:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ResourceExhaustedScopeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _ResourceExhaustedScope.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    RESOURCE_EXHAUSTED_SCOPE_UNSPECIFIED: _ResourceExhaustedScope.ValueType  # 0
+    RESOURCE_EXHAUSTED_SCOPE_NAMESPACE: _ResourceExhaustedScope.ValueType  # 1
+    """Exhausted resource is a system-level resource."""
+    RESOURCE_EXHAUSTED_SCOPE_SYSTEM: _ResourceExhaustedScope.ValueType  # 2
+    """Exhausted resource is a namespace-level resource."""
+
+class ResourceExhaustedScope(
+    _ResourceExhaustedScope, metaclass=_ResourceExhaustedScopeEnumTypeWrapper
+): ...
+
+RESOURCE_EXHAUSTED_SCOPE_UNSPECIFIED: ResourceExhaustedScope.ValueType  # 0
+RESOURCE_EXHAUSTED_SCOPE_NAMESPACE: ResourceExhaustedScope.ValueType  # 1
+"""Exhausted resource is a system-level resource."""
+RESOURCE_EXHAUSTED_SCOPE_SYSTEM: ResourceExhaustedScope.ValueType  # 2
+"""Exhausted resource is a namespace-level resource."""
+global___ResourceExhaustedScope = ResourceExhaustedScope
