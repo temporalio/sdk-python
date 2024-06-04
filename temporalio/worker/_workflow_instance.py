@@ -70,6 +70,8 @@ from ._interceptor import (
     WorkflowOutboundInterceptor,
 )
 
+import typing
+
 logger = logging.getLogger(__name__)
 
 # Set to true to log all cases where we're ignoring things during delete
@@ -1818,17 +1820,17 @@ class _WorkflowInstanceImpl(
                     code = "".join(source[0])
                     line_number = int(source[1])
                 except OSError as ose:
-                    code = "Cannot access code.\n---\n%s" % ose.strerror
+                    code = f"Cannot access code.\n---\n{ose.strerror}"
                     # TODO possibly include sentinel/property for success of src scrape? work out with ui
                 except Exception:
-                    code = "Generic Error.\n\n%s" % traceback.format_exc()
+                    code = f"Generic Error.\n\n{traceback.format_exc()}"
 
                 file_slice = temporalio.common._FileSlice(code, line_number)
                 file_location = temporalio.common._FileLocation(
                     filename, line=line_number, functionName=func_name
                 )
 
-                sources["%s %d" % (filename, line_number)] = file_slice
+                sources[f"{filename} {line_number}"] = file_slice
                 locations.append(file_location)
 
             stacks.append(temporalio.common._StackTrace(locations))
@@ -2668,3 +2670,35 @@ class _ReplaySafeMetricGaugeFloat(
 
 class _WorkflowBeingEvictedError(BaseException):
     pass
+
+
+@dataclass
+class _SDKInfo:
+    name: str
+    version: str
+
+
+@dataclass
+class _FileSlice:
+    content: str
+    lineOffset: int
+
+
+@dataclass
+class _FileLocation:
+    filePath: str
+    line: Optional[int] = -1
+    column: Optional[int] = -1
+    functionName: Optional[str] = None
+
+
+@dataclass
+class _StackTrace:
+    locations: typing.List[_FileLocation]
+
+
+@dataclass
+class _EnhancedStackTrace:
+    sdk: _SDKInfo
+    sources: typing.Mapping[str, _FileSlice]
+    stacks: typing.List[_StackTrace]
