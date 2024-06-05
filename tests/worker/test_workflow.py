@@ -4927,3 +4927,67 @@ async def test_workflow_wait_utility(client: Client):
             task_queue=worker.task_queue,
         )
         assert len(result) == 10
+
+
+@workflow.defn
+class CurrentUpdateWorkflow:
+    def __init__(self) -> None:
+        self._pending_get_update_id_tasks: List[asyncio.Task[str]] = []
+
+    @workflow.run
+    async def run(self) -> List[str]:
+        # Confirm no update info
+        assert not workflow.current_update_info()
+
+        # Wait for all tasks to come in, then return the full set
+        await workflow.wait_condition(
+            lambda: len(self._pending_get_update_id_tasks) == 5
+        )
+        assert not workflow.current_update_info()
+        return list(await asyncio.gather(*self._pending_get_update_id_tasks))
+
+    @workflow.update
+    async def do_update(self) -> str:
+        # Check that simple helper awaited has the ID
+        info = workflow.current_update_info()
+        assert info
+        assert info.id == await self.get_update_id()
+
+        # Also schedule the task but run it in the main workflow to confirm
+        # it still gets the update ID
+        self._pending_get_update_id_tasks.append(
+            asyncio.create_task(self.get_update_id())
+        )
+
+        # Re-fetch and return
+        info = workflow.current_update_info()
+        assert info
+        return info.id
+
+    async def get_update_id(self) -> str:
+        await asyncio.sleep(0.01)
+        info = workflow.current_update_info()
+        assert info
+        return info.id
+
+
+async def test_workflow_current_update(client: Client):
+    async with new_worker(client, CurrentUpdateWorkflow) as worker:
+        handle = await client.start_workflow(
+            CurrentUpdateWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        update_ids = await asyncio.gather(
+            handle.execute_update(CurrentUpdateWorkflow.do_update, id="update1"),
+            handle.execute_update(CurrentUpdateWorkflow.do_update, id="update2"),
+            handle.execute_update(CurrentUpdateWorkflow.do_update, id="update3"),
+            handle.execute_update(CurrentUpdateWorkflow.do_update, id="update4"),
+            handle.execute_update(CurrentUpdateWorkflow.do_update, id="update5"),
+        )
+        assert {"update1", "update2", "update3", "update4", "update5"} == set(
+            update_ids
+        )
+        assert {"update1", "update2", "update3", "update4", "update5"} == set(
+            await handle.result()
+        )
