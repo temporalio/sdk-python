@@ -49,7 +49,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - if: ${{ matrix.os == 'ubuntu-arm' }}
-        uses: deadsnakes/action@v3
+        uses: deadsnakes/action@v3.1.0
         with:
           python-version: ${{ matrix.python }}
       # Using fixed Poetry version until

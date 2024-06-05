@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: "3.12"
       - if: ${{ matrix.os == 'ubuntu-arm' }}
-        uses: deadsnakes/action@v3
+        uses: deadsnakes/action@v3.1.0
         with:
           python-version: "3.12"
 
