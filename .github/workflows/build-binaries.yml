@@ -29,16 +29,16 @@ jobs:
             package-suffix: windows-amd64
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       # actions/setup-python doesn't yet support Linux ARM
       - if: ${{ matrix.os != 'ubuntu-arm' }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - if: ${{ matrix.os == 'ubuntu-arm' }}
-        uses: deadsnakes/action@v2.1.1
+        uses: deadsnakes/action@v3.1.0
         with:
           python-version: "3.12"
 
@@ -46,11 +46,9 @@ jobs:
       # command to build with cibuildwheel which uses rustup install defined
       # in pyproject.toml)
       - if: ${{ runner.os != 'Linux' }}
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
       - if: ${{ runner.os != 'Linux' }}
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
         with:
           working-directory: temporalio/bridge
 
@@ -73,7 +71,7 @@ jobs:
       - run: poe test-dist-single
 
       # Upload dist
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.package-suffix }}
           path: dist
