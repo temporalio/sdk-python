@@ -679,7 +679,8 @@ def current_update_info() -> Optional[UpdateInfo]:
     update handler and coroutines/tasks it has started.
 
     Returns:
-        Info for the current update handler if any.
+        Info for the current update handler the code calling this is executing
+            within if any.
     """
     return _current_update_info.get(None)
 

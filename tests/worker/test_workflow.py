@@ -4971,7 +4971,11 @@ class CurrentUpdateWorkflow:
         return info.id
 
 
-async def test_workflow_current_update(client: Client):
+async def test_workflow_current_update(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     async with new_worker(client, CurrentUpdateWorkflow) as worker:
         handle = await client.start_workflow(
             CurrentUpdateWorkflow.run,
