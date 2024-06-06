@@ -50,7 +50,7 @@ jobs:
       - if: ${{ runner.os != 'Linux' }}
         uses: Swatinem/rust-cache@v2
         with:
-          working-directory: temporalio/bridge
+          workspaces: temporalio/bridge -> target
 
       # Prepare
       # Using fixed Poetry version until
