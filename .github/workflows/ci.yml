@@ -36,22 +36,20 @@ jobs:
             python: "3.8"
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-        with:
-          working-directory: temporalio/bridge
+          workspaces: temporalio/bridge -> target
       # actions/setup-python doesn't yet support Linux ARM
       - if: ${{ matrix.os != 'ubuntu-arm' }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - if: ${{ matrix.os == 'ubuntu-arm' }}
-        uses: deadsnakes/action@v2.1.1
+        uses: deadsnakes/action@v3.1.0
         with:
           python-version: ${{ matrix.python }}
       # Using fixed Poetry version until
@@ -91,7 +89,7 @@ jobs:
         run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --name python --scope temporal --prod --yes
 
       # Confirm README ToC is generated properly
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
       - name: Check generated README ToC
         if: ${{ matrix.docsTarget }}
         run: |
