@@ -4965,6 +4965,12 @@ class CurrentUpdateWorkflow:
         assert info
         return info.id
 
+    @do_update.validator
+    def do_update_validator(self) -> None:
+        info = workflow.current_update_info()
+        assert info
+        assert info.name == "do_update"
+
     async def get_update_id(self) -> str:
         await asyncio.sleep(0.01)
         info = workflow.current_update_info()
