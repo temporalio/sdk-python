@@ -42,7 +42,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: temporalio/bridge
+          workspaces: temporalio/bridge -> target
       # actions/setup-python doesn't yet support Linux ARM
       - if: ${{ matrix.os != 'ubuntu-arm' }}
         uses: actions/setup-python@v5
