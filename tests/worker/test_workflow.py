@@ -4951,9 +4951,10 @@ class CurrentUpdateWorkflow:
         # Check that simple helper awaited has the ID
         info = workflow.current_update_info()
         assert info
+        assert info.name == "do_update"
         assert info.id == await self.get_update_id()
 
-        # Also schedule the task but run it in the main workflow to confirm
+        # Also schedule the task and wait for it in the main workflow to confirm
         # it still gets the update ID
         self._pending_get_update_id_tasks.append(
             asyncio.create_task(self.get_update_id())

@@ -465,7 +465,7 @@ class _WorkflowInstanceImpl(
         async def run_update() -> None:
             # Set the current update for the life of this task
             temporalio.workflow._set_current_update_info(
-                temporalio.workflow.UpdateInfo(id=job.id)
+                temporalio.workflow.UpdateInfo(id=job.id, name=job.name)
             )
 
             command = self._add_command()
