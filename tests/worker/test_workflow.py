@@ -107,11 +107,12 @@ from tests.helpers import (
     find_free_port,
     new_worker,
 )
-from tests.helpers.externalstacktrace import (
-    ExternalLongSleepWorkflow,
+from tests.helpers.external_stack_trace import (
+    MultiFileStackTraceWorkflow,
     ExternalStackTraceWorkflow,
     external_wait_cancel,
 )
+from tests.helpers.external_coroutine import wait_on_timer
 
 
 @workflow.defn
@@ -2132,25 +2133,31 @@ async def test_workflow_enhanced_stack_trace(client: Client):
         assert trace["sdk"]["version"] == __version__
 
 
+# TODO(divy) remove
+import json
 async def test_workflow_external_enhanced_stack_trace(client: Client):
     async with new_worker(
-        client,
+        client, 
         ExternalStackTraceWorkflow,
-        ExternalLongSleepWorkflow,
         activities=[external_wait_cancel],
-    ) as ext_worker:
-        ext_handle = await client.start_workflow(
+    ) as worker:
+        handle = await client.start_workflow(
             ExternalStackTraceWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
-            task_queue=ext_worker.task_queue,
+            task_queue=worker.task_queue,
         )
 
         async def status() -> str:
-            return await ext_handle.query(ExternalStackTraceWorkflow.status)
+            return await handle.query(ExternalStackTraceWorkflow.status)
 
         await assert_eq_eventually("waiting", status)
 
-        trace = await ext_handle.query("__enhanced_stack_trace")
+        trace = await handle.query("__enhanced_stack_trace")
+
+        with open('output.json', 'w') as f:
+            json.dump(trace, f)
+
+        # test that a coroutine only has the source as its stack
 
         assert "never_completing_coroutine" in [
             loc["functionName"]
@@ -2160,15 +2167,63 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
 
         fn = None
         for source in trace["sources"].keys():
-            if source.endswith("externalstacktrace.py 53"):
+            if source.endswith("external_coroutine.py 9"):
                 fn = source
 
         assert fn != None
         assert (
-            'self._status = "waiting"  # with external comment'
+            'status[0] = "waiting"  # external coroutine test'
             in trace["sources"][fn]["content"]
         )
         assert trace["sdk"]["version"] == __version__
+
+async def test_workflow_external_multifile_enhanced_stack_trace(client: Client):
+    async with new_worker (
+        client,
+        MultiFileStackTraceWorkflow,
+        activities=[]
+    ) as multifile_worker:
+        mf_handle = await client.start_workflow(
+            MultiFileStackTraceWorkflow.run_multifile_workflow,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=multifile_worker.task_queue
+        )
+
+        async def mf_status() -> str:
+            return await mf_handle.query(MultiFileStackTraceWorkflow.status)
+        
+        await assert_eq_eventually("waiting", mf_status)
+
+        mf_trace = await mf_handle.query("__enhanced_stack_trace")
+
+        with open('mf_output.json', 'w') as f:
+            json.dump(mf_trace, f)
+
+        assert "wait_on_timer" in [
+            loc["functionName"]
+            for stack in mf_trace["stacks"]
+            for loc in stack["locations"]
+        ]
+
+        filenames = [None, None]
+        for source in mf_trace["sources"].keys():
+            if source.endswith("external_coroutine.py 11"):
+                filenames[1] = source
+            if source.endswith("external_stack_trace.py 51"):
+                filenames[0] = source
+
+        assert filenames[0] is not None and filenames[1] is not None
+        assert (
+            'status[0] = "waiting"  # multifile test'
+            in mf_trace["sources"][filenames[1]]["content"]
+        )
+        assert (
+            'await wait_on_timer(self._status)'
+            in mf_trace["sources"][filenames[0]]["content"]
+        )
+        assert mf_trace["sdk"]["version"] == __version__
+
+
 
 
 @dataclass

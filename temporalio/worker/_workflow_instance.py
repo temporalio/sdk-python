@@ -258,7 +258,7 @@ class _WorkflowInstanceImpl(
             fn=self._enhanced_stack_trace,
             is_method=False,
             arg_types=[],
-            ret_type=temporalio.common._EnhancedStackTrace,
+            ret_type=_EnhancedStackTrace,
         )
 
         # Maintain buffered signals for later-added dynamic handlers
@@ -1802,8 +1802,8 @@ class _WorkflowInstanceImpl(
             )
         return "\n\n".join(stacks)
 
-    def _enhanced_stack_trace(self) -> temporalio.common._EnhancedStackTrace:
-        sdk = temporalio.common._SDKInfo("sdk-python", __version__)
+    def _enhanced_stack_trace(self) -> _EnhancedStackTrace:
+        sdk = _SDKInfo("sdk-python", __version__)
 
         sources = dict()
         stacks = []
@@ -1825,17 +1825,17 @@ class _WorkflowInstanceImpl(
                 except Exception:
                     code = f"Generic Error.\n\n{traceback.format_exc()}"
 
-                file_slice = temporalio.common._FileSlice(code, line_number)
-                file_location = temporalio.common._FileLocation(
+                file_slice = _FileSlice(code, line_number)
+                file_location = _FileLocation(
                     filename, line=line_number, functionName=func_name
                 )
 
                 sources[f"{filename} {line_number}"] = file_slice
                 locations.append(file_location)
 
-            stacks.append(temporalio.common._StackTrace(locations))
+            stacks.append(_StackTrace(locations))
 
-        est = temporalio.common._EnhancedStackTrace(sdk, sources, stacks)
+        est = _EnhancedStackTrace(sdk, sources, stacks)
         return est
 
     #### asyncio.AbstractEventLoop function impls ####
@@ -2690,6 +2690,7 @@ class _FileLocation:
     line: Optional[int] = -1
     column: Optional[int] = -1
     functionName: Optional[str] = None
+    hideByDefault : bool = True
 
 
 @dataclass
