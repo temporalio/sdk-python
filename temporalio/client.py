@@ -1852,7 +1852,10 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
-            WorkflowUpdateFailedError: If the update failed
+            WorkflowUpdateFailedError: If the update failed.
+            WorkflowUpdateRPCTimeoutOrCancelledError: This update call timed out
+                or was cancelled. This doesn't mean the update itself was timed
+                out or cancelled.
             RPCError: There was some issue sending the update to the workflow.
         """
         handle = await self._start_update(
@@ -1968,6 +1971,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Raises:
+            WorkflowUpdateRPCTimeoutOrCancelledError: This update call timed out
+                or was cancelled. This doesn't mean the update itself was timed
+                out or cancelled.
             RPCError: There was some issue sending the update to the workflow.
         """
         return await self._start_update(
@@ -4305,7 +4311,10 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
                 it will be retried until the result is available.
 
         Raises:
-            WorkflowUpdateFailedError: If the update failed
+            WorkflowUpdateFailedError: If the update failed.
+            WorkflowUpdateRPCTimeoutOrCancelledError: This update call timed out
+                or was cancelled. This doesn't mean the update itself was timed
+                out or cancelled.
             RPCError: Update result could not be fetched for some other reason.
         """
         # Poll until outcome reached
@@ -4357,15 +4366,28 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
 
         # Continue polling as long as we have no outcome
         while True:
-            res = await self._client.workflow_service.poll_workflow_execution_update(
-                req,
-                retry=True,
-                metadata=rpc_metadata,
-                timeout=rpc_timeout,
-            )
-            if res.HasField("outcome"):
-                self._known_outcome = res.outcome
-                return
+            try:
+                res = (
+                    await self._client.workflow_service.poll_workflow_execution_update(
+                        req,
+                        retry=True,
+                        metadata=rpc_metadata,
+                        timeout=rpc_timeout,
+                    )
+                )
+                if res.HasField("outcome"):
+                    self._known_outcome = res.outcome
+                    return
+            except RPCError as err:
+                if (
+                    err.status == RPCStatusCode.DEADLINE_EXCEEDED
+                    or err.status == RPCStatusCode.CANCELLED
+                ):
+                    raise WorkflowUpdateRPCTimeoutOrCancelledError() from err
+                else:
+                    raise
+            except asyncio.CancelledError as err:
+                raise WorkflowUpdateRPCTimeoutOrCancelledError() from err
 
 
 class WorkflowUpdateStage(IntEnum):
@@ -4454,6 +4476,24 @@ class WorkflowUpdateFailedError(temporalio.exceptions.TemporalError):
         """Cause of the update failure."""
         assert self.__cause__
         return self.__cause__
+
+
+class RPCTimeoutOrCancelledError(temporalio.exceptions.TemporalError):
+    """Error that occurs on some client calls that timeout or get cancelled."""
+
+    pass
+
+
+class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
+    """Error that occurs when update RPC call times out or is cancelled.
+
+    Note, this is not related to any general concept of timing out or cancelling
+    a running update, this is only related to the client call itself.
+    """
+
+    def __init__(self) -> None:
+        """Create workflow update timeout or cancelled error."""
+        super().__init__("Timeout or cancellation waiting for update")
 
 
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
@@ -5261,9 +5301,23 @@ class _ClientImpl(OutboundInterceptor):
         # the user cannot specify sooner than ACCEPTED)
         resp: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse
         while True:
-            resp = await self._client.workflow_service.update_workflow_execution(
-                req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
-            )
+            try:
+                resp = await self._client.workflow_service.update_workflow_execution(
+                    req,
+                    retry=True,
+                    metadata=input.rpc_metadata,
+                    timeout=input.rpc_timeout,
+                )
+            except RPCError as err:
+                if (
+                    err.status == RPCStatusCode.DEADLINE_EXCEEDED
+                    or err.status == RPCStatusCode.CANCELLED
+                ):
+                    raise WorkflowUpdateRPCTimeoutOrCancelledError() from err
+                else:
+                    raise
+            except asyncio.CancelledError as err:
+                raise WorkflowUpdateRPCTimeoutOrCancelledError() from err
             if (
                 resp.stage >= req.wait_policy.lifecycle_stage
                 or resp.stage
