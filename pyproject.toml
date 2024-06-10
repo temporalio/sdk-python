@@ -123,6 +123,7 @@ environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = 
 [tool.isort]
 profile = "black"
 skip_gitignore = true
+extend_skip = ["./temporalio/bridge/sdk-core", "./temporalio/bridge/target"]
 
 [tool.mypy]
 ignore_missing_imports = true

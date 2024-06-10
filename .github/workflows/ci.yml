@@ -52,6 +52,11 @@ jobs:
         uses: deadsnakes/action@v3.1.0
         with:
           python-version: ${{ matrix.python }}
+      - uses: arduino/setup-protoc@v3
+        with:
+          # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
+          version: "23.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       # Using fixed Poetry version until
       # https://github.com/python-poetry/poetry/issues/7611 and
       # https://github.com/python-poetry/poetry/pull/7694 are fixed
