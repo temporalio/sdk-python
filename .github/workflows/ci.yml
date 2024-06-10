@@ -10,7 +10,7 @@ jobs:
   # Build and test the project
   build-lint-test:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         python: ["3.8", "3.12"]
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
