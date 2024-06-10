@@ -1329,6 +1329,7 @@ To build the SDK from source for use as a dependency, the following prerequisite
 * [Python](https://www.python.org/) >= 3.8
   * Make sure the latest version of `pip` is in use
 * [Rust](https://www.rust-lang.org/)
+* [Protobuf Compiler](https://protobuf.dev/)
 * [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
 * [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
 
