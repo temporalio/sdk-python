@@ -200,11 +200,25 @@ class _EventTypeEnumTypeWrapper(
     """
     EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: _EventType.ValueType  # 46
     """Workflow properties modified by user workflow code"""
-    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REQUESTED: _EventType.ValueType  # 47
-    """An update was requested. Note that not all update requests result in this
-    event. See UpdateRequestedEventOrigin for situations in which this event
+    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED: _EventType.ValueType  # 47
+    """An update was admitted. Note that not all admitted updates result in this
+    event. See UpdateAdmittedEventOrigin for situations in which this event
     is created.
     """
+    EVENT_TYPE_NEXUS_OPERATION_SCHEDULED: _EventType.ValueType  # 48
+    """A Nexus operation was scheduled using a ScheduleNexusOperation command."""
+    EVENT_TYPE_NEXUS_OPERATION_STARTED: _EventType.ValueType  # 49
+    """An asynchronous Nexus operation was started by a Nexus handler."""
+    EVENT_TYPE_NEXUS_OPERATION_COMPLETED: _EventType.ValueType  # 50
+    """A Nexus operation completed successfully."""
+    EVENT_TYPE_NEXUS_OPERATION_FAILED: _EventType.ValueType  # 51
+    """A Nexus operation failed."""
+    EVENT_TYPE_NEXUS_OPERATION_CANCELED: _EventType.ValueType  # 52
+    """A Nexus operation completed as canceled."""
+    EVENT_TYPE_NEXUS_OPERATION_TIMED_OUT: _EventType.ValueType  # 53
+    """A Nexus operation timed out."""
+    EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED: _EventType.ValueType  # 54
+    """A Nexus operation was requested to be canceled using a RequestCancelNexusOperation command."""
 
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
@@ -364,9 +378,23 @@ maintain determinism when using the command-based approach.
 """
 EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: EventType.ValueType  # 46
 """Workflow properties modified by user workflow code"""
-EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REQUESTED: EventType.ValueType  # 47
-"""An update was requested. Note that not all update requests result in this
-event. See UpdateRequestedEventOrigin for situations in which this event
+EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED: EventType.ValueType  # 47
+"""An update was admitted. Note that not all admitted updates result in this
+event. See UpdateAdmittedEventOrigin for situations in which this event
 is created.
 """
+EVENT_TYPE_NEXUS_OPERATION_SCHEDULED: EventType.ValueType  # 48
+"""A Nexus operation was scheduled using a ScheduleNexusOperation command."""
+EVENT_TYPE_NEXUS_OPERATION_STARTED: EventType.ValueType  # 49
+"""An asynchronous Nexus operation was started by a Nexus handler."""
+EVENT_TYPE_NEXUS_OPERATION_COMPLETED: EventType.ValueType  # 50
+"""A Nexus operation completed successfully."""
+EVENT_TYPE_NEXUS_OPERATION_FAILED: EventType.ValueType  # 51
+"""A Nexus operation failed."""
+EVENT_TYPE_NEXUS_OPERATION_CANCELED: EventType.ValueType  # 52
+"""A Nexus operation completed as canceled."""
+EVENT_TYPE_NEXUS_OPERATION_TIMED_OUT: EventType.ValueType  # 53
+"""A Nexus operation timed out."""
+EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED: EventType.ValueType  # 54
+"""A Nexus operation was requested to be canceled using a RequestCancelNexusOperation command."""
 global___EventType = EventType

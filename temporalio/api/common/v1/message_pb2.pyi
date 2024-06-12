@@ -446,15 +446,10 @@ class WorkerVersionStamp(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BUILD_ID_FIELD_NUMBER: builtins.int
-    BUNDLE_ID_FIELD_NUMBER: builtins.int
     USE_VERSIONING_FIELD_NUMBER: builtins.int
     build_id: builtins.str
     """An opaque whole-worker identifier. Replaces the deprecated `binary_checksum` field when this
     message is included in requests which previously used that.
-    """
-    bundle_id: builtins.str
-    """Set if the worker used a dynamically loadable bundle to process
-    the task. The bundle could be a WASM blob, JS bundle, etc.
     """
     use_versioning: builtins.bool
     """If set, the worker is opting in to worker versioning. Otherwise, this is used only as a
@@ -464,18 +459,12 @@ class WorkerVersionStamp(google.protobuf.message.Message):
         self,
         *,
         build_id: builtins.str = ...,
-        bundle_id: builtins.str = ...,
         use_versioning: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "build_id",
-            b"build_id",
-            "bundle_id",
-            b"bundle_id",
-            "use_versioning",
-            b"use_versioning",
+            "build_id", b"build_id", "use_versioning", b"use_versioning"
         ],
     ) -> None: ...
 
@@ -525,6 +514,7 @@ class ResetOptions(google.protobuf.message.Message):
     BUILD_ID_FIELD_NUMBER: builtins.int
     RESET_REAPPLY_TYPE_FIELD_NUMBER: builtins.int
     CURRENT_RUN_ONLY_FIELD_NUMBER: builtins.int
+    RESET_REAPPLY_EXCLUDE_TYPES_FIELD_NUMBER: builtins.int
     @property
     def first_workflow_task(self) -> google.protobuf.empty_pb2.Empty:
         """Resets to the first workflow task completed or started event."""
@@ -544,11 +534,20 @@ class ResetOptions(google.protobuf.message.Message):
     continue-as-new.
     """
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """History event reapply options."""
+    """Event types to be reapplied (deprecated)
+    Default: RESET_REAPPLY_TYPE_SIGNAL
+    """
     current_run_only: builtins.bool
     """If true, limit the reset to only within the current run. (Applies to build_id targets and
     possibly others in the future.)
     """
+    @property
+    def reset_reapply_exclude_types(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        temporalio.api.enums.v1.reset_pb2.ResetReapplyExcludeType.ValueType
+    ]:
+        """Event types not to be reapplied"""
     def __init__(
         self,
         *,
@@ -558,6 +557,10 @@ class ResetOptions(google.protobuf.message.Message):
         build_id: builtins.str = ...,
         reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType = ...,
         current_run_only: builtins.bool = ...,
+        reset_reapply_exclude_types: collections.abc.Iterable[
+            temporalio.api.enums.v1.reset_pb2.ResetReapplyExcludeType.ValueType
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -585,6 +588,8 @@ class ResetOptions(google.protobuf.message.Message):
             b"first_workflow_task",
             "last_workflow_task",
             b"last_workflow_task",
+            "reset_reapply_exclude_types",
+            b"reset_reapply_exclude_types",
             "reset_reapply_type",
             b"reset_reapply_type",
             "target",
@@ -603,3 +608,71 @@ class ResetOptions(google.protobuf.message.Message):
     ): ...
 
 global___ResetOptions = ResetOptions
+
+class Callback(google.protobuf.message.Message):
+    """Callback to attach to various events in the system, e.g. workflow run completion."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class Nexus(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class HeaderEntry(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            KEY_FIELD_NUMBER: builtins.int
+            VALUE_FIELD_NUMBER: builtins.int
+            key: builtins.str
+            value: builtins.str
+            def __init__(
+                self,
+                *,
+                key: builtins.str = ...,
+                value: builtins.str = ...,
+            ) -> None: ...
+            def ClearField(
+                self,
+                field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            ) -> None: ...
+
+        URL_FIELD_NUMBER: builtins.int
+        HEADER_FIELD_NUMBER: builtins.int
+        url: builtins.str
+        """Callback URL."""
+        @property
+        def header(
+            self,
+        ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
+            """Header to attach to callback request."""
+        def __init__(
+            self,
+            *,
+            url: builtins.str = ...,
+            header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["header", b"header", "url", b"url"],
+        ) -> None: ...
+
+    NEXUS_FIELD_NUMBER: builtins.int
+    @property
+    def nexus(self) -> global___Callback.Nexus: ...
+    def __init__(
+        self,
+        *,
+        nexus: global___Callback.Nexus | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["nexus", b"nexus", "variant", b"variant"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["nexus", b"nexus", "variant", b"variant"],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> typing_extensions.Literal["nexus"] | None: ...
+
+global___Callback = Callback

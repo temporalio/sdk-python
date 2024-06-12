@@ -6,6 +6,7 @@ and extend standard Error Details defined in https://github.com/googleapis/googl
 """
 import builtins
 import collections.abc
+import google.protobuf.any_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
@@ -255,14 +256,18 @@ class ResourceExhaustedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CAUSE_FIELD_NUMBER: builtins.int
+    SCOPE_FIELD_NUMBER: builtins.int
     cause: temporalio.api.enums.v1.failed_cause_pb2.ResourceExhaustedCause.ValueType
+    scope: temporalio.api.enums.v1.failed_cause_pb2.ResourceExhaustedScope.ValueType
     def __init__(
         self,
         *,
         cause: temporalio.api.enums.v1.failed_cause_pb2.ResourceExhaustedCause.ValueType = ...,
+        scope: temporalio.api.enums.v1.failed_cause_pb2.ResourceExhaustedScope.ValueType = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["cause", b"cause"]
+        self,
+        field_name: typing_extensions.Literal["cause", b"cause", "scope", b"scope"],
     ) -> None: ...
 
 global___ResourceExhaustedFailure = ResourceExhaustedFailure
@@ -332,3 +337,66 @@ class NewerBuildExistsFailure(google.protobuf.message.Message):
     ) -> None: ...
 
 global___NewerBuildExistsFailure = NewerBuildExistsFailure
+
+class MultiOperationExecutionFailure(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class OperationStatus(google.protobuf.message.Message):
+        """NOTE: `OperationStatus` is modelled after
+        [`google.rpc.Status`](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto).
+
+        (-- api-linter: core::0146::any=disabled
+            aip.dev/not-precedent: details are meant to hold arbitrary payloads. --)
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        CODE_FIELD_NUMBER: builtins.int
+        MESSAGE_FIELD_NUMBER: builtins.int
+        DETAILS_FIELD_NUMBER: builtins.int
+        code: builtins.int
+        message: builtins.str
+        @property
+        def details(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            google.protobuf.any_pb2.Any
+        ]: ...
+        def __init__(
+            self,
+            *,
+            code: builtins.int = ...,
+            message: builtins.str = ...,
+            details: collections.abc.Iterable[google.protobuf.any_pb2.Any] | None = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "code", b"code", "details", b"details", "message", b"message"
+            ],
+        ) -> None: ...
+
+    STATUSES_FIELD_NUMBER: builtins.int
+    @property
+    def statuses(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___MultiOperationExecutionFailure.OperationStatus
+    ]:
+        """One status for each requested operation from the failed MultiOperation. The failed
+        operation(s) have the same error details as if it was executed separately. All other operations have the
+        status code `Aborted` and `MultiOperationExecutionAborted` is added to the details field.
+        """
+    def __init__(
+        self,
+        *,
+        statuses: collections.abc.Iterable[
+            global___MultiOperationExecutionFailure.OperationStatus
+        ]
+        | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["statuses", b"statuses"]
+    ) -> None: ...
+
+global___MultiOperationExecutionFailure = MultiOperationExecutionFailure

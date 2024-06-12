@@ -47,7 +47,6 @@ grpcio-tools = "^1.48.0"
 isort = "^5.11.5"
 mypy = "^1.0.0"
 mypy-protobuf = "^3.3.0"
-protoc-wheel-0 = "^21.1"
 psutil = "^5.9.3"
 pydantic = "^1.9.1"
 pydocstyle = "^6.1.1"
@@ -124,6 +123,7 @@ environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = 
 [tool.isort]
 profile = "black"
 skip_gitignore = true
+extend_skip = ["./temporalio/bridge/sdk-core", "./temporalio/bridge/target"]
 
 [tool.mypy]
 ignore_missing_imports = true

@@ -25,6 +25,7 @@ THE SOFTWARE.
 """
 import builtins
 import google.protobuf.descriptor
+import google.protobuf.duration_pb2
 import google.protobuf.message
 import sys
 import temporalio.api.common.v1.message_pb2
@@ -43,24 +44,45 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     NON_RETRYABLE_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
+    NEXT_RETRY_DELAY_FIELD_NUMBER: builtins.int
     type: builtins.str
     non_retryable: builtins.bool
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    @property
+    def next_retry_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """next_retry_delay can be used by the client to override the activity
+        retry interval calculated by the retry policy. Retry attempts will
+        still be subject to the maximum retries limit and total time limit
+        defined by the policy.
+        ATTENTION: this value will be ignored if set for failures produced by
+        the workflow.
+        """
     def __init__(
         self,
         *,
         type: builtins.str = ...,
         non_retryable: builtins.bool = ...,
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+        next_retry_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
+        self,
+        field_name: typing_extensions.Literal[
+            "details", b"details", "next_retry_delay", b"next_retry_delay"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "details", b"details", "non_retryable", b"non_retryable", "type", b"type"
+            "details",
+            b"details",
+            "next_retry_delay",
+            b"next_retry_delay",
+            "non_retryable",
+            b"non_retryable",
+            "type",
+            b"type",
         ],
     ) -> None: ...
 
@@ -283,6 +305,51 @@ class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
 
 global___ChildWorkflowExecutionFailureInfo = ChildWorkflowExecutionFailureInfo
 
+class NexusOperationFailureInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    OPERATION_ID_FIELD_NUMBER: builtins.int
+    scheduled_event_id: builtins.int
+    """The NexusOperationScheduled event ID."""
+    endpoint: builtins.str
+    """Endpoint name."""
+    service: builtins.str
+    """Service name."""
+    operation: builtins.str
+    """Operation name."""
+    operation_id: builtins.str
+    """Operation ID - may be empty if the operation completed synchronously."""
+    def __init__(
+        self,
+        *,
+        scheduled_event_id: builtins.int = ...,
+        endpoint: builtins.str = ...,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+        operation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "endpoint",
+            b"endpoint",
+            "operation",
+            b"operation",
+            "operation_id",
+            b"operation_id",
+            "scheduled_event_id",
+            b"scheduled_event_id",
+            "service",
+            b"service",
+        ],
+    ) -> None: ...
+
+global___NexusOperationFailureInfo = NexusOperationFailureInfo
+
 class Failure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -299,6 +366,7 @@ class Failure(google.protobuf.message.Message):
     RESET_WORKFLOW_FAILURE_INFO_FIELD_NUMBER: builtins.int
     ACTIVITY_FAILURE_INFO_FIELD_NUMBER: builtins.int
     CHILD_WORKFLOW_EXECUTION_FAILURE_INFO_FIELD_NUMBER: builtins.int
+    NEXUS_OPERATION_EXECUTION_FAILURE_INFO_FIELD_NUMBER: builtins.int
     message: builtins.str
     source: builtins.str
     """The source this Failure originated in, e.g. TypeScriptSDK / JavaSDK
@@ -343,6 +411,10 @@ class Failure(google.protobuf.message.Message):
     def child_workflow_execution_failure_info(
         self,
     ) -> global___ChildWorkflowExecutionFailureInfo: ...
+    @property
+    def nexus_operation_execution_failure_info(
+        self,
+    ) -> global___NexusOperationFailureInfo: ...
     def __init__(
         self,
         *,
@@ -359,6 +431,8 @@ class Failure(google.protobuf.message.Message):
         reset_workflow_failure_info: global___ResetWorkflowFailureInfo | None = ...,
         activity_failure_info: global___ActivityFailureInfo | None = ...,
         child_workflow_execution_failure_info: global___ChildWorkflowExecutionFailureInfo
+        | None = ...,
+        nexus_operation_execution_failure_info: global___NexusOperationFailureInfo
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -378,6 +452,8 @@ class Failure(google.protobuf.message.Message):
             b"encoded_attributes",
             "failure_info",
             b"failure_info",
+            "nexus_operation_execution_failure_info",
+            b"nexus_operation_execution_failure_info",
             "reset_workflow_failure_info",
             b"reset_workflow_failure_info",
             "server_failure_info",
@@ -407,6 +483,8 @@ class Failure(google.protobuf.message.Message):
             b"failure_info",
             "message",
             b"message",
+            "nexus_operation_execution_failure_info",
+            b"nexus_operation_execution_failure_info",
             "reset_workflow_failure_info",
             b"reset_workflow_failure_info",
             "server_failure_info",
@@ -433,8 +511,18 @@ class Failure(google.protobuf.message.Message):
             "reset_workflow_failure_info",
             "activity_failure_info",
             "child_workflow_execution_failure_info",
+            "nexus_operation_execution_failure_info",
         ]
         | None
     ): ...
 
 global___Failure = Failure
+
+class MultiOperationExecutionAborted(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___MultiOperationExecutionAborted = MultiOperationExecutionAborted

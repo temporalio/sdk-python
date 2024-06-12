@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import inspect
 import logging
 import threading
@@ -424,6 +425,17 @@ class ParentInfo:
     workflow_id: str
 
 
+@dataclass(frozen=True)
+class UpdateInfo:
+    """Information about a workflow update."""
+
+    id: str
+    """Update ID."""
+
+    name: str
+    """Update type name."""
+
+
 class _Runtime(ABC):
     @staticmethod
     def current() -> _Runtime:
@@ -652,6 +664,31 @@ class _Runtime(ABC):
         self, fn: Callable[[], bool], *, timeout: Optional[float] = None
     ) -> None:
         ...
+
+
+_current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
+    "__temporal_current_update_info"
+)
+
+
+def _set_current_update_info(info: UpdateInfo) -> None:
+    _current_update_info.set(info)
+
+
+def current_update_info() -> Optional[UpdateInfo]:
+    """Info for the current update if any.
+
+    This is powered by :py:mod:`contextvars` so it is only valid within the
+    update handler and coroutines/tasks it has started.
+
+    .. warning::
+       This API is experimental
+
+    Returns:
+        Info for the current update handler the code calling this is executing
+            within if any.
+    """
+    return _current_update_info.get(None)
 
 
 def deprecate_patch(id: str) -> None:

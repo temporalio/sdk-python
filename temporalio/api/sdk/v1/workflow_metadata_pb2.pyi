@@ -38,7 +38,7 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class WorkflowMetadata(google.protobuf.message.Message):
-    """The name of the query to retrieve this information is `__temporal_getWorkflowMetadata`."""
+    """The name of the query to retrieve this information is `__temporal_workflow_metadata`."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

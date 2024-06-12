@@ -1109,22 +1109,6 @@ files = [
 ]
 
 [[package]]
-name = "protoc-wheel-0"
-version = "21.5"
-description = "Google Protocol buffers compiler"
-category = "dev"
-optional = false
-python-versions = "*"
-files = [
-    {file = "protoc_wheel_0-21.5-py2.py3-none-macosx_10_6_x86_64.whl", hash = "sha256:136b94aa6ae9e899b4282a33e42de07d51c572135dd731774fb358e67702862a"},
-    {file = "protoc_wheel_0-21.5-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:21b74c0a8f3e1ae56d4d236e2d9c1f4d3dc5fe092072a8acf6d1616e79d4e87d"},
-    {file = "protoc_wheel_0-21.5-py2.py3-none-manylinux1_x86_64.whl", hash = "sha256:965437ee501fa7f012e336bbd2655d24bcbeb556a5b3130ae7315639ef8a1dab"},
-    {file = "protoc_wheel_0-21.5-py2.py3-none-manylinux2014_aarch64.whl", hash = "sha256:d9a89dd5ece4e9217fcf0f69a43f543424d3a134b978cf0c7ce2316867fe5d19"},
-    {file = "protoc_wheel_0-21.5-py2.py3-none-win32.whl", hash = "sha256:19173b492c93f0e95dc0df5edc53c285b804ab141edfea122693aa6bc009ffbe"},
-    {file = "protoc_wheel_0-21.5-py2.py3-none-win_amd64.whl", hash = "sha256:ae766f84e3ce3e34d7e936f625f1a5ab081aa8d5add23dc98b81cf771844ea0e"},
-]
-
-[[package]]
 name = "psutil"
 version = "5.9.3"
 description = "Cross-platform lib for process and system monitoring in Python."
@@ -1919,4 +1903,4 @@ opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "8f0c924ca5a46babe0117ac2d195a82db5579b7e10f0889b50645ad46ec16ac7"
+content-hash = "58ce3f2d28683ca8dad34116a76a1f7582fcd6c877188f649b858da8510e8cc5"

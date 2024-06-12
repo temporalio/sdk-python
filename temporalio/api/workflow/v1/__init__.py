@@ -1,7 +1,10 @@
 from .message_pb2 import (
+    CallbackInfo,
     NewWorkflowExecutionInfo,
+    NexusOperationCancellationInfo,
     PendingActivityInfo,
     PendingChildExecutionInfo,
+    PendingNexusOperationInfo,
     PendingWorkflowTaskInfo,
     ResetPointInfo,
     ResetPoints,
@@ -10,9 +13,12 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "CallbackInfo",
     "NewWorkflowExecutionInfo",
+    "NexusOperationCancellationInfo",
     "PendingActivityInfo",
     "PendingChildExecutionInfo",
+    "PendingNexusOperationInfo",
     "PendingWorkflowTaskInfo",
     "ResetPointInfo",
     "ResetPoints",

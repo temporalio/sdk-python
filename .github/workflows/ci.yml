@@ -36,24 +36,27 @@ jobs:
             python: "3.8"
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-        with:
-          working-directory: temporalio/bridge
+          workspaces: temporalio/bridge -> target
       # actions/setup-python doesn't yet support Linux ARM
       - if: ${{ matrix.os != 'ubuntu-arm' }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - if: ${{ matrix.os == 'ubuntu-arm' }}
-        uses: deadsnakes/action@v2.1.1
+        uses: deadsnakes/action@v3.1.0
         with:
           python-version: ${{ matrix.python }}
+      - uses: arduino/setup-protoc@v3
+        with:
+          # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
+          version: "23.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       # Using fixed Poetry version until
       # https://github.com/python-poetry/poetry/issues/7611 and
       # https://github.com/python-poetry/poetry/pull/7694 are fixed
@@ -79,7 +82,7 @@ jobs:
           poetry add "protobuf<4"
           poe gen-protos
           poe format
-          [[ -z $(git status --porcelain temporalio) ]] || (git diff; echo "Protos changed"; exit 1)
+          [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
           poe test -s -o log_cli_level=DEBUG
 
       # Do docs stuff (only on one host)
@@ -91,7 +94,7 @@ jobs:
         run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --name python --scope temporal --prod --yes
 
       # Confirm README ToC is generated properly
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
       - name: Check generated README ToC
         if: ${{ matrix.docsTarget }}
         run: |

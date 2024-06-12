@@ -261,10 +261,13 @@ class MyTypedDictNotTotal(TypedDict, total=False):
     bar: MyDataClass
 
 
-class MyPydanticClass(pydantic.BaseModel):
-    foo: str
-    bar: List[MyPydanticClass]
-    baz: Optional[UUID] = None
+# TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
+if sys.version_info <= (3, 12, 3):
+
+    class MyPydanticClass(pydantic.BaseModel):
+        foo: str
+        bar: List[MyPydanticClass]
+        baz: Optional[UUID] = None
 
 
 def test_json_type_hints():
@@ -401,14 +404,16 @@ def test_json_type_hints():
         ok(tuple[int, str], (1, "2"))
 
     # Pydantic
-    ok(
-        MyPydanticClass,
-        MyPydanticClass(
-            foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()
-        ),
-    )
-    ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
-    fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
+    # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
+    if sys.version_info <= (3, 12, 3):
+        ok(
+            MyPydanticClass,
+            MyPydanticClass(
+                foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()
+            ),
+        )
+        ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
+        fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
 
 
 # This is an example of appending the stack to every Temporal failure error

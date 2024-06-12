@@ -474,6 +474,11 @@ class _WorkflowInstanceImpl(
         # inside the task, since the update may not be defined until after we have started the workflow - for example
         # if an update is in the first WFT & is also registered dynamically at the top of workflow code.
         async def run_update() -> None:
+            # Set the current update for the life of this task
+            temporalio.workflow._set_current_update_info(
+                temporalio.workflow.UpdateInfo(id=job.id, name=job.name)
+            )
+
             command = self._add_command()
             command.update_response.protocol_instance_id = job.protocol_instance_id
             past_validation = False
