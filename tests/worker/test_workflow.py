@@ -2101,6 +2101,10 @@ async def test_workflow_stack_trace(client: Client):
         # Send stack trace query
         trace = await handle.query("__stack_trace")
         # TODO(cretz): Do more specific checks once we clean up traces
+
+        with open("stack_trace.txt", 'w') as f:
+            f.write(str(trace))
+
         assert "never_completing_coroutine" in trace
 
 

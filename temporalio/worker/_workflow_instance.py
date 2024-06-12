@@ -2675,36 +2675,3 @@ class _ReplaySafeMetricGaugeFloat(
 
 class _WorkflowBeingEvictedError(BaseException):
     pass
-
-
-@dataclass
-class _SDKInfo:
-    name: str
-    version: str
-
-
-@dataclass
-class _FileSlice:
-    content: str
-    lineOffset: int
-
-
-@dataclass
-class _FileLocation:
-    filePath: str
-    line: Optional[int] = -1
-    column: Optional[int] = -1
-    functionName: Optional[str] = None
-    hideByDefault : bool = True
-
-
-@dataclass
-class _StackTrace:
-    locations: typing.List[_FileLocation]
-
-
-@dataclass
-class _EnhancedStackTrace:
-    sdk: _SDKInfo
-    sources: typing.Mapping[str, _FileSlice]
-    stacks: typing.List[_StackTrace]
