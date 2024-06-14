@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n+temporal/api/sdk/v1/workflow_metadata.proto\x12\x13temporal.api.sdk.v1"O\n\x10WorkflowMetadata\x12;\n\ndefinition\x18\x01 \x01(\x0b\x32\'.temporal.api.sdk.v1.WorkflowDefinition"\xa6\x02\n\x12WorkflowDefinition\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12M\n\x11query_definitions\x18\x03 \x03(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowInteractionDefinition\x12N\n\x12signal_definitions\x18\x04 \x03(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowInteractionDefinition\x12N\n\x12update_definitions\x18\x05 \x03(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowInteractionDefinition"B\n\x1dWorkflowInteractionDefinition\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\tB\x83\x01\n\x16io.temporal.api.sdk.v1B\x15WorkflowMetadataProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3'
+    b'\n+temporal/api/sdk/v1/workflow_metadata.proto\x12\x13temporal.api.sdk.v1"h\n\x10WorkflowMetadata\x12;\n\ndefinition\x18\x01 \x01(\x0b\x32\'.temporal.api.sdk.v1.WorkflowDefinition\x12\x17\n\x0f\x63urrent_details\x18\x02 \x01(\t"\x91\x02\n\x12WorkflowDefinition\x12\x0c\n\x04type\x18\x01 \x01(\t\x12M\n\x11query_definitions\x18\x02 \x03(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowInteractionDefinition\x12N\n\x12signal_definitions\x18\x03 \x03(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowInteractionDefinition\x12N\n\x12update_definitions\x18\x04 \x03(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowInteractionDefinition"B\n\x1dWorkflowInteractionDefinition\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\tB\x83\x01\n\x16io.temporal.api.sdk.v1B\x15WorkflowMetadataProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3'
 )
 
 
@@ -60,9 +60,9 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\026io.temporal.api.sdk.v1B\025WorkflowMetadataProtoP\001Z\035go.temporal.io/api/sdk/v1;sdk\252\002\025Temporalio.Api.Sdk.V1\352\002\030Temporalio::Api::Sdk::V1"
     _WORKFLOWMETADATA._serialized_start = 68
-    _WORKFLOWMETADATA._serialized_end = 147
-    _WORKFLOWDEFINITION._serialized_start = 150
-    _WORKFLOWDEFINITION._serialized_end = 444
-    _WORKFLOWINTERACTIONDEFINITION._serialized_start = 446
-    _WORKFLOWINTERACTIONDEFINITION._serialized_end = 512
+    _WORKFLOWMETADATA._serialized_end = 172
+    _WORKFLOWDEFINITION._serialized_start = 175
+    _WORKFLOWDEFINITION._serialized_end = 448
+    _WORKFLOWINTERACTIONDEFINITION._serialized_start = 450
+    _WORKFLOWINTERACTIONDEFINITION._serialized_end = 516
 # @@protoc_insertion_point(module_scope)

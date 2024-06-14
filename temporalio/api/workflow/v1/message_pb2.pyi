@@ -36,6 +36,7 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -250,6 +251,7 @@ class WorkflowExecutionConfig(google.protobuf.message.Message):
     WORKFLOW_EXECUTION_TIMEOUT_FIELD_NUMBER: builtins.int
     WORKFLOW_RUN_TIMEOUT_FIELD_NUMBER: builtins.int
     DEFAULT_WORKFLOW_TASK_TIMEOUT_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     @property
@@ -260,6 +262,9 @@ class WorkflowExecutionConfig(google.protobuf.message.Message):
     def default_workflow_task_timeout(
         self,
     ) -> google.protobuf.duration_pb2.Duration: ...
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """User metadata provided on start workflow."""
     def __init__(
         self,
         *,
@@ -267,6 +272,8 @@ class WorkflowExecutionConfig(google.protobuf.message.Message):
         workflow_execution_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         workflow_run_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         default_workflow_task_timeout: google.protobuf.duration_pb2.Duration
+        | None = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -276,6 +283,8 @@ class WorkflowExecutionConfig(google.protobuf.message.Message):
             b"default_workflow_task_timeout",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -289,6 +298,8 @@ class WorkflowExecutionConfig(google.protobuf.message.Message):
             b"default_workflow_task_timeout",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -660,6 +671,7 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
     workflow_id: builtins.str
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
@@ -692,6 +704,12 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """Metadata on the workflow if it is started. This is carried over to the WorkflowExecutionConfig
+        for use by user interfaces to display the fixed as-of-start summary and details of the
+        workflow.
+        """
     def __init__(
         self,
         *,
@@ -709,6 +727,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -725,6 +745,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -752,6 +774,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",

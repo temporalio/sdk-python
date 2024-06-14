@@ -107,12 +107,12 @@ from tests.helpers import (
     find_free_port,
     new_worker,
 )
+from tests.helpers.external_coroutine import wait_on_timer
 from tests.helpers.external_stack_trace import (
-    MultiFileStackTraceWorkflow,
     ExternalStackTraceWorkflow,
+    MultiFileStackTraceWorkflow,
     external_wait_cancel,
 )
-from tests.helpers.external_coroutine import wait_on_timer
 
 
 @workflow.defn
@@ -2102,7 +2102,7 @@ async def test_workflow_stack_trace(client: Client):
         trace = await handle.query("__stack_trace")
         # TODO(cretz): Do more specific checks once we clean up traces
 
-        with open("stack_trace.txt", 'w') as f:
+        with open("stack_trace.txt", "w") as f:
             f.write(str(trace))
 
         assert "never_completing_coroutine" in trace
@@ -2139,9 +2139,11 @@ async def test_workflow_enhanced_stack_trace(client: Client):
 
 # TODO(divy) remove
 import json
+
+
 async def test_workflow_external_enhanced_stack_trace(client: Client):
     async with new_worker(
-        client, 
+        client,
         ExternalStackTraceWorkflow,
         activities=[external_wait_cancel],
     ) as worker:
@@ -2158,7 +2160,7 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
 
         trace = await handle.query("__enhanced_stack_trace")
 
-        with open('output.json', 'w') as f:
+        with open("output.json", "w") as f:
             json.dump(trace, f)
 
         # test that a coroutine only has the source as its stack
@@ -2181,26 +2183,25 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
         )
         assert trace["sdk"]["version"] == __version__
 
+
 async def test_workflow_external_multifile_enhanced_stack_trace(client: Client):
-    async with new_worker (
-        client,
-        MultiFileStackTraceWorkflow,
-        activities=[]
+    async with new_worker(
+        client, MultiFileStackTraceWorkflow, activities=[]
     ) as multifile_worker:
         mf_handle = await client.start_workflow(
             MultiFileStackTraceWorkflow.run_multifile_workflow,
             id=f"workflow-{uuid.uuid4()}",
-            task_queue=multifile_worker.task_queue
+            task_queue=multifile_worker.task_queue,
         )
 
         async def mf_status() -> str:
             return await mf_handle.query(MultiFileStackTraceWorkflow.status)
-        
+
         await assert_eq_eventually("waiting", mf_status)
 
         mf_trace = await mf_handle.query("__enhanced_stack_trace")
 
-        with open('mf_output.json', 'w') as f:
+        with open("mf_output.json", "w") as f:
             json.dump(mf_trace, f)
 
         assert "wait_on_timer" in [
@@ -2222,12 +2223,10 @@ async def test_workflow_external_multifile_enhanced_stack_trace(client: Client):
             in mf_trace["sources"][filenames[1]]["content"]
         )
         assert (
-            'await wait_on_timer(self._status)'
+            "await wait_on_timer(self._status)"
             in mf_trace["sources"][filenames[0]]["content"]
         )
         assert mf_trace["sdk"]["version"] == __version__
-
-
 
 
 @dataclass

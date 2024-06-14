@@ -20,7 +20,7 @@ from temporalio.api.operatorservice.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n-temporal/api/operatorservice/v1/service.proto\x12\x1ftemporal.api.operatorservice.v1\x1a\x36temporal/api/operatorservice/v1/request_response.proto\x1a\x1cgoogle/api/annotations.proto2\xe9\x0f\n\x0fOperatorService\x12\x92\x01\n\x13\x41\x64\x64SearchAttributes\x12;.temporal.api.operatorservice.v1.AddSearchAttributesRequest\x1a<.temporal.api.operatorservice.v1.AddSearchAttributesResponse"\x00\x12\x9b\x01\n\x16RemoveSearchAttributes\x12>.temporal.api.operatorservice.v1.RemoveSearchAttributesRequest\x1a?.temporal.api.operatorservice.v1.RemoveSearchAttributesResponse"\x00\x12\xcd\x01\n\x14ListSearchAttributes\x12<.temporal.api.operatorservice.v1.ListSearchAttributesRequest\x1a=.temporal.api.operatorservice.v1.ListSearchAttributesResponse"8\x82\xd3\xe4\x93\x02\x32\x12\x30/api/v1/namespaces/{namespace}/search-attributes\x12\x86\x01\n\x0f\x44\x65leteNamespace\x12\x37.temporal.api.operatorservice.v1.DeleteNamespaceRequest\x1a\x38.temporal.api.operatorservice.v1.DeleteNamespaceResponse"\x00\x12\xa1\x01\n\x18\x41\x64\x64OrUpdateRemoteCluster\x12@.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterRequest\x1a\x41.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterResponse"\x00\x12\x92\x01\n\x13RemoveRemoteCluster\x12;.temporal.api.operatorservice.v1.RemoveRemoteClusterRequest\x1a<.temporal.api.operatorservice.v1.RemoveRemoteClusterResponse"\x00\x12}\n\x0cListClusters\x12\x34.temporal.api.operatorservice.v1.ListClustersRequest\x1a\x35.temporal.api.operatorservice.v1.ListClustersResponse"\x00\x12\xad\x01\n\x10GetNexusEndpoint\x12\x38.temporal.api.operatorservice.v1.GetNexusEndpointRequest\x1a\x39.temporal.api.operatorservice.v1.GetNexusEndpointResponse"$\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1/nexus/endpoints/{id}\x12\xb4\x01\n\x13\x43reateNexusEndpoint\x12;.temporal.api.operatorservice.v1.CreateNexusEndpointRequest\x1a<.temporal.api.operatorservice.v1.CreateNexusEndpointResponse""\x82\xd3\xe4\x93\x02\x1c"\x17/api/v1/nexus/endpoints:\x01*\x12\xc0\x01\n\x13UpdateNexusEndpoint\x12;.temporal.api.operatorservice.v1.UpdateNexusEndpointRequest\x1a<.temporal.api.operatorservice.v1.UpdateNexusEndpointResponse".\x82\xd3\xe4\x93\x02("#/api/v1/nexus/endpoints/{id}/update:\x01*\x12\xb6\x01\n\x13\x44\x65leteNexusEndpoint\x12;.temporal.api.operatorservice.v1.DeleteNexusEndpointRequest\x1a<.temporal.api.operatorservice.v1.DeleteNexusEndpointResponse"$\x82\xd3\xe4\x93\x02\x1e*\x1c/api/v1/nexus/endpoints/{id}\x12\xae\x01\n\x12ListNexusEndpoints\x12:.temporal.api.operatorservice.v1.ListNexusEndpointsRequest\x1a;.temporal.api.operatorservice.v1.ListNexusEndpointsResponse"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1/nexus/endpointsB\xb6\x01\n"io.temporal.api.operatorservice.v1B\x0cServiceProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
+    b'\n-temporal/api/operatorservice/v1/service.proto\x12\x1ftemporal.api.operatorservice.v1\x1a\x36temporal/api/operatorservice/v1/request_response.proto\x1a\x1cgoogle/api/annotations.proto2\xbf\x0f\n\x0fOperatorService\x12\x92\x01\n\x13\x41\x64\x64SearchAttributes\x12;.temporal.api.operatorservice.v1.AddSearchAttributesRequest\x1a<.temporal.api.operatorservice.v1.AddSearchAttributesResponse"\x00\x12\x9b\x01\n\x16RemoveSearchAttributes\x12>.temporal.api.operatorservice.v1.RemoveSearchAttributesRequest\x1a?.temporal.api.operatorservice.v1.RemoveSearchAttributesResponse"\x00\x12\xc6\x01\n\x14ListSearchAttributes\x12<.temporal.api.operatorservice.v1.ListSearchAttributesRequest\x1a=.temporal.api.operatorservice.v1.ListSearchAttributesResponse"1\x82\xd3\xe4\x93\x02+\x12)/namespaces/{namespace}/search-attributes\x12\x86\x01\n\x0f\x44\x65leteNamespace\x12\x37.temporal.api.operatorservice.v1.DeleteNamespaceRequest\x1a\x38.temporal.api.operatorservice.v1.DeleteNamespaceResponse"\x00\x12\xa1\x01\n\x18\x41\x64\x64OrUpdateRemoteCluster\x12@.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterRequest\x1a\x41.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterResponse"\x00\x12\x92\x01\n\x13RemoveRemoteCluster\x12;.temporal.api.operatorservice.v1.RemoveRemoteClusterRequest\x1a<.temporal.api.operatorservice.v1.RemoveRemoteClusterResponse"\x00\x12}\n\x0cListClusters\x12\x34.temporal.api.operatorservice.v1.ListClustersRequest\x1a\x35.temporal.api.operatorservice.v1.ListClustersResponse"\x00\x12\xa6\x01\n\x10GetNexusEndpoint\x12\x38.temporal.api.operatorservice.v1.GetNexusEndpointRequest\x1a\x39.temporal.api.operatorservice.v1.GetNexusEndpointResponse"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/nexus/endpoints/{id}\x12\xad\x01\n\x13\x43reateNexusEndpoint\x12;.temporal.api.operatorservice.v1.CreateNexusEndpointRequest\x1a<.temporal.api.operatorservice.v1.CreateNexusEndpointResponse"\x1b\x82\xd3\xe4\x93\x02\x15"\x10/nexus/endpoints:\x01*\x12\xb9\x01\n\x13UpdateNexusEndpoint\x12;.temporal.api.operatorservice.v1.UpdateNexusEndpointRequest\x1a<.temporal.api.operatorservice.v1.UpdateNexusEndpointResponse"\'\x82\xd3\xe4\x93\x02!"\x1c/nexus/endpoints/{id}/update:\x01*\x12\xaf\x01\n\x13\x44\x65leteNexusEndpoint\x12;.temporal.api.operatorservice.v1.DeleteNexusEndpointRequest\x1a<.temporal.api.operatorservice.v1.DeleteNexusEndpointResponse"\x1d\x82\xd3\xe4\x93\x02\x17*\x15/nexus/endpoints/{id}\x12\xa7\x01\n\x12ListNexusEndpoints\x12:.temporal.api.operatorservice.v1.ListNexusEndpointsRequest\x1a;.temporal.api.operatorservice.v1.ListNexusEndpointsResponse"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/nexus/endpointsB\xb6\x01\n"io.temporal.api.operatorservice.v1B\x0cServiceProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
 )
 
 
@@ -32,34 +32,30 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _OPERATORSERVICE.methods_by_name[
         "ListSearchAttributes"
     ]._serialized_options = (
-        b"\202\323\344\223\0022\0220/api/v1/namespaces/{namespace}/search-attributes"
+        b"\202\323\344\223\002+\022)/namespaces/{namespace}/search-attributes"
     )
     _OPERATORSERVICE.methods_by_name["GetNexusEndpoint"]._options = None
     _OPERATORSERVICE.methods_by_name[
         "GetNexusEndpoint"
-    ]._serialized_options = (
-        b"\202\323\344\223\002\036\022\034/api/v1/nexus/endpoints/{id}"
-    )
+    ]._serialized_options = b"\202\323\344\223\002\027\022\025/nexus/endpoints/{id}"
     _OPERATORSERVICE.methods_by_name["CreateNexusEndpoint"]._options = None
     _OPERATORSERVICE.methods_by_name[
         "CreateNexusEndpoint"
-    ]._serialized_options = (
-        b'\202\323\344\223\002\034"\027/api/v1/nexus/endpoints:\001*'
-    )
+    ]._serialized_options = b'\202\323\344\223\002\025"\020/nexus/endpoints:\001*'
     _OPERATORSERVICE.methods_by_name["UpdateNexusEndpoint"]._options = None
     _OPERATORSERVICE.methods_by_name[
         "UpdateNexusEndpoint"
     ]._serialized_options = (
-        b'\202\323\344\223\002("#/api/v1/nexus/endpoints/{id}/update:\001*'
+        b'\202\323\344\223\002!"\034/nexus/endpoints/{id}/update:\001*'
     )
     _OPERATORSERVICE.methods_by_name["DeleteNexusEndpoint"]._options = None
     _OPERATORSERVICE.methods_by_name[
         "DeleteNexusEndpoint"
-    ]._serialized_options = b"\202\323\344\223\002\036*\034/api/v1/nexus/endpoints/{id}"
+    ]._serialized_options = b"\202\323\344\223\002\027*\025/nexus/endpoints/{id}"
     _OPERATORSERVICE.methods_by_name["ListNexusEndpoints"]._options = None
     _OPERATORSERVICE.methods_by_name[
         "ListNexusEndpoints"
-    ]._serialized_options = b"\202\323\344\223\002\031\022\027/api/v1/nexus/endpoints"
+    ]._serialized_options = b"\202\323\344\223\002\022\022\020/nexus/endpoints"
     _OPERATORSERVICE._serialized_start = 169
-    _OPERATORSERVICE._serialized_end = 2194
+    _OPERATORSERVICE._serialized_end = 2152
 # @@protoc_insertion_point(module_scope)

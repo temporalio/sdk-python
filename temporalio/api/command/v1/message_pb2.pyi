@@ -34,6 +34,7 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.command_type_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -1019,6 +1020,7 @@ class Command(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     COMMAND_TYPE_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
     SCHEDULE_ACTIVITY_TASK_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_TIMER_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     COMPLETE_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -1037,6 +1039,19 @@ class Command(google.protobuf.message.Message):
     SCHEDULE_NEXUS_OPERATION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     REQUEST_CANCEL_NEXUS_OPERATION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """Metadata on the command. This is sometimes carried over to the history event if one is
+        created as a result of the command. Most commands won't have this information, and how this
+        information is used is dependent upon the interface that reads it.
+
+        Current well-known uses:
+         * start_child_workflow_execution_command_attributes - populates
+           temporalio.api.workflow.v1.WorkflowExecutionInfo.user_metadata where the summary and details
+           are used by user interfaces to show fixed as-of-start workflow summary and details.
+         * start_timer_command_attributes - populates temporalio.api.history.v1.HistoryEvent for timer
+           started where the summary is used to identify the timer.
+        """
     @property
     def schedule_activity_task_command_attributes(
         self,
@@ -1110,6 +1125,8 @@ class Command(google.protobuf.message.Message):
         self,
         *,
         command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
         schedule_activity_task_command_attributes: global___ScheduleActivityTaskCommandAttributes
         | None = ...,
         start_timer_command_attributes: global___StartTimerCommandAttributes
@@ -1184,6 +1201,8 @@ class Command(google.protobuf.message.Message):
             b"start_timer_command_attributes",
             "upsert_workflow_search_attributes_command_attributes",
             b"upsert_workflow_search_attributes_command_attributes",
+            "user_metadata",
+            b"user_metadata",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -1227,6 +1246,8 @@ class Command(google.protobuf.message.Message):
             b"start_timer_command_attributes",
             "upsert_workflow_search_attributes_command_attributes",
             b"upsert_workflow_search_attributes_command_attributes",
+            "user_metadata",
+            b"user_metadata",
         ],
     ) -> None: ...
     def WhichOneof(
