@@ -38,6 +38,7 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
+from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.update.v1 import UpdateRef
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
@@ -2101,10 +2102,6 @@ async def test_workflow_stack_trace(client: Client):
         # Send stack trace query
         trace = await handle.query("__stack_trace")
         # TODO(cretz): Do more specific checks once we clean up traces
-
-        with open("stack_trace.txt", "w") as f:
-            f.write(str(trace))
-
         assert "never_completing_coroutine" in trace
 
 
@@ -2127,18 +2124,17 @@ async def test_workflow_enhanced_stack_trace(client: Client):
         # Send stack trace query
         trace = await handle.query("__enhanced_stack_trace")
 
+        assert type(trace) == EnhancedStackTrace
+
         assert "never_completing_coroutine" in [
-            loc["functionName"]
-            for stack in trace["stacks"]
-            for loc in stack["locations"]
+            loc.function_name for stack in trace.stacks for loc in stack.locations
         ]
+
         # first line of never_completing_coroutine
-        assert 'self._status = "waiting"' in str(trace["sources"])
-        assert trace["sdk"]["version"] == __version__
-
-
-# TODO(divy) remove
-import json
+        assert 'self._status = "waiting"' in str(
+            [fileslice.content for fileslice in trace.sources.values()]
+        )
+        assert trace.sdk.version == __version__
 
 
 async def test_workflow_external_enhanced_stack_trace(client: Client):
@@ -2160,28 +2156,22 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
 
         trace = await handle.query("__enhanced_stack_trace")
 
-        with open("output.json", "w") as f:
-            json.dump(trace, f)
-
         # test that a coroutine only has the source as its stack
 
         assert "never_completing_coroutine" in [
-            loc["functionName"]
-            for stack in trace["stacks"]
-            for loc in stack["locations"]
+            loc.function_name for stack in trace.stacks for loc in stack.locations
         ]
 
         fn = None
-        for source in trace["sources"].keys():
-            if source.endswith("external_coroutine.py 9"):
+        for source in trace.sources.keys():
+            if source.endswith("external_coroutine.py 10"):
                 fn = source
 
         assert fn != None
-        assert (
-            'status[0] = "waiting"  # external coroutine test'
-            in trace["sources"][fn]["content"]
+        assert 'status[0] = "waiting"  # external coroutine test' in str(
+            [fileslice.content for fileslice in trace.sources.values()]
         )
-        assert trace["sdk"]["version"] == __version__
+        assert trace.sdk.version == __version__
 
 
 async def test_workflow_external_multifile_enhanced_stack_trace(client: Client):
@@ -2201,32 +2191,26 @@ async def test_workflow_external_multifile_enhanced_stack_trace(client: Client):
 
         mf_trace = await mf_handle.query("__enhanced_stack_trace")
 
-        with open("mf_output.json", "w") as f:
-            json.dump(mf_trace, f)
-
         assert "wait_on_timer" in [
-            loc["functionName"]
-            for stack in mf_trace["stacks"]
-            for loc in stack["locations"]
+            loc.function_name for stack in mf_trace.stacks for loc in stack.locations
         ]
 
         filenames = [None, None]
-        for source in mf_trace["sources"].keys():
-            if source.endswith("external_coroutine.py 11"):
+        for source in mf_trace.sources.keys():
+            if source.endswith("external_coroutine.py 15"):
                 filenames[1] = source
-            if source.endswith("external_stack_trace.py 51"):
+            if source.endswith("external_stack_trace.py 49"):
                 filenames[0] = source
 
         assert filenames[0] is not None and filenames[1] is not None
-        assert (
-            'status[0] = "waiting"  # multifile test'
-            in mf_trace["sources"][filenames[1]]["content"]
+        assert 'status[0] = "waiting"  # multifile test' in str(
+            [fileslice.content for fileslice in mf_trace.sources.values()]
         )
-        assert (
-            "await wait_on_timer(self._status)"
-            in mf_trace["sources"][filenames[0]]["content"]
+
+        assert "await wait_on_timer(self._status)" in str(
+            [fileslice.content for fileslice in mf_trace.sources.values()]
         )
-        assert mf_trace["sdk"]["version"] == __version__
+        assert mf_trace.sdk.version == __version__
 
 
 @dataclass

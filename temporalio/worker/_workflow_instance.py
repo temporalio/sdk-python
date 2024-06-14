@@ -1808,7 +1808,9 @@ class _WorkflowInstanceImpl(
         return "\n\n".join(stacks)
 
     def _enhanced_stack_trace(self) -> temporalio.api.sdk.v1.EnhancedStackTrace:
-        sdk = temporalio.api.sdk.v1.StackTraceSDKInfo("sdk-python", __version__)
+        sdk = temporalio.api.sdk.v1.StackTraceSDKInfo(
+            name="sdk-python", version=__version__
+        )
 
         sources = dict()
         stacks = []
@@ -1830,17 +1832,25 @@ class _WorkflowInstanceImpl(
                 except Exception:
                     code = f"Generic Error.\n\n{traceback.format_exc()}"
 
-                file_slice = temporalio.api.sdk.v1.StackTraceFileSlice(code, line_number)
+                file_slice = temporalio.api.sdk.v1.StackTraceFileSlice(
+                    line_offset=line_number, content=code
+                )
                 file_location = temporalio.api.sdk.v1.StackTraceFileLocation(
-                    filename, line=line_number, functionName=func_name
+                    file_path=filename,
+                    line=line_number,
+                    column=-1,
+                    function_name=func_name,
+                    internal_code=False,
                 )
 
                 sources[f"{filename} {line_number}"] = file_slice
                 locations.append(file_location)
 
-            stacks.append(temporalio.api.sdk.v1.StackTrace(locations))
+            stacks.append(temporalio.api.sdk.v1.StackTrace(locations=locations))
 
-        est = temporalio.api.sdk.v1.EnhancedStackTrace(sdk, sources, stacks)
+        est = temporalio.api.sdk.v1.EnhancedStackTrace(
+            sdk=sdk, sources=sources, stacks=stacks
+        )
         return est
 
     #### asyncio.AbstractEventLoop function impls ####
