@@ -1058,7 +1058,9 @@ async def test_schedule_backfill(
             )
         ],
     )
-    assert 2 == (await handle.describe()).info.num_actions
+    # The number of items backfilled on a schedule boundary changed in 1.24, so
+    # we check for either
+    assert (await handle.describe()).info.num_actions in [2, 3]
 
     # Add two more backfills and and -2m will be deduped
     await handle.backfill(
@@ -1073,7 +1075,9 @@ async def test_schedule_backfill(
             overlap=ScheduleOverlapPolicy.ALLOW_ALL,
         ),
     )
-    assert 6 == (await handle.describe()).info.num_actions
+    # The number of items backfilled on a schedule boundary changed in 1.24, so
+    # we check for either
+    assert (await handle.describe()).info.num_actions in [6, 8]
 
     await handle.delete()
     await assert_no_schedules(client)
@@ -1155,19 +1159,17 @@ async def test_schedule_search_attribute_update(
             input.description.typed_search_attributes[text_attr_key]
             == "some-schedule-attr1"
         )
+        # This assertion has changed since server 1.24. Now, even untyped search
+        # attributes are given a type server side
         assert (
             input.description.schedule.action.typed_search_attributes
-            and len(input.description.schedule.action.typed_search_attributes) == 1
+            and len(input.description.schedule.action.typed_search_attributes) == 2
             and input.description.schedule.action.typed_search_attributes[text_attr_key]
             == "some-workflow-attr1"
-        )
-        assert (
-            input.description.schedule.action.untyped_search_attributes
-            and len(input.description.schedule.action.untyped_search_attributes) == 1
-            and input.description.schedule.action.untyped_search_attributes[
-                untyped_keyword_key.name
+            and input.description.schedule.action.typed_search_attributes[
+                untyped_keyword_key
             ]
-            == ["some-untyped-attr1"]
+            == "some-untyped-attr1"
         )
 
         # Update the workflow search attribute with a new typed value but does
@@ -1189,41 +1191,16 @@ async def test_schedule_search_attribute_update(
     # Check that it changed
     desc = await handle.describe()
     assert isinstance(desc.schedule.action, ScheduleActionStartWorkflow)
+    # This assertion has changed since server 1.24. Now, even untyped search
+    # attributes are given a type server side
     assert (
         desc.schedule.action.typed_search_attributes
-        and len(desc.schedule.action.typed_search_attributes) == 1
+        and len(desc.schedule.action.typed_search_attributes) == 2
         and desc.schedule.action.typed_search_attributes[text_attr_key]
         == "some-workflow-attr2"
+        and desc.schedule.action.typed_search_attributes[untyped_keyword_key]
+        == "some-untyped-attr1"
     )
-    assert (
-        desc.schedule.action.untyped_search_attributes
-        and len(desc.schedule.action.untyped_search_attributes) == 1
-        and desc.schedule.action.untyped_search_attributes[untyped_keyword_key.name]
-        == ["some-untyped-attr1"]
-    )
-
-    # Normal update with no typed attr change but remove untyped
-    def update_schedule_remove_untyped(
-        input: ScheduleUpdateInput,
-    ) -> Optional[ScheduleUpdate]:
-        assert isinstance(
-            input.description.schedule.action, ScheduleActionStartWorkflow
-        )
-        input.description.schedule.action.untyped_search_attributes = {}
-        return ScheduleUpdate(input.description.schedule)
-
-    await handle.update(update_schedule_remove_untyped)
-
-    # Check that typed did not change but untyped did
-    desc = await handle.describe()
-    assert isinstance(desc.schedule.action, ScheduleActionStartWorkflow)
-    assert (
-        desc.schedule.action.typed_search_attributes
-        and len(desc.schedule.action.typed_search_attributes) == 1
-        and desc.schedule.action.typed_search_attributes[text_attr_key]
-        == "some-workflow-attr2"
-    )
-    assert not desc.schedule.action.untyped_search_attributes
 
 
 async def assert_no_schedules(client: Client) -> None:

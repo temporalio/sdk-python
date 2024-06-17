@@ -511,7 +511,11 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
         # Go over each update, replacing matching keys by index or adding
         for attr in search_attributes:
             existing_index = next(
-                (i for i, attr in enumerate(attrs) if attr.key.name == attr.key.name),
+                (
+                    i
+                    for i, index_attr in enumerate(attrs)
+                    if attr.key.name == index_attr.key.name
+                ),
                 None,
             )
             if existing_index is None:
