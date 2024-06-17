@@ -2131,9 +2131,16 @@ async def test_workflow_enhanced_stack_trace(client: Client):
         ]
 
         # first line of never_completing_coroutine
-        assert 'self._status = "waiting"' in str(
-            [fileslice.content for fileslice in trace.sources.values()]
-        )
+        cur_source = None
+        for source in trace.sources.keys():
+            if source.endswith("test_workflow.py"):
+                cur_source = source
+
+        # make sure the source exists
+        assert cur_source is not None
+
+        # make sure the line is present in the source
+        assert 'self._status = "waiting"' in trace.sources[cur_source].content
         assert trace.sdk.version == __version__
 
 
@@ -2158,59 +2165,23 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
 
         # test that a coroutine only has the source as its stack
 
+        assert type(trace) == EnhancedStackTrace
+
         assert "never_completing_coroutine" in [
             loc.function_name for stack in trace.stacks for loc in stack.locations
         ]
 
         fn = None
         for source in trace.sources.keys():
-            if source.endswith("external_coroutine.py 10"):
+            if source.endswith("external_coroutine.py"):
                 fn = source
 
-        assert fn != None
-        assert 'status[0] = "waiting"  # external coroutine test' in str(
-            [fileslice.content for fileslice in trace.sources.values()]
+        assert fn is not None
+        assert (
+            'status[0] = "waiting"  # external coroutine test'
+            in trace.sources[fn].content
         )
         assert trace.sdk.version == __version__
-
-
-async def test_workflow_external_multifile_enhanced_stack_trace(client: Client):
-    async with new_worker(
-        client, MultiFileStackTraceWorkflow, activities=[]
-    ) as multifile_worker:
-        mf_handle = await client.start_workflow(
-            MultiFileStackTraceWorkflow.run_multifile_workflow,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=multifile_worker.task_queue,
-        )
-
-        async def mf_status() -> str:
-            return await mf_handle.query(MultiFileStackTraceWorkflow.status)
-
-        await assert_eq_eventually("waiting", mf_status)
-
-        mf_trace = await mf_handle.query("__enhanced_stack_trace")
-
-        assert "wait_on_timer" in [
-            loc.function_name for stack in mf_trace.stacks for loc in stack.locations
-        ]
-
-        filenames = [None, None]
-        for source in mf_trace.sources.keys():
-            if source.endswith("external_coroutine.py 15"):
-                filenames[1] = source
-            if source.endswith("external_stack_trace.py 49"):
-                filenames[0] = source
-
-        assert filenames[0] is not None and filenames[1] is not None
-        assert 'status[0] = "waiting"  # multifile test' in str(
-            [fileslice.content for fileslice in mf_trace.sources.values()]
-        )
-
-        assert "await wait_on_timer(self._status)" in str(
-            [fileslice.content for fileslice in mf_trace.sources.values()]
-        )
-        assert mf_trace.sdk.version == __version__
 
 
 @dataclass

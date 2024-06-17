@@ -1812,46 +1812,47 @@ class _WorkflowInstanceImpl(
             name="sdk-python", version=__version__
         )
 
-        sources = dict()
-        stacks = []
+        # this is to use `open`
+        with temporalio.workflow.unsafe.sandbox_unrestricted():
+            sources = dict()
+            stacks = []
 
-        for task in list(self._tasks):
-            locations = []
-            for frame in task.get_stack():
-                filename = frame.f_code.co_filename
-                line_number = frame.f_lineno
-                func_name = frame.f_code.co_name
+            for task in list(self._tasks):
+                locations = []
+                for frame in task.get_stack():
+                    filename = frame.f_code.co_filename
+                    line_number = frame.f_lineno
+                    func_name = frame.f_code.co_name
 
-                try:
-                    source = inspect.getsourcelines(frame)
-                    code = "".join(source[0])
-                    line_number = int(source[1])
-                except OSError as ose:
-                    code = f"Cannot access code.\n---\n{ose.strerror}"
-                    # TODO possibly include sentinel/property for success of src scrape? work out with ui
-                except Exception:
-                    code = f"Generic Error.\n\n{traceback.format_exc()}"
+                    try:
+                        with open(filename, "r") as f:
+                            code = f.read()
+                    except OSError as ose:
+                        code = f"Cannot access code.\n---\n{ose.strerror}"
+                        # TODO possibly include sentinel/property for success of src scrape? work out with ui
+                    except Exception:
+                        code = f"Generic Error.\n\n{traceback.format_exc()}"
 
-                file_slice = temporalio.api.sdk.v1.StackTraceFileSlice(
-                    line_offset=line_number, content=code
-                )
-                file_location = temporalio.api.sdk.v1.StackTraceFileLocation(
-                    file_path=filename,
-                    line=line_number,
-                    column=-1,
-                    function_name=func_name,
-                    internal_code=False,
-                )
+                    file_slice = temporalio.api.sdk.v1.StackTraceFileSlice(
+                        line_offset=0, content=code
+                    )
+                    file_location = temporalio.api.sdk.v1.StackTraceFileLocation(
+                        file_path=filename,
+                        line=line_number,
+                        column=-1,
+                        function_name=func_name,
+                        internal_code=False,
+                    )
 
-                sources[f"{filename} {line_number}"] = file_slice
-                locations.append(file_location)
+                    sources[filename] = file_slice
+                    locations.append(file_location)
 
-            stacks.append(temporalio.api.sdk.v1.StackTrace(locations=locations))
+                stacks.append(temporalio.api.sdk.v1.StackTrace(locations=locations))
 
-        est = temporalio.api.sdk.v1.EnhancedStackTrace(
-            sdk=sdk, sources=sources, stacks=stacks
-        )
-        return est
+            est = temporalio.api.sdk.v1.EnhancedStackTrace(
+                sdk=sdk, sources=sources, stacks=stacks
+            )
+            return est
 
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many
