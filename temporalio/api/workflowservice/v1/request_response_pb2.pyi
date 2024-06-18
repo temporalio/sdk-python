@@ -53,6 +53,7 @@ import temporalio.api.query.v1.message_pb2
 import temporalio.api.replication.v1.message_pb2
 import temporalio.api.schedule.v1.message_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
@@ -550,6 +551,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     LAST_COMPLETION_RESULT_FIELD_NUMBER: builtins.int
     WORKFLOW_START_DELAY_FIELD_NUMBER: builtins.int
     COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -630,6 +632,12 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         If the workflow continues-as-new, these callbacks will be carried over to the new execution.
         Callback addresses must be whitelisted in the server's dynamic configuration.
         """
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """Metadata on the workflow if it is started. This is carried over to the WorkflowExecutionInfo
+        for use by user interfaces to display the fixed as-of-start summary and details of the
+        workflow.
+        """
     def __init__(
         self,
         *,
@@ -660,6 +668,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             temporalio.api.common.v1.message_pb2.Callback
         ]
         | None = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -680,6 +690,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -723,6 +735,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",
@@ -1094,8 +1108,16 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     attempt: builtins.int
     """Starting at 1, the number of attempts to complete this task by any worker."""
     backlog_count_hint: builtins.int
-    """A hint that there are more tasks already present in this task queue. Can be used to
-    prioritize draining a sticky queue before polling from a normal queue.
+    """A hint that there are more tasks already present in this task queue 
+    partition. Can be used to prioritize draining a sticky queue.
+
+    Specifically, the returned number is the number of tasks remaining in
+    the in-memory buffer for this partition, which is currently capped at
+    1000. Because sticky queues only have one partition, this number is 
+    more useful when draining them. Normal queues, typically having more than one 
+    partition, will return a number representing only some portion of the 
+    overall backlog. Subsequent RPCs may not hit the same partition as 
+    this call.
     """
     @property
     def history(self) -> temporalio.api.history.v1.message_pb2.History:
@@ -2575,6 +2597,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     HEADER_FIELD_NUMBER: builtins.int
     WORKFLOW_START_DELAY_FIELD_NUMBER: builtins.int
     SKIP_GENERATE_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -2642,6 +2665,12 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
         """
     skip_generate_workflow_task: builtins.bool
     """Indicates that a new workflow task should not be generated when this signal is received."""
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """Metadata on the workflow if it is started. This is carried over to the WorkflowExecutionInfo
+        for use by user interfaces to display the fixed as-of-start summary and details of the
+        workflow.
+        """
     def __init__(
         self,
         *,
@@ -2668,6 +2697,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
         workflow_start_delay: google.protobuf.duration_pb2.Duration | None = ...,
         skip_generate_workflow_task: builtins.bool = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2686,6 +2717,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"signal_input",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -2729,6 +2762,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"skip_generate_workflow_task",
             "task_queue",
             b"task_queue",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",
@@ -3846,6 +3881,7 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
     API_MODE_FIELD_NUMBER: builtins.int
     VERSIONS_FIELD_NUMBER: builtins.int
     TASK_QUEUE_TYPES_FIELD_NUMBER: builtins.int
+    REPORT_STATS_FIELD_NUMBER: builtins.int
     REPORT_POLLERS_FIELD_NUMBER: builtins.int
     REPORT_TASK_REACHABILITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
@@ -3876,11 +3912,10 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
         temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
     ]:
         """Task queue types to report info about. If not specified, all types are considered."""
+    report_stats: builtins.bool
+    """Report stats for the requested task queue types and versions"""
     report_pollers: builtins.bool
-    """Report backlog info for the requested task queue types and versions
-    bool report_backlog_info = 8;
-    Report list of pollers for requested task queue types and versions
-    """
+    """Report list of pollers for requested task queue types and versions"""
     report_task_reachability: builtins.bool
     """Report task reachability for the requested versions and all task types (task reachability is not reported
     per task type).
@@ -3899,6 +3934,7 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
             temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
         ]
         | None = ...,
+        report_stats: builtins.bool = ...,
         report_pollers: builtins.bool = ...,
         report_task_reachability: builtins.bool = ...,
     ) -> None: ...
@@ -3919,6 +3955,8 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "report_pollers",
             b"report_pollers",
+            "report_stats",
+            b"report_stats",
             "report_task_reachability",
             b"report_task_reachability",
             "task_queue",

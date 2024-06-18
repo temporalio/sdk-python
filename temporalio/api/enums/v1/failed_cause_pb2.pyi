@@ -312,6 +312,8 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
     """Workflow is busy"""
     RESOURCE_EXHAUSTED_CAUSE_APS_LIMIT: _ResourceExhaustedCause.ValueType  # 6
     """Caller exceeds action per second limit."""
+    RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_STORAGE_LIMIT: _ResourceExhaustedCause.ValueType  # 7
+    """Persistence storage limit exceeded."""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -330,6 +332,8 @@ RESOURCE_EXHAUSTED_CAUSE_BUSY_WORKFLOW: ResourceExhaustedCause.ValueType  # 5
 """Workflow is busy"""
 RESOURCE_EXHAUSTED_CAUSE_APS_LIMIT: ResourceExhaustedCause.ValueType  # 6
 """Caller exceeds action per second limit."""
+RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_STORAGE_LIMIT: ResourceExhaustedCause.ValueType  # 7
+"""Persistence storage limit exceeded."""
 global___ResourceExhaustedCause = ResourceExhaustedCause
 
 class _ResourceExhaustedScope:

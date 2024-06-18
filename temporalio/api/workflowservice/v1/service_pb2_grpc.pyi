@@ -518,7 +518,26 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
     ]
-    """Allows updating the Build ID assignment and redirect rules for a given Task Queue.
+    """Use this API to manage Worker Versioning Rules for a given Task Queue. There are two types of
+    rules: Build ID Assignment rules and Compatible Build ID Redirect rules.
+
+    Assignment rules are used to assign a Build ID for a new execution when it starts. Its primary
+    use case is to specify the latest Build ID but it has powerful features for gradual rollout
+    of a new Build ID.
+
+    Once a Build ID is assigned to a workflow execution and it completes its first Workflow Task,
+    the workflow stays on the assigned Build ID regardless of changes in assignment rules. This
+    eliminates the need for compatibility between versions when you only care about using the new
+    version for new workflows and let existing workflows finish in their own version.
+
+    Activities, Child Workflows and Continue-as-New executions have the option to inherit their
+    parent/previous workflow or use the latest assigment rules to independently select a Build ID.
+
+    Redirect rules should only be used when you want to move workflows and activities assigned to
+    one Build ID (source) to another compatible Build ID (target). You are responsible to make sure
+    the target Build ID of a redirect rule is able to process event histories made by the source
+    Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
+
     WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
@@ -1289,7 +1308,26 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> (
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse
     ):
-        """Allows updating the Build ID assignment and redirect rules for a given Task Queue.
+        """Use this API to manage Worker Versioning Rules for a given Task Queue. There are two types of
+        rules: Build ID Assignment rules and Compatible Build ID Redirect rules.
+
+        Assignment rules are used to assign a Build ID for a new execution when it starts. Its primary
+        use case is to specify the latest Build ID but it has powerful features for gradual rollout
+        of a new Build ID.
+
+        Once a Build ID is assigned to a workflow execution and it completes its first Workflow Task,
+        the workflow stays on the assigned Build ID regardless of changes in assignment rules. This
+        eliminates the need for compatibility between versions when you only care about using the new
+        version for new workflows and let existing workflows finish in their own version.
+
+        Activities, Child Workflows and Continue-as-New executions have the option to inherit their
+        parent/previous workflow or use the latest assigment rules to independently select a Build ID.
+
+        Redirect rules should only be used when you want to move workflows and activities assigned to
+        one Build ID (source) to another compatible Build ID (target). You are responsible to make sure
+        the target Build ID of a redirect rule is able to process event histories made by the source
+        Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
+
         WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
