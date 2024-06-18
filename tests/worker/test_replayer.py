@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -66,7 +67,11 @@ class SayHelloWorkflow:
         return self._waiting
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Skipping for < 3.12")
 async def test_replayer_workflow_complete(client: Client) -> None:
+    # This test skips for versions < 3.12 because this is flaky due to CPython reimport issue:
+    # https://github.com/python/cpython/issues/91351
+
     # Run workflow to completion
     async with new_say_hello_worker(client) as worker:
         handle = await client.start_workflow(
@@ -83,7 +88,10 @@ async def test_replayer_workflow_complete(client: Client) -> None:
     )
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Skipping for < 3.12")
 async def test_replayer_workflow_complete_json() -> None:
+    # See `test_replayer_workflow_complete` for full skip description.
+
     with Path(__file__).with_name("test_replayer_complete_history.json").open("r") as f:
         history_json = f.read()
     await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
