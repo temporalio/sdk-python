@@ -206,6 +206,27 @@ def signal(
     ...
 
 
+@overload
+def signal(
+    *, unfinished_handlers_policy: UnfinishedHandlersPolicy
+) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
+    ...
+
+
+@overload
+def signal(
+    *, name: str, unfinished_handlers_policy: UnfinishedHandlersPolicy
+) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
+    ...
+
+
+@overload
+def signal(
+    *, dynamic: Literal[True], unfinished_handlers_policy: UnfinishedHandlersPolicy
+) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
+    ...
+
+
 def signal(
     fn: Optional[CallableSyncOrAsyncReturnNoneType] = None,
     *,
@@ -236,10 +257,19 @@ def signal(
             a running instance of this handler.
     """
 
-    def with_name(
-        name: Optional[str], fn: CallableSyncOrAsyncReturnNoneType
+    def decorator(
+        name: Optional[str],
+        unfinished_handlers_policy: UnfinishedHandlersPolicy,
+        fn: CallableSyncOrAsyncReturnNoneType,
     ) -> CallableSyncOrAsyncReturnNoneType:
-        defn = _SignalDefinition(name=name, fn=fn, is_method=True)
+        if not name and not dynamic:
+            name = fn.__name__
+        defn = _SignalDefinition(
+            name=name,
+            fn=fn,
+            is_method=True,
+            unfinished_handlers_policy=unfinished_handlers_policy,
+        )
         setattr(fn, "__temporal_signal_definition", defn)
         if defn.dynamic_vararg:
             warnings.warn(
@@ -249,13 +279,12 @@ def signal(
             )
         return fn
 
-    if name is not None or dynamic:
+    if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot create signal without function or name or dynamic")
-    return with_name(fn.__name__, fn)
+        return partial(decorator, name, unfinished_handlers_policy)
+    else:
+        return decorator(fn.__name__, unfinished_handlers_policy, fn)
 
 
 @overload
@@ -962,6 +991,36 @@ def update(
     ...
 
 
+@overload
+def update(
+    *, unfinished_handlers_policy: UnfinishedHandlersPolicy
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+]:
+    ...
+
+
+@overload
+def update(
+    *, name: str, unfinished_handlers_policy: UnfinishedHandlersPolicy
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+]:
+    ...
+
+
+@overload
+def update(
+    *, dynamic: Literal[True], unfinished_handlers_policy: UnfinishedHandlersPolicy
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+]:
+    ...
+
+
 def update(
     fn: Optional[CallableSyncOrAsyncType] = None,
     *,
@@ -999,10 +1058,19 @@ def update(
             a running instance of this handler.
     """
 
-    def with_name(
-        name: Optional[str], fn: CallableSyncOrAsyncType
+    def decorator(
+        name: Optional[str],
+        unfinished_handlers_policy: UnfinishedHandlersPolicy,
+        fn: CallableSyncOrAsyncType,
     ) -> CallableSyncOrAsyncType:
-        defn = _UpdateDefinition(name=name, fn=fn, is_method=True)
+        if not name and not dynamic:
+            name = fn.__name__
+        defn = _UpdateDefinition(
+            name=name,
+            fn=fn,
+            is_method=True,
+            unfinished_handlers_policy=unfinished_handlers_policy,
+        )
         if defn.dynamic_vararg:
             raise RuntimeError(
                 "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
@@ -1011,13 +1079,12 @@ def update(
         setattr(fn, "validator", partial(_update_validator, defn))
         return fn
 
-    if name is not None or dynamic:
+    if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot create update without function or name or dynamic")
-    return with_name(fn.__name__, fn)
+        return partial(decorator, name, unfinished_handlers_policy)
+    else:
+        return decorator(fn.__name__, unfinished_handlers_policy, fn)
 
 
 def _update_validator(

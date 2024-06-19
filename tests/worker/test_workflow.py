@@ -14,7 +14,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
-from functools import partial
 from typing import (
     Any,
     Awaitable,
@@ -5193,15 +5192,41 @@ class UnfinishedHandlersWorkflow:
             self.handler_may_return = True
             await workflow.wait_condition(workflow.all_handlers_finished)
 
-    @workflow.update
-    async def my_update(self) -> None:
+    async def _do_update_or_signal(self) -> None:
         self.started_handler = True
         await workflow.wait_condition(lambda: self.handler_may_return)
 
+    @workflow.update
+    async def my_update(self) -> None:
+        await self._do_update_or_signal()
+
+    @workflow.update(
+        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON
+    )
+    async def my_update_ABANDON(self) -> None:
+        await self._do_update_or_signal()
+
+    @workflow.update(
+        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+    )
+    async def my_update_WARN_AND_ABANDON(self) -> None:
+        await self._do_update_or_signal()
+
     @workflow.signal
     async def my_signal(self):
-        self.started_handler = True
-        await workflow.wait_condition(lambda: self.handler_may_return)
+        await self._do_update_or_signal()
+
+    @workflow.signal(
+        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON
+    )
+    async def my_signal_ABANDON(self):
+        await self._do_update_or_signal()
+
+    @workflow.signal(
+        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+    )
+    async def my_signal_WARN_AND_ABANDON(self):
+        await self._do_update_or_signal()
 
 
 async def test_unfinished_update_handlers(client: Client):
@@ -5223,14 +5248,34 @@ class _UnfinishedHandlersTest:
             assert any(
                 self.is_unfinished_handler_warning(w)
                 for w in await self.capture_warnings_from_workflow(
-                    worker, wait_for_handlers=False
+                    worker,
+                    wait_for_handlers=False,
                 )
             )
-            # but not when the workflow waits for handlers to complete.
+            # and when the workflow sets the unfinished_handlers_policy to WARN_AND_ABANDON,
+            assert any(
+                self.is_unfinished_handler_warning(w)
+                for w in await self.capture_warnings_from_workflow(
+                    worker,
+                    wait_for_handlers=False,
+                    unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+                )
+            )
+            # but not when the workflow waits for handlers to complete,
             assert not any(
                 self.is_unfinished_handler_warning(w)
                 for w in await self.capture_warnings_from_workflow(
-                    worker, wait_for_handlers=True
+                    worker,
+                    wait_for_handlers=True,
+                )
+            )
+            # nor when the silence-warnings policy is set on the handler.
+            assert not any(
+                self.is_unfinished_handler_warning(w)
+                for w in await self.capture_warnings_from_workflow(
+                    worker,
+                    wait_for_handlers=False,
+                    unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON,
                 )
             )
 
@@ -5238,6 +5283,7 @@ class _UnfinishedHandlersTest:
         self,
         worker: Worker,
         wait_for_handlers: bool,
+        unfinished_handlers_policy: Optional[workflow.UnfinishedHandlersPolicy] = None,
     ) -> pytest.WarningsRecorder:
         handle = await self.client.start_workflow(
             UnfinishedHandlersWorkflow.run,
@@ -5245,11 +5291,12 @@ class _UnfinishedHandlersTest:
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+        handler_name = f"my_{self.handler_type}"
+        if unfinished_handlers_policy:
+            handler_name += f"_{unfinished_handlers_policy.name}"
         with pytest.WarningsRecorder() as warnings:
             if self.handler_type == "signal":
-                await asyncio.gather(
-                    handle.signal(UnfinishedHandlersWorkflow.my_signal)
-                )
+                await asyncio.gather(handle.signal(handler_name))
                 # In the case of signal, we must wait here for the workflow to complete to guarantee
                 # that we'll capture the warning emitted by the worker.
                 await handle.result()
@@ -5257,9 +5304,7 @@ class _UnfinishedHandlersTest:
                 if not wait_for_handlers:
                     with pytest.raises(RPCError) as err:
                         await asyncio.gather(
-                            handle.execute_update(
-                                UnfinishedHandlersWorkflow.my_update, id="update1"
-                            )
+                            handle.execute_update(handler_name, id="my-update")
                         )
                     assert (
                         err.value.status == RPCStatusCode.NOT_FOUND
@@ -5268,9 +5313,7 @@ class _UnfinishedHandlersTest:
                     )
                 else:
                     await asyncio.gather(
-                        handle.execute_update(
-                            UnfinishedHandlersWorkflow.my_update, id="update1"
-                        )
+                        handle.execute_update(handler_name, id="my-update")
                     )
 
             return warnings

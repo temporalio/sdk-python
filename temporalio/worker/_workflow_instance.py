@@ -634,7 +634,7 @@ class _WorkflowInstanceImpl(
                     return
                 raise
             finally:
-                del self._in_progress_updates[job.id]
+                self._in_progress_updates.pop(job.id, None)
 
         self.create_task(
             run_update(),
@@ -1722,7 +1722,7 @@ class _WorkflowInstanceImpl(
                     self._inbound.handle_signal(input)
                 )
             finally:
-                del self._in_progress_signals[id]
+                self._in_progress_signals.pop(id, None)
 
         self.create_task(
             run_signal(),
