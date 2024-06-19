@@ -211,6 +211,7 @@ def signal(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow signal method.
 
@@ -231,6 +232,8 @@ def signal(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
+        unfinished_handlers_policy: Actions taken if a workflow terminates with
+            a running instance of this handler.
     """
 
     def with_name(
@@ -964,6 +967,7 @@ def update(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow update handler method.
 
@@ -991,6 +995,8 @@ def update(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
+        unfinished_handlers_policy: Actions taken if a workflow terminates with
+            a running instance of this handler.
     """
 
     def with_name(
@@ -1468,6 +1474,9 @@ class _SignalDefinition:
     name: Optional[str]
     fn: Callable[..., Union[None, Awaitable[None]]]
     is_method: bool
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = (
+        UnfinishedHandlersPolicy.WARN_AND_ABANDON
+    )
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     dynamic_vararg: bool = False
@@ -1549,6 +1558,9 @@ class _UpdateDefinition:
     name: Optional[str]
     fn: Callable[..., Union[Any, Awaitable[Any]]]
     is_method: bool
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = (
+        UnfinishedHandlersPolicy.WARN_AND_ABANDON
+    )
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None

@@ -272,10 +272,18 @@ class _WorkflowInstanceImpl(
         # purpose.
         self._handled_signals_seq = 0
         self._in_progress_signals: dict[
-            int, temporalio.bridge.proto.workflow_activation.SignalWorkflow
+            int,
+            Tuple[
+                temporalio.bridge.proto.workflow_activation.SignalWorkflow,
+                temporalio.workflow.UnfinishedHandlersPolicy,
+            ],
         ] = {}
         self._in_progress_updates: dict[
-            str, temporalio.bridge.proto.workflow_activation.DoUpdate
+            str,
+            Tuple[
+                temporalio.bridge.proto.workflow_activation.DoUpdate,
+                temporalio.workflow.UnfinishedHandlersPolicy,
+            ],
         ] = {}
 
         # Add stack trace handler
@@ -450,10 +458,17 @@ class _WorkflowInstanceImpl(
                 continue
             i += 1
 
-        if seen_completion and self._in_progress_updates:
-            warnings.warn(UNFINISHED_UPDATE_HANDLERS_WARNING, RuntimeWarning)
-        if seen_completion and self._in_progress_signals:
-            warnings.warn(UNFINISHED_SIGNAL_HANDLERS_WARNING, RuntimeWarning)
+        if seen_completion:
+            if any(
+                policy == temporalio.workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+                for _, policy in self._in_progress_updates.values()
+            ):
+                warnings.warn(UNFINISHED_UPDATE_HANDLERS_WARNING, RuntimeWarning)
+            if any(
+                policy == temporalio.workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+                for _, policy in self._in_progress_signals.values()
+            ):
+                warnings.warn(UNFINISHED_SIGNAL_HANDLERS_WARNING, RuntimeWarning)
         return self._current_completion
 
     def _apply(
@@ -525,7 +540,6 @@ class _WorkflowInstanceImpl(
             command.update_response.protocol_instance_id = job.protocol_instance_id
             past_validation = False
             try:
-                self._in_progress_updates[job.id] = job
                 defn = self._updates.get(job.name) or self._updates.get(None)
                 if not defn:
                     known_updates = sorted([k for k in self._updates.keys() if k])
@@ -533,6 +547,10 @@ class _WorkflowInstanceImpl(
                         f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler. "
                         f"known updates: [{' '.join(known_updates)}]"
                     )
+                self._in_progress_updates[job.id] = (
+                    job,
+                    defn.unfinished_handlers_policy,
+                )
                 args = self._process_handler_args(
                     job.name,
                     job.input,
@@ -1699,7 +1717,7 @@ class _WorkflowInstanceImpl(
             try:
                 self._handled_signals_seq += 1
                 id = self._handled_signals_seq
-                self._in_progress_signals[id] = job
+                self._in_progress_signals[id] = (job, defn.unfinished_handlers_policy)
                 await self._run_top_level_workflow_function(
                     self._inbound.handle_signal(input)
                 )
