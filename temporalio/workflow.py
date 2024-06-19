@@ -599,6 +599,10 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
+    def workflow_all_handlers_finished(self) -> bool:
+        ...
+
+    @abstractmethod
     def workflow_start_activity(
         self,
         activity: Any,
@@ -4412,6 +4416,19 @@ def set_dynamic_update_handler(
         validator: Callable to set or None to unset as the update validator.
     """
     _Runtime.current().workflow_set_update_handler(None, handler, validator)
+
+
+def all_handlers_finished() -> bool:
+    """Whether update and signal handlers have finished executing.
+
+    Consider waiting on this condition before workflow return or continue-as-new, to prevent
+    interruption of in-progress handlers by workflow exit:
+    ``await workflow.wait_condition(lambda: workflow.all_handlers_finished())``
+
+    Returns:
+        True if there are no in-progress update or signal handler executions.
+    """
+    return _Runtime.current().workflow_all_handlers_finished()
 
 
 def as_completed(

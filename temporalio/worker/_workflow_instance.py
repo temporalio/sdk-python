@@ -1147,6 +1147,9 @@ class _WorkflowInstanceImpl(
         else:
             self._updates.pop(name, None)
 
+    def workflow_all_handlers_finished(self) -> bool:
+        return not self._in_progress_updates and not self._in_progress_signals
+
     def workflow_start_activity(
         self,
         activity: Any,
