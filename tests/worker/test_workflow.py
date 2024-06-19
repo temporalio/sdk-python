@@ -5203,26 +5203,25 @@ class UnfinishedHandlersWorkflow:
 
 
 async def test_unfinished_update_handlers_warning(client: Client):
-    await _test_unfinished_handlers_warning(client, "update")
+    warnings = await _get_warnings_from_unfinished_handlers_workflow(client, "update")
+    assert any(_is_unfinished_handler_warning(w, "update") for w in warnings)
 
 
 async def test_unfinished_signal_handlers_warning(client: Client):
-    await _test_unfinished_handlers_warning(client, "signal")
+    warnings = await _get_warnings_from_unfinished_handlers_workflow(client, "signal")
+    assert any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
 
 
-async def _test_unfinished_handlers_warning(
+async def _get_warnings_from_unfinished_handlers_workflow(
     client: Client, handler_type: Literal["update", "signal"]
-):
+) -> pytest.WarningsRecorder:
     async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
         handle = await client.start_workflow(
             UnfinishedHandlersWorkflow.run,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        with pytest.warns(
-            RuntimeWarning,
-            match=f"Workflow finished while {handler_type} handlers are still running",
-        ):
+        with pytest.WarningsRecorder() as warnings:
             if handler_type == "signal":
                 await asyncio.gather(
                     handle.signal(UnfinishedHandlersWorkflow.my_signal)
@@ -5241,3 +5240,13 @@ async def _test_unfinished_handlers_warning(
                     err.value.status == RPCStatusCode.NOT_FOUND
                     and "workflow execution already completed" in str(err.value).lower()
                 )
+
+            return warnings
+
+def _is_unfinished_handler_warning(
+    warning: warnings.WarningMessage, handler_type: Literal["update", "signal"]
+) -> bool:
+    expected_text = f"Workflow finished while {handler_type} handlers are still running"
+    return issubclass(warning.category, RuntimeWarning) and expected_text in str(
+        warning.message
+    )
