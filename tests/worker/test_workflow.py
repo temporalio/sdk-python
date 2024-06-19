@@ -8,6 +8,7 @@ import sys
 import threading
 import typing
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -31,7 +32,7 @@ from urllib.request import urlopen
 
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
-from typing_extensions import Protocol, runtime_checkable
+from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.worker
 from temporalio import activity, workflow
@@ -5176,3 +5177,67 @@ async def test_workflow_current_update(client: Client, env: WorkflowEnvironment)
         assert {"update1", "update2", "update3", "update4", "update5"} == set(
             await handle.result()
         )
+
+
+@workflow.defn
+class UnfinishedHandlersWorkflow:
+    def __init__(self):
+        self.started_handler = False
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self.started_handler)
+        return None
+
+    @workflow.update
+    async def my_update(self) -> None:
+        self.started_handler = True
+        await workflow.wait_condition(lambda: False)
+        raise AssertionError("Unreachable")
+
+    @workflow.signal
+    async def my_signal(self) -> None:
+        self.started_handler = True
+        await workflow.wait_condition(lambda: False)
+        raise AssertionError("Unreachable")
+
+
+async def test_unfinished_update_handlers_warning(client: Client):
+    await _test_unfinished_handlers_warning(client, "update")
+
+
+async def test_unfinished_signal_handlers_warning(client: Client):
+    await _test_unfinished_handlers_warning(client, "signal")
+
+
+async def _test_unfinished_handlers_warning(
+    client: Client, handler_type: Literal["update", "signal"]
+):
+    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
+        handle = await client.start_workflow(
+            UnfinishedHandlersWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        with pytest.warns(
+            RuntimeWarning,
+            match=f"Workflow finished while {handler_type} handlers are still running",
+        ):
+            if handler_type == "signal":
+                await asyncio.gather(
+                    handle.signal(UnfinishedHandlersWorkflow.my_signal)
+                )
+                # In the case of signal, we must wait here for the workflow to complete to guarantee
+                # that we'll capture the warning emitted by the worker.
+                await handle.result()
+            else:
+                with pytest.raises(RPCError) as err:
+                    await asyncio.gather(
+                        handle.execute_update(
+                            UnfinishedHandlersWorkflow.my_update, id="update1"
+                        )
+                    )
+                assert (
+                    err.value.status == RPCStatusCode.NOT_FOUND
+                    and "workflow execution already completed" in str(err.value).lower()
+                )
