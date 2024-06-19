@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
+from functools import partial
 from typing import (
     Any,
     Awaitable,
@@ -5204,27 +5205,31 @@ class UnfinishedHandlersWorkflow:
 
 
 async def test_unfinished_update_handlers(client: Client):
-    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
-        warnings = await _get_warnings_from_unfinished_handlers_workflow(
-            client, worker, handler_type="update", wait_for_handlers=False
-        )
-        assert any(_is_unfinished_handler_warning(w, "update") for w in warnings)
-        warnings = await _get_warnings_from_unfinished_handlers_workflow(
-            client, worker, handler_type="update", wait_for_handlers=True
-        )
-        assert not any(_is_unfinished_handler_warning(w, "update") for w in warnings)
+    await _test_unfinished_handlers(client, "update")
 
 
 async def test_unfinished_signal_handlers(client: Client):
+    await _test_unfinished_handlers(client, "signal")
+
+
+async def _test_unfinished_handlers(
+    client: Client, handler_type: Literal["update", "signal"]
+):
     async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
-        warnings = await _get_warnings_from_unfinished_handlers_workflow(
-            client, worker, handler_type="signal", wait_for_handlers=False
+        get_warnings = partial(
+            _get_warnings_from_unfinished_handlers_workflow,
+            client,
+            worker,
+            handler_type,
         )
-        assert any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
-        warnings = await _get_warnings_from_unfinished_handlers_workflow(
-            client, worker, handler_type="signal", wait_for_handlers=True
+        assert any(
+            _is_unfinished_handler_warning(w, handler_type)
+            for w in await get_warnings(wait_for_handlers=False)
         )
-        assert not any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
+        assert not any(
+            _is_unfinished_handler_warning(w, handler_type)
+            for w in await get_warnings(wait_for_handlers=True)
+        )
 
 
 async def _get_warnings_from_unfinished_handlers_workflow(
