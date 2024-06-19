@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import Enum
 from typing import (
     Any,
     Awaitable,
@@ -76,6 +77,31 @@ logger = logging.getLogger(__name__)
 
 # Set to true to log all cases where we're ignoring things during delete
 LOG_IGNORE_DURING_DELETE = False
+
+UNFINISHED_UPDATE_HANDLERS_WARNING = """
+Workflow finished while update handlers are still running. This may have interrupted work that the
+update handler was doing, and the client that sent the update will receive a 'workflow execution
+already completed' RPCError instead of the update result. You can wait for all update and signal
+handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`.
+Alternatively, if both you and the clients sending updates and signals are okay with interrupting
+running handlers when the workflow finishes, and causing clients to receive errors, then you can
+disable this warning via the update handler decorator:
+`@workflow.update(unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON)`.
+""".replace(
+    "\n", " "
+).strip()
+
+UNFINISHED_SIGNAL_HANDLERS_WARNING = """
+Workflow finished while signal handlers are still running. This may have interrupted work that the
+signal handler was doing. You can wait for all update and signal handlers to complete by using
+`await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both
+you and the clients sending updates and signals are okay with interrupting running handlers when the
+workflow finishes, and causing clients to receive errors, then you can disable this warning via the
+signal handler decorator:
+`@workflow.signal(unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON)`.
+""".replace(
+    "\n", " "
+).strip()
 
 
 class WorkflowRunner(ABC):
@@ -239,6 +265,18 @@ class _WorkflowInstanceImpl(
         self._signals = dict(self._defn.signals)
         self._queries = dict(self._defn.queries)
         self._updates = dict(self._defn.updates)
+
+        # We record in-progress signals and updates in order to support waiting for handlers to
+        # finish, and issuing warnings when the workflow exits with unfinished handlers. Since
+        # signals lack a unique per-invocation identifier, we introduce a sequence number for the
+        # purpose.
+        self._handled_signals_seq = 0
+        self._in_progress_signals: dict[
+            int, temporalio.bridge.proto.workflow_activation.SignalWorkflow
+        ] = {}
+        self._in_progress_updates: dict[
+            str, temporalio.bridge.proto.workflow_activation.DoUpdate
+        ] = {}
 
         # Add stack trace handler
         # TODO(cretz): Is it ok that this can be forcefully overridden by the
@@ -412,6 +450,10 @@ class _WorkflowInstanceImpl(
                 continue
             i += 1
 
+        if seen_completion and self._in_progress_updates:
+            warnings.warn(UNFINISHED_UPDATE_HANDLERS_WARNING, RuntimeWarning)
+        if seen_completion and self._in_progress_signals:
+            warnings.warn(UNFINISHED_SIGNAL_HANDLERS_WARNING, RuntimeWarning)
         return self._current_completion
 
     def _apply(
@@ -483,6 +525,7 @@ class _WorkflowInstanceImpl(
             command.update_response.protocol_instance_id = job.protocol_instance_id
             past_validation = False
             try:
+                self._in_progress_updates[job.id] = job
                 defn = self._updates.get(job.name) or self._updates.get(None)
                 if not defn:
                     known_updates = sorted([k for k in self._updates.keys() if k])
@@ -572,6 +615,8 @@ class _WorkflowInstanceImpl(
                         )
                     return
                 raise
+            finally:
+                del self._in_progress_updates[job.id]
 
         self.create_task(
             run_update(),
@@ -1646,8 +1691,20 @@ class _WorkflowInstanceImpl(
         input = HandleSignalInput(
             signal=job.signal_name, args=args, headers=job.headers
         )
+
+        async def run_signal():
+            try:
+                self._handled_signals_seq += 1
+                id = self._handled_signals_seq
+                self._in_progress_signals[id] = job
+                await self._run_top_level_workflow_function(
+                    self._inbound.handle_signal(input)
+                )
+            finally:
+                del self._in_progress_signals[id]
+
         self.create_task(
-            self._run_top_level_workflow_function(self._inbound.handle_signal(input)),
+            run_signal(),
             name=f"signal: {job.signal_name}",
         )
 
