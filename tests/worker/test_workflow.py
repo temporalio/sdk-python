@@ -5183,41 +5183,57 @@ async def test_workflow_current_update(client: Client, env: WorkflowEnvironment)
 class UnfinishedHandlersWorkflow:
     def __init__(self):
         self.started_handler = False
+        self.handler_may_return = False
 
     @workflow.run
-    async def run(self) -> None:
+    async def run(self, wait_for_handlers: bool) -> None:
         await workflow.wait_condition(lambda: self.started_handler)
-        return None
+        if wait_for_handlers:
+            self.handler_may_return = True
+            await workflow.wait_condition(workflow.all_handlers_finished)
 
     @workflow.update
     async def my_update(self) -> None:
         self.started_handler = True
-        await workflow.wait_condition(lambda: False)
-        raise AssertionError("Unreachable")
+        await workflow.wait_condition(lambda: self.handler_may_return)
 
     @workflow.signal
-    async def my_signal(self) -> None:
+    async def my_signal(self):
         self.started_handler = True
-        await workflow.wait_condition(lambda: False)
-        raise AssertionError("Unreachable")
+        await workflow.wait_condition(lambda: self.handler_may_return)
 
 
-async def test_unfinished_update_handlers_warning(client: Client):
-    warnings = await _get_warnings_from_unfinished_handlers_workflow(client, "update")
+async def test_unfinished_update_handlers(client: Client):
+    warnings = await _get_warnings_from_unfinished_handlers_workflow(
+        client, handler_type="update", wait_for_handlers=False
+    )
     assert any(_is_unfinished_handler_warning(w, "update") for w in warnings)
+    warnings = await _get_warnings_from_unfinished_handlers_workflow(
+        client, handler_type="update", wait_for_handlers=True
+    )
+    assert not any(_is_unfinished_handler_warning(w, "update") for w in warnings)
 
 
-async def test_unfinished_signal_handlers_warning(client: Client):
-    warnings = await _get_warnings_from_unfinished_handlers_workflow(client, "signal")
+async def test_unfinished_signal_handlers(client: Client):
+    warnings = await _get_warnings_from_unfinished_handlers_workflow(
+        client, handler_type="signal", wait_for_handlers=False
+    )
     assert any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
+    warnings = await _get_warnings_from_unfinished_handlers_workflow(
+        client, handler_type="signal", wait_for_handlers=True
+    )
+    assert not any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
 
 
 async def _get_warnings_from_unfinished_handlers_workflow(
-    client: Client, handler_type: Literal["update", "signal"]
+    client: Client,
+    handler_type: Literal["update", "signal"],
+    wait_for_handlers: bool,
 ) -> pytest.WarningsRecorder:
     async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
         handle = await client.start_workflow(
             UnfinishedHandlersWorkflow.run,
+            arg=wait_for_handlers,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -5230,18 +5246,27 @@ async def _get_warnings_from_unfinished_handlers_workflow(
                 # that we'll capture the warning emitted by the worker.
                 await handle.result()
             else:
-                with pytest.raises(RPCError) as err:
+                if not wait_for_handlers:
+                    with pytest.raises(RPCError) as err:
+                        await asyncio.gather(
+                            handle.execute_update(
+                                UnfinishedHandlersWorkflow.my_update, id="update1"
+                            )
+                        )
+                    assert (
+                        err.value.status == RPCStatusCode.NOT_FOUND
+                        and "workflow execution already completed"
+                        in str(err.value).lower()
+                    )
+                else:
                     await asyncio.gather(
                         handle.execute_update(
                             UnfinishedHandlersWorkflow.my_update, id="update1"
                         )
                     )
-                assert (
-                    err.value.status == RPCStatusCode.NOT_FOUND
-                    and "workflow execution already completed" in str(err.value).lower()
-                )
 
             return warnings
+
 
 def _is_unfinished_handler_warning(
     warning: warnings.WarningMessage, handler_type: Literal["update", "signal"]
