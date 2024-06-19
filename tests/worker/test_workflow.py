@@ -5204,68 +5204,67 @@ class UnfinishedHandlersWorkflow:
 
 
 async def test_unfinished_update_handlers(client: Client):
-    warnings = await _get_warnings_from_unfinished_handlers_workflow(
-        client, handler_type="update", wait_for_handlers=False
-    )
-    assert any(_is_unfinished_handler_warning(w, "update") for w in warnings)
-    warnings = await _get_warnings_from_unfinished_handlers_workflow(
-        client, handler_type="update", wait_for_handlers=True
-    )
-    assert not any(_is_unfinished_handler_warning(w, "update") for w in warnings)
+    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
+        warnings = await _get_warnings_from_unfinished_handlers_workflow(
+            client, worker, handler_type="update", wait_for_handlers=False
+        )
+        assert any(_is_unfinished_handler_warning(w, "update") for w in warnings)
+        warnings = await _get_warnings_from_unfinished_handlers_workflow(
+            client, worker, handler_type="update", wait_for_handlers=True
+        )
+        assert not any(_is_unfinished_handler_warning(w, "update") for w in warnings)
 
 
 async def test_unfinished_signal_handlers(client: Client):
-    warnings = await _get_warnings_from_unfinished_handlers_workflow(
-        client, handler_type="signal", wait_for_handlers=False
-    )
-    assert any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
-    warnings = await _get_warnings_from_unfinished_handlers_workflow(
-        client, handler_type="signal", wait_for_handlers=True
-    )
-    assert not any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
+    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
+        warnings = await _get_warnings_from_unfinished_handlers_workflow(
+            client, worker, handler_type="signal", wait_for_handlers=False
+        )
+        assert any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
+        warnings = await _get_warnings_from_unfinished_handlers_workflow(
+            client, worker, handler_type="signal", wait_for_handlers=True
+        )
+        assert not any(_is_unfinished_handler_warning(w, "signal") for w in warnings)
 
 
 async def _get_warnings_from_unfinished_handlers_workflow(
     client: Client,
+    worker: Worker,
     handler_type: Literal["update", "signal"],
     wait_for_handlers: bool,
 ) -> pytest.WarningsRecorder:
-    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
-        handle = await client.start_workflow(
-            UnfinishedHandlersWorkflow.run,
-            arg=wait_for_handlers,
-            id=f"wf-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        with pytest.WarningsRecorder() as warnings:
-            if handler_type == "signal":
-                await asyncio.gather(
-                    handle.signal(UnfinishedHandlersWorkflow.my_signal)
-                )
-                # In the case of signal, we must wait here for the workflow to complete to guarantee
-                # that we'll capture the warning emitted by the worker.
-                await handle.result()
-            else:
-                if not wait_for_handlers:
-                    with pytest.raises(RPCError) as err:
-                        await asyncio.gather(
-                            handle.execute_update(
-                                UnfinishedHandlersWorkflow.my_update, id="update1"
-                            )
-                        )
-                    assert (
-                        err.value.status == RPCStatusCode.NOT_FOUND
-                        and "workflow execution already completed"
-                        in str(err.value).lower()
-                    )
-                else:
+    handle = await client.start_workflow(
+        UnfinishedHandlersWorkflow.run,
+        arg=wait_for_handlers,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue=worker.task_queue,
+    )
+    with pytest.WarningsRecorder() as warnings:
+        if handler_type == "signal":
+            await asyncio.gather(handle.signal(UnfinishedHandlersWorkflow.my_signal))
+            # In the case of signal, we must wait here for the workflow to complete to guarantee
+            # that we'll capture the warning emitted by the worker.
+            await handle.result()
+        else:
+            if not wait_for_handlers:
+                with pytest.raises(RPCError) as err:
                     await asyncio.gather(
                         handle.execute_update(
                             UnfinishedHandlersWorkflow.my_update, id="update1"
                         )
                     )
+                assert (
+                    err.value.status == RPCStatusCode.NOT_FOUND
+                    and "workflow execution already completed" in str(err.value).lower()
+                )
+            else:
+                await asyncio.gather(
+                    handle.execute_update(
+                        UnfinishedHandlersWorkflow.my_update, id="update1"
+                    )
+                )
 
-            return warnings
+        return warnings
 
 
 def _is_unfinished_handler_warning(
