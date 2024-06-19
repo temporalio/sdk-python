@@ -275,14 +275,14 @@ class _WorkflowInstanceImpl(
             int,
             Tuple[
                 temporalio.bridge.proto.workflow_activation.SignalWorkflow,
-                temporalio.workflow.UnfinishedHandlersPolicy,
+                temporalio.workflow._SignalDefinition,
             ],
         ] = {}
         self._in_progress_updates: dict[
             str,
             Tuple[
                 temporalio.bridge.proto.workflow_activation.DoUpdate,
-                temporalio.workflow.UnfinishedHandlersPolicy,
+                temporalio.workflow._UpdateDefinition,
             ],
         ] = {}
 
@@ -460,13 +460,15 @@ class _WorkflowInstanceImpl(
 
         if seen_completion:
             if any(
-                policy == temporalio.workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
-                for _, policy in self._in_progress_updates.values()
+                defn.unfinished_handlers_policy
+                == temporalio.workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+                for _, defn in self._in_progress_updates.values()
             ):
                 warnings.warn(UNFINISHED_UPDATE_HANDLERS_WARNING, RuntimeWarning)
             if any(
-                policy == temporalio.workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
-                for _, policy in self._in_progress_signals.values()
+                defn.unfinished_handlers_policy
+                == temporalio.workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+                for _, defn in self._in_progress_signals.values()
             ):
                 warnings.warn(UNFINISHED_SIGNAL_HANDLERS_WARNING, RuntimeWarning)
         return self._current_completion
@@ -547,10 +549,7 @@ class _WorkflowInstanceImpl(
                         f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler. "
                         f"known updates: [{' '.join(known_updates)}]"
                     )
-                self._in_progress_updates[job.id] = (
-                    job,
-                    defn.unfinished_handlers_policy,
-                )
+                self._in_progress_updates[job.id] = (job, defn)
                 args = self._process_handler_args(
                     job.name,
                     job.input,
@@ -1717,7 +1716,7 @@ class _WorkflowInstanceImpl(
             try:
                 self._handled_signals_seq += 1
                 id = self._handled_signals_seq
-                self._in_progress_signals[id] = (job, defn.unfinished_handlers_policy)
+                self._in_progress_signals[id] = (job, defn)
                 await self._run_top_level_workflow_function(
                     self._inbound.handle_signal(input)
                 )
