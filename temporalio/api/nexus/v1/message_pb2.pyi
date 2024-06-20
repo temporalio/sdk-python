@@ -29,6 +29,7 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import sys
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -575,17 +576,14 @@ class EndpointSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAME_FIELD_NUMBER: builtins.int
-    DESCRIPTION_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
     TARGET_FIELD_NUMBER: builtins.int
     name: builtins.str
     """Endpoint name, unique for this cluster. Must match `[a-zA-Z_][a-zA-Z0-9_]*`.
     Renaming an endpoint breaks all workflow callers that reference this endpoint, causing operations to fail.
     """
     @property
-    def description(self) -> temporalio.api.common.v1.message_pb2.Payload:
-        """Markdown description serialized as a single JSON string.
-        If the Payload is encrypted, the UI and CLI may decrypt with the configured codec server endpoint.
-        """
+    def metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata: ...
     @property
     def target(self) -> global___EndpointTarget:
         """Target to route requests to."""
@@ -593,19 +591,19 @@ class EndpointSpec(google.protobuf.message.Message):
         self,
         *,
         name: builtins.str = ...,
-        description: temporalio.api.common.v1.message_pb2.Payload | None = ...,
+        metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata | None = ...,
         target: global___EndpointTarget | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "description", b"description", "target", b"target"
+            "metadata", b"metadata", "target", b"target"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "description", b"description", "name", b"name", "target", b"target"
+            "metadata", b"metadata", "name", b"name", "target", b"target"
         ],
     ) -> None: ...
 

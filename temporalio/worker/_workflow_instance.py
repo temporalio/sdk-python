@@ -10,6 +10,7 @@ import logging
 import random
 import sys
 import traceback
+import typing
 import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -44,6 +45,7 @@ from typing_extensions import Self, TypeAlias, TypedDict
 import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
+import temporalio.api.sdk.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.workflow_activation
@@ -53,6 +55,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
+from temporalio.service import __version__
 
 from ._interceptor import (
     ContinueAsNewInput,
@@ -248,6 +251,14 @@ class _WorkflowInstanceImpl(
             is_method=False,
             arg_types=[],
             ret_type=str,
+        )
+
+        self._queries["__enhanced_stack_trace"] = temporalio.workflow._QueryDefinition(
+            name="__enhanced_stack_trace",
+            fn=self._enhanced_stack_trace,
+            is_method=False,
+            arg_types=[],
+            ret_type=temporalio.api.sdk.v1.EnhancedStackTrace,
         )
 
         # Maintain buffered signals for later-added dynamic handlers
@@ -1795,6 +1806,53 @@ class _WorkflowInstanceImpl(
                 + "\n".join(traceback.format_list(frames))
             )
         return "\n\n".join(stacks)
+
+    def _enhanced_stack_trace(self) -> temporalio.api.sdk.v1.EnhancedStackTrace:
+        sdk = temporalio.api.sdk.v1.StackTraceSDKInfo(
+            name="sdk-python", version=__version__
+        )
+
+        # this is to use `open`
+        with temporalio.workflow.unsafe.sandbox_unrestricted():
+            sources = dict()
+            stacks = []
+
+            for task in list(self._tasks):
+                locations = []
+                for frame in task.get_stack():
+                    filename = frame.f_code.co_filename
+                    line_number = frame.f_lineno
+                    func_name = frame.f_code.co_name
+
+                    try:
+                        with open(filename, "r") as f:
+                            code = f.read()
+                    except OSError as ose:
+                        code = f"Cannot access code.\n---\n{ose.strerror}"
+                        # TODO possibly include sentinel/property for success of src scrape? work out with ui
+                    except Exception:
+                        code = f"Generic Error.\n\n{traceback.format_exc()}"
+
+                    file_slice = temporalio.api.sdk.v1.StackTraceFileSlice(
+                        line_offset=0, content=code
+                    )
+                    file_location = temporalio.api.sdk.v1.StackTraceFileLocation(
+                        file_path=filename,
+                        line=line_number,
+                        column=-1,
+                        function_name=func_name,
+                        internal_code=False,
+                    )
+
+                    sources[filename] = file_slice
+                    locations.append(file_location)
+
+                stacks.append(temporalio.api.sdk.v1.StackTrace(locations=locations))
+
+            est = temporalio.api.sdk.v1.EnhancedStackTrace(
+                sdk=sdk, sources=sources, stacks=stacks
+            )
+            return est
 
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many

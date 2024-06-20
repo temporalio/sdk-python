@@ -38,6 +38,7 @@ import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
@@ -3546,6 +3547,7 @@ class HistoryEvent(google.protobuf.message.Message):
     VERSION_FIELD_NUMBER: builtins.int
     TASK_ID_FIELD_NUMBER: builtins.int
     WORKER_MAY_IGNORE_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_STARTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -3615,6 +3617,17 @@ class HistoryEvent(google.protobuf.message.Message):
     type which it does not understand, it must error unless this is true. If it is true, it's
     acceptable for the event type and/or attributes to be uninterpretable.
     """
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """Metadata on the event. This is often carried over from commands and client calls. Most events
+        won't have this information, and how this information is used is dependent upon the interface
+        that reads it.
+
+        Current well-known uses:
+         * workflow_execution_started_event_attributes - summary and details from start workflow.
+         * timer_started_event_attributes - summary represents an identifier for the timer for use by
+           user interfaces.
+        """
     @property
     def workflow_execution_started_event_attributes(
         self,
@@ -3838,6 +3851,8 @@ class HistoryEvent(google.protobuf.message.Message):
         version: builtins.int = ...,
         task_id: builtins.int = ...,
         worker_may_ignore: builtins.bool = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
         workflow_execution_started_event_attributes: global___WorkflowExecutionStartedEventAttributes
         | None = ...,
         workflow_execution_completed_event_attributes: global___WorkflowExecutionCompletedEventAttributes
@@ -4021,6 +4036,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"timer_started_event_attributes",
             "upsert_workflow_search_attributes_event_attributes",
             b"upsert_workflow_search_attributes_event_attributes",
+            "user_metadata",
+            b"user_metadata",
             "workflow_execution_cancel_requested_event_attributes",
             b"workflow_execution_cancel_requested_event_attributes",
             "workflow_execution_canceled_event_attributes",
@@ -4144,6 +4161,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"timer_started_event_attributes",
             "upsert_workflow_search_attributes_event_attributes",
             b"upsert_workflow_search_attributes_event_attributes",
+            "user_metadata",
+            b"user_metadata",
             "version",
             b"version",
             "worker_may_ignore",

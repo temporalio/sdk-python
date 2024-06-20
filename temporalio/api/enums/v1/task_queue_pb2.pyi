@@ -184,8 +184,8 @@ class _BuildIdTaskReachabilityEnumTypeWrapper(
     BUILD_ID_TASK_REACHABILITY_UNSPECIFIED: _BuildIdTaskReachability.ValueType  # 0
     """Task reachability is not reported"""
     BUILD_ID_TASK_REACHABILITY_REACHABLE: _BuildIdTaskReachability.ValueType  # 1
-    """Build ID may be used by new workflows or activities (base on versioning rules), or there are
-    open workflows or backlogged activities assigned to it.
+    """Build ID may be used by new workflows or activities (base on versioning rules), or there MAY
+    be open workflows or backlogged activities assigned to it.
     """
     BUILD_ID_TASK_REACHABILITY_CLOSED_WORKFLOWS_ONLY: _BuildIdTaskReachability.ValueType  # 2
     """Build ID does not have open workflows and is not reachable by new workflows,
@@ -201,8 +201,13 @@ class BuildIdTaskReachability(
     _BuildIdTaskReachability, metaclass=_BuildIdTaskReachabilityEnumTypeWrapper
 ):
     """Specifies which category of tasks may reach a versioned worker of a certain Build ID.
+
+    Task Reachability is eventually consistent; there may be a delay until it converges to the most
+    accurate value but it is designed in a way to take the more conservative side until it converges.
+    For example REACHABLE is more conservative than CLOSED_WORKFLOWS_ONLY.
+
     Note: future activities who inherit their workflow's Build ID but not its Task Queue will not be
-    accounted for reachability as server cannot not know if they'll happen as they do not use
+    accounted for reachability as server cannot know if they'll happen as they do not use
     assignment rules of their Task Queue. Same goes for Child Workflows or Continue-As-New Workflows
     who inherit the parent/previous workflow's Build ID but not its Task Queue. In those cases, make
     sure to query reachability for the parent/previous workflow's Task Queue as well.
@@ -211,8 +216,8 @@ class BuildIdTaskReachability(
 BUILD_ID_TASK_REACHABILITY_UNSPECIFIED: BuildIdTaskReachability.ValueType  # 0
 """Task reachability is not reported"""
 BUILD_ID_TASK_REACHABILITY_REACHABLE: BuildIdTaskReachability.ValueType  # 1
-"""Build ID may be used by new workflows or activities (base on versioning rules), or there are
-open workflows or backlogged activities assigned to it.
+"""Build ID may be used by new workflows or activities (base on versioning rules), or there MAY
+be open workflows or backlogged activities assigned to it.
 """
 BUILD_ID_TASK_REACHABILITY_CLOSED_WORKFLOWS_ONLY: BuildIdTaskReachability.ValueType  # 2
 """Build ID does not have open workflows and is not reachable by new workflows,

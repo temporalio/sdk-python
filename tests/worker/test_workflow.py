@@ -38,6 +38,8 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
+from temporalio.api.sdk.v1 import EnhancedStackTrace
+from temporalio.api.update.v1 import UpdateRef
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
     ResetStickyTaskQueueRequest,
@@ -91,7 +93,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
 )
-from temporalio.service import RPCError, RPCStatusCode
+from temporalio.service import RPCError, RPCStatusCode, __version__
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
@@ -106,6 +108,12 @@ from tests.helpers import (
     find_free_port,
     new_worker,
     workflow_update_exists,
+)
+from tests.helpers.external_coroutine import wait_on_timer
+from tests.helpers.external_stack_trace import (
+    ExternalStackTraceWorkflow,
+    MultiFileStackTraceWorkflow,
+    external_wait_cancel,
 )
 
 
@@ -494,7 +502,7 @@ async def test_workflow_signal_and_query_errors(client: Client):
             await handle.query("non-existent query")
         assert str(rpc_err.value) == (
             "Query handler for 'non-existent query' expected but not found,"
-            " known queries: [__stack_trace bad_query other_query]"
+            " known queries: [__enhanced_stack_trace __stack_trace bad_query other_query]"
         )
 
 
@@ -2096,6 +2104,85 @@ async def test_workflow_stack_trace(client: Client):
         trace = await handle.query("__stack_trace")
         # TODO(cretz): Do more specific checks once we clean up traces
         assert "never_completing_coroutine" in trace
+
+
+async def test_workflow_enhanced_stack_trace(client: Client):
+    async with new_worker(
+        client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+    ) as worker:
+        handle = await client.start_workflow(
+            StackTraceWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Wait until waiting
+        async def status() -> str:
+            return await handle.query(StackTraceWorkflow.status)
+
+        await assert_eq_eventually("waiting", status)
+
+        # Send stack trace query
+        trace = await handle.query("__enhanced_stack_trace")
+
+        assert type(trace) == EnhancedStackTrace
+
+        assert "never_completing_coroutine" in [
+            loc.function_name for stack in trace.stacks for loc in stack.locations
+        ]
+
+        # first line of never_completing_coroutine
+        cur_source = None
+        for source in trace.sources.keys():
+            if source.endswith("test_workflow.py"):
+                cur_source = source
+
+        # make sure the source exists
+        assert cur_source is not None
+
+        # make sure the line is present in the source
+        assert 'self._status = "waiting"' in trace.sources[cur_source].content
+        assert trace.sdk.version == __version__
+
+
+async def test_workflow_external_enhanced_stack_trace(client: Client):
+    async with new_worker(
+        client,
+        ExternalStackTraceWorkflow,
+        activities=[external_wait_cancel],
+    ) as worker:
+        handle = await client.start_workflow(
+            ExternalStackTraceWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def status() -> str:
+            return await handle.query(ExternalStackTraceWorkflow.status)
+
+        await assert_eq_eventually("waiting", status)
+
+        trace = await handle.query("__enhanced_stack_trace")
+
+        # test that a coroutine only has the source as its stack
+
+        assert type(trace) == EnhancedStackTrace
+
+        assert "never_completing_coroutine" in [
+            loc.function_name for stack in trace.stacks for loc in stack.locations
+        ]
+
+        fn = None
+        for source in trace.sources.keys():
+            if source.endswith("external_coroutine.py"):
+                fn = source
+
+        assert fn is not None
+        assert (
+            'status[0] = "waiting"  # external coroutine test'
+            in trace.sources[fn].content
+        )
+        assert trace.sdk.version == __version__
 
 
 @dataclass
