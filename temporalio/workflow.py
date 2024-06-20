@@ -514,6 +514,10 @@ class _Runtime(ABC):
         return self._logger_details
 
     @abstractmethod
+    def workflow_all_handlers_finished(self) -> bool:
+        ...
+
+    @abstractmethod
     def workflow_continue_as_new(
         self,
         *args: Any,
@@ -628,10 +632,6 @@ class _Runtime(ABC):
         handler: Optional[Callable],
         validator: Optional[Callable],
     ) -> None:
-        ...
-
-    @abstractmethod
-    def workflow_all_handlers_finished(self) -> bool:
         ...
 
     @abstractmethod

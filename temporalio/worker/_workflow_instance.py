@@ -887,6 +887,9 @@ class _WorkflowInstanceImpl(
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
 
+    def workflow_all_handlers_finished(self) -> bool:
+        return not self._in_progress_updates and not self._in_progress_signals
+
     def workflow_continue_as_new(
         self,
         *args: Any,
@@ -1119,9 +1122,6 @@ class _WorkflowInstanceImpl(
                 )
         else:
             self._updates.pop(name, None)
-
-    def workflow_all_handlers_finished(self) -> bool:
-        return not self._in_progress_updates and not self._in_progress_signals
 
     def workflow_start_activity(
         self,
