@@ -1685,23 +1685,20 @@ class _WorkflowInstanceImpl(
             signal=job.signal_name, args=args, headers=job.headers
         )
 
-        async def run_signal():
-            try:
-                self._handled_signals_seq += 1
-                id = self._handled_signals_seq
-                self._in_progress_signals[id] = HandlerExecution(
-                    job.signal_name, defn.unfinished_handlers_policy
-                )
-                await self._run_top_level_workflow_function(
-                    self._inbound.handle_signal(input)
-                )
-            finally:
-                self._in_progress_signals.pop(id, None)
+        self._handled_signals_seq += 1
+        id = self._handled_signals_seq
+        self._in_progress_signals[id] = HandlerExecution(
+            job.signal_name, defn.unfinished_handlers_policy
+        )
 
-        self.create_task(
-            run_signal(),
+        def done_callback(f):
+            self._in_progress_signals.pop(id, None)
+
+        task = self.create_task(
+            self._run_top_level_workflow_function(self._inbound.handle_signal(input)),
             name=f"signal: {job.signal_name}",
         )
+        task.add_done_callback(done_callback)
 
     def _register_task(
         self,
