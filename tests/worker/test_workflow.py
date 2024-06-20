@@ -42,7 +42,6 @@ from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.update.v1 import UpdateRef
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
-    PollWorkflowExecutionUpdateRequest,
     ResetStickyTaskQueueRequest,
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
@@ -57,6 +56,7 @@ from temporalio.client import (
     WorkflowQueryFailedError,
     WorkflowUpdateFailedError,
     WorkflowUpdateHandle,
+    WorkflowUpdateRPCTimeoutOrCancelledError,
     WorkflowUpdateStage,
 )
 from temporalio.common import (
@@ -107,6 +107,7 @@ from tests.helpers import (
     ensure_search_attributes_present,
     find_free_port,
     new_worker,
+    workflow_update_exists,
 )
 from tests.helpers.external_coroutine import wait_on_timer
 from tests.helpers.external_stack_trace import (
@@ -4364,25 +4365,8 @@ async def test_workflow_update_before_worker_start(
         task_queue=task_queue,
     )
 
-    async def update_exists() -> bool:
-        try:
-            await client.workflow_service.poll_workflow_execution_update(
-                PollWorkflowExecutionUpdateRequest(
-                    namespace=client.namespace,
-                    update_ref=UpdateRef(
-                        workflow_execution=WorkflowExecution(workflow_id=handle.id),
-                        update_id="my-update",
-                    ),
-                )
-            )
-            return True
-        except RPCError as err:
-            if err.status != RPCStatusCode.NOT_FOUND:
-                raise
-            return False
-
     # Confirm update not there
-    assert not await update_exists()
+    assert not await workflow_update_exists(client, handle.id, "my-update")
 
     # Execute update in background
     update_task = asyncio.create_task(
@@ -4392,7 +4376,9 @@ async def test_workflow_update_before_worker_start(
     )
 
     # Wait until update exists
-    await assert_eq_eventually(True, update_exists)
+    await assert_eq_eventually(
+        True, lambda: workflow_update_exists(client, handle.id, "my-update")
+    )
 
     # Start no-cache worker on the task queue
     async with new_worker(
@@ -4464,6 +4450,108 @@ async def test_workflow_update_separate_handle(
         assert "update-done" == await update_handle_task1
         assert "update-done" == await update_handle_task2
         assert "workflow-done" == await handle.result()
+
+
+@workflow.defn
+class UpdateTimeoutOrCancelWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.update
+    async def do_update(self, sleep: float) -> None:
+        await asyncio.sleep(sleep)
+
+
+async def test_workflow_update_timeout_or_cancel(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+
+    # Confirm start timeout via short timeout on update w/ no worker running
+    handle = await client.start_workflow(
+        UpdateTimeoutOrCancelWorkflow.run,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue="does-not-exist",
+    )
+    with pytest.raises(WorkflowUpdateRPCTimeoutOrCancelledError):
+        await handle.start_update(
+            UpdateTimeoutOrCancelWorkflow.do_update,
+            1000,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+            rpc_timeout=timedelta(milliseconds=1),
+        )
+
+    # Confirm start cancel via cancel on update w/ no worker running
+    handle = await client.start_workflow(
+        UpdateTimeoutOrCancelWorkflow.run,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue="does-not-exist",
+    )
+    task = asyncio.create_task(
+        handle.start_update(
+            UpdateTimeoutOrCancelWorkflow.do_update,
+            1000,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+            id="my-update",
+        )
+    )
+    # Have to wait for update to exist before cancelling to capture
+    await assert_eq_eventually(
+        True, lambda: workflow_update_exists(client, handle.id, "my-update")
+    )
+    task.cancel()
+    with pytest.raises(WorkflowUpdateRPCTimeoutOrCancelledError):
+        await task
+
+    # Start worker
+    async with new_worker(client, UpdateTimeoutOrCancelWorkflow) as worker:
+        # Start the workflow
+        handle = await client.start_workflow(
+            UpdateTimeoutOrCancelWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Start an update
+        update_handle = await handle.start_update(
+            UpdateTimeoutOrCancelWorkflow.do_update,
+            1000,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+        )
+        # Timeout a poll call
+        with pytest.raises(WorkflowUpdateRPCTimeoutOrCancelledError):
+            await update_handle.result(rpc_timeout=timedelta(milliseconds=1))
+
+        # Cancel a poll call
+        update_handle = await handle.start_update(
+            UpdateTimeoutOrCancelWorkflow.do_update,
+            1000,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+        )
+        result_task = asyncio.create_task(update_handle.result())
+        # Unfortunately there is not a way for us to confirm this is actually
+        # pending the server call and if you cancel early you get an asyncio
+        # cancelled error because it never even reached the gRPC client. We
+        # considered sleeping, but that makes for flaky tests. So what we are
+        # going to do is patch the poll call to notify us when it was called.
+        called = asyncio.Event()
+        unpatched_call = client.workflow_service.poll_workflow_execution_update
+
+        async def patched_call(*args, **kwargs):
+            called.set()
+            return await unpatched_call(*args, **kwargs)
+
+        client.workflow_service.poll_workflow_execution_update = patched_call  # type: ignore
+        try:
+            await called.wait()
+        finally:
+            client.workflow_service.poll_workflow_execution_update = unpatched_call
+        result_task.cancel()
+        with pytest.raises(WorkflowUpdateRPCTimeoutOrCancelledError):
+            await result_task
 
 
 @workflow.defn

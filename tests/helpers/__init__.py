@@ -6,11 +6,14 @@ from contextlib import closing
 from datetime import timedelta
 from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
+from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import IndexedValueType
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
 )
+from temporalio.api.update.v1 import UpdateRef
+from temporalio.api.workflowservice.v1 import PollWorkflowExecutionUpdateRequest
 from temporalio.client import BuildIdOpAddNewDefault, Client
 from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
@@ -105,3 +108,23 @@ def find_free_port() -> int:
         s.bind(("", 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
+
+
+async def workflow_update_exists(
+    client: Client, workflow_id: str, update_id: str
+) -> bool:
+    try:
+        await client.workflow_service.poll_workflow_execution_update(
+            PollWorkflowExecutionUpdateRequest(
+                namespace=client.namespace,
+                update_ref=UpdateRef(
+                    workflow_execution=WorkflowExecution(workflow_id=workflow_id),
+                    update_id=update_id,
+                ),
+            )
+        )
+        return True
+    except RPCError as err:
+        if err.status != RPCStatusCode.NOT_FOUND:
+            raise
+        return False
