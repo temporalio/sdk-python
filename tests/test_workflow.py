@@ -42,6 +42,10 @@ class GoodDefn(GoodDefnBase):
     def signal3(self, name: str, args: Sequence[RawValue]):
         pass
 
+    @workflow.signal()
+    def signal4(self):
+        pass
+
     @workflow.query
     def query1(self):
         pass
@@ -54,6 +58,10 @@ class GoodDefn(GoodDefnBase):
     def query3(self, name: str, args: Sequence[RawValue]):
         pass
 
+    @workflow.query()
+    def query4(self):
+        pass
+
     @workflow.update
     def update1(self):
         pass
@@ -64,6 +72,10 @@ class GoodDefn(GoodDefnBase):
 
     @workflow.update(dynamic=True)
     def update3(self, name: str, args: Sequence[RawValue]):
+        pass
+
+    @workflow.update()
+    def update4(self):
         pass
 
 

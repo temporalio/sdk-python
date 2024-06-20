@@ -179,6 +179,13 @@ def signal(fn: CallableSyncOrAsyncReturnNoneType) -> CallableSyncOrAsyncReturnNo
 
 
 @overload
+def signal() -> (
+    Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]
+):
+    ...
+
+
+@overload
 def signal(
     *, name: str
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
@@ -232,17 +239,20 @@ def signal(
             )
         return fn
 
-    if name is not None or dynamic:
+    if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
         return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot create signal without function or name or dynamic")
     return with_name(fn.__name__, fn)
 
 
 @overload
 def query(fn: CallableType) -> CallableType:
+    ...
+
+
+@overload
+def query() -> Callable[[CallableType], CallableType]:
     ...
 
 
@@ -302,12 +312,10 @@ def query(
             )
         return fn
 
-    if name is not None or dynamic:
+    if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
         return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot create query without function or name or dynamic")
     if inspect.iscoroutinefunction(fn):
         warnings.warn(
             "Queries as async def functions are deprecated",
@@ -922,6 +930,16 @@ def update(
 
 
 @overload
+def update() -> (
+    Callable[
+        [Callable[MultiParamSpec, ReturnType]],
+        UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+    ]
+):
+    ...
+
+
+@overload
 def update(
     *, name: str
 ) -> Callable[
@@ -987,12 +1005,10 @@ def update(
         setattr(fn, "validator", partial(_update_validator, defn))
         return fn
 
-    if name is not None or dynamic:
+    if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
         return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot create update without function or name or dynamic")
     return with_name(fn.__name__, fn)
 
 
