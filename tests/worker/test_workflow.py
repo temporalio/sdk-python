@@ -5184,17 +5184,20 @@ class UnfinishedHandlersWorkflow:
     def __init__(self):
         self.started_handler = False
         self.handler_may_return = False
+        self.handler_finished = False
 
     @workflow.run
-    async def run(self, wait_for_handlers: bool) -> None:
+    async def run(self, wait_for_handlers: bool) -> bool:
         await workflow.wait_condition(lambda: self.started_handler)
         if wait_for_handlers:
             self.handler_may_return = True
             await workflow.wait_condition(workflow.all_handlers_finished)
+        return self.handler_finished
 
     async def _do_update_or_signal(self) -> None:
         self.started_handler = True
         await workflow.wait_condition(lambda: self.handler_may_return)
+        self.handler_finished = True
 
     @workflow.update
     async def my_update(self) -> None:
@@ -5230,66 +5233,55 @@ class UnfinishedHandlersWorkflow:
 
 
 async def test_unfinished_update_handlers(client: Client):
-    await _UnfinishedHandlersTest(client, "update").run_test()
+    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
+        await _UnfinishedHandlersTest(client, worker, "update").run_test()
 
 
 async def test_unfinished_signal_handlers(client: Client):
-    await _UnfinishedHandlersTest(client, "signal").run_test()
+    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
+        await _UnfinishedHandlersTest(client, worker, "signal").run_test()
 
 
 @dataclass
 class _UnfinishedHandlersTest:
     client: Client
+    worker: Worker
     handler_type: Literal["update", "signal"]
 
     async def run_test(self):
-        async with new_worker(self.client, UnfinishedHandlersWorkflow) as worker:
-            # The unfinished handler warning is issued by default,
-            assert any(
-                self.is_unfinished_handler_warning(w)
-                for w in await self.capture_warnings_from_workflow(
-                    worker,
-                    wait_for_handlers=False,
-                )
-            )
-            # and when the workflow sets the unfinished_handlers_policy to WARN_AND_ABANDON,
-            assert any(
-                self.is_unfinished_handler_warning(w)
-                for w in await self.capture_warnings_from_workflow(
-                    worker,
-                    wait_for_handlers=False,
-                    unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON,
-                )
-            )
-            # but not when the workflow waits for handlers to complete,
-            assert not any(
-                self.is_unfinished_handler_warning(w)
-                for w in await self.capture_warnings_from_workflow(
-                    worker,
-                    wait_for_handlers=True,
-                )
-            )
-            # nor when the silence-warnings policy is set on the handler.
-            assert not any(
-                self.is_unfinished_handler_warning(w)
-                for w in await self.capture_warnings_from_workflow(
-                    worker,
-                    wait_for_handlers=False,
-                    unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON,
-                )
-            )
+        # The unfinished handler warning is issued by default,
+        handler_finished, warning = await self.get_workflow_result_and_warning(
+            wait_for_handlers=False,
+        )
+        assert not handler_finished and warning
+        # and when the workflow sets the unfinished_handlers_policy to WARN_AND_ABANDON,
+        handler_finished, warning = await self.get_workflow_result_and_warning(
+            wait_for_handlers=False,
+            unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+        )
+        assert not handler_finished and warning
+        # but not when the workflow waits for handlers to complete,
+        handler_finished, warning = await self.get_workflow_result_and_warning(
+            wait_for_handlers=True,
+        )
+        assert handler_finished and not warning
+        # nor when the silence-warnings policy is set on the handler.
+        handler_finished, warning = await self.get_workflow_result_and_warning(
+            wait_for_handlers=False,
+            unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON,
+        )
+        assert not handler_finished and not warning
 
-    async def capture_warnings_from_workflow(
+    async def get_workflow_result_and_warning(
         self,
-        worker: Worker,
         wait_for_handlers: bool,
         unfinished_handlers_policy: Optional[workflow.UnfinishedHandlersPolicy] = None,
-    ) -> pytest.WarningsRecorder:
+    ) -> Tuple[bool, bool]:
         handle = await self.client.start_workflow(
             UnfinishedHandlersWorkflow.run,
             arg=wait_for_handlers,
             id=f"wf-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
+            task_queue=self.worker.task_queue,
         )
         handler_name = f"my_{self.handler_type}"
         if unfinished_handlers_policy:
@@ -5297,9 +5289,6 @@ class _UnfinishedHandlersTest:
         with pytest.WarningsRecorder() as warnings:
             if self.handler_type == "signal":
                 await asyncio.gather(handle.signal(handler_name))
-                # In the case of signal, we must wait here for the workflow to complete to guarantee
-                # that we'll capture the warning emitted by the worker.
-                await handle.result()
             else:
                 if not wait_for_handlers:
                     with pytest.raises(RPCError) as err:
@@ -5316,7 +5305,11 @@ class _UnfinishedHandlersTest:
                         handle.execute_update(handler_name, id="my-update")
                     )
 
-            return warnings
+            wf_result = await handle.result()
+            unfinished_handler_warning_emitted = any(
+                self.is_unfinished_handler_warning(w) for w in warnings
+            )
+            return wf_result, unfinished_handler_warning_emitted
 
     def is_unfinished_handler_warning(
         self,
