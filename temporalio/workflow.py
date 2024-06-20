@@ -173,7 +173,7 @@ def run(fn: CallableAsyncType) -> CallableAsyncType:
     return fn  # type: ignore[return-value]
 
 
-class UnfinishedHandlersPolicy(IntEnum):
+class UnfinishedHandlersPolicy(Enum):
     """Actions taken if a workflow terminates with running handlers.
 
     Policy defining actions taken when a workflow exits while update or signal handlers are running.
