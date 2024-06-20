@@ -173,7 +173,7 @@ def run(fn: CallableAsyncType) -> CallableAsyncType:
     return fn  # type: ignore[return-value]
 
 
-class IncompleteHandlersPolicy(IntEnum):
+class UnfinishedHandlersPolicy(IntEnum):
     """Actions taken if a workflow terminates with running handlers.
 
     Policy defining actions taken when a workflow exits while update or signal handlers are running.
@@ -208,21 +208,21 @@ def signal(
 
 @overload
 def signal(
-    *, incomplete_handlers_policy: IncompleteHandlersPolicy
+    *, unfinished_handlers_policy: UnfinishedHandlersPolicy
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
 
 @overload
 def signal(
-    *, name: str, incomplete_handlers_policy: IncompleteHandlersPolicy
+    *, name: str, unfinished_handlers_policy: UnfinishedHandlersPolicy
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
 
 @overload
 def signal(
-    *, dynamic: Literal[True], incomplete_handlers_policy: IncompleteHandlersPolicy
+    *, dynamic: Literal[True], unfinished_handlers_policy: UnfinishedHandlersPolicy
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -232,7 +232,7 @@ def signal(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
-    incomplete_handlers_policy: IncompleteHandlersPolicy = IncompleteHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow signal method.
 
@@ -253,13 +253,13 @@ def signal(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
-        incomplete_handlers_policy: Actions taken if a workflow terminates with
+        unfinished_handlers_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
     """
 
     def decorator(
         name: Optional[str],
-        incomplete_handlers_policy: IncompleteHandlersPolicy,
+        unfinished_handlers_policy: UnfinishedHandlersPolicy,
         fn: CallableSyncOrAsyncReturnNoneType,
     ) -> CallableSyncOrAsyncReturnNoneType:
         if not name and not dynamic:
@@ -268,7 +268,7 @@ def signal(
             name=name,
             fn=fn,
             is_method=True,
-            incomplete_handlers_policy=incomplete_handlers_policy,
+            unfinished_handlers_policy=unfinished_handlers_policy,
         )
         setattr(fn, "__temporal_signal_definition", defn)
         if defn.dynamic_vararg:
@@ -282,9 +282,9 @@ def signal(
     if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(decorator, name, incomplete_handlers_policy)
+        return partial(decorator, name, unfinished_handlers_policy)
     else:
-        return decorator(fn.__name__, incomplete_handlers_policy, fn)
+        return decorator(fn.__name__, unfinished_handlers_policy, fn)
 
 
 @overload
@@ -631,7 +631,7 @@ class _Runtime(ABC):
         ...
 
     @abstractmethod
-    def workflow_all_handlers_complete(self) -> bool:
+    def workflow_all_handlers_finished(self) -> bool:
         ...
 
     @abstractmethod
@@ -993,7 +993,7 @@ def update(
 
 @overload
 def update(
-    *, incomplete_handlers_policy: IncompleteHandlersPolicy
+    *, unfinished_handlers_policy: UnfinishedHandlersPolicy
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1003,7 +1003,7 @@ def update(
 
 @overload
 def update(
-    *, name: str, incomplete_handlers_policy: IncompleteHandlersPolicy
+    *, name: str, unfinished_handlers_policy: UnfinishedHandlersPolicy
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1013,7 +1013,7 @@ def update(
 
 @overload
 def update(
-    *, dynamic: Literal[True], incomplete_handlers_policy: IncompleteHandlersPolicy
+    *, dynamic: Literal[True], unfinished_handlers_policy: UnfinishedHandlersPolicy
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1026,7 +1026,7 @@ def update(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
-    incomplete_handlers_policy: IncompleteHandlersPolicy = IncompleteHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow update handler method.
 
@@ -1054,13 +1054,13 @@ def update(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
-        incomplete_handlers_policy: Actions taken if a workflow terminates with
+        unfinished_handlers_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
     """
 
     def decorator(
         name: Optional[str],
-        incomplete_handlers_policy: IncompleteHandlersPolicy,
+        unfinished_handlers_policy: UnfinishedHandlersPolicy,
         fn: CallableSyncOrAsyncType,
     ) -> CallableSyncOrAsyncType:
         if not name and not dynamic:
@@ -1069,7 +1069,7 @@ def update(
             name=name,
             fn=fn,
             is_method=True,
-            incomplete_handlers_policy=incomplete_handlers_policy,
+            unfinished_handlers_policy=unfinished_handlers_policy,
         )
         if defn.dynamic_vararg:
             raise RuntimeError(
@@ -1082,9 +1082,9 @@ def update(
     if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(decorator, name, incomplete_handlers_policy)
+        return partial(decorator, name, unfinished_handlers_policy)
     else:
-        return decorator(fn.__name__, incomplete_handlers_policy, fn)
+        return decorator(fn.__name__, unfinished_handlers_policy, fn)
 
 
 def _update_validator(
@@ -1541,8 +1541,8 @@ class _SignalDefinition:
     name: Optional[str]
     fn: Callable[..., Union[None, Awaitable[None]]]
     is_method: bool
-    incomplete_handlers_policy: IncompleteHandlersPolicy = (
-        IncompleteHandlersPolicy.WARN_AND_ABANDON
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = (
+        UnfinishedHandlersPolicy.WARN_AND_ABANDON
     )
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
@@ -1625,8 +1625,8 @@ class _UpdateDefinition:
     name: Optional[str]
     fn: Callable[..., Union[Any, Awaitable[Any]]]
     is_method: bool
-    incomplete_handlers_policy: IncompleteHandlersPolicy = (
-        IncompleteHandlersPolicy.WARN_AND_ABANDON
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = (
+        UnfinishedHandlersPolicy.WARN_AND_ABANDON
     )
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
@@ -4497,17 +4497,17 @@ def set_dynamic_update_handler(
     _Runtime.current().workflow_set_update_handler(None, handler, validator)
 
 
-def all_handlers_complete() -> bool:
+def all_handlers_finished() -> bool:
     """Whether update and signal handlers have finished executing.
 
     Consider waiting on this condition before workflow return or continue-as-new, to prevent
     interruption of in-progress handlers by workflow exit:
-    ``await workflow.wait_condition(lambda: workflow.all_handlers_complete())``
+    ``await workflow.wait_condition(lambda: workflow.all_handlers_finished())``
 
     Returns:
         True if there are no in-progress update or signal handler executions.
     """
-    return _Runtime.current().workflow_all_handlers_complete()
+    return _Runtime.current().workflow_all_handlers_finished()
 
 
 def as_completed(
