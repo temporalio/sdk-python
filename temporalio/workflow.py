@@ -180,11 +180,11 @@ class UnfinishedHandlersPolicy(IntEnum):
     The workflow exit may be due to successful return, failure, cancellation, or continue-as-new.
     """
 
+    # Issue a warning in addition to abandoning.
+    WARN_AND_ABANDON = 1
     # Abandon the handler. In the case of an update handler this means that the client will receive
     # an error rather than the update result.
-    ABANDON = 1
-    # Issue a warning in addition to abandoning.
-    WARN_AND_ABANDON = 2
+    ABANDON = 2
 
 
 @overload
