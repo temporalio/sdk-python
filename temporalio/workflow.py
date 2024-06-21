@@ -4729,3 +4729,11 @@ class VersioningIntent(Enum):
         elif self == VersioningIntent.DEFAULT:
             return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
+
+
+class UnfinishedUpdateHandlerWarning(RuntimeWarning):
+    """Warning issued when a workflow exits before an update handler has finished executing"""
+
+
+class UnfinishedSignalHandlerWarning(RuntimeWarning):
+    """Warning issued when a workflow exits before a signal handler has finished executing"""

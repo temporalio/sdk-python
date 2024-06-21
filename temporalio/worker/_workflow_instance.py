@@ -1628,11 +1628,19 @@ class _WorkflowInstanceImpl(
 
         warnable_updates = warnable(self._in_progress_updates.values())
         if warnable_updates:
-            warnings.warn(UnfinishedUpdateHandlerWarning(warnable_updates))
+            warnings.warn(
+                temporalio.workflow.UnfinishedUpdateHandlerWarning(
+                    _make_unfinished_update_handler_message(warnable_updates)
+                )
+            )
 
         warnable_signals = warnable(self._in_progress_signals.values())
         if warnable_signals:
-            warnings.warn(UnfinishedSignalHandlerWarning(warnable_signals))
+            warnings.warn(
+                temporalio.workflow.UnfinishedSignalHandlerWarning(
+                    _make_unfinished_signal_handler_message(warnable_signals)
+                )
+            )
 
     def _next_seq(self, type: str) -> int:
         seq = self._curr_seqs.get(type, 0) + 1
@@ -2746,17 +2754,10 @@ class HandlerExecution:
     id: Optional[str] = None
 
 
-class UnfinishedUpdateHandlerWarning(RuntimeWarning):
-    """Warning issued when a workflow exits before an update handler has finished executing"""
-
-    def __init__(self, handler_executions: List[HandlerExecution]) -> None:
-        """Initialize warning object"""
-        super().__init__()
-        self.handler_executions = handler_executions
-
-    def __str__(self) -> str:
-        """Return warning message"""
-        message = """
+def _make_unfinished_update_handler_message(
+    handler_executions: List[HandlerExecution],
+) -> str:
+    message = """
 Workflow finished while update handlers are still running. This may have interrupted work that the
 update handler was doing, and the client that sent the update will receive a 'workflow execution
 already completed' RPCError instead of the update result. You can wait for all update and signal
@@ -2766,27 +2767,18 @@ running handlers when the workflow finishes, and causing clients to receive erro
 disable this warning via the update handler decorator:
 `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
 """.replace(
-            "\n", " "
-        ).strip()
-        return (
-            f"{message} The following updates were unfinished (and warnings were not disabled for their handler): "
-            + json.dumps(
-                [{"name": ex.name, "id": ex.id} for ex in self.handler_executions]
-            )
-        )
+        "\n", " "
+    ).strip()
+    return (
+        f"{message} The following updates were unfinished (and warnings were not disabled for their handler): "
+        + json.dumps([{"name": ex.name, "id": ex.id} for ex in handler_executions])
+    )
 
 
-class UnfinishedSignalHandlerWarning(RuntimeWarning):
-    """Warning issued when a workflow exits before a signal handler has finished executing"""
-
-    def __init__(self, handler_executions: List[HandlerExecution]) -> None:
-        """Initialize warning object"""
-        super().__init__()
-        self.handler_executions = handler_executions
-
-    def __str__(self) -> str:
-        """Return warning message"""
-        message = """
+def _make_unfinished_signal_handler_message(
+    handler_executions: List[HandlerExecution],
+) -> str:
+    message = """
 Workflow finished while signal handlers are still running. This may have interrupted work that the
 signal handler was doing. You can wait for all update and signal handlers to complete by using
 `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both
@@ -2795,12 +2787,12 @@ workflow finishes, and causing clients to receive errors, then you can disable t
 signal handler decorator:
 `@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
 """.replace(
-            "\n", " "
-        ).strip()
-        names = collections.Counter(ex.name for ex in self.handler_executions)
-        return (
-            f"{message} The following signals were unfinished (and warnings were not disabled for their handler): "
-            + json.dumps(
-                [{"name": name, "count": count} for name, count in names.most_common()]
-            )
+        "\n", " "
+    ).strip()
+    names = collections.Counter(ex.name for ex in handler_executions)
+    return (
+        f"{message} The following signals were unfinished (and warnings were not disabled for their handler): "
+        + json.dumps(
+            [{"name": name, "count": count} for name, count in names.most_common()]
         )
+    )

@@ -106,10 +106,6 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from temporalio.worker._workflow_instance import (
-    UnfinishedSignalHandlerWarning,
-    UnfinishedUpdateHandlerWarning,
-)
 from tests.helpers import (
     assert_eq_eventually,
     ensure_search_attributes_present,
@@ -5355,6 +5351,6 @@ class _UnfinishedHandlersTest:
     @property
     def unfinished_handler_warning_cls(self) -> Type:
         return {
-            "update": UnfinishedUpdateHandlerWarning,
-            "signal": UnfinishedSignalHandlerWarning,
+            "update": workflow.UnfinishedUpdateHandlerWarning,
+            "signal": workflow.UnfinishedSignalHandlerWarning,
         }[self.handler_type]
