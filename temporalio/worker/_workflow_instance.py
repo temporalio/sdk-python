@@ -2739,17 +2739,23 @@ class _WorkflowBeingEvictedError(BaseException):
 
 @dataclass
 class HandlerExecution:
+    """Information about an execution of a signal or update handler."""
+
     name: str
     unfinished_handlers_policy: temporalio.workflow.UnfinishedHandlersPolicy
     id: Optional[str] = None
 
 
 class UnfinishedUpdateHandlerWarning(RuntimeWarning):
+    """Warning issued when a workflow exits before an update handler has finished executing"""
+
     def __init__(self, handler_executions: List[HandlerExecution]) -> None:
+        """Initialize warning object"""
         super().__init__()
         self.handler_executions = handler_executions
 
     def __str__(self) -> str:
+        """Return warning message"""
         message = """
 Workflow finished while update handlers are still running. This may have interrupted work that the
 update handler was doing, and the client that sent the update will receive a 'workflow execution
@@ -2771,11 +2777,15 @@ disable this warning via the update handler decorator:
 
 
 class UnfinishedSignalHandlerWarning(RuntimeWarning):
+    """Warning issued when a workflow exits before a signal handler has finished executing"""
+
     def __init__(self, handler_executions: List[HandlerExecution]) -> None:
+        """Initialize warning object"""
         super().__init__()
         self.handler_executions = handler_executions
 
     def __str__(self) -> str:
+        """Return warning message"""
         message = """
 Workflow finished while signal handlers are still running. This may have interrupted work that the
 signal handler was doing. You can wait for all update and signal handlers to complete by using
