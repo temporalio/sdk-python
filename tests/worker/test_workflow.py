@@ -5253,10 +5253,7 @@ class _UnfinishedHandlersTest:
             self.get_workflow_result(wait_for_handlers=False, handle_future=handle)
         )
         await assert_eq_eventually(
-            True,
-            partial(self.workflow_task_failed, workflow_id=(await handle).id),
-            timeout=timedelta(seconds=5),
-            interval=timedelta(seconds=1),
+            True, partial(self.workflow_task_failed, workflow_id=(await handle).id)
         )
 
         # The unfinished handler warning is issued by default,
