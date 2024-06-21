@@ -1622,8 +1622,8 @@ class _WorkflowInstanceImpl(
             return [
                 ex
                 for ex in handler_executions
-                if ex.unfinished_handlers_policy
-                == temporalio.workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+                if ex.unfinished_policy
+                == temporalio.workflow.HandlerUnfinishedPolicy.WARN_AND_ABANDON
             ]
 
         warnable_updates = warnable(self._in_progress_updates.values())
@@ -2742,7 +2742,7 @@ class HandlerExecution:
     """Information about an execution of a signal or update handler."""
 
     name: str
-    unfinished_handlers_policy: temporalio.workflow.UnfinishedHandlersPolicy
+    unfinished_policy: temporalio.workflow.HandlerUnfinishedPolicy
     id: Optional[str] = None
 
 
@@ -2764,7 +2764,7 @@ handlers to complete by using `await workflow.wait_condition(lambda: workflow.al
 Alternatively, if both you and the clients sending updates and signals are okay with interrupting
 running handlers when the workflow finishes, and causing clients to receive errors, then you can
 disable this warning via the update handler decorator:
-`@workflow.update(unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON)`.
+`@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
 """.replace(
             "\n", " "
         ).strip()
@@ -2793,7 +2793,7 @@ signal handler was doing. You can wait for all update and signal handlers to com
 you and the clients sending updates and signals are okay with interrupting running handlers when the
 workflow finishes, and causing clients to receive errors, then you can disable this warning via the
 signal handler decorator:
-`@workflow.signal(unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON)`.
+`@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
 """.replace(
             "\n", " "
         ).strip()

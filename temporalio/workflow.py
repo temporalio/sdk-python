@@ -173,7 +173,7 @@ def run(fn: CallableAsyncType) -> CallableAsyncType:
     return fn  # type: ignore[return-value]
 
 
-class UnfinishedHandlersPolicy(Enum):
+class HandlerUnfinishedPolicy(Enum):
     """Actions taken if a workflow terminates with running handlers.
 
     Policy defining actions taken when a workflow exits while update or signal handlers are running.
@@ -195,7 +195,7 @@ def signal(fn: CallableSyncOrAsyncReturnNoneType) -> CallableSyncOrAsyncReturnNo
 @overload
 def signal(
     *,
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -204,7 +204,7 @@ def signal(
 def signal(
     *,
     name: str,
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -213,7 +213,7 @@ def signal(
 def signal(
     *,
     dynamic: Literal[True],
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -223,7 +223,7 @@ def signal(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow signal method.
 
@@ -250,7 +250,7 @@ def signal(
 
     def decorator(
         name: Optional[str],
-        unfinished_policy: UnfinishedHandlersPolicy,
+        unfinished_policy: HandlerUnfinishedPolicy,
         fn: CallableSyncOrAsyncReturnNoneType,
     ) -> CallableSyncOrAsyncReturnNoneType:
         if not name and not dynamic:
@@ -965,7 +965,7 @@ def update(
 @overload
 def update(
     *,
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -977,7 +977,7 @@ def update(
 def update(
     *,
     name: str,
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -989,7 +989,7 @@ def update(
 def update(
     *,
     dynamic: Literal[True],
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1002,7 +1002,7 @@ def update(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
-    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow update handler method.
 
@@ -1036,7 +1036,7 @@ def update(
 
     def decorator(
         name: Optional[str],
-        unfinished_policy: UnfinishedHandlersPolicy,
+        unfinished_policy: HandlerUnfinishedPolicy,
         fn: CallableSyncOrAsyncType,
     ) -> CallableSyncOrAsyncType:
         if not name and not dynamic:
@@ -1517,8 +1517,8 @@ class _SignalDefinition:
     name: Optional[str]
     fn: Callable[..., Union[None, Awaitable[None]]]
     is_method: bool
-    unfinished_policy: UnfinishedHandlersPolicy = (
-        UnfinishedHandlersPolicy.WARN_AND_ABANDON
+    unfinished_policy: HandlerUnfinishedPolicy = (
+        HandlerUnfinishedPolicy.WARN_AND_ABANDON
     )
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
@@ -1601,8 +1601,8 @@ class _UpdateDefinition:
     name: Optional[str]
     fn: Callable[..., Union[Any, Awaitable[Any]]]
     is_method: bool
-    unfinished_policy: UnfinishedHandlersPolicy = (
-        UnfinishedHandlersPolicy.WARN_AND_ABANDON
+    unfinished_policy: HandlerUnfinishedPolicy = (
+        HandlerUnfinishedPolicy.WARN_AND_ABANDON
     )
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
