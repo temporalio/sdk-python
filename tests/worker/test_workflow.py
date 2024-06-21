@@ -103,6 +103,10 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
+from temporalio.worker._workflow_instance import (
+    UnfinishedSignalHandlerWarning,
+    UnfinishedUpdateHandlerWarning,
+)
 from tests.helpers import (
     assert_eq_eventually,
     ensure_search_attributes_present,
@@ -5301,17 +5305,14 @@ class _UnfinishedHandlersTest:
 
             wf_result = await handle.result()
             unfinished_handler_warning_emitted = any(
-                self.is_unfinished_handler_warning(w) for w in warnings
+                issubclass(w.category, self.unfinished_handler_warning_cls)
+                for w in warnings
             )
             return wf_result, unfinished_handler_warning_emitted
 
-    def is_unfinished_handler_warning(
-        self,
-        warning: warnings.WarningMessage,
-    ) -> bool:
-        expected_text = (
-            f"Workflow finished while {self.handler_type} handlers are still running"
-        )
-        return issubclass(warning.category, RuntimeWarning) and expected_text in str(
-            warning.message
-        )
+    @property
+    def unfinished_handler_warning_cls(self) -> Type:
+        return {
+            "update": UnfinishedUpdateHandlerWarning,
+            "signal": UnfinishedSignalHandlerWarning,
+        }[self.handler_type]
