@@ -10,10 +10,9 @@ import sys
 import threading
 import typing
 import uuid
-import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from functools import partial
