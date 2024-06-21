@@ -195,7 +195,7 @@ def signal(fn: CallableSyncOrAsyncReturnNoneType) -> CallableSyncOrAsyncReturnNo
 @overload
 def signal(
     *,
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -204,7 +204,7 @@ def signal(
 def signal(
     *,
     name: str,
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -213,7 +213,7 @@ def signal(
 def signal(
     *,
     dynamic: Literal[True],
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -223,7 +223,7 @@ def signal(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow signal method.
 
@@ -244,13 +244,13 @@ def signal(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
-        unfinished_handlers_policy: Actions taken if a workflow terminates with
+        unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
     """
 
     def decorator(
         name: Optional[str],
-        unfinished_handlers_policy: UnfinishedHandlersPolicy,
+        unfinished_policy: UnfinishedHandlersPolicy,
         fn: CallableSyncOrAsyncReturnNoneType,
     ) -> CallableSyncOrAsyncReturnNoneType:
         if not name and not dynamic:
@@ -259,7 +259,7 @@ def signal(
             name=name,
             fn=fn,
             is_method=True,
-            unfinished_handlers_policy=unfinished_handlers_policy,
+            unfinished_policy=unfinished_policy,
         )
         setattr(fn, "__temporal_signal_definition", defn)
         if defn.dynamic_vararg:
@@ -273,9 +273,9 @@ def signal(
     if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(decorator, name, unfinished_handlers_policy)
+        return partial(decorator, name, unfinished_policy)
     else:
-        return decorator(fn.__name__, unfinished_handlers_policy, fn)
+        return decorator(fn.__name__, unfinished_policy, fn)
 
 
 @overload
@@ -965,7 +965,7 @@ def update(
 @overload
 def update(
     *,
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -977,7 +977,7 @@ def update(
 def update(
     *,
     name: str,
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -989,7 +989,7 @@ def update(
 def update(
     *,
     dynamic: Literal[True],
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1002,7 +1002,7 @@ def update(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+    unfinished_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ):
     """Decorator for a workflow update handler method.
 
@@ -1030,13 +1030,13 @@ def update(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
-        unfinished_handlers_policy: Actions taken if a workflow terminates with
+        unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
     """
 
     def decorator(
         name: Optional[str],
-        unfinished_handlers_policy: UnfinishedHandlersPolicy,
+        unfinished_policy: UnfinishedHandlersPolicy,
         fn: CallableSyncOrAsyncType,
     ) -> CallableSyncOrAsyncType:
         if not name and not dynamic:
@@ -1045,7 +1045,7 @@ def update(
             name=name,
             fn=fn,
             is_method=True,
-            unfinished_handlers_policy=unfinished_handlers_policy,
+            unfinished_policy=unfinished_policy,
         )
         if defn.dynamic_vararg:
             raise RuntimeError(
@@ -1058,9 +1058,9 @@ def update(
     if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(decorator, name, unfinished_handlers_policy)
+        return partial(decorator, name, unfinished_policy)
     else:
-        return decorator(fn.__name__, unfinished_handlers_policy, fn)
+        return decorator(fn.__name__, unfinished_policy, fn)
 
 
 def _update_validator(
@@ -1517,7 +1517,7 @@ class _SignalDefinition:
     name: Optional[str]
     fn: Callable[..., Union[None, Awaitable[None]]]
     is_method: bool
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = (
+    unfinished_policy: UnfinishedHandlersPolicy = (
         UnfinishedHandlersPolicy.WARN_AND_ABANDON
     )
     # Types loaded on post init if None
@@ -1601,7 +1601,7 @@ class _UpdateDefinition:
     name: Optional[str]
     fn: Callable[..., Union[Any, Awaitable[Any]]]
     is_method: bool
-    unfinished_handlers_policy: UnfinishedHandlersPolicy = (
+    unfinished_policy: UnfinishedHandlersPolicy = (
         UnfinishedHandlersPolicy.WARN_AND_ABANDON
     )
     # Types loaded on post init if None

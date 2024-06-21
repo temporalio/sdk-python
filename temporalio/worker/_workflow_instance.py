@@ -504,7 +504,7 @@ class _WorkflowInstanceImpl(
                         f"known updates: [{' '.join(known_updates)}]"
                     )
                 self._in_progress_updates[job.id] = HandlerExecution(
-                    job.name, defn.unfinished_handlers_policy, job.id
+                    job.name, defn.unfinished_policy, job.id
                 )
                 args = self._process_handler_args(
                     job.name,
@@ -1688,7 +1688,7 @@ class _WorkflowInstanceImpl(
         self._handled_signals_seq += 1
         id = self._handled_signals_seq
         self._in_progress_signals[id] = HandlerExecution(
-            job.signal_name, defn.unfinished_handlers_policy
+            job.signal_name, defn.unfinished_policy
         )
 
         def done_callback(f):

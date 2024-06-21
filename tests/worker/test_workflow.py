@@ -5203,14 +5203,12 @@ class UnfinishedHandlersWorkflow:
     async def my_update(self) -> None:
         await self._do_update_or_signal()
 
-    @workflow.update(
-        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON
-    )
+    @workflow.update(unfinished_policy=workflow.UnfinishedHandlersPolicy.ABANDON)
     async def my_update_ABANDON(self) -> None:
         await self._do_update_or_signal()
 
     @workflow.update(
-        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+        unfinished_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
     )
     async def my_update_WARN_AND_ABANDON(self) -> None:
         await self._do_update_or_signal()
@@ -5219,14 +5217,12 @@ class UnfinishedHandlersWorkflow:
     async def my_signal(self):
         await self._do_update_or_signal()
 
-    @workflow.signal(
-        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON
-    )
+    @workflow.signal(unfinished_policy=workflow.UnfinishedHandlersPolicy.ABANDON)
     async def my_signal_ABANDON(self):
         await self._do_update_or_signal()
 
     @workflow.signal(
-        unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
+        unfinished_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON
     )
     async def my_signal_WARN_AND_ABANDON(self):
         await self._do_update_or_signal()
@@ -5257,7 +5253,7 @@ class _UnfinishedHandlersTest:
         # and when the workflow sets the unfinished_handlers_policy to WARN_AND_ABANDON,
         handler_finished, warning = await self.get_workflow_result_and_warning(
             wait_for_handlers=False,
-            unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON,
+            unfinished_policy=workflow.UnfinishedHandlersPolicy.WARN_AND_ABANDON,
         )
         assert not handler_finished and warning
         # but not when the workflow waits for handlers to complete,
@@ -5268,14 +5264,14 @@ class _UnfinishedHandlersTest:
         # nor when the silence-warnings policy is set on the handler.
         handler_finished, warning = await self.get_workflow_result_and_warning(
             wait_for_handlers=False,
-            unfinished_handlers_policy=workflow.UnfinishedHandlersPolicy.ABANDON,
+            unfinished_policy=workflow.UnfinishedHandlersPolicy.ABANDON,
         )
         assert not handler_finished and not warning
 
     async def get_workflow_result_and_warning(
         self,
         wait_for_handlers: bool,
-        unfinished_handlers_policy: Optional[workflow.UnfinishedHandlersPolicy] = None,
+        unfinished_policy: Optional[workflow.UnfinishedHandlersPolicy] = None,
     ) -> Tuple[bool, bool]:
         handle = await self.client.start_workflow(
             UnfinishedHandlersWorkflow.run,
@@ -5284,8 +5280,8 @@ class _UnfinishedHandlersTest:
             task_queue=self.worker.task_queue,
         )
         handler_name = f"my_{self.handler_type}"
-        if unfinished_handlers_policy:
-            handler_name += f"_{unfinished_handlers_policy.name}"
+        if unfinished_policy:
+            handler_name += f"_{unfinished_policy.name}"
         with pytest.WarningsRecorder() as warnings:
             if self.handler_type == "signal":
                 await asyncio.gather(handle.signal(handler_name))
