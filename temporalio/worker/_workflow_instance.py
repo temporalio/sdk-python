@@ -1629,7 +1629,7 @@ class _WorkflowInstanceImpl(
         warnable_updates = warnable(self._in_progress_updates.values())
         if warnable_updates:
             warnings.warn(
-                temporalio.workflow.UnfinishedUpdateHandlerWarning(
+                temporalio.workflow.UnfinishedUpdateHandlersWarning(
                     _make_unfinished_update_handler_message(warnable_updates)
                 )
             )
@@ -1637,7 +1637,7 @@ class _WorkflowInstanceImpl(
         warnable_signals = warnable(self._in_progress_signals.values())
         if warnable_signals:
             warnings.warn(
-                temporalio.workflow.UnfinishedSignalHandlerWarning(
+                temporalio.workflow.UnfinishedSignalHandlersWarning(
                     _make_unfinished_signal_handler_message(warnable_signals)
                 )
             )

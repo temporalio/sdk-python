@@ -5351,6 +5351,6 @@ class _UnfinishedHandlersTest:
     @property
     def unfinished_handler_warning_cls(self) -> Type:
         return {
-            "update": workflow.UnfinishedUpdateHandlerWarning,
-            "signal": workflow.UnfinishedSignalHandlerWarning,
+            "update": workflow.UnfinishedUpdateHandlersWarning,
+            "signal": workflow.UnfinishedSignalHandlersWarning,
         }[self.handler_type]

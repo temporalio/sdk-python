@@ -187,6 +187,15 @@ class HandlerUnfinishedPolicy(Enum):
     ABANDON = 2
 
 
+
+class UnfinishedUpdateHandlersWarning(RuntimeWarning):
+    """The workflow exited before all update handlers had finished executing."""
+
+
+class UnfinishedSignalHandlersWarning(RuntimeWarning):
+    """The workflow exited before all signal handlers had finished executing."""
+
+
 @overload
 def signal(fn: CallableSyncOrAsyncReturnNoneType) -> CallableSyncOrAsyncReturnNoneType:
     ...
@@ -4729,11 +4738,3 @@ class VersioningIntent(Enum):
         elif self == VersioningIntent.DEFAULT:
             return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
-
-
-class UnfinishedUpdateHandlerWarning(RuntimeWarning):
-    """Warning issued when a workflow exits before an update handler has finished executing"""
-
-
-class UnfinishedSignalHandlerWarning(RuntimeWarning):
-    """Warning issued when a workflow exits before a signal handler has finished executing"""
