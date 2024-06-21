@@ -194,35 +194,26 @@ def signal(fn: CallableSyncOrAsyncReturnNoneType) -> CallableSyncOrAsyncReturnNo
 
 @overload
 def signal(
-    *, name: str
+    *,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
 
 @overload
 def signal(
-    *, dynamic: Literal[True]
+    *,
+    name: str,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
 
 @overload
 def signal(
-    *, unfinished_handlers_policy: UnfinishedHandlersPolicy
-) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
-    ...
-
-
-@overload
-def signal(
-    *, name: str, unfinished_handlers_policy: UnfinishedHandlersPolicy
-) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
-    ...
-
-
-@overload
-def signal(
-    *, dynamic: Literal[True], unfinished_handlers_policy: UnfinishedHandlersPolicy
+    *,
+    dynamic: Literal[True],
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
     ...
 
@@ -973,7 +964,8 @@ def update(
 
 @overload
 def update(
-    *, name: str
+    *,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -983,7 +975,9 @@ def update(
 
 @overload
 def update(
-    *, dynamic: Literal[True]
+    *,
+    name: str,
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -993,27 +987,9 @@ def update(
 
 @overload
 def update(
-    *, unfinished_handlers_policy: UnfinishedHandlersPolicy
-) -> Callable[
-    [Callable[MultiParamSpec, ReturnType]],
-    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]:
-    ...
-
-
-@overload
-def update(
-    *, name: str, unfinished_handlers_policy: UnfinishedHandlersPolicy
-) -> Callable[
-    [Callable[MultiParamSpec, ReturnType]],
-    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]:
-    ...
-
-
-@overload
-def update(
-    *, dynamic: Literal[True], unfinished_handlers_policy: UnfinishedHandlersPolicy
+    *,
+    dynamic: Literal[True],
+    unfinished_handlers_policy: UnfinishedHandlersPolicy = UnfinishedHandlersPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
