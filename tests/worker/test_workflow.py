@@ -110,10 +110,8 @@ from tests.helpers import (
     new_worker,
     workflow_update_exists,
 )
-from tests.helpers.external_coroutine import wait_on_timer
 from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
-    MultiFileStackTraceWorkflow,
     external_wait_cancel,
 )
 
