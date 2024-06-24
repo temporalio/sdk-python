@@ -299,14 +299,18 @@ async def test_cant_specify_max_concurrent_and_tuner(
     tuner.set_workflow_task_options(
         ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
     )
-    async with new_worker(
-        client,
-        WaitOnSignalWorkflow,
-        activities=[say_hello],
-        tuner=tuner,
-        max_concurrent_workflow_tasks=10,
-    ):
-        pass
+
+    with pytest.raises(ValueError) as err:
+        async with new_worker(
+            client,
+            WaitOnSignalWorkflow,
+            activities=[say_hello],
+            tuner=tuner,
+            max_concurrent_workflow_tasks=10,
+        ):
+            pass
+    assert "Cannot specify " in str(err.value)
+    assert "when also specifying tuner" in str(err.value)
 
 
 def create_worker(

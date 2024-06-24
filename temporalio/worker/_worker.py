@@ -327,6 +327,16 @@ class Worker:
         local_activity_slot_supplier: temporalio.bridge.worker.SlotSupplier
 
         if tuner is not None:
+            if (
+                max_concurrent_workflow_tasks
+                or max_concurrent_activities
+                or max_concurrent_local_activities
+            ):
+                raise ValueError(
+                    "Cannot specify max_concurrent_workflow_tasks, max_concurrent_activities, "
+                    "or max_concurrent_local_activities when also specifying tuner"
+                )
+
             workflow_slot_supplier = _to_bridge_slot_supplier(
                 tuner._get_workflow_task_slot_supplier(), "workflow"
             )
