@@ -241,6 +241,8 @@ async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnviro
     tuner.set_workflow_task_options(
         ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
     )
+    # Ensure we can assume defaults when specifying only some options
+    tuner.set_activity_task_options(ResourceBasedSlotOptions(minimum_slots=1))
     async with new_worker(
         client,
         WaitOnSignalWorkflow,

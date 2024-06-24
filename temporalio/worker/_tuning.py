@@ -41,12 +41,15 @@ class ResourceBasedSlotOptions:
         The resource based tuner is currently experimental.
     """
 
-    minimum_slots: Optional[int]
-    """Amount of slots that will be issued regardless of any other checks"""
-    maximum_slots: Optional[int]
-    """Maximum amount of slots permitted"""
-    ramp_throttle: Optional[timedelta]
+    minimum_slots: Optional[int] = None
+    """Amount of slots that will be issued regardless of any other checks. Defaults to 5 for workflows and 1 for
+    activities."""
+    maximum_slots: Optional[int] = None
+    """Maximum amount of slots permitted. Defaults to 500."""
+    ramp_throttle: Optional[timedelta] = None
     """Minimum time we will wait (after passing the minimum slots number) between handing out new slots in milliseconds.
+    Defaults to 0 for workflows and 50ms for activities.
+    
     This value matters because how many resources a task will use cannot be determined ahead of time, and thus the
     system should wait to see how much resources are used before issuing more slots."""
 
