@@ -1,3 +1,4 @@
+use anyhow::Context;
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -59,15 +60,21 @@ pub struct TunerHolder {
 
 #[derive(FromPyObject)]
 pub enum SlotSupplier {
-    FixedSize(usize),
+    FixedSize(FixedSizeSlotSupplier),
     ResourceBased(ResourceBasedSlotSupplier),
+}
+
+#[derive(FromPyObject)]
+pub struct FixedSizeSlotSupplier {
+    num_slots: usize,
 }
 
 #[derive(FromPyObject)]
 pub struct ResourceBasedSlotSupplier {
     minimum_slots: usize,
     maximum_slots: usize,
-    ramp_throttle: Duration,
+    // Need pyo3 0.21+ for this to be std Duration
+    ramp_throttle_ms: u64,
     tuner_options: ResourceBasedTunerOptions,
 }
 
@@ -98,7 +105,7 @@ pub fn new_worker(
         config,
         client.retry_client.clone().into_inner(),
     )
-    .map_err(|err| PyValueError::new_err(format!("Failed creating worker: {}", err)))?;
+    .context("Failed creating worker")?;
     Ok(WorkerRef {
         worker: Some(Arc::new(worker)),
         runtime: runtime_ref.runtime.clone(),
@@ -132,9 +139,11 @@ impl WorkerRef {
     fn validate<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
-            worker.validate().await.map_err(|err| {
-                PyRuntimeError::new_err(format!("Worker validation failed: {}", err))
-            })
+            worker
+                .validate()
+                .await
+                .context("Worker validation failed")
+                .map_err(Into::into)
         })
     }
 
@@ -176,10 +185,8 @@ impl WorkerRef {
             worker
                 .complete_workflow_activation(completion)
                 .await
-                .map_err(|err| {
-                    // TODO(cretz): More error types
-                    PyRuntimeError::new_err(format!("Completion failure: {}", err))
-                })
+                .context("Completion failure")
+                .map_err(Into::into)
         })
     }
 
@@ -191,10 +198,8 @@ impl WorkerRef {
             worker
                 .complete_activity_task(completion)
                 .await
-                .map_err(|err| {
-                    // TODO(cretz): More error types
-                    PyRuntimeError::new_err(format!("Completion failure: {}", err))
-                })
+                .context("Completion failure")
+                .map_err(Into::into)
         })
     }
 
@@ -359,7 +364,7 @@ impl TryFrom<TunerHolder> for temporal_sdk_core::TunerHolder {
             .build()
             .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {}", e)))?
             .build_tuner_holder()
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to build tuner holder: {}", e)))?)
+            .context("Failed building tuner holder")?)
     }
 }
 
@@ -368,15 +373,15 @@ impl TryFrom<SlotSupplier> for temporal_sdk_core::SlotSupplierOptions {
 
     fn try_from(supplier: SlotSupplier) -> PyResult<temporal_sdk_core::SlotSupplierOptions> {
         Ok(match supplier {
-            SlotSupplier::FixedSize(size) => {
-                temporal_sdk_core::SlotSupplierOptions::FixedSize { slots: size }
-            }
+            SlotSupplier::FixedSize(fs) => temporal_sdk_core::SlotSupplierOptions::FixedSize {
+                slots: fs.num_slots,
+            },
             SlotSupplier::ResourceBased(ss) => {
                 temporal_sdk_core::SlotSupplierOptions::ResourceBased(
                     temporal_sdk_core::ResourceSlotOptions::new(
                         ss.minimum_slots,
                         ss.maximum_slots,
-                        ss.ramp_throttle,
+                        Duration::from_millis(ss.ramp_throttle_ms),
                     ),
                 )
             }

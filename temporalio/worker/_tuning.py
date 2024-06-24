@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Literal, Optional, TypeAlias, Union
+from typing import Literal, Optional, Union
+
+from typing_extensions import TypeAlias
 
 import temporalio.bridge.worker
 
