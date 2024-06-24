@@ -12,13 +12,13 @@ from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
+    CompositeTuner,
+    FixedSizeSlotSupplier,
     ResourceBasedSlotOptions,
+    ResourceBasedSlotSupplier,
     ResourceBasedTuner,
     ResourceBasedTunerOptions,
     Worker,
-    CompositeTuner,
-    ResourceBasedSlotSupplier,
-    FixedSizeSlotSupplier,
 )
 from temporalio.workflow import VersioningIntent
 from tests.helpers import new_worker, worker_versioning_enabled
@@ -271,7 +271,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
         ResourceBasedSlotSupplier(
             ResourceBasedSlotOptions(
                 minimum_slots=1,
-                maximum_slots=20,
+                maximum_slots=5,
                 ramp_throttle=timedelta(milliseconds=60),
             ),
             resource_based_options,
@@ -290,6 +290,23 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
         )
         await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
         await wf1.result()
+
+
+async def test_cant_specify_max_concurrent_and_tuner(
+    client: Client, env: WorkflowEnvironment
+):
+    tuner = ResourceBasedTuner(ResourceBasedTunerOptions(0.5, 0.5))
+    tuner.set_workflow_task_options(
+        ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
+    )
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+        max_concurrent_workflow_tasks=10,
+    ):
+        pass
 
 
 def create_worker(

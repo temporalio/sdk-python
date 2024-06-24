@@ -63,12 +63,16 @@ class WorkerConfig:
 
 @dataclass
 class ResourceBasedTunerOptions:
+    """Python representation of the Rust struct for configuring a resource-based tuner."""
+
     target_memory_usage: float
     target_cpu_usage: float
 
 
 @dataclass
 class ResourceBasedSlotSupplier:
+    """Python representation of the Rust struct for a resource-based slot supplier."""
+
     minimum_slots: int
     maximum_slots: int
     ramp_throttle_ms: int
@@ -77,6 +81,8 @@ class ResourceBasedSlotSupplier:
 
 @dataclass(frozen=True)
 class FixedSizeSlotSupplier:
+    """Python representation of the Rust struct for a fixed-size slot supplier."""
+
     num_slots: int
 
 
@@ -85,6 +91,8 @@ SlotSupplier: TypeAlias = Union[FixedSizeSlotSupplier, ResourceBasedSlotSupplier
 
 @dataclass
 class TunerHolder:
+    """Python representation of the Rust struct for a tuner holder."""
+
     workflow_slot_supplier: SlotSupplier
     activity_slot_supplier: SlotSupplier
     local_activity_slot_supplier: SlotSupplier

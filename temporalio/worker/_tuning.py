@@ -10,11 +10,20 @@ import temporalio.bridge.worker
 
 @dataclass(frozen=True)
 class FixedSizeSlotSupplier:
+    """A fixed-size slot supplier that will never issue more than a fixed number of slots."""
+
     num_slots: int
+    """The maximum number of slots that can be issued"""
 
 
 @dataclass(frozen=True)
 class ResourceBasedTunerOptions:
+    """Options for a :py:class:`ResourceBasedTuner` or a :py:class:`ResourceBasedSlotSupplier`.
+
+    .. warning::
+        The resource based tuner is currently experimental.
+    """
+
     target_memory_usage: float
     """A value between 0 and 1 that represents the target (system) memory usage. It's not recommended
        to set this higher than 0.8, since how much memory a workflow may use is not predictable, and
@@ -26,15 +35,34 @@ class ResourceBasedTunerOptions:
 
 @dataclass(frozen=True)
 class ResourceBasedSlotOptions:
+    """Options for a specific slot type being used with a :py:class:`ResourceBasedSlotSupplier`.
+
+    .. warning::
+        The resource based tuner is currently experimental.
+    """
+
     minimum_slots: Optional[int]
+    """Amount of slots that will be issued regardless of any other checks"""
     maximum_slots: Optional[int]
+    """Maximum amount of slots permitted"""
     ramp_throttle: Optional[timedelta]
+    """Minimum time we will wait (after passing the minimum slots number) between handing out new slots in milliseconds.
+    This value matters because how many resources a task will use cannot be determined ahead of time, and thus the
+    system should wait to see how much resources are used before issuing more slots."""
 
 
 @dataclass(frozen=True)
 class ResourceBasedSlotSupplier:
+    """A slot supplier that will dynamically adjust the number of slots based on resource usage.
+
+    .. warning::
+        The resource based tuner is currently experimental.
+    """
+
     slot_options: ResourceBasedSlotOptions
     tuner_options: ResourceBasedTunerOptions
+    """Options for the tuner that will be used to adjust the number of slots. When used with a
+    :py:class:`CompositeTuner`, all resource-based slot suppliers must use the same tuner options."""
 
 
 SlotSupplier: TypeAlias = Union[FixedSizeSlotSupplier, ResourceBasedSlotSupplier]
@@ -74,47 +102,61 @@ class WorkerTuner(ABC):
     """WorkerTuners allow for the dynamic customization of some aspects of worker configuration"""
 
     @abstractmethod
-    def get_workflow_task_slot_supplier(self) -> SlotSupplier:
+    def _get_workflow_task_slot_supplier(self) -> SlotSupplier:
         raise NotImplementedError
 
     @abstractmethod
-    def get_activity_task_slot_supplier(self) -> SlotSupplier:
+    def _get_activity_task_slot_supplier(self) -> SlotSupplier:
         raise NotImplementedError
 
     @abstractmethod
-    def get_local_activity_task_slot_supplier(self) -> SlotSupplier:
+    def _get_local_activity_task_slot_supplier(self) -> SlotSupplier:
         raise NotImplementedError
 
 
 class ResourceBasedTuner(WorkerTuner):
+    """This tuner attempts to maintain certain levels of resource usage when under load.
+
+    .. warning::
+        The resource based tuner is currently experimental.
+    """
+
     def __init__(self, options: ResourceBasedTunerOptions):
+        """Create a new ResourceBasedTuner
+
+        Args:
+            options: Specify the target resource usage levels for the tuner
+        """
         self.options = options
         self.workflow_task_options: Optional[ResourceBasedSlotOptions] = None
         self.activity_task_options: Optional[ResourceBasedSlotOptions] = None
         self.local_activity_task_options: Optional[ResourceBasedSlotOptions] = None
 
     def set_workflow_task_options(self, options: ResourceBasedSlotOptions):
+        """Set options for the workflow task slot supplier"""
         self.workflow_task_options = options
 
     def set_activity_task_options(self, options: ResourceBasedSlotOptions):
+        """Set options for the activity task slot supplier"""
         self.activity_task_options = options
 
     def set_local_activity_task_options(self, options: ResourceBasedSlotOptions):
+        """Set options for the local activity task slot supplier"""
         self.local_activity_task_options = options
 
-    def get_workflow_task_slot_supplier(self) -> SlotSupplier:
+    def _get_workflow_task_slot_supplier(self) -> SlotSupplier:
         return ResourceBasedSlotSupplier(
             self.workflow_task_options or ResourceBasedSlotOptions(None, None, None),
             self.options,
         )
 
-    def get_activity_task_slot_supplier(self) -> SlotSupplier:
+    def _get_activity_task_slot_supplier(self) -> SlotSupplier:
         return ResourceBasedSlotSupplier(
             self.activity_task_options or ResourceBasedSlotOptions(None, None, None),
             self.options,
         )
 
-    def get_local_activity_task_slot_supplier(self) -> SlotSupplier:
+    def _get_local_activity_task_slot_supplier(self) -> SlotSupplier:
         return ResourceBasedSlotSupplier(
             self.local_activity_task_options
             or ResourceBasedSlotOptions(None, None, None),
@@ -124,15 +166,17 @@ class ResourceBasedTuner(WorkerTuner):
 
 @dataclass(frozen=True)
 class CompositeTuner(WorkerTuner):
+    """This tuner allows for different slot suppliers for different slot types."""
+
     workflow_slot_supplier: SlotSupplier
     activity_slot_supplier: SlotSupplier
     local_activity_slot_supplier: SlotSupplier
 
-    def get_workflow_task_slot_supplier(self) -> SlotSupplier:
+    def _get_workflow_task_slot_supplier(self) -> SlotSupplier:
         return self.workflow_slot_supplier
 
-    def get_activity_task_slot_supplier(self) -> SlotSupplier:
+    def _get_activity_task_slot_supplier(self) -> SlotSupplier:
         return self.activity_slot_supplier
 
-    def get_local_activity_task_slot_supplier(self) -> SlotSupplier:
+    def _get_local_activity_task_slot_supplier(self) -> SlotSupplier:
         return self.local_activity_slot_supplier

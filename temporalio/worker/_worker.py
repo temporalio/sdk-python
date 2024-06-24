@@ -128,12 +128,16 @@ class Worker:
             max_cached_workflows: If nonzero, workflows will be cached and
                 sticky task queues will be used.
             max_concurrent_workflow_tasks: Maximum allowed number of workflow
-                tasks that will ever be given to this worker at one time.
+                tasks that will ever be given to this worker at one time. Mutually exclusive with ``tuner``.
             max_concurrent_activities: Maximum number of activity tasks that
-                will ever be given to this worker concurrently.
+                will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
-                tasks that will ever be given to this worker concurrently.
-            tuner: TODO
+                tasks that will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
+            tuner:  Provide a custom :py:class:`WorkerTuner`. Mutually exclusive with the
+                ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``, and
+                ``max_concurrent_local_activities`` arguments.
+
+                WARNING: This argument is experimental
             max_concurrent_workflow_task_polls: Maximum number of concurrent
                 poll workflow task requests we will perform at a time on this
                 worker's task queue.
@@ -324,13 +328,13 @@ class Worker:
 
         if tuner is not None:
             workflow_slot_supplier = _to_bridge_slot_supplier(
-                tuner.get_workflow_task_slot_supplier(), "workflow"
+                tuner._get_workflow_task_slot_supplier(), "workflow"
             )
             activity_slot_supplier = _to_bridge_slot_supplier(
-                tuner.get_activity_task_slot_supplier(), "activity"
+                tuner._get_activity_task_slot_supplier(), "activity"
             )
             local_activity_slot_supplier = _to_bridge_slot_supplier(
-                tuner.get_local_activity_task_slot_supplier(), "local_activity"
+                tuner._get_local_activity_task_slot_supplier(), "local_activity"
             )
         else:
             workflow_slot_supplier = temporalio.bridge.worker.FixedSizeSlotSupplier(
@@ -394,9 +398,11 @@ class Worker:
                 # per workflow type
                 nondeterminism_as_workflow_fail=self._workflow_worker is not None
                 and self._workflow_worker.nondeterminism_as_workflow_fail(),
-                nondeterminism_as_workflow_fail_for_types=self._workflow_worker.nondeterminism_as_workflow_fail_for_types()
-                if self._workflow_worker
-                else set(),
+                nondeterminism_as_workflow_fail_for_types=(
+                    self._workflow_worker.nondeterminism_as_workflow_fail_for_types()
+                    if self._workflow_worker
+                    else set()
+                ),
             ),
         )
 
