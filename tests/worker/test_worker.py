@@ -11,7 +11,15 @@ import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
+from temporalio.worker import (
+    ResourceBasedSlotOptions,
+    ResourceBasedTuner,
+    ResourceBasedTunerOptions,
+    Worker,
+    CompositeTuner,
+    ResourceBasedSlotSupplier,
+    FixedSizeSlotSupplier,
+)
 from temporalio.workflow import VersioningIntent
 from tests.helpers import new_worker, worker_versioning_enabled
 
@@ -226,6 +234,62 @@ async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
             client, task_queue=f"tq-{uuid.uuid4()}", workflows=[NeverRunWorkflow]
         ).run()
     assert str(err.value).startswith("Worker validation failed")
+
+
+async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnvironment):
+    tuner = ResourceBasedTuner(ResourceBasedTunerOptions(0.5, 0.5))
+    tuner.set_workflow_task_options(
+        ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
+    )
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"resource-based-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
+
+
+async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvironment):
+    resource_based_options = ResourceBasedTunerOptions(0.5, 0.5)
+    tuner = CompositeTuner(
+        FixedSizeSlotSupplier(5),
+        ResourceBasedSlotSupplier(
+            ResourceBasedSlotOptions(
+                minimum_slots=1,
+                maximum_slots=20,
+                ramp_throttle=timedelta(milliseconds=60),
+            ),
+            resource_based_options,
+        ),
+        ResourceBasedSlotSupplier(
+            ResourceBasedSlotOptions(
+                minimum_slots=1,
+                maximum_slots=20,
+                ramp_throttle=timedelta(milliseconds=60),
+            ),
+            resource_based_options,
+        ),
+    )
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"composite-tuner-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
 
 
 def create_worker(

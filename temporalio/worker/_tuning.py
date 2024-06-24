@@ -60,7 +60,7 @@ def _to_bridge_slot_supplier(
         return temporalio.bridge.worker.ResourceBasedSlotSupplier(
             min_slots,
             max_slots,
-            ramp_throttle,
+            int(ramp_throttle / timedelta(milliseconds=1)),
             temporalio.bridge.worker.ResourceBasedTunerOptions(
                 slot_supplier.tuner_options.target_memory_usage,
                 slot_supplier.tuner_options.target_cpu_usage,

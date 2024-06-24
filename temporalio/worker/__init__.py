@@ -26,7 +26,15 @@ from ._replayer import (
     WorkflowReplayResult,
     WorkflowReplayResults,
 )
-from ._tuning import WorkerTuner
+from ._tuning import (
+    CompositeTuner,
+    FixedSizeSlotSupplier,
+    ResourceBasedSlotOptions,
+    ResourceBasedSlotSupplier,
+    ResourceBasedTuner,
+    ResourceBasedTunerOptions,
+    WorkerTuner,
+)
 from ._worker import Worker, WorkerConfig
 from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
@@ -72,4 +80,10 @@ __all__ = [
     "UnsandboxedWorkflowRunner",
     # Tuning types
     "WorkerTuner",
+    "ResourceBasedTuner",
+    "CompositeTuner",
+    "FixedSizeSlotSupplier",
+    "ResourceBasedSlotSupplier",
+    "ResourceBasedTunerOptions",
+    "ResourceBasedSlotOptions",
 ]

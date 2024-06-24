@@ -71,7 +71,7 @@ class ResourceBasedTunerOptions:
 class ResourceBasedSlotSupplier:
     minimum_slots: int
     maximum_slots: int
-    ramp_throttle: timedelta
+    ramp_throttle_ms: int
     tuner_options: ResourceBasedTunerOptions
 
 
