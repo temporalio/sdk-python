@@ -2761,10 +2761,10 @@ def _make_unfinished_update_handler_message(
 Workflow finished while update handlers are still running. This may have interrupted work that the
 update handler was doing, and the client that sent the update will receive a 'workflow execution
 already completed' RPCError instead of the update result. You can wait for all update and signal
-handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`.
-Alternatively, if both you and the clients sending updates and signals are okay with interrupting
-running handlers when the workflow finishes, and causing clients to receive errors, then you can
-disable this warning via the update handler decorator:
+handlers to complete by using `await workflow.wait_condition(lambda:
+workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update
+are okay with interrupting running handlers when the workflow finishes, and causing clients to
+receive errors, then you can disable this warning via the update handler decorator:
 `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
 """.replace(
         "\n", " "
@@ -2782,10 +2782,9 @@ def _make_unfinished_signal_handler_message(
 Workflow finished while signal handlers are still running. This may have interrupted work that the
 signal handler was doing. You can wait for all update and signal handlers to complete by using
 `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both
-you and the clients sending updates and signals are okay with interrupting running handlers when the
-workflow finishes, and causing clients to receive errors, then you can disable this warning via the
-signal handler decorator:
-`@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
+you and the clients sending the signal are okay with interrupting running handlers when the workflow
+finishes, and causing clients to receive errors, then you can disable this warning via the signal
+handler decorator: `@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
 """.replace(
         "\n", " "
     ).strip()
