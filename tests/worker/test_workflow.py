@@ -5187,9 +5187,9 @@ class UnfinishedHandlersWorkflow:
         self.handler_finished = False
 
     @workflow.run
-    async def run(self, wait_for_handlers: bool) -> bool:
+    async def run(self, wait_all_handlers_finished: bool) -> bool:
         await workflow.wait_condition(lambda: self.started_handler)
-        if wait_for_handlers:
+        if wait_all_handlers_finished:
             self.handler_may_return = True
             await workflow.wait_condition(workflow.all_handlers_finished)
         return self.handler_finished
@@ -5228,14 +5228,18 @@ class UnfinishedHandlersWorkflow:
         await self._do_update_or_signal()
 
 
-async def test_unfinished_update_handlers(client: Client):
+async def test_unfinished_update_handler(client: Client):
     async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
-        await _UnfinishedHandlersTest(client, worker, "update").run_test()
+        test = _UnfinishedHandlersTest(client, worker, "update")
+        await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
+        await test.test_unfinished_handlers_cause_exceptions_in_test_suite()
 
 
-async def test_unfinished_signal_handlers(client: Client):
+async def test_unfinished_signal_handler(client: Client):
     async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
-        await _UnfinishedHandlersTest(client, worker, "signal").run_test()
+        test = _UnfinishedHandlersTest(client, worker, "signal")
+        await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
+        await test.test_unfinished_handlers_cause_exceptions_in_test_suite()
 
 
 @dataclass
@@ -5244,41 +5248,44 @@ class _UnfinishedHandlersTest:
     worker: Worker
     handler_type: Literal["update", "signal"]
 
-    async def run_test(self):
-        # If we don't capture warnings then -- since the unfinished handler warning is converted to
-        # an exception in the test suite -- we see WFT failures when we don't wait for handlers.
-        handle: asyncio.Future[WorkflowHandle] = asyncio.Future()
-        asyncio.create_task(
-            self.get_workflow_result(wait_for_handlers=False, handle_future=handle)
-        )
-        await assert_eq_eventually(
-            True, partial(self.workflow_task_failed, workflow_id=(await handle).id)
-        )
-
+    async def test_wait_all_handlers_finished_and_unfinished_handlers_warning(self):
         # The unfinished handler warning is issued by default,
-        handler_finished, warning = await self.get_workflow_result_and_warning(
-            wait_for_handlers=False,
+        handler_finished, warning = await self._get_workflow_result_and_warning(
+            wait_all_handlers_finished=False,
         )
         assert not handler_finished and warning
         # and when the workflow sets the unfinished_policy to WARN_AND_ABANDON,
-        handler_finished, warning = await self.get_workflow_result_and_warning(
-            wait_for_handlers=False,
+        handler_finished, warning = await self._get_workflow_result_and_warning(
+            wait_all_handlers_finished=False,
             unfinished_policy=workflow.HandlerUnfinishedPolicy.WARN_AND_ABANDON,
         )
         assert not handler_finished and warning
         # but not when the workflow waits for handlers to complete,
-        handler_finished, warning = await self.get_workflow_result_and_warning(
-            wait_for_handlers=True,
+        handler_finished, warning = await self._get_workflow_result_and_warning(
+            wait_all_handlers_finished=True,
         )
         assert handler_finished and not warning
         # nor when the silence-warnings policy is set on the handler.
-        handler_finished, warning = await self.get_workflow_result_and_warning(
-            wait_for_handlers=False,
+        handler_finished, warning = await self._get_workflow_result_and_warning(
+            wait_all_handlers_finished=False,
             unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON,
         )
         assert not handler_finished and not warning
 
-    async def workflow_task_failed(self, workflow_id: str) -> bool:
+    async def test_unfinished_handlers_cause_exceptions_in_test_suite(self):
+        # If we don't capture warnings then -- since the unfinished handler warning is converted to
+        # an exception in the test suite -- we see WFT failures when we don't wait for handlers.
+        handle: asyncio.Future[WorkflowHandle] = asyncio.Future()
+        asyncio.create_task(
+            self._get_workflow_result(
+                wait_all_handlers_finished=False, handle_future=handle
+            )
+        )
+        await assert_eq_eventually(
+            True, partial(self._workflow_task_failed, workflow_id=(await handle).id)
+        )
+
+    async def _workflow_task_failed(self, workflow_id: str) -> bool:
         resp = await self.client.workflow_service.get_workflow_execution_history(
             GetWorkflowExecutionHistoryRequest(
                 namespace=self.client.namespace,
@@ -5293,30 +5300,30 @@ class _UnfinishedHandlersTest:
                 return True
         return False
 
-    async def get_workflow_result_and_warning(
+    async def _get_workflow_result_and_warning(
         self,
-        wait_for_handlers: bool,
+        wait_all_handlers_finished: bool,
         unfinished_policy: Optional[workflow.HandlerUnfinishedPolicy] = None,
     ) -> Tuple[bool, bool]:
         with pytest.WarningsRecorder() as warnings:
-            wf_result = await self.get_workflow_result(
-                wait_for_handlers, unfinished_policy
+            wf_result = await self._get_workflow_result(
+                wait_all_handlers_finished, unfinished_policy
             )
             unfinished_handler_warning_emitted = any(
-                issubclass(w.category, self.unfinished_handler_warning_cls)
+                issubclass(w.category, self._unfinished_handler_warning_cls)
                 for w in warnings
             )
             return wf_result, unfinished_handler_warning_emitted
 
-    async def get_workflow_result(
+    async def _get_workflow_result(
         self,
-        wait_for_handlers: bool,
+        wait_all_handlers_finished: bool,
         unfinished_policy: Optional[workflow.HandlerUnfinishedPolicy] = None,
         handle_future: Optional[asyncio.Future[WorkflowHandle]] = None,
     ) -> bool:
         handle = await self.client.start_workflow(
             UnfinishedHandlersWorkflow.run,
-            arg=wait_for_handlers,
+            arg=wait_all_handlers_finished,
             id=f"wf-{uuid.uuid4()}",
             task_queue=self.worker.task_queue,
         )
@@ -5328,7 +5335,7 @@ class _UnfinishedHandlersTest:
         if self.handler_type == "signal":
             await asyncio.gather(handle.signal(handler_name))
         else:
-            if not wait_for_handlers:
+            if not wait_all_handlers_finished:
                 with pytest.raises(RPCError) as err:
                     await asyncio.gather(
                         handle.execute_update(handler_name, id="my-update")
@@ -5345,7 +5352,7 @@ class _UnfinishedHandlersTest:
         return await handle.result()
 
     @property
-    def unfinished_handler_warning_cls(self) -> Type:
+    def _unfinished_handler_warning_cls(self) -> Type:
         return {
             "update": workflow.UnfinishedUpdateHandlersWarning,
             "signal": workflow.UnfinishedSignalHandlersWarning,
