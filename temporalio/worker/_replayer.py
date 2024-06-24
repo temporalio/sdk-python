@@ -223,9 +223,17 @@ class Replayer:
                     nondeterminism_as_workflow_fail_for_types=workflow_worker.nondeterminism_as_workflow_fail_for_types(),
                     # All values below are ignored but required by Core
                     max_cached_workflows=2,
-                    max_outstanding_workflow_tasks=2,
-                    max_outstanding_activities=1,
-                    max_outstanding_local_activities=1,
+                    tuner=temporalio.bridge.worker.TunerHolder(
+                        workflow_slot_supplier=temporalio.bridge.worker.FixedSizeSlotSupplier(
+                            2
+                        ),
+                        activity_slot_supplier=temporalio.bridge.worker.FixedSizeSlotSupplier(
+                            1
+                        ),
+                        local_activity_slot_supplier=temporalio.bridge.worker.FixedSizeSlotSupplier(
+                            1
+                        ),
+                    ),
                     max_concurrent_workflow_task_polls=1,
                     nonsticky_to_sticky_poll_ratio=1,
                     max_concurrent_activity_task_polls=1,

@@ -26,6 +26,7 @@ from ._replayer import (
     WorkflowReplayResult,
     WorkflowReplayResults,
 )
+from ._tuning import WorkerTuner
 from ._worker import Worker, WorkerConfig
 from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
@@ -69,4 +70,6 @@ __all__ = [
     "WorkflowInstance",
     "WorkflowInstanceDetails",
     "UnsandboxedWorkflowRunner",
+    # Tuning types
+    "WorkerTuner",
 ]
