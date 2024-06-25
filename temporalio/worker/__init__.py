@@ -27,11 +27,9 @@ from ._replayer import (
     WorkflowReplayResults,
 )
 from ._tuning import (
-    CompositeTuner,
     FixedSizeSlotSupplier,
     ResourceBasedSlotOptions,
     ResourceBasedSlotSupplier,
-    ResourceBasedTuner,
     ResourceBasedTunerConfig,
     WorkerTuner,
 )
@@ -80,8 +78,6 @@ __all__ = [
     "UnsandboxedWorkflowRunner",
     # Tuning types
     "WorkerTuner",
-    "ResourceBasedTuner",
-    "CompositeTuner",
     "FixedSizeSlotSupplier",
     "ResourceBasedSlotSupplier",
     "ResourceBasedTunerConfig",

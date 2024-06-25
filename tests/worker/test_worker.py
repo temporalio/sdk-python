@@ -12,13 +12,12 @@ from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
-    CompositeTuner,
     FixedSizeSlotSupplier,
     ResourceBasedSlotOptions,
     ResourceBasedSlotSupplier,
-    ResourceBasedTuner,
     ResourceBasedTunerConfig,
     Worker,
+    WorkerTuner,
 )
 from temporalio.workflow import VersioningIntent
 from tests.helpers import new_worker, worker_versioning_enabled
@@ -237,12 +236,13 @@ async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
 
 
 async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnvironment):
-    tuner = ResourceBasedTuner(ResourceBasedTunerConfig(0.5, 0.5))
-    tuner.set_workflow_task_options(
-        ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
+    tuner = WorkerTuner.create_resource_based(
+        target_memory_usage=0.5,
+        target_cpu_usage=0.5,
+        workflow_config=ResourceBasedSlotOptions(5, 20, timedelta(seconds=0)),
+        # Ensure we can assume defaults when specifying only some options
+        activity_config=ResourceBasedSlotOptions(minimum_slots=1),
     )
-    # Ensure we can assume defaults when specifying only some options
-    tuner.set_activity_task_options(ResourceBasedSlotOptions(minimum_slots=1))
     async with new_worker(
         client,
         WaitOnSignalWorkflow,
@@ -260,9 +260,9 @@ async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnviro
 
 async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvironment):
     resource_based_options = ResourceBasedTunerConfig(0.5, 0.5)
-    tuner = CompositeTuner(
-        FixedSizeSlotSupplier(5),
-        ResourceBasedSlotSupplier(
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=FixedSizeSlotSupplier(5),
+        activity_supplier=ResourceBasedSlotSupplier(
             ResourceBasedSlotOptions(
                 minimum_slots=1,
                 maximum_slots=20,
@@ -270,7 +270,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
             ),
             resource_based_options,
         ),
-        ResourceBasedSlotSupplier(
+        local_activity_supplier=ResourceBasedSlotSupplier(
             ResourceBasedSlotOptions(
                 minimum_slots=1,
                 maximum_slots=5,
@@ -297,11 +297,11 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
 async def test_cant_specify_max_concurrent_and_tuner(
     client: Client, env: WorkflowEnvironment
 ):
-    tuner = ResourceBasedTuner(ResourceBasedTunerConfig(0.5, 0.5))
-    tuner.set_workflow_task_options(
-        ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
+    tuner = WorkerTuner.create_resource_based(
+        target_memory_usage=0.5,
+        target_cpu_usage=0.5,
+        workflow_config=ResourceBasedSlotOptions(5, 20, timedelta(seconds=0)),
     )
-
     with pytest.raises(ValueError) as err:
         async with new_worker(
             client,

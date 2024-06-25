@@ -336,34 +336,14 @@ class Worker:
                     "Cannot specify max_concurrent_workflow_tasks, max_concurrent_activities, "
                     "or max_concurrent_local_activities when also specifying tuner"
                 )
-
-            workflow_slot_supplier = _to_bridge_slot_supplier(
-                tuner._get_workflow_task_slot_supplier(), "workflow"
-            )
-            activity_slot_supplier = _to_bridge_slot_supplier(
-                tuner._get_activity_task_slot_supplier(), "activity"
-            )
-            local_activity_slot_supplier = _to_bridge_slot_supplier(
-                tuner._get_local_activity_task_slot_supplier(), "local_activity"
-            )
         else:
-            workflow_slot_supplier = temporalio.bridge.worker.FixedSizeSlotSupplier(
-                max_concurrent_workflow_tasks if max_concurrent_workflow_tasks else 100
-            )
-            activity_slot_supplier = temporalio.bridge.worker.FixedSizeSlotSupplier(
-                max_concurrent_activities if max_concurrent_activities else 100
-            )
-            local_activity_slot_supplier = (
-                temporalio.bridge.worker.FixedSizeSlotSupplier(
-                    max_concurrent_local_activities
-                    if max_concurrent_local_activities
-                    else 100
-                )
+            tuner = WorkerTuner.create_fixed(
+                workflow_slots=max_concurrent_workflow_tasks,
+                activity_slots=max_concurrent_activities,
+                local_activity_slots=max_concurrent_local_activities,
             )
 
-        bridge_tuner = temporalio.bridge.worker.TunerHolder(
-            workflow_slot_supplier, activity_slot_supplier, local_activity_slot_supplier
-        )
+        bridge_tuner = tuner._to_bridge_tuner()
 
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
