@@ -1,7 +1,6 @@
 use futures::channel::mpsc::Receiver;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::AsPyPointer;
 use pythonize::pythonize;
 use std::collections::HashMap;
 use std::future::Future;

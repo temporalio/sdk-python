@@ -17,7 +17,7 @@ class FixedSizeSlotSupplier:
 
 
 @dataclass(frozen=True)
-class ResourceBasedTunerOptions:
+class ResourceBasedTunerConfig:
     """Options for a :py:class:`ResourceBasedTuner` or a :py:class:`ResourceBasedSlotSupplier`.
 
     .. warning::
@@ -63,7 +63,7 @@ class ResourceBasedSlotSupplier:
     """
 
     slot_options: ResourceBasedSlotOptions
-    tuner_options: ResourceBasedTunerOptions
+    tuner_config: ResourceBasedTunerConfig
     """Options for the tuner that will be used to adjust the number of slots. When used with a
     :py:class:`CompositeTuner`, all resource-based slot suppliers must use the same tuner options."""
 
@@ -92,9 +92,9 @@ def _to_bridge_slot_supplier(
             min_slots,
             max_slots,
             int(ramp_throttle / timedelta(milliseconds=1)),
-            temporalio.bridge.worker.ResourceBasedTunerOptions(
-                slot_supplier.tuner_options.target_memory_usage,
-                slot_supplier.tuner_options.target_cpu_usage,
+            temporalio.bridge.worker.ResourceBasedTunerConfig(
+                slot_supplier.tuner_config.target_memory_usage,
+                slot_supplier.tuner_config.target_cpu_usage,
             ),
         )
     else:
@@ -124,7 +124,7 @@ class ResourceBasedTuner(WorkerTuner):
         The resource based tuner is currently experimental.
     """
 
-    def __init__(self, options: ResourceBasedTunerOptions):
+    def __init__(self, options: ResourceBasedTunerConfig):
         """Create a new ResourceBasedTuner
 
         Args:

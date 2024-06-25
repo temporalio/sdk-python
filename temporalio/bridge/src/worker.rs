@@ -75,11 +75,11 @@ pub struct ResourceBasedSlotSupplier {
     maximum_slots: usize,
     // Need pyo3 0.21+ for this to be std Duration
     ramp_throttle_ms: u64,
-    tuner_options: ResourceBasedTunerOptions,
+    tuner_config: ResourceBasedTunerConfig,
 }
 
 #[derive(FromPyObject, Clone, Copy, PartialEq)]
-pub struct ResourceBasedTunerOptions {
+pub struct ResourceBasedTunerConfig {
     target_memory_usage: f64,
     target_cpu_usage: f64,
 }
@@ -312,19 +312,19 @@ impl TryFrom<TunerHolder> for temporal_sdk_core::TunerHolder {
         // Verify all resource-based options are the same if any are set
         let maybe_wf_resource_opts =
             if let SlotSupplier::ResourceBased(ref ss) = holder.workflow_slot_supplier {
-                Some(&ss.tuner_options)
+                Some(&ss.tuner_config)
             } else {
                 None
             };
         let maybe_act_resource_opts =
             if let SlotSupplier::ResourceBased(ref ss) = holder.activity_slot_supplier {
-                Some(&ss.tuner_options)
+                Some(&ss.tuner_config)
             } else {
                 None
             };
         let maybe_local_act_resource_opts =
             if let SlotSupplier::ResourceBased(ref ss) = holder.local_activity_slot_supplier {
-                Some(&ss.tuner_options)
+                Some(&ss.tuner_config)
             } else {
                 None
             };

@@ -62,7 +62,7 @@ class WorkerConfig:
 
 
 @dataclass
-class ResourceBasedTunerOptions:
+class ResourceBasedTunerConfig:
     """Python representation of the Rust struct for configuring a resource-based tuner."""
 
     target_memory_usage: float
@@ -76,7 +76,7 @@ class ResourceBasedSlotSupplier:
     minimum_slots: int
     maximum_slots: int
     ramp_throttle_ms: int
-    tuner_options: ResourceBasedTunerOptions
+    tuner_config: ResourceBasedTunerConfig
 
 
 @dataclass(frozen=True)

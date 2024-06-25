@@ -17,7 +17,7 @@ from temporalio.worker import (
     ResourceBasedSlotOptions,
     ResourceBasedSlotSupplier,
     ResourceBasedTuner,
-    ResourceBasedTunerOptions,
+    ResourceBasedTunerConfig,
     Worker,
 )
 from temporalio.workflow import VersioningIntent
@@ -237,7 +237,7 @@ async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
 
 
 async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnvironment):
-    tuner = ResourceBasedTuner(ResourceBasedTunerOptions(0.5, 0.5))
+    tuner = ResourceBasedTuner(ResourceBasedTunerConfig(0.5, 0.5))
     tuner.set_workflow_task_options(
         ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
     )
@@ -259,7 +259,7 @@ async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnviro
 
 
 async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvironment):
-    resource_based_options = ResourceBasedTunerOptions(0.5, 0.5)
+    resource_based_options = ResourceBasedTunerConfig(0.5, 0.5)
     tuner = CompositeTuner(
         FixedSizeSlotSupplier(5),
         ResourceBasedSlotSupplier(
@@ -297,7 +297,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
 async def test_cant_specify_max_concurrent_and_tuner(
     client: Client, env: WorkflowEnvironment
 ):
-    tuner = ResourceBasedTuner(ResourceBasedTunerOptions(0.5, 0.5))
+    tuner = ResourceBasedTuner(ResourceBasedTunerConfig(0.5, 0.5))
     tuner.set_workflow_task_options(
         ResourceBasedSlotOptions(5, 20, timedelta(seconds=0))
     )

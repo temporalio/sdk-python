@@ -32,7 +32,7 @@ from ._tuning import (
     ResourceBasedSlotOptions,
     ResourceBasedSlotSupplier,
     ResourceBasedTuner,
-    ResourceBasedTunerOptions,
+    ResourceBasedTunerConfig,
     WorkerTuner,
 )
 from ._worker import Worker, WorkerConfig
@@ -84,6 +84,6 @@ __all__ = [
     "CompositeTuner",
     "FixedSizeSlotSupplier",
     "ResourceBasedSlotSupplier",
-    "ResourceBasedTunerOptions",
+    "ResourceBasedTunerConfig",
     "ResourceBasedSlotOptions",
 ]
