@@ -5228,7 +5228,11 @@ class UnfinishedHandlersWorkflow:
         await self._do_update_or_signal()
 
 
-async def test_unfinished_update_handler(client: Client):
+async def test_unfinished_update_handler(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
         test = _UnfinishedHandlersTest(client, worker, "update")
         await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
@@ -5383,7 +5387,13 @@ class UnfinishedHandlersWithCancellationOrFailureWorkflow:
         raise AssertionError("unreachable")
 
 
-async def test_unfinished_update_handler_with_workflow_cancellation(client: Client):
+async def test_unfinished_update_handler_with_workflow_cancellation(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     await _UnfinishedHandlersWithCancellationOrFailureTest(
         client,
         "update",
@@ -5399,7 +5409,13 @@ async def test_unfinished_signal_handler_with_workflow_cancellation(client: Clie
     ).test_warning_is_issued_when_cancellation_or_failure_causes_exit_with_unfinished_handler()
 
 
-async def test_unfinished_update_handler_with_workflow_failure(client: Client):
+async def test_unfinished_update_handler_with_workflow_failure(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     await _UnfinishedHandlersWithCancellationOrFailureTest(
         client,
         "update",
