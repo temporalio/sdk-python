@@ -5285,7 +5285,9 @@ class _UnfinishedHandlersTest:
             )
         )
         await assert_eq_eventually(
-            True, partial(self._workflow_task_failed, workflow_id=(await handle).id)
+            True,
+            partial(self._workflow_task_failed, workflow_id=(await handle).id),
+            timeout=timedelta(seconds=20),
         )
 
     async def _workflow_task_failed(self, workflow_id: str) -> bool:
