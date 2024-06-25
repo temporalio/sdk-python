@@ -5338,21 +5338,17 @@ class _UnfinishedHandlersTest:
         if unfinished_policy:
             handler_name += f"_{unfinished_policy.name}"
         if self.handler_type == "signal":
-            await asyncio.gather(handle.signal(handler_name))
+            await handle.signal(handler_name)
         else:
             if not wait_all_handlers_finished:
                 with pytest.raises(RPCError) as err:
-                    await asyncio.gather(
-                        handle.execute_update(handler_name, id="my-update")
-                    )
+                    await handle.execute_update(handler_name, id="my-update")
                 assert (
                     err.value.status == RPCStatusCode.NOT_FOUND
                     and "workflow execution already completed" in str(err.value).lower()
                 )
             else:
-                await asyncio.gather(
-                    handle.execute_update(handler_name, id="my-update")
-                )
+                await handle.execute_update(handler_name, id="my-update")
 
         return await handle.result()
 
