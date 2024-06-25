@@ -5370,15 +5370,17 @@ class UnfinishedHandlersWithCancellationOrFailureWorkflow:
                 "Deliberately failing workflow with an unfinished handler"
             )
         await workflow.wait_condition(lambda: False)
+        raise AssertionError("unreachable")
 
     @workflow.update
-    async def my_update(self) -> str:
+    async def my_update(self) -> NoReturn:
         await workflow.wait_condition(lambda: False)
-        return "update-result"
+        raise AssertionError("unreachable")
 
     @workflow.signal
-    async def my_signal(self):
+    async def my_signal(self) -> NoReturn:
         await workflow.wait_condition(lambda: False)
+        raise AssertionError("unreachable")
 
 
 async def test_unfinished_update_handler_with_workflow_cancellation(client: Client):
@@ -5465,13 +5467,13 @@ class _UnfinishedHandlersWithCancellationOrFailureTest:
             with pytest.WarningsRecorder() as warnings:
                 if self.handler_type == "update":
                     assert update_task
-                    with pytest.raises(RPCError) as err:
+                    with pytest.raises(RPCError) as update_err:
                         await update_task
-                    assert (
-                        err.value.status == RPCStatusCode.NOT_FOUND
-                        and "workflow execution already completed"
-                        in str(err.value).lower()
-                    )
+                        assert (
+                            update_err.value.status == RPCStatusCode.NOT_FOUND
+                            and "workflow execution already completed"
+                            in str(update_err.value).lower()
+                        )
 
                 with pytest.raises(WorkflowFailureError) as err:
                     await handle.result()
