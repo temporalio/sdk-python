@@ -14,7 +14,7 @@ from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityTy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     FixedSizeSlotSupplier,
-    ResourceBasedSlotOptions,
+    ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
     Worker,
@@ -240,9 +240,9 @@ async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnviro
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
-        workflow_config=ResourceBasedSlotOptions(5, 20, timedelta(seconds=0)),
+        workflow_config=ResourceBasedSlotConfig(5, 20, timedelta(seconds=0)),
         # Ensure we can assume defaults when specifying only some options
-        activity_config=ResourceBasedSlotOptions(minimum_slots=1),
+        activity_config=ResourceBasedSlotConfig(minimum_slots=1),
     )
     async with new_worker(
         client,
@@ -264,7 +264,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
     tuner = WorkerTuner.create_composite(
         workflow_supplier=FixedSizeSlotSupplier(5),
         activity_supplier=ResourceBasedSlotSupplier(
-            ResourceBasedSlotOptions(
+            ResourceBasedSlotConfig(
                 minimum_slots=1,
                 maximum_slots=20,
                 ramp_throttle=timedelta(milliseconds=60),
@@ -272,7 +272,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
             resource_based_options,
         ),
         local_activity_supplier=ResourceBasedSlotSupplier(
-            ResourceBasedSlotOptions(
+            ResourceBasedSlotConfig(
                 minimum_slots=1,
                 maximum_slots=5,
                 ramp_throttle=timedelta(milliseconds=60),
@@ -301,7 +301,7 @@ async def test_cant_specify_max_concurrent_and_tuner(
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
-        workflow_config=ResourceBasedSlotOptions(5, 20, timedelta(seconds=0)),
+        workflow_config=ResourceBasedSlotConfig(5, 20, timedelta(seconds=0)),
     )
     with pytest.raises(ValueError) as err:
         async with new_worker(

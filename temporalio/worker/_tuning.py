@@ -36,7 +36,7 @@ class ResourceBasedTunerConfig:
 
 
 @dataclass(frozen=True)
-class ResourceBasedSlotOptions:
+class ResourceBasedSlotConfig:
     """Options for a specific slot type being used with a :py:class:`ResourceBasedSlotSupplier`.
 
     .. warning::
@@ -64,7 +64,7 @@ class ResourceBasedSlotSupplier:
         The resource based tuner is currently experimental.
     """
 
-    slot_options: ResourceBasedSlotOptions
+    slot_config: ResourceBasedSlotConfig
     tuner_config: ResourceBasedTunerConfig
     """Options for the tuner that will be used to adjust the number of slots. When used with a
     :py:class:`CompositeTuner`, all resource-based slot suppliers must use the same tuner options."""
@@ -84,12 +84,12 @@ def _to_bridge_slot_supplier(
         ramp_throttle = (
             timedelta(seconds=0) if kind == "workflow" else timedelta(milliseconds=50)
         )
-        if slot_supplier.slot_options.minimum_slots is not None:
-            min_slots = slot_supplier.slot_options.minimum_slots
-        if slot_supplier.slot_options.maximum_slots is not None:
-            max_slots = slot_supplier.slot_options.maximum_slots
-        if slot_supplier.slot_options.ramp_throttle is not None:
-            ramp_throttle = slot_supplier.slot_options.ramp_throttle
+        if slot_supplier.slot_config.minimum_slots is not None:
+            min_slots = slot_supplier.slot_config.minimum_slots
+        if slot_supplier.slot_config.maximum_slots is not None:
+            max_slots = slot_supplier.slot_config.maximum_slots
+        if slot_supplier.slot_config.ramp_throttle is not None:
+            ramp_throttle = slot_supplier.slot_config.ramp_throttle
         return temporalio.bridge.worker.ResourceBasedSlotSupplier(
             min_slots,
             max_slots,
@@ -111,20 +111,20 @@ class WorkerTuner(ABC):
         *,
         target_memory_usage: float,
         target_cpu_usage: float,
-        workflow_config: Optional[ResourceBasedSlotOptions] = None,
-        activity_config: Optional[ResourceBasedSlotOptions] = None,
-        local_activity_config: Optional[ResourceBasedSlotOptions] = None,
+        workflow_config: Optional[ResourceBasedSlotConfig] = None,
+        activity_config: Optional[ResourceBasedSlotConfig] = None,
+        local_activity_config: Optional[ResourceBasedSlotConfig] = None,
     ) -> "WorkerTuner":
         """Create a resource-based tuner with the provided options."""
         resource_cfg = ResourceBasedTunerConfig(target_memory_usage, target_cpu_usage)
         wf = ResourceBasedSlotSupplier(
-            workflow_config or ResourceBasedSlotOptions(), resource_cfg
+            workflow_config or ResourceBasedSlotConfig(), resource_cfg
         )
         act = ResourceBasedSlotSupplier(
-            activity_config or ResourceBasedSlotOptions(), resource_cfg
+            activity_config or ResourceBasedSlotConfig(), resource_cfg
         )
         local_act = ResourceBasedSlotSupplier(
-            local_activity_config or ResourceBasedSlotOptions(), resource_cfg
+            local_activity_config or ResourceBasedSlotConfig(), resource_cfg
         )
         return _CompositeTuner(
             wf,
@@ -192,7 +192,7 @@ class WorkerTuner(ABC):
         if isinstance(ss, FixedSizeSlotSupplier):
             return ss.num_slots
         elif isinstance(ss, ResourceBasedSlotSupplier):
-            return ss.slot_options.maximum_slots or _DEFAULT_RESOURCE_ACTIVITY_MAX
+            return ss.slot_config.maximum_slots or _DEFAULT_RESOURCE_ACTIVITY_MAX
         return None
 
 

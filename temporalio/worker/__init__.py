@@ -28,7 +28,7 @@ from ._replayer import (
 )
 from ._tuning import (
     FixedSizeSlotSupplier,
-    ResourceBasedSlotOptions,
+    ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
     WorkerTuner,
@@ -81,5 +81,5 @@ __all__ = [
     "FixedSizeSlotSupplier",
     "ResourceBasedSlotSupplier",
     "ResourceBasedTunerConfig",
-    "ResourceBasedSlotOptions",
+    "ResourceBasedSlotConfig",
 ]
