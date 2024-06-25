@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional
@@ -313,6 +314,26 @@ async def test_cant_specify_max_concurrent_and_tuner(
             pass
     assert "Cannot specify " in str(err.value)
     assert "when also specifying tuner" in str(err.value)
+
+
+async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironment):
+    tuner = WorkerTuner.create_resource_based(
+        target_memory_usage=0.5,
+        target_cpu_usage=0.5,
+    )
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        with pytest.warns(
+            UserWarning,
+            match=f"Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
+        ):
+            async with new_worker(
+                client,
+                WaitOnSignalWorkflow,
+                activities=[say_hello],
+                tuner=tuner,
+                activity_executor=executor,
+            ):
+                pass
 
 
 def create_worker(

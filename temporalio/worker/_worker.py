@@ -283,11 +283,14 @@ class Worker:
             # concurrent activities. We do this here instead of in
             # _ActivityWorker so the stack level is predictable.
             max_workers = getattr(activity_executor, "_max_workers", None)
+            concurrent_activities = max_concurrent_activities
+            if tuner and tuner._get_activities_max():
+                concurrent_activities = tuner._get_activities_max()
             if isinstance(max_workers, int) and max_workers < (
-                max_concurrent_activities or 0
+                concurrent_activities or 0
             ):
                 warnings.warn(
-                    f"Worker max_concurrent_activities is {max_concurrent_activities} "
+                    f"Worker max_concurrent_activities is {concurrent_activities} "
                     + f"but activity_executor's max_workers is only {max_workers}",
                     stacklevel=2,
                 )

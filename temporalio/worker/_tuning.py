@@ -7,6 +7,8 @@ from typing_extensions import TypeAlias
 
 import temporalio.bridge.worker
 
+_DEFAULT_RESOURCE_ACTIVITY_MAX = 500
+
 
 @dataclass(frozen=True)
 class FixedSizeSlotSupplier:
@@ -78,7 +80,7 @@ def _to_bridge_slot_supplier(
         return temporalio.bridge.worker.FixedSizeSlotSupplier(slot_supplier.num_slots)
     elif isinstance(slot_supplier, ResourceBasedSlotSupplier):
         min_slots = 5 if kind == "workflow" else 1
-        max_slots = 500
+        max_slots = _DEFAULT_RESOURCE_ACTIVITY_MAX
         ramp_throttle = (
             timedelta(seconds=0) if kind == "workflow" else timedelta(milliseconds=50)
         )
@@ -184,6 +186,14 @@ class WorkerTuner(ABC):
                 self._get_local_activity_task_slot_supplier(), "local_activity"
             ),
         )
+
+    def _get_activities_max(self) -> Optional[int]:
+        ss = self._get_activity_task_slot_supplier()
+        if isinstance(ss, FixedSizeSlotSupplier):
+            return ss.num_slots
+        elif isinstance(ss, ResourceBasedSlotSupplier):
+            return ss.slot_options.maximum_slots or _DEFAULT_RESOURCE_ACTIVITY_MAX
+        return None
 
 
 @dataclass(frozen=True)
