@@ -5357,3 +5357,102 @@ class _UnfinishedHandlersTest:
             "update": workflow.UnfinishedUpdateHandlersWarning,
             "signal": workflow.UnfinishedSignalHandlersWarning,
         }[self.handler_type]
+
+
+@workflow.defn
+class UnfinishedHandlersWithCancellationWorkflow:
+    @workflow.run
+    async def run(self) -> NoReturn:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.update
+    async def my_update(self) -> str:
+        await workflow.wait_condition(lambda: False)
+        return "update-result"
+
+    @workflow.signal
+    async def my_signal(self):
+        await workflow.wait_condition(lambda: False)
+
+
+async def test_unfinished_update_handler_with_workflow_cancellation(client: Client):
+    await _UnfinishedHandlersWithCancellationTest(
+        client, "update"
+    ).test_warning_is_issued_when_cancellation_causes_exit_with_unfinished_handler()
+
+
+async def test_unfinished_signal_handler_with_workflow_cancellation(client: Client):
+    await _UnfinishedHandlersWithCancellationTest(
+        client, "signal"
+    ).test_warning_is_issued_when_cancellation_causes_exit_with_unfinished_handler()
+
+
+@dataclass
+class _UnfinishedHandlersWithCancellationTest:
+    client: Client
+    handler_type: Literal["update", "signal"]
+
+    async def test_warning_is_issued_when_cancellation_causes_exit_with_unfinished_handler(
+        self,
+    ):
+        assert await self._run_workflow_and_get_warning()
+
+    async def _run_workflow_and_get_warning(self) -> bool:
+        workflow_id = f"wf-{uuid.uuid4()}"
+        update_id = "update-id"
+        task_queue = "tq"
+
+        # We require a cancellation request and an update to be delivered in the same WFT. To do
+        # this we send the start, cancel, and update/signal requests, and then start the worker
+        # after they've all been accepted by the server.
+        handle = await self.client.start_workflow(
+            UnfinishedHandlersWithCancellationWorkflow.run,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        await handle.cancel()
+
+        if self.handler_type == "update":
+            update_task = asyncio.create_task(
+                handle.execute_update(
+                    UnfinishedHandlersWithCancellationWorkflow.my_update, id=update_id
+                )
+            )
+            await assert_eq_eventually(
+                True, lambda: workflow_update_exists(self.client, workflow_id, update_id)
+            )
+        else:
+            await handle.signal(UnfinishedHandlersWithCancellationWorkflow.my_signal)
+
+        async with new_worker(
+            self.client,
+            UnfinishedHandlersWithCancellationWorkflow,
+            task_queue=task_queue,
+        ):
+            with pytest.WarningsRecorder() as warnings:
+                if self.handler_type == "update":
+                    assert update_task
+                    with pytest.raises(RPCError) as err:
+                        await update_task
+                    assert (
+                        err.value.status == RPCStatusCode.NOT_FOUND
+                        and "workflow execution already completed"
+                        in str(err.value).lower()
+                    )
+
+                with pytest.raises(WorkflowFailureError) as err:
+                    await handle.result()
+                    assert "workflow execution failed" in str(err.value).lower()
+
+                unfinished_handler_warning_emitted = any(
+                    issubclass(w.category, self._unfinished_handler_warning_cls)
+                    for w in warnings
+                )
+                return unfinished_handler_warning_emitted
+
+    @property
+    def _unfinished_handler_warning_cls(self) -> Type:
+        return {
+            "update": workflow.UnfinishedUpdateHandlersWarning,
+            "signal": workflow.UnfinishedSignalHandlersWarning,
+        }[self.handler_type]
