@@ -99,7 +99,6 @@ env = { TEMPORAL_INTEGRATION_TEST = "1" }
 cmd = "pip uninstall temporalio -y"
 
 [tool.pytest.ini_options]
-addopts = "-p no:warnings"
 asyncio_mode = "auto"
 log_cli = true
 log_cli_level = "INFO"
@@ -107,6 +106,12 @@ log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(linen
 testpaths = ["tests"]
 timeout = 600
 timeout_func_only = true
+filterwarnings = [
+  "error::temporalio.workflow.UnfinishedUpdateHandlersWarning",
+  "error::temporalio.workflow.UnfinishedSignalHandlersWarning",
+  "ignore::pytest.PytestDeprecationWarning",
+  "ignore::DeprecationWarning",
+]
 
 [tool.cibuildwheel]
 # We only want the 3.8 64-bit build of each type. However, due to
