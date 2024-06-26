@@ -6,6 +6,7 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -15,6 +16,7 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    Union,
 )
 
 import google.protobuf.internal.containers
@@ -43,9 +45,7 @@ class WorkerConfig:
     build_id: str
     identity_override: Optional[str]
     max_cached_workflows: int
-    max_outstanding_workflow_tasks: int
-    max_outstanding_activities: int
-    max_outstanding_local_activities: int
+    tuner: TunerHolder
     max_concurrent_workflow_task_polls: int
     nonsticky_to_sticky_poll_ratio: float
     max_concurrent_activity_task_polls: int
@@ -59,6 +59,43 @@ class WorkerConfig:
     use_worker_versioning: bool
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
+
+
+@dataclass
+class ResourceBasedTunerConfig:
+    """Python representation of the Rust struct for configuring a resource-based tuner."""
+
+    target_memory_usage: float
+    target_cpu_usage: float
+
+
+@dataclass
+class ResourceBasedSlotSupplier:
+    """Python representation of the Rust struct for a resource-based slot supplier."""
+
+    minimum_slots: int
+    maximum_slots: int
+    ramp_throttle_ms: int
+    tuner_config: ResourceBasedTunerConfig
+
+
+@dataclass(frozen=True)
+class FixedSizeSlotSupplier:
+    """Python representation of the Rust struct for a fixed-size slot supplier."""
+
+    num_slots: int
+
+
+SlotSupplier: TypeAlias = Union[FixedSizeSlotSupplier, ResourceBasedSlotSupplier]
+
+
+@dataclass
+class TunerHolder:
+    """Python representation of the Rust struct for a tuner holder."""
+
+    workflow_slot_supplier: SlotSupplier
+    activity_slot_supplier: SlotSupplier
+    local_activity_slot_supplier: SlotSupplier
 
 
 class Worker:

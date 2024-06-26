@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional
@@ -11,7 +12,14 @@ import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
+from temporalio.worker import (
+    FixedSizeSlotSupplier,
+    ResourceBasedSlotConfig,
+    ResourceBasedSlotSupplier,
+    ResourceBasedTunerConfig,
+    Worker,
+    WorkerTuner,
+)
 from temporalio.workflow import VersioningIntent
 from tests.helpers import new_worker, worker_versioning_enabled
 
@@ -226,6 +234,106 @@ async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
             client, task_queue=f"tq-{uuid.uuid4()}", workflows=[NeverRunWorkflow]
         ).run()
     assert str(err.value).startswith("Worker validation failed")
+
+
+async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnvironment):
+    tuner = WorkerTuner.create_resource_based(
+        target_memory_usage=0.5,
+        target_cpu_usage=0.5,
+        workflow_config=ResourceBasedSlotConfig(5, 20, timedelta(seconds=0)),
+        # Ensure we can assume defaults when specifying only some options
+        activity_config=ResourceBasedSlotConfig(minimum_slots=1),
+    )
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"resource-based-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
+
+
+async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvironment):
+    resource_based_options = ResourceBasedTunerConfig(0.5, 0.5)
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=FixedSizeSlotSupplier(5),
+        activity_supplier=ResourceBasedSlotSupplier(
+            ResourceBasedSlotConfig(
+                minimum_slots=1,
+                maximum_slots=20,
+                ramp_throttle=timedelta(milliseconds=60),
+            ),
+            resource_based_options,
+        ),
+        local_activity_supplier=ResourceBasedSlotSupplier(
+            ResourceBasedSlotConfig(
+                minimum_slots=1,
+                maximum_slots=5,
+                ramp_throttle=timedelta(milliseconds=60),
+            ),
+            resource_based_options,
+        ),
+    )
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"composite-tuner-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
+
+
+async def test_cant_specify_max_concurrent_and_tuner(
+    client: Client, env: WorkflowEnvironment
+):
+    tuner = WorkerTuner.create_resource_based(
+        target_memory_usage=0.5,
+        target_cpu_usage=0.5,
+        workflow_config=ResourceBasedSlotConfig(5, 20, timedelta(seconds=0)),
+    )
+    with pytest.raises(ValueError) as err:
+        async with new_worker(
+            client,
+            WaitOnSignalWorkflow,
+            activities=[say_hello],
+            tuner=tuner,
+            max_concurrent_workflow_tasks=10,
+        ):
+            pass
+    assert "Cannot specify " in str(err.value)
+    assert "when also specifying tuner" in str(err.value)
+
+
+async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironment):
+    tuner = WorkerTuner.create_resource_based(
+        target_memory_usage=0.5,
+        target_cpu_usage=0.5,
+    )
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        with pytest.warns(
+            UserWarning,
+            match=f"Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
+        ):
+            async with new_worker(
+                client,
+                WaitOnSignalWorkflow,
+                activities=[say_hello],
+                tuner=tuner,
+                activity_executor=executor,
+            ):
+                pass
 
 
 def create_worker(

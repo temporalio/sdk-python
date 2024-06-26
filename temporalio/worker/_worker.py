@@ -29,6 +29,7 @@ import temporalio.service
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
+from ._tuning import WorkerTuner, _to_bridge_slot_supplier
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -60,9 +61,10 @@ class Worker:
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         max_cached_workflows: int = 1000,
-        max_concurrent_workflow_tasks: int = 100,
-        max_concurrent_activities: int = 100,
-        max_concurrent_local_activities: int = 100,
+        max_concurrent_workflow_tasks: Optional[int] = None,
+        max_concurrent_activities: Optional[int] = None,
+        max_concurrent_local_activities: Optional[int] = None,
+        tuner: Optional[WorkerTuner] = None,
         max_concurrent_workflow_task_polls: int = 5,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
         max_concurrent_activity_task_polls: int = 5,
@@ -126,11 +128,16 @@ class Worker:
             max_cached_workflows: If nonzero, workflows will be cached and
                 sticky task queues will be used.
             max_concurrent_workflow_tasks: Maximum allowed number of workflow
-                tasks that will ever be given to this worker at one time.
+                tasks that will ever be given to this worker at one time. Mutually exclusive with ``tuner``.
             max_concurrent_activities: Maximum number of activity tasks that
-                will ever be given to this worker concurrently.
+                will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
-                tasks that will ever be given to this worker concurrently.
+                tasks that will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
+            tuner:  Provide a custom :py:class:`WorkerTuner`. Mutually exclusive with the
+                ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``, and
+                ``max_concurrent_local_activities`` arguments.
+
+                WARNING: This argument is experimental
             max_concurrent_workflow_task_polls: Maximum number of concurrent
                 poll workflow task requests we will perform at a time on this
                 worker's task queue.
@@ -202,7 +209,7 @@ class Worker:
                 workflow collect its tasks properly, the worker will simply let
                 the Python garbage collector collect the tasks. WARNING: Users
                 should not set this value to true. The garbage collector will
-                throw ``GeneratorExit`` in coroutines causing them to to wake up
+                throw ``GeneratorExit`` in coroutines causing them to wake up
                 in different threads and run ``finally`` and other code in the
                 wrong workflow environment.
         """
@@ -276,9 +283,14 @@ class Worker:
             # concurrent activities. We do this here instead of in
             # _ActivityWorker so the stack level is predictable.
             max_workers = getattr(activity_executor, "_max_workers", None)
-            if isinstance(max_workers, int) and max_workers < max_concurrent_activities:
+            concurrent_activities = max_concurrent_activities
+            if tuner and tuner._get_activities_max():
+                concurrent_activities = tuner._get_activities_max()
+            if isinstance(max_workers, int) and max_workers < (
+                concurrent_activities or 0
+            ):
                 warnings.warn(
-                    f"Worker max_concurrent_activities is {max_concurrent_activities} "
+                    f"Worker max_concurrent_activities is {concurrent_activities} "
                     + f"but activity_executor's max_workers is only {max_workers}",
                     stacklevel=2,
                 )
@@ -313,6 +325,29 @@ class Worker:
                 disable_safe_eviction=disable_safe_workflow_eviction,
             )
 
+        workflow_slot_supplier: temporalio.bridge.worker.SlotSupplier
+        activity_slot_supplier: temporalio.bridge.worker.SlotSupplier
+        local_activity_slot_supplier: temporalio.bridge.worker.SlotSupplier
+
+        if tuner is not None:
+            if (
+                max_concurrent_workflow_tasks
+                or max_concurrent_activities
+                or max_concurrent_local_activities
+            ):
+                raise ValueError(
+                    "Cannot specify max_concurrent_workflow_tasks, max_concurrent_activities, "
+                    "or max_concurrent_local_activities when also specifying tuner"
+                )
+        else:
+            tuner = WorkerTuner.create_fixed(
+                workflow_slots=max_concurrent_workflow_tasks,
+                activity_slots=max_concurrent_activities,
+                local_activity_slots=max_concurrent_local_activities,
+            )
+
+        bridge_tuner = tuner._to_bridge_tuner()
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -328,9 +363,7 @@ class Worker:
                 build_id=build_id or load_default_build_id(),
                 identity_override=identity,
                 max_cached_workflows=max_cached_workflows,
-                max_outstanding_workflow_tasks=max_concurrent_workflow_tasks,
-                max_outstanding_activities=max_concurrent_activities,
-                max_outstanding_local_activities=max_concurrent_local_activities,
+                tuner=bridge_tuner,
                 max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
                 nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
                 max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
@@ -358,9 +391,11 @@ class Worker:
                 # per workflow type
                 nondeterminism_as_workflow_fail=self._workflow_worker is not None
                 and self._workflow_worker.nondeterminism_as_workflow_fail(),
-                nondeterminism_as_workflow_fail_for_types=self._workflow_worker.nondeterminism_as_workflow_fail_for_types()
-                if self._workflow_worker
-                else set(),
+                nondeterminism_as_workflow_fail_for_types=(
+                    self._workflow_worker.nondeterminism_as_workflow_fail_for_types()
+                    if self._workflow_worker
+                    else set()
+                ),
             ),
         )
 
@@ -613,9 +648,10 @@ class WorkerConfig(TypedDict, total=False):
     build_id: Optional[str]
     identity: Optional[str]
     max_cached_workflows: int
-    max_concurrent_workflow_tasks: int
-    max_concurrent_activities: int
-    max_concurrent_local_activities: int
+    max_concurrent_workflow_tasks: Optional[int]
+    max_concurrent_activities: Optional[int]
+    max_concurrent_local_activities: Optional[int]
+    tuner: Optional[WorkerTuner]
     max_concurrent_workflow_task_polls: int
     nonsticky_to_sticky_poll_ratio: float
     max_concurrent_activity_task_polls: int

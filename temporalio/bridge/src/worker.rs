@@ -1,3 +1,4 @@
+use anyhow::Context;
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -34,9 +35,7 @@ pub struct WorkerConfig {
     build_id: String,
     identity_override: Option<String>,
     max_cached_workflows: usize,
-    max_outstanding_workflow_tasks: usize,
-    max_outstanding_activities: usize,
-    max_outstanding_local_activities: usize,
+    tuner: TunerHolder,
     max_concurrent_workflow_task_polls: usize,
     nonsticky_to_sticky_poll_ratio: f32,
     max_concurrent_activity_task_polls: usize,
@@ -50,6 +49,39 @@ pub struct WorkerConfig {
     use_worker_versioning: bool,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
+}
+
+#[derive(FromPyObject)]
+pub struct TunerHolder {
+    workflow_slot_supplier: SlotSupplier,
+    activity_slot_supplier: SlotSupplier,
+    local_activity_slot_supplier: SlotSupplier,
+}
+
+#[derive(FromPyObject)]
+pub enum SlotSupplier {
+    FixedSize(FixedSizeSlotSupplier),
+    ResourceBased(ResourceBasedSlotSupplier),
+}
+
+#[derive(FromPyObject)]
+pub struct FixedSizeSlotSupplier {
+    num_slots: usize,
+}
+
+#[derive(FromPyObject)]
+pub struct ResourceBasedSlotSupplier {
+    minimum_slots: usize,
+    maximum_slots: usize,
+    // Need pyo3 0.21+ for this to be std Duration
+    ramp_throttle_ms: u64,
+    tuner_config: ResourceBasedTunerConfig,
+}
+
+#[derive(FromPyObject, Clone, Copy, PartialEq)]
+pub struct ResourceBasedTunerConfig {
+    target_memory_usage: f64,
+    target_cpu_usage: f64,
 }
 
 macro_rules! enter_sync {
@@ -73,7 +105,7 @@ pub fn new_worker(
         config,
         client.retry_client.clone().into_inner(),
     )
-    .map_err(|err| PyValueError::new_err(format!("Failed creating worker: {}", err)))?;
+    .context("Failed creating worker")?;
     Ok(WorkerRef {
         worker: Some(Arc::new(worker)),
         runtime: runtime_ref.runtime.clone(),
@@ -107,9 +139,11 @@ impl WorkerRef {
     fn validate<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
-            worker.validate().await.map_err(|err| {
-                PyRuntimeError::new_err(format!("Worker validation failed: {}", err))
-            })
+            worker
+                .validate()
+                .await
+                .context("Worker validation failed")
+                .map_err(Into::into)
         })
     }
 
@@ -151,10 +185,8 @@ impl WorkerRef {
             worker
                 .complete_workflow_activation(completion)
                 .await
-                .map_err(|err| {
-                    // TODO(cretz): More error types
-                    PyRuntimeError::new_err(format!("Completion failure: {}", err))
-                })
+                .context("Completion failure")
+                .map_err(Into::into)
         })
     }
 
@@ -166,10 +198,8 @@ impl WorkerRef {
             worker
                 .complete_activity_task(completion)
                 .await
-                .map_err(|err| {
-                    // TODO(cretz): More error types
-                    PyRuntimeError::new_err(format!("Completion failure: {}", err))
-                })
+                .context("Completion failure")
+                .map_err(Into::into)
         })
     }
 
@@ -226,16 +256,15 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
     type Error = PyErr;
 
     fn try_from(conf: WorkerConfig) -> PyResult<Self> {
+        let converted_tuner: temporal_sdk_core::TunerHolder = conf.tuner.try_into()?;
         temporal_sdk_core::WorkerConfigBuilder::default()
             .namespace(conf.namespace)
             .task_queue(conf.task_queue)
             .worker_build_id(conf.build_id)
             .client_identity_override(conf.identity_override)
             .max_cached_workflows(conf.max_cached_workflows)
-            .max_outstanding_workflow_tasks(conf.max_outstanding_workflow_tasks)
-            .max_outstanding_activities(conf.max_outstanding_activities)
-            .max_outstanding_local_activities(conf.max_outstanding_local_activities)
             .max_concurrent_wft_polls(conf.max_concurrent_workflow_task_polls)
+            .tuner(Arc::new(converted_tuner))
             .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
             .max_concurrent_at_polls(conf.max_concurrent_activity_task_polls)
             .no_remote_activities(conf.no_remote_activities)
@@ -273,6 +302,90 @@ impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
             )
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
+    }
+}
+
+impl TryFrom<TunerHolder> for temporal_sdk_core::TunerHolder {
+    type Error = PyErr;
+
+    fn try_from(holder: TunerHolder) -> PyResult<Self> {
+        // Verify all resource-based options are the same if any are set
+        let maybe_wf_resource_opts =
+            if let SlotSupplier::ResourceBased(ref ss) = holder.workflow_slot_supplier {
+                Some(&ss.tuner_config)
+            } else {
+                None
+            };
+        let maybe_act_resource_opts =
+            if let SlotSupplier::ResourceBased(ref ss) = holder.activity_slot_supplier {
+                Some(&ss.tuner_config)
+            } else {
+                None
+            };
+        let maybe_local_act_resource_opts =
+            if let SlotSupplier::ResourceBased(ref ss) = holder.local_activity_slot_supplier {
+                Some(&ss.tuner_config)
+            } else {
+                None
+            };
+        let all_resource_opts = [
+            maybe_wf_resource_opts,
+            maybe_act_resource_opts,
+            maybe_local_act_resource_opts,
+        ];
+        let mut set_resource_opts = all_resource_opts.iter().flatten();
+        let first = set_resource_opts.next();
+        let all_are_same = if let Some(first) = first {
+            set_resource_opts.all(|elem| elem == first)
+        } else {
+            true
+        };
+        if !all_are_same {
+            return Err(PyValueError::new_err(
+                "All resource-based slot suppliers must have the same ResourceBasedTunerOptions",
+            ));
+        }
+
+        let mut options = temporal_sdk_core::TunerHolderOptionsBuilder::default();
+        if let Some(first) = first {
+            options.resource_based_options(
+                temporal_sdk_core::ResourceBasedSlotsOptionsBuilder::default()
+                    .target_mem_usage(first.target_memory_usage)
+                    .target_cpu_usage(first.target_cpu_usage)
+                    .build()
+                    .expect("Building ResourceBasedSlotsOptions is infallible"),
+            );
+        };
+        options
+            .workflow_slot_options(holder.workflow_slot_supplier.try_into()?)
+            .activity_slot_options(holder.activity_slot_supplier.try_into()?)
+            .local_activity_slot_options(holder.local_activity_slot_supplier.try_into()?);
+        Ok(options
+            .build()
+            .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {}", e)))?
+            .build_tuner_holder()
+            .context("Failed building tuner holder")?)
+    }
+}
+
+impl TryFrom<SlotSupplier> for temporal_sdk_core::SlotSupplierOptions {
+    type Error = PyErr;
+
+    fn try_from(supplier: SlotSupplier) -> PyResult<temporal_sdk_core::SlotSupplierOptions> {
+        Ok(match supplier {
+            SlotSupplier::FixedSize(fs) => temporal_sdk_core::SlotSupplierOptions::FixedSize {
+                slots: fs.num_slots,
+            },
+            SlotSupplier::ResourceBased(ss) => {
+                temporal_sdk_core::SlotSupplierOptions::ResourceBased(
+                    temporal_sdk_core::ResourceSlotOptions::new(
+                        ss.minimum_slots,
+                        ss.maximum_slots,
+                        Duration::from_millis(ss.ramp_throttle_ms),
+                    ),
+                )
+            }
+        })
     }
 }
 
