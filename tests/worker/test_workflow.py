@@ -5420,7 +5420,13 @@ async def test_unfinished_update_handler_with_workflow_failure(
     ).test_warning_is_issued_when_cancellation_or_failure_causes_exit_with_unfinished_handler()
 
 
-async def test_unfinished_signal_handler_with_workflow_failure(client: Client):
+async def test_unfinished_signal_handler_with_workflow_failure(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2127"
+        )
     await _UnfinishedHandlersWithCancellationOrFailureTest(
         client,
         "signal",
