@@ -6,11 +6,11 @@ import asyncio
 import collections
 import contextvars
 import inspect
+import json
 import logging
 import random
 import sys
 import traceback
-import typing
 import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -25,6 +25,7 @@ from typing import (
     Dict,
     Generator,
     Generic,
+    Iterable,
     Iterator,
     List,
     Mapping,
@@ -240,6 +241,14 @@ class _WorkflowInstanceImpl(
         self._queries = dict(self._defn.queries)
         self._updates = dict(self._defn.updates)
 
+        # We record in-progress signals and updates in order to support waiting for handlers to
+        # finish, and issuing warnings when the workflow exits with unfinished handlers. Since
+        # signals lack a unique per-invocation identifier, we introduce a sequence number for the
+        # purpose.
+        self._handled_signals_seq = 0
+        self._in_progress_signals: Dict[int, HandlerExecution] = {}
+        self._in_progress_updates: Dict[str, HandlerExecution] = {}
+
         # Add stack trace handler
         # TODO(cretz): Is it ok that this can be forcefully overridden by the
         # workflow author? They could technically override in interceptor
@@ -406,12 +415,15 @@ class _WorkflowInstanceImpl(
                     command.HasField("complete_workflow_execution")
                     or command.HasField("continue_as_new_workflow_execution")
                     or command.HasField("fail_workflow_execution")
+                    or command.HasField("cancel_workflow_execution")
                 )
             elif not command.HasField("respond_to_query"):
                 del self._current_completion.successful.commands[i]
                 continue
             i += 1
 
+        if seen_completion:
+            self._warn_if_unfinished_handlers()
         return self._current_completion
 
     def _apply(
@@ -490,6 +502,9 @@ class _WorkflowInstanceImpl(
                         f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler. "
                         f"known updates: [{' '.join(known_updates)}]"
                     )
+                self._in_progress_updates[job.id] = HandlerExecution(
+                    job.name, defn.unfinished_policy, job.id
+                )
                 args = self._process_handler_args(
                     job.name,
                     job.input,
@@ -572,6 +587,8 @@ class _WorkflowInstanceImpl(
                         )
                     return
                 raise
+            finally:
+                self._in_progress_updates.pop(job.id, None)
 
         self.create_task(
             run_update(),
@@ -868,6 +885,9 @@ class _WorkflowInstanceImpl(
 
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
+
+    def workflow_all_handlers_finished(self) -> bool:
+        return not self._in_progress_updates and not self._in_progress_signals
 
     def workflow_continue_as_new(
         self,
@@ -1596,6 +1616,31 @@ class _WorkflowInstanceImpl(
             )
         )
 
+    def _warn_if_unfinished_handlers(self) -> None:
+        def warnable(handler_executions: Iterable[HandlerExecution]):
+            return [
+                ex
+                for ex in handler_executions
+                if ex.unfinished_policy
+                == temporalio.workflow.HandlerUnfinishedPolicy.WARN_AND_ABANDON
+            ]
+
+        warnable_updates = warnable(self._in_progress_updates.values())
+        if warnable_updates:
+            warnings.warn(
+                temporalio.workflow.UnfinishedUpdateHandlersWarning(
+                    _make_unfinished_update_handler_message(warnable_updates)
+                )
+            )
+
+        warnable_signals = warnable(self._in_progress_signals.values())
+        if warnable_signals:
+            warnings.warn(
+                temporalio.workflow.UnfinishedSignalHandlersWarning(
+                    _make_unfinished_signal_handler_message(warnable_signals)
+                )
+            )
+
     def _next_seq(self, type: str) -> int:
         seq = self._curr_seqs.get(type, 0) + 1
         self._curr_seqs[type] = seq
@@ -1646,10 +1691,21 @@ class _WorkflowInstanceImpl(
         input = HandleSignalInput(
             signal=job.signal_name, args=args, headers=job.headers
         )
-        self.create_task(
+
+        self._handled_signals_seq += 1
+        id = self._handled_signals_seq
+        self._in_progress_signals[id] = HandlerExecution(
+            job.signal_name, defn.unfinished_policy
+        )
+
+        def done_callback(f):
+            self._in_progress_signals.pop(id, None)
+
+        task = self.create_task(
             self._run_top_level_workflow_function(self._inbound.handle_signal(input)),
             name=f"signal: {job.signal_name}",
         )
+        task.add_done_callback(done_callback)
 
     def _register_task(
         self,
@@ -2686,3 +2742,55 @@ class _ReplaySafeMetricGaugeFloat(
 
 class _WorkflowBeingEvictedError(BaseException):
     pass
+
+
+@dataclass
+class HandlerExecution:
+    """Information about an execution of a signal or update handler."""
+
+    name: str
+    unfinished_policy: temporalio.workflow.HandlerUnfinishedPolicy
+    id: Optional[str] = None
+
+
+def _make_unfinished_update_handler_message(
+    handler_executions: List[HandlerExecution],
+) -> str:
+    message = """
+Workflow finished while update handlers are still running. This may have interrupted work that the
+update handler was doing, and the client that sent the update will receive a 'workflow execution
+already completed' RPCError instead of the update result. You can wait for all update and signal
+handlers to complete by using `await workflow.wait_condition(lambda:
+workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update
+are okay with interrupting running handlers when the workflow finishes, and causing clients to
+receive errors, then you can disable this warning via the update handler decorator:
+`@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
+""".replace(
+        "\n", " "
+    ).strip()
+    return (
+        f"{message} The following updates were unfinished (and warnings were not disabled for their handler): "
+        + json.dumps([{"name": ex.name, "id": ex.id} for ex in handler_executions])
+    )
+
+
+def _make_unfinished_signal_handler_message(
+    handler_executions: List[HandlerExecution],
+) -> str:
+    message = """
+Workflow finished while signal handlers are still running. This may have interrupted work that the
+signal handler was doing. You can wait for all update and signal handlers to complete by using
+`await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both
+you and the clients sending the signal are okay with interrupting running handlers when the workflow
+finishes, and causing clients to receive errors, then you can disable this warning via the signal
+handler decorator: `@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
+""".replace(
+        "\n", " "
+    ).strip()
+    names = collections.Counter(ex.name for ex in handler_executions)
+    return (
+        f"{message} The following signals were unfinished (and warnings were not disabled for their handler): "
+        + json.dumps(
+            [{"name": name, "count": count} for name, count in names.most_common()]
+        )
+    )
