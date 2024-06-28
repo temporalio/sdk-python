@@ -65,6 +65,9 @@ wheel = "^0.42.0"
 opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 grpc = ["grpcio"]
 
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.0"
+
 [tool.poe.tasks]
 build-develop = "python scripts/setup_bridge.py develop"
 build-develop-with-release = { cmd = "python scripts/setup_bridge.py develop", env = { TEMPORAL_BUILD_RELEASE = "1" }}
