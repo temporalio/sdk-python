@@ -54,6 +54,7 @@ pydoctor = "^23.4.1"
 pytest = "^7.4"
 pytest-asyncio = "^0.21"
 pytest-timeout = "^2.2"
+ruff = "^0.5.0"
 setuptools = ">=65.0.0"
 setuptools-rust = ">=1.3.0"
 toml = "^0.10.2"
@@ -68,12 +69,12 @@ grpc = ["grpcio"]
 build-develop = "python scripts/setup_bridge.py develop"
 build-develop-with-release = { cmd = "python scripts/setup_bridge.py develop", env = { TEMPORAL_BUILD_RELEASE = "1" }}
 fix-wheel = "python scripts/fix_wheel.py"
-format = [{cmd = "black ."}, {cmd = "isort ."}]
+format = [{cmd = "ruff check --select I --fix"}, {cmd = "ruff format"}, ]
 gen-docs = "python scripts/gen_docs.py"
 gen-protos = "python scripts/gen_protos.py"
 lint = [
-  {cmd = "black --check ."},
-  {cmd = "isort --check-only ."},
+  {cmd = "ruff check --select I"},
+  {cmd = "ruff format --check"},
   {ref = "lint-types"},
   {ref = "lint-docs"},
 ]
@@ -176,6 +177,14 @@ privacy = [
 ]
 project-name = "Temporal Python"
 sidebar-expand-depth = 2
+
+[tool.ruff]
+target-version = "py38"
+extend-exclude = [
+  "temporalio/api",
+  "temporalio/bridge/proto",
+  "tests/worker/workflow_sandbox/testmodules/proto",
+]
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
