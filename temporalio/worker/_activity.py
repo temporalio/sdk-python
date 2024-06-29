@@ -623,8 +623,8 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         # Handle synchronous activity
         is_async = inspect.iscoroutinefunction(input.fn) or inspect.iscoroutinefunction(
-            input.fn.__call__
-        )  # type: ignore
+            input.fn.__call__  # type: ignore
+        )
         if not is_async:
             # We execute a top-level function via the executor. It is top-level
             # because it needs to be picklable. Also, by default Python does not

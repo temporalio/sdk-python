@@ -1127,8 +1127,8 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
                     return await handle.query(
                         CancelChildWorkflow.ready
                     ) and await client.get_workflow_handle_for(
-                        LongSleepWorkflow.run,
-                        workflow_id=f"{handle.id}_child",  # type: ignore[arg-type]
+                        LongSleepWorkflow.run,  # type: ignore[arg-type]
+                        workflow_id=f"{handle.id}_child",
                     ).query(LongSleepWorkflow.started)
                 except RPCError as err:
                     # Ignore not-found or failed precondition because child may
@@ -3056,8 +3056,8 @@ async def test_workflow_typed_handle(client: Client):
             TypedHandleWorkflow.run, id=id, task_queue=worker.task_queue
         )
         handle_result: TypedHandleResponse = await client.get_workflow_handle_for(
-            TypedHandleWorkflow.run,
-            id,  # type: ignore[arg-type]
+            TypedHandleWorkflow.run,  # type: ignore[arg-type]
+            id,
         ).result()
         assert isinstance(handle_result, TypedHandleResponse)
 
