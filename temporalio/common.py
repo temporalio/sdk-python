@@ -479,16 +479,14 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
     @overload
     def get(
         self, key: SearchAttributeKey[SearchAttributeValueType]
-    ) -> Optional[SearchAttributeValueType]:
-        ...
+    ) -> Optional[SearchAttributeValueType]: ...
 
     @overload
     def get(
         self,
         key: SearchAttributeKey[SearchAttributeValueType],
         default: temporalio.types.AnyType,
-    ) -> Union[SearchAttributeValueType, temporalio.types.AnyType]:
-        ...
+    ) -> Union[SearchAttributeValueType, temporalio.types.AnyType]: ...
 
     def get(
         self,

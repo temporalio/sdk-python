@@ -80,9 +80,9 @@ class _ActivityWorker:
         self._metric_meter = metric_meter
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         # Lazily created on first activity
-        self._worker_shutdown_event: Optional[
-            temporalio.activity._CompositeEvent
-        ] = None
+        self._worker_shutdown_event: Optional[temporalio.activity._CompositeEvent] = (
+            None
+        )
         self._seen_sync_activity = False
 
         # Validate and build activity dict
@@ -151,7 +151,9 @@ class _ActivityWorker:
                 poll_task = asyncio.create_task(
                     self._bridge_worker().poll_activity_task()
                 )
-                await asyncio.wait([poll_task, exception_task], return_when=asyncio.FIRST_COMPLETED)  # type: ignore
+                await asyncio.wait(
+                    [poll_task, exception_task], return_when=asyncio.FIRST_COMPLETED
+                )  # type: ignore
                 # If exception for failing the worker happened, raise it.
                 # Otherwise, the poll succeeded.
                 if exception_task.done():
@@ -306,10 +308,12 @@ class _ActivityWorker:
                 if isinstance(
                     self._activity_executor, concurrent.futures.ThreadPoolExecutor
                 ):
-                    running_activity.cancelled_event = temporalio.activity._CompositeEvent(
-                        thread_event=threading.Event(),
-                        # No async event
-                        async_event=None,
+                    running_activity.cancelled_event = (
+                        temporalio.activity._CompositeEvent(
+                            thread_event=threading.Event(),
+                            # No async event
+                            async_event=None,
+                        )
                     )
                     if not activity_def.no_thread_cancel_exception:
                         running_activity.cancel_thread_raiser = _ThreadExceptionRaiser()
@@ -318,10 +322,12 @@ class _ActivityWorker:
                     manager = self._shared_state_manager
                     # Pre-checked on worker init
                     assert manager
-                    running_activity.cancelled_event = temporalio.activity._CompositeEvent(
-                        thread_event=manager.new_event(),
-                        # No async event
-                        async_event=None,
+                    running_activity.cancelled_event = (
+                        temporalio.activity._CompositeEvent(
+                            thread_event=manager.new_event(),
+                            # No async event
+                            async_event=None,
+                        )
                     )
                     # We also must set the worker shutdown thread event to a
                     # manager event if this is the first sync event. We don't
@@ -616,7 +622,9 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         # Handle synchronous activity
-        is_async = inspect.iscoroutinefunction(input.fn) or inspect.iscoroutinefunction(input.fn.__call__)  # type: ignore
+        is_async = inspect.iscoroutinefunction(input.fn) or inspect.iscoroutinefunction(
+            input.fn.__call__
+        )  # type: ignore
         if not is_async:
             # We execute a top-level function via the executor. It is top-level
             # because it needs to be picklable. Also, by default Python does not

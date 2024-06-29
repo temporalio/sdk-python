@@ -54,7 +54,6 @@ customize, and work around sandbox issues.
 #   * https://bugs.python.org/issue44847
 #   * https://github.com/GrahamDumpleton/wrapt/issues/130
 
-
 from ._restrictions import (
     RestrictedWorkflowAccessError,
     SandboxMatcher,

@@ -286,9 +286,9 @@ async def test_replayer_multiple_from_client(
                 task_queue=worker.task_queue,
             )
             assert handle.result_run_id
-            expected_runs_and_non_det[
-                handle.result_run_id
-            ] = should_cause_nondeterminism
+            expected_runs_and_non_det[handle.result_run_id] = (
+                should_cause_nondeterminism
+            )
             await handle.result()
 
     # Run replayer with list iterator mapped to histories and collect results
