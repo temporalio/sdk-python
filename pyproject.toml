@@ -178,7 +178,7 @@ sidebar-expand-depth = 2
 target-version = "py38"
 extend-exclude = [
   "temporalio/api",
-  "temporalio/bridge/proto",
+  "temporalio/bridge",
   "tests/worker/workflow_sandbox/testmodules/proto",
 ]
 
