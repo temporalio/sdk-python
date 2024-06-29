@@ -24,7 +24,7 @@ script = "build.py"
 # a setup file, but we are using setuptools Rust manually in our build.py which
 # needs a setup file.
 # TODO(cretz): Find a way to not require a setup file since that is going away
-# at some point in Poetry. Revisit Maturin or fine some other approach.
+# at some point in Poetry. Revisit Maturin or find some other approach.
 generate-setup-file = true
 
 [tool.poetry.urls]
