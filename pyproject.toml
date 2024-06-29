@@ -49,6 +49,7 @@ psutil = "^5.9.3"
 pydantic = "^1.9.1"
 pydocstyle = "^6.1.1"
 pydoctor = "^23.4.1"
+pyright = ">=1.1.377"
 pytest = "^7.4"
 pytest-asyncio = "^0.21"
 pytest-timeout = "^2.2"
@@ -77,6 +78,7 @@ lint = [
   {cmd = "ruff check --select I"},
   {cmd = "ruff format --check"},
   {ref = "lint-types"},
+  {cmd = "pyright"},
   {ref = "lint-docs"},
 ]
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
@@ -173,6 +175,35 @@ privacy = [
 ]
 project-name = "Temporal Python"
 sidebar-expand-depth = 2
+
+[tool.pyright]
+include = ["temporalio", "tests"]
+exclude = [
+  "temporalio/api",
+  "temporalio/bridge/proto",
+  "tests/worker/workflow_sandbox/testmodules/proto",
+  "temporalio/bridge/worker.py",
+  "temporalio/client.py",
+  "temporalio/contrib/opentelemetry.py",
+  "temporalio/converter.py",
+  "temporalio/testing/_workflow.py",
+  "temporalio/worker/_activity.py",
+  "temporalio/worker/_replayer.py",
+  "temporalio/worker/_worker.py",
+  "temporalio/worker/workflow_sandbox/_importer.py",
+  "temporalio/worker/workflow_sandbox/_restrictions.py",
+  "temporalio/workflow.py",
+  "tests/api/test_grpc_stub.py",
+  "tests/conftest.py",
+  "tests/contrib/test_opentelemetry.py",
+  "tests/test_converter.py",
+  "tests/test_service.py",
+  "tests/test_workflow.py",
+  "tests/worker/test_activity.py",
+  "tests/worker/test_workflow.py",
+  "tests/worker/workflow_sandbox/test_importer.py",
+  "tests/worker/workflow_sandbox/test_restrictions.py",
+]
 
 [tool.ruff]
 target-version = "py38"
