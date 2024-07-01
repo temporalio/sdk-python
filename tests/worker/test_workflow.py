@@ -6659,9 +6659,10 @@ class CoroutinesUseLockWorkflow:
     @workflow.run
     async def run(
         self,
-        params: UseLockOrSemaphoreWorkflowParameters,
+        params: Optional[UseLockOrSemaphoreWorkflowParameters],
     ) -> LockOrSemaphoreWorkflowConcurrencySummary:
         # TODO: Use workflow init method when it exists.
+        assert params
         self.init(params)
         await asyncio.gather(
             *(self.coroutine(f"{i}") for i in range(self.params.n_coroutines))
@@ -6716,6 +6717,7 @@ class HandlerCoroutinesUseLockWorkflow(CoroutinesUseLockWorkflow):
     @workflow.run
     async def run(
         self,
+        _: Optional[UseLockOrSemaphoreWorkflowParameters] = None,
     ) -> LockOrSemaphoreWorkflowConcurrencySummary:
         await workflow.wait_condition(lambda: self.workflow_may_exit)
         return LockOrSemaphoreWorkflowConcurrencySummary(
