@@ -2765,9 +2765,7 @@ workflow.all_handlers_finished())`. Alternatively, if both you and the clients s
 are okay with interrupting running handlers when the workflow finishes, and causing clients to
 receive errors, then you can disable this warning via the update handler decorator:
 `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
-""".replace(
-        "\n", " "
-    ).strip()
+""".replace("\n", " ").strip()
     return (
         f"{message} The following updates were unfinished (and warnings were not disabled for their handler): "
         + json.dumps([{"name": ex.name, "id": ex.id} for ex in handler_executions])
@@ -2784,9 +2782,7 @@ signal handler was doing. You can wait for all update and signal handlers to com
 you and the clients sending the signal are okay with interrupting running handlers when the workflow
 finishes, and causing clients to receive errors, then you can disable this warning via the signal
 handler decorator: `@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
-""".replace(
-        "\n", " "
-    ).strip()
+""".replace("\n", " ").strip()
     names = collections.Counter(ex.name for ex in handler_executions)
     return (
         f"{message} The following signals were unfinished (and warnings were not disabled for their handler): "

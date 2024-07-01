@@ -23,13 +23,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.command_type_pb2
 import temporalio.api.enums.v1.workflow_pb2
@@ -767,10 +770,14 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     @property
     def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Timeout of a single workflow task."""
-    parent_close_policy: temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
+    parent_close_policy: (
+        temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
+    )
     """Default: PARENT_CLOSE_POLICY_TERMINATE."""
     control: builtins.str
-    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    workflow_id_reuse_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    )
     """Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
@@ -1028,7 +1035,9 @@ class Command(google.protobuf.message.Message):
     REQUEST_CANCEL_ACTIVITY_TASK_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CANCEL_TIMER_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CANCEL_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: (
+        builtins.int
+    )
     RECORD_MARKER_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CONTINUE_AS_NEW_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_CHILD_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int

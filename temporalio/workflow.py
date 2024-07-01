@@ -80,8 +80,7 @@ from .types import (
 
 
 @overload
-def defn(cls: ClassType) -> ClassType:
-    ...
+def defn(cls: ClassType) -> ClassType: ...
 
 
 @overload
@@ -90,15 +89,13 @@ def defn(
     name: Optional[str] = None,
     sandboxed: bool = True,
     failure_exception_types: Sequence[Type[BaseException]] = [],
-) -> Callable[[ClassType], ClassType]:
-    ...
+) -> Callable[[ClassType], ClassType]: ...
 
 
 @overload
 def defn(
     *, sandboxed: bool = True, dynamic: bool = False
-) -> Callable[[ClassType], ClassType]:
-    ...
+) -> Callable[[ClassType], ClassType]: ...
 
 
 def defn(
@@ -198,16 +195,18 @@ class UnfinishedSignalHandlersWarning(RuntimeWarning):
 
 
 @overload
-def signal(fn: CallableSyncOrAsyncReturnNoneType) -> CallableSyncOrAsyncReturnNoneType:
-    ...
+def signal(
+    fn: CallableSyncOrAsyncReturnNoneType,
+) -> CallableSyncOrAsyncReturnNoneType: ...
 
 
 @overload
 def signal(
     *,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
-) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
-    ...
+) -> Callable[
+    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
+]: ...
 
 
 @overload
@@ -215,8 +214,9 @@ def signal(
     *,
     name: str,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
-) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
-    ...
+) -> Callable[
+    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
+]: ...
 
 
 @overload
@@ -224,8 +224,9 @@ def signal(
     *,
     dynamic: Literal[True],
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
-) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
-    ...
+) -> Callable[
+    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
+]: ...
 
 
 def signal(
@@ -289,18 +290,15 @@ def signal(
 
 
 @overload
-def query(fn: CallableType) -> CallableType:
-    ...
+def query(fn: CallableType) -> CallableType: ...
 
 
 @overload
-def query(*, name: str) -> Callable[[CallableType], CallableType]:
-    ...
+def query(*, name: str) -> Callable[[CallableType], CallableType]: ...
 
 
 @overload
-def query(*, dynamic: Literal[True]) -> Callable[[CallableType], CallableType]:
-    ...
+def query(*, dynamic: Literal[True]) -> Callable[[CallableType], CallableType]: ...
 
 
 def query(
@@ -515,8 +513,7 @@ class _Runtime(ABC):
         return self._logger_details
 
     @abstractmethod
-    def workflow_all_handlers_finished(self) -> bool:
-        ...
+    def workflow_all_handlers_finished(self) -> bool: ...
 
     @abstractmethod
     def workflow_continue_as_new(
@@ -535,96 +532,81 @@ class _Runtime(ABC):
             ]
         ],
         versioning_intent: Optional[VersioningIntent],
-    ) -> NoReturn:
-        ...
+    ) -> NoReturn: ...
 
     @abstractmethod
-    def workflow_extern_functions(self) -> Mapping[str, Callable]:
-        ...
+    def workflow_extern_functions(self) -> Mapping[str, Callable]: ...
 
     @abstractmethod
-    def workflow_get_current_build_id(self) -> str:
-        ...
+    def workflow_get_current_build_id(self) -> str: ...
 
     @abstractmethod
-    def workflow_get_current_history_length(self) -> int:
-        ...
+    def workflow_get_current_history_length(self) -> int: ...
 
     @abstractmethod
-    def workflow_get_current_history_size(self) -> int:
-        ...
+    def workflow_get_current_history_size(self) -> int: ...
 
     @abstractmethod
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
-    ) -> ExternalWorkflowHandle[Any]:
-        ...
+    ) -> ExternalWorkflowHandle[Any]: ...
 
     @abstractmethod
-    def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_get_signal_handler(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_signal_handler(
+        self, name: Optional[str]
+    ) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_get_update_handler(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_update_handler(
+        self, name: Optional[str]
+    ) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_get_update_validator(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_update_validator(
+        self, name: Optional[str]
+    ) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_info(self) -> Info:
-        ...
+    def workflow_info(self) -> Info: ...
 
     @abstractmethod
-    def workflow_is_continue_as_new_suggested(self) -> bool:
-        ...
+    def workflow_is_continue_as_new_suggested(self) -> bool: ...
 
     @abstractmethod
-    def workflow_is_replaying(self) -> bool:
-        ...
+    def workflow_is_replaying(self) -> bool: ...
 
     @abstractmethod
-    def workflow_memo(self) -> Mapping[str, Any]:
-        ...
+    def workflow_memo(self) -> Mapping[str, Any]: ...
 
     @abstractmethod
     def workflow_memo_value(
         self, key: str, default: Any, *, type_hint: Optional[Type]
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     @abstractmethod
-    def workflow_metric_meter(self) -> temporalio.common.MetricMeter:
-        ...
+    def workflow_metric_meter(self) -> temporalio.common.MetricMeter: ...
 
     @abstractmethod
-    def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
-        ...
+    def workflow_patch(self, id: str, *, deprecated: bool) -> bool: ...
 
     @abstractmethod
-    def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter:
-        ...
+    def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter: ...
 
     @abstractmethod
-    def workflow_random(self) -> Random:
-        ...
+    def workflow_random(self) -> Random: ...
 
     @abstractmethod
     def workflow_set_query_handler(
         self, name: Optional[str], handler: Optional[Callable]
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def workflow_set_signal_handler(
         self, name: Optional[str], handler: Optional[Callable]
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def workflow_set_update_handler(
@@ -632,8 +614,7 @@ class _Runtime(ABC):
         name: Optional[str],
         handler: Optional[Callable],
         validator: Optional[Callable],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def workflow_start_activity(
@@ -650,8 +631,7 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
         versioning_intent: Optional[VersioningIntent],
-    ) -> ActivityHandle[Any]:
-        ...
+    ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
     async def workflow_start_child_workflow(
@@ -677,8 +657,7 @@ class _Runtime(ABC):
             ]
         ],
         versioning_intent: Optional[VersioningIntent],
-    ) -> ChildWorkflowHandle[Any, Any]:
-        ...
+    ) -> ChildWorkflowHandle[Any, Any]: ...
 
     @abstractmethod
     def workflow_start_local_activity(
@@ -693,12 +672,10 @@ class _Runtime(ABC):
         local_retry_threshold: Optional[timedelta],
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
-    ) -> ActivityHandle[Any]:
-        ...
+    ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
-    def workflow_time_ns(self) -> int:
-        ...
+    def workflow_time_ns(self) -> int: ...
 
     @abstractmethod
     def workflow_upsert_search_attributes(
@@ -707,14 +684,12 @@ class _Runtime(ABC):
             temporalio.common.SearchAttributes,
             Sequence[temporalio.common.SearchAttributeUpdate],
         ],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     async def workflow_wait_condition(
         self, fn: Callable[[], bool], *, timeout: Optional[float] = None
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -790,20 +765,17 @@ def memo() -> Mapping[str, Any]:
 
 
 @overload
-def memo_value(key: str, default: Any = temporalio.common._arg_unset) -> Any:
-    ...
+def memo_value(key: str, default: Any = temporalio.common._arg_unset) -> Any: ...
 
 
 @overload
-def memo_value(key: str, *, type_hint: Type[ParamType]) -> ParamType:
-    ...
+def memo_value(key: str, *, type_hint: Type[ParamType]) -> ParamType: ...
 
 
 @overload
 def memo_value(
     key: str, default: AnyType, *, type_hint: Type[ParamType]
-) -> Union[AnyType, ParamType]:
-    ...
+) -> Union[AnyType, ParamType]: ...
 
 
 def memo_value(
@@ -923,7 +895,7 @@ def upsert_search_attributes(
     attributes: Union[
         temporalio.common.SearchAttributes,
         Sequence[temporalio.common.SearchAttributeUpdate],
-    ]
+    ],
 ) -> None:
     """Upsert search attributes for this workflow.
 
@@ -960,16 +932,14 @@ class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
 
 @overload
 def update(
-    fn: Callable[MultiParamSpec, Awaitable[ReturnType]]
-) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
-    ...
+    fn: Callable[MultiParamSpec, Awaitable[ReturnType]],
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]: ...
 
 
 @overload
 def update(
-    fn: Callable[MultiParamSpec, ReturnType]
-) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
-    ...
+    fn: Callable[MultiParamSpec, ReturnType],
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]: ...
 
 
 @overload
@@ -979,8 +949,7 @@ def update(
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]:
-    ...
+]: ...
 
 
 @overload
@@ -991,8 +960,7 @@ def update(
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]:
-    ...
+]: ...
 
 
 @overload
@@ -1003,8 +971,7 @@ def update(
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]:
-    ...
+]: ...
 
 
 def update(
@@ -1713,8 +1680,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -1731,8 +1697,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -1750,8 +1715,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -1769,8 +1733,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -1788,8 +1751,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -1807,8 +1769,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for string-name activity
@@ -1828,8 +1789,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[Any]:
-    ...
+) -> ActivityHandle[Any]: ...
 
 
 def start_activity(
@@ -1914,8 +1874,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -1932,8 +1891,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -1951,8 +1909,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -1970,8 +1927,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -1989,8 +1945,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -2008,8 +1963,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for string-name activity
@@ -2029,8 +1983,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> Any:
-    ...
+) -> Any: ...
 
 
 async def execute_activity(
@@ -2085,8 +2038,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -2103,8 +2055,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -2122,8 +2073,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -2141,8 +2091,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -2160,8 +2109,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -2179,8 +2127,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_activity_class(
@@ -2232,8 +2179,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -2250,8 +2196,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -2269,8 +2214,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -2288,8 +2232,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -2307,8 +2250,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -2326,8 +2268,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 async def execute_activity_class(
@@ -2379,8 +2320,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -2397,8 +2337,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -2416,8 +2355,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -2435,8 +2373,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -2454,8 +2391,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -2473,8 +2409,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_activity_method(
@@ -2526,8 +2461,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -2544,8 +2478,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -2563,8 +2496,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -2582,8 +2514,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -2601,8 +2532,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -2620,8 +2550,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 async def execute_activity_method(
@@ -2687,8 +2616,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -2703,8 +2631,7 @@ def start_local_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -2720,8 +2647,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -2737,8 +2663,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -2754,8 +2679,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -2771,8 +2695,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for string-name activity
@@ -2790,8 +2713,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[Any]:
-    ...
+) -> ActivityHandle[Any]: ...
 
 
 def start_local_activity(
@@ -2867,8 +2789,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -2883,8 +2804,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -2900,8 +2820,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -2917,8 +2836,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -2934,8 +2852,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -2951,8 +2868,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for string-name activity
@@ -2970,8 +2886,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> Any:
-    ...
+) -> Any: ...
 
 
 async def execute_local_activity(
@@ -3023,8 +2938,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -3039,8 +2953,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -3056,8 +2969,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -3073,8 +2985,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -3090,8 +3001,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -3107,8 +3017,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_local_activity_class(
@@ -3157,8 +3066,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -3173,8 +3081,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -3190,8 +3097,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -3207,8 +3113,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -3224,8 +3129,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -3241,8 +3145,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 async def execute_local_activity_class(
@@ -3293,8 +3196,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -3309,8 +3211,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -3326,8 +3227,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -3343,8 +3243,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -3360,8 +3259,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -3377,8 +3275,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_local_activity_method(
@@ -3427,8 +3324,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -3443,8 +3339,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -3460,8 +3355,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -3477,8 +3371,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -3494,8 +3387,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -3511,8 +3403,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 async def execute_local_activity_method(
@@ -3573,16 +3464,14 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
     async def signal(
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
@@ -3592,8 +3481,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         ],
         *,
         args: Sequence[Any],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
@@ -3602,8 +3490,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def signal(
         self,
@@ -3702,8 +3589,7 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[SelfType, ReturnType]:
-    ...
+) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Overload for single-param workflow
@@ -3729,8 +3615,7 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[SelfType, ReturnType]:
-    ...
+) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Overload for multi-param workflow
@@ -3756,8 +3641,7 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[SelfType, ReturnType]:
-    ...
+) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Overload for string-name workflow
@@ -3785,8 +3669,7 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[Any, Any]:
-    ...
+) -> ChildWorkflowHandle[Any, Any]: ...
 
 
 async def start_child_workflow(
@@ -3888,8 +3771,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for single-param workflow
@@ -3915,8 +3797,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for multi-param workflow
@@ -3942,8 +3823,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for string-name workflow
@@ -3971,8 +3851,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> Any:
-    ...
+) -> Any: ...
 
 
 async def execute_child_workflow(
@@ -4048,16 +3927,14 @@ class ExternalWorkflowHandle(Generic[SelfType]):
     async def signal(
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
@@ -4066,8 +3943,7 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def signal(
         self,
@@ -4170,8 +4046,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for no-param workflow
@@ -4190,8 +4065,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for single-param workflow
@@ -4211,8 +4085,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for multi-param workflow
@@ -4232,8 +4105,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for string-name workflow
@@ -4253,8 +4125,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 def continue_as_new(
@@ -4558,8 +4429,7 @@ async def wait(  # type: ignore[misc]
     *,
     timeout: Optional[float] = None,
     return_when: str = asyncio.ALL_COMPLETED,
-) -> Tuple[List[_FT], List[_FT]]:
-    ...
+) -> Tuple[List[_FT], List[_FT]]: ...
 
 
 @overload
@@ -4568,8 +4438,7 @@ async def wait(
     *,
     timeout: Optional[float] = None,
     return_when: str = asyncio.ALL_COMPLETED,
-) -> Tuple[List[asyncio.Task[AnyType]], set[asyncio.Task[AnyType]]]:
-    ...
+) -> Tuple[List[asyncio.Task[AnyType]], set[asyncio.Task[AnyType]]]: ...
 
 
 async def wait(

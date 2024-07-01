@@ -23,8 +23,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import abc
+
 import grpc
+
 import temporalio.api.operatorservice.v1.request_response_pb2
 
 class OperatorServiceStub:
@@ -129,9 +132,7 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse:
         """AddSearchAttributes add custom search attributes.
 
         Returns ALREADY_EXISTS status code if a Search Attribute with any of the specified names already exists
@@ -142,9 +143,7 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse:
         """RemoveSearchAttributes removes custom search attributes.
 
         Returns NOT_FOUND status code if a Search Attribute with any of the specified names is not registered
@@ -154,9 +153,7 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse:
         """ListSearchAttributes returns comprehensive information about search attributes."""
     @abc.abstractmethod
     def DeleteNamespace(
@@ -170,18 +167,14 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse:
         """AddOrUpdateRemoteCluster adds or updates remote cluster."""
     @abc.abstractmethod
     def RemoveRemoteCluster(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse:
         """RemoveRemoteCluster removes remote cluster."""
     @abc.abstractmethod
     def ListClusters(
@@ -204,9 +197,7 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse:
         """Create a Nexus endpoint. This will fail if an endpoint with the same name is already registered with a status of
         ALREADY_EXISTS.
         Returns the created endpoint with its initial version. You may use this version for subsequent updates.
@@ -216,9 +207,7 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse:
         """Optimistically update a Nexus endpoint based on provided version as obtained via the `GetNexusEndpoint` or
         `ListNexusEndpointResponse` APIs. This will fail with a status of FAILED_PRECONDITION if the version does not
         match.
@@ -230,18 +219,14 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse:
         """Delete an incoming Nexus service by ID."""
     @abc.abstractmethod
     def ListNexusEndpoints(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse
-    ):
+    ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse:
         """List all Nexus endpoints for the cluster, sorted by ID in ascending order. Set page_token in the request to the
         next_page_token field of the previous response to get the next page of results. An empty next_page_token
         indicates that there are no more results. During pagination, a newly added service with an ID lexicographically

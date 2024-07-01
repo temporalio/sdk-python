@@ -313,8 +313,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> WorkflowHandle[SelfType, ReturnType]:
-        ...
+    ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for single-param workflow
     @overload
@@ -344,8 +343,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> WorkflowHandle[SelfType, ReturnType]:
-        ...
+    ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for multi-param workflow
     @overload
@@ -377,8 +375,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> WorkflowHandle[SelfType, ReturnType]:
-        ...
+    ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for string-name workflow
     @overload
@@ -410,8 +407,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> WorkflowHandle[Any, Any]:
-        ...
+    ) -> WorkflowHandle[Any, Any]: ...
 
     async def start_workflow(
         self,
@@ -556,8 +552,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> ReturnType:
-        ...
+    ) -> ReturnType: ...
 
     # Overload for single-param workflow
     @overload
@@ -587,8 +582,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> ReturnType:
-        ...
+    ) -> ReturnType: ...
 
     # Overload for multi-param workflow
     @overload
@@ -620,8 +614,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> ReturnType:
-        ...
+    ) -> ReturnType: ...
 
     # Overload for string-name workflow
     @overload
@@ -653,8 +646,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     async def execute_workflow(
         self,
@@ -1503,8 +1495,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> LocalReturnType:
-        ...
+    ) -> LocalReturnType: ...
 
     # Overload for single-param query
     @overload
@@ -1516,8 +1507,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> LocalReturnType:
-        ...
+    ) -> LocalReturnType: ...
 
     # Overload for multi-param query
     @overload
@@ -1532,8 +1522,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> LocalReturnType:
-        ...
+    ) -> LocalReturnType: ...
 
     # Overload for string-name query
     @overload
@@ -1547,8 +1536,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     async def query(
         self,
@@ -1631,8 +1619,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     # Overload for single-param signal
     @overload
@@ -1643,8 +1630,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     # Overload for multi-param signal
     @overload
@@ -1657,8 +1643,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     # Overload for string-name signal
     @overload
@@ -1670,8 +1655,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def signal(
         self,
@@ -1768,8 +1752,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> LocalReturnType:
-        ...
+    ) -> LocalReturnType: ...
 
     # Overload for single-param update
     @overload
@@ -1783,8 +1766,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> LocalReturnType:
-        ...
+    ) -> LocalReturnType: ...
 
     # Overload for multi-param update
     @overload
@@ -1798,8 +1780,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> LocalReturnType:
-        ...
+    ) -> LocalReturnType: ...
 
     # Overload for string-name update
     @overload
@@ -1813,8 +1794,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     async def execute_update(
         self,
@@ -1880,8 +1860,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> WorkflowUpdateHandle[LocalReturnType]:
-        ...
+    ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for single-param start update
     @overload
@@ -1896,8 +1875,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> WorkflowUpdateHandle[LocalReturnType]:
-        ...
+    ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for multi-param start update
     @overload
@@ -1912,8 +1890,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> WorkflowUpdateHandle[LocalReturnType]:
-        ...
+    ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for string-name start update
     @overload
@@ -1928,8 +1905,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: Optional[Type] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> WorkflowUpdateHandle[Any]:
-        ...
+    ) -> WorkflowUpdateHandle[Any]: ...
 
     async def start_update(
         self,
@@ -2318,18 +2294,17 @@ class WorkflowExecution:
     @overload
     async def memo_value(
         self, key: str, default: Any = temporalio.common._arg_unset
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     @overload
-    async def memo_value(self, key: str, *, type_hint: Type[ParamType]) -> ParamType:
-        ...
+    async def memo_value(
+        self, key: str, *, type_hint: Type[ParamType]
+    ) -> ParamType: ...
 
     @overload
     async def memo_value(
         self, key: str, default: AnyType, *, type_hint: Type[ParamType]
-    ) -> Union[AnyType, ParamType]:
-        ...
+    ) -> Union[AnyType, ParamType]: ...
 
     async def memo_value(
         self,
@@ -2909,8 +2884,7 @@ class ScheduleHandle:
         *,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def update(
@@ -2919,8 +2893,7 @@ class ScheduleHandle:
         *,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def update(
         self,
@@ -3212,8 +3185,7 @@ class ScheduleAction(ABC):
     @abstractmethod
     async def _to_proto(
         self, client: Client
-    ) -> temporalio.api.schedule.v1.ScheduleAction:
-        ...
+    ) -> temporalio.api.schedule.v1.ScheduleAction: ...
 
 
 @dataclass
@@ -3259,8 +3231,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     # Overload for single-param workflow
     @overload
@@ -3277,8 +3248,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     # Overload for multi-param workflow
     @overload
@@ -3297,8 +3267,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     # Overload for string-name workflow
     @overload
@@ -3316,8 +3285,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     # Overload for raw info
     @overload
@@ -3326,8 +3294,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         workflow: str,
         *,
         raw_info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def __init__(
         self,
@@ -3566,9 +3533,7 @@ class ScheduleBackfill:
         start_time.FromDatetime(self.start_at)
         end_time = google.protobuf.timestamp_pb2.Timestamp()
         end_time.FromDatetime(self.end_at)
-        overlap_policy = (
-            temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
-        )
+        overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
         if self.overlap:
             overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.ValueType(
                 self.overlap
@@ -3772,18 +3737,17 @@ class ScheduleDescription:
     @overload
     async def memo_value(
         self, key: str, default: Any = temporalio.common._arg_unset
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     @overload
-    async def memo_value(self, key: str, *, type_hint: Type[ParamType]) -> ParamType:
-        ...
+    async def memo_value(
+        self, key: str, *, type_hint: Type[ParamType]
+    ) -> ParamType: ...
 
     @overload
     async def memo_value(
         self, key: str, default: AnyType, *, type_hint: Type[ParamType]
-    ) -> Union[AnyType, ParamType]:
-        ...
+    ) -> Union[AnyType, ParamType]: ...
 
     async def memo_value(
         self,
@@ -4019,18 +3983,17 @@ class ScheduleListDescription:
     @overload
     async def memo_value(
         self, key: str, default: Any = temporalio.common._arg_unset
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     @overload
-    async def memo_value(self, key: str, *, type_hint: Type[ParamType]) -> ParamType:
-        ...
+    async def memo_value(
+        self, key: str, *, type_hint: Type[ParamType]
+    ) -> ParamType: ...
 
     @overload
     async def memo_value(
         self, key: str, default: AnyType, *, type_hint: Type[ParamType]
-    ) -> Union[AnyType, ParamType]:
-        ...
+    ) -> Union[AnyType, ParamType]: ...
 
     async def memo_value(
         self,
@@ -5093,9 +5056,7 @@ class _ClientImpl(OutboundInterceptor):
             # If the status is ALREADY_EXISTS and the details can be extracted
             # as already started, use a different exception
             if err.status == RPCStatusCode.ALREADY_EXISTS and err.grpc_status.details:
-                details = (
-                    temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
-                )
+                details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
                 if err.grpc_status.details[0].Unpack(details):
                     raise temporalio.exceptions.WorkflowAlreadyStartedError(
                         input.id, input.workflow, run_id=details.run_id
@@ -5623,9 +5584,7 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def trigger_schedule(self, input: TriggerScheduleInput) -> None:
-        overlap_policy = (
-            temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
-        )
+        overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_UNSPECIFIED
         if input.overlap:
             overlap_policy = temporalio.api.enums.v1.ScheduleOverlapPolicy.ValueType(
                 input.overlap
@@ -5743,7 +5702,7 @@ class _ClientImpl(OutboundInterceptor):
 
 
 def _history_from_json(
-    history: Union[str, Dict[str, Any]]
+    history: Union[str, Dict[str, Any]],
 ) -> temporalio.api.history.v1.History:
     if isinstance(history, str):
         history = json.loads(history)
@@ -6118,17 +6077,11 @@ class TaskReachabilityType(Enum):
                 temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_NEW_WORKFLOWS
             )
         elif self == TaskReachabilityType.EXISTING_WORKFLOWS:
-            return (
-                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_EXISTING_WORKFLOWS
-            )
+            return temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_EXISTING_WORKFLOWS
         elif self == TaskReachabilityType.OPEN_WORKFLOWS:
-            return (
-                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_OPEN_WORKFLOWS
-            )
+            return temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_OPEN_WORKFLOWS
         elif self == TaskReachabilityType.CLOSED_WORKFLOWS:
-            return (
-                temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_CLOSED_WORKFLOWS
-            )
+            return temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_CLOSED_WORKFLOWS
         else:
             return (
                 temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_UNSPECIFIED

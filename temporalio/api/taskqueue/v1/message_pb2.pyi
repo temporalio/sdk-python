@@ -23,15 +23,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import google.protobuf.wrappers_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 
@@ -176,7 +179,9 @@ class TaskQueueVersionInfo(google.protobuf.message.Message):
         builtins.int, global___TaskQueueTypeInfo
     ]:
         """Task Queue info per Task Type. Key is the numerical value of the temporalio.api.enums.v1.TaskQueueType enum."""
-    task_reachability: temporalio.api.enums.v1.task_queue_pb2.BuildIdTaskReachability.ValueType
+    task_reachability: (
+        temporalio.api.enums.v1.task_queue_pb2.BuildIdTaskReachability.ValueType
+    )
     """Task Reachability is eventually consistent; there may be a delay until it converges to the most
     accurate value but it is designed in a way to take the more conservative side until it converges.
     For example REACHABLE is more conservative than CLOSED_WORKFLOWS_ONLY.

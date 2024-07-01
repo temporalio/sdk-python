@@ -23,14 +23,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.enums.v1.namespace_pb2
 
 if sys.version_info >= (3, 8):
@@ -192,10 +195,14 @@ class NamespaceConfig(google.protobuf.message.Message):
     ) -> google.protobuf.duration_pb2.Duration: ...
     @property
     def bad_binaries(self) -> global___BadBinaries: ...
-    history_archival_state: temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    history_archival_state: (
+        temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    )
     """If unspecified (ARCHIVAL_STATE_UNSPECIFIED) then default server configuration is used."""
     history_archival_uri: builtins.str
-    visibility_archival_state: temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    visibility_archival_state: (
+        temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    )
     """If unspecified (ARCHIVAL_STATE_UNSPECIFIED) then default server configuration is used."""
     visibility_archival_uri: builtins.str
     @property

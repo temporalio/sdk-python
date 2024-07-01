@@ -23,11 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
 import sys
 import typing
+
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -127,9 +129,13 @@ class _EventTypeEnumTypeWrapper(
     """A request has been made to cancel the Workflow execution"""
     EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED: _EventType.ValueType  # 21
     """SDK client has confirmed the cancellation request and the Workflow execution has been cancelled"""
-    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: _EventType.ValueType  # 22
+    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: (
+        _EventType.ValueType
+    )  # 22
     """Workflow has requested that the Temporal Server try to cancel another Workflow"""
-    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED: _EventType.ValueType  # 23
+    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED: (
+        _EventType.ValueType
+    )  # 23
     """Temporal Server could not cancel the targeted Workflow
     This is usually because the target Workflow could not be found
     """
@@ -305,7 +311,9 @@ EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED: EventType.ValueType  # 20
 """A request has been made to cancel the Workflow execution"""
 EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED: EventType.ValueType  # 21
 """SDK client has confirmed the cancellation request and the Workflow execution has been cancelled"""
-EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: EventType.ValueType  # 22
+EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: (
+    EventType.ValueType
+)  # 22
 """Workflow has requested that the Temporal Server try to cancel another Workflow"""
 EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED: EventType.ValueType  # 23
 """Temporal Server could not cancel the targeted Workflow

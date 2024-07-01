@@ -163,9 +163,9 @@ class KitchenSinkWorkflow:
                     milliseconds=opt.schedule_to_start_timeout_ms
                 )
             if opt.wait_for_cancellation:
-                config[
-                    "cancellation_type"
-                ] = workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+                config["cancellation_type"] = (
+                    workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED
+                )
             if opt.heartbeat_timeout_ms:
                 config["heartbeat_timeout"] = timedelta(
                     milliseconds=opt.heartbeat_timeout_ms

@@ -23,15 +23,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.empty_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.workflow_pb2
@@ -470,7 +473,9 @@ class PendingChildExecutionInfo(google.protobuf.message.Message):
     run_id: builtins.str
     workflow_type_name: builtins.str
     initiated_id: builtins.int
-    parent_close_policy: temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
+    parent_close_policy: (
+        temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
+    )
     """Default: PARENT_CLOSE_POLICY_TERMINATE."""
     def __init__(
         self,
@@ -689,7 +694,9 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
     @property
     def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Timeout of a single workflow task."""
-    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    workflow_id_reuse_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    )
     """Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:

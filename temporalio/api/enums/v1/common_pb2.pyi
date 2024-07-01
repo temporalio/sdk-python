@@ -23,11 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
 import sys
 import typing
+
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -166,11 +168,15 @@ class _PendingNexusOperationStateEnumTypeWrapper(
     builtins.type,
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    PENDING_NEXUS_OPERATION_STATE_UNSPECIFIED: _PendingNexusOperationState.ValueType  # 0
+    PENDING_NEXUS_OPERATION_STATE_UNSPECIFIED: (
+        _PendingNexusOperationState.ValueType
+    )  # 0
     """Default value, unspecified state."""
     PENDING_NEXUS_OPERATION_STATE_SCHEDULED: _PendingNexusOperationState.ValueType  # 1
     """Operation is in the queue waiting to be executed or is currently executing."""
-    PENDING_NEXUS_OPERATION_STATE_BACKING_OFF: _PendingNexusOperationState.ValueType  # 2
+    PENDING_NEXUS_OPERATION_STATE_BACKING_OFF: (
+        _PendingNexusOperationState.ValueType
+    )  # 2
     """Operation has failed with a retryable error and is backing off before the next attempt."""
     PENDING_NEXUS_OPERATION_STATE_STARTED: _PendingNexusOperationState.ValueType  # 3
     """Operation was started and will complete asynchronously."""
@@ -201,17 +207,29 @@ class _NexusOperationCancellationStateEnumTypeWrapper(
     builtins.type,
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: _NexusOperationCancellationState.ValueType  # 0
+    NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: (
+        _NexusOperationCancellationState.ValueType
+    )  # 0
     """Default value, unspecified state."""
-    NEXUS_OPERATION_CANCELLATION_STATE_SCHEDULED: _NexusOperationCancellationState.ValueType  # 1
+    NEXUS_OPERATION_CANCELLATION_STATE_SCHEDULED: (
+        _NexusOperationCancellationState.ValueType
+    )  # 1
     """Cancellation request is in the queue waiting to be executed or is currently executing."""
-    NEXUS_OPERATION_CANCELLATION_STATE_BACKING_OFF: _NexusOperationCancellationState.ValueType  # 2
+    NEXUS_OPERATION_CANCELLATION_STATE_BACKING_OFF: (
+        _NexusOperationCancellationState.ValueType
+    )  # 2
     """Cancellation request has failed with a retryable error and is backing off before the next attempt."""
-    NEXUS_OPERATION_CANCELLATION_STATE_SUCCEEDED: _NexusOperationCancellationState.ValueType  # 3
+    NEXUS_OPERATION_CANCELLATION_STATE_SUCCEEDED: (
+        _NexusOperationCancellationState.ValueType
+    )  # 3
     """Cancellation request succeeded."""
-    NEXUS_OPERATION_CANCELLATION_STATE_FAILED: _NexusOperationCancellationState.ValueType  # 4
+    NEXUS_OPERATION_CANCELLATION_STATE_FAILED: (
+        _NexusOperationCancellationState.ValueType
+    )  # 4
     """Cancellation request failed with a non-retryable error."""
-    NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT: _NexusOperationCancellationState.ValueType  # 5
+    NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT: (
+        _NexusOperationCancellationState.ValueType
+    )  # 5
     """The associated operation timed out - exceeded the user supplied schedule-to-close timeout."""
 
 class NexusOperationCancellationState(
@@ -220,16 +238,28 @@ class NexusOperationCancellationState(
 ):
     """State of a Nexus operation cancellation."""
 
-NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: NexusOperationCancellationState.ValueType  # 0
+NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: (
+    NexusOperationCancellationState.ValueType
+)  # 0
 """Default value, unspecified state."""
-NEXUS_OPERATION_CANCELLATION_STATE_SCHEDULED: NexusOperationCancellationState.ValueType  # 1
+NEXUS_OPERATION_CANCELLATION_STATE_SCHEDULED: (
+    NexusOperationCancellationState.ValueType
+)  # 1
 """Cancellation request is in the queue waiting to be executed or is currently executing."""
-NEXUS_OPERATION_CANCELLATION_STATE_BACKING_OFF: NexusOperationCancellationState.ValueType  # 2
+NEXUS_OPERATION_CANCELLATION_STATE_BACKING_OFF: (
+    NexusOperationCancellationState.ValueType
+)  # 2
 """Cancellation request has failed with a retryable error and is backing off before the next attempt."""
-NEXUS_OPERATION_CANCELLATION_STATE_SUCCEEDED: NexusOperationCancellationState.ValueType  # 3
+NEXUS_OPERATION_CANCELLATION_STATE_SUCCEEDED: (
+    NexusOperationCancellationState.ValueType
+)  # 3
 """Cancellation request succeeded."""
-NEXUS_OPERATION_CANCELLATION_STATE_FAILED: NexusOperationCancellationState.ValueType  # 4
+NEXUS_OPERATION_CANCELLATION_STATE_FAILED: (
+    NexusOperationCancellationState.ValueType
+)  # 4
 """Cancellation request failed with a non-retryable error."""
-NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT: NexusOperationCancellationState.ValueType  # 5
+NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT: (
+    NexusOperationCancellationState.ValueType
+)  # 5
 """The associated operation timed out - exceeded the user supplied schedule-to-close timeout."""
 global___NexusOperationCancellationState = NexusOperationCancellationState

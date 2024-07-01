@@ -23,11 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
 import sys
 import typing
+
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -187,7 +189,9 @@ class _BuildIdTaskReachabilityEnumTypeWrapper(
     """Build ID may be used by new workflows or activities (base on versioning rules), or there MAY
     be open workflows or backlogged activities assigned to it.
     """
-    BUILD_ID_TASK_REACHABILITY_CLOSED_WORKFLOWS_ONLY: _BuildIdTaskReachability.ValueType  # 2
+    BUILD_ID_TASK_REACHABILITY_CLOSED_WORKFLOWS_ONLY: (
+        _BuildIdTaskReachability.ValueType
+    )  # 2
     """Build ID does not have open workflows and is not reachable by new workflows,
     but MAY have closed workflows within the namespace retention period.
     Not applicable to activity-only task queues.

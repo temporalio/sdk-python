@@ -145,16 +145,14 @@ class PayloadConverter(ABC):
         return self.to_payloads([value])[0]
 
     @overload
-    def from_payload(self, payload: temporalio.api.common.v1.Payload) -> Any:
-        ...
+    def from_payload(self, payload: temporalio.api.common.v1.Payload) -> Any: ...
 
     @overload
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Type[temporalio.types.AnyType],
-    ) -> temporalio.types.AnyType:
-        ...
+    ) -> temporalio.types.AnyType: ...
 
     def from_payload(
         self,
@@ -878,9 +876,7 @@ class DefaultFailureConverter(FailureConverter):
         elif isinstance(error, temporalio.exceptions.ChildWorkflowError):
             failure.child_workflow_execution_failure_info.SetInParent()
             failure.child_workflow_execution_failure_info.namespace = error.namespace
-            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = (
-                error.workflow_id
-            )
+            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = error.workflow_id
             failure.child_workflow_execution_failure_info.workflow_execution.run_id = (
                 error.run_id
             )

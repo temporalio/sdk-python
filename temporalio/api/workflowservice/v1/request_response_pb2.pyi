@@ -23,14 +23,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.batch.v1.message_pb2
 import temporalio.api.command.v1.message_pb2
 import temporalio.api.common.v1.message_pb2
@@ -121,10 +124,14 @@ class RegisterNamespaceRequest(google.protobuf.message.Message):
         """A key-value map for any customized purpose."""
     security_token: builtins.str
     is_global_namespace: builtins.bool
-    history_archival_state: temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    history_archival_state: (
+        temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    )
     """If unspecified (ARCHIVAL_STATE_UNSPECIFIED) then default server configuration is used."""
     history_archival_uri: builtins.str
-    visibility_archival_state: temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    visibility_archival_state: (
+        temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
+    )
     """If unspecified (ARCHIVAL_STATE_UNSPECIFIED) then default server configuration is used."""
     visibility_archival_uri: builtins.str
     def __init__(
@@ -574,13 +581,17 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     """The identity of the client who initiated this request"""
     request_id: builtins.str
     """A unique identifier for this start request. Typically UUIDv4."""
-    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    workflow_id_reuse_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    )
     """Defines whether to allow re-using the workflow id from a previously *closed* workflow.
     The default policy is WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
 
     See `workflow_id_conflict_policy` for handling a workflow id duplication with a *running* workflow.
     """
-    workflow_id_conflict_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdConflictPolicy.ValueType
+    workflow_id_conflict_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdConflictPolicy.ValueType
+    )
     """Defines how to resolve a workflow id conflict with a *running* workflow.
     The default policy is WORKFLOW_ID_CONFLICT_POLICY_FAIL.
 
@@ -823,7 +834,9 @@ class GetWorkflowExecutionHistoryRequest(google.protobuf.message.Message):
     """If set to true, the RPC call will not resolve until there is a new event which matches
     the `history_event_filter_type`, or a timeout is hit.
     """
-    history_event_filter_type: temporalio.api.enums.v1.workflow_pb2.HistoryEventFilterType.ValueType
+    history_event_filter_type: (
+        temporalio.api.enums.v1.workflow_pb2.HistoryEventFilterType.ValueType
+    )
     """Filter returned events such that they match the specified filter type.
     Default: HISTORY_EVENT_FILTER_TYPE_ALL_EVENT.
     """
@@ -2621,13 +2634,17 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     """The identity of the worker/client"""
     request_id: builtins.str
     """Used to de-dupe signal w/ start requests"""
-    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    workflow_id_reuse_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    )
     """Defines whether to allow re-using the workflow id from a previously *closed* workflow.
     The default policy is WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
 
     See `workflow_id_reuse_policy` for handling a workflow id duplication with a *running* workflow.
     """
-    workflow_id_conflict_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdConflictPolicy.ValueType
+    workflow_id_conflict_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdConflictPolicy.ValueType
+    )
     """Defines how to resolve a workflow id conflict with a *running* workflow.
     The default policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING.
     Note that WORKFLOW_ID_CONFLICT_POLICY_FAIL is an invalid option.
@@ -3672,7 +3689,9 @@ class QueryWorkflowRequest(google.protobuf.message.Message):
     def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     @property
     def query(self) -> temporalio.api.query.v1.message_pb2.WorkflowQuery: ...
-    query_reject_condition: temporalio.api.enums.v1.query_pb2.QueryRejectCondition.ValueType
+    query_reject_condition: (
+        temporalio.api.enums.v1.query_pb2.QueryRejectCondition.ValueType
+    )
     """QueryRejectCondition can used to reject the query if workflow state does not satisfy condition.
     Default: QUERY_REJECT_CONDITION_NONE.
     """
@@ -6064,7 +6083,9 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
     FAILURE_OPERATION_COUNT_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
-    operation_type: temporalio.api.enums.v1.batch_operation_pb2.BatchOperationType.ValueType
+    operation_type: (
+        temporalio.api.enums.v1.batch_operation_pb2.BatchOperationType.ValueType
+    )
     """Batch operation type"""
     job_id: builtins.str
     """Batch job ID"""

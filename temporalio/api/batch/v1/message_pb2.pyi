@@ -23,11 +23,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.batch_operation_pb2
 import temporalio.api.enums.v1.reset_pb2

@@ -1127,10 +1127,9 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
                     return await handle.query(
                         CancelChildWorkflow.ready
                     ) and await client.get_workflow_handle_for(
-                        LongSleepWorkflow.run, workflow_id=f"{handle.id}_child"  # type: ignore[arg-type]
-                    ).query(
-                        LongSleepWorkflow.started
-                    )
+                        LongSleepWorkflow.run,  # type: ignore[arg-type]
+                        workflow_id=f"{handle.id}_child",
+                    ).query(LongSleepWorkflow.started)
                 except RPCError as err:
                     # Ignore not-found or failed precondition because child may
                     # not have started yet
@@ -1228,10 +1227,10 @@ class SignalExternalWorkflowArgs:
 class SignalExternalWorkflow:
     @workflow.run
     async def run(self, args: SignalExternalWorkflowArgs) -> None:
-        handle: workflow.ExternalWorkflowHandle[
-            ReturnSignalWorkflow
-        ] = workflow.get_external_workflow_handle_for(
-            ReturnSignalWorkflow.run, args.external_workflow_id
+        handle: workflow.ExternalWorkflowHandle[ReturnSignalWorkflow] = (
+            workflow.get_external_workflow_handle_for(
+                ReturnSignalWorkflow.run, args.external_workflow_id
+            )
         )
         await handle.signal(ReturnSignalWorkflow.my_signal, args.signal_value)
 
@@ -1609,7 +1608,7 @@ sa_prefix = "python_test_"
 
 
 def search_attributes_to_serializable(
-    attrs: Union[SearchAttributes, TypedSearchAttributes]
+    attrs: Union[SearchAttributes, TypedSearchAttributes],
 ) -> Mapping[str, Any]:
     if isinstance(attrs, TypedSearchAttributes):
         return {
@@ -2205,43 +2204,35 @@ async def data_class_typed_activity(param: MyDataClass) -> MyDataClass:
 @workflow.defn(name="DataClassTypedWorkflow")
 class DataClassTypedWorkflowProto(Protocol):
     @workflow.run
-    async def run(self, arg: MyDataClass) -> MyDataClass:
-        ...
+    async def run(self, arg: MyDataClass) -> MyDataClass: ...
 
     @workflow.signal
-    def signal_sync(self, param: MyDataClass) -> None:
-        ...
+    def signal_sync(self, param: MyDataClass) -> None: ...
 
     @workflow.query
-    def query_sync(self, param: MyDataClass) -> MyDataClass:
-        ...
+    def query_sync(self, param: MyDataClass) -> MyDataClass: ...
 
     @workflow.signal
-    def complete(self) -> None:
-        ...
+    def complete(self) -> None: ...
 
 
 @workflow.defn(name="DataClassTypedWorkflow")
 class DataClassTypedWorkflowAbstract(ABC):
     @workflow.run
     @abstractmethod
-    async def run(self, arg: MyDataClass) -> MyDataClass:
-        ...
+    async def run(self, arg: MyDataClass) -> MyDataClass: ...
 
     @workflow.signal
     @abstractmethod
-    def signal_sync(self, param: MyDataClass) -> None:
-        ...
+    def signal_sync(self, param: MyDataClass) -> None: ...
 
     @workflow.query
     @abstractmethod
-    def query_sync(self, param: MyDataClass) -> MyDataClass:
-        ...
+    def query_sync(self, param: MyDataClass) -> MyDataClass: ...
 
     @workflow.signal
     @abstractmethod
-    def complete(self) -> None:
-        ...
+    def complete(self) -> None: ...
 
 
 @workflow.defn
@@ -3065,7 +3056,8 @@ async def test_workflow_typed_handle(client: Client):
             TypedHandleWorkflow.run, id=id, task_queue=worker.task_queue
         )
         handle_result: TypedHandleResponse = await client.get_workflow_handle_for(
-            TypedHandleWorkflow.run, id  # type: ignore[arg-type]
+            TypedHandleWorkflow.run,  # type: ignore[arg-type]
+            id,
         ).result()
         assert isinstance(handle_result, TypedHandleResponse)
 
@@ -4042,7 +4034,9 @@ async def test_workflow_metrics_other_types(client: Client):
     assert any(
         u.metric.name == "temporal_workflow_task_execution_latency"
         # Took more than 3ms
-        and u.value > 3 and isinstance(u.value, int) and u.metric.unit == "ms"
+        and u.value > 3
+        and isinstance(u.value, int)
+        and u.metric.unit == "ms"
         for u in updates
     )
     assert any(
@@ -4072,7 +4066,9 @@ async def test_workflow_metrics_other_types(client: Client):
     assert any(
         u.metric.name == "temporal_workflow_task_execution_latency"
         # Took less than 3s
-        and u.value < 3 and isinstance(u.value, float) and u.metric.unit == "s"
+        and u.value < 3
+        and isinstance(u.value, float)
+        and u.metric.unit == "s"
         for u in updates
     )
     assert any(
@@ -4709,8 +4705,7 @@ class FailureTypesScenario(IntEnum):
     WAIT_FOREVER = 3
 
 
-class FailureTypesCustomException(Exception):
-    ...
+class FailureTypesCustomException(Exception): ...
 
 
 class FailureTypesWorkflowBase(ABC):
