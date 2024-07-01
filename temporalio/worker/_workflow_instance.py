@@ -843,8 +843,17 @@ class _WorkflowInstanceImpl(
                 # The final Task.__step of the main workflow coroutine might have done something
                 # that would, for example, allow an update handler to complete. Allow all coroutines
                 # to advance as far as possible before recording workflow completion (after which
-                # any commands emitted are ignored).
+                # any commands emitted are ignored). Set an SDK flag
+                n_commands_at_completion = len(
+                    self._current_completion.successful.commands
+                )
                 await asyncio.sleep(0)
+                if (
+                    len(self._current_completion.successful.commands)
+                    > n_commands_at_completion
+                ):
+                    # TODO
+                    pass
 
                 result_payloads = self._payload_converter.to_payloads([result])
                 if len(result_payloads) != 1:
