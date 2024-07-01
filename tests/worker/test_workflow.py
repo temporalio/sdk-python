@@ -11,6 +11,7 @@ import threading
 import typing
 import uuid
 from abc import ABC, abstractmethod
+from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -37,7 +38,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.worker
-from temporalio import activity, workflow
+from temporalio import activity, common, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
@@ -104,6 +105,7 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
+from tests import worker
 from tests.helpers import (
     assert_eq_eventually,
     ensure_search_attributes_present,
@@ -5505,3 +5507,42 @@ class _UnfinishedHandlersWithCancellationOrFailureTest:
             "update": workflow.UnfinishedUpdateHandlersWarning,
             "signal": workflow.UnfinishedSignalHandlersWarning,
         }[self.handler_type]
+
+
+@workflow.defn
+class CoroutinesMustSettleBeforeWorkflowCompletionWorkflow:
+    def __init__(self):
+        self.received_update = False
+        self.update_result: asyncio.Future[str] = asyncio.Future()
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self.received_update)
+        self.update_result.set_result("update-result")
+        # Before https://github.com/temporalio/sdk-python/issues/528 we allowed the main coroutine
+        # to exit (thus recording a workflow completion) without giving the update handler a chance
+        # to resume.
+        return "workflow-result"
+
+    @workflow.update
+    async def my_update(self) -> str:
+        self.received_update = True
+        return await self.update_result
+
+
+async def test_coroutines_settle_before_workflow_completion(client: Client):
+    async with Worker(
+        client,
+        task_queue="tq",
+        workflows=[CoroutinesMustSettleBeforeWorkflowCompletionWorkflow],
+    ) as worker:
+        handle = await client.start_workflow(
+            CoroutinesMustSettleBeforeWorkflowCompletionWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        update_result = await handle.execute_update(
+            CoroutinesMustSettleBeforeWorkflowCompletionWorkflow.my_update
+        )
+        assert update_result == "update-result"
+        assert await handle.result() == "workflow-result"
