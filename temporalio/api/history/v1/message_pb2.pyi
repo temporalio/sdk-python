@@ -23,14 +23,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.event_type_pb2
 import temporalio.api.enums.v1.failed_cause_pb2
@@ -2330,13 +2333,17 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     @property
     def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Timeout of a single workflow task."""
-    parent_close_policy: temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
+    parent_close_policy: (
+        temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
+    )
     """Default: PARENT_CLOSE_POLICY_TERMINATE."""
     control: builtins.str
     """Deprecated"""
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
-    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    workflow_id_reuse_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    )
     """Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
@@ -3573,8 +3580,12 @@ class HistoryEvent(google.protobuf.message.Message):
     WORKFLOW_EXECUTION_CANCEL_REQUESTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_CANCELED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: (
+        builtins.int
+    )
+    EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED_EVENT_ATTRIBUTES_FIELD_NUMBER: (
+        builtins.int
+    )
     WORKFLOW_EXECUTION_CONTINUED_AS_NEW_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_CHILD_WORKFLOW_EXECUTION_INITIATED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_CHILD_WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -3584,8 +3595,12 @@ class HistoryEvent(google.protobuf.message.Message):
     CHILD_WORKFLOW_EXECUTION_CANCELED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CHILD_WORKFLOW_EXECUTION_TIMED_OUT_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CHILD_WORKFLOW_EXECUTION_TERMINATED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
-    SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED_EVENT_ATTRIBUTES_FIELD_NUMBER: (
+        builtins.int
+    )
+    SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: (
+        builtins.int
+    )
     EXTERNAL_WORKFLOW_EXECUTION_SIGNALED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_UPDATE_ACCEPTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int

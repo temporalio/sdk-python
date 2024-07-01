@@ -23,11 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
 import sys
 import typing
+
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -50,7 +52,9 @@ class _WorkflowIdReusePolicyEnumTypeWrapper(
     WORKFLOW_ID_REUSE_POLICY_UNSPECIFIED: _WorkflowIdReusePolicy.ValueType  # 0
     WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE: _WorkflowIdReusePolicy.ValueType  # 1
     """Allow starting a workflow execution using the same workflow id."""
-    WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY: _WorkflowIdReusePolicy.ValueType  # 2
+    WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY: (
+        _WorkflowIdReusePolicy.ValueType
+    )  # 2
     """Allow starting a workflow execution using the same workflow id, only when the last
     execution's final state is one of [terminated, cancelled, timed out, failed].
     """
@@ -77,7 +81,9 @@ class WorkflowIdReusePolicy(
 WORKFLOW_ID_REUSE_POLICY_UNSPECIFIED: WorkflowIdReusePolicy.ValueType  # 0
 WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE: WorkflowIdReusePolicy.ValueType  # 1
 """Allow starting a workflow execution using the same workflow id."""
-WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY: WorkflowIdReusePolicy.ValueType  # 2
+WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY: (
+    WorkflowIdReusePolicy.ValueType
+)  # 2
 """Allow starting a workflow execution using the same workflow id, only when the last
 execution's final state is one of [terminated, cancelled, timed out, failed].
 """
@@ -109,7 +115,9 @@ class _WorkflowIdConflictPolicyEnumTypeWrapper(
     """Don't start a new workflow; instead return `WorkflowExecutionAlreadyStartedFailure`."""
     WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING: _WorkflowIdConflictPolicy.ValueType  # 2
     """Don't start a new workflow; instead return a workflow handle for the running workflow."""
-    WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING: _WorkflowIdConflictPolicy.ValueType  # 3
+    WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING: (
+        _WorkflowIdConflictPolicy.ValueType
+    )  # 3
     """Terminate the running workflow before starting a new one."""
 
 class WorkflowIdConflictPolicy(

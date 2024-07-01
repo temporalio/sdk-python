@@ -6,14 +6,17 @@ isort:skip_file
 (-- api-linter: core::0203::input-only=disabled
     aip.dev/not-precedent: field_behavior annotation not available in our gogo fork --)
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.schedule_pb2
 import temporalio.api.workflow.v1.message_pb2

@@ -5,15 +5,19 @@ isort:skip_file
 Definitions of the different workflow activation jobs returned from [crate::Core::poll_task]. The
 lang SDK applies these activation jobs to drive workflows.
 """
+
 import builtins
 import collections.abc
+import sys
+import typing
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
@@ -21,7 +25,6 @@ import temporalio.api.update.v1.message_pb2
 import temporalio.bridge.proto.activity_result.activity_result_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
-import typing
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -434,7 +437,9 @@ class StartWorkflow(google.protobuf.message.Message):
     """Run id of the previous workflow which continued-as-new or retired or cron executed into this
     workflow, if any.
     """
-    continued_initiator: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
+    continued_initiator: (
+        temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
+    )
     """If this workflow was a continuation, indicates the type of continuation."""
     @property
     def continued_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:

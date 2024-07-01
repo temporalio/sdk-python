@@ -6,8 +6,12 @@ Definitions for commands from a workflow in lang SDK to core. While a workflow p
 of activation jobs, it accumulates these commands to be sent back to core to conclude that
 activation.
 """
+
 import builtins
 import collections.abc
+import sys
+import typing
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.empty_pb2
@@ -15,13 +19,12 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
-import typing
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -437,7 +440,9 @@ class ScheduleActivity(google.protobuf.message.Message):
     activity. When unset/default, workers will always attempt to do so if activity execution
     slots are available.
     """
-    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    versioning_intent: (
+        temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    )
     """Whether this activity should run on a worker with a compatible build id or not."""
     def __init__(
         self,
@@ -962,7 +967,9 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         """If set, the new workflow will have this retry policy. If unset, re-uses the current
         workflow's retry policy.
         """
-    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    versioning_intent: (
+        temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    )
     """Whether the continued workflow should run on a worker with a compatible build id or not."""
     def __init__(
         self,
@@ -1185,7 +1192,9 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         """Timeout of a single workflow task."""
     parent_close_policy: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ParentClosePolicy.ValueType
     """Default: PARENT_CLOSE_POLICY_TERMINATE."""
-    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    workflow_id_reuse_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    )
     """string control = 11; (unused from StartChildWorkflowExecutionCommandAttributes)
     Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
     """
@@ -1215,7 +1224,9 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         """Search attributes"""
     cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType
     """Defines behaviour of the underlying workflow when child workflow cancellation has been requested."""
-    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    versioning_intent: (
+        temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    )
     """Whether this child should run on a worker with a compatible build id or not."""
     def __init__(
         self,

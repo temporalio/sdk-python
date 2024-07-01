@@ -23,11 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
 import sys
 import typing
+
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -47,20 +49,28 @@ class _UpdateWorkflowExecutionLifecycleStageEnumTypeWrapper(
     builtins.type,
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED: _UpdateWorkflowExecutionLifecycleStage.ValueType  # 0
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED: (
+        _UpdateWorkflowExecutionLifecycleStage.ValueType
+    )  # 0
     """An unspecified vale for this enum."""
-    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED: _UpdateWorkflowExecutionLifecycleStage.ValueType  # 1
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED: (
+        _UpdateWorkflowExecutionLifecycleStage.ValueType
+    )  # 1
     """The gRPC call will not return until the update request has been admitted
     by the server - it may be the case that due to a considerations like load
     or resource limits that an update is made to wait before the server will
     indicate that it has been received and will be processed. This value
     does not wait for any sort of acknowledgement from a worker.
     """
-    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED: _UpdateWorkflowExecutionLifecycleStage.ValueType  # 2
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED: (
+        _UpdateWorkflowExecutionLifecycleStage.ValueType
+    )  # 2
     """The gRPC call will not return until the update has passed validation on
     a worker.
     """
-    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED: _UpdateWorkflowExecutionLifecycleStage.ValueType  # 3
+    UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED: (
+        _UpdateWorkflowExecutionLifecycleStage.ValueType
+    )  # 3
     """The gRPC call will not return until the update has executed to completion
     on a worker and has either been rejected or returned a value or an error.
     """
@@ -78,20 +88,28 @@ class UpdateWorkflowExecutionLifecycleStage(
     completion.
     """
 
-UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED: UpdateWorkflowExecutionLifecycleStage.ValueType  # 0
+UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED: (
+    UpdateWorkflowExecutionLifecycleStage.ValueType
+)  # 0
 """An unspecified vale for this enum."""
-UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED: UpdateWorkflowExecutionLifecycleStage.ValueType  # 1
+UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ADMITTED: (
+    UpdateWorkflowExecutionLifecycleStage.ValueType
+)  # 1
 """The gRPC call will not return until the update request has been admitted
 by the server - it may be the case that due to a considerations like load
 or resource limits that an update is made to wait before the server will
 indicate that it has been received and will be processed. This value
 does not wait for any sort of acknowledgement from a worker.
 """
-UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED: UpdateWorkflowExecutionLifecycleStage.ValueType  # 2
+UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED: (
+    UpdateWorkflowExecutionLifecycleStage.ValueType
+)  # 2
 """The gRPC call will not return until the update has passed validation on
 a worker.
 """
-UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED: UpdateWorkflowExecutionLifecycleStage.ValueType  # 3
+UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED: (
+    UpdateWorkflowExecutionLifecycleStage.ValueType
+)  # 3
 """The gRPC call will not return until the update has executed to completion
 on a worker and has either been rejected or returned a value or an error.
 """
