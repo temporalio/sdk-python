@@ -176,11 +176,6 @@ sidebar-expand-depth = 2
 
 [tool.ruff]
 target-version = "py38"
-extend-exclude = [
-  "temporalio/api",
-  "temporalio/bridge",
-  "tests/worker/workflow_sandbox/testmodules/proto",
-]
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
