@@ -839,6 +839,13 @@ class _WorkflowInstanceImpl(
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
             try:
                 result = await self._inbound.execute_workflow(input)
+
+                # The final Task.__step of the main workflow coroutine might have done something
+                # that would, for example, allow an update handler to complete. Allow all coroutines
+                # to advance as far as possible before recording workflow completion (after which
+                # any commands emitted are ignored).
+                await asyncio.sleep(0)
+
                 result_payloads = self._payload_converter.to_payloads([result])
                 if len(result_payloads) != 1:
                     raise ValueError(
