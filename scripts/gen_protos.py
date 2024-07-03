@@ -13,6 +13,7 @@ proto_dir = (
     base_dir / "temporalio" / "bridge" / "sdk-core" / "sdk-core-protos" / "protos"
 )
 api_proto_dir = proto_dir / "api_upstream"
+api_cloud_proto_dir = proto_dir / "api_cloud_upstream"
 core_proto_dir = proto_dir / "local"
 testsrv_proto_dir = proto_dir / "testsrv_upstream"
 test_proto_dir = base_dir / "tests"
@@ -155,6 +156,7 @@ def generate_protos(output_dir: Path):
             sys.executable,
             "-mgrpc_tools.protoc",
             f"--proto_path={api_proto_dir}",
+            f"--proto_path={api_cloud_proto_dir}",
             f"--proto_path={core_proto_dir}",
             f"--proto_path={testsrv_proto_dir}",
             f"--proto_path={health_proto_dir}",

@@ -12,6 +12,7 @@ import temporalio.api.enums.v1
 import temporalio.common
 import temporalio.exceptions
 from temporalio import workflow
+from temporalio.api.cloud.cloudservice.v1 import GetNamespaceRequest
 from temporalio.api.enums.v1 import (
     CancelExternalWorkflowExecutionFailedCause,
     ContinueAsNewInitiator,
@@ -35,6 +36,7 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
+    CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
     QueryWorkflowInput,
@@ -1241,3 +1243,16 @@ async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
     ]
     assert reachability.build_id_reachability["1.0"].task_queue_reachability[tq] == []
     assert reachability.build_id_reachability["1.1"].task_queue_reachability[tq] == []
+
+
+async def test_cloud_client_simple():
+    if "TEMPORAL_CLIENT_CLOUD_API_KEY" not in os.environ:
+        pytest.skip("No cloud API key")
+    client = await CloudOperationsClient.connect(
+        api_key=os.environ["TEMPORAL_CLIENT_CLOUD_API_KEY"],
+        version=os.environ["TEMPORAL_CLIENT_CLOUD_API_VERSION"],
+    )
+    result = await client.cloud_service.get_namespace(
+        GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
+    )
+    assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace

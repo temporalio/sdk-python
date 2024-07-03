@@ -18,6 +18,7 @@ jobs:
           - os: ubuntu-latest
             python: "3.12"
             docsTarget: true
+            cloudTestTarget: true
           - os: ubuntu-latest
             python: "3.8"
             protoCheckTarget: true
@@ -68,6 +69,13 @@ jobs:
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
+      # Check cloud if proper target and not on fork
+      - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
+        run: poe test -s -o log_cli_level=DEBUG -k test_cloud_client
+        env:
+          TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
+          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
+          TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
 
       # Confirm protos are already generated properly with older protobuf
       # library and run test with that older version. We must downgrade protobuf

@@ -137,6 +137,8 @@ class Client:
             resp_fut = self._ref.call_workflow_service(call)
         elif service == "operator":
             resp_fut = self._ref.call_operator_service(call)
+        elif service == "cloud":
+            resp_fut = self._ref.call_cloud_service(call)
         elif service == "test":
             resp_fut = self._ref.call_test_service(call)
         elif service == "health":

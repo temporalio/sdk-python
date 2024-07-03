@@ -1475,8 +1475,8 @@ protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf
 generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var
 to `1` prior to running tests.
 
-Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore `pyproject.toml` and
-run `poetry update protobuf grpcio-tools`.
+Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files
+and run `poetry install --no-root --all extras`.
 
 For a less system-intrusive approach, you can (note this approach [may have a bug](https://github.com/temporalio/sdk-python/issues/543)):
 ```shell

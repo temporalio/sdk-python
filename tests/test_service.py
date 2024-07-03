@@ -9,6 +9,7 @@ import grpc
 import pytest
 
 import temporalio
+import temporalio.api.cloud.cloudservice.v1
 import temporalio.api.errordetails.v1
 import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
@@ -56,6 +57,11 @@ def test_all_grpc_calls_present(client: Client):
         client.operator_service,
         temporalio.api.operatorservice.v1,
         temporalio.api.operatorservice.v1.OperatorServiceStub,
+    )
+    assert_all_calls_present(
+        client.service_client.cloud_service,
+        temporalio.api.cloud.cloudservice.v1,
+        temporalio.api.cloud.cloudservice.v1.CloudServiceStub,
     )
     assert_all_calls_present(
         client.test_service,
