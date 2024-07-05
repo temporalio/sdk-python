@@ -1,6 +1,7 @@
 """Common Temporal exceptions."""
 
 import asyncio
+from datetime import timedelta
 from enum import IntEnum
 from typing import Any, Optional, Sequence, Tuple
 
@@ -78,6 +79,7 @@ class ApplicationError(FailureError):
         *details: Any,
         type: Optional[str] = None,
         non_retryable: bool = False,
+        next_retry_delay: Optional[timedelta] = None,
     ) -> None:
         """Initialize an application error."""
         super().__init__(
@@ -88,6 +90,7 @@ class ApplicationError(FailureError):
         self._details = details
         self._type = type
         self._non_retryable = non_retryable
+        self._next_retry_delay = next_retry_delay
 
     @property
     def details(self) -> Sequence[Any]:
@@ -108,6 +111,16 @@ class ApplicationError(FailureError):
         non-retryable upon creation by the user.
         """
         return self._non_retryable
+
+    @property
+    def next_retry_delay(self) -> Optional[timedelta]:
+        """Delay before the next activity retry attempt.
+
+        User activity code may set this when raising ApplicationError to specify
+        a delay before the next activity retry. Ignored if set when raising
+        ApplicationError from workflow code.
+        """
+        return self._next_retry_delay
 
 
 class CancelledError(FailureError):
