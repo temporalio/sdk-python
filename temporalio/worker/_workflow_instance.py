@@ -1870,28 +1870,36 @@ class _WorkflowInstanceImpl(
 
         # this is to use `open`
         with temporalio.workflow.unsafe.sandbox_unrestricted():
-            sources = dict()
-            stacks = []
+            sources: Dict[str, temporalio.api.sdk.v1.StackTraceFileSlice] = dict()
+            stacks: List[temporalio.api.sdk.v1.StackTrace] = []
+
+            # future TODO
+            # site package filter list -- we want to filter out traces from Python's internals and our sdk's internals. This is what `internal_code` is for, but right now it's just set to false.
 
             for task in list(self._tasks):
-                locations = []
+                locations: List[temporalio.api.sdk.v1.StackTraceFileLocation] = []
+
                 for frame in task.get_stack():
                     filename = frame.f_code.co_filename
                     line_number = frame.f_lineno
                     func_name = frame.f_code.co_name
 
-                    try:
-                        with open(filename, "r") as f:
-                            code = f.read()
-                    except OSError as ose:
-                        code = f"Cannot access code.\n---\n{ose.strerror}"
-                        # TODO possibly include sentinel/property for success of src scrape? work out with ui
-                    except Exception:
-                        code = f"Generic Error.\n\n{traceback.format_exc()}"
+                    if filename not in sources.keys():
+                        try:
+                            with open(filename, "r") as f:
+                                code = f.read()
+                        except OSError as ose:
+                            code = f"Cannot access code.\n---\n{ose.strerror}"
+                            # TODO possibly include sentinel/property for success of src scrape? work out with ui
+                        except Exception:
+                            code = f"Generic Error.\n\n{traceback.format_exc()}"
 
-                    file_slice = temporalio.api.sdk.v1.StackTraceFileSlice(
-                        line_offset=0, content=code
-                    )
+                        file_slice = temporalio.api.sdk.v1.StackTraceFileSlice(
+                            line_offset=0, content=code
+                        )
+
+                        sources[filename] = file_slice
+
                     file_location = temporalio.api.sdk.v1.StackTraceFileLocation(
                         file_path=filename,
                         line=line_number,
@@ -1900,7 +1908,6 @@ class _WorkflowInstanceImpl(
                         internal_code=False,
                     )
 
-                    sources[filename] = file_slice
                     locations.append(file_location)
 
                 stacks.append(temporalio.api.sdk.v1.StackTrace(locations=locations))
