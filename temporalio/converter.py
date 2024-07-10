@@ -845,9 +845,9 @@ class DefaultFailureConverter(FailureConverter):
                     payload_converter.to_payloads_wrapper(error.details)
                 )
             if error.next_retry_delay:
-                delay = google.protobuf.duration_pb2.Duration()
-                delay.FromTimedelta(error.next_retry_delay)
-                failure.application_failure_info.next_retry_delay.CopyFrom(delay)
+                failure.application_failure_info.next_retry_delay.FromTimedelta(
+                    error.next_retry_delay
+                )
         elif isinstance(error, temporalio.exceptions.TimeoutError):
             failure.timeout_failure_info.SetInParent()
             failure.timeout_failure_info.timeout_type = (
