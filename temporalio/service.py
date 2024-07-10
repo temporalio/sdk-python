@@ -16,6 +16,7 @@ from typing import ClassVar, Generic, Mapping, Optional, Tuple, Type, TypeVar, U
 import google.protobuf.empty_pb2
 import google.protobuf.message
 
+import temporalio.api.cloud.cloudservice.v1
 import temporalio.api.common.v1
 import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
@@ -213,6 +214,7 @@ class ServiceClient(ABC):
         self.config = config
         self.workflow_service = WorkflowService(self)
         self.operator_service = OperatorService(self)
+        self.cloud_service = CloudService(self)
         self.test_service = TestService(self)
         self._check_health_call = self._new_call(
             "check",
@@ -692,6 +694,212 @@ class OperatorService:
             osv1.UpdateNexusEndpointRequest,
             osv1.UpdateNexusEndpointResponse,
             service="operator",
+        )
+
+
+class CloudService:
+    """Client to the Temporal server's cloud service."""
+
+    def __init__(self, client: ServiceClient) -> None:
+        """Initialize the cloud service."""
+        clv1 = temporalio.api.cloud.cloudservice.v1
+        self.add_namespace_region = client._new_call(
+            "add_namespace_region",
+            clv1.AddNamespaceRegionRequest,
+            clv1.AddNamespaceRegionResponse,
+            service="cloud",
+        )
+        self.create_api_key = client._new_call(
+            "create_api_key",
+            clv1.CreateApiKeyRequest,
+            clv1.CreateApiKeyResponse,
+            service="cloud",
+        )
+        self.create_namespace = client._new_call(
+            "create_namespace",
+            clv1.CreateNamespaceRequest,
+            clv1.CreateNamespaceResponse,
+            service="cloud",
+        )
+        self.create_service_account = client._new_call(
+            "create_service_account",
+            clv1.CreateServiceAccountRequest,
+            clv1.CreateServiceAccountResponse,
+            service="cloud",
+        )
+        self.create_user_group = client._new_call(
+            "create_user_group",
+            clv1.CreateUserGroupRequest,
+            clv1.CreateUserGroupResponse,
+            service="cloud",
+        )
+        self.create_user = client._new_call(
+            "create_user",
+            clv1.CreateUserRequest,
+            clv1.CreateUserResponse,
+            service="cloud",
+        )
+        self.delete_api_key = client._new_call(
+            "delete_api_key",
+            clv1.DeleteApiKeyRequest,
+            clv1.DeleteApiKeyResponse,
+            service="cloud",
+        )
+        self.delete_namespace = client._new_call(
+            "delete_namespace",
+            clv1.DeleteNamespaceRequest,
+            clv1.DeleteNamespaceResponse,
+            service="cloud",
+        )
+        self.delete_service_account = client._new_call(
+            "delete_service_account",
+            clv1.DeleteServiceAccountRequest,
+            clv1.DeleteServiceAccountResponse,
+            service="cloud",
+        )
+        self.delete_user_group = client._new_call(
+            "delete_user_group",
+            clv1.DeleteUserGroupRequest,
+            clv1.DeleteUserGroupResponse,
+            service="cloud",
+        )
+        self.delete_user = client._new_call(
+            "delete_user",
+            clv1.DeleteUserRequest,
+            clv1.DeleteUserResponse,
+            service="cloud",
+        )
+        self.failover_namespace_region = client._new_call(
+            "failover_namespace_region",
+            clv1.FailoverNamespaceRegionRequest,
+            clv1.FailoverNamespaceRegionResponse,
+            service="cloud",
+        )
+        self.get_api_key = client._new_call(
+            "get_api_key",
+            clv1.GetApiKeyRequest,
+            clv1.GetApiKeyResponse,
+            service="cloud",
+        )
+        self.get_api_keys = client._new_call(
+            "get_api_keys",
+            clv1.GetApiKeysRequest,
+            clv1.GetApiKeysResponse,
+            service="cloud",
+        )
+        self.get_async_operation = client._new_call(
+            "get_async_operation",
+            clv1.GetAsyncOperationRequest,
+            clv1.GetAsyncOperationResponse,
+            service="cloud",
+        )
+        self.get_namespace = client._new_call(
+            "get_namespace",
+            clv1.GetNamespaceRequest,
+            clv1.GetNamespaceResponse,
+            service="cloud",
+        )
+        self.get_namespaces = client._new_call(
+            "get_namespaces",
+            clv1.GetNamespacesRequest,
+            clv1.GetNamespacesResponse,
+            service="cloud",
+        )
+        self.get_region = client._new_call(
+            "get_region",
+            clv1.GetRegionRequest,
+            clv1.GetRegionResponse,
+            service="cloud",
+        )
+        self.get_regions = client._new_call(
+            "get_regions",
+            clv1.GetRegionsRequest,
+            clv1.GetRegionsResponse,
+            service="cloud",
+        )
+        self.get_service_account = client._new_call(
+            "get_service_account",
+            clv1.GetServiceAccountRequest,
+            clv1.GetServiceAccountResponse,
+            service="cloud",
+        )
+        self.get_service_accounts = client._new_call(
+            "get_service_accounts",
+            clv1.GetServiceAccountsRequest,
+            clv1.GetServiceAccountsResponse,
+            service="cloud",
+        )
+        self.get_user_group = client._new_call(
+            "get_user_group",
+            clv1.GetUserGroupRequest,
+            clv1.GetUserGroupResponse,
+            service="cloud",
+        )
+        self.get_user_groups = client._new_call(
+            "get_user_groups",
+            clv1.GetUserGroupsRequest,
+            clv1.GetUserGroupsResponse,
+            service="cloud",
+        )
+        self.get_user = client._new_call(
+            "get_user",
+            clv1.GetUserRequest,
+            clv1.GetUserResponse,
+            service="cloud",
+        )
+        self.get_users = client._new_call(
+            "get_users",
+            clv1.GetUsersRequest,
+            clv1.GetUsersResponse,
+            service="cloud",
+        )
+        self.rename_custom_search_attribute = client._new_call(
+            "rename_custom_search_attribute",
+            clv1.RenameCustomSearchAttributeRequest,
+            clv1.RenameCustomSearchAttributeResponse,
+            service="cloud",
+        )
+        self.set_user_group_namespace_access = client._new_call(
+            "set_user_group_namespace_access",
+            clv1.SetUserGroupNamespaceAccessRequest,
+            clv1.SetUserGroupNamespaceAccessResponse,
+            service="cloud",
+        )
+        self.set_user_namespace_access = client._new_call(
+            "set_user_namespace_access",
+            clv1.SetUserNamespaceAccessRequest,
+            clv1.SetUserNamespaceAccessResponse,
+            service="cloud",
+        )
+        self.update_api_key = client._new_call(
+            "update_api_key",
+            clv1.UpdateApiKeyRequest,
+            clv1.UpdateApiKeyResponse,
+            service="cloud",
+        )
+        self.update_namespace = client._new_call(
+            "update_namespace",
+            clv1.UpdateNamespaceRequest,
+            clv1.UpdateNamespaceResponse,
+            service="cloud",
+        )
+        self.update_service_account = client._new_call(
+            "update_service_account",
+            clv1.UpdateServiceAccountRequest,
+            clv1.UpdateServiceAccountResponse,
+            service="cloud",
+        )
+        self.update_user_group = client._new_call(
+            "update_user_group",
+            clv1.UpdateUserGroupRequest,
+            clv1.UpdateUserGroupResponse,
+            service="cloud",
+        )
+        self.update_user = client._new_call(
+            "update_user",
+            clv1.UpdateUserRequest,
+            clv1.UpdateUserResponse,
+            service="cloud",
         )
 
 

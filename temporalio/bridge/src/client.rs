@@ -5,8 +5,9 @@ use std::str::FromStr;
 use std::time::Duration;
 use temporal_client::{
     ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
-    ConfiguredClient, HealthService, HttpConnectProxyOptions, OperatorService, RetryClient,
-    RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
+    CloudService, ConfiguredClient, HealthService, HttpConnectProxyOptions, OperatorService,
+    RetryClient, RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig,
+    WorkflowService,
 };
 use tonic::metadata::MetadataKey;
 use url::Url;
@@ -102,6 +103,16 @@ macro_rules! rpc_call {
             rpc_resp($retry_client.$call_name(rpc_req($call)?).await)
         } else {
             rpc_resp($retry_client.into_inner().$call_name(rpc_req($call)?).await)
+        }
+    };
+}
+
+macro_rules! rpc_call_on_trait {
+    ($retry_client:ident, $call:ident, $trait:tt, $call_name:ident) => {
+        if $call.retry {
+            rpc_resp($trait::$call_name(&mut $retry_client, rpc_req($call)?).await)
+        } else {
+            rpc_resp($trait::$call_name(&mut $retry_client.into_inner(), rpc_req($call)?).await)
         }
     };
 }
@@ -260,7 +271,9 @@ impl ClientRef {
                 "terminate_workflow_execution" => {
                     rpc_call!(retry_client, call, terminate_workflow_execution)
                 }
-                "update_namespace" => rpc_call!(retry_client, call, update_namespace),
+                "update_namespace" => {
+                    rpc_call_on_trait!(retry_client, call, WorkflowService, update_namespace)
+                }
                 "update_schedule" => rpc_call!(retry_client, call, update_schedule),
                 "update_workflow_execution" => {
                     rpc_call!(retry_client, call, update_workflow_execution)
@@ -294,7 +307,9 @@ impl ClientRef {
                     rpc_call!(retry_client, call, add_search_attributes)
                 }
                 "create_nexus_endpoint" => rpc_call!(retry_client, call, create_nexus_endpoint),
-                "delete_namespace" => rpc_call!(retry_client, call, delete_namespace),
+                "delete_namespace" => {
+                    rpc_call_on_trait!(retry_client, call, OperatorService, delete_namespace)
+                }
                 "delete_nexus_endpoint" => rpc_call!(retry_client, call, delete_nexus_endpoint),
                 "get_nexus_endpoint" => rpc_call!(retry_client, call, get_nexus_endpoint),
                 "list_clusters" => rpc_call!(retry_client, call, list_clusters),
@@ -309,6 +324,67 @@ impl ClientRef {
                     rpc_call!(retry_client, call, remove_search_attributes)
                 }
                 "update_nexus_endpoint" => rpc_call!(retry_client, call, update_nexus_endpoint),
+                _ => {
+                    return Err(PyValueError::new_err(format!(
+                        "Unknown RPC call {}",
+                        call.rpc
+                    )))
+                }
+            }?;
+            let bytes: &[u8] = &bytes;
+            Ok(Python::with_gil(|py| bytes.into_py(py)))
+        })
+    }
+
+    fn call_cloud_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+        let mut retry_client = self.retry_client.clone();
+        self.runtime.future_into_py(py, async move {
+            let bytes = match call.rpc.as_str() {
+                "add_namespace_region" => rpc_call!(retry_client, call, add_namespace_region),
+                "create_api_key" => rpc_call!(retry_client, call, create_api_key),
+                "create_namespace" => rpc_call!(retry_client, call, create_namespace),
+                "create_service_account" => rpc_call!(retry_client, call, create_service_account),
+                "create_user_group" => rpc_call!(retry_client, call, create_user_group),
+                "create_user" => rpc_call!(retry_client, call, create_user),
+                "delete_api_key" => rpc_call!(retry_client, call, delete_api_key),
+                "delete_namespace" => {
+                    rpc_call_on_trait!(retry_client, call, CloudService, delete_namespace)
+                }
+                "delete_service_account" => rpc_call!(retry_client, call, delete_service_account),
+                "delete_user_group" => rpc_call!(retry_client, call, delete_user_group),
+                "delete_user" => rpc_call!(retry_client, call, delete_user),
+                "failover_namespace_region" => {
+                    rpc_call!(retry_client, call, failover_namespace_region)
+                }
+                "get_api_key" => rpc_call!(retry_client, call, get_api_key),
+                "get_api_keys" => rpc_call!(retry_client, call, get_api_keys),
+                "get_async_operation" => rpc_call!(retry_client, call, get_async_operation),
+                "get_namespace" => rpc_call!(retry_client, call, get_namespace),
+                "get_namespaces" => rpc_call!(retry_client, call, get_namespaces),
+                "get_region" => rpc_call!(retry_client, call, get_region),
+                "get_regions" => rpc_call!(retry_client, call, get_regions),
+                "get_service_account" => rpc_call!(retry_client, call, get_service_account),
+                "get_service_accounts" => rpc_call!(retry_client, call, get_service_accounts),
+                "get_user_group" => rpc_call!(retry_client, call, get_user_group),
+                "get_user_groups" => rpc_call!(retry_client, call, get_user_groups),
+                "get_user" => rpc_call!(retry_client, call, get_user),
+                "get_users" => rpc_call!(retry_client, call, get_users),
+                "rename_custom_search_attribute" => {
+                    rpc_call!(retry_client, call, rename_custom_search_attribute)
+                }
+                "set_user_group_namespace_access" => {
+                    rpc_call!(retry_client, call, set_user_group_namespace_access)
+                }
+                "set_user_namespace_access" => {
+                    rpc_call!(retry_client, call, set_user_namespace_access)
+                }
+                "update_api_key" => rpc_call!(retry_client, call, update_api_key),
+                "update_namespace" => {
+                    rpc_call_on_trait!(retry_client, call, CloudService, update_namespace)
+                }
+                "update_service_account" => rpc_call!(retry_client, call, update_service_account),
+                "update_user_group" => rpc_call!(retry_client, call, update_user_group),
+                "update_user" => rpc_call!(retry_client, call, update_user),
                 _ => {
                     return Err(PyValueError::new_err(format!(
                         "Unknown RPC call {}",
