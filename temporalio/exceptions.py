@@ -117,8 +117,7 @@ class ApplicationError(FailureError):
         """Delay before the next activity retry attempt.
 
         User activity code may set this when raising ApplicationError to specify
-        a delay before the next activity retry. Ignored if set when raising
-        ApplicationError from workflow code.
+        a delay before the next activity retry.
         """
         return self._next_retry_delay
 
