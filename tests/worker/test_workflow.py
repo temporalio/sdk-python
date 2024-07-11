@@ -6639,7 +6639,7 @@ class UseLockOrSemaphoreWorkflowParameters:
 
 
 @workflow.defn
-class CoroutinesUseLockWorkflow:
+class CoroutinesUseLockOrSemaphoreWorkflow:
     def __init__(self) -> None:
         self.params: UseLockOrSemaphoreWorkflowParameters
         self.lock_or_semaphore: Union[asyncio.Lock, asyncio.Semaphore]
@@ -6709,7 +6709,7 @@ class CoroutinesUseLockWorkflow:
 
 
 @workflow.defn
-class HandlerCoroutinesUseLockWorkflow(CoroutinesUseLockWorkflow):
+class HandlerCoroutinesUseLockOrSemaphoreWorkflow(CoroutinesUseLockOrSemaphoreWorkflow):
     def __init__(self) -> None:
         super().__init__()
         self.workflow_may_exit = False
@@ -6745,11 +6745,11 @@ async def _do_workflow_coroutines_lock_or_semaphore_test(
 ):
     async with new_worker(
         client,
-        CoroutinesUseLockWorkflow,
+        CoroutinesUseLockOrSemaphoreWorkflow,
         activities=[noop_activity_for_lock_or_semaphore_tests],
     ) as worker:
         summary = await client.execute_workflow(
-            CoroutinesUseLockWorkflow.run,
+            CoroutinesUseLockOrSemaphoreWorkflow.run,
             arg=params,
             id=str(uuid.uuid4()),
             task_queue=worker.task_queue,
@@ -6771,7 +6771,7 @@ async def _do_update_handler_lock_or_semaphore_test(
 
     task_queue = "tq"
     handle = await client.start_workflow(
-        HandlerCoroutinesUseLockWorkflow.run,
+        HandlerCoroutinesUseLockOrSemaphoreWorkflow.run,
         id=f"wf-{str(uuid.uuid4())}",
         task_queue=task_queue,
     )
@@ -6780,7 +6780,7 @@ async def _do_update_handler_lock_or_semaphore_test(
         await admitted_update_task(
             client,
             handle,
-            HandlerCoroutinesUseLockWorkflow.my_update,
+            HandlerCoroutinesUseLockOrSemaphoreWorkflow.my_update,
             arg=params,
             id=f"update-{i}",
         )
@@ -6788,13 +6788,13 @@ async def _do_update_handler_lock_or_semaphore_test(
     ]
     async with new_worker(
         client,
-        HandlerCoroutinesUseLockWorkflow,
+        HandlerCoroutinesUseLockOrSemaphoreWorkflow,
         activities=[noop_activity_for_lock_or_semaphore_tests],
         task_queue=task_queue,
     ):
         for update_task in admitted_updates:
             await update_task
-        await handle.signal(HandlerCoroutinesUseLockWorkflow.finish)
+        await handle.signal(HandlerCoroutinesUseLockOrSemaphoreWorkflow.finish)
         summary = await handle.result()
         assert summary == expectation
 
