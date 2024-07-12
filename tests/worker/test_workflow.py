@@ -69,6 +69,7 @@ from temporalio.common import (
     SearchAttributes,
     SearchAttributeValues,
     TypedSearchAttributes,
+    WorkflowIDConflictPolicy,
 )
 from temporalio.converter import (
     DataConverter,
@@ -5505,3 +5506,69 @@ class _UnfinishedHandlersWithCancellationOrFailureTest:
             "update": workflow.UnfinishedUpdateHandlersWarning,
             "signal": workflow.UnfinishedSignalHandlersWarning,
         }[self.handler_type]
+
+
+@workflow.defn
+class IDConflictWorkflow:
+    # Just run forever
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+
+async def test_workflow_id_conflict(client: Client):
+    async with new_worker(client, IDConflictWorkflow) as worker:
+        # Start a workflow
+        handle = await client.start_workflow(
+            IDConflictWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        handle = client.get_workflow_handle_for(
+            IDConflictWorkflow.run, handle.id, run_id=handle.result_run_id
+        )
+
+        # Confirm another fails by default
+        with pytest.raises(WorkflowAlreadyStartedError):
+            await client.start_workflow(
+                IDConflictWorkflow.run,
+                id=handle.id,
+                task_queue=worker.task_queue,
+            )
+
+        # Confirm fails if explicitly given that option
+        with pytest.raises(WorkflowAlreadyStartedError):
+            await client.start_workflow(
+                IDConflictWorkflow.run,
+                id=handle.id,
+                task_queue=worker.task_queue,
+                id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            )
+
+        # Confirm gives back same handle if requested
+        new_handle = await client.start_workflow(
+            IDConflictWorkflow.run,
+            id=handle.id,
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+        )
+        new_handle = client.get_workflow_handle_for(
+            IDConflictWorkflow.run, new_handle.id, run_id=new_handle.result_run_id
+        )
+        assert new_handle.run_id == handle.run_id
+        assert (await handle.describe()).status == WorkflowExecutionStatus.RUNNING
+        assert (await new_handle.describe()).status == WorkflowExecutionStatus.RUNNING
+
+        # Confirm terminates and starts new if requested
+        new_handle = await client.start_workflow(
+            IDConflictWorkflow.run,
+            id=handle.id,
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
+        )
+        new_handle = client.get_workflow_handle_for(
+            IDConflictWorkflow.run, new_handle.id, run_id=new_handle.result_run_id
+        )
+        assert new_handle.run_id != handle.run_id
+        assert (await handle.describe()).status == WorkflowExecutionStatus.TERMINATED
+        assert (await new_handle.describe()).status == WorkflowExecutionStatus.RUNNING

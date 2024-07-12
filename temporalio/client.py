@@ -298,6 +298,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -328,6 +329,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -360,6 +362,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -392,6 +395,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -422,6 +426,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -455,6 +460,10 @@ class Client:
             run_timeout: Timeout of a single workflow run.
             task_timeout: Timeout of a single workflow task.
             id_reuse_policy: How already-existing IDs are treated.
+            id_conflict_policy: How already-running workflows of the same ID are
+                treated. Default is unspecified which effectively means fail the
+                start attempt. This cannot be set if ``id_reuse_policy`` is set
+                to terminate if running.
             retry_policy: Retry policy for the workflow.
             cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
             memo: Memo for the workflow.
@@ -510,6 +519,7 @@ class Client:
                 run_timeout=run_timeout,
                 task_timeout=task_timeout,
                 id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
                 retry_policy=retry_policy,
                 cron_schedule=cron_schedule,
                 memo=memo,
@@ -537,6 +547,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -567,6 +578,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -599,6 +611,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -631,6 +644,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -661,6 +675,7 @@ class Client:
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         cron_schedule: str = "",
         memo: Optional[Mapping[str, Any]] = None,
@@ -696,6 +711,7 @@ class Client:
                 run_timeout=run_timeout,
                 task_timeout=task_timeout,
                 id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
                 retry_policy=retry_policy,
                 cron_schedule=cron_schedule,
                 memo=memo,
@@ -4487,6 +4503,7 @@ class StartWorkflowInput:
     run_timeout: Optional[timedelta]
     task_timeout: Optional[timedelta]
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy
     retry_policy: Optional[temporalio.common.RetryPolicy]
     cron_schedule: str
     memo: Optional[Mapping[str, Any]]
@@ -5007,6 +5024,10 @@ class _ClientImpl(OutboundInterceptor):
         req.workflow_id_reuse_policy = cast(
             "temporalio.api.enums.v1.WorkflowIdReusePolicy.ValueType",
             int(input.id_reuse_policy),
+        )
+        req.workflow_id_conflict_policy = cast(
+            "temporalio.api.enums.v1.WorkflowIdConflictPolicy.ValueType",
+            int(input.id_conflict_policy),
         )
         if input.retry_policy is not None:
             input.retry_policy.apply_to_proto(req.retry_policy)
