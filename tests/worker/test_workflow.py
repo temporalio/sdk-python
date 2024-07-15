@@ -5739,7 +5739,10 @@ async def test_workflow_return_is_honored_when_it_precedes_signal_completion_com
 async def _do_first_completion_command_is_honored_test(
     client: Client, main_workflow_returns_before_signal_completions: bool
 ):
-    workflow_cls = (
+    workflow_cls: Union[
+        Type[FirstCompletionCommandIsHonoredPingPongWorkflow],
+        Type[FirstCompletionCommandIsHonoredWorkflow],
+    ] = (
         FirstCompletionCommandIsHonoredPingPongWorkflow
         if main_workflow_returns_before_signal_completions
         else FirstCompletionCommandIsHonoredWorkflow
