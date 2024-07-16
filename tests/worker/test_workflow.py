@@ -5773,3 +5773,35 @@ async def _do_first_completion_command_is_honored_test(
                 main_workflow_returns_before_signal_completions
                 and result == "workflow-result"
             )
+
+
+@workflow.defn
+class TimerStartedAfterWorkflowCompletionWorkflow:
+    def __init__(self) -> None:
+        self.received_signal = False
+        self.main_workflow_coroutine_finished = False
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self.received_signal)
+        self.main_workflow_coroutine_finished = True
+        return "workflow-result"
+
+    @workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)
+    async def my_signal(self):
+        self.received_signal = True
+        await workflow.wait_condition(lambda: self.main_workflow_coroutine_finished)
+        await asyncio.sleep(7777777)
+
+
+async def test_timer_started_after_workflow_completion(client: Client):
+    async with new_worker(
+        client, TimerStartedAfterWorkflowCompletionWorkflow
+    ) as worker:
+        handle = await client.start_workflow(
+            TimerStartedAfterWorkflowCompletionWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(TimerStartedAfterWorkflowCompletionWorkflow.my_signal)
+        assert await handle.result() == "workflow-result"
