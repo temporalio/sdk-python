@@ -23,7 +23,7 @@ jobs:
             python: "3.8"
             protoCheckTarget: true
           - os: ubuntu-arm
-            runsOn: buildjet-4vcpu-ubuntu-2204-arm
+            runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
             runsOn: macos-12
           - os: macos-arm
