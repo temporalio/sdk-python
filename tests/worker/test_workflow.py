@@ -5491,7 +5491,12 @@ class _UnfinishedHandlersWithCancellationOrFailureTest:
 
                 with pytest.raises(WorkflowFailureError) as err:
                     await handle.result()
-                assert str(err.value).lower() == "workflow execution failed"
+                assert isinstance(
+                    err.value.cause,
+                    {"cancellation": CancelledError, "failure": ApplicationError}[
+                        self.workflow_termination_type
+                    ],
+                )
 
                 unfinished_handler_warning_emitted = any(
                     issubclass(w.category, self._unfinished_handler_warning_cls)
