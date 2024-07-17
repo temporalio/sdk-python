@@ -909,10 +909,20 @@ async def test_schedule_basics(
     )
 
     # Create 4 more schedules of the same type and confirm they are in list
-    # eventually
+    # eventually. Two of them we will create with search attributes.
+    keyword_attr_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
+    await ensure_search_attributes_present(client, keyword_attr_key)
     expected_ids = [handle.id]
     for i in range(4):
-        new_handle = await client.create_schedule(f"{handle.id}-{i + 1}", desc.schedule)
+        new_handle = await client.create_schedule(
+            f"{handle.id}-{i + 1}",
+            desc.schedule,
+            search_attributes=TypedSearchAttributes(
+                [SearchAttributePair(keyword_attr_key, "some-schedule-attr")]
+            )
+            if i >= 2
+            else None,
+        )
         expected_ids.append(new_handle.id)
 
     async def list_ids() -> List[str]:
@@ -924,6 +934,17 @@ async def test_schedule_basics(
         )
 
     await assert_eq_eventually(expected_ids, list_ids)
+
+    # Now do a list w/ query for certain search attributes and confirm
+    list_descs = [
+        d
+        async for d in await client.list_schedules(
+            "`python-test-schedule-keyword` = 'some-schedule-attr'"
+        )
+    ]
+    assert len(list_descs) == 2
+    assert list_descs[0].id in [f"{handle.id}-3", f"{handle.id}-4"]
+    assert list_descs[1].id in [f"{handle.id}-3", f"{handle.id}-4"]
 
     # Delete all of the schedules
     for id in await list_ids():
