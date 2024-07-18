@@ -16,9 +16,7 @@ jobs:
             package-suffix: linux-amd64
           - os: ubuntu-arm
             package-suffix: linux-aarch64
-            # Need the 8 CPU version that has 12GB of RAM, the 4 CPU version
-            # only has 6 GB.
-            runsOn: buildjet-8vcpu-ubuntu-2204-arm
+            runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
             package-suffix: macos-amd64
             runsOn: macos-12
@@ -32,13 +30,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      # actions/setup-python doesn't yet support Linux ARM
-      - if: ${{ matrix.os != 'ubuntu-arm' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - if: ${{ matrix.os == 'ubuntu-arm' }}
-        uses: deadsnakes/action@v3.1.0
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
