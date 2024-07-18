@@ -966,6 +966,7 @@ class Client:
 
     async def list_schedules(
         self,
+        query: Optional[str] = None,
         *,
         page_size: int = 1000,
         next_page_token: Optional[bytes] = None,
@@ -982,6 +983,9 @@ class Client:
 
         Args:
             page_size: Maximum number of results for each page.
+            query: A Temporal visibility list filter. See Temporal documentation
+                concerning visibility list filters including behavior when left
+                unset.
             next_page_token: A previously obtained next page token if doing
                 pagination. Usually not needed as the iterator automatically
                 starts from the beginning.
@@ -998,6 +1002,7 @@ class Client:
                 next_page_token=next_page_token,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                query=query,
             )
         )
 
@@ -4195,6 +4200,7 @@ class ScheduleAsyncIterator:
                 namespace=self._client.namespace,
                 maximum_page_size=page_size or self._input.page_size,
                 next_page_token=self._next_page_token or b"",
+                query=self._input.query or "",
             ),
             retry=True,
             metadata=self._input.rpc_metadata,
@@ -4704,6 +4710,7 @@ class ListSchedulesInput:
     next_page_token: Optional[bytes]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
+    query: Optional[str] = None
 
 
 @dataclass
