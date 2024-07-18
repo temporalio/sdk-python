@@ -41,7 +41,7 @@ types-protobuf = ">=3.20"
 typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
-cibuildwheel = "^2.17.0"
+cibuildwheel = "^2.19.0"
 grpcio-tools = "^1.48.0"
 mypy = "^1.0.0"
 mypy-protobuf = "^3.3.0"
