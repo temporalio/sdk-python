@@ -44,13 +44,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: temporalio/bridge -> target
-      # actions/setup-python doesn't yet support Linux ARM
-      - if: ${{ matrix.os != 'ubuntu-arm' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - if: ${{ matrix.os == 'ubuntu-arm' }}
-        uses: deadsnakes/action@v3.1.0
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - uses: arduino/setup-protoc@v3
