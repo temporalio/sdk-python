@@ -5597,7 +5597,12 @@ class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1:
 
 async def test_update_completion_is_honored_when_after_workflow_return_1(
     client: Client,
+    env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     update_id = "my-update"
     task_queue = "tq"
     wf_handle = await client.start_workflow(
@@ -5648,7 +5653,12 @@ class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
 
 async def test_update_completion_is_honored_when_after_workflow_return_2(
     client: Client,
+    env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     async with Worker(
         client,
         task_queue="tq",
