@@ -2778,7 +2778,7 @@ def _make_unfinished_update_handler_message(
     handler_executions: List[HandlerExecution],
 ) -> str:
     message = """
-TMPRL1102 Workflow finished while update handlers are still running. This may have interrupted work that the
+[TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the
 update handler was doing, and the client that sent the update will receive a 'workflow execution
 already completed' RPCError instead of the update result. You can wait for all update and signal
 handlers to complete by using `await workflow.wait_condition(lambda:
@@ -2797,7 +2797,7 @@ def _make_unfinished_signal_handler_message(
     handler_executions: List[HandlerExecution],
 ) -> str:
     message = """
-TMPRL1102 Workflow finished while signal handlers are still running. This may have interrupted work that the
+[TMPRL1102] Workflow finished while signal handlers are still running. This may have interrupted work that the
 signal handler was doing. You can wait for all update and signal handlers to complete by using
 `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both
 you and the clients sending the signal are okay with interrupting running handlers when the workflow
