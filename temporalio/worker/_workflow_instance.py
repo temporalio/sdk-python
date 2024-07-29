@@ -2801,8 +2801,8 @@ TMPRL1102 Workflow finished while signal handlers are still running. This may ha
 signal handler was doing. You can wait for all update and signal handlers to complete by using
 `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both
 you and the clients sending the signal are okay with interrupting running handlers when the workflow
-finishes, and causing clients to receive errors, then you can disable this warning via the signal
-handler decorator: `@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
+finishes, then you can disable this warning via the signal handler decorator:
+`@workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`.
 """.replace("\n", " ").strip()
     names = collections.Counter(ex.name for ex in handler_executions)
     return (
