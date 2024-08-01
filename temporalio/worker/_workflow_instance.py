@@ -1783,12 +1783,6 @@ class _WorkflowInstanceImpl(
                     )
                 return
 
-            # Handle continue as new
-            if isinstance(err, _ContinueAsNewError):
-                logger.debug("Workflow requested continue as new")
-                err._apply_command(self._add_command())
-                return
-
             logger.debug(
                 f"Workflow raised failure with run ID {self._info.run_id}",
                 exc_info=True,
