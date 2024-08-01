@@ -6,8 +6,9 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime, timedelta, timezone
-from typing import Any, Sequence, Type
+from typing import Any, Optional, Sequence, Type
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
@@ -112,6 +113,8 @@ class _Instance(WorkflowInstance):
         self.runner_class = runner_class
         self.importer = Importer(restrictions, RestrictionContext())
 
+        self._current_thread_id: Optional[int] = None
+
         # Create the instance
         self.globals_and_locals = {
             "__file__": "workflow_sandbox.py",
@@ -169,8 +172,13 @@ class _Instance(WorkflowInstance):
             self.globals_and_locals[k] = v
         try:
             temporalio.workflow.unsafe._set_in_sandbox(True)
+            self._current_thread_id = threading.get_ident()
             exec(code, self.globals_and_locals, self.globals_and_locals)
         finally:
             temporalio.workflow.unsafe._set_in_sandbox(False)
+            self._current_thread_id = None
             for k, v in extra_globals.items():
                 self.globals_and_locals.pop(k, None)
+
+    def get_thread_id(self) -> Optional[int]:
+        return self._current_thread_id

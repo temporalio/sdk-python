@@ -6,8 +6,21 @@ import asyncio
 import concurrent.futures
 import logging
 import os
+import sys
 from datetime import timezone
-from typing import Callable, Dict, List, MutableMapping, Optional, Sequence, Set, Type
+from threading import get_ident
+from types import TracebackType
+from typing import (
+    Callable,
+    Dict,
+    List,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+)
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -193,6 +206,59 @@ class _WorkflowWorker:
     ) -> None:
         global LOG_PROTOS
 
+        def get_traceback_for_thread(
+            thread_id: int,
+        ) -> Tuple[Optional[TracebackType], bool]:
+            """Take a thread id and attempt to construct a traceback from its frames.
+
+            Args:
+                thread_id: Thread ID to be checked.
+
+            Returns:
+                A tuple containing:
+                    0: A TracebackType if the supplied thread id is valid, None otherwise.
+                    1: A bool that determines whether the error message should warn about a possibly incomplete traceback.
+            """
+            # retrieve all frames
+            frame = sys._current_frames().get(thread_id)
+
+            # if the id is not present, the thread must have terminated or there is another error
+            if not frame:
+                return (None, False)
+
+            # Construct tb stack, might be a better way/builtin to do this
+
+            # gather all frames
+            tb_frames = [frame]
+            while frame.f_back:
+                frame = frame.f_back
+                tb_frames.append(frame)
+
+            top_tb = TracebackType(
+                None,
+                tb_frame=tb_frames[0],
+                tb_lasti=tb_frames[0].f_lasti,
+                tb_lineno=tb_frames[0].f_lineno,
+            )
+            tb_frames.reverse()
+            tb_frames.pop()
+
+            tb = top_tb
+            for f in tb_frames:
+                try:
+                    tb.tb_next = TracebackType(
+                        None,
+                        tb_frame=f,
+                        tb_lasti=f.f_lasti,
+                        tb_lineno=f.f_lineno,
+                    )
+                    tb = tb.tb_next
+
+                except Exception:  # TODO better exception type
+                    return (top_tb, True)
+
+            return (top_tb, False)
+
         # Extract a couple of jobs from the activation
         cache_remove_job = None
         start_job = None
@@ -250,9 +316,32 @@ class _WorkflowWorker:
                         activate_task, self._deadlock_timeout_seconds
                     )
                 except asyncio.TimeoutError:
-                    raise RuntimeError(
-                        f"[TMPRL1101] Potential deadlock detected, workflow didn't yield within {self._deadlock_timeout_seconds} second(s)"
-                    )
+                    # extract the stack of the workflow if possible
+
+                    # cases:
+                    # 1. get_thread_id() is not implemented for the worker (returns None, fall to case 2)
+                    # 2. get_thread_id() returns None
+                    # 3. tid is not present in sys._current_frames()
+                    # 4. error occurs during traceback construction
+                    # 5. normal
+
+                    msg = f"[TMPRL1101] Potential deadlock detected: workflow didn't yield within {self._deadlock_timeout_seconds} second(s)."
+                    tid = workflow.get_thread_id()
+                    if not tid:
+                        # Default error if the function is not implemented for the workers, or the worker is not running
+                        raise RuntimeError(msg) from None
+
+                    tb, warn = get_traceback_for_thread(tid)
+
+                    if not tb:
+                        msg += " Worker was unable to retrieve workflow thread info. No frames from workflow available."
+                        raise RuntimeError(msg) from None
+
+                    if warn:
+                        msg += " System encountered errors while constructing traceback, minimal or partial traceback will be presented."
+
+                    raise RuntimeError(msg).with_traceback(tb) from None
+
         except Exception as err:
             # We cannot fail a cache eviction, we must just log and not complete
             # the activation (failed or otherwise). This should only happen in

@@ -10,6 +10,7 @@ import json
 import logging
 import random
 import sys
+import threading
 import traceback
 import warnings
 from abc import ABC, abstractmethod
@@ -158,6 +159,16 @@ class WorkflowInstance(ABC):
         """
         raise NotImplementedError
 
+    def get_thread_id(self) -> Optional[int]:
+        """Return the thread identifier that this workflow is running on.
+
+        Not an abstractmethod because it is not mandatory to implement. Used primarily for getting the frames of a deadlocked thread.
+
+        Returns:
+            Thread ID if the workflow is running, None if not.
+        """
+        return None
+
 
 class UnsandboxedWorkflowRunner(WorkflowRunner):
     """Workflow runner that does not do any sandboxing."""
@@ -299,6 +310,12 @@ class _WorkflowInstanceImpl(
 
         # We only create the metric meter lazily
         self._metric_meter: Optional[_ReplaySafeMetricMeter] = None
+
+        # For tracking the thread this workflow is running on (primarily for deadlock situations)
+        self._current_thread_id: Optional[int] = None
+
+    def get_thread_id(self) -> Optional[int]:
+        return self._current_thread_id
 
     #### Activation functions ####
     # These are in alphabetical order and besides "activate", all other calls
@@ -1714,12 +1731,11 @@ class _WorkflowInstanceImpl(
         name: Optional[str],
     ) -> None:
         self._assert_not_read_only("create task")
-        # Name not supported on older Python versions
-        if sys.version_info >= (3, 8):
-            # Put the workflow info at the end of the task name
-            name = name or task.get_name()
-            name += f" (workflow: {self._info.workflow_type}, id: {self._info.workflow_id}, run: {self._info.run_id})"
-            task.set_name(name)
+
+        # Put the workflow info at the end of the task name
+        name = name or task.get_name()
+        name += f" (workflow: {self._info.workflow_type}, id: {self._info.workflow_id}, run: {self._info.run_id})"
+        task.set_name(name)
         # Add to and remove from our own non-weak set instead of relying on
         # Python's weak set which can collect these too early
         self._tasks.add(task)
@@ -1733,6 +1749,7 @@ class _WorkflowInstanceImpl(
 
     def _run_once(self, *, check_conditions: bool) -> None:
         try:
+            self._current_thread_id = threading.get_ident()
             asyncio._set_running_loop(self)
 
             # We instantiate the workflow class _inside_ here because __init__
@@ -1763,6 +1780,7 @@ class _WorkflowInstanceImpl(
                     ]
         finally:
             asyncio._set_running_loop(None)
+            self._current_thread_id = None
 
     # This is used for the primary workflow function and signal handlers in
     # order to apply common exception handling to each
