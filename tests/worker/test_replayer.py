@@ -310,3 +310,78 @@ def new_say_hello_worker(client: Client) -> Worker:
         workflows=[SayHelloWorkflow],
         activities=[say_hello],
     )
+
+
+@workflow.defn
+class UpdateCompletionAfterWorkflowReturn:
+    def __init__(self) -> None:
+        self.workflow_returned = False
+
+    @workflow.run
+    async def run(self) -> str:
+        self.workflow_returned = True
+        return "workflow-result"
+
+    @workflow.update
+    async def my_update(self) -> str:
+        await workflow.wait_condition(lambda: self.workflow_returned)
+        return "update-result"
+
+
+async def test_replayer_command_reordering_backward_compatibility() -> None:
+    """
+    The UpdateCompletionAfterWorkflowReturn workflow above features an update handler that returns
+    after the main workflow coroutine has exited. It will (if an update is sent in the first WFT)
+    generate a raw command sequence (before sending to core) of
+
+    [UpdateAccepted, CompleteWorkflowExecution, UpdateCompleted].
+
+    Prior to https://github.com/temporalio/sdk-python/pull/569, Python truncated this command
+    sequence to
+
+    [UpdateAccepted, CompleteWorkflowExecution].
+
+    With #569, Python performs no truncation, and Core changes it to
+
+    [UpdateAccepted, UpdateCompleted, CompleteWorkflowExecution].
+
+    This test takes a history generated using pre-#569 SDK code, and replays it. This succeeds.
+    The history is
+
+    1 WorkflowExecutionStarted
+    2 WorkflowTaskScheduled
+    3 WorkflowTaskStarted
+    4 WorkflowTaskCompleted
+    5 WorkflowExecutionUpdateAccepted
+    6 WorkflowExecutionCompleted
+
+    Note that the history lacks a WorkflowExecutionUpdateCompleted event.
+
+    If Core's logic (which involves a flag) incorrectly allowed this history to be replayed
+    using Core's post-#569 implementation, then a non-determinism error would result. Specifically,
+    Core would, at some point during replay, do the following:
+
+    Receive [UpdateAccepted, CompleteWorkflowExecution, UpdateCompleted] from lang,
+    change that to [UpdateAccepted, UpdateCompleted, CompleteWorkflowExecution]
+    and create an UpdateMachine instance (the WorkflowTaskMachine instance already exists).
+    Then continue to consume history events.
+
+    Event 5 WorkflowExecutionUpdateAccepted would apply to the UpdateMachine associated with
+    the UpdateAccepted command, but event 6 WorkflowExecutionCompleted would not, since
+    core is expecting an event that can be applied to the UpdateMachine corresponding to
+    UpdateCompleted. If we modify core to incorrectly apply its new logic then we do see that:
+
+    [TMPRL1100] Nondeterminism error: Update machine does not handle this event: HistoryEvent(id: 6, WorkflowExecutionCompleted)
+
+    The test passes because core in fact (because the history lacks the flag) uses its old logic
+    and changes the command sequence from [UpdateAccepted, CompleteWorkflowExecution, UpdateCompleted]
+    to [UpdateAccepted, CompleteWorkflowExecution], and events 5 and 6 can be applied to the
+    corresponding state machines.
+    """
+    with Path(__file__).with_name(
+        "test_replayer_command_reordering_backward_compatibility.json"
+    ).open() as f:
+        history = f.read()
+    await Replayer(workflows=[UpdateCompletionAfterWorkflowReturn]).replay_workflow(
+        WorkflowHistory.from_json("fake", history)
+    )
