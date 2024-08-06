@@ -111,3 +111,14 @@ jobs:
       version: ${{github.event.pull_request.head.ref}}
       version-is-repo-ref: true
       features-repo-ref: python-update-updates
+
+  omes-image-build:
+    uses: temporalio/omes/.github/workflows/docker-images.yml@main
+    secrets: inherit
+    with:
+      lang: python
+      sdk-repo-url: ${{ github.event.pull_request.head.repo.full_name || 'temporalio/sdk-python' }}
+      sdk-repo-ref: ${{ github.event.pull_request.head.ref || github.ref }}
+      # TODO: Remove once we have a good way of cleaning up sha-based pushed images
+      docker-tag-ext: ci-latest
+      do-push: true
