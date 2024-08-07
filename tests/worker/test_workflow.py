@@ -3350,15 +3350,27 @@ async def test_workflow_optional_param(client: Client):
 
 
 class ExceptionRaisingPayloadConverter(DefaultPayloadConverter):
-    bad_str = "bad-payload-str"
+    bad_outbound_str = "bad-outbound-payload-str"
+    bad_inbound_str = "bad-inbound-payload-str"
+
+    def to_payloads(self, values: Sequence[Any]) -> List[Payload]:
+        if any(
+            value == ExceptionRaisingPayloadConverter.bad_outbound_str
+            for value in values
+        ):
+            raise ApplicationError("Intentional outbound converter failure")
+        return super().to_payloads(values)
 
     def from_payloads(
         self, payloads: Sequence[Payload], type_hints: Optional[List] = None
     ) -> List[Any]:
         # Check if any payloads contain the bad data
         for payload in payloads:
-            if ExceptionRaisingPayloadConverter.bad_str.encode() in payload.data:
-                raise ApplicationError("Intentional converter failure")
+            if (
+                ExceptionRaisingPayloadConverter.bad_inbound_str.encode()
+                in payload.data
+            ):
+                raise ApplicationError("Intentional inbound converter failure")
         return super().from_payloads(payloads, type_hints)
 
 
@@ -3383,12 +3395,46 @@ async def test_exception_raising_converter_param(client: Client):
         with pytest.raises(WorkflowFailureError) as err:
             await client.execute_workflow(
                 ExceptionRaisingConverterWorkflow.run,
-                ExceptionRaisingPayloadConverter.bad_str,
+                ExceptionRaisingPayloadConverter.bad_inbound_str,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
         assert isinstance(err.value.cause, ApplicationError)
-        assert "Intentional converter failure" in str(err.value.cause)
+        assert "Intentional inbound converter failure" in str(err.value.cause)
+
+
+@workflow.defn
+class ActivityOutboundConversionFailureWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            "some-activity",
+            ExceptionRaisingPayloadConverter.bad_outbound_str,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+async def test_workflow_activity_outbound_conversion_failure(client: Client):
+    # This test used to fail because we created commands _before_ we attempted
+    # to convert the arguments thereby causing half-built commands to get sent
+    # to the server.
+
+    # Clone the client but change the data converter to use our converter
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        config["data_converter"],
+        payload_converter_class=ExceptionRaisingPayloadConverter,
+    )
+    client = Client(**config)
+    async with new_worker(client, ActivityOutboundConversionFailureWorkflow) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                ActivityOutboundConversionFailureWorkflow.run,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ApplicationError)
+        assert "Intentional outbound converter failure" in str(err.value.cause)
 
 
 @dataclass
