@@ -34,6 +34,7 @@ from typing import (
     overload,
 )
 
+import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
@@ -842,6 +843,10 @@ class DefaultFailureConverter(FailureConverter):
             if error.details:
                 failure.application_failure_info.details.CopyFrom(
                     payload_converter.to_payloads_wrapper(error.details)
+                )
+            if error.next_retry_delay:
+                failure.application_failure_info.next_retry_delay.FromTimedelta(
+                    error.next_retry_delay
                 )
         elif isinstance(error, temporalio.exceptions.TimeoutError):
             failure.timeout_failure_info.SetInParent()
