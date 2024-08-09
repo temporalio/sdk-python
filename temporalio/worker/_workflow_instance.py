@@ -403,27 +403,17 @@ class _WorkflowInstanceImpl(
                     f"Failed converting activation exception: {inner_err}"
                 )
 
-        # If there are successful commands, we must remove all
-        # non-query-responses after terminal workflow commands. We must do this
-        # in place to avoid the copy-on-write that occurs when you reassign.
-        seen_completion = False
-        i = 0
-        while i < len(self._current_completion.successful.commands):
-            command = self._current_completion.successful.commands[i]
-            if not seen_completion:
-                seen_completion = (
-                    command.HasField("complete_workflow_execution")
-                    or command.HasField("continue_as_new_workflow_execution")
-                    or command.HasField("fail_workflow_execution")
-                    or command.HasField("cancel_workflow_execution")
-                )
-            elif not command.HasField("respond_to_query"):
-                del self._current_completion.successful.commands[i]
-                continue
-            i += 1
+        def is_completion(command):
+            return (
+                command.HasField("complete_workflow_execution")
+                or command.HasField("continue_as_new_workflow_execution")
+                or command.HasField("fail_workflow_execution")
+                or command.HasField("cancel_workflow_execution")
+            )
 
-        if seen_completion:
+        if any(map(is_completion, self._current_completion.successful.commands)):
             self._warn_if_unfinished_handlers()
+
         return self._current_completion
 
     def _apply(

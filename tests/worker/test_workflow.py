@@ -19,6 +19,7 @@ from functools import partial
 from typing import (
     Any,
     Awaitable,
+    Callable,
     Dict,
     List,
     Mapping,
@@ -5622,3 +5623,241 @@ async def test_workflow_id_conflict(client: Client):
         assert new_handle.run_id != handle.run_id
         assert (await handle.describe()).status == WorkflowExecutionStatus.TERMINATED
         assert (await new_handle.describe()).status == WorkflowExecutionStatus.RUNNING
+
+
+@workflow.defn
+class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1:
+    def __init__(self) -> None:
+        self.workflow_returned = False
+
+    @workflow.run
+    async def run(self) -> str:
+        self.workflow_returned = True
+        return "workflow-result"
+
+    @workflow.update
+    async def my_update(self) -> str:
+        await workflow.wait_condition(lambda: self.workflow_returned)
+        return "update-result"
+
+
+async def test_update_completion_is_honored_when_after_workflow_return_1(
+    client: Client,
+    env: WorkflowEnvironment,
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    update_id = "my-update"
+    task_queue = "tq"
+    wf_handle = await client.start_workflow(
+        TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1.run,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+    update_result_task = asyncio.create_task(
+        wf_handle.execute_update(
+            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1.my_update,
+            id=update_id,
+        )
+    )
+    await workflow_update_exists(client, wf_handle.id, update_id)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1],
+    ):
+        assert await wf_handle.result() == "workflow-result"
+        assert await update_result_task == "update-result"
+
+
+@workflow.defn
+class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
+    def __init__(self):
+        self.received_update = False
+        self.update_result: asyncio.Future[str] = asyncio.Future()
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self.received_update)
+        self.update_result.set_result("update-result")
+        # Prior to https://github.com/temporalio/features/issues/481, the client
+        # waiting on the update got a "Workflow execution already completed"
+        # error instead of the update result, because the main workflow
+        # coroutine completion command is emitted before the update completion
+        # command, and we were truncating commands at the first completion
+        # command.
+        return "workflow-result"
+
+    @workflow.update
+    async def my_update(self) -> str:
+        self.received_update = True
+        return await self.update_result
+
+
+async def test_update_completion_is_honored_when_after_workflow_return_2(
+    client: Client,
+    env: WorkflowEnvironment,
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    async with Worker(
+        client,
+        task_queue="tq",
+        workflows=[TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2],
+    ) as worker:
+        handle = await client.start_workflow(
+            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        update_result = await handle.execute_update(
+            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.my_update
+        )
+        assert update_result == "update-result"
+        assert await handle.result() == "workflow-result"
+
+
+@workflow.defn
+class FirstCompletionCommandIsHonoredWorkflow:
+    def __init__(self, main_workflow_returns_before_signal_completions=False) -> None:
+        self.seen_first_signal = False
+        self.seen_second_signal = False
+        self.main_workflow_returns_before_signal_completions = (
+            main_workflow_returns_before_signal_completions
+        )
+        self.ping_pong_val = 1
+        self.ping_pong_counter = 0
+        self.ping_pong_max_count = 4
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(
+            lambda: self.seen_first_signal and self.seen_second_signal
+        )
+        return "workflow-result"
+
+    @workflow.signal
+    async def this_signal_executes_first(self):
+        self.seen_first_signal = True
+        if self.main_workflow_returns_before_signal_completions:
+            await self.ping_pong(lambda: self.ping_pong_val > 0)
+        raise ApplicationError(
+            "Client should see this error unless doing ping-pong "
+            "(in which case main coroutine returns first)"
+        )
+
+    @workflow.signal
+    async def this_signal_executes_second(self):
+        await workflow.wait_condition(lambda: self.seen_first_signal)
+        self.seen_second_signal = True
+        if self.main_workflow_returns_before_signal_completions:
+            await self.ping_pong(lambda: self.ping_pong_val < 0)
+        raise ApplicationError("Client should never see this error!")
+
+    async def ping_pong(self, cond: Callable[[], bool]):
+        while self.ping_pong_counter < self.ping_pong_max_count:
+            await workflow.wait_condition(cond)
+            self.ping_pong_val = -self.ping_pong_val
+            self.ping_pong_counter += 1
+
+
+@workflow.defn
+class FirstCompletionCommandIsHonoredPingPongWorkflow(
+    FirstCompletionCommandIsHonoredWorkflow
+):
+    def __init__(self) -> None:
+        super().__init__(main_workflow_returns_before_signal_completions=True)
+
+    @workflow.run
+    async def run(self) -> str:
+        return await super().run()
+
+
+async def test_first_of_two_signal_completion_commands_is_honored(client: Client):
+    await _do_first_completion_command_is_honored_test(
+        client, main_workflow_returns_before_signal_completions=False
+    )
+
+
+async def test_workflow_return_is_honored_when_it_precedes_signal_completion_command(
+    client: Client,
+):
+    await _do_first_completion_command_is_honored_test(
+        client, main_workflow_returns_before_signal_completions=True
+    )
+
+
+async def _do_first_completion_command_is_honored_test(
+    client: Client, main_workflow_returns_before_signal_completions: bool
+):
+    workflow_cls: Union[
+        Type[FirstCompletionCommandIsHonoredPingPongWorkflow],
+        Type[FirstCompletionCommandIsHonoredWorkflow],
+    ] = (
+        FirstCompletionCommandIsHonoredPingPongWorkflow
+        if main_workflow_returns_before_signal_completions
+        else FirstCompletionCommandIsHonoredWorkflow
+    )
+    async with Worker(
+        client,
+        task_queue="tq",
+        workflows=[workflow_cls],
+    ) as worker:
+        handle = await client.start_workflow(
+            workflow_cls.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(workflow_cls.this_signal_executes_second)
+        await handle.signal(workflow_cls.this_signal_executes_first)
+        try:
+            result = await handle.result()
+        except WorkflowFailureError as err:
+            if main_workflow_returns_before_signal_completions:
+                assert (
+                    False
+                ), "Expected no error due to main workflow coroutine returning first"
+            else:
+                assert str(err.cause).startswith("Client should see this error")
+        else:
+            assert (
+                main_workflow_returns_before_signal_completions
+                and result == "workflow-result"
+            )
+
+
+@workflow.defn
+class TimerStartedAfterWorkflowCompletionWorkflow:
+    def __init__(self) -> None:
+        self.received_signal = False
+        self.main_workflow_coroutine_finished = False
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self.received_signal)
+        self.main_workflow_coroutine_finished = True
+        return "workflow-result"
+
+    @workflow.signal(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)
+    async def my_signal(self):
+        self.received_signal = True
+        await workflow.wait_condition(lambda: self.main_workflow_coroutine_finished)
+        await asyncio.sleep(7777777)
+
+
+async def test_timer_started_after_workflow_completion(client: Client):
+    async with new_worker(
+        client, TimerStartedAfterWorkflowCompletionWorkflow
+    ) as worker:
+        handle = await client.start_workflow(
+            TimerStartedAfterWorkflowCompletionWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(TimerStartedAfterWorkflowCompletionWorkflow.my_signal)
+        assert await handle.result() == "workflow-result"
