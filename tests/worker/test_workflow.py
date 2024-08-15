@@ -5407,14 +5407,26 @@ class _UnfinishedHandlersWarningsTest:
 class UnfinishedHandlersOnWorkflowTerminationWorkflow:
     @workflow.run
     async def run(
-        self, workflow_termination_type: Literal["cancellation", "failure"]
+        self,
+        workflow_termination_type: Literal[
+            "cancellation",
+            "failure",
+            "continue-as-new",
+            "fail-post-continue-as-new-run",
+        ],
     ) -> NoReturn:
         if workflow_termination_type == "failure":
             raise ApplicationError(
                 "Deliberately failing workflow with an unfinished handler"
             )
-        await workflow.wait_condition(lambda: False)
-        raise AssertionError("unreachable")
+        if workflow_termination_type == "fail-post-continue-as-new-run":
+            raise ApplicationError("Deliberately failing post-ContinueAsNew run")
+        elif workflow_termination_type == "continue-as-new":
+            # Fail next run so tat test terminates
+            workflow.continue_as_new("fail-post-continue-as-new-run")
+        else:
+            await workflow.wait_condition(lambda: False)
+            raise AssertionError("unreachable")
 
     @workflow.update
     async def my_update(self) -> NoReturn:
@@ -5477,11 +5489,39 @@ async def test_unfinished_signal_handler_with_workflow_failure(
     ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
+async def test_unfinished_update_handler_with_continue_as_new(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    await _UnfinishedHandlersOnWorkflowTerminationTest(
+        client,
+        "update",
+        "continue-as-new",
+    ).test_warning_is_issued_on_exit_with_unfinished_handler()
+
+
+async def test_unfinished_signal_handler_with_continue_as_new(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2127"
+        )
+    await _UnfinishedHandlersOnWorkflowTerminationTest(
+        client,
+        "signal",
+        "continue-as-new",
+    ).test_warning_is_issued_on_exit_with_unfinished_handler()
+
+
 @dataclass
 class _UnfinishedHandlersOnWorkflowTerminationTest:
     client: Client
     handler_type: Literal["update", "signal"]
-    workflow_termination_type: Literal["cancellation", "failure"]
+    workflow_termination_type: Literal["cancellation", "failure", "continue-as-new"]
 
     async def test_warning_is_issued_on_exit_with_unfinished_handler(
         self,
@@ -5540,10 +5580,17 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                     await handle.result()
                 assert isinstance(
                     err.value.cause,
-                    {"cancellation": CancelledError, "failure": ApplicationError}[
-                        self.workflow_termination_type
-                    ],
+                    {
+                        "cancellation": CancelledError,
+                        "continue-as-new": ApplicationError,
+                        "failure": ApplicationError,
+                    }[self.workflow_termination_type],
                 )
+                if self.workflow_termination_type == "continue-as-new":
+                    assert (
+                        str(err.value.cause)
+                        == "Deliberately failing post-ContinueAsNew run"
+                    )
 
                 unfinished_handler_warning_emitted = any(
                     issubclass(w.category, self._unfinished_handler_warning_cls)
