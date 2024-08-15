@@ -5222,7 +5222,7 @@ async def test_workflow_current_update(client: Client, env: WorkflowEnvironment)
 
 
 @workflow.defn
-class UnfinishedHandlersWorkflow:
+class UnfinishedHandlersWarningsWorkflow:
     def __init__(self):
         self.started_handler = False
         self.handler_may_return = False
@@ -5275,21 +5275,21 @@ async def test_unfinished_update_handler(client: Client, env: WorkflowEnvironmen
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
-    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
-        test = _UnfinishedHandlersTest(client, worker, "update")
+    async with new_worker(client, UnfinishedHandlersWarningsWorkflow) as worker:
+        test = _UnfinishedHandlersWarningsTest(client, worker, "update")
         await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
         await test.test_unfinished_handlers_cause_exceptions_in_test_suite()
 
 
 async def test_unfinished_signal_handler(client: Client):
-    async with new_worker(client, UnfinishedHandlersWorkflow) as worker:
-        test = _UnfinishedHandlersTest(client, worker, "signal")
+    async with new_worker(client, UnfinishedHandlersWarningsWorkflow) as worker:
+        test = _UnfinishedHandlersWarningsTest(client, worker, "signal")
         await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
         await test.test_unfinished_handlers_cause_exceptions_in_test_suite()
 
 
 @dataclass
-class _UnfinishedHandlersTest:
+class _UnfinishedHandlersWarningsTest:
     client: Client
     worker: Worker
     handler_type: Literal["update", "signal"]
@@ -5370,7 +5370,7 @@ class _UnfinishedHandlersTest:
         handle_future: Optional[asyncio.Future[WorkflowHandle]] = None,
     ) -> bool:
         handle = await self.client.start_workflow(
-            UnfinishedHandlersWorkflow.run,
+            UnfinishedHandlersWarningsWorkflow.run,
             arg=wait_all_handlers_finished,
             id=f"wf-{uuid.uuid4()}",
             task_queue=self.worker.task_queue,
@@ -5404,7 +5404,7 @@ class _UnfinishedHandlersTest:
 
 
 @workflow.defn
-class UnfinishedHandlersWithCancellationOrFailureWorkflow:
+class UnfinishedHandlersOnWorkflowTerminationWorkflow:
     @workflow.run
     async def run(
         self, workflow_termination_type: Literal["cancellation", "failure"]
@@ -5434,19 +5434,19 @@ async def test_unfinished_update_handler_with_workflow_cancellation(
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
-    await _UnfinishedHandlersWithCancellationOrFailureTest(
+    await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         "update",
         "cancellation",
-    ).test_warning_is_issued_when_cancellation_or_failure_causes_exit_with_unfinished_handler()
+    ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
 async def test_unfinished_signal_handler_with_workflow_cancellation(client: Client):
-    await _UnfinishedHandlersWithCancellationOrFailureTest(
+    await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         "signal",
         "cancellation",
-    ).test_warning_is_issued_when_cancellation_or_failure_causes_exit_with_unfinished_handler()
+    ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
 async def test_unfinished_update_handler_with_workflow_failure(
@@ -5456,11 +5456,11 @@ async def test_unfinished_update_handler_with_workflow_failure(
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
-    await _UnfinishedHandlersWithCancellationOrFailureTest(
+    await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         "update",
         "failure",
-    ).test_warning_is_issued_when_cancellation_or_failure_causes_exit_with_unfinished_handler()
+    ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
 async def test_unfinished_signal_handler_with_workflow_failure(
@@ -5470,20 +5470,20 @@ async def test_unfinished_signal_handler_with_workflow_failure(
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2127"
         )
-    await _UnfinishedHandlersWithCancellationOrFailureTest(
+    await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         "signal",
         "failure",
-    ).test_warning_is_issued_when_cancellation_or_failure_causes_exit_with_unfinished_handler()
+    ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
 @dataclass
-class _UnfinishedHandlersWithCancellationOrFailureTest:
+class _UnfinishedHandlersOnWorkflowTerminationTest:
     client: Client
     handler_type: Literal["update", "signal"]
     workflow_termination_type: Literal["cancellation", "failure"]
 
-    async def test_warning_is_issued_when_cancellation_or_failure_causes_exit_with_unfinished_handler(
+    async def test_warning_is_issued_on_exit_with_unfinished_handler(
         self,
     ):
         assert await self._run_workflow_and_get_warning()
@@ -5497,7 +5497,7 @@ class _UnfinishedHandlersWithCancellationOrFailureTest:
         # in the same WFT. To do this we start the worker after they've all been accepted by the
         # server.
         handle = await self.client.start_workflow(
-            UnfinishedHandlersWithCancellationOrFailureWorkflow.run,
+            UnfinishedHandlersOnWorkflowTerminationWorkflow.run,
             self.workflow_termination_type,
             id=workflow_id,
             task_queue=task_queue,
@@ -5508,7 +5508,7 @@ class _UnfinishedHandlersWithCancellationOrFailureTest:
         if self.handler_type == "update":
             update_task = asyncio.create_task(
                 handle.execute_update(
-                    UnfinishedHandlersWithCancellationOrFailureWorkflow.my_update,
+                    UnfinishedHandlersOnWorkflowTerminationWorkflow.my_update,
                     id=update_id,
                 )
             )
@@ -5518,12 +5518,12 @@ class _UnfinishedHandlersWithCancellationOrFailureTest:
             )
         else:
             await handle.signal(
-                UnfinishedHandlersWithCancellationOrFailureWorkflow.my_signal
+                UnfinishedHandlersOnWorkflowTerminationWorkflow.my_signal
             )
 
         async with new_worker(
             self.client,
-            UnfinishedHandlersWithCancellationOrFailureWorkflow,
+            UnfinishedHandlersOnWorkflowTerminationWorkflow,
             task_queue=task_queue,
         ):
             with pytest.WarningsRecorder() as warnings:
