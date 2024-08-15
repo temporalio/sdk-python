@@ -5343,7 +5343,7 @@ class _UnfinishedHandlersWarningsTest:
         for event in reversed(resp.history.events):
             if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
                 assert event.workflow_task_failed_event_attributes.failure.message.startswith(
-                    f"Workflow finished while {self.handler_type} handlers are still running"
+                    f"[TMPRL1102] Workflow finished while {self.handler_type} handlers are still running"
                 )
                 return True
         return False
