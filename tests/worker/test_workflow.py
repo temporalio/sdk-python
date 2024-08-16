@@ -5405,6 +5405,9 @@ class _UnfinishedHandlersWarningsTest:
 
 @workflow.defn
 class UnfinishedHandlersOnWorkflowTerminationWorkflow:
+    def __init__(self) -> None:
+        self.handlers_may_finish = False
+
     @workflow.run
     async def run(
         self,
@@ -5414,33 +5417,38 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
             "continue-as-new",
             "fail-post-continue-as-new-run",
         ],
+        wait_all_handlers_finished: bool,
     ) -> NoReturn:
+        if wait_all_handlers_finished:
+            self.handlers_may_finish = True
+            await workflow.wait_condition(workflow.all_handlers_finished)
         if workflow_termination_type == "failure":
             raise ApplicationError(
                 "Deliberately failing workflow with an unfinished handler"
             )
-        if workflow_termination_type == "fail-post-continue-as-new-run":
+        elif workflow_termination_type == "fail-post-continue-as-new-run":
             raise ApplicationError("Deliberately failing post-ContinueAsNew run")
         elif workflow_termination_type == "continue-as-new":
-            # Fail next run so tat test terminates
-            workflow.continue_as_new("fail-post-continue-as-new-run")
+            # Fail next run so that test terminates
+            workflow.continue_as_new(
+                args=["fail-post-continue-as-new-run", wait_all_handlers_finished]
+            )
         else:
             await workflow.wait_condition(lambda: False)
             raise AssertionError("unreachable")
 
     @workflow.update
     async def my_update(self) -> NoReturn:
-        await workflow.wait_condition(lambda: False)
-        raise AssertionError("unreachable")
+        await workflow.wait_condition(lambda: self.handlers_may_finish)
 
     @workflow.signal
     async def my_signal(self) -> NoReturn:
-        await workflow.wait_condition(lambda: False)
-        raise AssertionError("unreachable")
+        await workflow.wait_condition(lambda: self.handlers_may_finish)
 
 
+@pytest.mark.parametrize("wait_all_handlers_finished", [True, False])
 async def test_unfinished_update_handler_with_workflow_cancellation(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, wait_all_handlers_finished: bool
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -5450,19 +5458,25 @@ async def test_unfinished_update_handler_with_workflow_cancellation(
         client,
         "update",
         "cancellation",
+        wait_all_handlers_finished,
     ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
-async def test_unfinished_signal_handler_with_workflow_cancellation(client: Client):
+@pytest.mark.parametrize("wait_all_handlers_finished", [True, False])
+async def test_unfinished_signal_handler_with_workflow_cancellation(
+    client: Client, wait_all_handlers_finished: bool
+):
     await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         "signal",
         "cancellation",
+        wait_all_handlers_finished,
     ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
+@pytest.mark.parametrize("wait_all_handlers_finished", [True, False])
 async def test_unfinished_update_handler_with_workflow_failure(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, wait_all_handlers_finished: bool
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -5472,11 +5486,13 @@ async def test_unfinished_update_handler_with_workflow_failure(
         client,
         "update",
         "failure",
+        wait_all_handlers_finished,
     ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
+@pytest.mark.parametrize("wait_all_handlers_finished", [True, False])
 async def test_unfinished_signal_handler_with_workflow_failure(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, wait_all_handlers_finished: bool
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -5486,11 +5502,13 @@ async def test_unfinished_signal_handler_with_workflow_failure(
         client,
         "signal",
         "failure",
+        wait_all_handlers_finished,
     ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
+@pytest.mark.parametrize("wait_all_handlers_finished", [True, False])
 async def test_unfinished_update_handler_with_continue_as_new(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, wait_all_handlers_finished: bool
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -5500,11 +5518,13 @@ async def test_unfinished_update_handler_with_continue_as_new(
         client,
         "update",
         "continue-as-new",
+        wait_all_handlers_finished,
     ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
+@pytest.mark.parametrize("wait_all_handlers_finished", [True, False])
 async def test_unfinished_signal_handler_with_continue_as_new(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, wait_all_handlers_finished: bool
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -5514,6 +5534,7 @@ async def test_unfinished_signal_handler_with_continue_as_new(
         client,
         "signal",
         "continue-as-new",
+        wait_all_handlers_finished,
     ).test_warning_is_issued_on_exit_with_unfinished_handler()
 
 
@@ -5522,11 +5543,14 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     client: Client
     handler_type: Literal["update", "signal"]
     workflow_termination_type: Literal["cancellation", "failure", "continue-as-new"]
+    wait_all_handlers_finished: bool
 
     async def test_warning_is_issued_on_exit_with_unfinished_handler(
         self,
     ):
-        assert await self._run_workflow_and_get_warning()
+        assert await self._run_workflow_and_get_warning() == (
+            not self.wait_all_handlers_finished
+        )
 
     async def _run_workflow_and_get_warning(self) -> bool:
         workflow_id = f"wf-{uuid.uuid4()}"
@@ -5538,7 +5562,7 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
         # server.
         handle = await self.client.start_workflow(
             UnfinishedHandlersOnWorkflowTerminationWorkflow.run,
-            self.workflow_termination_type,
+            args=[self.workflow_termination_type, self.wait_all_handlers_finished],
             id=workflow_id,
             task_queue=task_queue,
         )
@@ -5569,12 +5593,15 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             with pytest.WarningsRecorder() as warnings:
                 if self.handler_type == "update":
                     assert update_task
-                    with pytest.raises(RPCError) as update_err:
+                    if self.wait_all_handlers_finished:
                         await update_task
-                    assert update_err.value.status == RPCStatusCode.NOT_FOUND and (
-                        str(update_err.value).lower()
-                        == "workflow execution already completed"
-                    )
+                    else:
+                        with pytest.raises(RPCError) as update_err:
+                            await update_task
+                        assert update_err.value.status == RPCStatusCode.NOT_FOUND and (
+                            str(update_err.value).lower()
+                            == "workflow execution already completed"
+                        )
 
                 with pytest.raises(WorkflowFailureError) as err:
                     await handle.result()
