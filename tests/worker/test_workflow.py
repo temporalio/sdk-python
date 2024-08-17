@@ -5412,19 +5412,19 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
     async def run(
         self,
         workflow_termination_type: Literal[
-            "cancellation",
-            "failure",
-            "continue-as-new",
-            "fail-post-continue-as-new-run",
+            "-cancellation-",
+            "-failure-",
+            "-continue-as-new-",
+            "-fail-post-continue-as-new-run-",
         ],
-        handler_registration: Literal["late_registered", "not_late_registered"],
-        handler_dynamism: Literal["dynamic", "not_dynamic"],
+        handler_registration: Literal["-late-registered-", "-not-late-registered-"],
+        handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
         handler_waiting: Literal[
-            "wait_all_handlers_finish", "no_wait_all_handlers_finish"
+            "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
         ],
     ) -> NoReturn:
-        if handler_registration == "late_registered":
-            if handler_dynamism == "dynamic":
+        if handler_registration == "-late-registered-":
+            if handler_dynamism == "-dynamic-":
 
                 async def my_late_registered_dynamic_update(
                     self, name: str, args: Sequence[RawValue]
@@ -5455,20 +5455,20 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
                     "my_late_registered_signal", my_late_registered_signal
                 )
 
-        if handler_waiting == "wait_all_handlers_finish":
+        if handler_waiting == "-wait-all-handlers-finish-":
             self.handlers_may_finish = True
             await workflow.wait_condition(workflow.all_handlers_finished)
-        if workflow_termination_type == "failure":
+        if workflow_termination_type == "-failure-":
             raise ApplicationError(
                 "Deliberately failing workflow with an unfinished handler"
             )
-        elif workflow_termination_type == "fail-post-continue-as-new-run":
+        elif workflow_termination_type == "-fail-post-continue-as-new-run-":
             raise ApplicationError("Deliberately failing post-ContinueAsNew run")
-        elif workflow_termination_type == "continue-as-new":
+        elif workflow_termination_type == "-continue-as-new-":
             # Fail next run so that test terminates
             workflow.continue_as_new(
                 args=[
-                    "fail-post-continue-as-new-run",
+                    "-fail-post-continue-as-new-run-",
                     handler_registration,
                     handler_dynamism,
                     handler_waiting,
@@ -5497,169 +5497,39 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
         await workflow.wait_condition(lambda: self.handlers_may_finish)
 
 
+@pytest.mark.parametrize("handler_type", ["-signal-", "-update-"])
 @pytest.mark.parametrize(
-    "handler_registration", ["late_registered", "not_late_registered"]
+    "handler_registration", ["-late-registered-", "-not-late-registered-"]
 )
-@pytest.mark.parametrize("handler_dynamism", ["dynamic", "not_dynamic"])
+@pytest.mark.parametrize("handler_dynamism", ["-dynamic-", "-not-dynamic-"])
 @pytest.mark.parametrize(
     "handler_waiting",
-    ["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
+    ["-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"],
 )
-async def test_unfinished_update_handler_with_workflow_cancellation(
+@pytest.mark.parametrize(
+    "workflow_termination_type", ["-cancellation-", "-failure-", "-continue-as-new-"]
+)
+async def test_unfinished_handler_on_workflow_termination(
     client: Client,
     env: WorkflowEnvironment,
-    handler_registration: Literal["late_registered", "not_late_registered"],
-    handler_dynamism: Literal["dynamic", "not_dynamic"],
-    handler_waiting: Literal["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
+    handler_type: Literal["-signal-", "-update-"],
+    handler_registration: Literal["-late-registered-", "-not-late-registered-"],
+    handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
+    handler_waiting: Literal[
+        "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
+    ],
+    workflow_termination_type: Literal[
+        "-cancellation-", "-failure-", "-continue-as-new-"
+    ],
 ):
-    if env.supports_time_skipping:
+    if handler_type == "-update-" and env.supports_time_skipping:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
     await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
-        "update",
-        "cancellation",
-        handler_registration,
-        handler_dynamism,
-        handler_waiting,
-    ).test_warning_is_issued_on_exit_with_unfinished_handler()
-
-
-@pytest.mark.parametrize(
-    "handler_registration", ["late_registered", "not_late_registered"]
-)
-@pytest.mark.parametrize("handler_dynamism", ["dynamic", "not_dynamic"])
-@pytest.mark.parametrize(
-    "handler_waiting",
-    ["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-)
-async def test_unfinished_signal_handler_with_workflow_cancellation(
-    client: Client,
-    handler_registration: Literal["late_registered", "not_late_registered"],
-    handler_dynamism: Literal["dynamic", "not_dynamic"],
-    handler_waiting: Literal["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-):
-    await _UnfinishedHandlersOnWorkflowTerminationTest(
-        client,
-        "signal",
-        "cancellation",
-        handler_registration,
-        handler_dynamism,
-        handler_waiting,
-    ).test_warning_is_issued_on_exit_with_unfinished_handler()
-
-
-@pytest.mark.parametrize(
-    "handler_registration", ["late_registered", "not_late_registered"]
-)
-@pytest.mark.parametrize("handler_dynamism", ["dynamic", "not_dynamic"])
-@pytest.mark.parametrize(
-    "handler_waiting",
-    ["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-)
-async def test_unfinished_update_handler_with_workflow_failure(
-    client: Client,
-    env: WorkflowEnvironment,
-    handler_registration: Literal["late_registered", "not_late_registered"],
-    handler_dynamism: Literal["dynamic", "not_dynamic"],
-    handler_waiting: Literal["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
-    await _UnfinishedHandlersOnWorkflowTerminationTest(
-        client,
-        "update",
-        "failure",
-        handler_registration,
-        handler_dynamism,
-        handler_waiting,
-    ).test_warning_is_issued_on_exit_with_unfinished_handler()
-
-
-@pytest.mark.parametrize(
-    "handler_registration", ["late_registered", "not_late_registered"]
-)
-@pytest.mark.parametrize("handler_dynamism", ["dynamic", "not_dynamic"])
-@pytest.mark.parametrize(
-    "handler_waiting",
-    ["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-)
-async def test_unfinished_signal_handler_with_workflow_failure(
-    client: Client,
-    env: WorkflowEnvironment,
-    handler_registration: Literal["late_registered", "not_late_registered"],
-    handler_dynamism: Literal["dynamic", "not_dynamic"],
-    handler_waiting: Literal["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/2127"
-        )
-    await _UnfinishedHandlersOnWorkflowTerminationTest(
-        client,
-        "signal",
-        "failure",
-        handler_registration,
-        handler_dynamism,
-        handler_waiting,
-    ).test_warning_is_issued_on_exit_with_unfinished_handler()
-
-
-@pytest.mark.parametrize(
-    "handler_registration", ["late_registered", "not_late_registered"]
-)
-@pytest.mark.parametrize("handler_dynamism", ["dynamic", "not_dynamic"])
-@pytest.mark.parametrize(
-    "handler_waiting",
-    ["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-)
-async def test_unfinished_update_handler_with_continue_as_new(
-    client: Client,
-    env: WorkflowEnvironment,
-    handler_registration: Literal["late_registered", "not_late_registered"],
-    handler_dynamism: Literal["dynamic", "not_dynamic"],
-    handler_waiting: Literal["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
-    await _UnfinishedHandlersOnWorkflowTerminationTest(
-        client,
-        "update",
-        "continue-as-new",
-        handler_registration,
-        handler_dynamism,
-        handler_waiting,
-    ).test_warning_is_issued_on_exit_with_unfinished_handler()
-
-
-@pytest.mark.parametrize(
-    "handler_registration", ["late_registered", "not_late_registered"]
-)
-@pytest.mark.parametrize("handler_dynamism", ["dynamic", "not_dynamic"])
-@pytest.mark.parametrize(
-    "handler_waiting",
-    ["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-)
-async def test_unfinished_signal_handler_with_continue_as_new(
-    client: Client,
-    env: WorkflowEnvironment,
-    handler_registration: Literal["late_registered", "not_late_registered"],
-    handler_dynamism: Literal["dynamic", "not_dynamic"],
-    handler_waiting: Literal["wait_all_handlers_finish", "no_wait_all_handlers_finish"],
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/2127"
-        )
-    await _UnfinishedHandlersOnWorkflowTerminationTest(
-        client,
-        "signal",
-        "continue-as-new",
+        handler_type,
+        workflow_termination_type,
         handler_registration,
         handler_dynamism,
         handler_waiting,
@@ -5669,17 +5539,21 @@ async def test_unfinished_signal_handler_with_continue_as_new(
 @dataclass
 class _UnfinishedHandlersOnWorkflowTerminationTest:
     client: Client
-    handler_type: Literal["update", "signal"]
-    workflow_termination_type: Literal["cancellation", "failure", "continue-as-new"]
-    handler_registration: Literal["late_registered", "not_late_registered"]
-    handler_dynamism: Literal["dynamic", "not_dynamic"]
-    handler_waiting: Literal["wait_all_handlers_finish", "no_wait_all_handlers_finish"]
+    handler_type: Literal["-signal-", "-update-"]
+    workflow_termination_type: Literal[
+        "-cancellation-", "-failure-", "-continue-as-new-"
+    ]
+    handler_registration: Literal["-late-registered-", "-not-late-registered-"]
+    handler_dynamism: Literal["-dynamic-", "-not-dynamic-"]
+    handler_waiting: Literal[
+        "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
+    ]
 
     async def test_warning_is_issued_on_exit_with_unfinished_handler(
         self,
     ):
         assert await self._run_workflow_and_get_warning() == (
-            self.handler_waiting == "no_wait_all_handlers_finish"
+            self.handler_waiting == "-no-wait-all-handlers-finish-"
         )
 
     async def _run_workflow_and_get_warning(self) -> bool:
@@ -5701,20 +5575,20 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             id=workflow_id,
             task_queue=task_queue,
         )
-        if self.workflow_termination_type == "cancellation":
+        if self.workflow_termination_type == "-cancellation-":
             await handle.cancel()
 
-        if self.handler_type == "update":
+        if self.handler_type == "-update-":
             update_method = (
                 "__does_not_exist__"
-                if self.handler_dynamism == "dynamic"
+                if self.handler_dynamism == "-dynamic-"
                 else "my_late_registered_update"
-                if self.handler_registration == "late_registered"
+                if self.handler_registration == "-late-registered-"
                 else UnfinishedHandlersOnWorkflowTerminationWorkflow.my_update
             )
             update_task = asyncio.create_task(
                 handle.execute_update(
-                    update_method,
+                    update_method,  # type: ignore
                     id=update_id,
                 )
             )
@@ -5725,12 +5599,12 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
         else:
             signal_method = (
                 "__does_not_exist__"
-                if self.handler_dynamism == "dynamic"
+                if self.handler_dynamism == "-dynamic-"
                 else "my_late_registered_signal"
-                if self.handler_registration == "late_registered"
+                if self.handler_registration == "-late-registered-"
                 else UnfinishedHandlersOnWorkflowTerminationWorkflow.my_signal
             )
-            await handle.signal(signal_method)
+            await handle.signal(signal_method)  # type: ignore
 
         async with new_worker(
             self.client,
@@ -5738,9 +5612,9 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             task_queue=task_queue,
         ):
             with pytest.WarningsRecorder() as warnings:
-                if self.handler_type == "update":
+                if self.handler_type == "-update-":
                     assert update_task
-                    if self.handler_waiting == "wait_all_handlers_finish":
+                    if self.handler_waiting == "-wait-all-handlers-finish-":
                         await update_task
                     else:
                         with pytest.raises(RPCError) as update_err:
@@ -5755,12 +5629,12 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                 assert isinstance(
                     err.value.cause,
                     {
-                        "cancellation": CancelledError,
-                        "continue-as-new": ApplicationError,
-                        "failure": ApplicationError,
+                        "-cancellation-": CancelledError,
+                        "-continue-as-new-": ApplicationError,
+                        "-failure-": ApplicationError,
                     }[self.workflow_termination_type],
                 )
-                if self.workflow_termination_type == "continue-as-new":
+                if self.workflow_termination_type == "-continue-as-new-":
                     assert (
                         str(err.value.cause)
                         == "Deliberately failing post-ContinueAsNew run"
@@ -5775,8 +5649,8 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     @property
     def _unfinished_handler_warning_cls(self) -> Type:
         return {
-            "update": workflow.UnfinishedUpdateHandlersWarning,
-            "signal": workflow.UnfinishedSignalHandlersWarning,
+            "-update-": workflow.UnfinishedUpdateHandlersWarning,
+            "-signal-": workflow.UnfinishedSignalHandlersWarning,
         }[self.handler_type]
 
 
