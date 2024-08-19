@@ -1355,37 +1355,44 @@ def assert_activity_application_error(
 
 
 @activity.defn
-async def activity_with_retry_delay(retry_delay_seconds: float):
-    if activity.info().attempt == 1:
-        raise ApplicationError(
-            "Deliberately failing with next_retry_delay set",
-            next_retry_delay=timedelta(seconds=retry_delay_seconds),
-        )
+async def activity_with_retry_delay():
+    raise ApplicationError(
+        ActivitiesWithRetryDelayWorkflow.error_message,
+        next_retry_delay=ActivitiesWithRetryDelayWorkflow.next_retry_delay,
+    )
 
 
 @workflow.defn
 class ActivitiesWithRetryDelayWorkflow:
+    error_message = "Deliberately failing with next_retry_delay set"
+    next_retry_delay = timedelta(milliseconds=5)
+
     @workflow.run
-    async def run(self, retry_delay_seconds: float) -> float:
-        t0 = workflow.time()
+    async def run(self) -> None:
         await workflow.execute_activity(
             activity_with_retry_delay,
-            retry_delay_seconds,
-            schedule_to_close_timeout=timedelta(seconds=retry_delay_seconds * 2),
+            retry_policy=RetryPolicy(maximum_attempts=2),
+            schedule_to_close_timeout=self.next_retry_delay,
         )
-        t1 = workflow.time()
-        return t1 - t0
 
 
 async def test_activity_retry_delay(client: Client):
-    retry_delay = timedelta(seconds=2)
     async with new_worker(
         client, ActivitiesWithRetryDelayWorkflow, activities=[activity_with_retry_delay]
     ) as worker:
-        workflow_duration = await client.execute_workflow(
-            ActivitiesWithRetryDelayWorkflow.run,
-            retry_delay.total_seconds(),
-            id=str(uuid.uuid4()),
-            task_queue=worker.task_queue,
-        )
-        assert workflow_duration > retry_delay.total_seconds()
+        try:
+            await client.execute_workflow(
+                ActivitiesWithRetryDelayWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=worker.task_queue,
+            )
+        except WorkflowFailureError as err:
+            assert isinstance(err.cause, ActivityError)
+            assert isinstance(err.cause.cause, ApplicationError)
+            assert (
+                str(err.cause.cause) == ActivitiesWithRetryDelayWorkflow.error_message
+            )
+            assert (
+                err.cause.cause.next_retry_delay
+                == ActivitiesWithRetryDelayWorkflow.next_retry_delay
+            )
