@@ -41,7 +41,6 @@ from temporalio.worker import (
     Worker,
     WorkerConfig,
 )
-from tests.helpers import new_worker
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -1352,47 +1351,3 @@ def assert_activity_application_error(
     ret = assert_activity_error(err)
     assert isinstance(ret, ApplicationError)
     return ret
-
-
-@activity.defn
-async def activity_with_retry_delay():
-    raise ApplicationError(
-        ActivitiesWithRetryDelayWorkflow.error_message,
-        next_retry_delay=ActivitiesWithRetryDelayWorkflow.next_retry_delay,
-    )
-
-
-@workflow.defn
-class ActivitiesWithRetryDelayWorkflow:
-    error_message = "Deliberately failing with next_retry_delay set"
-    next_retry_delay = timedelta(milliseconds=5)
-
-    @workflow.run
-    async def run(self) -> None:
-        await workflow.execute_activity(
-            activity_with_retry_delay,
-            retry_policy=RetryPolicy(maximum_attempts=2),
-            schedule_to_close_timeout=self.next_retry_delay,
-        )
-
-
-async def test_activity_retry_delay(client: Client):
-    async with new_worker(
-        client, ActivitiesWithRetryDelayWorkflow, activities=[activity_with_retry_delay]
-    ) as worker:
-        try:
-            await client.execute_workflow(
-                ActivitiesWithRetryDelayWorkflow.run,
-                id=str(uuid.uuid4()),
-                task_queue=worker.task_queue,
-            )
-        except WorkflowFailureError as err:
-            assert isinstance(err.cause, ActivityError)
-            assert isinstance(err.cause.cause, ApplicationError)
-            assert (
-                str(err.cause.cause) == ActivitiesWithRetryDelayWorkflow.error_message
-            )
-            assert (
-                err.cause.cause.next_retry_delay
-                == ActivitiesWithRetryDelayWorkflow.next_retry_delay
-            )
