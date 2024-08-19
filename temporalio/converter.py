@@ -933,6 +933,7 @@ class DefaultFailureConverter(FailureConverter):
                 *payload_converter.from_payloads_wrapper(app_info.details),
                 type=app_info.type or None,
                 non_retryable=app_info.non_retryable,
+                next_retry_delay=app_info.next_retry_delay.ToTimedelta(),
             )
         elif failure.HasField("timeout_failure_info"):
             timeout_info = failure.timeout_failure_info
