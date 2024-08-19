@@ -5881,7 +5881,7 @@ class ActivitiesWithRetryDelayWorkflow:
         await workflow.execute_activity(
             activity_with_retry_delay,
             retry_policy=RetryPolicy(maximum_attempts=2),
-            schedule_to_close_timeout=self.next_retry_delay,
+            schedule_to_close_timeout=timedelta(minutes=5),
         )
 
 
