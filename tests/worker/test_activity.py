@@ -744,7 +744,14 @@ async def test_sync_activity_process_non_picklable_heartbeat_details(
                 picklable_activity_non_pickable_heartbeat_details,
                 worker_config={"activity_executor": executor},
             )
-    assert "Can't pickle" in str(assert_activity_application_error(err.value))
+    msg = str(assert_activity_application_error(err.value))
+    # TODO: different messages can apparently be produced across runs/platforms
+    # See e.g. https://github.com/temporalio/sdk-python/actions/runs/10455232879/job/28949714969?pr=571
+    assert (
+        "Can't pickle" in msg
+        or "Can't get local object 'picklable_activity_non_pickable_heartbeat_details.<locals>.<lambda>'"
+        in msg
+    )
 
 
 async def test_activity_error_non_retryable(client: Client, worker: ExternalWorker):
