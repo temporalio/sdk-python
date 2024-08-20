@@ -1,0 +1,61 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity manual_result_type_activity (token b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12-workflow-e1305aca-01b8-4ceb-881a-b4f77d80a135\x1a$d42771c6-ed49-4d29-9ca7-788333f538a2 \x05(\x012\x011B\x1bmanual_result_type_activityJ\x08\x08\x01\x10\x9c\xb8@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'manual_result_type_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '22cd78e0-5037-4eb3-8134-34bec174b92c', 'workflow_id': 'workflow-e1305aca-01b8-4ceb-881a-b4f77d80a135', 'workflow_run_id': 'd42771c6-ed49-4d29-9ca7-788333f538a2', 'workflow_type': 'ManualResultTypeWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\022-workflow-e1305aca-01b8-4ceb-881a-b4f77d80a135\032$d42771c6-ed49-4d29-9ca7-788333f538a2 \005(\0012\0011B\033manual_result_type_activityJ\010\010\001\020\234\270@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"some_string\":\"from-activity\"}"
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity manual_result_type_activity (token b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12-workflow-e1305aca-01b8-4ceb-881a-b4f77d80a135\x1a$d42771c6-ed49-4d29-9ca7-788333f538a2 \x0b(\x012\x012B\x1bmanual_result_type_activityJ\x08\x08\x01\x10\xad\xb8@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'manual_result_type_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '22cd78e0-5037-4eb3-8134-34bec174b92c', 'workflow_id': 'workflow-e1305aca-01b8-4ceb-881a-b4f77d80a135', 'workflow_run_id': 'd42771c6-ed49-4d29-9ca7-788333f538a2', 'workflow_type': 'ManualResultTypeWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\022-workflow-e1305aca-01b8-4ceb-881a-b4f77d80a135\032$d42771c6-ed49-4d29-9ca7-788333f538a2 \013(\0012\0012B\033manual_result_type_activityJ\010\010\001\020\255\270@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"some_string\":\"from-activity\"}"
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity manual_result_type_activity (token b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12-workflow-f373a989-216a-476c-9fbf-f179de0bdf08\x1a$c8d4a7bd-7a75-4bb0-993a-0848dfea4452 \x05(\x012\x011B\x1bmanual_result_type_activityJ\x08\x08\x01\x10\xa3\xb9@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'manual_result_type_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '22cd78e0-5037-4eb3-8134-34bec174b92c', 'workflow_id': 'workflow-f373a989-216a-476c-9fbf-f179de0bdf08', 'workflow_run_id': 'c8d4a7bd-7a75-4bb0-993a-0848dfea4452', 'workflow_type': 'ManualResultTypeWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\022-workflow-f373a989-216a-476c-9fbf-f179de0bdf08\032$c8d4a7bd-7a75-4bb0-993a-0848dfea4452 \005(\0012\0011B\033manual_result_type_activityJ\010\010\001\020\243\271@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"some_string\":\"from-activity\"}"
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity manual_result_type_activity (token b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12-workflow-f373a989-216a-476c-9fbf-f179de0bdf08\x1a$c8d4a7bd-7a75-4bb0-993a-0848dfea4452 \x0b(\x012\x012B\x1bmanual_result_type_activityJ\x08\x08\x01\x10\xb4\xb9@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'manual_result_type_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '22cd78e0-5037-4eb3-8134-34bec174b92c', 'workflow_id': 'workflow-f373a989-216a-476c-9fbf-f179de0bdf08', 'workflow_run_id': 'c8d4a7bd-7a75-4bb0-993a-0848dfea4452', 'workflow_type': 'ManualResultTypeWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\022-workflow-f373a989-216a-476c-9fbf-f179de0bdf08\032$c8d4a7bd-7a75-4bb0-993a-0848dfea4452 \013(\0012\0012B\033manual_result_type_activityJ\010\010\001\020\264\271@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"some_string\":\"from-activity\"}"
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

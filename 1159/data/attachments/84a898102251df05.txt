@@ -1,0 +1,20 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity wait_cancel (token b'\x00\x07default\x00$14b4afd7-eab6-4d65-94cf-75f413e4d2b1\x00$46d30dbb-8471-4037-984a-29532f89272e\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '82729418-31c9-4f1d-93e2-ee6842e07d0b', 'workflow_id': '14b4afd7-eab6-4d65-94cf-75f413e4d2b1', 'workflow_run_id': '46d30dbb-8471-4037-984a-29532f89272e', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '82729418-31c9-4f1d-93e2-ee6842e07d0b', 'workflow_id': '14b4afd7-eab6-4d65-94cf-75f413e4d2b1', 'workflow_run_id': '46d30dbb-8471-4037-984a-29532f89272e', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:216 Cancelling activity b'\x00\x07default\x00$14b4afd7-eab6-4d65-94cf-75f413e4d2b1\x00$46d30dbb-8471-4037-984a-29532f89272e\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01', reason: 1
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '82729418-31c9-4f1d-93e2-ee6842e07d0b', 'workflow_id': '14b4afd7-eab6-4d65-94cf-75f413e4d2b1', 'workflow_run_id': '46d30dbb-8471-4037-984a-29532f89272e', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '82729418-31c9-4f1d-93e2-ee6842e07d0b', 'workflow_id': '14b4afd7-eab6-4d65-94cf-75f413e4d2b1', 'workflow_run_id': '46d30dbb-8471-4037-984a-29532f89272e', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000$14b4afd7-eab6-4d65-94cf-75f413e4d2b1\000$46d30dbb-8471-4037-984a-29532f89272e\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Cancelled\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

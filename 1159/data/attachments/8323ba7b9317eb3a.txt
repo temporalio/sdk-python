@@ -1,0 +1,39 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity simulate_heartbeat_timeout (token b'\x00\x07default\x00-workflow-b61b66f8-a7c3-438f-998a-047f81c76d0e\x00$af867a21-9b9b-4ab9-96e8-709e764b9955\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'simulate_heartbeat_timeout', 'attempt': 1, 'namespace': 'default', 'task_queue': '06ed45dc-8f9f-4539-8bb9-f22f610d995d', 'workflow_id': 'workflow-b61b66f8-a7c3-438f-998a-047f81c76d0e', 'workflow_run_id': 'af867a21-9b9b-4ab9-96e8-709e764b9955', 'workflow_type': 'ActivityWaitWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000-workflow-b61b66f8-a7c3-438f-998a-047f81c76d0e\000$af867a21-9b9b-4ab9-96e8-709e764b9955\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"all done\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID af867a21-9b9b-4ab9-96e8-709e764b9955
+temporalio.exceptions.TimeoutError: Timeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/testing/test_workflow.py", line 110, in run
+    return await workflow.execute_activity_method(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 2577, in execute_activity_method
+    return await _Runtime.current().workflow_start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity task timed out
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

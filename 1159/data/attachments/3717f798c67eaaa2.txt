@@ -1,0 +1,106 @@
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4192, in bad_validator_validator
+    workflow.start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1847, in start_activity
+    return _Runtime.current().workflow_start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1130, in workflow_start_activity
+    self._assert_not_read_only("start activity")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1556, in _assert_not_read_only
+    raise temporalio.workflow.ReadOnlyContextError(
+temporalio.workflow.ReadOnlyContextError: While in read-only function, action attempted: start activity
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow UpdateHandlersWorkflow with ID update-handlers-command-in-validator-82353d09-803e-4f47-98da-3c221dab43e0 and run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4192, in bad_validator_validator
+    workflow.start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1847, in start_activity
+    return _Runtime.current().workflow_start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1130, in workflow_start_activity
+    self._assert_not_read_only("start activity")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1556, in _assert_not_read_only
+    raise temporalio.workflow.ReadOnlyContextError(
+temporalio.workflow.ReadOnlyContextError: While in read-only function, action attempted: start activity
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "While in read-only function, action attempted: start activity", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 351, in activate\n    self._run_once(check_conditions=index == 1 or index == 2)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1749, in _run_once\n    raise self._current_activation_error\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 514, in run_update\n    self._inbound.handle_update_validator(handler_input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 340, in handle_update_validator\n    self.next.handle_update_validator(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 2130, in handle_update_validator\n    handler(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 4192, in bad_validator_validator\n    workflow.start_activity(\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py\", line 1847, in start_activity\n    return _Runtime.current().workflow_start_activity(\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1130, in workflow_start_activity\n    self._assert_not_read_only(\"start activity\")\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1556, in _assert_not_read_only\n    raise temporalio.workflow.ReadOnlyContextError(\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "ReadOnlyContextError", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4192, in bad_validator_validator
+    workflow.start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1847, in start_activity
+    return _Runtime.current().workflow_start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1130, in workflow_start_activity
+    self._assert_not_read_only("start activity")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1556, in _assert_not_read_only
+    raise temporalio.workflow.ReadOnlyContextError(
+temporalio.workflow.ReadOnlyContextError: While in read-only function, action attempted: start activity
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow UpdateHandlersWorkflow with ID update-handlers-command-in-validator-82353d09-803e-4f47-98da-3c221dab43e0 and run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4192, in bad_validator_validator
+    workflow.start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1847, in start_activity
+    return _Runtime.current().workflow_start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1130, in workflow_start_activity
+    self._assert_not_read_only("start activity")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1556, in _assert_not_read_only
+    raise temporalio.workflow.ReadOnlyContextError(
+temporalio.workflow.ReadOnlyContextError: While in read-only function, action attempted: start activity
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "While in read-only function, action attempted: start activity", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 351, in activate\n    self._run_once(check_conditions=index == 1 or index == 2)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1749, in _run_once\n    raise self._current_activation_error\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 514, in run_update\n    self._inbound.handle_update_validator(handler_input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 340, in handle_update_validator\n    self.next.handle_update_validator(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 2130, in handle_update_validator\n    handler(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 4192, in bad_validator_validator\n    workflow.start_activity(\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py\", line 1847, in start_activity\n    return _Runtime.current().workflow_start_activity(\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1130, in workflow_start_activity\n    self._assert_not_read_only(\"start activity\")\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1556, in _assert_not_read_only\n    raise temporalio.workflow.ReadOnlyContextError(\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "ReadOnlyContextError", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2141, in handle_update_handler
+    return handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4213, in throws_runtime_err
+    raise RuntimeError("intentional failure")
+RuntimeError: intentional failure
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow UpdateHandlersWorkflow with ID update-handlers-command-in-validator-82353d09-803e-4f47-98da-3c221dab43e0 and run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2141, in handle_update_handler
+    return handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4213, in throws_runtime_err
+    raise RuntimeError("intentional failure")
+RuntimeError: intentional failure
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 1b05d7e2-e0f4-49fe-bd42-f96f0763297e, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "intentional failure", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 351, in activate\n    self._run_once(check_conditions=index == 1 or index == 2)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1749, in _run_once\n    raise self._current_activation_error\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 531, in run_update\n    success = await self._inbound.handle_update_handler(handler_input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 344, in handle_update_handler\n    return await self.next.handle_update_handler(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 2141, in handle_update_handler\n    return handler(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 4213, in throws_runtime_err\n    raise RuntimeError(\"intentional failure\")\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "RuntimeError", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

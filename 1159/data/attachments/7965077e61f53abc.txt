@@ -1,0 +1,10 @@
+INFO     temporalio.workflow:test_workflow.py:1909 Signal: signal 1 ({'attempt': 1, 'namespace': 'default', 'run_id': '90c714e1-8b61-49a5-b3d0-8cefe80bdba7', 'task_queue': '9cf5f5cb-5ffd-4976-9a7b-e232a2498565', 'workflow_id': 'workflow-10a0eb5f-9386-4ca1-b6eb-162cd7313750', 'workflow_type': 'LoggingWorkflow'})
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 90c714e1-8b61-49a5-b3d0-8cefe80bdba7, message: Workflow cache full
+INFO     temporalio.workflow:test_workflow.py:1909 Signal: signal 2 ({'attempt': 1, 'namespace': 'default', 'run_id': '90c714e1-8b61-49a5-b3d0-8cefe80bdba7', 'task_queue': '9cf5f5cb-5ffd-4976-9a7b-e232a2498565', 'workflow_id': 'workflow-10a0eb5f-9386-4ca1-b6eb-162cd7313750', 'workflow_type': 'LoggingWorkflow'})
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 90c714e1-8b61-49a5-b3d0-8cefe80bdba7, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.workflow:test_workflow.py:1909 Signal: signal 3 ({'attempt': 1, 'namespace': 'default', 'run_id': '90c714e1-8b61-49a5-b3d0-8cefe80bdba7', 'task_queue': '9cf5f5cb-5ffd-4976-9a7b-e232a2498565', 'workflow_id': 'workflow-10a0eb5f-9386-4ca1-b6eb-162cd7313750', 'workflow_type': 'LoggingWorkflow'})
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 90c714e1-8b61-49a5-b3d0-8cefe80bdba7, message: Workflow cache full
+INFO     temporalio.workflow:test_workflow.py:1909 Signal: finish ({'attempt': 1, 'namespace': 'default', 'run_id': '90c714e1-8b61-49a5-b3d0-8cefe80bdba7', 'task_queue': '9cf5f5cb-5ffd-4976-9a7b-e232a2498565', 'workflow_id': 'workflow-10a0eb5f-9386-4ca1-b6eb-162cd7313750', 'workflow_type': 'LoggingWorkflow'})
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 90c714e1-8b61-49a5-b3d0-8cefe80bdba7, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

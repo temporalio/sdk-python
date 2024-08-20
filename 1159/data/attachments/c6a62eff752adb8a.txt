@@ -1,0 +1,31 @@
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 68396e6a-e4fa-469e-ac76-393682045a0b
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2110, in handle_signal
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 473, in bad_signal
+    raise ApplicationError("signal fail", 123)
+temporalio.exceptions.ApplicationError: signal fail
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\x00\x07default\x00-workflow-3f047cd2-25e7-4cc0-9274-bc1ddda6af4a\x00$37da3249-d347-4a82-8205-d578f3f3d4bc\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': 'f937fa24-6630-4782-b8e7-dffe48f49325', 'workflow_id': 'workflow-3f047cd2-25e7-4cc0-9274-bc1ddda6af4a', 'workflow_run_id': '37da3249-d347-4a82-8205-d578f3f3d4bc', 'workflow_type': 'SimpleActivityWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000-workflow-3f047cd2-25e7-4cc0-9274-bc1ddda6af4a\000$37da3249-d347-4a82-8205-d578f3f3d4bc\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "simple-codec"
+        value: "true"
+      }
+      data: "\n,\n\026\n\010encoding\022\njson/plain\022\022\"Hello, Temporal!\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

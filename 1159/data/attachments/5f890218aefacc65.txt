@@ -1,0 +1,16 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity external_wait_cancel (token b'\x00\x07default\x00-workflow-71a7ddda-d8a2-42fd-bc6e-e2f0b61bd935\x00$09c92a27-3540-409e-9534-eb080746e2a9\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'external_wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': 'c9d19ce7-dab4-4ef0-8f22-2e30d2815d2c', 'workflow_id': 'workflow-71a7ddda-d8a2-42fd-bc6e-e2f0b61bd935', 'workflow_run_id': '09c92a27-3540-409e-9534-eb080746e2a9', 'workflow_type': 'ExternalStackTraceWorkflow'})
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._activity:_activity.py:216 Cancelling activity b'\x00\x07default\x00-workflow-71a7ddda-d8a2-42fd-bc6e-e2f0b61bd935\x00$09c92a27-3540-409e-9534-eb080746e2a9\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x01', reason: 3
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000-workflow-71a7ddda-d8a2-42fd-bc6e-e2f0b61bd935\000$09c92a27-3540-409e-9534-eb080746e2a9\000\000\000\000\000\000\000\006\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Got cancelled error, cancelled? True\""
+    }
+  }
+}

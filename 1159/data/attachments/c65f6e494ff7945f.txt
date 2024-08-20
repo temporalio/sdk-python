@@ -1,0 +1,35 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity run (token b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12$275f2fda-0276-449f-ac37-362e91a128f5\x1a$2901d919-938b-462f-9685-d9e75e8e6a01 \x05(\x012\x011B\x03runJ\x08\x08\x01\x10\x83\x97@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': 'eb8e954c-3565-44f3-a170-d1adf80f7a8d', 'workflow_id': '275f2fda-0276-449f-ac37-362e91a128f5', 'workflow_run_id': '2901d919-938b-462f-9685-d9e75e8e6a01', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:463 Completing asynchronously ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': 'eb8e954c-3565-44f3-a170-d1adf80f7a8d', 'workflow_id': '275f2fda-0276-449f-ac37-362e91a128f5', 'workflow_run_id': '2901d919-938b-462f-9685-d9e75e8e6a01', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\022$275f2fda-0276-449f-ac37-362e91a128f5\032$2901d919-938b-462f-9685-d9e75e8e6a01 \005(\0012\0011B\003runJ\010\010\001\020\203\227@\030\001"
+result {
+  will_complete_async {
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 2901d919-938b-462f-9685-d9e75e8e6a01
+temporalio.exceptions.CancelledError: Cancelled
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 97, in run
+    should_return, ret = await self.handle_action(params, action)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 204, in handle_action
+    raise task.exception()  # type: ignore
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 193, in run_activity
+    last_result = await task
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity cancelled
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

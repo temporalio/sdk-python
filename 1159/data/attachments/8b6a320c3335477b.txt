@@ -1,0 +1,15 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity picklable_wait_on_event (token b'\x00\x07default\x00$afc78a22-5c7e-4e74-8588-af4319c09b65\x00$277b5628-87a1-4cb9-9f00-83b2fe31c00a\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'picklable_wait_on_event', 'attempt': 1, 'namespace': 'default', 'task_queue': '613d6cfb-c1fb-43cf-8fa2-c5923da1dcd7', 'workflow_id': 'afc78a22-5c7e-4e74-8588-af4319c09b65', 'workflow_run_id': '277b5628-87a1-4cb9-9f00-83b2fe31c00a', 'workflow_type': 'kitchen_sink'})
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:02 before cancelling activities
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000$afc78a22-5c7e-4e74-8588-af4319c09b65\000$277b5628-87a1-4cb9-9f00-83b2fe31c00a\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Worker graceful shutdown\""
+    }
+  }
+}

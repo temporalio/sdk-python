@@ -1,0 +1,43 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12-workflow-0a88af57-f13e-482f-9b9a-4b0d646d482c\x1a$a6e7ae7c-21df-456f-8427-5aab497f8ba6 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\x93\x9a@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': 'bc2672b6-4a5e-469a-919f-38aaa17dd461', 'workflow_id': 'workflow-0a88af57-f13e-482f-9b9a-4b0d646d482c', 'workflow_run_id': 'a6e7ae7c-21df-456f-8427-5aab497f8ba6', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\022-workflow-0a88af57-f13e-482f-9b9a-4b0d646d482c\032$a6e7ae7c-21df-456f-8427-5aab497f8ba6 \005(\0012\0011B\tsay_helloJ\010\010\001\020\223\232@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID a6e7ae7c-21df-456f-8427-5aab497f8ba6
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_replayer.py", line 52, in run
+    raise ApplicationError("Intentional error")
+temporalio.exceptions.ApplicationError: Intentional error
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID a6e7ae7c-21df-456f-8427-5aab497f8ba6
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_replayer.py", line 52, in run
+    raise ApplicationError("Intentional error")
+temporalio.exceptions.ApplicationError: Intentional error
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID a6e7ae7c-21df-456f-8427-5aab497f8ba6, message: Always evict workflows after replay

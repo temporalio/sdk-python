@@ -1,0 +1,16 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity multi_param_activity (token b'\x00\x07default\x00-workflow-09f6eb21-2c18-4c4a-9f9b-17c41313ef93\x00$d9100d18-85b4-4a7b-ac8e-3313528cbd55\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'multi_param_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '2a61b637-7b5f-486c-a718-263d487b3a09', 'workflow_id': 'workflow-09f6eb21-2c18-4c4a-9f9b-17c41313ef93', 'workflow_run_id': 'd9100d18-85b4-4a7b-ac8e-3313528cbd55', 'workflow_type': 'MultiParamWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000-workflow-09f6eb21-2c18-4c4a-9f9b-17c41313ef93\000$d9100d18-85b4-4a7b-ac8e-3313528cbd55\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"param1: 123, param2: val1\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

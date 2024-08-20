@@ -1,0 +1,42 @@
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 411b488b-f0e1-4383-bb36-a4ef3fb82178, message: Workflow cache full
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity sync_activity_wait_cancel (token b'\x00\x07default\x00-workflow-c342f1cc-aa65-4f58-86b6-b78ce4603060\x00$411b488b-f0e1-4383-bb36-a4ef3fb82178\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'sync_activity_wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': 'tq-faea7950-e083-4dcb-a454-13a368bdfb88', 'workflow_id': 'workflow-c342f1cc-aa65-4f58-86b6-b78ce4603060', 'workflow_run_id': '411b488b-f0e1-4383-bb36-a4ef3fb82178', 'workflow_type': 'CancelOnWorkerShutdownWorkflow'})
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._activity:_activity.py:216 Cancelling activity b'\x00\x07default\x00-workflow-c342f1cc-aa65-4f58-86b6-b78ce4603060\x00$411b488b-f0e1-4383-bb36-a4ef3fb82178\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01', reason: 3
+DEBUG    temporalio.activity:_activity.py:486 Completing as cancelled ({'activity_id': '1', 'activity_type': 'sync_activity_wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': 'tq-faea7950-e083-4dcb-a454-13a368bdfb88', 'workflow_id': 'workflow-c342f1cc-aa65-4f58-86b6-b78ce4603060', 'workflow_run_id': '411b488b-f0e1-4383-bb36-a4ef3fb82178', 'workflow_type': 'CancelOnWorkerShutdownWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000-workflow-c342f1cc-aa65-4f58-86b6-b78ce4603060\000$411b488b-f0e1-4383-bb36-a4ef3fb82178\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  cancelled {
+    failure {
+      message: "Cancelled"
+      canceled_failure_info {
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 411b488b-f0e1-4383-bb36-a4ef3fb82178
+temporalio.exceptions.ApplicationError: WorkerShutdown: Worker is shutting down and this activity did not complete in time
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 430, in run
+    await workflow.execute_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 2011, in execute_activity
+    return await _Runtime.current().workflow_start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity task failed
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 411b488b-f0e1-4383-bb36-a4ef3fb82178, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

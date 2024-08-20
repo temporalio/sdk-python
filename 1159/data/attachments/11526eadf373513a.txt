@@ -1,0 +1,12 @@
+DEBUG    tests.test_converter:test_converter.py:467 Showing appended exception
+temporalio.exceptions.ApplicationError: ValueError: error1
+Stack:
+  File "/home/runner/work/sdk-python/sdk-python/tests/test_converter.py", line 438, in test_exception_format
+    raise ValueError("error1")
+
+The above exception was the direct cause of the following exception:
+
+temporalio.exceptions.ApplicationError: RuntimeError: error2
+Stack:
+  File "/home/runner/work/sdk-python/sdk-python/tests/test_converter.py", line 440, in test_exception_format
+    raise RuntimeError("error2") from err

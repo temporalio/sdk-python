@@ -1,0 +1,575 @@
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on os.getcwd restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID aadaebfd-cb05-4437-877a-5fafd571b3d2
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access os.getcwd.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access os.getcwd.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on os.getcwd restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 9b52d33e-ab6b-4349-846a-aff2aecec577
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 3, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access os.getcwd.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access os.getcwd.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on glob.glob restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 66fce9b8-a12b-4491-97da-2d149eb57f7b
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access glob.glob.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access glob.glob.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 name on os restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID e0c4b4bb-c556-48ff-8e05-3a42c3b5064f
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 942, in __getattribute__
+    state.assert_child_not_restricted(__name)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access os.name from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access os.name from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 33d1d064-60e5-4e0c-9794-6ded1c349c8a
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 1, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_importer.py", line 441, in __call__
+    return self.current(*args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_importer.py", line 94, in restrict_built_in
+    raise RestrictedWorkflowAccessError(f"__builtins__.{name}")
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access __builtins__.open from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access __builtins__.open from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on random.choice restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 693e3c28-fe63-4586-add9-a5bb81f45f5e
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 1, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_importer.py", line 441, in __call__
+    return self.current(*args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_importer.py", line 234, in _import
+    mod = importlib.__import__(name, globals, locals, fromlist, level)
+  File "<frozen importlib._bootstrap>", line 1093, in __import__
+  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 991, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 975, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 671, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 843, in exec_module
+  File "<frozen importlib._bootstrap>", line 219, in _call_with_frames_removed
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/testmodules/module_calling_invalid.py", line 3, in <module>
+    random.choice(["foo", "bar"])
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access random.choice.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access random.choice.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on datetime.date.today restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 1a30e6ac-fcce-4e22-bbb4-1fb5cf2b0c3a
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access datetime.date.today.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access datetime.date.today.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on datetime.datetime.now restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID c5e090c3-3cd4-48ca-b48d-334a27e1f74b
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access datetime.datetime.now.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access datetime.datetime.now.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 foo on os.environ restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 5966fc64-217f-409b-9097-e8c84406a993
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 942, in __getattribute__
+    state.assert_child_not_restricted(__name)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access os.environ.foo from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access os.environ.foo from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on os.getenv restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID f3f50899-bda5-46ba-94c1-27d5e630af2a
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access os.getenv.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access os.getenv.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 abspath on os.path restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID c8656898-3861-42df-81e0-89757536485b
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 942, in __getattribute__
+    state.assert_child_not_restricted(__name)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access os.path.abspath from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access os.path.abspath from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on random.choice restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID b91c553c-8bbc-4d9a-a446-c4d293cb52f5
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access random.choice.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access random.choice.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on secrets.choice restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 98ed950c-6208-4d8b-a465-8a124e98b5f5
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access secrets.choice.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access secrets.choice.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on threading.current_thread restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID c6f375d7-f078-444a-8a50-e322c0273355
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access threading.current_thread.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access threading.current_thread.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on time.sleep restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 95ec24cd-654e-4993-b080-710f25b0b16a
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access time.sleep.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access time.sleep.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on concurrent.futures.ThreadPoolExecutor restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 46ab9f45-b287-4518-b406-fb6e5ffd5c43
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access concurrent.futures.ThreadPoolExecutor.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access concurrent.futures.ThreadPoolExecutor.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on urllib.request.urlopen restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 5acff924-1daa-4c8e-ab11-467f8f44e73f
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access urllib.request.urlopen.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access urllib.request.urlopen.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on http.client.HTTPConnection restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 3cc04145-82c0-4810-804d-2500157470bf
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access http.client.HTTPConnection.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access http.client.HTTPConnection.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on uuid.uuid4 restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID db767648-fab4-4b5a-a97d-e9a948e9003c
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access uuid.uuid4.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on datetime.date restricted
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID e9762d16-9b57-4651-8a5a-705029e337e2
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 149, in run
+    exec(code)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 964, in __call__
+    state.assert_child_not_restricted("__call__")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_restrictions.py", line 792, in assert_child_not_restricted
+    raise RestrictedWorkflowAccessError(
+temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access datetime.date.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/workflow_sandbox/test_runner.py", line 151, in run
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: RestrictedWorkflowAccessError: Cannot access datetime.date.__call__ from inside a workflow. If this is code from a module not used in a workflow or known to only be used deterministically from a workflow, mark the import as pass through.
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

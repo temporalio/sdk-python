@@ -1,0 +1,85 @@
+ERROR    temporalio.worker._workflow:_workflow.py:271 Failed handling activation on workflow with run ID 045c3a8e-0858-4f84-8e91-0af0b89da2a0
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/asyncio/tasks.py", line 501, in wait_for
+    raise exceptions.TimeoutError()
+asyncio.exceptions.TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 253, in _handle_activation
+    raise RuntimeError(
+RuntimeError: [TMPRL1101] Potential deadlock detected, workflow didn't yield within 1 second(s)
+ERROR    temporalio.worker._workflow:_workflow.py:264 Failed running eviction job, not evicting. Since eviction could not be processed, this worker cannot complete and the slot will remain forever used.
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/asyncio/tasks.py", line 494, in wait_for
+    return fut.result()
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/concurrent/futures/thread.py", line 57, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 157, in activate
+    self._run_code(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 172, in _run_code
+    exec(code, self.globals_and_locals, self.globals_and_locals)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py", line 81, in activate
+    return self.instance.activate(act)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 379, in activate
+    raise RuntimeError(
+RuntimeError: Eviction processed, but 3 tasks remain. Stack traces below:
+
+Stack for <Task cancelling name='Task-2908 (workflow: EvictionDeadlockWorkflow, id: workflow-49869139-f587-4a8c-a8d7-8ea42eb1bb6e, run: 045c3a8e-0858-4f84-8e91-0af0b89da2a0)' coro=<EvictionDeadlockWorkflow.wait_until_negative() running at /home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py:2594> wait_for=<Future cancelled> cb=[set.remove(), gather.<locals>._done_callback() at /opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/asyncio/tasks.py:769]> (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2594, in wait_until_negative
+    await workflow.wait_condition(lambda: self.val < 0)
+
+
+Stack for <Task pending name='run (workflow: EvictionDeadlockWorkflow, id: workflow-49869139-f587-4a8c-a8d7-8ea42eb1bb6e, run: 045c3a8e-0858-4f84-8e91-0af0b89da2a0)' coro=<_WorkflowInstanceImpl._run_top_level_workflow_function() running at /home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py:1767> wait_for=<_GatheringFuture pending cb=[<TaskWakeupMethWrapper object at 0x7f959e81a1f0>()]> cb=[set.remove()]> (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+
+
+Stack for <Task cancelling name='Task-2909 (workflow: EvictionDeadlockWorkflow, id: workflow-49869139-f587-4a8c-a8d7-8ea42eb1bb6e, run: 045c3a8e-0858-4f84-8e91-0af0b89da2a0)' coro=<EvictionDeadlockWorkflow.wait_until_positive() running at /home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py:2589> cb=[set.remove(), gather.<locals>._done_callback() at /opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/asyncio/tasks.py:769]> (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/threading.py", line 890, in _bootstrap
+    self._bootstrap_inner()
+
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/threading.py", line 932, in _bootstrap_inner
+    self.run()
+
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/threading.py", line 870, in run
+    self._target(*self._args, **self._kwargs)
+
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/concurrent/futures/thread.py", line 80, in _worker
+    work_item.run()
+
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/concurrent/futures/thread.py", line 57, in run
+    result = self.fn(*self.args, **self.kwargs)
+
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 157, in activate
+    self._run_code(
+
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 172, in _run_code
+    exec(code, self.globals_and_locals, self.globals_and_locals)
+
+  File "<string>", line 2, in <module>
+
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py", line 81, in activate
+    return self.instance.activate(act)
+
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1744, in _run_once
+    handle._run()
+
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/asyncio/events.py", line 81, in _run
+    self._context.run(self._callback, *self._args)
+
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2589, in wait_until_positive
+    await workflow.wait_condition(lambda: self.val > 0)
+
+INFO     temporalio.worker._worker:_worker.py:517 Worker cancelled, shutting down
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+WARNING  temporalio.worker._workflow:_workflow.py:172 Shutting down workflow worker, but 1 workflow(s) could not be evicted previously, so the shutdown will hang

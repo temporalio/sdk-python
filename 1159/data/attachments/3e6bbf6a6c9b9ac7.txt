@@ -1,0 +1,18 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity wait_cancel (token b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12$60cf007b-9d7a-44e1-bc1a-f6ee300c48c9\x1a$5d724d6e-c838-4fcb-90ba-d172c46164a1 \x05(\x012\x011B\x0bwait_cancelJ\x08\x08\x01\x10\xaa\x8d@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '897da17b-5b81-489f-b476-6cda49b0cc9c', 'workflow_id': '60cf007b-9d7a-44e1-bc1a-f6ee300c48c9', 'workflow_run_id': '5d724d6e-c838-4fcb-90ba-d172c46164a1', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '897da17b-5b81-489f-b476-6cda49b0cc9c', 'workflow_id': '60cf007b-9d7a-44e1-bc1a-f6ee300c48c9', 'workflow_run_id': '5d724d6e-c838-4fcb-90ba-d172c46164a1', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:216 Cancelling activity b'\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\x12$60cf007b-9d7a-44e1-bc1a-f6ee300c48c9\x1a$5d724d6e-c838-4fcb-90ba-d172c46164a1 \x05(\x012\x011B\x0bwait_cancelJ\x08\x08\x01\x10\xaa\x8d@\x18\x01', reason: 1
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$f032a326-ed6d-485e-81c8-68533bd3a6fc\022$60cf007b-9d7a-44e1-bc1a-f6ee300c48c9\032$5d724d6e-c838-4fcb-90ba-d172c46164a1 \005(\0012\0011B\013wait_cancelJ\010\010\001\020\252\215@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Cancelled\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

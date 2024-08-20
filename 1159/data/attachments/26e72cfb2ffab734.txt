@@ -1,0 +1,108 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity picklable_activity_non_pickable_heartbeat_details (token b'\x00\x07default\x00$06e50b7b-92e5-4c0d-b1ac-beff6542ea4a\x00$209f72fd-93de-41b5-adfa-1a3ede78f437\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'picklable_activity_non_pickable_heartbeat_details', 'attempt': 1, 'namespace': 'default', 'task_queue': '938533c7-08ce-4818-ba19-0aef9e830066', 'workflow_id': '06e50b7b-92e5-4c0d-b1ac-beff6542ea4a', 'workflow_run_id': '209f72fd-93de-41b5-adfa-1a3ede78f437', 'workflow_type': 'kitchen_sink'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'picklable_activity_non_pickable_heartbeat_details', 'attempt': 1, 'namespace': 'default', 'task_queue': '938533c7-08ce-4818-ba19-0aef9e830066', 'workflow_id': '06e50b7b-92e5-4c0d-b1ac-beff6542ea4a', 'workflow_run_id': '209f72fd-93de-41b5-adfa-1a3ede78f437', 'workflow_type': 'kitchen_sink'})
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/concurrent/futures/process.py", line 239, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 774, in _execute_sync_activity
+    return fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 732, in picklable_activity_non_pickable_heartbeat_details
+    activity.heartbeat(lambda: "cannot pickle lambda by default")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/activity.py", line 271, in heartbeat
+    heartbeat_fn(*details)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 752, in <lambda>
+    heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 933, in send_heartbeat
+    self._heartbeat_queue.put((task_token, details), True, 30)
+  File "<string>", line 2, in put
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/managers.py", line 834, in _callmethod
+    conn.send((self._id, methodname, args, kwds))
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/connection.py", line 206, in send
+    self._send_bytes(_ForkingPickler.dumps(obj))
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/reduction.py", line 51, in dumps
+    cls(buf, protocol).dump(obj)
+AttributeError: Can't pickle local object 'picklable_activity_non_pickable_heartbeat_details.<locals>.<lambda>'
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 705, in execute_activity
+    return await loop.run_in_executor(input.executor, func, *args)
+AttributeError: Can't pickle local object 'picklable_activity_non_pickable_heartbeat_details.<locals>.<lambda>'
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000$06e50b7b-92e5-4c0d-b1ac-beff6542ea4a\000$209f72fd-93de-41b5-adfa-1a3ede78f437\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  failed {
+    failure {
+      message: "Can\'t pickle local object \'picklable_activity_non_pickable_heartbeat_details.<locals>.<lambda>\'"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 705, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n"
+      cause {
+        message: "\n\"\"\"\nTraceback (most recent call last):\n  File \"/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/concurrent/futures/process.py\", line 239, in _process_worker\n    r = call_item.fn(*call_item.args, **call_item.kwargs)\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 774, in _execute_sync_activity\n    return fn(*args)\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py\", line 732, in picklable_activity_non_pickable_heartbeat_details\n    activity.heartbeat(lambda: \"cannot pickle lambda by default\")\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/activity.py\", line 271, in heartbeat\n    heartbeat_fn(*details)\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 752, in <lambda>\n    heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 933, in send_heartbeat\n    self._heartbeat_queue.put((task_token, details), True, 30)\n  File \"<string>\", line 2, in put\n  File \"/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/managers.py\", line 834, in _callmethod\n    conn.send((self._id, methodname, args, kwds))\n  File \"/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/connection.py\", line 206, in send\n    self._send_bytes(_ForkingPickler.dumps(obj))\n  File \"/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/reduction.py\", line 51, in dumps\n    cls(buf, protocol).dump(obj)\nAttributeError: Can\'t pickle local object \'picklable_activity_non_pickable_heartbeat_details.<locals>.<lambda>\'\n\"\"\""
+        application_failure_info {
+          type: "_RemoteTraceback"
+        }
+      }
+      application_failure_info {
+        type: "AttributeError"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 209f72fd-93de-41b5-adfa-1a3ede78f437
+temporalio.exceptions.ApplicationError: _RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/concurrent/futures/process.py", line 239, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 774, in _execute_sync_activity
+    return fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 732, in picklable_activity_non_pickable_heartbeat_details
+    activity.heartbeat(lambda: "cannot pickle lambda by default")
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/activity.py", line 271, in heartbeat
+    heartbeat_fn(*details)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 752, in <lambda>
+    heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 933, in send_heartbeat
+    self._heartbeat_queue.put((task_token, details), True, 30)
+  File "<string>", line 2, in put
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/managers.py", line 834, in _callmethod
+    conn.send((self._id, methodname, args, kwds))
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/connection.py", line 206, in send
+    self._send_bytes(_ForkingPickler.dumps(obj))
+  File "/opt/hostedtoolcache/Python/3.8.18/x64/lib/python3.8/multiprocessing/reduction.py", line 51, in dumps
+    cls(buf, protocol).dump(obj)
+AttributeError: Can't pickle local object 'picklable_activity_non_pickable_heartbeat_details.<locals>.<lambda>'
+"""
+
+The above exception was the direct cause of the following exception:
+
+temporalio.exceptions.ApplicationError: AttributeError: Can't pickle local object 'picklable_activity_non_pickable_heartbeat_details.<locals>.<lambda>'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 97, in run
+    should_return, ret = await self.handle_action(params, action)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 204, in handle_action
+    raise task.exception()  # type: ignore
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 193, in run_activity
+    last_result = await task
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity task failed
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

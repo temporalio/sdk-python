@@ -1,0 +1,155 @@
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 91ee56fd-ce98-4361-a790-6eb31cab5179, message: Workflow cache full
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-2 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\x07\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '3', 'activity_type': 'my-activity-2', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\007\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-2\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-0 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'my-activity-0', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-0\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-1 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\x06\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'my-activity-1', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\006\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-1\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-4 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\t\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '5', 'activity_type': 'my-activity-4', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\t\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-4\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-3 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '4', 'activity_type': 'my-activity-3', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\010\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-3\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-7 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '8', 'activity_type': 'my-activity-7', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\014\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-7\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-9 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\x0e\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '10', 'activity_type': 'my-activity-9', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\016\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-9\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-6 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\x0b\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '7', 'activity_type': 'my-activity-6', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\013\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-6\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-8 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\r\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '9', 'activity_type': 'my-activity-8', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\r\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-8\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity my-activity-5 (token b"\x00\x07default\x00'wf-81356c6b-7682-4237-b80a-6939984ddd8f\x00$91ee56fd-ce98-4361-a790-6eb31cab5179\x00\x00\x00\x00\x00\x00\x00\n\x00\x00\x00\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '6', 'activity_type': 'my-activity-5', 'attempt': 1, 'namespace': 'default', 'task_queue': '8f105c25-b6db-42c3-887d-8e28a602b7cd', 'workflow_id': 'wf-81356c6b-7682-4237-b80a-6939984ddd8f', 'workflow_run_id': '91ee56fd-ce98-4361-a790-6eb31cab5179', 'workflow_type': 'AsCompletedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000\'wf-81356c6b-7682-4237-b80a-6939984ddd8f\000$91ee56fd-ce98-4361-a790-6eb31cab5179\000\000\000\000\000\000\000\n\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"my-activity-5\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 91ee56fd-ce98-4361-a790-6eb31cab5179, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 91ee56fd-ce98-4361-a790-6eb31cab5179, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 91ee56fd-ce98-4361-a790-6eb31cab5179, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

@@ -1,0 +1,16 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\x00\x07default\x00$c4cb3178-3812-42aa-af6d-28c86b0a366f\x00$7e36a3ab-f605-40c5-be0e-d3fcbbfa0d06\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '1d177216-278c-41cf-9bb9-a4bc69e23f59', 'workflow_id': 'c4cb3178-3812-42aa-af6d-28c86b0a366f', 'workflow_run_id': '7e36a3ab-f605-40c5-be0e-d3fcbbfa0d06', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\000\007default\000$c4cb3178-3812-42aa-af6d-28c86b0a366f\000$7e36a3ab-f605-40c5-be0e-d3fcbbfa0d06\000\000\000\000\000\000\000\005\000\000\000\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"activity name: some_activity\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
