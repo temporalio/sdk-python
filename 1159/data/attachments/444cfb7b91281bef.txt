@@ -1,0 +1,51 @@
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 57c062fd-0bf6-4d41-bf1f-f29856b6ef47
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 492, in execute_workflow
+    with self.assert_error_as_app_error():
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 508, in assert_error_as_app_error
+    raise app_err from None
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 502, in assert_error_as_app_error
+    yield None
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/testing/test_workflow.py", line 178, in run
+    assert "foo" == "bar"
+temporalio.exceptions.ApplicationError: AssertionError: assert 'foo' == 'bar'
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 18825e91-48d4-43c9-a2c7-bc1a6874bea8
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 496, in handle_signal
+    with self.assert_error_as_app_error():
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 508, in assert_error_as_app_error
+    raise app_err from None
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 502, in assert_error_as_app_error
+    yield None
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2110, in handle_signal
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/testing/test_workflow.py", line 182, in some_signal
+    assert "foo" == "bar"
+temporalio.exceptions.ApplicationError: AssertionError: assert 'foo' == 'bar'
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

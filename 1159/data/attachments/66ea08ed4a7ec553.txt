@@ -1,0 +1,634 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 /(\x012\x0243B\rsome_activityJ\x08\x08\x01\x10\xdb\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '43', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x0c(\x012\x018B\rsome_activityJ\x08\x08\x01\x10\xdc\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '8', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x07(\x012\x013B\rsome_activityJ\x08\x08\x01\x10\xdf\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '3', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \n(\x012\x016B\rsome_activityJ\x08\x08\x01\x10\xdd\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '6', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x0e(\x012\x0210B\rsome_activityJ\x08\x08\x01\x10\xde\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '10', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x12(\x012\x0214B\rsome_activityJ\x08\x08\x01\x10\xe0\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '14', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x11(\x012\x0213B\rsome_activityJ\x08\x08\x01\x10\xe1\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '13', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x19(\x012\x0221B\rsome_activityJ\x08\x08\x01\x10\xe2\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '21', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x10(\x012\x0212B\rsome_activityJ\x08\x08\x01\x10\xe3\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '12', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x1e(\x012\x0226B\rsome_activityJ\x08\x08\x01\x10\xe7\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '26', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x06(\x012\x012B\rsome_activityJ\x08\x08\x01\x10\xe6\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \r(\x012\x019B\rsome_activityJ\x08\x08\x01\x10\xe5\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '9', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x1d(\x012\x0225B\rsome_activityJ\x08\x08\x01\x10\xe4\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '25', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x05(\x012\x011B\rsome_activityJ\x08\x08\x01\x10\xe9\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b"\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 '(\x012\x0235B\rsome_activityJ\x08\x08\x01\x10\xea\x90@\x18\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '35', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x08(\x012\x014B\rsome_activityJ\x08\x08\x01\x10\xed\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '4', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x14(\x012\x0216B\rsome_activityJ\x08\x08\x01\x10\xeb\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '16', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 .(\x012\x0242B\rsome_activityJ\x08\x08\x01\x10\xee\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '42', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \t(\x012\x015B\rsome_activityJ\x08\x08\x01\x10\xf0\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '5', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x16(\x012\x0218B\rsome_activityJ\x08\x08\x01\x10\xf1\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '18', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x1a(\x012\x0222B\rsome_activityJ\x08\x08\x01\x10\xf2\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '22', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x1b(\x012\x0223B\rsome_activityJ\x08\x08\x01\x10\xf4\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '23', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x13(\x012\x0215B\rsome_activityJ\x08\x08\x01\x10\xf3\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '15', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 "(\x012\x0230B\rsome_activityJ\x08\x08\x01\x10\xf6\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '30', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x15(\x012\x0217B\rsome_activityJ\x08\x08\x01\x10\xf5\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '17', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x1f(\x012\x0227B\rsome_activityJ\x08\x08\x01\x10\xf7\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '27', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x17(\x012\x0219B\rsome_activityJ\x08\x08\x01\x10\xf8\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '19', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 $(\x012\x0232B\rsome_activityJ\x08\x08\x01\x10\xf9\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '32', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 #(\x012\x0231B\rsome_activityJ\x08\x08\x01\x10\xfa\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '31', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x1c(\x012\x0224B\rsome_activityJ\x08\x08\x01\x10\xfc\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '24', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x18(\x012\x0220B\rsome_activityJ\x08\x08\x01\x10\xfb\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '20', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 ,(\x012\x0240B\rsome_activityJ\x08\x08\x01\x10\xfe\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '40', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81  (\x012\x0228B\rsome_activityJ\x08\x08\x01\x10\xff\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '28', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 %(\x012\x0233B\rsome_activityJ\x08\x08\x01\x10\xfd\x90@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '33', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 !(\x012\x0229B\rsome_activityJ\x08\x08\x01\x10\x80\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '29', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 ((\x012\x0236B\rsome_activityJ\x08\x08\x01\x10\x81\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '36', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 +(\x012\x0239B\rsome_activityJ\x08\x08\x01\x10\x82\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '39', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 \x0b(\x012\x017B\rsome_activityJ\x08\x08\x01\x10\x84\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '7', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 &(\x012\x0234B\rsome_activityJ\x08\x08\x01\x10\x85\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '34', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$fa8c3a80-cce2-4859-b413-bd60b662b611\x1a$66d5c65d-245e-4921-b207-be940050eb81 )(\x012\x0237B\rsome_activityJ\x08\x08\x01\x10\x86\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '37', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd859781c-a858-4f21-b032-e704cd4b739b', 'workflow_id': 'fa8c3a80-cce2-4859-b413-bd60b662b611', 'workflow_run_id': '66d5c65d-245e-4921-b207-be940050eb81', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 66d5c65d-245e-4921-b207-be940050eb81
+temporalio.exceptions.TimeoutError: activity ScheduleToStart timeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 97, in run
+    should_return, ret = await self.handle_action(params, action)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 204, in handle_action
+    raise task.exception()  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 193, in run_activity
+    last_result = await task
+                  ^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+temporalio.exceptions.ActivityError: Activity task timed out
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 /(\0012\00243B\rsome_activityJ\010\010\001\020\333\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \014(\0012\0018B\rsome_activityJ\010\010\001\020\334\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \007(\0012\0013B\rsome_activityJ\010\010\001\020\337\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \n(\0012\0016B\rsome_activityJ\010\010\001\020\335\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \016(\0012\00210B\rsome_activityJ\010\010\001\020\336\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \022(\0012\00214B\rsome_activityJ\010\010\001\020\340\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \021(\0012\00213B\rsome_activityJ\010\010\001\020\341\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \031(\0012\00221B\rsome_activityJ\010\010\001\020\342\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \020(\0012\00212B\rsome_activityJ\010\010\001\020\343\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \036(\0012\00226B\rsome_activityJ\010\010\001\020\347\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \006(\0012\0012B\rsome_activityJ\010\010\001\020\346\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \r(\0012\0019B\rsome_activityJ\010\010\001\020\345\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \035(\0012\00225B\rsome_activityJ\010\010\001\020\344\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \005(\0012\0011B\rsome_activityJ\010\010\001\020\351\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \'(\0012\00235B\rsome_activityJ\010\010\001\020\352\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \010(\0012\0014B\rsome_activityJ\010\010\001\020\355\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \024(\0012\00216B\rsome_activityJ\010\010\001\020\353\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 .(\0012\00242B\rsome_activityJ\010\010\001\020\356\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \t(\0012\0015B\rsome_activityJ\010\010\001\020\360\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \026(\0012\00218B\rsome_activityJ\010\010\001\020\361\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \032(\0012\00222B\rsome_activityJ\010\010\001\020\362\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \033(\0012\00223B\rsome_activityJ\010\010\001\020\364\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \023(\0012\00215B\rsome_activityJ\010\010\001\020\363\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \"(\0012\00230B\rsome_activityJ\010\010\001\020\366\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \025(\0012\00217B\rsome_activityJ\010\010\001\020\365\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \037(\0012\00227B\rsome_activityJ\010\010\001\020\367\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \027(\0012\00219B\rsome_activityJ\010\010\001\020\370\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 $(\0012\00232B\rsome_activityJ\010\010\001\020\371\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 #(\0012\00231B\rsome_activityJ\010\010\001\020\372\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \034(\0012\00224B\rsome_activityJ\010\010\001\020\374\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \030(\0012\00220B\rsome_activityJ\010\010\001\020\373\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 ,(\0012\00240B\rsome_activityJ\010\010\001\020\376\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81  (\0012\00228B\rsome_activityJ\010\010\001\020\377\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 %(\0012\00233B\rsome_activityJ\010\010\001\020\375\220@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 !(\0012\00229B\rsome_activityJ\010\010\001\020\200\221@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 ((\0012\00236B\rsome_activityJ\010\010\001\020\201\221@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 +(\0012\00239B\rsome_activityJ\010\010\001\020\202\221@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 \013(\0012\0017B\rsome_activityJ\010\010\001\020\204\221@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 &(\0012\00234B\rsome_activityJ\010\010\001\020\205\221@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$fa8c3a80-cce2-4859-b413-bd60b662b611\032$66d5c65d-245e-4921-b207-be940050eb81 )(\0012\00237B\rsome_activityJ\010\010\001\020\206\221@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

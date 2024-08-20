@@ -1,0 +1,38 @@
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 70e16e68-4046-425d-a564-0d122b47b453
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2399, in run
+    await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 3732, in start_child_workflow
+    return await _Runtime.current().workflow_start_child_workflow(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1207, in workflow_start_child_workflow
+    return await self._outbound.start_child_workflow(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2171, in start_child_workflow
+    return await self._instance._outbound_start_child_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1527, in _outbound_start_child_workflow
+    await asyncio.shield(handle._start_fut)
+temporalio.exceptions.WorkflowAlreadyStartedError: Workflow execution already started
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2401, in run
+    raise ApplicationError("Already started")
+temporalio.exceptions.ApplicationError: Already started
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

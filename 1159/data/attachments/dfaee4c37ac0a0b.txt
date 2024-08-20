@@ -1,0 +1,31 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity data_class_typed_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow-13913c57-8e49-44ea-ae3a-da27cc39e5dd\x1a$484e5b9f-0a1d-407f-96a4-9aab801541e3 \x06(\x012\x011B\x19data_class_typed_activityJ\x08\x08\x01\x10\x9e\xb0@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'data_class_typed_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '5aa22920-1fe5-4436-818a-7c5410fcdd2e', 'workflow_id': 'workflow-13913c57-8e49-44ea-ae3a-da27cc39e5dd', 'workflow_run_id': '484e5b9f-0a1d-407f-96a4-9aab801541e3', 'workflow_type': 'DataClassTypedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow-13913c57-8e49-44ea-ae3a-da27cc39e5dd\032$484e5b9f-0a1d-407f-96a4-9aab801541e3 \006(\0012\0011B\031data_class_typed_activityJ\010\010\001\020\236\260@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"field1\":\"some value\"}"
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity data_class_typed_activity (token b'local_act_\x01\x00\x00\x00')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'data_class_typed_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '5aa22920-1fe5-4436-818a-7c5410fcdd2e', 'workflow_id': 'workflow-13913c57-8e49-44ea-ae3a-da27cc39e5dd', 'workflow_run_id': '484e5b9f-0a1d-407f-96a4-9aab801541e3', 'workflow_type': 'DataClassTypedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "local_act_\001\000\000\000"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"field1\":\"some value\"}"
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

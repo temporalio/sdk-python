@@ -1,0 +1,55 @@
+ERROR    temporalio.worker._workflow:_workflow.py:271 Failed handling activation on workflow with run ID 82160e0c-6f66-45e8-9ca8-d86e3dca0aa0
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 519, in wait_for
+    async with timeouts.timeout(timeout):
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/timeouts.py", line 115, in __aexit__
+    raise TimeoutError from exc_val
+TimeoutError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 253, in _handle_activation
+    raise RuntimeError(
+RuntimeError: [TMPRL1101] Potential deadlock detected, workflow didn't yield within 1 second(s)
+ERROR    temporalio.worker._workflow:_workflow.py:264 Failed running eviction job, not evicting. Since eviction could not be processed, this worker cannot complete and the slot will remain forever used.
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 157, in activate
+    self._run_code(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 172, in _run_code
+    exec(code, self.globals_and_locals, self.globals_and_locals)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py", line 81, in activate
+    return self.instance.activate(act)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 379, in activate
+    raise RuntimeError(
+RuntimeError: Eviction processed, but 1 tasks remain. Stack traces below:
+
+Stack for <Task cancelling name='Task-2883 (workflow: EvictionDeadlockWorkflow, id: workflow-b2c66f79-7292-4f71-99b5-f988e48acfbb, run: 82160e0c-6f66-45e8-9ca8-d86e3dca0aa0)' coro=<EvictionDeadlockWorkflow.wait_until_positive() running at /home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py:2589> wait_for=<Future finished result=True> cb=[set.remove(), gather.<locals>._done_callback() at /opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py:767]> (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2589, in wait_until_positive
+    await workflow.wait_condition(lambda: self.val > 0)
+
+INFO     temporalio.worker._worker:_worker.py:517 Worker cancelled, shutting down
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+WARNING  temporalio.worker._workflow:_workflow.py:172 Shutting down workflow worker, but 1 workflow(s) could not be evicted previously, so the shutdown will hang

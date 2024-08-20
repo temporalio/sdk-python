@@ -1,0 +1,24 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow-8f559252-a12c-4a39-bdbb-453967374a72\x1a$e93911a4-9278-481f-a256-e8d149a110a6 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\x94\x9b@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '1d431b2b-393b-4188-9e75-5844339d2878', 'workflow_id': 'workflow-8f559252-a12c-4a39-bdbb-453967374a72', 'workflow_run_id': 'e93911a4-9278-481f-a256-e8d149a110a6', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow-8f559252-a12c-4a39-bdbb-453967374a72\032$e93911a4-9278-481f-a256-e8d149a110a6 \005(\0012\0011B\tsay_helloJ\010\010\001\020\224\233@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+ERROR    temporalio.worker._workflow:_workflow.py:271 Failed handling activation on workflow with run ID e93911a4-9278-481f-a256-e8d149a110a6
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 232, in _handle_activation
+    workflow = self._create_workflow_instance(act, start_job)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 348, in _create_workflow_instance
+    raise temporalio.exceptions.ApplicationError(
+temporalio.exceptions.ApplicationError: NotFoundError: Workflow class SayHelloWorkflow is not registered on this worker, available workflows: SayHelloWorkflowDifferent

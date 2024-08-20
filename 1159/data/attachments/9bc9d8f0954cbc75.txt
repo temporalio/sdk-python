@@ -1,0 +1,16 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow-565b3687-709d-461c-ba36-f5625bace511\x1a$82844964-c52c-41f2-ac96-d5d8c0c682a7 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\xbf\xab@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': 'bc364220-580f-42c4-9917-b43008a793be', 'workflow_id': 'workflow-565b3687-709d-461c-ba36-f5625bace511', 'workflow_run_id': '82844964-c52c-41f2-ac96-d5d8c0c682a7', 'workflow_type': 'SimpleActivityWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow-565b3687-709d-461c-ba36-f5625bace511\032$82844964-c52c-41f2-ac96-d5d8c0c682a7 \005(\0012\0011B\tsay_helloJ\010\010\001\020\277\253@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

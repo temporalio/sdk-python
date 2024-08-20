@@ -1,0 +1,70 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity custom_error_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow-8f6d985b-4932-4ddc-9127-cef57383fb35\x1a$685777e3-2184-4806-9511-3f3648305656 \x05(\x012\x011B\x15custom_error_activityJ\x08\x08\x01\x10\xca\xb7@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'custom_error_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '8c9f49f3-b33c-4882-a518-0285cee4159c', 'workflow_id': 'workflow-8f6d985b-4932-4ddc-9127-cef57383fb35', 'workflow_run_id': '685777e3-2184-4806-9511-3f3648305656', 'workflow_type': 'CustomErrorWorkflow'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'custom_error_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '8c9f49f3-b33c-4882-a518-0285cee4159c', 'workflow_id': 'workflow-8f6d985b-4932-4ddc-9127-cef57383fb35', 'workflow_run_id': '685777e3-2184-4806-9511-3f3648305656', 'workflow_type': 'CustomErrorWorkflow'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 3228, in custom_error_activity
+    raise MyCustomError("activity error!")
+tests.worker.test_workflow.MyCustomError: MyCustomError: activity error!
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow-8f6d985b-4932-4ddc-9127-cef57383fb35\032$685777e3-2184-4806-9511-3f3648305656 \005(\0012\0011B\025custom_error_activityJ\010\010\001\020\312\267@\030\001"
+result {
+  failed {
+    failure {
+      message: "Encoded failure"
+      encoded_attributes {
+        metadata {
+          key: "encoding"
+          value: "json/plain"
+        }
+        data: "{\"message\":\"activity error!\",\"stack_trace\":\"  File \\\"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\\\", line 453, in _run_activity\\n    result = await impl.execute_activity(input)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n\\n  File \\\"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\\\", line 711, in execute_activity\\n    return await input.fn(*input.args)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n\\n  File \\\"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\\\", line 3228, in custom_error_activity\\n    raise MyCustomError(\\\"activity error!\\\")\\n\"}"
+      }
+      application_failure_info {
+        type: "MyCustomError"
+        non_retryable: true
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 685777e3-2184-4806-9511-3f3648305656
+tests.worker.test_workflow.MyCustomError: MyCustomError: activity error!
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 3236, in run
+    await workflow.execute_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 2011, in execute_activity
+    return await _Runtime.current().workflow_start_activity(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+temporalio.exceptions.ActivityError: Activity task failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 3240, in run
+    raise MyCustomError("workflow error!")
+tests.worker.test_workflow.MyCustomError: MyCustomError: workflow error!
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

@@ -1,0 +1,5 @@
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on asyncio.as_completed restricted
+WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on asyncio.wait restricted
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    asyncio:selector_events.py:64 Using selector: EpollSelector

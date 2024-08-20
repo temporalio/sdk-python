@@ -1,0 +1,20 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity run (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$d32b495a-4a8a-4ca0-bd63-e79eecce8ca5\x1a$e4f9b392-13a6-468f-b70d-4cc37063dfa3 \x05(\x012\x011B\x03runJ\x08\x08\x01\x10\x8d\x95@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': '8475ed63-5569-49f0-948d-a8a9b7a7f14d', 'workflow_id': 'd32b495a-4a8a-4ca0-bd63-e79eecce8ca5', 'workflow_run_id': 'e4f9b392-13a6-468f-b70d-4cc37063dfa3', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:463 Completing asynchronously ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': '8475ed63-5569-49f0-948d-a8a9b7a7f14d', 'workflow_id': 'd32b495a-4a8a-4ca0-bd63-e79eecce8ca5', 'workflow_run_id': 'e4f9b392-13a6-468f-b70d-4cc37063dfa3', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$d32b495a-4a8a-4ca0-bd63-e79eecce8ca5\032$e4f9b392-13a6-468f-b70d-4cc37063dfa3 \005(\0012\0011B\003runJ\010\010\001\020\215\225@\030\001"
+result {
+  will_complete_async {
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity run (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$b304719f-c209-40cb-8ce9-83fecb066112\x1a$f5023ffc-926c-44ec-813e-d0f29f303c05 \x05(\x012\x011B\x03runJ\x08\x08\x01\x10\xae\x95@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': 'be8a2f2c-65eb-45c9-b5f0-00eaf28b7ff2', 'workflow_id': 'b304719f-c209-40cb-8ce9-83fecb066112', 'workflow_run_id': 'f5023ffc-926c-44ec-813e-d0f29f303c05', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:463 Completing asynchronously ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': 'be8a2f2c-65eb-45c9-b5f0-00eaf28b7ff2', 'workflow_id': 'b304719f-c209-40cb-8ce9-83fecb066112', 'workflow_run_id': 'f5023ffc-926c-44ec-813e-d0f29f303c05', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$b304719f-c209-40cb-8ce9-83fecb066112\032$f5023ffc-926c-44ec-813e-d0f29f303c05 \005(\0012\0011B\003runJ\010\010\001\020\256\225@\030\001"
+result {
+  will_complete_async {
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

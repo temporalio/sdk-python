@@ -1,0 +1,248 @@
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py", line 356, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 89, in run
+    await self._raise_on_non_replay()
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 143, in _raise_on_non_replay
+    raise RuntimeError("Intentional task failure")
+RuntimeError: Intentional task failure
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow TracingWorkflow with ID workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677 and run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py", line 356, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 89, in run
+    await self._raise_on_non_replay()
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 143, in _raise_on_non_replay
+    raise RuntimeError("Intentional task failure")
+RuntimeError: Intentional task failure
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "Intentional task failure", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 351, in activate\n    self._run_once(check_conditions=index == 1 or index == 2)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1749, in _run_once\n    raise self._current_activation_error\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1767, in _run_top_level_workflow_function\n    await coro\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 831, in run_workflow\n    result = await self._inbound.execute_workflow(input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py\", line 356, in execute_workflow\n    return await super().execute_workflow(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 328, in execute_workflow\n    return await self.next.execute_workflow(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 2099, in execute_workflow\n    return await input.run_fn(*args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py\", line 89, in run\n    await self._raise_on_non_replay()\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py\", line 143, in _raise_on_non_replay\n    raise RuntimeError(\"Intentional task failure\")\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "RuntimeError", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity tracing_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677\x1a$5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461 \x11(\x012\x011B\x10tracing_activityJ\x08\x08\x01\x10\xdf\x88@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'tracing_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_29dd28fe-82ad-447c-b7c0-c46565bf44b8', 'workflow_id': 'workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677', 'workflow_run_id': '5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461', 'workflow_type': 'TracingWorkflow'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'tracing_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_29dd28fe-82ad-447c-b7c0-c46565bf44b8', 'workflow_id': 'workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677', 'workflow_run_id': '5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461', 'workflow_type': 'TracingWorkflow'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py", line 280, in execute_activity
+    return await super().execute_activity(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 119, in execute_activity
+    return await self.next.execute_activity(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 36, in tracing_activity
+    raise RuntimeError("intentional failure")
+RuntimeError: intentional failure
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'tracing_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_29dd28fe-82ad-447c-b7c0-c46565bf44b8', 'workflow_id': 'workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677', 'workflow_run_id': '5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461', 'workflow_type': 'TracingWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677\032$5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461 \021(\0012\0011B\020tracing_activityJ\010\010\001\020\337\210@\030\001"
+result {
+  failed {
+    failure {
+      message: "intentional failure"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py\", line 280, in execute_activity\n    return await super().execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 119, in execute_activity\n    return await self.next.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py\", line 36, in tracing_activity\n    raise RuntimeError(\"intentional failure\")\n"
+      application_failure_info {
+        type: "RuntimeError"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py", line 356, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 126, in run
+    await self._raise_on_non_replay()
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 143, in _raise_on_non_replay
+    raise RuntimeError("Intentional task failure")
+RuntimeError: Intentional task failure
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow TracingWorkflow with ID workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677 and run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py", line 356, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 126, in run
+    await self._raise_on_non_replay()
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 143, in _raise_on_non_replay
+    raise RuntimeError("Intentional task failure")
+RuntimeError: Intentional task failure
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "Intentional task failure", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 351, in activate\n    self._run_once(check_conditions=index == 1 or index == 2)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1749, in _run_once\n    raise self._current_activation_error\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1767, in _run_top_level_workflow_function\n    await coro\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 831, in run_workflow\n    result = await self._inbound.execute_workflow(input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py\", line 356, in execute_workflow\n    return await super().execute_workflow(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 328, in execute_workflow\n    return await self.next.execute_workflow(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 2099, in execute_workflow\n    return await input.run_fn(*args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py\", line 126, in run\n    await self._raise_on_non_replay()\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py\", line 143, in _raise_on_non_replay\n    raise RuntimeError(\"Intentional task failure\")\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "RuntimeError", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity tracing_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677\x1a$5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461 \x11(\x022\x011B\x10tracing_activityJ\x08\x08\x01\x10\xf3\x88@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'tracing_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'task_queue_29dd28fe-82ad-447c-b7c0-c46565bf44b8', 'workflow_id': 'workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677', 'workflow_run_id': '5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461', 'workflow_type': 'TracingWorkflow'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'tracing_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'task_queue_29dd28fe-82ad-447c-b7c0-c46565bf44b8', 'workflow_id': 'workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677', 'workflow_run_id': '5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461', 'workflow_type': 'TracingWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677\032$5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461 \021(\0022\0011B\020tracing_activityJ\010\010\001\020\363\210@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "binary/null"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity tracing_activity (token b'local_act_\x01\x00\x00\x00')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'tracing_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_29dd28fe-82ad-447c-b7c0-c46565bf44b8', 'workflow_id': 'workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677_child', 'workflow_run_id': '86177573-441c-44ad-90ad-e18ef986ccee', 'workflow_type': 'TracingWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "local_act_\001\000\000\000"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "binary/null"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py", line 356, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 97, in run
+    await self._raise_on_non_replay()
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 143, in _raise_on_non_replay
+    raise RuntimeError("Intentional task failure")
+RuntimeError: Intentional task failure
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow TracingWorkflow with ID workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677 and run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py", line 356, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 97, in run
+    await self._raise_on_non_replay()
+  File "/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py", line 143, in _raise_on_non_replay
+    raise RuntimeError("Intentional task failure")
+RuntimeError: Intentional task failure
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 5d8a2c24-ddd4-4cf2-9d8e-ad45c7431461, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "Intentional task failure", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 351, in activate\n    self._run_once(check_conditions=index == 1 or index == 2)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1749, in _run_once\n    raise self._current_activation_error\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1767, in _run_top_level_workflow_function\n    await coro\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 831, in run_workflow\n    result = await self._inbound.execute_workflow(input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/contrib/opentelemetry.py\", line 356, in execute_workflow\n    return await super().execute_workflow(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 328, in execute_workflow\n    return await self.next.execute_workflow(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 2099, in execute_workflow\n    return await input.run_fn(*args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py\", line 97, in run\n    await self._raise_on_non_replay()\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/contrib/test_opentelemetry.py\", line 143, in _raise_on_non_replay\n    raise RuntimeError(\"Intentional task failure\")\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "RuntimeError", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity tracing_activity (token b'local_act_\x02\x00\x00\x00')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'tracing_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_29dd28fe-82ad-447c-b7c0-c46565bf44b8', 'workflow_id': 'workflow_d02f8fe8-6335-449e-8c47-e0807ac4a677', 'workflow_run_id': '7aba7546-931a-4da4-8f55-9a1372198830', 'workflow_type': 'TracingWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "local_act_\002\000\000\000"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "binary/null"
+      }
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    root:test_opentelemetry.py:262 Spans:
+StartWorkflow:TracingWorkflow
+  RunWorkflow:TracingWorkflow
+  MyCustomSpan
+  HandleSignal:signal (links: SignalWorkflow:signal)
+  StartActivity:tracing_activity
+    RunActivity:tracing_activity
+    RunActivity:tracing_activity
+  ValidateUpdate:update (links: StartWorkflowUpdate:update)
+  HandleUpdate:update (links: StartWorkflowUpdate:update)
+  StartChildWorkflow:TracingWorkflow
+    RunWorkflow:TracingWorkflow
+    MyCustomSpan
+    StartActivity:tracing_activity
+      RunActivity:tracing_activity
+    HandleSignal:signal (links: SignalChildWorkflow:signal)
+    HandleSignal:signal (links: SignalExternalWorkflow:signal)
+    CompleteWorkflow:TracingWorkflow
+  SignalChildWorkflow:signal
+  SignalExternalWorkflow:signal
+  RunWorkflow:TracingWorkflow
+  MyCustomSpan
+  StartActivity:tracing_activity
+    RunActivity:tracing_activity
+  CompleteWorkflow:TracingWorkflow
+QueryWorkflow:query
+  HandleQuery:query (links: StartWorkflow:TracingWorkflow)
+SignalWorkflow:signal
+StartWorkflowUpdate:update

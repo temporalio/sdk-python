@@ -1,0 +1,17 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow-8186fd1d-075c-4738-b623-ed29a087d219\x1a$00f406fc-933c-4062-af87-cee029725911 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\xf2\x9a@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '19d554e8-ce0e-4584-99a9-e37771775bba', 'workflow_id': 'workflow-8186fd1d-075c-4738-b623-ed29a087d219', 'workflow_run_id': '00f406fc-933c-4062-af87-cee029725911', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow-8186fd1d-075c-4738-b623-ed29a087d219\032$00f406fc-933c-4062-af87-cee029725911 \005(\0012\0011B\tsay_helloJ\010\010\001\020\362\232@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 00f406fc-933c-4062-af87-cee029725911, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "[TMPRL1100] Nondeterminism error: Timer machine does not handle this event: HistoryEvent(id: 11, WorkflowExecutionCompleted)", source: "", stack_trace: "", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: NonDeterministicError }

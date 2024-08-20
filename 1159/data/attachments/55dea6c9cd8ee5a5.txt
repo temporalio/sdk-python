@@ -1,0 +1,47 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity wait_cancel (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow-88837de5-ab10-404e-aa86-a1c4faf9c6ef\x1a$20627b8a-2f00-47f9-b680-bf8354b60f5b \x06(\x012\x011B\x0bwait_cancelJ\x08\x08\x01\x10\xfe\xc0@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': 'e2a551f9-1784-4a3c-b485-6c552825b0e7', 'workflow_id': 'workflow-88837de5-ab10-404e-aa86-a1c4faf9c6ef', 'workflow_run_id': '20627b8a-2f00-47f9-b680-bf8354b60f5b', 'workflow_type': 'TimeoutSupportWorkflow'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': 'e2a551f9-1784-4a3c-b485-6c552825b0e7', 'workflow_id': 'workflow-88837de5-ab10-404e-aa86-a1c4faf9c6ef', 'workflow_run_id': '20627b8a-2f00-47f9-b680-bf8354b60f5b', 'workflow_type': 'TimeoutSupportWorkflow'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': 'e2a551f9-1784-4a3c-b485-6c552825b0e7', 'workflow_id': 'workflow-88837de5-ab10-404e-aa86-a1c4faf9c6ef', 'workflow_run_id': '20627b8a-2f00-47f9-b680-bf8354b60f5b', 'workflow_type': 'TimeoutSupportWorkflow'})
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 20627b8a-2f00-47f9-b680-bf8354b60f5b
+temporalio.exceptions.CancelledError: Cancelled
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4641, in run
+    await activity_task
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 2011, in execute_activity
+    return await _Runtime.current().workflow_start_activity(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+temporalio.exceptions.ActivityError: Activity cancelled
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._activity:_activity.py:216 Cancelling activity b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12-workflow-88837de5-ab10-404e-aa86-a1c4faf9c6ef\x1a$20627b8a-2f00-47f9-b680-bf8354b60f5b \x06(\x012\x011B\x0bwait_cancelJ\x08\x08\x01\x10\xfe\xc0@\x18\x01', reason: 3
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022-workflow-88837de5-ab10-404e-aa86-a1c4faf9c6ef\032$20627b8a-2f00-47f9-b680-bf8354b60f5b \006(\0012\0011B\013wait_cancelJ\010\010\001\020\376\300@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Got cancelled error, cancelled? True\""
+    }
+  }
+}

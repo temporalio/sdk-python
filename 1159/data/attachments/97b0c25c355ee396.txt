@@ -1,0 +1,2 @@
+INFO     temporalio.worker._worker:_worker.py:517 Worker cancelled, shutting down
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

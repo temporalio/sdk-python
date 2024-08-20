@@ -1,0 +1,154 @@
+ERROR    temporalio.worker._workflow:_workflow.py:271 Failed handling activation on workflow with run ID eac2023c-aa2a-48b8-9479-58d7335782e8
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 157, in activate
+    self._run_code(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 172, in _run_code
+    exec(code, self.globals_and_locals, self.globals_and_locals)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py", line 81, in activate
+    return self.instance.activate(act)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 415, in activate
+    self._warn_if_unfinished_handlers()
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1626, in _warn_if_unfinished_handlers
+    warnings.warn(
+temporalio.workflow.UnfinishedUpdateHandlersWarning: [TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the update handler was doing, and the client that sent the update will receive a 'workflow execution already completed' RPCError instead of the update result. You can wait for all update and signal handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update are okay with interrupting running handlers when the workflow finishes, and causing clients to receive errors, then you can disable this warning via the update handler decorator: `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`. The following updates were unfinished (and warnings were not disabled for their handler): [{"name": "my_update", "id": "my-update"}]
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID eac2023c-aa2a-48b8-9479-58d7335782e8
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5246, in my_update
+    await self._do_update_or_signal()
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5241, in _do_update_or_signal
+    await workflow.wait_condition(lambda: self.handler_may_return)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1077, in wait_condition
+    await _Runtime.current().workflow_wait_condition(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1391, in workflow_wait_condition
+    await asyncio.wait_for(fut, timeout)
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+asyncio.exceptions.CancelledError
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID eac2023c-aa2a-48b8-9479-58d7335782e8, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "[TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the update handler was doing, and the client that sent the update will receive a 'workflow execution already completed' RPCError instead of the update result. You can wait for all update and signal handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update are okay with interrupting running handlers when the workflow finishes, and causing clients to receive errors, then you can disable this warning via the update handler decorator: `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`. The following updates were unfinished (and warnings were not disabled for their handler): [{\"name\": \"my_update\", \"id\": \"my-update\"}]", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py\", line 249, in _handle_activation\n    completion = await asyncio.wait_for(\n                 ^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n\n  File \"/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/concurrent/futures/thread.py\", line 58, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py\", line 157, in activate\n    self._run_code(\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py\", line 172, in _run_code\n    exec(code, self.globals_and_locals, self.globals_and_locals)\n\n  File \"<string>\", line 2, in <module>\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py\", line 81, in activate\n    return self.instance.activate(act)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 415, in activate\n    self._warn_if_unfinished_handlers()\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1626, in _warn_if_unfinished_handlers\n    warnings.warn(\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "UnfinishedUpdateHandlersWarning", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+ERROR    temporalio.worker._workflow:_workflow.py:271 Failed handling activation on workflow with run ID eac2023c-aa2a-48b8-9479-58d7335782e8
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 157, in activate
+    self._run_code(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 172, in _run_code
+    exec(code, self.globals_and_locals, self.globals_and_locals)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py", line 81, in activate
+    return self.instance.activate(act)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 415, in activate
+    self._warn_if_unfinished_handlers()
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1626, in _warn_if_unfinished_handlers
+    warnings.warn(
+temporalio.workflow.UnfinishedUpdateHandlersWarning: [TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the update handler was doing, and the client that sent the update will receive a 'workflow execution already completed' RPCError instead of the update result. You can wait for all update and signal handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update are okay with interrupting running handlers when the workflow finishes, and causing clients to receive errors, then you can disable this warning via the update handler decorator: `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`. The following updates were unfinished (and warnings were not disabled for their handler): [{"name": "my_update", "id": "my-update"}]
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID eac2023c-aa2a-48b8-9479-58d7335782e8
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5246, in my_update
+    await self._do_update_or_signal()
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5241, in _do_update_or_signal
+    await workflow.wait_condition(lambda: self.handler_may_return)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1077, in wait_condition
+    await _Runtime.current().workflow_wait_condition(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1391, in workflow_wait_condition
+    await asyncio.wait_for(fut, timeout)
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+asyncio.exceptions.CancelledError
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID eac2023c-aa2a-48b8-9479-58d7335782e8, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "[TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the update handler was doing, and the client that sent the update will receive a 'workflow execution already completed' RPCError instead of the update result. You can wait for all update and signal handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update are okay with interrupting running handlers when the workflow finishes, and causing clients to receive errors, then you can disable this warning via the update handler decorator: `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`. The following updates were unfinished (and warnings were not disabled for their handler): [{\"name\": \"my_update\", \"id\": \"my-update\"}]", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py\", line 249, in _handle_activation\n    completion = await asyncio.wait_for(\n                 ^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n\n  File \"/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/concurrent/futures/thread.py\", line 58, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py\", line 157, in activate\n    self._run_code(\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py\", line 172, in _run_code\n    exec(code, self.globals_and_locals, self.globals_and_locals)\n\n  File \"<string>\", line 2, in <module>\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py\", line 81, in activate\n    return self.instance.activate(act)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 415, in activate\n    self._warn_if_unfinished_handlers()\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1626, in _warn_if_unfinished_handlers\n    warnings.warn(\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "UnfinishedUpdateHandlersWarning", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+ERROR    temporalio.worker._workflow:_workflow.py:271 Failed handling activation on workflow with run ID eac2023c-aa2a-48b8-9479-58d7335782e8
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 157, in activate
+    self._run_code(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 172, in _run_code
+    exec(code, self.globals_and_locals, self.globals_and_locals)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py", line 81, in activate
+    return self.instance.activate(act)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 415, in activate
+    self._warn_if_unfinished_handlers()
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1626, in _warn_if_unfinished_handlers
+    warnings.warn(
+temporalio.workflow.UnfinishedUpdateHandlersWarning: [TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the update handler was doing, and the client that sent the update will receive a 'workflow execution already completed' RPCError instead of the update result. You can wait for all update and signal handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update are okay with interrupting running handlers when the workflow finishes, and causing clients to receive errors, then you can disable this warning via the update handler decorator: `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`. The following updates were unfinished (and warnings were not disabled for their handler): [{"name": "my_update", "id": "my-update"}]
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID eac2023c-aa2a-48b8-9479-58d7335782e8
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5246, in my_update
+    await self._do_update_or_signal()
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5241, in _do_update_or_signal
+    await workflow.wait_condition(lambda: self.handler_may_return)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1077, in wait_condition
+    await _Runtime.current().workflow_wait_condition(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1391, in workflow_wait_condition
+    await asyncio.wait_for(fut, timeout)
+  File "/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+asyncio.exceptions.CancelledError
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID eac2023c-aa2a-48b8-9479-58d7335782e8, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "[TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the update handler was doing, and the client that sent the update will receive a 'workflow execution already completed' RPCError instead of the update result. You can wait for all update and signal handlers to complete by using `await workflow.wait_condition(lambda: workflow.all_handlers_finished())`. Alternatively, if both you and the clients sending the update are okay with interrupting running handlers when the workflow finishes, and causing clients to receive errors, then you can disable this warning via the update handler decorator: `@workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)`. The following updates were unfinished (and warnings were not disabled for their handler): [{\"name\": \"my_update\", \"id\": \"my-update\"}]", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py\", line 249, in _handle_activation\n    completion = await asyncio.wait_for(\n                 ^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n\n  File \"/opt/hostedtoolcache/Python/3.12.5/arm64/lib/python3.12/concurrent/futures/thread.py\", line 58, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py\", line 157, in activate\n    self._run_code(\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py\", line 172, in _run_code\n    exec(code, self.globals_and_locals, self.globals_and_locals)\n\n  File \"<string>\", line 2, in <module>\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py\", line 81, in activate\n    return self.instance.activate(act)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 415, in activate\n    self._warn_if_unfinished_handlers()\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1626, in _warn_if_unfinished_handlers\n    warnings.warn(\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "UnfinishedUpdateHandlersWarning", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

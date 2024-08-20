@@ -1,0 +1,110 @@
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 491, in run_update
+    raise RuntimeError(
+RuntimeError: Update handler for 'whargarbl' expected but not found, and there is no dynamic handler. known updates: [bad_validator first_task_update last_event last_event_async renamed runs_activity set_dynamic throws_runtime_err]
+INFO     temporalio.workflow:test_workflow.py:4156 Running validator with arg reject_me ({'attempt': 1, 'namespace': 'default', 'run_id': '32108097-fdb0-4ff2-99d7-ea029f948d49', 'task_queue': 'e8bb63ab-eac6-4e9b-9339-ada33b88cd91', 'workflow_id': 'update-handlers-workflow-unhappy-7f07f67c-20f5-4a47-b601-9feeb3c72854', 'workflow_type': 'UpdateHandlersWorkflow'})
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4158, in last_event_validator
+    raise ApplicationError("Rejected")
+temporalio.exceptions.ApplicationError: Rejected
+INFO     temporalio.workflow:test_workflow.py:4156 Running validator with arg fail ({'attempt': 1, 'namespace': 'default', 'run_id': '32108097-fdb0-4ff2-99d7-ea029f948d49', 'task_queue': 'e8bb63ab-eac6-4e9b-9339-ada33b88cd91', 'workflow_id': 'update-handlers-workflow-unhappy-7f07f67c-20f5-4a47-b601-9feeb3c72854', 'workflow_type': 'UpdateHandlersWorkflow'})
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2141, in handle_update_handler
+    return handler(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4149, in last_event
+    raise ApplicationError("SyncFail")
+temporalio.exceptions.ApplicationError: SyncFail
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4164, in last_event_async
+    raise ApplicationError("AsyncFail")
+temporalio.exceptions.ApplicationError: AsyncFail
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4175, in runs_activity
+    await act
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1413, in run_activity
+    async def run_activity() -> Any:
+asyncio.exceptions.CancelledError
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+TypeError: UpdateHandlersWorkflow.last_event_validator() takes 2 positional arguments but 3 were given
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1592, in _convert_payloads
+    return self._payload_converter.from_payloads(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/converter.py", line 304, in from_payloads
+    raise KeyError(f"Unknown payload encoding {encoding.decode()}")
+KeyError: 'Unknown payload encoding u-dont-know-me'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 498, in run_update
+    args = self._process_handler_args(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1667, in _process_handler_args
+    return self._convert_payloads(job_input, defn_arg_types)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1600, in _convert_payloads
+    raise RuntimeError("Failed decoding arguments") from err
+RuntimeError: Failed decoding arguments
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 32108097-fdb0-4ff2-99d7-ea029f948d49
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4203, in dynavalidator
+    raise ApplicationError("Rejected")
+temporalio.exceptions.ApplicationError: Rejected
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

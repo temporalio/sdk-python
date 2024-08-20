@@ -1,0 +1,86 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$e75d2d88-1256-48e4-84a1-2ac6fafe5d88\x1a$24059587-59ff-4905-9d37-5b5601c17665 \x05(\x012\x011B\rsome_activityJ\x08\x08\x01\x10\xc4\x93@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'f27dc7d6-185f-4fea-8252-262d3ccfef5e', 'workflow_id': 'e75d2d88-1256-48e4-84a1-2ac6fafe5d88', 'workflow_run_id': '24059587-59ff-4905-9d37-5b5601c17665', 'workflow_type': 'kitchen_sink'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'f27dc7d6-185f-4fea-8252-262d3ccfef5e', 'workflow_id': 'e75d2d88-1256-48e4-84a1-2ac6fafe5d88', 'workflow_run_id': '24059587-59ff-4905-9d37-5b5601c17665', 'workflow_type': 'kitchen_sink'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 783, in some_activity
+    raise ApplicationError("Retry me", type="Can retry me")
+temporalio.exceptions.ApplicationError: Can retry me: Retry me
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$e75d2d88-1256-48e4-84a1-2ac6fafe5d88\032$24059587-59ff-4905-9d37-5b5601c17665 \005(\0012\0011B\rsome_activityJ\010\010\001\020\304\223@\030\001"
+result {
+  failed {
+    failure {
+      message: "Retry me"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py\", line 783, in some_activity\n    raise ApplicationError(\"Retry me\", type=\"Can retry me\")\n"
+      application_failure_info {
+        type: "Can retry me"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\x12$e75d2d88-1256-48e4-84a1-2ac6fafe5d88\x1a$24059587-59ff-4905-9d37-5b5601c17665 \x05(\x022\x011B\rsome_activityJ\x08\x08\x01\x10\xc7\x93@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'f27dc7d6-185f-4fea-8252-262d3ccfef5e', 'workflow_id': 'e75d2d88-1256-48e4-84a1-2ac6fafe5d88', 'workflow_run_id': '24059587-59ff-4905-9d37-5b5601c17665', 'workflow_type': 'kitchen_sink'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'f27dc7d6-185f-4fea-8252-262d3ccfef5e', 'workflow_id': 'e75d2d88-1256-48e4-84a1-2ac6fafe5d88', 'workflow_run_id': '24059587-59ff-4905-9d37-5b5601c17665', 'workflow_type': 'kitchen_sink'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 784, in some_activity
+    raise ApplicationError("Do not retry me", type="Cannot retry me")
+temporalio.exceptions.ApplicationError: Cannot retry me: Do not retry me
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$e6d2a310-ce30-4dfe-87db-9ed829a8df47\022$e75d2d88-1256-48e4-84a1-2ac6fafe5d88\032$24059587-59ff-4905-9d37-5b5601c17665 \005(\0022\0011B\rsome_activityJ\010\010\001\020\307\223@\030\001"
+result {
+  failed {
+    failure {
+      message: "Do not retry me"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py\", line 784, in some_activity\n    raise ApplicationError(\"Do not retry me\", type=\"Cannot retry me\")\n"
+      application_failure_info {
+        type: "Cannot retry me"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 24059587-59ff-4905-9d37-5b5601c17665
+temporalio.exceptions.ApplicationError: Cannot retry me: Do not retry me
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 97, in run
+    should_return, ret = await self.handle_action(params, action)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 204, in handle_action
+    raise task.exception()  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 193, in run_activity
+    last_result = await task
+                  ^^^^^^^^^^
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+temporalio.exceptions.ActivityError: Activity task failed
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
