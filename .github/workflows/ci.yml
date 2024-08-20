@@ -59,7 +59,16 @@ jobs:
       - run: poetry install --no-root --all-extras
       - run: poe lint
       - run: poe build-develop
-      - run: poe test -s -o log_cli_level=DEBUG --alluredir allure-results-${{ matrix.python }}-${{ matrix.os }}
+      - run: mkdir junit-xml
+      - run: poe test -s -o log_cli_level=DEBUG --junit-xml=junit-xml/${{ matrix.python }}-${{ matrix.os }}.xml --alluredir allure-results-${{ matrix.python }}-${{ matrix.os }} 
+      - name: "Upload junit-xml artifact"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          # TODO: handle matrix build structure with allure
+          name: allure-results-${{ matrix.python }}-${{ matrix.os }}
+          path: allure-results-${{ matrix.python }}-${{ matrix.os }}
+          retention-days: 30
       - name: "Allure: upload artifact"
         uses: actions/upload-artifact@v4
         if: always()
@@ -70,10 +79,10 @@ jobs:
           retention-days: 30
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
+        run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}-${{ matrix.os }}-time-skipping.xml
       # Check cloud if proper target and not on fork
       - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test -s -o log_cli_level=DEBUG -k test_cloud_client
+        run: poe test -s -o log_cli_level=DEBUG -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}-${{ matrix.os }}-cloud.xml
         env:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
