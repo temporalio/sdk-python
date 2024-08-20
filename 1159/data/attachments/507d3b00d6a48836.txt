@@ -1,0 +1,14 @@
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID b3988d9b-8a13-4de5-99ca-47c5b20a29aa
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2110, in handle_signal
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 473, in bad_signal
+    raise ApplicationError("signal fail", 123)
+temporalio.exceptions.ApplicationError: signal fail
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

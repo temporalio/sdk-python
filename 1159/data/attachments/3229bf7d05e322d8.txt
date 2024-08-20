@@ -1,0 +1,48 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity intercepted_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow_4d45b3fe-27c3-4c39-a140-5dab3c5c7cfa\x1a$34f7e7ea-9829-43d4-9f1f-f5a2654ab882 \x05(\x012\x011B\x14intercepted_activityJ\x08\x08\x01\x10\xd6\x98@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'intercepted_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_b73b4b2b-ab62-4c31-909e-467d95bef73e', 'workflow_id': 'workflow_4d45b3fe-27c3-4c39-a140-5dab3c5c7cfa', 'workflow_run_id': '34f7e7ea-9829-43d4-9f1f-f5a2654ab882', 'workflow_type': 'InterceptedWorkflow'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details ('details',) ({'activity_id': '1', 'activity_type': 'intercepted_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_b73b4b2b-ab62-4c31-909e-467d95bef73e', 'workflow_id': 'workflow_4d45b3fe-27c3-4c39-a140-5dab3c5c7cfa', 'workflow_run_id': '34f7e7ea-9829-43d4-9f1f-f5a2654ab882', 'workflow_type': 'InterceptedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow_4d45b3fe-27c3-4c39-a140-5dab3c5c7cfa\032$34f7e7ea-9829-43d4-9f1f-f5a2654ab882 \005(\0012\0011B\024intercepted_activityJ\010\010\001\020\326\230@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"param: val1\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity intercepted_activity (token b'local_act_\x01\x00\x00\x00')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'intercepted_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'task_queue_b73b4b2b-ab62-4c31-909e-467d95bef73e', 'workflow_id': 'workflow_4d45b3fe-27c3-4c39-a140-5dab3c5c7cfa', 'workflow_run_id': '34f7e7ea-9829-43d4-9f1f-f5a2654ab882', 'workflow_type': 'InterceptedWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "local_act_\001\000\000\000"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"param: val2\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 34f7e7ea-9829-43d4-9f1f-f5a2654ab882
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 514, in run_update
+    self._inbound.handle_update_validator(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_interceptor.py", line 85, in handle_update_validator
+    return super().handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 340, in handle_update_validator
+    self.next.handle_update_validator(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2130, in handle_update_validator
+    handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_interceptor.py", line 191, in update_validated_validator
+    raise ApplicationError("Invalid update")
+temporalio.exceptions.ApplicationError: Invalid update
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

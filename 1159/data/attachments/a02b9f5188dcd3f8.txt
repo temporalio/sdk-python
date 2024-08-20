@@ -1,0 +1,17 @@
+INFO     temporalio.workflow:test_worker.py:164 Signal: finish ({'attempt': 1, 'namespace': 'default', 'run_id': 'f9dbf045-9733-4ab9-b0f9-9552edf049a5', 'task_queue': '7e6fe255-a585-4ab2-94fc-9f733593be42', 'workflow_id': 'resource-based-4c76d38a-1672-41a9-b29e-50c21e77c8a2', 'workflow_type': 'WaitOnSignalWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x123resource-based-4c76d38a-1672-41a9-b29e-50c21e77c8a2\x1a$f9dbf045-9733-4ab9-b0f9-9552edf049a5 \t(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\xd4\x9c@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '7e6fe255-a585-4ab2-94fc-9f733593be42', 'workflow_id': 'resource-based-4c76d38a-1672-41a9-b29e-50c21e77c8a2', 'workflow_run_id': 'f9dbf045-9733-4ab9-b0f9-9552edf049a5', 'workflow_type': 'WaitOnSignalWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\0223resource-based-4c76d38a-1672-41a9-b29e-50c21e77c8a2\032$f9dbf045-9733-4ab9-b0f9-9552edf049a5 \t(\0012\0011B\tsay_helloJ\010\010\001\020\324\234@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, hi!\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

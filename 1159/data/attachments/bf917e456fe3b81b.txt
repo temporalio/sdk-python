@@ -1,0 +1,63 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$a4809d3b-d5ab-42e1-a48d-6c4eafade019\x1a$24e22f7c-3f58-4521-b021-09dc6ad60206 \x05(\x012\x011B\rsome_activityJ\x08\x08\x01\x10\xfd\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '0f41397f-4e57-44bf-b314-3b0e46341290', 'workflow_id': 'a4809d3b-d5ab-42e1-a48d-6c4eafade019', 'workflow_run_id': '24e22f7c-3f58-4521-b021-09dc6ad60206', 'workflow_type': 'kitchen_sink'})
+WARNING  temporalio.activity:_activity.py:264 Cancelling activity because failed recording heartbeat ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '0f41397f-4e57-44bf-b314-3b0e46341290', 'workflow_id': 'a4809d3b-d5ab-42e1-a48d-6c4eafade019', 'workflow_run_id': '24e22f7c-3f58-4521-b021-09dc6ad60206', 'workflow_type': 'kitchen_sink'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 254, in _heartbeat_async
+    heartbeat.details.extend(await self._data_converter.encode(details))
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/converter.py", line 1055, in encode
+    payloads = self.payload_converter.to_payloads(values)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/converter.py", line 269, in to_payloads
+    payload = converter.to_payload(value)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/converter.py", line 568, in to_payload
+    data=json.dumps(
+  File "/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/__init__.py", line 234, in dumps
+    return cls(
+  File "/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/encoder.py", line 199, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/encoder.py", line 257, in iterencode
+    return _iterencode(o, 0)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/converter.py", line 512, in default
+    return super().default(o)
+  File "/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type NotSerializableValue is not JSON serializable
+WARNING  temporalio.activity:_activity.py:473 Completing as failure during heartbeat with error of type <class 'TypeError'>: Object of type NotSerializableValue is not JSON serializable ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '0f41397f-4e57-44bf-b314-3b0e46341290', 'workflow_id': 'a4809d3b-d5ab-42e1-a48d-6c4eafade019', 'workflow_run_id': '24e22f7c-3f58-4521-b021-09dc6ad60206', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$a4809d3b-d5ab-42e1-a48d-6c4eafade019\032$24e22f7c-3f58-4521-b021-09dc6ad60206 \005(\0012\0011B\rsome_activityJ\010\010\001\020\375\221@\030\001"
+result {
+  failed {
+    failure {
+      message: "Object of type NotSerializableValue is not JSON serializable"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 254, in _heartbeat_async\n    heartbeat.details.extend(await self._data_converter.encode(details))\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/converter.py\", line 1055, in encode\n    payloads = self.payload_converter.to_payloads(values)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/converter.py\", line 269, in to_payloads\n    payload = converter.to_payload(value)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/converter.py\", line 568, in to_payload\n    data=json.dumps(\n\n  File \"/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/__init__.py\", line 234, in dumps\n    return cls(\n\n  File \"/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/encoder.py\", line 199, in encode\n    chunks = self.iterencode(o, _one_shot=True)\n\n  File \"/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/encoder.py\", line 257, in iterencode\n    return _iterencode(o, 0)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/converter.py\", line 512, in default\n    return super().default(o)\n\n  File \"/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/json/encoder.py\", line 179, in default\n    raise TypeError(f\'Object of type {o.__class__.__name__} \'\n"
+      application_failure_info {
+        type: "TypeError"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 24e22f7c-3f58-4521-b021-09dc6ad60206
+temporalio.exceptions.ApplicationError: TypeError: Object of type NotSerializableValue is not JSON serializable
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 97, in run
+    should_return, ret = await self.handle_action(params, action)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 204, in handle_action
+    raise task.exception()  # type: ignore
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 193, in run_activity
+    last_result = await task
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity task failed
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

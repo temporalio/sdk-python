@@ -1,0 +1,81 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\x1a$7325dd83-bbd7-49ee-8468-734f8006068b \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\x9d\x9b@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '3ca19c10-1ece-41ff-b0f0-6a21b5f9ea6a', 'workflow_id': 'workflow-d6870075-4a39-4b1a-8813-acf88cba83e1', 'workflow_run_id': '7325dd83-bbd7-49ee-8468-734f8006068b', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\032$7325dd83-bbd7-49ee-8468-734f8006068b \005(\0012\0011B\tsay_helloJ\010\010\001\020\235\233@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\x1a$49721484-3353-4d32-8d9a-52a670c79f26 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\xc1\x9b@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '3ca19c10-1ece-41ff-b0f0-6a21b5f9ea6a', 'workflow_id': 'workflow-d6870075-4a39-4b1a-8813-acf88cba83e1', 'workflow_run_id': '49721484-3353-4d32-8d9a-52a670c79f26', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\032$49721484-3353-4d32-8d9a-52a670c79f26 \005(\0012\0011B\tsay_helloJ\010\010\001\020\301\233@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\x1a$d8fb47be-2f2b-4db8-8fbf-bfa47ff9e8a2 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\xe5\x9b@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '3ca19c10-1ece-41ff-b0f0-6a21b5f9ea6a', 'workflow_id': 'workflow-d6870075-4a39-4b1a-8813-acf88cba83e1', 'workflow_run_id': 'd8fb47be-2f2b-4db8-8fbf-bfa47ff9e8a2', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\032$d8fb47be-2f2b-4db8-8fbf-bfa47ff9e8a2 \005(\0012\0011B\tsay_helloJ\010\010\001\020\345\233@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\x1a$99c7d359-7673-4d6a-995c-4925b22cca36 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\x89\x9c@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '3ca19c10-1ece-41ff-b0f0-6a21b5f9ea6a', 'workflow_id': 'workflow-d6870075-4a39-4b1a-8813-acf88cba83e1', 'workflow_run_id': '99c7d359-7673-4d6a-995c-4925b22cca36', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\032$99c7d359-7673-4d6a-995c-4925b22cca36 \005(\0012\0011B\tsay_helloJ\010\010\001\020\211\234@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity say_hello (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\x1a$3496dbed-3832-4d98-b7fd-ae927883fd71 \x05(\x012\x011B\tsay_helloJ\x08\x08\x01\x10\xad\x9c@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'say_hello', 'attempt': 1, 'namespace': 'default', 'task_queue': '3ca19c10-1ece-41ff-b0f0-6a21b5f9ea6a', 'workflow_id': 'workflow-d6870075-4a39-4b1a-8813-acf88cba83e1', 'workflow_run_id': '3496dbed-3832-4d98-b7fd-ae927883fd71', 'workflow_type': 'SayHelloWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-d6870075-4a39-4b1a-8813-acf88cba83e1\032$3496dbed-3832-4d98-b7fd-ae927883fd71 \005(\0012\0011B\tsay_helloJ\010\010\001\020\255\234@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"Hello, Temporal!\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 3496dbed-3832-4d98-b7fd-ae927883fd71, message: Always evict workflows after replay
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 99c7d359-7673-4d6a-995c-4925b22cca36, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "[TMPRL1100] Nondeterminism error: Timer machine does not handle this event: HistoryEvent(id: 11, WorkflowExecutionCompleted)", source: "", stack_trace: "", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: NonDeterministicError }
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID d8fb47be-2f2b-4db8-8fbf-bfa47ff9e8a2, message: Always evict workflows after replay
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 49721484-3353-4d32-8d9a-52a670c79f26, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "[TMPRL1100] Nondeterminism error: Timer machine does not handle this event: HistoryEvent(id: 11, WorkflowExecutionCompleted)", source: "", stack_trace: "", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: NonDeterministicError }
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 7325dd83-bbd7-49ee-8468-734f8006068b, message: Always evict workflows after replay

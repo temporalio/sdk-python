@@ -1,0 +1,44 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity run (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$8b0dada4-97c4-4a49-8c38-464552a8d4f3\x1a$71e03601-87c6-4942-8142-5591c8fc67a0 \x05(\x012\x011B\x03runJ\x08\x08\x01\x10\xbe\x96@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': '1a065dae-2f6d-41d8-aaf8-c79faaab010a', 'workflow_id': '8b0dada4-97c4-4a49-8c38-464552a8d4f3', 'workflow_run_id': '71e03601-87c6-4942-8142-5591c8fc67a0', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:463 Completing asynchronously ({'activity_id': '1', 'activity_type': 'run', 'attempt': 1, 'namespace': 'default', 'task_queue': '1a065dae-2f6d-41d8-aaf8-c79faaab010a', 'workflow_id': '8b0dada4-97c4-4a49-8c38-464552a8d4f3', 'workflow_run_id': '71e03601-87c6-4942-8142-5591c8fc67a0', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$8b0dada4-97c4-4a49-8c38-464552a8d4f3\032$71e03601-87c6-4942-8142-5591c8fc67a0 \005(\0012\0011B\003runJ\010\010\001\020\276\226@\030\001"
+result {
+  will_complete_async {
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity run (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$8b0dada4-97c4-4a49-8c38-464552a8d4f3\x1a$71e03601-87c6-4942-8142-5591c8fc67a0 \x05(\x022\x011B\x03runJ\x08\x08\x01\x10\xc1\x96@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'run', 'attempt': 2, 'namespace': 'default', 'task_queue': '1a065dae-2f6d-41d8-aaf8-c79faaab010a', 'workflow_id': '8b0dada4-97c4-4a49-8c38-464552a8d4f3', 'workflow_run_id': '71e03601-87c6-4942-8142-5591c8fc67a0', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:463 Completing asynchronously ({'activity_id': '1', 'activity_type': 'run', 'attempt': 2, 'namespace': 'default', 'task_queue': '1a065dae-2f6d-41d8-aaf8-c79faaab010a', 'workflow_id': '8b0dada4-97c4-4a49-8c38-464552a8d4f3', 'workflow_run_id': '71e03601-87c6-4942-8142-5591c8fc67a0', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$8b0dada4-97c4-4a49-8c38-464552a8d4f3\032$71e03601-87c6-4942-8142-5591c8fc67a0 \005(\0022\0011B\003runJ\010\010\001\020\301\226@\030\001"
+result {
+  will_complete_async {
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 71e03601-87c6-4942-8142-5591c8fc67a0
+temporalio.exceptions.ApplicationError: err message 2
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 97, in run
+    should_return, ret = await self.handle_action(params, action)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 204, in handle_action
+    raise task.exception()  # type: ignore
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 193, in run_activity
+    last_result = await task
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity task failed
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

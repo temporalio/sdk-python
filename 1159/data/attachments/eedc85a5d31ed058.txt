@@ -1,0 +1,38 @@
+ERROR    temporalio.worker._workflow:_workflow.py:264 Failed running eviction job, not evicting. Since eviction could not be processed, this worker cannot complete and the slot will remain forever used.
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow.py", line 249, in _handle_activation
+    completion = await asyncio.wait_for(
+  File "/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/asyncio/tasks.py", line 494, in wait_for
+    return fut.result()
+  File "/opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/concurrent/futures/thread.py", line 57, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 157, in activate
+    self._run_code(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_runner.py", line 172, in _run_code
+    exec(code, self.globals_and_locals, self.globals_and_locals)
+  File "<string>", line 2, in <module>
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/workflow_sandbox/_in_sandbox.py", line 81, in activate
+    return self.instance.activate(act)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 379, in activate
+    raise RuntimeError(
+RuntimeError: Eviction processed, but 1 tasks remain. Stack traces below:
+
+Stack for <Task cancelling name='Task-2863 (workflow: EvictionDeadlockWorkflow, id: workflow-cab80db2-a151-4226-879a-5305c8bf06eb, run: 4ae4afb3-4f5f-42e3-96f4-d28df48ecb2a)' coro=<EvictionDeadlockWorkflow.wait_until_positive() running at /home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py:2589> wait_for=<Future finished result=True cb=[<TaskWakeupMethWrapper object at 0xff65161eee20>()]> cb=[set.remove(), gather.<locals>._done_callback() at /opt/hostedtoolcache/Python/3.8.18/arm64/lib/python3.8/asyncio/tasks.py:769]> (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2589, in wait_until_positive
+    await workflow.wait_condition(lambda: self.val > 0)
+
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 16cd67f9-acba-4c82-86b8-4bf3e870fef2, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 16cd67f9-acba-4c82-86b8-4bf3e870fef2, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 11fbd18e-80a8-4f4f-814d-7b148748a826, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 11fbd18e-80a8-4f4f-814d-7b148748a826, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 16cd67f9-acba-4c82-86b8-4bf3e870fef2, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 25f8101c-1cc6-4d48-b4eb-f0e84d3c9306, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 25f8101c-1cc6-4d48-b4eb-f0e84d3c9306, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 11fbd18e-80a8-4f4f-814d-7b148748a826, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID cc2e6756-ee23-4296-8ae2-66cc4ed407d1, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID cc2e6756-ee23-4296-8ae2-66cc4ed407d1, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 25f8101c-1cc6-4d48-b4eb-f0e84d3c9306, message: Workflow cache full

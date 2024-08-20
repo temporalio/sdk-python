@@ -1,0 +1,31 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity custom-name (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-63cae736-34e1-4e3c-9841-416e4411d658\x1a$44dfbf59-9b36-42db-866f-41311c4a2f85 \x05(\x012\x011B\x0bcustom-nameJ\x08\x08\x01\x10\xe9\xb5@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'custom-name', 'attempt': 1, 'namespace': 'default', 'task_queue': '79c14fb0-c2f2-493b-9a42-a9ff7ae89f8d', 'workflow_id': 'workflow-63cae736-34e1-4e3c-9841-416e4411d658', 'workflow_run_id': '44dfbf59-9b36-42db-866f-41311c4a2f85', 'workflow_type': 'ActivityMethodWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-63cae736-34e1-4e3c-9841-416e4411d658\032$44dfbf59-9b36-42db-866f-41311c4a2f85 \005(\0012\0011B\013custom-nameJ\010\010\001\020\351\265@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"field1\":\"in worker, workflow param\"}"
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity add_multi (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-63cae736-34e1-4e3c-9841-416e4411d658\x1a$44dfbf59-9b36-42db-866f-41311c4a2f85 \x0b(\x012\x012B\tadd_multiJ\x08\x08\x01\x10\xf9\xb5@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'add_multi', 'attempt': 1, 'namespace': 'default', 'task_queue': '79c14fb0-c2f2-493b-9a42-a9ff7ae89f8d', 'workflow_id': 'workflow-63cae736-34e1-4e3c-9841-416e4411d658', 'workflow_run_id': '44dfbf59-9b36-42db-866f-41311c4a2f85', 'workflow_type': 'ActivityMethodWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-63cae736-34e1-4e3c-9841-416e4411d658\032$44dfbf59-9b36-42db-866f-41311c4a2f85 \013(\0012\0012B\tadd_multiJ\010\010\001\020\371\265@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "{\"field1\":\"in worker, workflow param, in workflow\"}"
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

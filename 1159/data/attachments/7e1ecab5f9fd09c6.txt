@@ -1,0 +1,39 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity fail_until_attempt_activity (token b'local_act_\x01\x00\x00\x00')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'fail_until_attempt_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '15eb9f96-34cb-4442-ae9d-da8826afd0be', 'workflow_id': 'workflow-689717a0-90e8-4052-8944-f1a9bd1f94b1', 'workflow_run_id': '854147a2-4dd5-40e8-a9a6-2fef221d7f73', 'workflow_type': 'LocalActivityBackoffWorkflow'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'fail_until_attempt_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '15eb9f96-34cb-4442-ae9d-da8826afd0be', 'workflow_id': 'workflow-689717a0-90e8-4052-8944-f1a9bd1f94b1', 'workflow_run_id': '854147a2-4dd5-40e8-a9a6-2fef221d7f73', 'workflow_type': 'LocalActivityBackoffWorkflow'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2474, in fail_until_attempt_activity
+    raise ApplicationError("Attempt too low")
+temporalio.exceptions.ApplicationError: Attempt too low
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "local_act_\001\000\000\000"
+result {
+  failed {
+    failure {
+      message: "Attempt too low"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 2474, in fail_until_attempt_activity\n    raise ApplicationError(\"Attempt too low\")\n"
+      application_failure_info {
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity fail_until_attempt_activity (token b'local_act_\x02\x00\x00\x00')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '2', 'activity_type': 'fail_until_attempt_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': '15eb9f96-34cb-4442-ae9d-da8826afd0be', 'workflow_id': 'workflow-689717a0-90e8-4052-8944-f1a9bd1f94b1', 'workflow_run_id': '854147a2-4dd5-40e8-a9a6-2fef221d7f73', 'workflow_type': 'LocalActivityBackoffWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "local_act_\002\000\000\000"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"attempt: 2\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

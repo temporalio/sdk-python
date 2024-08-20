@@ -1,0 +1,57 @@
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow TaskFailOnceWorkflow with ID workflow-911a5bb8-4ea5-409f-a67a-bed25ac72659 and run ID 8ba362d0-2883-45b7-9a50-40e609700758
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2015, in run
+    raise RuntimeError("Intentional workflow task failure")
+RuntimeError: Intentional workflow task failure
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 8ba362d0-2883-45b7-9a50-40e609700758, message: Workflow activation completion failed: Failure { failure: Some(Failure { message: "Intentional workflow task failure", source: "", stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 351, in activate\n    self._run_once(check_conditions=index == 1 or index == 2)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1749, in _run_once\n    raise self._current_activation_error\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 1767, in _run_top_level_workflow_function\n    await coro\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 831, in run_workflow\n    result = await self._inbound.execute_workflow(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py\", line 493, in execute_workflow\n    return await super().execute_workflow(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py\", line 328, in execute_workflow\n    return await self.next.execute_workflow(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py\", line 2099, in execute_workflow\n    return await input.run_fn(*args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 2015, in run\n    raise RuntimeError(\"Intentional workflow task failure\")\n", encoded_attributes: None, cause: None, failure_info: Some(ApplicationFailureInfo(ApplicationFailureInfo { r#type: "RuntimeError", non_retryable: false, details: None, next_retry_delay: None })) }), force_cause: Unspecified }
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity task_fail_once_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-911a5bb8-4ea5-409f-a67a-bed25ac72659\x1a$8ba362d0-2883-45b7-9a50-40e609700758 \x08(\x012\x011B\x17task_fail_once_activityJ\x08\x08\x01\x10\xc3\xad@\x18\x01')
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'task_fail_once_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '41742242-5be5-4e15-9149-3955d6650c79', 'workflow_id': 'workflow-911a5bb8-4ea5-409f-a67a-bed25ac72659', 'workflow_run_id': '8ba362d0-2883-45b7-9a50-40e609700758', 'workflow_type': 'TaskFailOnceWorkflow'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 2001, in task_fail_once_activity
+    raise RuntimeError("Intentional activity task failure")
+RuntimeError: Intentional activity task failure
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-911a5bb8-4ea5-409f-a67a-bed25ac72659\032$8ba362d0-2883-45b7-9a50-40e609700758 \010(\0012\0011B\027task_fail_once_activityJ\010\010\001\020\303\255@\030\001"
+result {
+  failed {
+    failure {
+      message: "Intentional activity task failure"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 2001, in task_fail_once_activity\n    raise RuntimeError(\"Intentional activity task failure\")\n"
+      application_failure_info {
+        type: "RuntimeError"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity task_fail_once_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12-workflow-911a5bb8-4ea5-409f-a67a-bed25ac72659\x1a$8ba362d0-2883-45b7-9a50-40e609700758 \x08(\x022\x011B\x17task_fail_once_activityJ\x08\x08\x01\x10\xc6\xad@\x18\x01')
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022-workflow-911a5bb8-4ea5-409f-a67a-bed25ac72659\032$8ba362d0-2883-45b7-9a50-40e609700758 \010(\0022\0011B\027task_fail_once_activityJ\010\010\001\020\306\255@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "binary/null"
+      }
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

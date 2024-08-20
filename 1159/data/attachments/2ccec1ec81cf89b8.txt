@@ -1,0 +1,554 @@
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': True, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': True, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': <class 'tests.worker.test_workflow.FailureTypesCustomException'>, 'workflow_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': <class 'temporalio.workflow.NondeterminismError'>, 'workflow_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': <class 'Exception'>, 'workflow_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': <class 'Exception'>, 'workflow_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredExplicitlyWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredExplicitlyWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredInheritedWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredInheritedWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'signal_scenario': None, 'update_scenario': None}
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID e18483f9-a896-4b39-92ec-5d2f50b8b902
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4797, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 39374d5b-48a7-43fd-acc0-34b41b881f10
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4804, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 434ec2b5-26ac-4e94-b2f3-de2aba6d7b52
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4788, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow FailureTypesUnconfiguredWorkflow with ID wf-558b077c-d1ca-4d0f-9d28-c42e9908a253 and run ID 434ec2b5-26ac-4e94-b2f3-de2aba6d7b52
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4788, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 0b0bd63c-3800-4b1e-a1a7-300368a87c50
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4788, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 8eaff221-e8d6-48e8-aa55-e9f0e598c59b
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4788, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 212010aa-4bbf-4279-b902-bf9e0ce8bf9e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 0b0bd63c-3800-4b1e-a1a7-300368a87c50, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 39374d5b-48a7-43fd-acc0-34b41b881f10, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 56227871-3d5e-425e-b697-d8921d1571e6, message: Workflow cache full
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredInheritedWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': <class 'tests.worker.test_workflow.FailureTypesCustomException'>, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'update_scenario': None}
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 4e40c410-5bef-4d93-ad11-4237ad7e8f12, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 434ec2b5-26ac-4e94-b2f3-de2aba6d7b52, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 8eaff221-e8d6-48e8-aa55-e9f0e598c59b, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 7f8d4abb-5ffd-41a2-bf34-fc9c734774db, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e18483f9-a896-4b39-92ec-5d2f50b8b902, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 28054521-1380-41fd-a399-4ac559516e92, message: Workflow cache full
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 434ec2b5-26ac-4e94-b2f3-de2aba6d7b52
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4788, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow FailureTypesUnconfiguredWorkflow with ID wf-558b077c-d1ca-4d0f-9d28-c42e9908a253 and run ID 434ec2b5-26ac-4e94-b2f3-de2aba6d7b52
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4788, in run
+    await super().run(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4761, in run
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': <class 'Exception'>, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'update_scenario': None}
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID c604c621-e1ad-4de7-a17e-7eab19029d6a
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredExplicitlyWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'update_scenario': None}
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 0aa18900-2071-4664-ba09-078985dc7425
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 434ec2b5-26ac-4e94-b2f3-de2aba6d7b52, message: Workflow cache full
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': True, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>, 'update_scenario': None}
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 761f2d00-7daa-4c74-aebf-3a1464410b39
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 80c6c09f-7499-4228-bb72-218d481eafec
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 7f8d4abb-5ffd-41a2-bf34-fc9c734774db, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 4e40c410-5bef-4d93-ad11-4237ad7e8f12, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 28054521-1380-41fd-a399-4ac559516e92, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 212010aa-4bbf-4279-b902-bf9e0ce8bf9e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 0aa18900-2071-4664-ba09-078985dc7425, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID c604c621-e1ad-4de7-a17e-7eab19029d6a, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 56227871-3d5e-425e-b697-d8921d1571e6, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': <class 'temporalio.workflow.NondeterminismError'>, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredInheritedWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': <class 'tests.worker.test_workflow.FailureTypesCustomException'>, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>}
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 82479f7c-169e-4511-97cf-ccf5ae580a80
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow FailureTypesUnconfiguredWorkflow with ID wf-30d73d9d-f1bb-4076-b0bd-8a0153e189db and run ID 82479f7c-169e-4511-97cf-ccf5ae580a80
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredExplicitlyWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': <class 'Exception'>, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'update_scenario': None}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredInheritedWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'update_scenario': None}
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 761f2d00-7daa-4c74-aebf-3a1464410b39, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 80c6c09f-7499-4228-bb72-218d481eafec, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 4e40c410-5bef-4d93-ad11-4237ad7e8f12, message: Workflow cache full
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredExplicitlyWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': <class 'Exception'>, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': True, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>, 'update_scenario': None}
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 82479f7c-169e-4511-97cf-ccf5ae580a80, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 82479f7c-169e-4511-97cf-ccf5ae580a80
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow FailureTypesUnconfiguredWorkflow with ID wf-30d73d9d-f1bb-4076-b0bd-8a0153e189db and run ID 82479f7c-169e-4511-97cf-ccf5ae580a80
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 497, in handle_signal
+    return await super().handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 332, in handle_signal
+    return await self.next.handle_signal(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2108, in handle_signal
+    await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4765, in signal
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 38362366-1b2b-4e7c-8b18-21b5df1eface, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e32afb54-e25f-482e-917b-126e6289986a, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID b624d341-8c9d-4999-987c-bdb6a9ec159b, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID a1f53b65-330d-4ed0-bb62-790ca259b4d3, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e0f25d8f-0a9d-4e21-a208-fd657bfc7a3d, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 694a1dc4-35f4-4878-8a3c-dbaaf61d5c3e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 82479f7c-169e-4511-97cf-ccf5ae580a80, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e4adfa57-4c73-4ed9-b267-57bd0cb2dd15, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 55834aaa-8e54-47fd-994d-ca2013191b58, message: Workflow cache full
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID e32afb54-e25f-482e-917b-126e6289986a
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID b624d341-8c9d-4999-987c-bdb6a9ec159b
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': True, 'fail_message_contains': 'Intentional exception', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.THROW_CUSTOM_EXCEPTION: 1>}
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 38362366-1b2b-4e7c-8b18-21b5df1eface, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 36c93928-94ee-4fad-b172-1551d55b3803, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e0f25d8f-0a9d-4e21-a208-fd657bfc7a3d, message: Workflow cache full
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID e4adfa57-4c73-4ed9-b267-57bd0cb2dd15
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID a1f53b65-330d-4ed0-bb62-790ca259b4d3, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 694a1dc4-35f4-4878-8a3c-dbaaf61d5c3e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID 55834aaa-8e54-47fd-994d-ca2013191b58
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e32afb54-e25f-482e-917b-126e6289986a, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID b624d341-8c9d-4999-987c-bdb6a9ec159b, message: Workflow cache full
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': <class 'temporalio.workflow.NondeterminismError'>, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>}
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredInheritedWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesConfiguredExplicitlyWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>}
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': False, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': <class 'Exception'>, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>}
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e4adfa57-4c73-4ed9-b267-57bd0cb2dd15, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 36c93928-94ee-4fad-b172-1551d55b3803, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 55834aaa-8e54-47fd-994d-ca2013191b58, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e34f604d-4cec-4048-b43a-462cf3bcc50c, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 36c93928-94ee-4fad-b172-1551d55b3803, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 65b28c09-959d-4a83-aa88-ebbfe27877d9, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e34f604d-4cec-4048-b43a-462cf3bcc50c, message: Workflow cache full
+DEBUG    root:test_workflow.py:4826 Asserting scenario {'workflow': <class 'tests.worker.test_workflow.FailureTypesUnconfiguredWorkflow'>, 'expect_task_fail': True, 'fail_message_contains': 'Nondeterminism', 'worker_level_failure_exception_type': None, 'workflow_scenario': None, 'signal_scenario': None, 'update_scenario': <FailureTypesScenario.CAUSE_NON_DETERMINISM: 2>}
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 034f5dbf-dd59-4695-aeea-9e6ca18b79ab, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 19f6f0dd-3321-4a14-9aaa-924f2f14b55e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 51e11fd4-d787-4949-9bf2-cea36d87134e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 293484a1-a1f1-432b-92e7-b0eca100b865, message: Workflow cache full
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID e34f604d-4cec-4048-b43a-462cf3bcc50c
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow FailureTypesUnconfiguredWorkflow with ID wf-e86adc0d-ae5c-46cd-83b4-b93e55b5a52f and run ID e34f604d-4cec-4048-b43a-462cf3bcc50c
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e34f604d-4cec-4048-b43a-462cf3bcc50c, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 51e11fd4-d787-4949-9bf2-cea36d87134e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 65b28c09-959d-4a83-aa88-ebbfe27877d9, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 034f5dbf-dd59-4695-aeea-9e6ca18b79ab, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 293484a1-a1f1-432b-92e7-b0eca100b865, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 19f6f0dd-3321-4a14-9aaa-924f2f14b55e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:541 Update raised failure with run ID e34f604d-4cec-4048-b43a-462cf3bcc50c
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+WARNING  temporalio.worker._workflow_instance:_workflow_instance.py:385 Failed activation on workflow FailureTypesUnconfiguredWorkflow with ID wf-e86adc0d-ae5c-46cd-83b4-b93e55b5a52f and run ID e34f604d-4cec-4048-b43a-462cf3bcc50c
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 351, in activate
+    self._run_once(check_conditions=index == 1 or index == 2)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1749, in _run_once
+    raise self._current_activation_error
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 531, in run_update
+    success = await self._inbound.handle_update_handler(handler_input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 344, in handle_update_handler
+    return await self.next.handle_update_handler(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2139, in handle_update_handler
+    return await handler(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 1457, in with_object
+    return await fn(obj, *args, **kwargs)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4772, in update
+    await self._apply_scenario(scenario)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 4776, in _apply_scenario
+    raise FailureTypesCustomException("Intentional exception")
+tests.worker.test_workflow.FailureTypesCustomException: Intentional exception
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e34f604d-4cec-4048-b43a-462cf3bcc50c, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 51e11fd4-d787-4949-9bf2-cea36d87134e, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 293484a1-a1f1-432b-92e7-b0eca100b865, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 19f6f0dd-3321-4a14-9aaa-924f2f14b55e, message: Workflow cache full
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 034f5dbf-dd59-4695-aeea-9e6ca18b79ab, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 65b28c09-959d-4a83-aa88-ebbfe27877d9, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
+DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 293484a1-a1f1-432b-92e7-b0eca100b865, message: Workflow cache full
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

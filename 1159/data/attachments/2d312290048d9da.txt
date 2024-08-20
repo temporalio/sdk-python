@@ -1,0 +1,76 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity activity_with_retry_delay (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$1f6869af-fbe6-44ea-a900-d6434ac5f25c\x1a$61d6dcb4-8afc-493a-a02d-de0a6d6254ad \x05(\x012\x011B\x19activity_with_retry_delayJ\x08\x08\x01\x10\x96\xd5@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'activity_with_retry_delay', 'attempt': 1, 'namespace': 'default', 'task_queue': '67537cb6-49fc-4f8b-80d7-837f30e9f4d0', 'workflow_id': '1f6869af-fbe6-44ea-a900-d6434ac5f25c', 'workflow_run_id': '61d6dcb4-8afc-493a-a02d-de0a6d6254ad', 'workflow_type': 'ActivitiesWithRetryDelayWorkflow'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'activity_with_retry_delay', 'attempt': 1, 'namespace': 'default', 'task_queue': '67537cb6-49fc-4f8b-80d7-837f30e9f4d0', 'workflow_id': '1f6869af-fbe6-44ea-a900-d6434ac5f25c', 'workflow_run_id': '61d6dcb4-8afc-493a-a02d-de0a6d6254ad', 'workflow_type': 'ActivitiesWithRetryDelayWorkflow'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5963, in activity_with_retry_delay
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: Deliberately failing with next_retry_delay set
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$1f6869af-fbe6-44ea-a900-d6434ac5f25c\032$61d6dcb4-8afc-493a-a02d-de0a6d6254ad \005(\0012\0011B\031activity_with_retry_delayJ\010\010\001\020\226\325@\030\001"
+result {
+  failed {
+    failure {
+      message: "Deliberately failing with next_retry_delay set"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 5963, in activity_with_retry_delay\n    raise ApplicationError(\n"
+      application_failure_info {
+        next_retry_delay {
+          nanos: 5000000
+        }
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity activity_with_retry_delay (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$1f6869af-fbe6-44ea-a900-d6434ac5f25c\x1a$61d6dcb4-8afc-493a-a02d-de0a6d6254ad \x05(\x022\x011B\x19activity_with_retry_delayJ\x08\x08\x01\x10\x9a\xd5@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'activity_with_retry_delay', 'attempt': 2, 'namespace': 'default', 'task_queue': '67537cb6-49fc-4f8b-80d7-837f30e9f4d0', 'workflow_id': '1f6869af-fbe6-44ea-a900-d6434ac5f25c', 'workflow_run_id': '61d6dcb4-8afc-493a-a02d-de0a6d6254ad', 'workflow_type': 'ActivitiesWithRetryDelayWorkflow'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'activity_with_retry_delay', 'attempt': 2, 'namespace': 'default', 'task_queue': '67537cb6-49fc-4f8b-80d7-837f30e9f4d0', 'workflow_id': '1f6869af-fbe6-44ea-a900-d6434ac5f25c', 'workflow_run_id': '61d6dcb4-8afc-493a-a02d-de0a6d6254ad', 'workflow_type': 'ActivitiesWithRetryDelayWorkflow'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5963, in activity_with_retry_delay
+    raise ApplicationError(
+temporalio.exceptions.ApplicationError: Deliberately failing with next_retry_delay set
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$1f6869af-fbe6-44ea-a900-d6434ac5f25c\032$61d6dcb4-8afc-493a-a02d-de0a6d6254ad \005(\0022\0011B\031activity_with_retry_delayJ\010\010\001\020\232\325@\030\001"
+result {
+  failed {
+    failure {
+      message: "Deliberately failing with next_retry_delay set"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py\", line 5963, in activity_with_retry_delay\n    raise ApplicationError(\n"
+      application_failure_info {
+        next_retry_delay {
+          nanos: 5000000
+        }
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID 61d6dcb4-8afc-493a-a02d-de0a6d6254ad
+temporalio.exceptions.ApplicationError: Deliberately failing with next_retry_delay set
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_workflow.py", line 5976, in run
+    await workflow.execute_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/workflow.py", line 2011, in execute_activity
+    return await _Runtime.current().workflow_start_activity(
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity task failed
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

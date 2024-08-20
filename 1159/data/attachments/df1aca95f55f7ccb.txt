@@ -1,0 +1,42 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity wait_cancel (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$72b8fc26-26fb-4633-b2f5-f3ddd0726be5\x1a$e88ee8b0-7d9b-4506-a144-be2d0952a87a \x05(\x012\x011B\x0bwait_cancelJ\x08\x08\x01\x10\xe4\x8d@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '6ac71c5d-dcc8-401e-be80-0d8685809637', 'workflow_id': '72b8fc26-26fb-4633-b2f5-f3ddd0726be5', 'workflow_run_id': 'e88ee8b0-7d9b-4506-a144-be2d0952a87a', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details () ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '6ac71c5d-dcc8-401e-be80-0d8685809637', 'workflow_id': '72b8fc26-26fb-4633-b2f5-f3ddd0726be5', 'workflow_run_id': 'e88ee8b0-7d9b-4506-a144-be2d0952a87a', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:216 Cancelling activity b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$72b8fc26-26fb-4633-b2f5-f3ddd0726be5\x1a$e88ee8b0-7d9b-4506-a144-be2d0952a87a \x05(\x012\x011B\x0bwait_cancelJ\x08\x08\x01\x10\xe4\x8d@\x18\x01', reason: 1
+DEBUG    temporalio.activity:_activity.py:486 Completing as cancelled ({'activity_id': '1', 'activity_type': 'wait_cancel', 'attempt': 1, 'namespace': 'default', 'task_queue': '6ac71c5d-dcc8-401e-be80-0d8685809637', 'workflow_id': '72b8fc26-26fb-4633-b2f5-f3ddd0726be5', 'workflow_run_id': 'e88ee8b0-7d9b-4506-a144-be2d0952a87a', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$72b8fc26-26fb-4633-b2f5-f3ddd0726be5\032$e88ee8b0-7d9b-4506-a144-be2d0952a87a \005(\0012\0011B\013wait_cancelJ\010\010\001\020\344\215@\030\001"
+result {
+  cancelled {
+    failure {
+      message: "Cancelled"
+      canceled_failure_info {
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1788 Workflow raised failure with run ID e88ee8b0-7d9b-4506-a144-be2d0952a87a
+temporalio.exceptions.CancelledError: Cancelled
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1767, in _run_top_level_workflow_function
+    await coro
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 831, in run_workflow
+    result = await self._inbound.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/testing/_workflow.py", line 493, in execute_workflow
+    return await super().execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_interceptor.py", line 328, in execute_workflow
+    return await self.next.execute_workflow(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 2099, in execute_workflow
+    return await input.run_fn(*args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 97, in run
+    should_return, ret = await self.handle_action(params, action)
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 204, in handle_action
+    raise task.exception()  # type: ignore
+  File "/home/runner/work/sdk-python/sdk-python/tests/helpers/worker.py", line 193, in run_activity
+    last_result = await task
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_workflow_instance.py", line 1423, in run_activity
+    return await asyncio.shield(handle._result_fut)
+temporalio.exceptions.ActivityError: Activity cancelled
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

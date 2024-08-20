@@ -1,0 +1,96 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$de0795ef-4014-4884-b4b9-85b063a6499f\x1a$ea549fa9-fba0-420b-9f2b-1991adba48ed \x05(\x012\x011B\rsome_activityJ\x08\x08\x01\x10\xd3\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:test_activity.py:619 Changing count from 0 to 9 ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 623, in some_activity
+    raise RuntimeError("Try again!")
+RuntimeError: Try again!
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details (9,) ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$de0795ef-4014-4884-b4b9-85b063a6499f\032$ea549fa9-fba0-420b-9f2b-1991adba48ed \005(\0012\0011B\rsome_activityJ\010\010\001\020\323\221@\030\001"
+result {
+  failed {
+    failure {
+      message: "Try again!"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py\", line 623, in some_activity\n    raise RuntimeError(\"Try again!\")\n"
+      application_failure_info {
+        type: "RuntimeError"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$de0795ef-4014-4884-b4b9-85b063a6499f\x1a$ea549fa9-fba0-420b-9f2b-1991adba48ed \x05(\x022\x011B\rsome_activityJ\x08\x08\x01\x10\xd6\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:test_activity.py:619 Changing count from 9 to 18 ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 623, in some_activity
+    raise RuntimeError("Try again!")
+RuntimeError: Try again!
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details (18,) ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 2, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$de0795ef-4014-4884-b4b9-85b063a6499f\032$ea549fa9-fba0-420b-9f2b-1991adba48ed \005(\0022\0011B\rsome_activityJ\010\010\001\020\326\221@\030\001"
+result {
+  failed {
+    failure {
+      message: "Try again!"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py\", line 623, in some_activity\n    raise RuntimeError(\"Try again!\")\n"
+      application_failure_info {
+        type: "RuntimeError"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$de0795ef-4014-4884-b4b9-85b063a6499f\x1a$ea549fa9-fba0-420b-9f2b-1991adba48ed \x05(\x032\x011B\rsome_activityJ\x08\x08\x01\x10\xd9\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 3, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:test_activity.py:619 Changing count from 18 to 27 ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 3, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+WARNING  temporalio.activity:_activity.py:493 Completing activity as failed ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 3, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+Traceback (most recent call last):
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 453, in _run_activity
+    result = await impl.execute_activity(input)
+  File "/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py", line 711, in execute_activity
+    return await input.fn(*input.args)
+  File "/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py", line 623, in some_activity
+    raise RuntimeError("Try again!")
+RuntimeError: Try again!
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details (27,) ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 3, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$de0795ef-4014-4884-b4b9-85b063a6499f\032$ea549fa9-fba0-420b-9f2b-1991adba48ed \005(\0032\0011B\rsome_activityJ\010\010\001\020\331\221@\030\001"
+result {
+  failed {
+    failure {
+      message: "Try again!"
+      stack_trace: "  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 453, in _run_activity\n    result = await impl.execute_activity(input)\n\n  File \"/home/runner/work/sdk-python/sdk-python/temporalio/worker/_activity.py\", line 711, in execute_activity\n    return await input.fn(*input.args)\n\n  File \"/home/runner/work/sdk-python/sdk-python/tests/worker/test_activity.py\", line 623, in some_activity\n    raise RuntimeError(\"Try again!\")\n"
+      application_failure_info {
+        type: "RuntimeError"
+      }
+    }
+  }
+}
+
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity some_activity (token b'\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12$de0795ef-4014-4884-b4b9-85b063a6499f\x1a$ea549fa9-fba0-420b-9f2b-1991adba48ed \x05(\x042\x011B\rsome_activityJ\x08\x08\x01\x10\xdc\x91@\x18\x01')
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 4, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:test_activity.py:619 Changing count from 27 to 36 ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 4, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.activity:_activity.py:255 Recording heartbeat with details (36,) ({'activity_id': '1', 'activity_type': 'some_activity', 'attempt': 4, 'namespace': 'default', 'task_queue': 'd69511f0-2c26-44d3-9ba7-aeda2bf46059', 'workflow_id': 'de0795ef-4014-4884-b4b9-85b063a6499f', 'workflow_run_id': 'ea549fa9-fba0-420b-9f2b-1991adba48ed', 'workflow_type': 'kitchen_sink'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022$de0795ef-4014-4884-b4b9-85b063a6499f\032$ea549fa9-fba0-420b-9f2b-1991adba48ed \005(\0042\0011B\rsome_activityJ\010\010\001\020\334\221@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "json/plain"
+      }
+      data: "\"final count: 36\""
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

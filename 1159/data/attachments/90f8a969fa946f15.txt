@@ -1,0 +1,15 @@
+DEBUG    temporalio.worker._activity:_activity.py:276 Running activity custom_metrics_activity (token b"\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\x12'wf-70715271-355e-4400-82c5-60c464d6d0a8\x1a$15225238-adf4-4e1f-a70d-f764d4a1ede8 \x05(\x012\x011B\x17custom_metrics_activityJ\x08\x08\x01\x10\xb4\xbc@\x18\x01")
+DEBUG    temporalio.activity:_activity.py:440 Starting activity ({'activity_id': '1', 'activity_type': 'custom_metrics_activity', 'attempt': 1, 'namespace': 'default', 'task_queue': '56361f3b-c016-4dc8-b959-f47db4aaa063', 'workflow_id': 'wf-70715271-355e-4400-82c5-60c464d6d0a8', 'workflow_run_id': '15225238-adf4-4e1f-a70d-f764d4a1ede8', 'workflow_type': 'CustomMetricsWorkflow'})
+DEBUG    temporalio.worker._activity:_activity.py:527 Completing activity with completion: task_token: "\n$8aa290fa-b00f-4fa1-a139-85696fcc157a\022\'wf-70715271-355e-4400-82c5-60c464d6d0a8\032$15225238-adf4-4e1f-a70d-f764d4a1ede8 \005(\0012\0011B\027custom_metrics_activityJ\010\010\001\020\264\274@\030\001"
+result {
+  completed {
+    result {
+      metadata {
+        key: "encoding"
+        value: "binary/null"
+      }
+    }
+  }
+}
+
+INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
