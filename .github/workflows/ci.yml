@@ -59,41 +59,26 @@ jobs:
       - run: poetry install --no-root --all-extras
       - run: poe lint
       - run: poe build-develop
+      # TODO: handle matrix build structure with allure
       - run: poe test -s --alluredir allure-results -o log_cli_level=DEBUG
+      - name: "Allure: upload artifact"
+        uses: actions/upload-artifact@master
+        if: always()
+        with:
+          # TODO: handle matrix build structure with allure
+          name: allure-results
+          path: allure-results
+          retention-days: 30
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test -s --alluredir allure-results -o log_cli_level=DEBUG --workflow-environment time-skipping
+        run: poe test -s -o log_cli_level=DEBUG --workflow-environment time-skipping
       # Check cloud if proper target and not on fork
       - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test -s --alluredir allure-results -o log_cli_level=DEBUG -k test_cloud_client
+        run: poe test -s -o log_cli_level=DEBUG -k test_cloud_client
         env:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
           TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
-
-      # https://allurereport.org/docs/integrations-github/
-
-      - name: "Allure: load test report history"
-        uses: actions/checkout@v4
-        if: always()
-        continue-on-error: true
-        with:
-          ref: gh-pages
-          path: allure-data
-      - name: "Allure: build test report"
-        uses: simple-elf/allure-report-action@v1.9
-        if: always()
-        with:
-          gh_pages: allure-data
-          allure_history: allure-history
-          allure_results: allure-results
-      - name: "Allure: publish test report"
-        uses: peaceiris/actions-gh-pages@v4
-        if: always()
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: allure-history
 
       # Confirm protos are already generated properly with older protobuf
       # library and run test with that older version. We must downgrade protobuf
@@ -135,3 +120,42 @@ jobs:
       version: ${{github.event.pull_request.head.ref}}
       version-is-repo-ref: true
       features-repo-ref: python-update-updates
+
+  # https://allurereport.org/docs/integrations-github/
+  # https://github.com/simple-elf/allure-report-action/issues/28#issuecomment-1139332329
+
+  create-allure-report:
+    name: "Allure: load previous history, create report, and publish"
+    needs: build-lint-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Allure: Download Artifacts"
+        uses: actions/download-artifact@v3
+        id: download
+        with:
+          name: allure-results
+          path: allure-results
+
+      - name: "Allure: load test report history"
+        uses: actions/checkout@v4
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: allure-report-data
+
+      - name: "Allure: build test report"
+        uses: simple-elf/allure-report-action@v1.9
+        if: always()
+        with:
+          gh_pages: allure-report-data
+          allure_results: allure-results
+          allure_history: allure-history
+
+      - name: "Allure: publish test report"
+        uses: peaceiris/actions-gh-pages@v4
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: allure-history
