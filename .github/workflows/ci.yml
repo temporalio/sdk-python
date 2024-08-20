@@ -126,6 +126,7 @@ jobs:
   create-allure-report:
     name: "Allure: load previous history, create report, and publish"
     needs: build-lint-test
+    if: always()
     runs-on: ubuntu-latest
     strategy:
       matrix:
