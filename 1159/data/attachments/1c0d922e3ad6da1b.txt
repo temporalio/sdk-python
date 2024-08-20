@@ -1,4 +1,0 @@
-WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 bar on RestrictableObject.foo restricted
-WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 foo on RestrictableObject.qux.foo restricted
-WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 subkey2 on RestrictableObject.some_dict.key1 restricted
-WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 subkey2 on RestrictableObject.some_dict.key.2 restricted

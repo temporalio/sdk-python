@@ -1,3 +1,0 @@
-DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e036aafe-eba8-4da4-b1b4-f49908846206, message: Workflow cache full
-DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID e036aafe-eba8-4da4-b1b4-f49908846206, message: Workflow cache full
-INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

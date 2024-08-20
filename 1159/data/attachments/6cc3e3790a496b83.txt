@@ -1,1 +1,0 @@
-DEBUG    grpc._cython.cygrpc:_server.py:60 Using AsyncIOEngine.POLLER as I/O engine

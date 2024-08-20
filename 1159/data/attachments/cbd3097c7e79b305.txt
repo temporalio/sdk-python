@@ -1,5 +1,0 @@
-INFO     log-e5f2aafa-5c18-48a4-bd85-e4a1063c7149-sdk_core::temporal_sdk_bridge::runtime:(sdk-core):0 [sdk_core::temporal_sdk_bridge::runtime] info1 {'extra_data': 'extra1'}
-INFO     log-e5f2aafa-5c18-48a4-bd85-e4a1063c7149-sdk_core::temporal_sdk_bridge::runtime:(sdk-core):0 [sdk_core::temporal_sdk_bridge::runtime] info3 {'extra_data': 'extra3'}
-INFO     log-e5f2aafa-5c18-48a4-bd85-e4a1063c7149-sdk_core::temporal_sdk_bridge::runtime:(sdk-core):0 [sdk_core::temporal_sdk_bridge::runtime] info4 {'extra_data': 'extra4'}
-DEBUG    log-e5f2aafa-5c18-48a4-bd85-e4a1063c7149-sdk_core::temporal_sdk_bridge::runtime:(sdk-core):0 [sdk_core::temporal_sdk_bridge::runtime] debug5 {'extra_data': 'extra5'}
-INFO     log-e5f2aafa-5c18-48a4-bd85-e4a1063c7149-sdk_core::temporal_sdk_bridge::runtime:(sdk-core):0 [sdk_core::temporal_sdk_bridge::runtime] info6 {'extra_data': 'extra6'}

@@ -1,9 +1,0 @@
-INFO     temporalio.workflow:test_workflow.py:1909 Signal: signal 1 ({'attempt': 1, 'namespace': 'default', 'run_id': '3b2fdf24-71b5-4270-8815-dc165e0842be', 'task_queue': 'fbf13048-d4ac-4043-9947-559345ef6cf6', 'workflow_id': 'workflow-eed95101-5f40-4478-92d2-1c22a7e4a8b3', 'workflow_type': 'LoggingWorkflow'})
-DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 3b2fdf24-71b5-4270-8815-dc165e0842be, message: Workflow cache full
-INFO     temporalio.workflow:test_workflow.py:1909 Signal: signal 2 ({'attempt': 1, 'namespace': 'default', 'run_id': '3b2fdf24-71b5-4270-8815-dc165e0842be', 'task_queue': 'fbf13048-d4ac-4043-9947-559345ef6cf6', 'workflow_id': 'workflow-eed95101-5f40-4478-92d2-1c22a7e4a8b3', 'workflow_type': 'LoggingWorkflow'})
-INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities
-DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 3b2fdf24-71b5-4270-8815-dc165e0842be, message: Workflow cache full
-INFO     temporalio.workflow:test_workflow.py:1909 Signal: signal 3 ({'attempt': 1, 'namespace': 'default', 'run_id': '3b2fdf24-71b5-4270-8815-dc165e0842be', 'task_queue': 'fbf13048-d4ac-4043-9947-559345ef6cf6', 'workflow_id': 'workflow-eed95101-5f40-4478-92d2-1c22a7e4a8b3', 'workflow_type': 'LoggingWorkflow'})
-INFO     temporalio.workflow:test_workflow.py:1909 Signal: finish ({'attempt': 1, 'namespace': 'default', 'run_id': '3b2fdf24-71b5-4270-8815-dc165e0842be', 'task_queue': 'fbf13048-d4ac-4043-9947-559345ef6cf6', 'workflow_id': 'workflow-eed95101-5f40-4478-92d2-1c22a7e4a8b3', 'workflow_type': 'LoggingWorkflow'})
-DEBUG    temporalio.worker._workflow:_workflow.py:299 Evicting workflow with run ID 3b2fdf24-71b5-4270-8815-dc165e0842be, message: Workflow cache full
-INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

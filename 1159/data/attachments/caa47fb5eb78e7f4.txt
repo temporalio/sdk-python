@@ -1,7 +1,0 @@
-DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
-DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
-DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
-DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
-DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
-DEBUG    temporalio.worker._workflow_instance:_workflow_instance.py:1769 Workflow requested continue as new
-INFO     temporalio.worker._worker:_worker.py:523 Beginning worker shutdown, will wait 0:00:00 before cancelling activities

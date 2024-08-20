@@ -1,2 +1,0 @@
-WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on tests.worker.workflow_sandbox.testmodules.invalid_module_members.invalid_function restricted
-WARNING  temporalio.worker.workflow_sandbox._restrictions:_restrictions.py:783 __call__ on tests.worker.workflow_sandbox.testmodules.invalid_module_members.invalid_function restricted
