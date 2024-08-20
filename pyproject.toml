@@ -41,6 +41,7 @@ types-protobuf = ">=3.20"
 typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
+allure-pytest = "^2.13.5"
 cibuildwheel = "^2.19.0"
 grpcio-tools = "^1.48.0"
 mypy = "^1.0.0"
