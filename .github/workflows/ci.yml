@@ -59,15 +59,14 @@ jobs:
       - run: poetry install --no-root --all-extras
       - run: poe lint
       - run: poe build-develop
-      # TODO: handle matrix build structure with allure
-      - run: poe test -s --alluredir allure-results -o log_cli_level=DEBUG
+      - run: poe test -s --alluredir allure-results-${{ matrix.python }}-${{ matrix.os }} -o log_cli_level=DEBUG
       - name: "Allure: upload artifact"
         uses: actions/upload-artifact@master
         if: always()
         with:
           # TODO: handle matrix build structure with allure
-          name: allure-results
-          path: allure-results
+          name: allure-results-${{ matrix.python }}-${{ matrix.os }}
+          path: allure-results-${{ matrix.python }}-${{ matrix.os }}
           retention-days: 30
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
@@ -128,13 +127,20 @@ jobs:
     name: "Allure: load previous history, create report, and publish"
     needs: build-lint-test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.8", "3.12"]
+        os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
+        exclude:
+          - os: macos-arm
+            python: "3.8"
     steps:
       - name: "Allure: Download Artifacts"
         uses: actions/download-artifact@v3
         id: download
         with:
+          path: allure-results-${{ matrix.python }}-${{ matrix.os }}
           name: allure-results
-          path: allure-results
 
       - name: "Allure: load test report history"
         uses: actions/checkout@v4
@@ -142,15 +148,15 @@ jobs:
         continue-on-error: true
         with:
           ref: gh-pages
-          path: allure-report-data
+          path: allure-report-data-${{ matrix.python }}-${{ matrix.os }}
 
       - name: "Allure: build test report"
         uses: simple-elf/allure-report-action@v1.9
         if: always()
         with:
-          gh_pages: allure-report-data
+          gh_pages: allure-report-data-${{ matrix.python }}-${{ matrix.os }}
           allure_results: allure-results
-          allure_history: allure-history
+          allure_history: allure-history-${{ matrix.python }}-${{ matrix.os }}
 
       - name: "Allure: publish test report"
         uses: peaceiris/actions-gh-pages@v4
@@ -158,4 +164,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: allure-history
+          publish_dir: allure-history-${{ matrix.python }}-${{ matrix.os }}
