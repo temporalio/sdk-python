@@ -121,7 +121,7 @@ jobs:
       features-repo-ref: python-update-updates
 
   # https://allurereport.org/docs/integrations-github/
-  # https://github.com/simple-elf/allure-report-action/issues/28#issuecomment-1139332329
+  # This must be a separate job since it uses container actions that are linux-only.
 
   create-allure-report:
     name: "Allure: load previous history, create report, and publish"
@@ -160,9 +160,11 @@ jobs:
           allure_history: allure-history-${{ matrix.python }}-${{ matrix.os }}
 
       - name: "Allure: publish test report"
-        uses: peaceiris/actions-gh-pages@v4
         if: always()
+        uses: Wandalen/wretry.action@master
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: allure-history-${{ matrix.python }}-${{ matrix.os }}
+          action: peaceiris/actions-gh-pages@v4
+          with: |
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            publish_branch: gh-pages
+            publish_dir: allure-history-${{ matrix.python }}-${{ matrix.os }}
