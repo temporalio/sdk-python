@@ -1635,7 +1635,10 @@ class _WorkflowInstanceImpl(
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
             raise RuntimeError("Expected workflow input. This is a Python SDK bug.")
-        return self._defn.cls()
+        if self._defn.init_fn_takes_workflow_input:
+            return self._defn.cls(*self._workflow_input.args)
+        else:
+            return self._defn.cls()
 
     def _is_workflow_failure_exception(self, err: BaseException) -> bool:
         # An exception is a failure instead of a task fail if it's already a

@@ -6032,3 +6032,24 @@ async def test_activity_retry_delay(client: Client):
                 err.cause.cause.next_retry_delay
                 == ActivitiesWithRetryDelayWorkflow.next_retry_delay
             )
+
+
+@workflow.defn
+class WorkflowInitWorkflow:
+    def __init__(self, arg: str) -> None:
+        self.init_arg = arg
+
+    @workflow.run
+    async def run(self, _: str):
+        return f"hello, {self.init_arg}"
+
+
+async def test_workflow_init(client: Client):
+    async with new_worker(client, WorkflowInitWorkflow) as worker:
+        workflow_result = await client.execute_workflow(
+            WorkflowInitWorkflow.run,
+            "world",
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
+        assert workflow_result == "hello, world"

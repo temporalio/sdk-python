@@ -1,4 +1,5 @@
-from typing import Any, Sequence
+from dataclasses import dataclass
+from typing import Protocol, Sequence
 
 import pytest
 
@@ -75,6 +76,7 @@ def test_workflow_defn_good():
         name="workflow-custom",
         cls=GoodDefn,
         run_fn=GoodDefn.run,
+        init_fn_takes_workflow_input=False,
         signals={
             "signal1": workflow._SignalDefinition(
                 name="signal1", fn=GoodDefn.signal1, is_method=True
@@ -342,3 +344,224 @@ def test_workflow_defn_dynamic_handler_warnings():
     # We want to make sure they are reporting the right stacklevel
     warnings[0].filename.endswith("test_workflow.py")
     warnings[1].filename.endswith("test_workflow.py")
+
+
+#
+# workflow init tests
+#
+
+
+class WorkflowInitGoodNoInitZeroParamRun:
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+class WorkflowInitGoodNoInitOneParamRun:
+    @workflow.run
+    async def run(self, a: int) -> None:
+        pass
+
+
+class WorkflowInitGoodNoArgInitZeroParamRun:
+    def __init__(self) -> None:
+        pass
+
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+class WorkflowInitGoodNoArgInitOneParamRun:
+    def __init__(self) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, a: int) -> None:
+        pass
+
+
+@dataclass
+class MyDataClass:
+    a: int
+    b: str
+
+
+class DataClassTypedWorkflowProto(Protocol):
+    @workflow.run
+    async def run(self, arg: MyDataClass) -> None:
+        pass
+
+
+class WorkflowInitGoodSlashStarArgsStarStarKwargsInitZeroParamRun:
+    # TODO: if they include the slash it will be allowed as it is
+    # indistinguishable from the default __init__ inherited from object. But if
+    # they don't it will not be.
+    def __init__(self, /, *args, **kwargs) -> None:
+        pass
+
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [
+        WorkflowInitGoodNoInitZeroParamRun,
+        WorkflowInitGoodNoInitOneParamRun,
+        WorkflowInitGoodNoArgInitZeroParamRun,
+        WorkflowInitGoodNoArgInitOneParamRun,
+        DataClassTypedWorkflowProto,
+        WorkflowInitGoodSlashStarArgsStarStarKwargsInitZeroParamRun,
+    ],
+)
+def test_workflow_init_good_does_not_take_workflow_input(cls):
+    assert not workflow.defn(
+        cls
+    ).__temporal_workflow_definition.init_fn_takes_workflow_input
+
+
+class WorkflowInitGoodOneParamTyped:
+    def __init__(self, a: int) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int) -> None:
+        pass
+
+
+class WorkflowInitGoodTwoParamsTyped:
+    def __init__(self, a: int, b: str) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int, bb: str) -> None:
+        pass
+
+
+class WorkflowInitGoodOneParamUntyped:
+    def __init__(self, a) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa) -> None:
+        pass
+
+
+class WorkflowInitGoodTwoParamsUntyped:
+    def __init__(self, a, b) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa, bb) -> None:
+        pass
+
+
+class WorkflowInitGoodOneParamNoInitType:
+    def __init__(self, a) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int) -> None:
+        pass
+
+
+class WorkflowInitGoodOneParamNoRunType:
+    def __init__(self, a: int) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa) -> None:
+        pass
+
+
+class WorkflowInitGoodTwoParamsMixedTyping:
+    def __init__(self, a, b: str) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: str, bb) -> None:
+        pass
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [
+        WorkflowInitGoodOneParamTyped,
+        WorkflowInitGoodTwoParamsTyped,
+        WorkflowInitGoodOneParamUntyped,
+        WorkflowInitGoodTwoParamsUntyped,
+        WorkflowInitGoodTwoParamsMixedTyping,
+        WorkflowInitGoodOneParamNoInitType,
+        WorkflowInitGoodOneParamNoRunType,
+    ],
+)
+def test_workflow_init_good_takes_workflow_input(cls):
+    assert workflow.defn(
+        cls
+    ).__temporal_workflow_definition.init_fn_takes_workflow_input
+
+
+class WorkflowInitBadStarArgsStarStarKwargs:
+    # TODO: if they include the slash it will be allowed as it is
+    # indistinguishable from the default __init__ inherited from object. But if
+    # they don't it will not be.
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+class WorkflowInitBadExtraInitParamUntyped:
+    def __init__(self, a) -> None:
+        pass
+
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+class WorkflowInitBadMismatchedParamUntyped:
+    def __init__(self, a) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa, bb) -> None:
+        pass
+
+
+class WorkflowInitBadExtraInitParamTyped:
+    def __init__(self, a: int) -> None:
+        pass
+
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+class WorkflowInitBadMismatchedParamTyped:
+    def __init__(self, a: int) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int, bb: str) -> None:
+        pass
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [
+        WorkflowInitBadStarArgsStarStarKwargs,
+        WorkflowInitBadExtraInitParamUntyped,
+        WorkflowInitBadMismatchedParamUntyped,
+        WorkflowInitBadExtraInitParamTyped,
+        WorkflowInitBadMismatchedParamTyped,
+    ],
+)
+def test_workflow_init_bad_takes_workflow_input(cls):
+    with pytest.raises(ValueError) as err:
+        workflow.defn(cls)
+    print(err)

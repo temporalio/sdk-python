@@ -36,6 +36,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    get_origin,
     overload,
 )
 
@@ -1252,6 +1253,7 @@ class _Definition:
     name: Optional[str]
     cls: Type
     run_fn: Callable[..., Awaitable]
+    init_fn_takes_workflow_input: bool
     signals: Mapping[Optional[str], _SignalDefinition]
     queries: Mapping[Optional[str], _QueryDefinition]
     updates: Mapping[Optional[str], _UpdateDefinition]
@@ -1306,14 +1308,14 @@ class _Definition:
             raise ValueError("Class already contains workflow definition")
         issues: List[str] = []
 
-        # Collect run fn and all signal/query/update fns
-        members = inspect.getmembers(cls)
+        # Collect init, run, and all signal/query/update fns
+        init_fn: Optional[Callable[..., None]] = None
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
         seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
         queries: Dict[Optional[str], _QueryDefinition] = {}
         updates: Dict[Optional[str], _UpdateDefinition] = {}
-        for name, member in members:
+        for name, member in inspect.getmembers(cls):
             if hasattr(member, "__temporal_workflow_run"):
                 seen_run_attr = True
                 if not _is_unbound_method_on_cls(member, cls):
@@ -1354,6 +1356,8 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
+            elif name == "__init__":
+                init_fn = member
             elif isinstance(member, UpdateMethodMultiParam):
                 update_defn = member._defn
                 if update_defn.name in updates:
@@ -1404,11 +1408,21 @@ class _Definition:
                             f"@workflow.update defined on {base_member.__qualname__} but not on the override"
                         )
 
+        init_fn_takes_workflow_input = False
+
         if not seen_run_attr:
             issues.append("Missing @workflow.run method")
-        if len(issues) == 1:
-            raise ValueError(f"Invalid workflow class: {issues[0]}")
-        elif issues:
+        if not init_fn:
+            issues.append("Missing __init__ method")
+        elif run_fn:
+            init_fn_takes_workflow_input, init_fn_issue = (
+                _get_init_fn_takes_workflow_input(init_fn, run_fn)
+            )
+            if init_fn_issue:
+                issues.append(init_fn_issue)
+        if issues:
+            if len(issues) == 1:
+                raise ValueError(f"Invalid workflow class: {issues[0]}")
             raise ValueError(
                 f"Invalid workflow class for {len(issues)} reasons: {', '.join(issues)}"
             )
@@ -1418,6 +1432,7 @@ class _Definition:
             name=workflow_name,
             cls=cls,
             run_fn=run_fn,
+            init_fn_takes_workflow_input=init_fn_takes_workflow_input,
             signals=signals,
             queries=queries,
             updates=updates,
@@ -1442,6 +1457,71 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
+
+
+def _get_init_fn_takes_workflow_input(
+    init_fn: Callable[..., None],
+    run_fn: Callable[..., Awaitable[Any]],
+) -> Tuple[bool, Optional[str]]:
+    """
+    Return (True, None) if the Workflow __init__ method  accepts Workflow input.
+
+    If __init__ has a signature that features user-defined parameters, and if
+    these match those of the @workflow.run method, and if no validity issue is
+    encountered, then return (True, None). Otherwise return False, along with
+    any validity issue.
+    """
+    init_params = inspect.signature(init_fn).parameters
+    if init_params == inspect.signature(object.__init__).parameters:
+        # No user __init__, or user __init__ with (self, *args, **kwargs) signature
+        return False, None
+    elif set(init_params) == {"self"}:
+        # User __init__ with (self) signature
+        return False, None
+
+    init_param_types, _ = temporalio.common._type_hints_from_func(init_fn)
+    run_param_types, _ = temporalio.common._type_hints_from_func(run_fn)
+    if init_param_types and run_param_types:
+        return _get_init_fn_takes_workflow_input_from_type_annotations(
+            init_param_types, run_param_types
+        )
+
+    run_params = inspect.signature(run_fn).parameters
+    if len(init_params) != len(run_params):
+        return (
+            False,
+            (
+                f"Number of __init__ method parameters ({len(init_params)}) must equal "
+                f"number of @workflow.run method parameters ({len(run_params)})"
+            ),
+        )
+    # TODO: positionals / kwargs
+    return True, None
+
+
+def _get_init_fn_takes_workflow_input_from_type_annotations(
+    init_param_types: List[Type],
+    run_param_types: List[Type],
+) -> Tuple[bool, Optional[str]]:
+    if len(init_param_types) != len(run_param_types):
+        return (
+            False,
+            (
+                f"Number of __init__ method parameters ({len(init_param_types)}) must equal "
+                f"number of @workflow.run method parameters ({len(run_param_types)})"
+            ),
+        )
+    else:
+        for t1, t2 in zip(init_param_types, run_param_types):
+            # Just check that the types are the same in a naive sense; do not
+            # support any notion of subtype compatibility for now.
+            if get_origin(t1) != get_origin(t2):
+                return (
+                    False,
+                    f"__init__ method param type {t1} does not match corresponding @workflow.run method param type {t2}",
+                )
+    # TODO: positionals / kwargs
+    return True, None
 
 
 # Async safe version of partial
