@@ -203,6 +203,12 @@ exclude = [
   "tests/worker/test_workflow.py",
   "tests/worker/workflow_sandbox/test_importer.py",
   "tests/worker/workflow_sandbox/test_restrictions.py",
+  # TODO: these pass locally but fail in CI with
+  # error: Import "temporalio.bridge.temporal_sdk_bridge" could not be resolved
+  "temporalio/bridge/client.py",
+  "temporalio/bridge/metric.py",
+  "temporalio/bridge/runtime.py",
+  "temporalio/bridge/testing.py",
 ]
 
 [tool.ruff]
