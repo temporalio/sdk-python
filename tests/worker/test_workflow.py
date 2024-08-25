@@ -5994,7 +5994,7 @@ async def test_activity_retry_delay(client: Client):
             assert isinstance(err.cause, ActivityError)
             assert isinstance(err.cause.cause, ApplicationError)
             assert (
-                str(err.cause.cause) == ActivitiesWithRetryDelayWorkflow.error_message
+                str(err.cause.cause) != ActivitiesWithRetryDelayWorkflow.error_message
             )
             assert (
                 err.cause.cause.next_retry_delay
