@@ -5089,8 +5089,7 @@ class _ClientImpl(OutboundInterceptor):
                     raise temporalio.exceptions.WorkflowAlreadyStartedError(
                         input.id, input.workflow, run_id=details.run_id
                     )
-            else:
-                raise
+            raise
         handle: WorkflowHandle[Any, Any] = WorkflowHandle(
             self._client,
             req.workflow_id,
