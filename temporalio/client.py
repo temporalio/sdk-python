@@ -35,7 +35,7 @@ from typing import (
 import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.timestamp_pb2
-from typing_extensions import Concatenate, TypedDict
+from typing_extensions import Concatenate, Required, TypedDict
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -1112,12 +1112,12 @@ class Client:
 class ClientConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
-    service_client: temporalio.service.ServiceClient
-    namespace: str
-    data_converter: temporalio.converter.DataConverter
-    interceptors: Sequence[Interceptor]
-    default_workflow_query_reject_condition: Optional[
-        temporalio.common.QueryRejectCondition
+    service_client: Required[temporalio.service.ServiceClient]
+    namespace: Required[str]
+    data_converter: Required[temporalio.converter.DataConverter]
+    interceptors: Required[Sequence[Interceptor]]
+    default_workflow_query_reject_condition: Required[
+        Optional[temporalio.common.QueryRejectCondition]
     ]
 
 
@@ -1797,7 +1797,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,
+        args: MultiParamSpec.args,  # pyright: ignore
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1906,7 +1906,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,
+        args: MultiParamSpec.args,  # pyright: ignore
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
@@ -3489,7 +3489,7 @@ class ScheduleOverlapPolicy(IntEnum):
     """
 
     SKIP = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP  # pyright: ignore
     )
     """Don't start anything.
     
@@ -3498,7 +3498,7 @@ class ScheduleOverlapPolicy(IntEnum):
     """
 
     BUFFER_ONE = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ONE
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ONE  # pyright: ignore
     )
     """Start the workflow again soon as the current one completes, but only
     buffer one start in this way.
@@ -3509,25 +3509,25 @@ class ScheduleOverlapPolicy(IntEnum):
     """
 
     BUFFER_ALL = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ALL
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ALL  # pyright: ignore
     )
     """Buffer up any number of starts to all happen sequentially, immediately
     after the running workflow completes."""
 
     CANCEL_OTHER = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_CANCEL_OTHER
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_CANCEL_OTHER  # pyright: ignore
     )
     """If there is another workflow running, cancel it, and start the new one
     after the old one completes cancellation."""
 
     TERMINATE_OTHER = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_TERMINATE_OTHER
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_TERMINATE_OTHER  # pyright: ignore
     )
     """If there is another workflow running, terminate it and start the new one
     immediately."""
 
     ALLOW_ALL = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_ALLOW_ALL
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_ALLOW_ALL  # pyright: ignore
     )
     """Start any number of concurrent workflows.
     
