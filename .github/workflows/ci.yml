@@ -77,7 +77,7 @@ jobs:
         with:
           name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--${{ matrix.python }}--${{ matrix.os }}
           path: junit-xml
-          retention-days: 30
+          retention-days: 14
 
       # Confirm protos are already generated properly with older protobuf
       # library and run test with that older version. We must downgrade protobuf
