@@ -3,7 +3,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, List, Mapping, Optional, Tuple, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -311,7 +311,14 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
         def __init__(self) -> None:
             pass
 
-        async def __call__(self, *args, **kwargs) -> google.protobuf.message.Message:
+        async def __call__(
+            self,
+            req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
+            *,
+            retry: bool = False,
+            metadata: Mapping[str, str] = {},
+            timeout: Optional[timedelta] = None,
+        ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
             raise self.already_exists_err
 
     workflow_service: temporalio.service.WorkflowService = (
