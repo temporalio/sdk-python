@@ -5426,26 +5426,22 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
         if handler_registration == "-late-registered-":
             if handler_dynamism == "-dynamic-":
 
-                async def my_late_registered_dynamic_update(
-                    self, name: str, args: Sequence[RawValue]
-                ) -> str:
+                async def my_late_registered_dynamic_update(*args, **kwargs) -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-dynamic-update-result"
 
-                async def my_late_registered_dynamic_signal(
-                    self, name: str, args: Sequence[RawValue]
-                ) -> None:
+                async def my_late_registered_dynamic_signal(*args, **kwargs) -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
                 workflow.set_dynamic_update_handler(my_late_registered_dynamic_update)
                 workflow.set_dynamic_signal_handler(my_late_registered_dynamic_signal)
             else:
 
-                async def my_late_registered_update(self) -> str:
+                async def my_late_registered_update() -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-update-result"
 
-                async def my_late_registered_signal(self) -> None:
+                async def my_late_registered_signal() -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
                 workflow.set_update_handler(
