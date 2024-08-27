@@ -321,11 +321,8 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
         ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
             raise self.already_exists_err
 
-    workflow_service: temporalio.service.WorkflowService = (
-        client._impl._client.workflow_service  # type: ignore
-    )
     with mock.patch.object(
-        workflow_service, "start_workflow_execution", start_workflow_execution()
+        client.workflow_service, "start_workflow_execution", start_workflow_execution()
     ):
         with pytest.raises(RPCError) as err:
             await client.start_workflow("fake", id="fake", task_queue="fake")
