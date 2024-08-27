@@ -10,6 +10,7 @@ import json
 import logging
 import random
 import sys
+import threading
 import traceback
 import warnings
 from abc import ABC, abstractmethod
@@ -158,6 +159,16 @@ class WorkflowInstance(ABC):
         """
         raise NotImplementedError
 
+    def get_thread_id(self) -> Optional[int]:
+        """Return the thread identifier that this workflow is running on.
+
+        Not an abstractmethod because it is not mandatory to implement. Used primarily for getting the frames of a deadlocked thread.
+
+        Returns:
+            Thread ID if the workflow is running, None if not.
+        """
+        return None
+
 
 class UnsandboxedWorkflowRunner(WorkflowRunner):
     """Workflow runner that does not do any sandboxing."""
@@ -300,6 +311,12 @@ class _WorkflowInstanceImpl(
         # We only create the metric meter lazily
         self._metric_meter: Optional[_ReplaySafeMetricMeter] = None
 
+        # For tracking the thread this workflow is running on (primarily for deadlock situations)
+        self._current_thread_id: Optional[int] = None
+
+    def get_thread_id(self) -> Optional[int]:
+        return self._current_thread_id
+
     #### Activation functions ####
     # These are in alphabetical order and besides "activate", all other calls
     # are "_apply_" + the job field name.
@@ -320,6 +337,7 @@ class _WorkflowInstanceImpl(
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
 
+        self._current_thread_id = threading.get_ident()
         activation_err: Optional[Exception] = None
         try:
             # Split into job sets with patches, then signals + updates, then
