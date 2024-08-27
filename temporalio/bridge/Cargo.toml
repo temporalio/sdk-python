@@ -18,7 +18,7 @@ pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38", "anyhow"
 pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
 pythonize = "0.20"
 temporal-client = { version = "0.1.0", path = "./sdk-core/client" }
-temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core", features = ["ephemeral-server"] }
+temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core", features = ["ephemeral-server", "debug-plugin"] }
 temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api" }
 temporal-sdk-core-protos = { version = "0.1.0", path = "./sdk-core/sdk-core-protos" }
 tokio = "1.26"
