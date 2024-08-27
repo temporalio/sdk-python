@@ -6,8 +6,22 @@ import asyncio
 import concurrent.futures
 import logging
 import os
+import sys
 from datetime import timezone
-from typing import Callable, Dict, List, MutableMapping, Optional, Sequence, Set, Type
+from threading import get_ident
+from types import TracebackType
+from typing import (
+    Callable,
+    Dict,
+    List,
+    Literal,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+)
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -250,9 +264,10 @@ class _WorkflowWorker:
                         activate_task, self._deadlock_timeout_seconds
                     )
                 except asyncio.TimeoutError:
-                    raise RuntimeError(
-                        f"[TMPRL1101] Potential deadlock detected, workflow didn't yield within {self._deadlock_timeout_seconds} second(s)"
-                    )
+                    raise _DeadlockError.from_deadlocked_workflow(
+                        workflow, self._deadlock_timeout_seconds
+                    ) from None
+
         except Exception as err:
             # We cannot fail a cache eviction, we must just log and not complete
             # the activation (failed or otherwise). This should only happen in
@@ -267,6 +282,9 @@ class _WorkflowWorker:
                 )
                 self._could_not_evict_count += 1
                 return
+
+            if isinstance(err, _DeadlockError):
+                err.swap_traceback()
 
             logger.exception(
                 "Failed handling activation on workflow with run ID %s", act.run_id
@@ -421,3 +439,77 @@ class _WorkflowWorker:
                 for typ in v.failure_exception_types
             )
         )
+
+
+class _DeadlockError(Exception):
+    """Exception class for deadlocks. Contains functionality to swap the default traceback for another."""
+
+    def __init__(self, message: str, replacement_tb: Optional[TracebackType] = None):
+        """Create a new DeadlockError, with message `msg` and optionally a traceback `tb` to be swapped in later.
+
+        Args:
+            message: Message to be presented through exception.
+            replacement_tb: Optional TracebackType to be swapped later.
+        """
+        super().__init__(message)
+        self._new_tb = replacement_tb
+
+    def swap_traceback(self) -> None:
+        """Swap the current traceback for the replacement passed during construction. Used to work around Python adding the current frame to the stack trace.
+
+        Returns:
+            None
+        """
+        if self._new_tb:
+            self.__traceback__ = self._new_tb
+            self._new_tb = None
+
+    @classmethod
+    def from_deadlocked_workflow(
+        cls, workflow: WorkflowInstance, timeout: Optional[int]
+    ):
+        msg = f"[TMPRL1101] Potential deadlock detected: workflow didn't yield within {timeout} second(s)."
+        tid = workflow.get_thread_id()
+        if not tid:
+            return cls(msg)
+
+        try:
+            tb = cls._gen_tb_helper(tid)
+            if tb:
+                return cls(msg, tb)
+            return cls(f"{msg} (no frames available)")
+        except Exception as err:
+            return cls(f"{msg} (failed getting frames: {err})")
+
+    @staticmethod
+    def _gen_tb_helper(
+        tid: int,
+    ) -> Optional[TracebackType]:
+        """Take a thread id and construct a stack trace.
+
+        Returns:
+            <Optional[TracebackType]> the traceback that was constructed, None if the thread could not be found.
+        """
+        frame = sys._current_frames().get(tid)
+        if not frame:
+            return None
+
+        # not using traceback.extract_stack() because it obfuscates the frame objects (specifically f_lasti)
+        thread_frames = [frame]
+        while frame.f_back:
+            frame = frame.f_back
+            thread_frames.append(frame)
+
+        thread_frames.reverse()
+
+        size = 0
+        tb = None
+        for frm in thread_frames:
+            tb = TracebackType(tb, frm, frm.f_lasti, frm.f_lineno)
+            size += sys.getsizeof(tb)
+
+        while size > 200000 and tb:
+            size -= sys.getsizeof(tb)
+            tb = tb.tb_next
+
+        return tb
