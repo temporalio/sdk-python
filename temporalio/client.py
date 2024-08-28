@@ -3482,14 +3482,13 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         return action
 
 
-@dataclass
 class ScheduleOverlapPolicy(IntEnum):
     """Controls what happens when a workflow would be started by a schedule but
     one is already running.
     """
 
     SKIP = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP  # pyright: ignore
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP
     )
     """Don't start anything.
     
@@ -3498,7 +3497,7 @@ class ScheduleOverlapPolicy(IntEnum):
     """
 
     BUFFER_ONE = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ONE  # pyright: ignore
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ONE
     )
     """Start the workflow again soon as the current one completes, but only
     buffer one start in this way.
@@ -3509,25 +3508,25 @@ class ScheduleOverlapPolicy(IntEnum):
     """
 
     BUFFER_ALL = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ALL  # pyright: ignore
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_BUFFER_ALL
     )
     """Buffer up any number of starts to all happen sequentially, immediately
     after the running workflow completes."""
 
     CANCEL_OTHER = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_CANCEL_OTHER  # pyright: ignore
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_CANCEL_OTHER
     )
     """If there is another workflow running, cancel it, and start the new one
     after the old one completes cancellation."""
 
     TERMINATE_OTHER = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_TERMINATE_OTHER  # pyright: ignore
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_TERMINATE_OTHER
     )
     """If there is another workflow running, terminate it and start the new one
     immediately."""
 
     ALLOW_ALL = int(
-        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_ALLOW_ALL  # pyright: ignore
+        temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_ALLOW_ALL
     )
     """Start any number of concurrent workflows.
     
