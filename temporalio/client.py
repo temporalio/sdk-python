@@ -3233,7 +3233,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
     @staticmethod
-    def _from_proto(
+    def _from_proto(  # pyright: ignore
         info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo,  # type: ignore[override]
     ) -> ScheduleActionStartWorkflow:
         return ScheduleActionStartWorkflow("<unset>", raw_info=info)
