@@ -45,8 +45,10 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     )?;
     m.add_class::<worker::WorkerRef>()?;
     m.add_class::<worker::HistoryPusher>()?;
+    m.add_class::<worker::DebugClient>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
     m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;
+    m.add_function(wrap_pyfunction!(new_debug_client, m)?)?;
     Ok(())
 }
 
@@ -108,4 +110,12 @@ fn new_replay_worker<'a>(
     config: worker::WorkerConfig,
 ) -> PyResult<&'a PyTuple> {
     worker::new_replay_worker(py, &runtime_ref, config)
+}
+
+#[pyfunction]
+fn new_debug_client<'a>(
+    py: Python<'a>,
+    debugger_url: String
+) -> PyResult<worker::DebugClient> {
+    worker::new_debug_client(py, debugger_url)
 }

@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
+use temporal_sdk_core::debug_client;
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::Worker;
@@ -132,6 +133,10 @@ pub fn new_replay_worker<'a>(
         py,
         [worker.into_py(py), history_pusher.into_py(py)],
     ))
+}
+
+pub fn new_debug_client<'a>(_py: Python<'a>, debugger_url: String) -> PyResult<DebugClient> {
+    Ok(DebugClient::new(debugger_url))
 }
 
 #[pymethods]
@@ -442,5 +447,31 @@ impl HistoryPusher {
 
     fn close(&mut self) {
         self.tx.take();
+    }
+}
+
+#[pyclass]
+pub struct DebugClient {
+    client: debug_client::DebugClient,
+    history: History,
+}
+
+impl DebugClient {
+    fn new(debugger_url: String, runtime_ref: &runtime::RuntimeRef) -> DebugClient {
+        enter_sync!(runtime_ref.runtime);
+        let cli = debug_client::DebugClient::new(debugger_url);
+        let hist = cli.get_history().await.expect();
+        DebugClient {
+            client: cli,
+            history: hist,
+        }
+    }
+}
+
+#[pymethods]
+impl DebugClient {
+    fn post_wft_started(&self, event_id: i64) {
+        // should be sync so I think this is okay?
+        self.client.post_wft_started(&event_id);
     }
 }
