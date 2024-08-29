@@ -138,18 +138,19 @@ pub fn new_replay_worker<'a>(
 pub fn new_debug_client<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
-    debugger_url: String) -> PyResult<DebugClient> {
+    debugger_url: String) -> PyResult<&'a PyAny> {
     let cli = debug_client::DebugClient::new(debugger_url); // internal client
     runtime_ref.runtime.future_into_py(py, async move {
         match cli.get_history().await {
             Ok(hist) => {
-                DebugClient {
+                Ok(DebugClient {
                     client: cli,
+                    runtime: runtime_ref.runtime.clone(),
                     history: hist,
-                }
+                })
             },
             Err(err) => {
-                PyRuntimeError::new_err(format!("Failed while fetching history: {}", err))
+                Err(PyRuntimeError::new_err(format!("Failed while fetching history: {}", err)))
             }
         }
     })
@@ -469,13 +470,22 @@ impl HistoryPusher {
 #[pyclass]
 pub struct DebugClient {
     client: debug_client::DebugClient,
+    runtime: runtime::Runtime,
     history: History,
 }
 
 #[pymethods]
 impl DebugClient {
-    fn post_wft_started(&self, event_id: i64) {
-        // should be sync so I think this is okay?
-        self.client.post_wft_started(&event_id);
+    fn post_wft_started<'a>(
+        &self,
+        py: Python<'a>,
+        event_id: i64
+    ) -> PyResult<&'a PyAny> {
+        self.runtime.future_into_py(py, async move {
+            match self.client.post_wft_started(&event_id).await {
+                Ok(_) => Ok(true),
+                Err(err) => Err(PyRuntimeError::new_err(format!("Failed while posting to debugger: {}", err)))
+            }
+        })
     }
 }
