@@ -140,12 +140,13 @@ pub fn new_debug_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     debugger_url: String) -> PyResult<&'a PyAny> {
     let cli = debug_client::DebugClient::new(debugger_url); // internal client
+    let rref = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         match cli.get_history().await {
             Ok(hist) => {
                 Ok(DebugClient {
                     client: cli,
-                    runtime: runtime_ref.runtime.clone(),
+                    runtime: rref,
                     history: hist,
                 })
             },
@@ -481,8 +482,9 @@ impl DebugClient {
         py: Python<'a>,
         event_id: i64
     ) -> PyResult<&'a PyAny> {
+        let cli = self.client.clone();
         self.runtime.future_into_py(py, async move {
-            match self.client.post_wft_started(&event_id).await {
+            match cli.post_wft_started(&event_id).await {
                 Ok(_) => Ok(true),
                 Err(err) => Err(PyRuntimeError::new_err(format!("Failed while posting to debugger: {}", err)))
             }
