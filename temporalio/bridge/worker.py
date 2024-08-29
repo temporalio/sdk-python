@@ -123,19 +123,26 @@ class Worker:
             runtime._ref, config
         )
         return Worker(replay_worker), pusher
-    
+
+    # TODO(divy) don't know if I need this
     @staticmethod
     def for_debug_replay_plugin(
         runtime: temporalio.bridge.runtime.Runtime,
         config: WorkerConfig,
         debugger_url: str,
-    ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher, temporalio.bridge.temporal_sdk_bridge.DebugClient]:
+    ) -> Tuple[
+        Worker,
+        temporalio.bridge.temporal_sdk_bridge.HistoryPusher,
+        temporalio.bridge.temporal_sdk_bridge.DebugClient,
+    ]:
         """Create a replay worker for use with the debug plugin."""
 
         [
             replay_worker,
             pusher,
-        ] = temporalio.bridge.temporal_sdk_bridge.new_replay_worker(runtime._ref, config)
+        ] = temporalio.bridge.temporal_sdk_bridge.new_replay_worker(
+            runtime._ref, config
+        )
 
         client = temporalio.bridge.temporal_sdk_bridge.new_debug_client(debugger_url)
 
