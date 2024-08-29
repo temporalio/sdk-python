@@ -115,7 +115,8 @@ fn new_replay_worker<'a>(
 #[pyfunction]
 fn new_debug_client<'a>(
     py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
     debugger_url: String
 ) -> PyResult<worker::DebugClient> {
-    worker::new_debug_client(py, debugger_url)
+    worker::new_debug_client(py, runtime_ref, debugger_url)
 }

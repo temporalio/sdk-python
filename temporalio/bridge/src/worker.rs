@@ -135,8 +135,24 @@ pub fn new_replay_worker<'a>(
     ))
 }
 
-pub fn new_debug_client<'a>(_py: Python<'a>, debugger_url: String) -> PyResult<DebugClient> {
-    Ok(DebugClient::new(debugger_url))
+pub fn new_debug_client<'a>(
+    py: Python<'a>,
+    runtime_ref: &runtime::RuntimeRef,
+    debugger_url: String) -> PyResult<DebugClient> {
+    let cli = debug_client::DebugClient::new(debugger_url); // internal client
+    runtime_ref.runtime.future_into_py(py, async move {
+        match cli.get_history().await {
+            Ok(hist) => {
+                DebugClient {
+                    client: cli,
+                    history: hist,
+                }
+            },
+            Err(err) => {
+                PyRuntimeError::new_err(format!("Failed while fetching history: {}", err))
+            }
+        }
+    })
 }
 
 #[pymethods]
@@ -454,18 +470,6 @@ impl HistoryPusher {
 pub struct DebugClient {
     client: debug_client::DebugClient,
     history: History,
-}
-
-impl DebugClient {
-    fn new(debugger_url: String, runtime_ref: &runtime::RuntimeRef) -> DebugClient {
-        enter_sync!(runtime_ref.runtime);
-        let cli = debug_client::DebugClient::new(debugger_url);
-        let hist = cli.get_history().await.expect();
-        DebugClient {
-            client: cli,
-            history: hist,
-        }
-    }
 }
 
 #[pymethods]
