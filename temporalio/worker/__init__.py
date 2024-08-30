@@ -1,6 +1,7 @@
 """Worker for processing Temporal workflows and/or activities."""
 
 from ._activity import SharedHeartbeatSender, SharedStateManager
+from ._debug_replayer import DebugReplayer
 from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
@@ -82,4 +83,5 @@ __all__ = [
     "ResourceBasedSlotSupplier",
     "ResourceBasedTunerConfig",
     "ResourceBasedSlotConfig",
+    "DebugReplayer",
 ]
