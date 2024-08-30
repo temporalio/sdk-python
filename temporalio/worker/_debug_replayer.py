@@ -1,13 +1,14 @@
 """Debug plugin replayers."""
 
+import asyncio
 import inspect
 import os
 from typing import Any, Coroutine, Sequence, Type
 
 from google.protobuf.json_format import MessageToDict
-import asyncio
-from temporalio import client, workflow
-from temporalio.bridge.temporal_sdk_bridge import DebugClient
+
+from temporalio import client, runtime, workflow
+from temporalio.bridge.temporal_sdk_bridge import DebugClient, new_debug_client
 from temporalio.worker._interceptor import (
     ExecuteWorkflowInput,
     HandleQueryInput,
@@ -35,31 +36,28 @@ class DebugReplayer:
     last_notified_start_event: int
 
     @staticmethod
-    def start_debug_replayer(workflows: Sequence[Type]):
+    async def start_debug_replayer(workflows: Sequence[Type]):
         """Start the debug replayer with the given set of workflows."""
         debugger_url = os.environ.get(
             "TEMPORAL_DEBUGGER_PLUGIN_URL"
         )  # process.env.TEMPORAL_DEBUGGER_PLUGIN_URL
-        DebugReplayer.client = DebugClient(debugger_url)
+        rt = runtime.Runtime.default()
+        DebugReplayer.client = await new_debug_client(
+            debugger_url=debugger_url,
+            runtime_ref=rt._core_runtime._ref,
+        )
         # get history if needed
         DebugReplayer.last_notified_start_event = -1
 
         # create replayer
         interceptors = [_Interceptor()]
-        replayer = Replayer(workflows=workflows, interceptors=interceptors)
+        replayer = Replayer(workflows=workflows, interceptors=interceptors, runtime=rt)
         history = DebugReplayer.client.history
         wf_history = client.WorkflowHistory.from_json(
             history=MessageToDict(history),
             workflow_id="debug-replay-wf",
         )  # this is stupid
-        asyncio.run(replayer.replay_workflow(wf_history, raise_on_replay_failure=True))
-
-    @staticmethod
-    def _post_hold(event_id: int):
-        try:
-            DebugReplayer.client.post_wft_started(event_id)
-        except:
-            raise
+        await replayer.replay_workflow(wf_history, raise_on_replay_failure=True)
 
 
 # Interceptors

@@ -138,21 +138,21 @@ pub fn new_replay_worker<'a>(
 pub fn new_debug_client<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
-    debugger_url: String) -> PyResult<&'a PyAny> {
+    debugger_url: String,
+) -> PyResult<&'a PyAny> {
     let cli = debug_client::DebugClient::new(debugger_url); // internal client
     let rref = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         match cli.get_history().await {
-            Ok(hist) => {
-                Ok(DebugClient {
-                    client: cli,
-                    runtime: rref,
-                    history: hist,
-                })
-            },
-            Err(err) => {
-                Err(PyRuntimeError::new_err(format!("Failed while fetching history: {}", err)))
-            }
+            Ok(hist) => Ok(DebugClient {
+                client: cli,
+                runtime: rref,
+                history: hist,
+            }),
+            Err(err) => Err(PyRuntimeError::new_err(format!(
+                "Failed while fetching history: {}",
+                err
+            ))),
         }
     })
 }
@@ -477,16 +477,15 @@ pub struct DebugClient {
 
 #[pymethods]
 impl DebugClient {
-    fn post_wft_started<'a>(
-        &self,
-        py: Python<'a>,
-        event_id: i64
-    ) -> PyResult<&'a PyAny> {
+    fn post_wft_started<'a>(&self, py: Python<'a>, event_id: i64) -> PyResult<&'a PyAny> {
         let cli = self.client.clone();
         self.runtime.future_into_py(py, async move {
             match cli.post_wft_started(&event_id).await {
                 Ok(_) => Ok(true),
-                Err(err) => Err(PyRuntimeError::new_err(format!("Failed while posting to debugger: {}", err)))
+                Err(err) => Err(PyRuntimeError::new_err(format!(
+                    "Failed while posting to debugger: {}",
+                    err
+                ))),
             }
         })
     }
