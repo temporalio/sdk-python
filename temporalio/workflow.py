@@ -906,6 +906,8 @@ def upsert_search_attributes(
             DEPRECATED and if used, result in invalid key types on the
             typed_search_attributes property in the info.
     """
+    if not attributes:
+        return
     temporalio.common._warn_on_deprecated_search_attributes(attributes)
     _Runtime.current().workflow_upsert_search_attributes(attributes)
 
