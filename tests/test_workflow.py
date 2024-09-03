@@ -393,11 +393,17 @@ class DataClassTypedWorkflowProto(Protocol):
         pass
 
 
-class WorkflowInitGoodSlashStarArgsStarStarKwargsInitZeroParamRun:
-    # TODO: if they include the slash it will be allowed as it is
-    # indistinguishable from the default __init__ inherited from object. But if
-    # they don't it will not be.
+class WorkflowInitGoodSlashStarArgsStarStarKwargs:
     def __init__(self, /, *args, **kwargs) -> None:
+        pass
+
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+class WorkflowInitGoodStarArgsStarStarKwargs:
+    def __init__(self, *args, **kwargs) -> None:
         pass
 
     @workflow.run
@@ -413,7 +419,8 @@ class WorkflowInitGoodSlashStarArgsStarStarKwargsInitZeroParamRun:
         WorkflowInitGoodNoArgInitZeroParamRun,
         WorkflowInitGoodNoArgInitOneParamRun,
         DataClassTypedWorkflowProto,
-        WorkflowInitGoodSlashStarArgsStarStarKwargsInitZeroParamRun,
+        WorkflowInitGoodSlashStarArgsStarStarKwargs,
+        WorkflowInitGoodStarArgsStarStarKwargs,
     ],
 )
 def test_workflow_init_good_does_not_take_workflow_input(cls):
@@ -503,18 +510,6 @@ def test_workflow_init_good_takes_workflow_input(cls):
     ).__temporal_workflow_definition.init_fn_takes_workflow_input
 
 
-class WorkflowInitBadStarArgsStarStarKwargs:
-    # TODO: if they include the slash it will be allowed as it is
-    # indistinguishable from the default __init__ inherited from object. But if
-    # they don't it will not be.
-    def __init__(self, *args, **kwargs) -> None:
-        pass
-
-    @workflow.run
-    async def run(self) -> None:
-        pass
-
-
 class WorkflowInitBadExtraInitParamUntyped:
     def __init__(self, a) -> None:
         pass
@@ -554,7 +549,6 @@ class WorkflowInitBadMismatchedParamTyped:
 @pytest.mark.parametrize(
     "cls",
     [
-        WorkflowInitBadStarArgsStarStarKwargs,
         WorkflowInitBadExtraInitParamUntyped,
         WorkflowInitBadMismatchedParamUntyped,
         WorkflowInitBadExtraInitParamTyped,

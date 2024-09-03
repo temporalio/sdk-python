@@ -1478,6 +1478,16 @@ def _get_init_fn_takes_workflow_input(
     elif set(init_params) == {"self"}:
         # User __init__ with (self) signature
         return False, None
+    else:
+        # This (in 3.12) differs from the default signature inherited from
+        # object.__init__, which is (self, /, *args, **kwargs). We allow both as
+        # valid __init__ signatures (that do not take workflow input).
+        class StarArgsStarStarKwargs:
+            def __init__(self, *args, **kwargs) -> None:
+                pass
+
+        if init_params == inspect.signature(StarArgsStarStarKwargs.__init__).parameters:
+            return False, None
 
     init_param_types, _ = temporalio.common._type_hints_from_func(init_fn)
     run_param_types, _ = temporalio.common._type_hints_from_func(run_fn)
