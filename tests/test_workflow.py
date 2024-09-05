@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Any, Callable, List, Protocol, Sequence
 
 import pytest
 
@@ -351,19 +351,68 @@ def test_workflow_defn_dynamic_handler_warnings():
 #
 
 
-class WorkflowInitGoodNoInitZeroParamRun:
+class CanBeCalledWithoutArgs:
+    def a(self):
+        pass
+
+    def b(self, arg=1):
+        pass
+
+    def c(self, /, arg=1):
+        pass
+
+    def d(self=1):  # type: ignore
+        pass
+
+    def e(self=1, /, arg1=1, *, arg2=2):  # type: ignore
+        pass
+
+
+class CannotBeCalledWithoutArgs:
+    def a(self, arg):
+        pass
+
+    def b(self, /, arg):
+        pass
+
+    def c(self, arg1, arg2=2):
+        pass
+
+
+@pytest.mark.parametrize(
+    "fn,expected",
+    [
+        (CanBeCalledWithoutArgs.a, True),
+        (CanBeCalledWithoutArgs.b, True),
+        (CanBeCalledWithoutArgs.c, True),
+        (CanBeCalledWithoutArgs.d, True),
+        (CanBeCalledWithoutArgs.e, True),
+        (CannotBeCalledWithoutArgs.a, False),
+        (CannotBeCalledWithoutArgs.b, False),
+        (CannotBeCalledWithoutArgs.c, False),
+    ],
+)
+def test_unbound_method_can_be_called_without_args_when_bound(
+    fn: Callable[..., Any], expected: bool
+):
+    assert (
+        workflow._unbound_method_can_be_called_without_args_when_bound(fn) == expected
+    )
+
+
+class NormalInitNoInit:
     @workflow.run
     async def run(self) -> None:
         pass
 
 
-class WorkflowInitGoodNoInitOneParamRun:
+class NormalInitNoInitOneParamRun:
     @workflow.run
     async def run(self, a: int) -> None:
         pass
 
 
-class WorkflowInitGoodNoArgInitZeroParamRun:
+class NormalInitNoArgInitZeroParamRun:
     def __init__(self) -> None:
         pass
 
@@ -372,7 +421,7 @@ class WorkflowInitGoodNoArgInitZeroParamRun:
         pass
 
 
-class WorkflowInitGoodNoArgInitOneParamRun:
+class NormalInitNoArgInitOneParamRun:
     def __init__(self) -> None:
         pass
 
@@ -387,13 +436,13 @@ class MyDataClass:
     b: str
 
 
-class DataClassTypedWorkflowProto(Protocol):
+class NormalInitDataClassProtocol(Protocol):
     @workflow.run
     async def run(self, arg: MyDataClass) -> None:
         pass
 
 
-class WorkflowInitGoodSlashStarArgsStarStarKwargs:
+class NormalInitSlashStarArgsStarStarKwargs:
     def __init__(self, /, *args, **kwargs) -> None:
         pass
 
@@ -402,7 +451,7 @@ class WorkflowInitGoodSlashStarArgsStarStarKwargs:
         pass
 
 
-class WorkflowInitGoodStarArgsStarStarKwargs:
+class NormalInitStarArgsStarStarKwargs:
     def __init__(self, *args, **kwargs) -> None:
         pass
 
@@ -411,16 +460,36 @@ class WorkflowInitGoodStarArgsStarStarKwargs:
         pass
 
 
+class NormalInitStarDefault:
+    def __init__(self, *, arg=1) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, arg) -> None:
+        pass
+
+
+class NormalInitTypedDefault:
+    def __init__(self, a: int = 1) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int) -> None:
+        pass
+
+
 @pytest.mark.parametrize(
     "cls",
     [
-        WorkflowInitGoodNoInitZeroParamRun,
-        WorkflowInitGoodNoInitOneParamRun,
-        WorkflowInitGoodNoArgInitZeroParamRun,
-        WorkflowInitGoodNoArgInitOneParamRun,
-        DataClassTypedWorkflowProto,
-        WorkflowInitGoodSlashStarArgsStarStarKwargs,
-        WorkflowInitGoodStarArgsStarStarKwargs,
+        NormalInitNoInit,
+        NormalInitNoInitOneParamRun,
+        NormalInitNoArgInitZeroParamRun,
+        NormalInitNoArgInitOneParamRun,
+        NormalInitDataClassProtocol,
+        NormalInitSlashStarArgsStarStarKwargs,
+        NormalInitStarArgsStarStarKwargs,
+        NormalInitStarDefault,
+        NormalInitTypedDefault,
     ],
 )
 def test_workflow_init_good_does_not_take_workflow_input(cls):
@@ -429,7 +498,7 @@ def test_workflow_init_good_does_not_take_workflow_input(cls):
     ).__temporal_workflow_definition.init_fn_takes_workflow_input
 
 
-class WorkflowInitGoodOneParamTyped:
+class WorkflowInitOneParamTyped:
     def __init__(self, a: int) -> None:
         pass
 
@@ -438,7 +507,7 @@ class WorkflowInitGoodOneParamTyped:
         pass
 
 
-class WorkflowInitGoodTwoParamsTyped:
+class WorkflowInitTwoParamsTyped:
     def __init__(self, a: int, b: str) -> None:
         pass
 
@@ -447,7 +516,7 @@ class WorkflowInitGoodTwoParamsTyped:
         pass
 
 
-class WorkflowInitGoodOneParamUntyped:
+class WorkflowInitOneParamUntyped:
     def __init__(self, a) -> None:
         pass
 
@@ -456,7 +525,7 @@ class WorkflowInitGoodOneParamUntyped:
         pass
 
 
-class WorkflowInitGoodTwoParamsUntyped:
+class WorkflowInitTwoParamsUntyped:
     def __init__(self, a, b) -> None:
         pass
 
@@ -465,43 +534,43 @@ class WorkflowInitGoodTwoParamsUntyped:
         pass
 
 
-class WorkflowInitGoodOneParamNoInitType:
-    def __init__(self, a) -> None:
+class WorkflowInitSlashStarArgsStarStarKwargs:
+    def __init__(self, /, a, *args, **kwargs) -> None:
         pass
 
     @workflow.run
-    async def run(self, aa: int) -> None:
+    async def run(self, /, a, *args, **kwargs) -> None:
         pass
 
 
-class WorkflowInitGoodOneParamNoRunType:
-    def __init__(self, a: int) -> None:
-        pass
-
-    @workflow.run
-    async def run(self, aa) -> None:
-        pass
-
-
-class WorkflowInitGoodTwoParamsMixedTyping:
-    def __init__(self, a, b: str) -> None:
+class WorkflowInitStarArgsStarStarKwargs:
+    def __init__(self, *args, a, **kwargs) -> None:
         pass
 
     @workflow.run
-    async def run(self, aa: str, bb) -> None:
+    async def run(self, *args, a, **kwargs) -> None:
+        pass
+
+
+class WorkflowInitStarDefault:
+    def __init__(self, a, *, arg=1) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, a, *, arg=1) -> None:
         pass
 
 
 @pytest.mark.parametrize(
     "cls",
     [
-        WorkflowInitGoodOneParamTyped,
-        WorkflowInitGoodTwoParamsTyped,
-        WorkflowInitGoodOneParamUntyped,
-        WorkflowInitGoodTwoParamsUntyped,
-        WorkflowInitGoodTwoParamsMixedTyping,
-        WorkflowInitGoodOneParamNoInitType,
-        WorkflowInitGoodOneParamNoRunType,
+        WorkflowInitOneParamTyped,
+        WorkflowInitTwoParamsTyped,
+        WorkflowInitOneParamUntyped,
+        WorkflowInitTwoParamsUntyped,
+        WorkflowInitSlashStarArgsStarStarKwargs,
+        WorkflowInitStarArgsStarStarKwargs,
+        WorkflowInitStarDefault,
     ],
 )
 def test_workflow_init_good_takes_workflow_input(cls):
@@ -546,6 +615,62 @@ class WorkflowInitBadMismatchedParamTyped:
         pass
 
 
+class WorkflowInitBadOneParamNoInitType:
+    def __init__(self, a) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int) -> None:
+        pass
+
+
+class WorkflowInitBadGenericSubtype:
+    # The types must match exactly; we do not support any notion of subtype
+    # compatibility.
+    def __init__(self, a: List) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: List[int]) -> None:
+        pass
+
+
+class WorkflowInitBadOneParamNoRunType:
+    def __init__(self, a: int) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa) -> None:
+        pass
+
+
+class WorkflowInitBadMissingDefault:
+    def __init__(self, a: int, b: int) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int, b: int = 1) -> None:
+        pass
+
+
+class WorkflowInitBadInconsistentDefaults:
+    def __init__(self, a: int, b: int = 1) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: int, b: int = 2) -> None:
+        pass
+
+
+class WorkflowInitBadTwoParamsMixedTyping:
+    def __init__(self, a, b: str) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, aa: str, bb) -> None:
+        pass
+
+
 @pytest.mark.parametrize(
     "cls",
     [
@@ -553,9 +678,14 @@ class WorkflowInitBadMismatchedParamTyped:
         WorkflowInitBadMismatchedParamUntyped,
         WorkflowInitBadExtraInitParamTyped,
         WorkflowInitBadMismatchedParamTyped,
+        WorkflowInitBadTwoParamsMixedTyping,
+        WorkflowInitBadOneParamNoInitType,
+        WorkflowInitBadOneParamNoRunType,
+        WorkflowInitBadGenericSubtype,
+        WorkflowInitBadMissingDefault,
+        WorkflowInitBadInconsistentDefaults,
     ],
 )
 def test_workflow_init_bad_takes_workflow_input(cls):
-    with pytest.raises(ValueError) as err:
+    with pytest.raises(ValueError):
         workflow.defn(cls)
-    print(err)

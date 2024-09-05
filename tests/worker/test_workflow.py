@@ -6053,3 +6053,44 @@ async def test_workflow_init(client: Client):
             task_queue=worker.task_queue,
         )
         assert workflow_result == "hello, world"
+
+
+@workflow.defn
+class WorkflowInitUpdateInFirstWFTWorkflow:
+    def __init__(self, arg: str) -> None:
+        self.init_arg = arg
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.init_arg
+
+    @workflow.run
+    async def run(self, _: str):
+        self.init_arg = "value set in run method"
+        return self.init_arg
+
+
+async def test_update_in_first_wft_sees_workflow_init(client: Client):
+    # Before running the worker, start a workflow, send the update, and wait
+    # until update is admitted.
+    task_queue = "task-queue"
+    update_id = "update-id"
+    wf_handle = await client.start_workflow(
+        WorkflowInitUpdateInFirstWFTWorkflow.run,
+        "workflow input value",
+        id=str(uuid.uuid4()),
+        task_queue=task_queue,
+    )
+    update_task = asyncio.create_task(
+        wf_handle.execute_update(
+            WorkflowInitUpdateInFirstWFTWorkflow.my_update, id=update_id
+        )
+    )
+    await assert_eq_eventually(
+        True, lambda: workflow_update_exists(client, wf_handle.id, update_id)
+    )
+    async with new_worker(
+        client, WorkflowInitUpdateInFirstWFTWorkflow, task_queue=task_queue
+    ):
+        assert await update_task == "workflow input value"
+        assert await wf_handle.result() == "value set in run method"
