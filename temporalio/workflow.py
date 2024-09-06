@@ -49,6 +49,8 @@ from typing_extensions import (
 
 import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
+import temporalio.bridge.proto.common
+import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
@@ -915,7 +917,7 @@ def upsert_search_attributes(
 class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
     """Decorated workflow update functions implement this."""
 
-    _defn: temporalio.workflow._UpdateDefinition
+    _defn: _UpdateDefinition
 
     def __call__(
         self, *args: MultiParamSpec.args, **kwargs: MultiParamSpec.kwargs
@@ -1262,7 +1264,7 @@ class _Definition:
     ret_type: Optional[Type] = None
 
     @staticmethod
-    def from_class(cls: Type) -> Optional[_Definition]:
+    def from_class(cls: Type) -> Optional[_Definition]:  # pyright: ignore[reportSelfClsParameterName]
         # We make sure to only return it if it's on _this_ class
         defn = getattr(cls, "__temporal_workflow_definition", None)
         if defn and defn.cls == cls:
@@ -1270,7 +1272,7 @@ class _Definition:
         return None
 
     @staticmethod
-    def must_from_class(cls: Type) -> _Definition:
+    def must_from_class(cls: Type) -> _Definition:  # pyright: ignore[reportSelfClsParameterName]
         ret = _Definition.from_class(cls)
         if ret:
             return ret
@@ -1295,7 +1297,7 @@ class _Definition:
 
     @staticmethod
     def _apply_to_class(
-        cls: Type,
+        cls: Type,  # pyright: ignore[reportSelfClsParameterName]
         *,
         workflow_name: Optional[str],
         sandboxed: bool,
