@@ -46,7 +46,8 @@ jobs:
           workspaces: temporalio/bridge -> target
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          # Pinning due to failed Windows builds on 3.12.5 https://github.com/temporalio/sdk-python/issues/637
+          python-version: ${{ matrix.python == '3.12' && '3.12.4' || matrix.python }}
       - uses: arduino/setup-protoc@v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
