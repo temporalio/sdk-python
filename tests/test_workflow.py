@@ -442,6 +442,25 @@ class NormalInitDataClassProtocol(Protocol):
         pass
 
 
+# Although the class is abstract, a user may decorate it with @workflow.defn,
+# for example in order to set the name as the same as the child class, so that
+# the client codebase need only import the interface.
+class NormalInitAbstractBaseClass:
+    def __init__(self, arg_supplied_by_child_cls) -> None:
+        pass
+
+    @workflow.run
+    async def run(self) -> None: ...
+
+
+class NormalInitChildClass(NormalInitAbstractBaseClass):
+    def __init__(self) -> None:
+        super().__init__(arg_supplied_by_child_cls=None)
+
+    @workflow.run
+    async def run(self) -> None: ...
+
+
 class NormalInitSlashStarArgsStarStarKwargs:
     def __init__(self, /, *args, **kwargs) -> None:
         pass
@@ -490,6 +509,8 @@ class NormalInitTypedDefault:
         NormalInitStarArgsStarStarKwargs,
         NormalInitStarDefault,
         NormalInitTypedDefault,
+        NormalInitAbstractBaseClass,
+        NormalInitChildClass,
     ],
 )
 def test_workflow_init_good_does_not_take_workflow_input(cls):
