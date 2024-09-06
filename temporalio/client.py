@@ -35,7 +35,7 @@ from typing import (
 import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.timestamp_pb2
-from typing_extensions import Concatenate, TypedDict
+from typing_extensions import Concatenate, Required, TypedDict
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -1112,12 +1112,12 @@ class Client:
 class ClientConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
-    service_client: temporalio.service.ServiceClient
-    namespace: str
-    data_converter: temporalio.converter.DataConverter
-    interceptors: Sequence[Interceptor]
-    default_workflow_query_reject_condition: Optional[
-        temporalio.common.QueryRejectCondition
+    service_client: Required[temporalio.service.ServiceClient]
+    namespace: Required[str]
+    data_converter: Required[temporalio.converter.DataConverter]
+    interceptors: Required[Sequence[Interceptor]]
+    default_workflow_query_reject_condition: Required[
+        Optional[temporalio.common.QueryRejectCondition]
     ]
 
 
@@ -1797,7 +1797,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,
+        args: MultiParamSpec.args,  # pyright: ignore
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -1906,7 +1906,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,
+        args: MultiParamSpec.args,  # pyright: ignore
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
@@ -3233,7 +3233,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
     @staticmethod
-    def _from_proto(
+    def _from_proto(  # pyright: ignore
         info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo,  # type: ignore[override]
     ) -> ScheduleActionStartWorkflow:
         return ScheduleActionStartWorkflow("<unset>", raw_info=info)
@@ -3482,7 +3482,6 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         return action
 
 
-@dataclass
 class ScheduleOverlapPolicy(IntEnum):
     """Controls what happens when a workflow would be started by a schedule but
     one is already running.

@@ -587,7 +587,7 @@ class _WorkflowInstanceImpl(
                 else:
                     self._current_activation_error = err
                     return
-            except BaseException as err:
+            except BaseException:
                 if self._deleting:
                     if LOG_IGNORE_DURING_DELETE:
                         logger.debug(
@@ -883,7 +883,7 @@ class _WorkflowInstanceImpl(
         )
         self._primary_task = self.create_task(
             self._run_top_level_workflow_function(run_workflow(input)),
-            name=f"run",
+            name="run",
         )
 
     def _apply_update_random_seed(
