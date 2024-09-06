@@ -1630,31 +1630,6 @@ class _WorkflowInstanceImpl(
             )
         )
 
-    def _warn_if_unfinished_handlers(self) -> None:
-        def warnable(handler_executions: Iterable[HandlerExecution]):
-            return [
-                ex
-                for ex in handler_executions
-                if ex.unfinished_policy
-                == temporalio.workflow.HandlerUnfinishedPolicy.WARN_AND_ABANDON
-            ]
-
-        warnable_updates = warnable(self._in_progress_updates.values())
-        if warnable_updates:
-            warnings.warn(
-                temporalio.workflow.UnfinishedUpdateHandlersWarning(
-                    _make_unfinished_update_handler_message(warnable_updates)
-                )
-            )
-
-        warnable_signals = warnable(self._in_progress_signals.values())
-        if warnable_signals:
-            warnings.warn(
-                temporalio.workflow.UnfinishedSignalHandlersWarning(
-                    _make_unfinished_signal_handler_message(warnable_signals)
-                )
-            )
-
     def _next_seq(self, type: str) -> int:
         seq = self._curr_seqs.get(type, 0) + 1
         self._curr_seqs[type] = seq
@@ -1930,6 +1905,31 @@ class _WorkflowInstanceImpl(
                 sdk=sdk, sources=sources, stacks=stacks
             )
             return est
+
+    def _warn_if_unfinished_handlers(self) -> None:
+        def warnable(handler_executions: Iterable[HandlerExecution]):
+            return [
+                ex
+                for ex in handler_executions
+                if ex.unfinished_policy
+                == temporalio.workflow.HandlerUnfinishedPolicy.WARN_AND_ABANDON
+            ]
+
+        warnable_updates = warnable(self._in_progress_updates.values())
+        if warnable_updates:
+            warnings.warn(
+                temporalio.workflow.UnfinishedUpdateHandlersWarning(
+                    _make_unfinished_update_handler_message(warnable_updates)
+                )
+            )
+
+        warnable_signals = warnable(self._in_progress_signals.values())
+        if warnable_signals:
+            warnings.warn(
+                temporalio.workflow.UnfinishedSignalHandlersWarning(
+                    _make_unfinished_signal_handler_message(warnable_signals)
+                )
+            )
 
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many

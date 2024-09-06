@@ -915,7 +915,7 @@ def upsert_search_attributes(
 class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
     """Decorated workflow update functions implement this."""
 
-    _defn: temporalio.workflow._UpdateDefinition
+    _defn: _UpdateDefinition
 
     def __call__(
         self, *args: MultiParamSpec.args, **kwargs: MultiParamSpec.kwargs
