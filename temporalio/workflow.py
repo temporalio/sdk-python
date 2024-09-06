@@ -237,7 +237,10 @@ def signal(
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
-):
+) -> Union[
+    CallableSyncOrAsyncReturnNoneType,
+    Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType],
+]:
     """Decorator for a workflow signal method.
 
     This is set on any async or non-async method that you wish to be called upon
