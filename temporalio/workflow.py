@@ -1252,7 +1252,6 @@ class _Definition:
     name: Optional[str]
     cls: Type
     run_fn: Callable[..., Awaitable]
-    init_fn_takes_workflow_input: bool
     signals: Mapping[Optional[str], _SignalDefinition]
     queries: Mapping[Optional[str], _QueryDefinition]
     updates: Mapping[Optional[str], _UpdateDefinition]
@@ -1307,8 +1306,7 @@ class _Definition:
             raise ValueError("Class already contains workflow definition")
         issues: List[str] = []
 
-        # Collect init, run, and all signal/query/update fns
-        init_fn: Optional[Callable[..., None]] = None
+        # Collect run fn and all signal/query/update fns
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
         seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
@@ -1355,8 +1353,6 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
-            elif name == "__init__":
-                init_fn = member
             elif isinstance(member, UpdateMethodMultiParam):
                 update_defn = member._defn
                 if update_defn.name in updates:
@@ -1407,18 +1403,8 @@ class _Definition:
                             f"@workflow.update defined on {base_member.__qualname__} but not on the override"
                         )
 
-        init_fn_takes_workflow_input = False
-
         if not seen_run_attr:
             issues.append("Missing @workflow.run method")
-        if not init_fn:
-            issues.append("Missing __init__ method")
-        elif run_fn:
-            init_fn_takes_workflow_input, init_fn_issue = _init_fn_takes_workflow_input(  # type: ignore[assignment]
-                init_fn, run_fn
-            )
-            if init_fn_issue is not None:
-                issues.append(init_fn_issue)
         if issues:
             if len(issues) == 1:
                 raise ValueError(f"Invalid workflow class: {issues[0]}")
@@ -1427,12 +1413,10 @@ class _Definition:
             )
 
         assert run_fn
-        assert init_fn_takes_workflow_input is not None
         defn = _Definition(
             name=workflow_name,
             cls=cls,
             run_fn=run_fn,
-            init_fn_takes_workflow_input=init_fn_takes_workflow_input,
             signals=signals,
             queries=queries,
             updates=updates,
@@ -1457,75 +1441,6 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
-
-
-def _init_fn_takes_workflow_input(
-    init_fn: Callable[..., None],
-    run_fn: Callable[..., Awaitable[Any]],
-) -> Union[Tuple[bool, None], Tuple[None, str]]:
-    """Return (True, None) if Workflow input args should be passed to Workflow __init__."""
-    # If the workflow class can be instantiated as cls(), i.e. without passing
-    # workflow input args, then we do that. Otherwise, if the parameters of
-    # __init__ exactly match those of the @workflow.run method, then we pass the
-    # workflow input args to __init__ when instantiating the workflow class.
-    # Otherwise, the workflow definition is invalid.
-
-    if _unbound_method_can_be_called_without_args_when_bound(init_fn):
-        # The workflow cls can be instantiated as cls()
-        return False, None
-    else:
-
-        def get_params(fn: Callable) -> List[inspect.Parameter]:
-            # Ignore name when comparing parameters (remaining fields are kind,
-            # default, and annotation).
-            return [
-                p.replace(name="x") for p in inspect.signature(fn).parameters.values()
-            ]
-
-        # We require that any type annotations present match exactly; i.e. we do
-        # not support any notion of subtype compatibility.
-        if get_params(init_fn) == get_params(run_fn):
-            # __init__ requires some args and has the same parameters as @workflow.run
-            return True, None
-        else:
-            return (
-                None,
-                "__init__ parameters do not match @workflow.run method parameters",
-            )
-
-
-def _unbound_method_can_be_called_without_args_when_bound(
-    fn: Callable[..., Any],
-) -> bool:
-    """Return True if the unbound method fn can be called without arguments when bound."""
-    # An unbound method can be called without arguments when bound if the
-    # following are both true:
-    #
-    # - The first parameter is POSITIONAL_ONLY or POSITIONAL_OR_KEYWORD (this is
-    #   the parameter conventionally named 'self')
-    #
-    # - All other POSITIONAL_OR_KEYWORD or KEYWORD_ONLY parameters have default
-    #   values.
-    params = iter(inspect.signature(fn).parameters.values())
-    self_param = next(params, None)
-    if not self_param or self_param.kind not in [
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        inspect.Parameter.POSITIONAL_ONLY,
-    ]:
-        raise ValueError("Not an unbound method. This is a Python SDK bug.")
-    for p in params:
-        if p.kind == inspect.Parameter.POSITIONAL_ONLY:
-            return False
-        elif (
-            p.kind
-            in [
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                inspect.Parameter.KEYWORD_ONLY,
-            ]
-            and p.default is inspect.Parameter.empty
-        ):
-            return False
-    return True
 
 
 # Async safe version of partial

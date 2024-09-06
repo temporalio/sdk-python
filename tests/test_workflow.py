@@ -5,6 +5,7 @@ import pytest
 
 from temporalio import workflow
 from temporalio.common import RawValue
+from temporalio.worker import _workflow_instance
 
 
 class GoodDefnBase:
@@ -76,7 +77,6 @@ def test_workflow_defn_good():
         name="workflow-custom",
         cls=GoodDefn,
         run_fn=GoodDefn.run,
-        init_fn_takes_workflow_input=False,
         signals={
             "signal1": workflow._SignalDefinition(
                 name="signal1", fn=GoodDefn.signal1, is_method=True
@@ -396,7 +396,8 @@ def test_unbound_method_can_be_called_without_args_when_bound(
     fn: Callable[..., Any], expected: bool
 ):
     assert (
-        workflow._unbound_method_can_be_called_without_args_when_bound(fn) == expected
+        _workflow_instance._unbound_method_can_be_called_without_args_when_bound(fn)
+        == expected
     )
 
 
@@ -509,14 +510,16 @@ class NormalInitTypedDefault:
         NormalInitStarArgsStarStarKwargs,
         NormalInitStarDefault,
         NormalInitTypedDefault,
-        NormalInitAbstractBaseClass,
+        # The base class is abstract, so will never be encountered by the worker
+        # during workflow task processing.
         NormalInitChildClass,
     ],
 )
 def test_workflow_init_good_does_not_take_workflow_input(cls):
-    assert not workflow.defn(
-        cls
-    ).__temporal_workflow_definition.init_fn_takes_workflow_input
+    takes_workflow_input, _ = _workflow_instance._init_fn_takes_workflow_input(
+        cls.__init__, workflow.defn(cls).__temporal_workflow_definition.run_fn
+    )
+    assert takes_workflow_input is False
 
 
 class WorkflowInitOneParamTyped:
@@ -595,9 +598,10 @@ class WorkflowInitStarDefault:
     ],
 )
 def test_workflow_init_good_takes_workflow_input(cls):
-    assert workflow.defn(
-        cls
-    ).__temporal_workflow_definition.init_fn_takes_workflow_input
+    takes_workflow_input, _ = _workflow_instance._init_fn_takes_workflow_input(
+        cls.__init__, workflow.defn(cls).__temporal_workflow_definition.run_fn
+    )
+    assert takes_workflow_input is True
 
 
 class WorkflowInitBadExtraInitParamUntyped:
@@ -708,5 +712,7 @@ class WorkflowInitBadTwoParamsMixedTyping:
     ],
 )
 def test_workflow_init_bad_takes_workflow_input(cls):
-    with pytest.raises(ValueError):
-        workflow.defn(cls)
+    takes_workflow_input, err = _workflow_instance._init_fn_takes_workflow_input(
+        cls.__init__, workflow.defn(cls).__temporal_workflow_definition.run_fn
+    )
+    assert takes_workflow_input is None and err is not None
