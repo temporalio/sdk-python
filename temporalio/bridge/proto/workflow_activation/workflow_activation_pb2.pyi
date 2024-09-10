@@ -40,22 +40,37 @@ class WorkflowActivation(google.protobuf.message.Message):
     ## Job ordering guarantees and semantics
 
     Core will, by default, order jobs within the activation as follows:
-    `patches -> signals/updates -> other -> queries -> evictions`
+    1. patches
+    2. random-seed-updates
+    3. signals/updates
+    4. all others
+    5. local activity resolutions
+    6. queries
+    7. evictions
 
     This is because:
     * Patches are expected to apply to the entire activation
     * Signal and update handlers should be invoked before workflow routines are iterated. That is to
       say before the users' main workflow function and anything spawned by it is allowed to continue.
+    * Local activities resolutions go after other normal jobs because while *not* replaying, they
+      will always take longer than anything else that produces an immediate job (which is
+      effectively instant). When *replaying* we need to scan ahead for LA markers so that we can
+      resolve them in the same activation that they completed in when not replaying. However, doing
+      so would, by default, put those resolutions *before* any other immediate jobs that happened
+      in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
+      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
+      normally would have when executing.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 
-    The downside of this reordering is that a signal or update handler may not observe that some
-    other event had already happened (ex: an activity completed) when it is first invoked, though it
-    will subsequently when workflow routines are driven. Core only does this reordering to make life
-    easier for languages that cannot explicitly control when workflow routines are iterated.
-    Languages that can explicitly control such iteration should prefer to apply all the jobs to state
-    (by resolving promises/futures, invoking handlers, etc as they iterate over the jobs) and then
-    only *after* that is done, drive the workflow routines.
+    Core does this reordering to ensure that langs observe jobs in the same order during replay as
+    they would have during execution. However, in principle, this ordering is not necessary
+    (excepting queries/evictions, which definitely must come last) if lang layers apply all jobs to
+    state *first* (by resolving promises/futures, marking handlers to be invoked, etc as they iterate
+    over the jobs) and then only *after* that is done, drive coroutines/threads/whatever. If
+    execution works this way, then determinism is only impacted by the order routines are driven in
+    (which must be stable based on lang implementation or convention), rather than the order jobs are
+    processed.
 
     ## Evictions
 
@@ -628,6 +643,7 @@ class ResolveActivity(google.protobuf.message.Message):
 
     SEQ_FIELD_NUMBER: builtins.int
     RESULT_FIELD_NUMBER: builtins.int
+    IS_LOCAL_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding ScheduleActivity command"""
     @property
@@ -636,18 +652,26 @@ class ResolveActivity(google.protobuf.message.Message):
     ) -> (
         temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution
     ): ...
+    is_local: builtins.bool
+    """Set to true if the resolution is for a local activity. This is used internally by Core and
+    lang does not need to care about it.
+    """
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
         result: temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution
         | None = ...,
+        is_local: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["result", b"result"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["result", b"result", "seq", b"seq"]
+        self,
+        field_name: typing_extensions.Literal[
+            "is_local", b"is_local", "result", b"result", "seq", b"seq"
+        ],
     ) -> None: ...
 
 global___ResolveActivity = ResolveActivity
