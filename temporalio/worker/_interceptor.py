@@ -47,7 +47,7 @@ class Interceptor:
         return next
 
     def workflow_interceptor_class(
-        self, input: WorkflowInterceptorClassInput
+        self, _: WorkflowInterceptorClassInput
     ) -> Optional[Type[WorkflowInboundInterceptor]]:
         """Class that will be instantiated and used to intercept workflows.
 

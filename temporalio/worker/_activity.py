@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from typing import (
     Any,
     Callable,
@@ -745,15 +746,11 @@ def _execute_sync_activity(
         thread_id = threading.current_thread().ident
         if thread_id is not None:
             cancel_thread_raiser.set_thread_id(thread_id)
-    heartbeat_fn: Callable[..., None]
-    if isinstance(heartbeat, SharedHeartbeatSender):
-        # To make mypy happy
-        heartbeat_sender = heartbeat
-        heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
-            info.task_token, *details
-        )
-    else:
-        heartbeat_fn = heartbeat
+    heartbeat_fn = (
+        partial(heartbeat.send_heartbeat, info.task_token)
+        if isinstance(heartbeat, SharedHeartbeatSender)
+        else heartbeat
+    )
     temporalio.activity._Context.set(
         temporalio.activity._Context(
             info=lambda: info,
