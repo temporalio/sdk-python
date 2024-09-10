@@ -8,18 +8,15 @@ import logging
 import os
 import sys
 from datetime import timezone
-from threading import get_ident
 from types import TracebackType
 from typing import (
     Callable,
     Dict,
     List,
-    Literal,
     MutableMapping,
     Optional,
     Sequence,
     Set,
-    Tuple,
     Type,
 )
 

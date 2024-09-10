@@ -183,7 +183,6 @@ exclude = [
   "temporalio/bridge/proto",
   "tests/worker/workflow_sandbox/testmodules/proto",
   "temporalio/bridge/worker.py",
-  "temporalio/client.py",
   "temporalio/contrib/opentelemetry.py",
   "temporalio/converter.py",
   "temporalio/testing/_workflow.py",
