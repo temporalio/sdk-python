@@ -1497,7 +1497,7 @@ async def test_workflow_with_codec(client: Client, env: WorkflowEnvironment):
     await test_workflow_signal_and_query(client)
     await test_workflow_signal_and_query_errors(client)
     await test_workflow_simple_activity(client)
-    await test_workflow_update_handlers_happy(client, env)
+    await test_workflow_update_handlers_happy(client)
 
 
 class PassThroughCodec(PayloadCodec):
@@ -4273,11 +4273,7 @@ class UpdateHandlersWorkflow:
             raise RuntimeError("intentional failure")
 
 
-async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_handlers_happy(client: Client):
     async with new_worker(
         client, UpdateHandlersWorkflow, activities=[say_hello]
     ) as worker:
@@ -4319,13 +4315,7 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
         )
 
 
-async def test_workflow_update_handlers_unhappy(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_handlers_unhappy(client: Client):
     async with new_worker(client, UpdateHandlersWorkflow) as worker:
         handle = await client.start_workflow(
             UpdateHandlersWorkflow.run,
@@ -4398,11 +4388,7 @@ async def test_workflow_update_handlers_unhappy(
         assert "Rejected" == err.value.cause.message
 
 
-async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_task_fails(client: Client):
     # Need to not sandbox so behavior can change based on globals
     async with new_worker(
         client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
@@ -4498,13 +4484,7 @@ class ImmediatelyCompleteUpdateAndWorkflow:
         return self._got_update
 
 
-async def test_workflow_update_before_worker_start(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_before_worker_start(client: Client):
     # In order to confirm that all started workflows get updates before the
     # workflow completes, this test will start a workflow and start an update.
     # Only then will it start the worker to process both in the task. The
@@ -4572,13 +4552,7 @@ class UpdateSeparateHandleWorkflow:
         self._complete_update = True
 
 
-async def test_workflow_update_separate_handle(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_separate_handle(client: Client):
     async with new_worker(client, UpdateSeparateHandleWorkflow) as worker:
         # Start the workflow
         handle = await client.start_workflow(
@@ -4620,14 +4594,7 @@ class UpdateTimeoutOrCancelWorkflow:
         await asyncio.sleep(sleep)
 
 
-async def test_workflow_update_timeout_or_cancel(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
-
+async def test_workflow_update_timeout_or_cancel(client: Client):
     # Confirm start timeout via short timeout on update w/ no worker running
     handle = await client.start_workflow(
         UpdateTimeoutOrCancelWorkflow.run,
@@ -4917,14 +4884,7 @@ class FailureTypesConfiguredInheritedWorkflow(FailureTypesWorkflowBase):
         await super().run(scenario)
 
 
-async def test_workflow_failure_types_configured(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
-
+async def test_workflow_failure_types_configured(client: Client):
     # Asserter for a single scenario
     async def assert_scenario(
         workflow: Type[FailureTypesWorkflowBase],
@@ -5305,11 +5265,7 @@ class CurrentUpdateWorkflow:
         return info.id
 
 
-async def test_workflow_current_update(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_current_update(client: Client):
     async with new_worker(client, CurrentUpdateWorkflow) as worker:
         handle = await client.start_workflow(
             CurrentUpdateWorkflow.run,
@@ -5386,12 +5342,7 @@ class UnfinishedHandlersWarningsWorkflow:
         await self._do_update_or_signal()
 
 
-async def test_unfinished_update_handler(client: Client, env: WorkflowEnvironment):
-    skip_unfinished_handler_tests_in_older_python()
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_unfinished_update_handler(client: Client):
     async with new_worker(client, UnfinishedHandlersWarningsWorkflow) as worker:
         test = _UnfinishedHandlersWarningsTest(client, worker, "update")
         await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
@@ -5628,7 +5579,6 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
 )
 async def test_unfinished_handler_on_workflow_termination(
     client: Client,
-    env: WorkflowEnvironment,
     handler_type: Literal["-signal-", "-update-"],
     handler_registration: Literal["-late-registered-", "-not-late-registered-"],
     handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
@@ -5640,10 +5590,6 @@ async def test_unfinished_handler_on_workflow_termination(
     ],
 ):
     skip_unfinished_handler_tests_in_older_python()
-    if handler_type == "-update-" and env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
     await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         handler_type,
@@ -5857,12 +5803,7 @@ class UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow:
 
 async def test_update_completion_is_honored_when_after_workflow_return_1(
     client: Client,
-    env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
     update_id = "my-update"
     task_queue = "tq"
     wf_handle = await client.start_workflow(
@@ -5915,10 +5856,6 @@ async def test_update_completion_is_honored_when_after_workflow_return_2(
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
     async with Worker(
         client,
         task_queue="tq",
