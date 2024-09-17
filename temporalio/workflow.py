@@ -146,7 +146,7 @@ def defn(
 def run(fn: CallableAsyncType) -> CallableAsyncType:
     """Decorator for the workflow run method.
 
-    This must be set on one and only one async method defined on the same class
+    This must be used on one and only one async method defined on the same class
     as ``@workflow.defn``. This can be defined on a base class method but must
     then be explicitly overridden and defined on the workflow class.
 
@@ -238,7 +238,7 @@ def signal(
 ):
     """Decorator for a workflow signal method.
 
-    This is set on any async or non-async method that you wish to be called upon
+    This is used on any async or non-async method that you wish to be called upon
     receiving a signal. If a function overrides one with this decorator, it too
     must be decorated.
 
@@ -309,7 +309,7 @@ def query(
 ):
     """Decorator for a workflow query method.
 
-    This is set on any non-async method that expects to handle a query. If a
+    This is used on any non-async method that expects to handle a query. If a
     function overrides one with this decorator, it too must be decorated.
 
     Query methods can only have positional parameters. Best practice for
@@ -983,7 +983,7 @@ def update(
 ):
     """Decorator for a workflow update handler method.
 
-    This is set on any async or non-async method that you wish to be called upon
+    This is used on any async or non-async method that you wish to be called upon
     receiving an update. If a function overrides one with this decorator, it too
     must be decorated.
 
