@@ -6035,63 +6035,191 @@ async def test_activity_retry_delay(client: Client):
 
 
 @workflow.defn
-class WorkflowInitWorkflow:
-    def __init__(self, arg: str) -> None:
-        self.init_arg = arg
-
-    @workflow.run
-    async def run(self, _: str):
-        return f"hello, {self.init_arg}"
-
-
-async def test_workflow_init(client: Client):
-    async with new_worker(client, WorkflowInitWorkflow) as worker:
-        workflow_result = await client.execute_workflow(
-            WorkflowInitWorkflow.run,
-            "world",
-            id=str(uuid.uuid4()),
-            task_queue=worker.task_queue,
-        )
-        assert workflow_result == "hello, world"
-
-
-@workflow.defn
-class WorkflowInitUpdateInFirstWFTWorkflow:
-    @workflow.init
-    def __init__(self, arg: str = "value from parameter default") -> None:
-        self.init_arg = arg
+class WorkflowWithoutInit:
+    value = "from class attribute"
+    _expected_update_result = "from class attribute"
 
     @workflow.update
     async def my_update(self) -> str:
-        return self.init_arg
+        return self.value
 
     @workflow.run
-    async def run(self, _: str):
-        self.init_arg = "value set in run method"
-        return self.init_arg
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
 
 
-async def test_update_in_first_wft_sees_workflow_init(client: Client):
-    # Before running the worker, start a workflow, send the update, and wait
-    # until update is admitted.
+@workflow.defn
+class WorkflowWithWorkflowInit:
+    _expected_update_result = "workflow input value"
+
+    @workflow.init
+    def __init__(self, arg: str = "from parameter default") -> None:
+        self.value = arg
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.value
+
+    @workflow.run
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
+
+
+@workflow.defn
+class WorkflowWithNonWorkflowInitInit:
+    _expected_update_result = "from parameter default"
+
+    def __init__(self, arg: str = "from parameter default") -> None:
+        self.value = arg
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.value
+
+    @workflow.run
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
+
+
+@workflow.defn(name="MyWorkflow")
+class WorkflowWithWorkflowInitBaseDecorated:
+    use_workflow_init = True
+
+    @workflow.init
+    def __init__(
+        self, required_param_that_will_be_supplied_by_child_init_method
+    ) -> None:
+        self.value = required_param_that_will_be_supplied_by_child_init_method
+
+    if use_workflow_init:
+        __init__ = workflow.init(__init__)
+
+    @workflow.run
+    async def run(self, _: str): ...
+
+    @workflow.update
+    async def my_update(self) -> str: ...
+
+
+class WorkflowWithWorkflowInitBaseUndecorated(WorkflowWithWorkflowInitBaseDecorated):
+    # The base class does not need the @workflow.init decorator
+    use_workflow_init = False
+
+
+@workflow.defn(name="MyWorkflow")
+class WorkflowWithWorkflowInitChild(WorkflowWithWorkflowInitBaseDecorated):
+    use_workflow_init = True
+    _expected_update_result = "workflow input value"
+
+    def __init__(self, arg: str = "from parameter default") -> None:
+        super().__init__("from child __init__")
+        self.value = arg
+
+    if use_workflow_init:
+        __init__ = workflow.init(__init__)
+
+    @workflow.run
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.value
+
+
+@workflow.defn(name="MyWorkflow")
+class WorkflowWithWorkflowInitChildNoWorkflowInit(
+    WorkflowWithWorkflowInitBaseDecorated
+):
+    use_workflow_init = False
+    _expected_update_result = "from parameter default"
+
+    def __init__(self, arg: str = "from parameter default") -> None:
+        super().__init__("from child __init__")
+        self.value = arg
+
+    if use_workflow_init:
+        __init__ = workflow.init(__init__)
+
+    @workflow.run
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.value
+
+
+@pytest.mark.parametrize(
+    ["client_cls", "worker_cls"],
+    [
+        (WorkflowWithoutInit, WorkflowWithoutInit),
+        (WorkflowWithNonWorkflowInitInit, WorkflowWithNonWorkflowInitInit),
+        (WorkflowWithWorkflowInit, WorkflowWithWorkflowInit),
+        (WorkflowWithWorkflowInitBaseDecorated, WorkflowWithWorkflowInitChild),
+        (WorkflowWithWorkflowInitBaseUndecorated, WorkflowWithWorkflowInitChild),
+        (
+            WorkflowWithWorkflowInitBaseUndecorated,
+            WorkflowWithWorkflowInitChildNoWorkflowInit,
+        ),
+    ],
+)
+async def test_update_in_first_wft_sees_workflow_init(
+    client: Client, client_cls: Type, worker_cls: Type
+):
+    """
+    Test how @workflow.init affects what an update in the first WFT sees.
+
+    Such an update is guaranteed to start executing before the main workflow
+    coroutine. The update should see the side effects of the __init__ method if
+    and only if @workflow.init is in effect.
+    """
+    # This test must ensure that the update is in the first WFT. To do so,
+    # before running the worker, we start the workflow, send the update, and
+    # wait until the update is admitted.
     task_queue = "task-queue"
     update_id = "update-id"
     wf_handle = await client.start_workflow(
-        WorkflowInitUpdateInFirstWFTWorkflow.run,
+        client_cls.run,
         "workflow input value",
         id=str(uuid.uuid4()),
         task_queue=task_queue,
     )
     update_task = asyncio.create_task(
-        wf_handle.execute_update(
-            WorkflowInitUpdateInFirstWFTWorkflow.my_update, id=update_id
-        )
+        wf_handle.execute_update(client_cls.my_update, id=update_id)
     )
     await assert_eq_eventually(
         True, lambda: workflow_update_exists(client, wf_handle.id, update_id)
     )
-    async with new_worker(
-        client, WorkflowInitUpdateInFirstWFTWorkflow, task_queue=task_queue
-    ):
-        assert await update_task == "workflow input value"
-        assert await wf_handle.result() == "value set in run method"
+    # When the worker starts polling it will receive a first WFT containing the
+    # update, in addition to the start_workflow job.
+    async with new_worker(client, worker_cls, task_queue=task_queue):
+        assert await update_task == worker_cls._expected_update_result
+        assert await wf_handle.result() == "set in run method"
+
+
+@workflow.defn
+class WorkflowRunSeesWorkflowInitWorkflow:
+    @workflow.init
+    def __init__(self, arg: str) -> None:
+        self.value = arg
+
+    @workflow.run
+    async def run(self, _: str):
+        return f"hello, {self.value}"
+
+
+async def test_workflow_run_sees_workflow_init(client: Client):
+    async with new_worker(client, WorkflowRunSeesWorkflowInitWorkflow) as worker:
+        workflow_result = await client.execute_workflow(
+            WorkflowRunSeesWorkflowInitWorkflow.run,
+            "world",
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
+        assert workflow_result == "hello, world"
