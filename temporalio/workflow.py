@@ -143,6 +143,34 @@ def defn(
     return decorator
 
 
+def init(
+    init_fn: CallableType,
+) -> CallableType:
+    """Decorator for the workflow init method.
+
+    This may be used on the __init__ method of the workflow class to specify
+    that it accepts the same workflow input arguments as the ``@workflow.run``
+    method. It may not be used on any other method.
+
+    If used, the workflow will be instantiated as
+    ``MyWorkflow(**workflow_input_args)``. If not used, the workflow will be
+    instantiated as ``MyWorkflow()``.
+
+    Note that the ``@workflow.run`` method is always called as
+    ``my_workflow.my_run_method(**workflow_input_args)``. If you use the
+    ``@workflow.init`` decorator, your __init__ method and your
+    ``@workflow.run`` method will typically have exactly the same parameters.
+
+    Args:
+        init_fn: The __init__function to decorate.
+    """
+    if init_fn.__name__ != "__init__":
+        raise ValueError("@workflow.init may only be used on the __init__ method")
+
+    setattr(init_fn, "__temporal_workflow_init", True)
+    return init_fn
+
+
 def run(fn: CallableAsyncType) -> CallableAsyncType:
     """Decorator for the workflow run method.
 

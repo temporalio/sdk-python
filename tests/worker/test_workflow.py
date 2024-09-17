@@ -6057,7 +6057,8 @@ async def test_workflow_init(client: Client):
 
 @workflow.defn
 class WorkflowInitUpdateInFirstWFTWorkflow:
-    def __init__(self, arg: str) -> None:
+    @workflow.init
+    def __init__(self, arg: str = "value from parameter default") -> None:
         self.init_arg = arg
 
     @workflow.update

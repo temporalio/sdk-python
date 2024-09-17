@@ -1635,12 +1635,7 @@ class _WorkflowInstanceImpl(
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
             raise RuntimeError("Expected workflow input. This is a Python SDK bug.")
-        takes_workflow_input, err = _init_fn_takes_workflow_input(
-            self._defn.cls.__init__, self._workflow_input.run_fn
-        )
-        if takes_workflow_input is None:
-            raise RuntimeError(f"Cannot instantiate workflow: {err}")
-        elif takes_workflow_input:
+        if hasattr(self._defn.cls.__init__, "__temporal_workflow_init"):
             return self._defn.cls(*self._workflow_input.args)
         else:
             return self._defn.cls()
@@ -2857,72 +2852,3 @@ finishes, then you can disable this warning via the signal handler decorator:
             [{"name": name, "count": count} for name, count in names.most_common()]
         )
     )
-
-
-def _init_fn_takes_workflow_input(
-    init_fn: Callable[..., None],
-    run_fn: Callable[..., Awaitable[Any]],
-) -> Union[Tuple[bool, None], Tuple[None, str]]:
-    """Return (True, None) if Workflow input args should be passed to Workflow __init__."""
-    # If the workflow class can be instantiated as cls(), i.e. without passing
-    # workflow input args, then we do that. Otherwise, if the parameters of
-    # __init__ exactly match those of the @workflow.run method, then we pass the
-    # workflow input args to __init__ when instantiating the workflow class.
-    # Otherwise, the workflow definition is invalid.
-
-    if _unbound_method_can_be_called_without_args_when_bound(init_fn):
-        # The workflow cls can be instantiated as cls()
-        return False, None
-    else:
-
-        def get_params(fn: Callable) -> List[inspect.Parameter]:
-            # Ignore name when comparing parameters (remaining fields are kind,
-            # default, and annotation).
-            return [
-                p.replace(name="x") for p in inspect.signature(fn).parameters.values()
-            ]
-
-        # We require that any type annotations present match exactly; i.e. we do
-        # not support any notion of subtype compatibility.
-        if get_params(init_fn) == get_params(run_fn):
-            # __init__ requires some args and has the same parameters as @workflow.run
-            return True, None
-        else:
-            return (
-                None,
-                "__init__ parameters do not match @workflow.run method parameters",
-            )
-
-
-def _unbound_method_can_be_called_without_args_when_bound(
-    fn: Callable[..., Any],
-) -> bool:
-    """Return True if the unbound method fn can be called without arguments when bound."""
-    # An unbound method can be called without arguments when bound if the
-    # following are both true:
-    #
-    # - The first parameter is POSITIONAL_ONLY or POSITIONAL_OR_KEYWORD (this is
-    #   the parameter conventionally named 'self')
-    #
-    # - All other POSITIONAL_OR_KEYWORD or KEYWORD_ONLY parameters have default
-    #   values.
-    params = iter(inspect.signature(fn).parameters.values())
-    self_param = next(params, None)
-    if not self_param or self_param.kind not in [
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        inspect.Parameter.POSITIONAL_ONLY,
-    ]:
-        raise ValueError("Not an unbound method. This is a Python SDK bug.")
-    for p in params:
-        if p.kind == inspect.Parameter.POSITIONAL_ONLY:
-            return False
-        elif (
-            p.kind
-            in [
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                inspect.Parameter.KEYWORD_ONLY,
-            ]
-            and p.default is inspect.Parameter.empty
-        ):
-            return False
-    return True
