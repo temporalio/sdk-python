@@ -157,9 +157,9 @@ def init(
     instantiated as ``MyWorkflow()``.
 
     Note that the ``@workflow.run`` method is always called as
-    ``my_workflow.my_run_method(**workflow_input_args)``. If you use the
-    ``@workflow.init`` decorator, your __init__ method and your
-    ``@workflow.run`` method will typically have exactly the same parameters.
+    ``my_workflow.my_run_method(**workflow_input_args)``. Therefore, if you use
+    the ``@workflow.init`` decorator, the parameter list of your  __init__ and
+    ``@workflow.run`` methods will usually be identical.
 
     Args:
         init_fn: The __init__function to decorate.
