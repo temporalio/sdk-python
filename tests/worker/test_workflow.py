@@ -6101,7 +6101,8 @@ class WorkflowWithWorkflowInitBaseDecorated:
     async def run(self, _: str): ...
 
     @workflow.update
-    async def my_update(self) -> str: ...
+    async def my_update(self) -> str:
+        return self.value
 
 
 class WorkflowWithWorkflowInitBaseUndecorated(WorkflowWithWorkflowInitBaseDecorated):
@@ -6126,10 +6127,6 @@ class WorkflowWithWorkflowInitChild(WorkflowWithWorkflowInitBaseDecorated):
         self.value = "set in run method"
         return self.value
 
-    @workflow.update
-    async def my_update(self) -> str:
-        return self.value
-
 
 @workflow.defn(name="MyWorkflow")
 class WorkflowWithWorkflowInitChildNoWorkflowInit(
@@ -6148,10 +6145,6 @@ class WorkflowWithWorkflowInitChildNoWorkflowInit(
     @workflow.run
     async def run(self, _: str) -> str:
         self.value = "set in run method"
-        return self.value
-
-    @workflow.update
-    async def my_update(self) -> str:
         return self.value
 
 
