@@ -1335,6 +1335,7 @@ class _Definition:
         issues: List[str] = []
 
         # Collect run fn and all signal/query/update fns
+        init_fn: Optional[Callable[..., None]] = None
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
         seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
@@ -1381,6 +1382,8 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
+            elif name == "__init__" and hasattr(member, "__temporal_workflow_init"):
+                init_fn = member
             elif isinstance(member, UpdateMethodMultiParam):
                 update_defn = member._defn
                 if update_defn.name in updates:
@@ -1433,6 +1436,11 @@ class _Definition:
 
         if not seen_run_attr:
             issues.append("Missing @workflow.run method")
+        if init_fn and run_fn:
+            if not _parameters_identical_up_to_naming(init_fn, run_fn):
+                issues.append(
+                    "@workflow.init and @workflow.run method parameters do not match"
+                )
         if issues:
             if len(issues) == 1:
                 raise ValueError(f"Invalid workflow class: {issues[0]}")
@@ -1469,6 +1477,19 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
+
+
+def _parameters_identical_up_to_naming(fn1: Callable, fn2: Callable) -> bool:
+    """Return True if the functions have identical parameter lists, ignoring parameter names."""
+
+    def params(fn: Callable) -> List[inspect.Parameter]:
+        # Ignore name when comparing parameters (remaining fields are kind,
+        # default, and annotation).
+        return [p.replace(name="x") for p in inspect.signature(fn).parameters.values()]
+
+    # We require that any type annotations present match exactly; i.e. we do
+    # not support any notion of subtype compatibility.
+    return params(fn1) == params(fn2)
 
 
 # Async safe version of partial

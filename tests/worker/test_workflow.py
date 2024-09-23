@@ -3902,7 +3902,7 @@ async def test_workflow_custom_metrics(client: Client):
                 return False
             # Must have labels (don't escape for this test)
             for k, v in at_least_labels.items():
-                if not f'{k}="{v}"' in line:
+                if f'{k}="{v}"' not in line:
                     return False
             return line.endswith(f" {value}")
 
@@ -4856,7 +4856,7 @@ async def test_workflow_failure_types_configured(
         update_scenario: Optional[FailureTypesScenario] = None,
     ) -> None:
         logging.debug(
-            f"Asserting scenario %s",
+            "Asserting scenario %s",
             {
                 "workflow": workflow,
                 "expect_task_fail": expect_task_fail,
@@ -6054,7 +6054,7 @@ class WorkflowWithWorkflowInit:
     _expected_update_result = "workflow input value"
 
     @workflow.init
-    def __init__(self, arg: str = "from parameter default") -> None:
+    def __init__(self, arg: str) -> None:
         self.value = arg
 
     @workflow.update
@@ -6084,82 +6084,12 @@ class WorkflowWithNonWorkflowInitInit:
         return self.value
 
 
-@workflow.defn(name="MyWorkflow")
-class WorkflowWithWorkflowInitBaseDecorated:
-    use_workflow_init = True
-
-    @workflow.init
-    def __init__(
-        self, required_param_that_will_be_supplied_by_child_init_method
-    ) -> None:
-        self.value = required_param_that_will_be_supplied_by_child_init_method
-
-    if use_workflow_init:
-        __init__ = workflow.init(__init__)
-
-    @workflow.run
-    async def run(self, _: str): ...
-
-    @workflow.update
-    async def my_update(self) -> str:
-        return self.value
-
-
-class WorkflowWithWorkflowInitBaseUndecorated(WorkflowWithWorkflowInitBaseDecorated):
-    # The base class does not need the @workflow.init decorator
-    use_workflow_init = False
-
-
-@workflow.defn(name="MyWorkflow")
-class WorkflowWithWorkflowInitChild(WorkflowWithWorkflowInitBaseDecorated):
-    use_workflow_init = True
-    _expected_update_result = "workflow input value"
-
-    def __init__(self, arg: str = "from parameter default") -> None:
-        super().__init__("from child __init__")
-        self.value = arg
-
-    if use_workflow_init:
-        __init__ = workflow.init(__init__)
-
-    @workflow.run
-    async def run(self, _: str) -> str:
-        self.value = "set in run method"
-        return self.value
-
-
-@workflow.defn(name="MyWorkflow")
-class WorkflowWithWorkflowInitChildNoWorkflowInit(
-    WorkflowWithWorkflowInitBaseDecorated
-):
-    use_workflow_init = False
-    _expected_update_result = "from parameter default"
-
-    def __init__(self, arg: str = "from parameter default") -> None:
-        super().__init__("from child __init__")
-        self.value = arg
-
-    if use_workflow_init:
-        __init__ = workflow.init(__init__)
-
-    @workflow.run
-    async def run(self, _: str) -> str:
-        self.value = "set in run method"
-        return self.value
-
-
 @pytest.mark.parametrize(
     ["client_cls", "worker_cls"],
     [
         (WorkflowWithoutInit, WorkflowWithoutInit),
         (WorkflowWithNonWorkflowInitInit, WorkflowWithNonWorkflowInitInit),
         (WorkflowWithWorkflowInit, WorkflowWithWorkflowInit),
-        (WorkflowWithWorkflowInitBaseDecorated, WorkflowWithWorkflowInitChild),
-        (WorkflowWithWorkflowInitBaseUndecorated, WorkflowWithWorkflowInitChild),
-        (
-            WorkflowWithWorkflowInitBaseUndecorated,
-            WorkflowWithWorkflowInitChildNoWorkflowInit,
-        ),
     ],
 )
 async def test_update_in_first_wft_sees_workflow_init(
