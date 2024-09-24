@@ -201,6 +201,7 @@ class _WorkflowInstanceImpl(
         self._payload_converter = det.payload_converter_class()
         self._failure_converter = det.failure_converter_class()
         self._defn = det.defn
+        self._workflow_input: Optional[ExecuteWorkflowInput] = None
         self._info = det.info
         self._extern_functions = det.extern_functions
         self._disable_eager_activity_execution = det.disable_eager_activity_execution
@@ -318,8 +319,9 @@ class _WorkflowInstanceImpl(
         return self._current_thread_id
 
     #### Activation functions ####
-    # These are in alphabetical order and besides "activate", all other calls
-    # are "_apply_" + the job field name.
+    # These are in alphabetical order and besides "activate", and
+    # "_make_workflow_input", all other calls are "_apply_" + the job field
+    # name.
 
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
@@ -342,6 +344,7 @@ class _WorkflowInstanceImpl(
         try:
             # Split into job sets with patches, then signals + updates, then
             # non-queries, then queries
+            start_job = None
             job_sets: List[
                 List[temporalio.bridge.proto.workflow_activation.WorkflowActivationJob]
             ] = [[], [], [], []]
@@ -351,9 +354,14 @@ class _WorkflowInstanceImpl(
                 elif job.HasField("signal_workflow") or job.HasField("do_update"):
                     job_sets[1].append(job)
                 elif not job.HasField("query_workflow"):
+                    if job.HasField("start_workflow"):
+                        start_job = job.start_workflow
                     job_sets[2].append(job)
                 else:
                     job_sets[3].append(job)
+
+            if start_job:
+                self._workflow_input = self._make_workflow_input(start_job)
 
             # Apply every job set, running after each set
             for index, job_set in enumerate(job_sets):
@@ -863,26 +871,12 @@ class _WorkflowInstanceImpl(
                     return
                 raise
 
-        # Set arg types, using raw values for dynamic
-        arg_types = self._defn.arg_types
-        if not self._defn.name:
-            # Dynamic is just the raw value for each input value
-            arg_types = [temporalio.common.RawValue] * len(job.arguments)
-        args = self._convert_payloads(job.arguments, arg_types)
-        # Put args in a list if dynamic
-        if not self._defn.name:
-            args = [args]
-
-        # Schedule it
-        input = ExecuteWorkflowInput(
-            type=self._defn.cls,
-            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
-            run_fn=cast(Callable[..., Awaitable[Any]], self._defn.run_fn),
-            args=args,
-            headers=job.headers,
-        )
+        if not self._workflow_input:
+            raise RuntimeError(
+                "Expected workflow input to be set. This is an SDK Python bug."
+            )
         self._primary_task = self.create_task(
-            self._run_top_level_workflow_function(run_workflow(input)),
+            self._run_top_level_workflow_function(run_workflow(self._workflow_input)),
             name="run",
         )
 
@@ -890,6 +884,27 @@ class _WorkflowInstanceImpl(
         self, job: temporalio.bridge.proto.workflow_activation.UpdateRandomSeed
     ) -> None:
         self._random.seed(job.randomness_seed)
+
+    def _make_workflow_input(
+        self, start_job: temporalio.bridge.proto.workflow_activation.StartWorkflow
+    ) -> ExecuteWorkflowInput:
+        # Set arg types, using raw values for dynamic
+        arg_types = self._defn.arg_types
+        if not self._defn.name:
+            # Dynamic is just the raw value for each input value
+            arg_types = [temporalio.common.RawValue] * len(start_job.arguments)
+        args = self._convert_payloads(start_job.arguments, arg_types)
+        # Put args in a list if dynamic
+        if not self._defn.name:
+            args = [args]
+
+        return ExecuteWorkflowInput(
+            type=self._defn.cls,
+            # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
+            run_fn=cast(Callable[..., Awaitable[Any]], self._defn.run_fn),
+            args=args,
+            headers=start_job.headers,
+        )
 
     #### _Runtime direct workflow call overrides ####
     # These are in alphabetical order and all start with "workflow_".
@@ -1617,6 +1632,14 @@ class _WorkflowInstanceImpl(
         except Exception as err:
             raise RuntimeError("Failed decoding arguments") from err
 
+    def _instantiate_workflow_object(self) -> Any:
+        if not self._workflow_input:
+            raise RuntimeError("Expected workflow input. This is a Python SDK bug.")
+        if hasattr(self._defn.cls.__init__, "__temporal_workflow_init"):
+            return self._defn.cls(*self._workflow_input.args)
+        else:
+            return self._defn.cls()
+
     def _is_workflow_failure_exception(self, err: BaseException) -> bool:
         # An exception is a failure instead of a task fail if it's already a
         # failure error or if it is an instance of any of the failure types in
@@ -1752,7 +1775,7 @@ class _WorkflowInstanceImpl(
             # We instantiate the workflow class _inside_ here because __init__
             # needs to run with this event loop set
             if not self._object:
-                self._object = self._defn.cls()
+                self._object = self._instantiate_workflow_object()
 
             # Run while there is anything ready
             while self._ready:

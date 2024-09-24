@@ -575,6 +575,11 @@ Here are the decorators that can be applied:
   * The method's arguments are the workflow's arguments
   * The first parameter must be `self`, followed by positional arguments. Best practice is to only take a single
     argument that is an object/dataclass of fields that can be added to as needed.
+* `@workflow.init` - Specifies that the `__init__`  method accepts the workflow's arguments.
+  * If present, may only be applied to the `__init__` method, the parameters of which must then be identical to those of
+    the `@workflow.run` method.
+  * The purpose of this decorator is to allow operations involving workflow arguments to be performed in the `__init__`
+    method, before any signal or update handler has a chance to execute.
 * `@workflow.signal` - Defines a method as a signal
   * Can be defined on an `async` or non-`async` function at any hierarchy depth, but if decorated method is overridden,
     the override must also be decorated
