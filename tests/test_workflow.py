@@ -393,3 +393,19 @@ def test_parameters_identical_up_to_naming():
         assert (
             workflow._parameters_identical_up_to_naming(f1, f2) == (expect_equal)
         ), f"expected {name1} and {name2} parameters{" " if expect_equal else " not "}to compare equal"
+
+
+@workflow.defn
+class BadWorkflowInit:
+    def not__init__(self):
+        pass
+
+    @workflow.run
+    async def run(self):
+        pass
+
+
+def test_workflow_init_not__init__():
+    with pytest.raises(ValueError) as err:
+        workflow.init(BadWorkflowInit.not__init__)
+    assert "@workflow.init may only be used on the __init__ method" in str(err.value)
