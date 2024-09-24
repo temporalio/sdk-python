@@ -392,7 +392,7 @@ def test_parameters_identical_up_to_naming():
         expect_equal = name1[0] == name2[0]
         assert (
             workflow._parameters_identical_up_to_naming(f1, f2) == (expect_equal)
-        ), f"expected {name1} and {name2} parameters{" " if expect_equal else " not "}to compare equal"
+        ), f"expected {name1} and {name2} parameters{' ' if expect_equal else ' not '}to compare equal"
 
 
 @workflow.defn
