@@ -3575,7 +3575,7 @@ class SchedulePolicy:
     """Controls what happens when an action is started while another is still
     running."""
 
-    catchup_window: timedelta = timedelta(minutes=1)
+    catchup_window: timedelta = timedelta(days=365)
     """After a Temporal server is unavailable, amount of time in the past to
     execute missed actions."""
 
