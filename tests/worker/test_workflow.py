@@ -6146,3 +6146,45 @@ async def test_workflow_run_sees_workflow_init(client: Client):
             task_queue=worker.task_queue,
         )
         assert workflow_result == "hello, world"
+
+
+@workflow.defn
+class UpdateCancellationWorkflow:
+    def __init__(self) -> None:
+        self.non_terminating_operation_has_started = False
+
+    @workflow.run
+    async def run(self) -> NoReturn:
+        await asyncio.Future()
+
+    @workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)
+    async def non_terminating_update(self) -> NoReturn:
+        self.non_terminating_operation_has_started = True
+        await asyncio.Future()
+
+    @workflow.update
+    async def wait_until_non_terminating_operation_has_started(self) -> None:
+        await workflow.wait_condition(
+            lambda: self.non_terminating_operation_has_started
+        )
+
+
+async def test_update_cancellation(client: Client):
+    async with new_worker(client, UpdateCancellationWorkflow) as worker:
+        wf_handle = await client.start_workflow(
+            UpdateCancellationWorkflow.run,
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
+        # Asynchronously run an update that will never complete
+        non_terminating_update = asyncio.create_task(
+            wf_handle.execute_update(UpdateCancellationWorkflow.non_terminating_update)
+        )
+        # Wait until we know the update handler has started executing
+        await wf_handle.execute_update(
+            UpdateCancellationWorkflow.wait_until_non_terminating_operation_has_started
+        )
+        # Cancel the workflow and confirm that update caller sees update failed
+        await wf_handle.cancel()
+        with pytest.raises(WorkflowUpdateFailedError):
+            await non_terminating_update
