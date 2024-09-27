@@ -518,9 +518,9 @@ class _WorkflowInstanceImpl(
                         f"Update handler for '{job.name}' expected but not found, and there is no dynamic handler. "
                         f"known updates: [{' '.join(known_updates)}]"
                     )
-                self._in_progress_updates[job.id] = HandlerExecution(
-                    job.name, defn.unfinished_policy, job.id
-                )
+                self._in_progress_updates[
+                    job.id
+                ].unfinished_policy = defn.unfinished_policy
                 args = self._process_handler_args(
                     job.name,
                     job.input,
@@ -571,7 +571,7 @@ class _WorkflowInstanceImpl(
                 # All asyncio cancelled errors become Temporal cancelled errors
                 if isinstance(err, asyncio.CancelledError):
                     err = temporalio.exceptions.CancelledError(
-                        f"Cancellation raised within update {err}"
+                        f"Cancellation raised within update: {err}"
                     )
                 # Read-only issues during validation should fail the task
                 if isinstance(err, temporalio.workflow.ReadOnlyContextError):
@@ -606,9 +606,15 @@ class _WorkflowInstanceImpl(
             finally:
                 self._in_progress_updates.pop(job.id, None)
 
-        self.create_task(
+        task = self.create_task(
             run_update(),
             name=f"update: {job.name}",
+        )
+        self._in_progress_updates[job.id] = HandlerExecution(
+            job.name,
+            task,
+            temporalio.workflow.HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+            job.id,
         )
 
     def _apply_fire_timer(
@@ -1729,20 +1735,20 @@ class _WorkflowInstanceImpl(
             signal=job.signal_name, args=args, headers=job.headers
         )
 
-        self._handled_signals_seq += 1
-        id = self._handled_signals_seq
-        self._in_progress_signals[id] = HandlerExecution(
-            job.signal_name, defn.unfinished_policy
-        )
-
-        def done_callback(f):
-            self._in_progress_signals.pop(id, None)
-
         task = self.create_task(
             self._run_top_level_workflow_function(self._inbound.handle_signal(input)),
             name=f"signal: {job.signal_name}",
         )
+        self._handled_signals_seq += 1
+        id = self._handled_signals_seq
+
+        def done_callback(_):
+            self._in_progress_signals.pop(id, None)
+
         task.add_done_callback(done_callback)
+        self._in_progress_signals[id] = HandlerExecution(
+            job.signal_name, task, defn.unfinished_policy
+        )
 
     def _register_task(
         self,
@@ -2811,6 +2817,7 @@ class HandlerExecution:
     """Information about an execution of a signal or update handler."""
 
     name: str
+    task: asyncio.Task[None]
     unfinished_policy: temporalio.workflow.HandlerUnfinishedPolicy
     id: Optional[str] = None
 
