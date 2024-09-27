@@ -434,7 +434,6 @@ class _WorkflowInstanceImpl(
                 command.HasField("complete_workflow_execution")
                 or command.HasField("continue_as_new_workflow_execution")
                 or command.HasField("fail_workflow_execution")
-                or command.HasField("cancel_workflow_execution")
             )
 
         if any(map(is_completion, self._current_completion.successful.commands)):

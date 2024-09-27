@@ -5584,8 +5584,10 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     async def test_warning_is_issued_on_exit_with_unfinished_handler(
         self,
     ):
-        assert await self._run_workflow_and_get_warning() == (
+        warning_emitted = await self._run_workflow_and_get_warning()
+        assert warning_emitted == (
             self.handler_waiting == "-no-wait-all-handlers-finish-"
+            and self.workflow_termination_type != "-cancellation-"
         )
 
     async def _run_workflow_and_get_warning(self) -> bool:
