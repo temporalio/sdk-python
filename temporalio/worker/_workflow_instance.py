@@ -429,20 +429,15 @@ class _WorkflowInstanceImpl(
                     f"Failed converting activation exception: {inner_err}"
                 )
 
-        def is_non_cancellation_completion(command):
+        def is_completion(command):
             return (
                 command.HasField("complete_workflow_execution")
                 or command.HasField("continue_as_new_workflow_execution")
                 or command.HasField("fail_workflow_execution")
+                or command.HasField("cancel_workflow_execution")
             )
 
-        # We do also warn in the case of workflow cancellation, but this is done
-        # when handling the workflow cancellation, since we also cancel update
-        # handlers at that time.
-        if any(
-            is_non_cancellation_completion(c)
-            for c in self._current_completion.successful.commands
-        ):
+        if any(map(is_completion, self._current_completion.successful.commands)):
             self._warn_if_unfinished_handlers()
 
         return self._current_completion
@@ -1856,7 +1851,6 @@ class _WorkflowInstanceImpl(
                 err
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
-                self._warn_if_unfinished_handlers()
                 # Cancel update tasks, so that the update caller receives an
                 # update failed error. We do not currently cancel signal tasks
                 # since (a) doing so would require a workflow flag and (b) the
