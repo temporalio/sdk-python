@@ -5584,18 +5584,18 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     async def test_warning_is_issued_on_exit_with_unfinished_handler(
         self,
     ):
-        warning_emitted = await self._run_workflow_and_get_warning()
+        warnings_emitted = await self._run_workflow_and_get_warning()
         if self.workflow_termination_type == "-cancellation-":
             # All paths through this test for which the workflow is cancelled result
             # in the warning being emitted.
-            assert warning_emitted
+            assert warnings_emitted == 1
         else:
             # Otherwise, the warning is emitted iff the workflow does not wait for handlers to finish.
-            assert warning_emitted == (
-                self.handler_waiting == "-no-wait-all-handlers-finish-"
+            assert warnings_emitted == (
+                1 if self.handler_waiting == "-no-wait-all-handlers-finish-" else 0
             )
 
-    async def _run_workflow_and_get_warning(self) -> bool:
+    async def _run_workflow_and_get_warning(self) -> int:
         workflow_id = f"wf-{uuid.uuid4()}"
         update_id = "update-id"
         task_queue = "tq"
@@ -5688,9 +5688,10 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                         == "Deliberately failing post-ContinueAsNew run"
                     )
 
-                unfinished_handler_warning_emitted = any(
-                    issubclass(w.category, self._unfinished_handler_warning_cls)
+                unfinished_handler_warning_emitted = sum(
+                    1
                     for w in warnings
+                    if issubclass(w.category, self._unfinished_handler_warning_cls)
                 )
                 return unfinished_handler_warning_emitted
 
