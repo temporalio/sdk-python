@@ -5646,7 +5646,16 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             with pytest.WarningsRecorder() as warnings:
                 if self.handler_type == "-update-":
                     assert update_task
-                    if self.handler_waiting == "-wait-all-handlers-finish-":
+
+                    if self.workflow_termination_type == "-cancellation-":
+                        with pytest.raises(WorkflowUpdateFailedError) as update_err:
+                            await update_task
+                        assert isinstance(update_err.value.cause, CancelledError)
+                        assert (
+                            "the workflow was cancelled"
+                            in str(update_err.value.cause).lower()
+                        )
+                    elif self.handler_waiting == "-wait-all-handlers-finish-":
                         await update_task
                     else:
                         with pytest.raises(RPCError) as update_err:
