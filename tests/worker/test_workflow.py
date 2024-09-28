@@ -3902,7 +3902,7 @@ async def test_workflow_custom_metrics(client: Client):
                 return False
             # Must have labels (don't escape for this test)
             for k, v in at_least_labels.items():
-                if not f'{k}="{v}"' in line:
+                if f'{k}="{v}"' not in line:
                     return False
             return line.endswith(f" {value}")
 
@@ -4856,7 +4856,7 @@ async def test_workflow_failure_types_configured(
         update_scenario: Optional[FailureTypesScenario] = None,
     ) -> None:
         logging.debug(
-            f"Asserting scenario %s",
+            "Asserting scenario %s",
             {
                 "workflow": workflow,
                 "expect_task_fail": expect_task_fail,
@@ -6032,3 +6032,117 @@ async def test_activity_retry_delay(client: Client):
                 err.cause.cause.next_retry_delay
                 == ActivitiesWithRetryDelayWorkflow.next_retry_delay
             )
+
+
+@workflow.defn
+class WorkflowWithoutInit:
+    value = "from class attribute"
+    _expected_update_result = "from class attribute"
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.value
+
+    @workflow.run
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
+
+
+@workflow.defn
+class WorkflowWithWorkflowInit:
+    _expected_update_result = "workflow input value"
+
+    @workflow.init
+    def __init__(self, arg: str) -> None:
+        self.value = arg
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.value
+
+    @workflow.run
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
+
+
+@workflow.defn
+class WorkflowWithNonWorkflowInitInit:
+    _expected_update_result = "from parameter default"
+
+    def __init__(self, arg: str = "from parameter default") -> None:
+        self.value = arg
+
+    @workflow.update
+    async def my_update(self) -> str:
+        return self.value
+
+    @workflow.run
+    async def run(self, _: str) -> str:
+        self.value = "set in run method"
+        return self.value
+
+
+@pytest.mark.parametrize(
+    ["client_cls", "worker_cls"],
+    [
+        (WorkflowWithoutInit, WorkflowWithoutInit),
+        (WorkflowWithNonWorkflowInitInit, WorkflowWithNonWorkflowInitInit),
+        (WorkflowWithWorkflowInit, WorkflowWithWorkflowInit),
+    ],
+)
+async def test_update_in_first_wft_sees_workflow_init(
+    client: Client, client_cls: Type, worker_cls: Type
+):
+    """
+    Test how @workflow.init affects what an update in the first WFT sees.
+
+    Such an update is guaranteed to start executing before the main workflow
+    coroutine. The update should see the side effects of the __init__ method if
+    and only if @workflow.init is in effect.
+    """
+    # This test must ensure that the update is in the first WFT. To do so,
+    # before running the worker, we start the workflow, send the update, and
+    # wait until the update is admitted.
+    task_queue = "task-queue"
+    update_id = "update-id"
+    wf_handle = await client.start_workflow(
+        client_cls.run,
+        "workflow input value",
+        id=str(uuid.uuid4()),
+        task_queue=task_queue,
+    )
+    update_task = asyncio.create_task(
+        wf_handle.execute_update(client_cls.my_update, id=update_id)
+    )
+    await assert_eq_eventually(
+        True, lambda: workflow_update_exists(client, wf_handle.id, update_id)
+    )
+    # When the worker starts polling it will receive a first WFT containing the
+    # update, in addition to the start_workflow job.
+    async with new_worker(client, worker_cls, task_queue=task_queue):
+        assert await update_task == worker_cls._expected_update_result
+        assert await wf_handle.result() == "set in run method"
+
+
+@workflow.defn
+class WorkflowRunSeesWorkflowInitWorkflow:
+    @workflow.init
+    def __init__(self, arg: str) -> None:
+        self.value = arg
+
+    @workflow.run
+    async def run(self, _: str):
+        return f"hello, {self.value}"
+
+
+async def test_workflow_run_sees_workflow_init(client: Client):
+    async with new_worker(client, WorkflowRunSeesWorkflowInitWorkflow) as worker:
+        workflow_result = await client.execute_workflow(
+            WorkflowRunSeesWorkflowInitWorkflow.run,
+            "world",
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
+        assert workflow_result == "hello, world"

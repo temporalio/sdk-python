@@ -143,10 +143,38 @@ def defn(
     return decorator
 
 
+def init(
+    init_fn: CallableType,
+) -> CallableType:
+    """Decorator for the workflow init method.
+
+    This may be used on the __init__ method of the workflow class to specify
+    that it accepts the same workflow input arguments as the ``@workflow.run``
+    method. It may not be used on any other method.
+
+    If used, the workflow will be instantiated as
+    ``MyWorkflow(**workflow_input_args)``. If not used, the workflow will be
+    instantiated as ``MyWorkflow()``.
+
+    Note that the ``@workflow.run`` method is always called as
+    ``my_workflow.my_run_method(**workflow_input_args)``. If you use the
+    ``@workflow.init`` decorator, the parameter list of your  __init__ and
+    ``@workflow.run`` methods must be identical.
+
+    Args:
+        init_fn: The __init__function to decorate.
+    """
+    if init_fn.__name__ != "__init__":
+        raise ValueError("@workflow.init may only be used on the __init__ method")
+
+    setattr(init_fn, "__temporal_workflow_init", True)
+    return init_fn
+
+
 def run(fn: CallableAsyncType) -> CallableAsyncType:
     """Decorator for the workflow run method.
 
-    This must be set on one and only one async method defined on the same class
+    This must be used on one and only one async method defined on the same class
     as ``@workflow.defn``. This can be defined on a base class method but must
     then be explicitly overridden and defined on the workflow class.
 
@@ -238,7 +266,7 @@ def signal(
 ):
     """Decorator for a workflow signal method.
 
-    This is set on any async or non-async method that you wish to be called upon
+    This is used on any async or non-async method that you wish to be called upon
     receiving a signal. If a function overrides one with this decorator, it too
     must be decorated.
 
@@ -309,7 +337,7 @@ def query(
 ):
     """Decorator for a workflow query method.
 
-    This is set on any non-async method that expects to handle a query. If a
+    This is used on any non-async method that expects to handle a query. If a
     function overrides one with this decorator, it too must be decorated.
 
     Query methods can only have positional parameters. Best practice for
@@ -985,7 +1013,7 @@ def update(
 ):
     """Decorator for a workflow update handler method.
 
-    This is set on any async or non-async method that you wish to be called upon
+    This is used on any async or non-async method that you wish to be called upon
     receiving an update. If a function overrides one with this decorator, it too
     must be decorated.
 
@@ -1309,13 +1337,13 @@ class _Definition:
         issues: List[str] = []
 
         # Collect run fn and all signal/query/update fns
-        members = inspect.getmembers(cls)
+        init_fn: Optional[Callable[..., None]] = None
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
         seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
         queries: Dict[Optional[str], _QueryDefinition] = {}
         updates: Dict[Optional[str], _UpdateDefinition] = {}
-        for name, member in members:
+        for name, member in inspect.getmembers(cls):
             if hasattr(member, "__temporal_workflow_run"):
                 seen_run_attr = True
                 if not _is_unbound_method_on_cls(member, cls):
@@ -1356,6 +1384,8 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
+            elif name == "__init__" and hasattr(member, "__temporal_workflow_init"):
+                init_fn = member
             elif isinstance(member, UpdateMethodMultiParam):
                 update_defn = member._defn
                 if update_defn.name in updates:
@@ -1408,9 +1438,14 @@ class _Definition:
 
         if not seen_run_attr:
             issues.append("Missing @workflow.run method")
-        if len(issues) == 1:
-            raise ValueError(f"Invalid workflow class: {issues[0]}")
-        elif issues:
+        if init_fn and run_fn:
+            if not _parameters_identical_up_to_naming(init_fn, run_fn):
+                issues.append(
+                    "@workflow.init and @workflow.run method parameters do not match"
+                )
+        if issues:
+            if len(issues) == 1:
+                raise ValueError(f"Invalid workflow class: {issues[0]}")
             raise ValueError(
                 f"Invalid workflow class for {len(issues)} reasons: {', '.join(issues)}"
             )
@@ -1444,6 +1479,19 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
+
+
+def _parameters_identical_up_to_naming(fn1: Callable, fn2: Callable) -> bool:
+    """Return True if the functions have identical parameter lists, ignoring parameter names."""
+
+    def params(fn: Callable) -> List[inspect.Parameter]:
+        # Ignore name when comparing parameters (remaining fields are kind,
+        # default, and annotation).
+        return [p.replace(name="x") for p in inspect.signature(fn).parameters.values()]
+
+    # We require that any type annotations present match exactly; i.e. we do
+    # not support any notion of subtype compatibility.
+    return params(fn1) == params(fn2)
 
 
 # Async safe version of partial

@@ -1,4 +1,6 @@
-from typing import Any, Sequence
+import inspect
+import itertools
+from typing import Sequence
 
 import pytest
 
@@ -342,3 +344,68 @@ def test_workflow_defn_dynamic_handler_warnings():
     # We want to make sure they are reporting the right stacklevel
     warnings[0].filename.endswith("test_workflow.py")
     warnings[1].filename.endswith("test_workflow.py")
+
+
+class _TestParametersIdenticalUpToNaming:
+    def a1(self, a):
+        pass
+
+    def a2(self, b):
+        pass
+
+    def b1(self, a: int):
+        pass
+
+    def b2(self, b: int) -> str:
+        return ""
+
+    def c1(self, a1: int, a2: str) -> str:
+        return ""
+
+    def c2(self, b1: int, b2: str) -> int:
+        return 0
+
+    def d1(self, a1, a2: str) -> None:
+        pass
+
+    def d2(self, b1, b2: str) -> str:
+        return ""
+
+    def e1(self, a1, a2: str = "") -> None:
+        return None
+
+    def e2(self, b1, b2: str = "") -> str:
+        return ""
+
+    def f1(self, a1, a2: str = "a") -> None:
+        return None
+
+
+def test_parameters_identical_up_to_naming():
+    fns = [
+        f
+        for _, f in inspect.getmembers(_TestParametersIdenticalUpToNaming)
+        if inspect.isfunction(f)
+    ]
+    for f1, f2 in itertools.combinations(fns, 2):
+        name1, name2 = f1.__name__, f2.__name__
+        expect_equal = name1[0] == name2[0]
+        assert (
+            workflow._parameters_identical_up_to_naming(f1, f2) == (expect_equal)
+        ), f"expected {name1} and {name2} parameters{' ' if expect_equal else ' not '}to compare equal"
+
+
+@workflow.defn
+class BadWorkflowInit:
+    def not__init__(self):
+        pass
+
+    @workflow.run
+    async def run(self):
+        pass
+
+
+def test_workflow_init_not__init__():
+    with pytest.raises(ValueError) as err:
+        workflow.init(BadWorkflowInit.not__init__)
+    assert "@workflow.init may only be used on the __init__ method" in str(err.value)
