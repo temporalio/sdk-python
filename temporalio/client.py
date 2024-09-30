@@ -1117,8 +1117,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> TaskQueueDescription:
-        """
-        Describe task queue.
+        """Describe task queue.
 
         .. note::
            This is only for unversioned workers. Worker versioning is not yet
@@ -1130,8 +1129,10 @@ class Client:
                 present or empty, all types are considered.
             report_pollers: Include list of pollers for requested task queue types.
             report_stats: Include task queue stats for requested task queue types.
+            rpc_metadata: Headers used on each RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call.
         """
-
         if not report_pollers and not report_stats:
             raise ValueError(
                 "At least one of report_pollers or report_stats must be True"
@@ -5039,6 +5040,7 @@ class OutboundInterceptor:
     async def describe_task_queue(
         self, input: DescribeTaskQueueInput
     ) -> TaskQueueDescription:
+        """Called for every :py:meth:`Client.describe_task_queue` call."""
         return await self.next.describe_task_queue(input)
 
 
@@ -6194,6 +6196,11 @@ class TaskReachabilityType(Enum):
 
 
 class TaskQueueType(IntEnum):
+    """Type of task queue.
+
+    See :py:class:`temporalio.api.enums.v1.TaskQueueType`.
+    """
+
     WORKFLOW = int(temporalio.api.enums.v1.TaskQueueType.TASK_QUEUE_TYPE_WORKFLOW)
     ACTIVITY = int(temporalio.api.enums.v1.TaskQueueType.TASK_QUEUE_TYPE_ACTIVITY)
     NEXUS = int(temporalio.api.enums.v1.TaskQueueType.TASK_QUEUE_TYPE_NEXUS)
@@ -6201,6 +6208,8 @@ class TaskQueueType(IntEnum):
 
 @dataclass
 class TaskQueueDescription:
+    """Description of a task queue."""
+
     types: Mapping[TaskQueueType, TaskQueueTypeInfo]
     """
     Task queue type information, keyed by task queue type.
@@ -6224,6 +6233,8 @@ class TaskQueueDescription:
 
 @dataclass
 class TaskQueueTypeInfo:
+    """Information for a specific task queue type."""
+
     pollers: Sequence[TaskQueuePollerInfo]
     """
     Information about recent pollers, or empty if not requested or none
@@ -6231,9 +6242,7 @@ class TaskQueueTypeInfo:
     """
 
     stats: Optional[TaskQueueStats]
-    """
-    Task queue stats, or none if not requested.
-    """
+    """Task queue stats, or none if not requested."""
 
     @staticmethod
     def _from_proto(
@@ -6252,14 +6261,16 @@ class TaskQueueTypeInfo:
 
 @dataclass
 class TaskQueuePollerInfo:
+    """Information for a specific task queue poller."""
+
     last_access_time: Optional[datetime]
-    # Time of the last poll if any.
+    """Time of the last poll if any."""
 
     identity: str
-    # Identity of the worker/client who is polling this task queue.
+    """Identity of the worker/client who is polling this task queue."""
 
     rate_per_second: Optional[float]
-    # Polling rate.
+    """Polling rate."""
 
     @staticmethod
     def _from_proto(
@@ -6278,6 +6289,8 @@ class TaskQueuePollerInfo:
 
 @dataclass
 class TaskQueueStats:
+    """Statistics for a specific task queue type."""
+
     approximate_backlog_count: int
     """
     The approximate number of tasks backlogged in this task queue. May count
