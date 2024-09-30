@@ -1856,7 +1856,7 @@ class _WorkflowInstanceImpl(
                 # presence of the update caller gives a strong reason to cancel
                 # update tasks.
                 for update_handler in self._in_progress_updates.values():
-                    update_handler.task.cancel("The workflow was cancelled.")
+                    update_handler.task.cancel()
             elif self._is_workflow_failure_exception(err):
                 # All other failure errors fail the workflow
                 self._set_workflow_failure(err)
