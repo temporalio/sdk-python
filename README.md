@@ -65,6 +65,7 @@ informal introduction to the features and their implementation.
       - [Asyncio Cancellation](#asyncio-cancellation)
       - [Workflow Utilities](#workflow-utilities)
       - [Exceptions](#exceptions)
+      - [Signal and update handlers](#signal-and-update-handlers)
       - [External Workflows](#external-workflows)
       - [Testing](#testing)
         - [Automatic Time Skipping](#automatic-time-skipping)
@@ -581,28 +582,35 @@ Here are the decorators that can be applied:
   * The purpose of this decorator is to allow operations involving workflow arguments to be performed in the `__init__`
     method, before any signal or update handler has a chance to execute.
 * `@workflow.signal` - Defines a method as a signal
-  * Can be defined on an `async` or non-`async` function at any hierarchy depth, but if decorated method is overridden,
-    the override must also be decorated
-  * The method's arguments are the signal's arguments
-  * Can have a `name` param to customize the signal name, otherwise it defaults to the unqualified method name
+  * Can be defined on an `async` or non-`async` method at any point in the class hierarchy, but if the decorated method
+    is overridden, then the override must also be decorated.
+  * The method's arguments are the signal's arguments.
+  * Return value is ignored.
+  * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
+  * Can have a `name` param to customize the signal name, otherwise it defaults to the unqualified method name.
   * Can have `dynamic=True` which means all otherwise unhandled signals fall through to this. If present, cannot have
     `name` argument, and method parameters must be `self`, a string signal name, and a
     `Sequence[temporalio.common.RawValue]`.
   * Non-dynamic method can only have positional arguments. Best practice is to only take a single argument that is an
     object/dataclass of fields that can be added to as needed.
-  * Return value is ignored
-* `@workflow.query` - Defines a method as a query
-  * All the same constraints as `@workflow.signal` but should return a value
-  * Should not be `async`
-  * Temporal queries should never mutate anything in the workflow or call any calls that would mutate the workflow
+  * See [Signal and update handlers](#signal-and-update-handlers) below
 * `@workflow.update` - Defines a method as an update
-  * May both accept as input and return a value
+  * Can be defined on an `async` or non-`async` method at any point in the class hierarchy, but if the decorated method
+    is overridden, then the override must also be decorated.
+  * May accept input and return a value
+  * The method's arguments are the update's arguments.
   * May be `async` or non-`async`
   * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
-  * Also accepts the `name` and `dynamic` parameters like signals and queries, with the same semantics.
+  * Also accepts the `name` and `dynamic` parameters like signal, with the same semantics.
   * Update handlers may optionally define a validator method by decorating it with `@update_handler_method.validator`.
     To reject an update before any events are written to history, throw an exception in a validator. Validators cannot 
     be `async`, cannot mutate workflow state, and return nothing.
+  * See [Signal and update handlers](#signal-and-update-handlers) below
+* `@workflow.query` - Defines a method as a query
+  * Should return a value
+  * Should not be `async`
+  * Temporal queries should never mutate anything in the workflow or call any calls that would mutate the workflow
+  * Also accepts the `name` and `dynamic` parameters like signal and update, with the same semantics.
 
 #### Running
 
@@ -705,9 +713,15 @@ deterministic:
 
 #### Asyncio Cancellation
 
-Cancellation is done the same way as `asyncio`. Specifically, a task can be requested to be cancelled but does not
-necessarily have to respect that cancellation immediately. This also means that `asyncio.shield()` can be used to
-protect against cancellation. The following tasks, when cancelled, perform a Temporal cancellation:
+Cancellation is done using `asyncio` [task cancellation](https://docs.python.org/3/library/asyncio-task.html#task-cancellation).
+This means that tasks are requested to be cancelled but can catch the
+[`asyncio.CancelledError`](https://docs.python.org/3/library/asyncio-exceptions.html#asyncio.CancelledError), thus
+allowing them to perform some cleanup before allowing the cancellation to proceed (i.e. re-raising the error), or to
+deny the cancellation entirely. It also means that
+[`asyncio.shield()`](https://docs.python.org/3/library/asyncio-task.html#shielding-from-cancellation) can be used to
+protect tasks against cancellation.
+
+The following tasks, when cancelled, perform a Temporal cancellation:
 
 * Activities - when the task executing an activity is cancelled, a cancellation request is sent to the activity
 * Child workflows - when the task starting or executing a child workflow is cancelled, a cancellation request is sent to
@@ -746,16 +760,42 @@ While running in a workflow, in addition to features documented elsewhere, the f
     be marked non-retryable or include details as needed.
   * Other exceptions that come from activity execution, child execution, cancellation, etc are already instances of
     `FailureError` and will fail the workflow when uncaught.
+* Update handlers are special: an instance of `temporalio.exceptions.FailureError` raised in an update handler will fail
+  the update instead of failing the workflow.
 * All other exceptions fail the "workflow task" which means the workflow will continually retry until the workflow is
   fixed. This is helpful for bad code or other non-predictable exceptions. To actually fail the workflow, use an
   `ApplicationError` as mentioned above.
 
 This default can be changed by providing a list of exception types to `workflow_failure_exception_types` when creating a
 `Worker` or `failure_exception_types` on the `@workflow.defn` decorator. If a workflow-thrown exception is an instance
-of any type in either list, it will fail the workflow instead of the task. This means a value of `[Exception]` will
-cause every exception to fail the workflow instead of the task. Also, as a special case, if
+of any type in either list, it will fail the workflow (or update) instead of the workflow task. This means a value of
+`[Exception]` will cause every exception to fail the workflow instead of the workflow task. Also, as a special case, if
 `temporalio.workflow.NondeterminismError` (or any superclass of it) is set, non-deterministic exceptions will fail the
 workflow. WARNING: These settings are experimental.
+
+#### Signal and update handlers
+
+Signal and update handlers are defined using decorated methods as shown in the example [above](#definition). Client code
+sends signals and updates using `workflow_handle.signal`, `workflow_handle.execute_update`, or
+`workflow_handle.start_update`. When the workflow receives one of these requests, it starts an `asyncio.Task` executing
+the corresponding handler method with the argument(s) from the request.
+
+The handler methods may be `async def` and can do all the async operations described above (e.g. invoking activities and
+child workflows, and waiting on timers and conditions). Notice that this means that handler tasks will be executing
+concurrently with respect to each other and the main workflow task. Use
+[asyncio.Lock](https://docs.python.org/3/library/asyncio-sync.html#lock) and
+[asyncio.Semaphore](https://docs.python.org/3/library/asyncio-sync.html#semaphore) if necessary.
+
+Your main workflow task may finish as a result of successful completion, cancellation, continue-as-new, or failure. You
+should ensure that all in-progress signal and update handler tasks have finished before this happens; if you do not, you
+will see a warning (the warning can be disabled via the `workflow.signal`/`workflow.update` decorators). One way to
+ensure that handler tasks have finished is to wait on the `workflow.all_handlers_finished` condition:
+```python
+await workflow.wait_condition(workflow.all_handlers_finished)
+```
+
+If your main workflow task finishes as a result of cancellation, then any in-progress update handler tasks will be
+automatically requested to cancel.
 
 #### External Workflows
 

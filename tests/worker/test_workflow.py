@@ -5584,8 +5584,10 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     async def test_warning_is_issued_on_exit_with_unfinished_handler(
         self,
     ):
-        assert await self._run_workflow_and_get_warning() == (
+        warning_emitted = await self._run_workflow_and_get_warning()
+        assert warning_emitted == (
             self.handler_waiting == "-no-wait-all-handlers-finish-"
+            and self.workflow_termination_type != "-cancellation-"
         )
 
     async def _run_workflow_and_get_warning(self) -> bool:
@@ -5646,13 +5648,22 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             with pytest.WarningsRecorder() as warnings:
                 if self.handler_type == "-update-":
                     assert update_task
-                    if self.handler_waiting == "-wait-all-handlers-finish-":
+
+                    if self.workflow_termination_type == "-cancellation-":
+                        with pytest.raises(WorkflowUpdateFailedError) as update_err:
+                            await update_task
+                        assert isinstance(update_err.value.cause, CancelledError)
+                        assert (
+                            "the workflow was cancelled"
+                            in str(update_err.value.cause).lower()
+                        )
+                    elif self.handler_waiting == "-wait-all-handlers-finish-":
                         await update_task
                     else:
-                        with pytest.raises(RPCError) as update_err:
+                        with pytest.raises(RPCError) as rpc_err:
                             await update_task
-                        assert update_err.value.status == RPCStatusCode.NOT_FOUND and (
-                            str(update_err.value).lower()
+                        assert rpc_err.value.status == RPCStatusCode.NOT_FOUND and (
+                            str(rpc_err.value).lower()
                             == "workflow execution already completed"
                         )
 
@@ -6146,3 +6157,45 @@ async def test_workflow_run_sees_workflow_init(client: Client):
             task_queue=worker.task_queue,
         )
         assert workflow_result == "hello, world"
+
+
+@workflow.defn
+class UpdateCancellationWorkflow:
+    def __init__(self) -> None:
+        self.non_terminating_operation_has_started = False
+
+    @workflow.run
+    async def run(self) -> None:
+        await asyncio.Future()
+
+    @workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)
+    async def non_terminating_update(self) -> None:
+        self.non_terminating_operation_has_started = True
+        await asyncio.Future()
+
+    @workflow.update
+    async def wait_until_non_terminating_operation_has_started(self) -> None:
+        await workflow.wait_condition(
+            lambda: self.non_terminating_operation_has_started
+        )
+
+
+async def test_update_cancellation(client: Client):
+    async with new_worker(client, UpdateCancellationWorkflow) as worker:
+        wf_handle = await client.start_workflow(
+            UpdateCancellationWorkflow.run,
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
+        # Asynchronously run an update that will never complete
+        non_terminating_update = asyncio.create_task(
+            wf_handle.execute_update(UpdateCancellationWorkflow.non_terminating_update)
+        )
+        # Wait until we know the update handler has started executing
+        await wf_handle.execute_update(
+            UpdateCancellationWorkflow.wait_until_non_terminating_operation_has_started
+        )
+        # Cancel the workflow and confirm that update caller sees update failed
+        await wf_handle.cancel()
+        with pytest.raises(WorkflowUpdateFailedError):
+            await non_terminating_update  # type: ignore
