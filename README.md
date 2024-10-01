@@ -793,6 +793,10 @@ ensure that handler tasks have finished is to wait on the `workflow.all_handlers
 ```python
 await workflow.wait_condition(workflow.all_handlers_finished)
 ```
+
+If your main workflow task finishes as a result of cancellation, then any in-progress update handler tasks will be
+automatically requested to cancel.
+
 #### External Workflows
 
 * `workflow.get_external_workflow_handle()` inside a workflow returns a handle to interact with another workflow
