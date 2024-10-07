@@ -358,6 +358,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        print("activate -------------------------------------------------------------")
         # Reset current completion, time, and whether replaying
         self._current_completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
@@ -490,6 +491,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def _apply(
         self, job: temporalio.bridge.proto.workflow_activation.WorkflowActivationJob
     ) -> None:
+        print("job", job.WhichOneof("variant"))
         if job.HasField("cancel_workflow"):
             self._apply_cancel_workflow(job.cancel_workflow)
         elif job.HasField("do_update"):
