@@ -150,19 +150,11 @@ def init(
 
     This may be used on the __init__ method of the workflow class to specify
     that it accepts the same workflow input arguments as the ``@workflow.run``
-    method. It may not be used on any other method.
-
-    If used, the workflow will be instantiated as
-    ``MyWorkflow(**workflow_input_args)``. If not used, the workflow will be
-    instantiated as ``MyWorkflow()``.
-
-    Note that the ``@workflow.run`` method is always called as
-    ``my_workflow.my_run_method(**workflow_input_args)``. If you use the
-    ``@workflow.init`` decorator, the parameter list of your  __init__ and
-    ``@workflow.run`` methods must be identical.
+    method. If used, the parameters of your  __init__ and ``@workflow.run``
+    methods must be identical.
 
     Args:
-        init_fn: The __init__function to decorate.
+        init_fn: The __init__ method to decorate.
     """
     if init_fn.__name__ != "__init__":
         raise ValueError("@workflow.init may only be used on the __init__ method")
