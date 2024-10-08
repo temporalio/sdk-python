@@ -1553,7 +1553,9 @@ async def test_workflow_with_custom_runner(client: Client):
         )
         assert result == "Hello, Temporal!"
     # Confirm first activation and last completion
-    assert runner._pairs[0][0].jobs[0].start_workflow.workflow_type == "HelloWorkflow"
+    assert (
+        runner._pairs[0][0].jobs[0].initialize_workflow.workflow_type == "HelloWorkflow"
+    )
     assert (
         runner._pairs[-1][-1]
         .successful.commands[0]
