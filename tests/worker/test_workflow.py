@@ -1908,6 +1908,10 @@ class LoggingWorkflow:
         self._last_signal = value
         workflow.logger.info(f"Signal: {value}")
 
+    @workflow.update
+    def my_update(self, value: str) -> None:
+        workflow.logger.info(f"Update: {value}")
+
     @workflow.query
     def last_signal(self) -> str:
         return self._last_signal
@@ -1955,14 +1959,22 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            # Send a couple signals
+            # Send some signals and updates
             await handle.signal(LoggingWorkflow.my_signal, "signal 1")
             await handle.signal(LoggingWorkflow.my_signal, "signal 2")
+            await handle.execute_update(
+                LoggingWorkflow.my_update, "update 1", id="update-1"
+            )
+            await handle.execute_update(
+                LoggingWorkflow.my_update, "update 2", id="update-2"
+            )
             assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
 
-        # Confirm two logs happened
+        # Confirm logs were produced
         assert capturer.find_log("Signal: signal 1 ({'attempt':")
         assert capturer.find_log("Signal: signal 2")
+        assert capturer.find_log("Update: update 1")
+        assert capturer.find_log("Update: update 2")
         assert not capturer.find_log("Signal: signal 3")
         # Also make sure it has some workflow info and correct funcName
         record = capturer.find_log("Signal: signal 1")
@@ -1974,6 +1986,15 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
         )
         # Since we enabled full info, make sure it's there
         assert isinstance(record.__dict__["workflow_info"], workflow.Info)
+        # Check the log emitted by the update execution.
+        record = capturer.find_log("Update: update 1")
+        assert (
+            record
+            and record.__dict__["temporal_update"]["id"] == "update-1"
+            and record.__dict__["temporal_update"]["name"] == "my_update"
+            and "'update_id': 'update-1'" in record.message
+            and "'update_name': 'my_update'" in record.message
+        )
 
         # Clear queue and start a new one with more signals
         capturer.log_queue.queue.clear()
@@ -1983,7 +2004,7 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
             task_queue=worker.task_queue,
             max_cached_workflows=0,
         ) as worker:
-            # Send a couple signals
+            # Send signals and updates
             await handle.signal(LoggingWorkflow.my_signal, "signal 3")
             await handle.signal(LoggingWorkflow.my_signal, "finish")
             await handle.result()
