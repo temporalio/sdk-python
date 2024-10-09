@@ -1211,6 +1211,10 @@ class LoggerAdapter(logging.LoggerAdapter):
             use by others. Default is False.
         log_during_replay: Boolean for whether logs should occur during replay.
             Default is False.
+
+    Values added to ``extra`` are merged with the ``extra`` map from a logging
+    call, with values from the logging call taking precedence. I.e. the
+    behavior is that of `merge_extra=True` in Python >= 3.13.
     """
 
     def __init__(
@@ -1232,20 +1236,17 @@ class LoggerAdapter(logging.LoggerAdapter):
             or self.workflow_info_on_extra
             or self.full_workflow_info_on_extra
         ):
+            extra = {}
             runtime = _Runtime.maybe_current()
             if runtime:
                 if self.workflow_info_on_message:
                     msg = f"{msg} ({runtime.logger_details})"
                 if self.workflow_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
                     extra["temporal_workflow"] = runtime.logger_details
-                    kwargs["extra"] = extra
                 if self.full_workflow_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
                     extra["workflow_info"] = runtime.workflow_info()
-                    kwargs["extra"] = extra
+
+        kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         return (msg, kwargs)
 
     def isEnabledFor(self, level: int) -> bool:
