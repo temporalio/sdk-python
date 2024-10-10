@@ -321,11 +321,11 @@ async def decode_activation(
                 await codec.decode_failure(job.resolve_signal_external_workflow.failure)
         elif job.HasField("signal_workflow"):
             await _decode_payloads(job.signal_workflow.input, codec)
-        elif job.HasField("start_workflow"):
-            await _decode_payloads(job.start_workflow.arguments, codec)
-            if job.start_workflow.HasField("continued_failure"):
-                await codec.decode_failure(job.start_workflow.continued_failure)
-            for val in job.start_workflow.memo.fields.values():
+        elif job.HasField("initialize_workflow"):
+            await _decode_payloads(job.initialize_workflow.arguments, codec)
+            if job.initialize_workflow.HasField("continued_failure"):
+                await codec.decode_failure(job.initialize_workflow.continued_failure)
+            for val in job.initialize_workflow.memo.fields.values():
                 # This uses API payload not bridge payload
                 new_payload = (await codec.decode([val]))[0]
                 val.metadata.clear()

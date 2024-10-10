@@ -40,13 +40,14 @@ class WorkflowActivation(google.protobuf.message.Message):
     ## Job ordering guarantees and semantics
 
     Core will, by default, order jobs within the activation as follows:
-    1. patches
-    2. random-seed-updates
-    3. signals/updates
-    4. all others
-    5. local activity resolutions
-    6. queries
-    7. evictions
+    1. init workflow
+    2. patches
+    3. random-seed-updates
+    4. signals/updates
+    5. all others
+    6. local activity resolutions
+    7. queries
+    8. evictions
 
     This is because:
     * Patches are expected to apply to the entire activation
@@ -172,7 +173,7 @@ global___WorkflowActivation = WorkflowActivation
 class WorkflowActivationJob(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    START_WORKFLOW_FIELD_NUMBER: builtins.int
+    INITIALIZE_WORKFLOW_FIELD_NUMBER: builtins.int
     FIRE_TIMER_FIELD_NUMBER: builtins.int
     UPDATE_RANDOM_SEED_FIELD_NUMBER: builtins.int
     QUERY_WORKFLOW_FIELD_NUMBER: builtins.int
@@ -187,8 +188,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     DO_UPDATE_FIELD_NUMBER: builtins.int
     REMOVE_FROM_CACHE_FIELD_NUMBER: builtins.int
     @property
-    def start_workflow(self) -> global___StartWorkflow:
-        """Begin a workflow for the first time"""
+    def initialize_workflow(self) -> global___InitializeWorkflow:
+        """A workflow is starting, record all of the information from its start event"""
     @property
     def fire_timer(self) -> global___FireTimer:
         """A timer has fired, allowing whatever was waiting on it (if anything) to proceed"""
@@ -247,7 +248,7 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        start_workflow: global___StartWorkflow | None = ...,
+        initialize_workflow: global___InitializeWorkflow | None = ...,
         fire_timer: global___FireTimer | None = ...,
         update_random_seed: global___UpdateRandomSeed | None = ...,
         query_workflow: global___QueryWorkflow | None = ...,
@@ -275,6 +276,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"do_update",
             "fire_timer",
             b"fire_timer",
+            "initialize_workflow",
+            b"initialize_workflow",
             "notify_has_patch",
             b"notify_has_patch",
             "query_workflow",
@@ -293,8 +296,6 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"resolve_signal_external_workflow",
             "signal_workflow",
             b"signal_workflow",
-            "start_workflow",
-            b"start_workflow",
             "update_random_seed",
             b"update_random_seed",
             "variant",
@@ -310,6 +311,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"do_update",
             "fire_timer",
             b"fire_timer",
+            "initialize_workflow",
+            b"initialize_workflow",
             "notify_has_patch",
             b"notify_has_patch",
             "query_workflow",
@@ -328,8 +331,6 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"resolve_signal_external_workflow",
             "signal_workflow",
             b"signal_workflow",
-            "start_workflow",
-            b"start_workflow",
             "update_random_seed",
             b"update_random_seed",
             "variant",
@@ -340,7 +341,7 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
     ) -> (
         typing_extensions.Literal[
-            "start_workflow",
+            "initialize_workflow",
             "fire_timer",
             "update_random_seed",
             "query_workflow",
@@ -360,8 +361,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
 
 global___WorkflowActivationJob = WorkflowActivationJob
 
-class StartWorkflow(google.protobuf.message.Message):
-    """Start a new workflow"""
+class InitializeWorkflow(google.protobuf.message.Message):
+    """Initialize a new workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -615,7 +616,7 @@ class StartWorkflow(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___StartWorkflow = StartWorkflow
+global___InitializeWorkflow = InitializeWorkflow
 
 class FireTimer(google.protobuf.message.Message):
     """Notify a workflow that a timer has fired"""
