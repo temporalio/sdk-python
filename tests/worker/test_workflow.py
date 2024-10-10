@@ -1990,8 +1990,8 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
         record = capturer.find_log("Update: update 1")
         assert (
             record
-            and record.__dict__["temporal_update"]["id"] == "update-1"
-            and record.__dict__["temporal_update"]["name"] == "my_update"
+            and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
+            and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
             and "'update_id': 'update-1'" in record.message
             and "'update_name': 'my_update'" in record.message
         )

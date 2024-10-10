@@ -11,7 +11,7 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from functools import partial
@@ -1213,10 +1213,6 @@ class LoggerAdapter(logging.LoggerAdapter):
             dictionary value will be added to the ``extra`` dictionary with some
             workflow info, making it present on the ``LogRecord.__dict__`` for
             use by others. Default is True.
-        update_info_on_extra: Boolean for whether a ``temporal_update``
-            dictionary value will be added to the ``extra`` dictionary with some
-            update info, making it present on the ``LogRecord.__dict__`` for use
-            by others. Default is True.
         full_workflow_info_on_extra: Boolean for whether a ``workflow_info``
             value will be added to the ``extra`` dictionary with the entire
             workflow info, making it present on the ``LogRecord.__dict__`` for
@@ -1236,7 +1232,6 @@ class LoggerAdapter(logging.LoggerAdapter):
         super().__init__(logger, extra or {})
         self.workflow_info_on_message = True
         self.workflow_info_on_extra = True
-        self.update_info_on_extra = True
         self.full_workflow_info_on_extra = False
         self.log_during_replay = False
 
@@ -1247,25 +1242,26 @@ class LoggerAdapter(logging.LoggerAdapter):
         if (
             self.workflow_info_on_message
             or self.workflow_info_on_extra
-            or self.update_info_on_extra
             or self.full_workflow_info_on_extra
         ):
             extra: Dict[str, Any] = {}
             msg_extra: Dict[str, Any] = {}
             runtime = _Runtime.maybe_current()
             if runtime:
+                workflow_details = runtime.logger_details
                 if self.workflow_info_on_message:
-                    msg_extra.update(runtime.logger_details)
+                    msg_extra.update(workflow_details)
                 if self.workflow_info_on_extra:
-                    extra["temporal_workflow"] = runtime.logger_details
+                    extra["temporal_workflow"] = workflow_details
                 if self.full_workflow_info_on_extra:
                     extra["workflow_info"] = runtime.workflow_info()
             update_info = current_update_info()
             if update_info:
-                if self.update_info_on_extra:
-                    extra["temporal_update"] = asdict(update_info)
+                update_details = update_info.logger_details
                 if self.workflow_info_on_message:
-                    msg_extra.update(update_info.logger_details)
+                    msg_extra.update(update_details)
+                if self.workflow_info_on_extra:
+                    extra.setdefault("temporal_workflow", {}).update(update_details)
 
         kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:
