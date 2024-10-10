@@ -5672,11 +5672,11 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                         == "Deliberately failing post-ContinueAsNew run"
                     )
 
-                unfinished_handler_warning_emitted = any(
-                    issubclass(w.category, self._unfinished_handler_warning_cls)
-                    for w in warnings
-                )
-                return unfinished_handler_warning_emitted
+            unfinished_handler_warning_emitted = any(
+                issubclass(w.category, self._unfinished_handler_warning_cls)
+                for w in warnings
+            )
+            return unfinished_handler_warning_emitted
 
     @property
     def _unfinished_handler_warning_cls(self) -> Type:
