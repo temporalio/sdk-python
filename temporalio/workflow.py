@@ -501,7 +501,7 @@ class UpdateInfo:
     """Update type name."""
 
     @property
-    def logger_details(self) -> Mapping[str, Any]:
+    def _logger_details(self) -> Mapping[str, Any]:
         """Data to be included in string appended to default logging output."""
         return {
             "update_id": self.id,
@@ -1257,7 +1257,7 @@ class LoggerAdapter(logging.LoggerAdapter):
                     extra["workflow_info"] = runtime.workflow_info()
             update_info = current_update_info()
             if update_info:
-                update_details = update_info.logger_details
+                update_details = update_info._logger_details
                 if self.workflow_info_on_message:
                     msg_extra.update(update_details)
                 if self.workflow_info_on_extra:
