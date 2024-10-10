@@ -500,6 +500,14 @@ class UpdateInfo:
     name: str
     """Update type name."""
 
+    @property
+    def _logger_details(self) -> Mapping[str, Any]:
+        """Data to be included in string appended to default logging output."""
+        return {
+            "update_id": self.id,
+            "update_name": self.name,
+        }
+
 
 class _Runtime(ABC):
     @staticmethod
@@ -1211,6 +1219,10 @@ class LoggerAdapter(logging.LoggerAdapter):
             use by others. Default is False.
         log_during_replay: Boolean for whether logs should occur during replay.
             Default is False.
+
+    Values added to ``extra`` are merged with the ``extra`` dictionary from a
+    logging call, with values from the logging call taking precedence. I.e. the
+    behavior is that of `merge_extra=True` in Python >= 3.13.
     """
 
     def __init__(
@@ -1232,20 +1244,28 @@ class LoggerAdapter(logging.LoggerAdapter):
             or self.workflow_info_on_extra
             or self.full_workflow_info_on_extra
         ):
+            extra: Dict[str, Any] = {}
+            msg_extra: Dict[str, Any] = {}
             runtime = _Runtime.maybe_current()
             if runtime:
+                workflow_details = runtime.logger_details
                 if self.workflow_info_on_message:
-                    msg = f"{msg} ({runtime.logger_details})"
+                    msg_extra.update(workflow_details)
                 if self.workflow_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
-                    extra["temporal_workflow"] = runtime.logger_details
-                    kwargs["extra"] = extra
+                    extra["temporal_workflow"] = workflow_details
                 if self.full_workflow_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
                     extra["workflow_info"] = runtime.workflow_info()
-                    kwargs["extra"] = extra
+            update_info = current_update_info()
+            if update_info:
+                update_details = update_info._logger_details
+                if self.workflow_info_on_message:
+                    msg_extra.update(update_details)
+                if self.workflow_info_on_extra:
+                    extra.setdefault("temporal_workflow", {}).update(update_details)
+
+        kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
+        if msg_extra:
+            msg = f"{msg} ({msg_extra})"
         return (msg, kwargs)
 
     def isEnabledFor(self, level: int) -> bool:
