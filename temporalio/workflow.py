@@ -1224,8 +1224,8 @@ class LoggerAdapter(logging.LoggerAdapter):
         log_during_replay: Boolean for whether logs should occur during replay.
             Default is False.
 
-    Values added to ``extra`` are merged with the ``extra`` map from a logging
-    call, with values from the logging call taking precedence. I.e. the
+    Values added to ``extra`` are merged with the ``extra`` dictionary from a
+    logging call, with values from the logging call taking precedence. I.e. the
     behavior is that of `merge_extra=True` in Python >= 3.13.
     """
 
