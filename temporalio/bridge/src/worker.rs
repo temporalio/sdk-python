@@ -140,7 +140,8 @@ pub fn new_debug_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     debugger_url: String,
 ) -> PyResult<&'a PyAny> {
-    let cli = debug_client::DebugClient::new(debugger_url); // internal client
+    enter_sync!(runtime_ref.runtime);
+    let cli = debug_client::DebugClient::new(debugger_url)?;
     let rref = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         match cli.get_history().await {
@@ -488,5 +489,9 @@ impl DebugClient {
                 ))),
             }
         })
+    }
+
+    fn get_history<'a>(&self, py: Python<'a>) -> PyResult<&'a PyBytes> {
+        Ok(PyBytes::new(py, &self.history.encode_to_vec()))
     }
 }

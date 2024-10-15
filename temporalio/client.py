@@ -2266,21 +2266,29 @@ class WorkflowExecution:
         **additional_fields,
     ) -> WorkflowExecution:
         return cls(
-            close_time=info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
-            if info.HasField("close_time")
-            else None,
+            close_time=(
+                info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("close_time")
+                else None
+            ),
             data_converter=converter,
-            execution_time=info.execution_time.ToDatetime().replace(tzinfo=timezone.utc)
-            if info.HasField("execution_time")
-            else None,
+            execution_time=(
+                info.execution_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("execution_time")
+                else None
+            ),
             history_length=info.history_length,
             id=info.execution.workflow_id,
-            parent_id=info.parent_execution.workflow_id
-            if info.HasField("parent_execution")
-            else None,
-            parent_run_id=info.parent_execution.run_id
-            if info.HasField("parent_execution")
-            else None,
+            parent_id=(
+                info.parent_execution.workflow_id
+                if info.HasField("parent_execution")
+                else None
+            ),
+            parent_run_id=(
+                info.parent_execution.run_id
+                if info.HasField("parent_execution")
+                else None
+            ),
             raw_info=info,
             run_id=info.execution.run_id,
             search_attributes=temporalio.converter.decode_search_attributes(
@@ -2618,6 +2626,21 @@ class WorkflowHistory:
         """
         parsed = _history_from_json(history)
         return WorkflowHistory(workflow_id, parsed.events)
+
+    @staticmethod
+    def from_proto(
+        workflow_id: str, history: temporalio.api.history.v1.History
+    ) -> WorkflowHistory:
+        """Construct a WorkflowHistory from an ID and a history proto message
+
+        Args:
+            workflow_id: The workflow's ID
+            history: A History protobuf message
+
+        Returns:
+            Workflow history
+        """
+        return WorkflowHistory(workflow_id, history.events)
 
     def to_json(self) -> str:
         """Convert this history to JSON.
@@ -3008,12 +3031,16 @@ class ScheduleSpec:
                 ScheduleCalendarSpec._from_proto(c)
                 for c in spec.exclude_structured_calendar
             ],
-            start_at=spec.start_time.ToDatetime().replace(tzinfo=timezone.utc)
-            if spec.HasField("start_time")
-            else None,
-            end_at=spec.end_time.ToDatetime().replace(tzinfo=timezone.utc)
-            if spec.HasField("end_time")
-            else None,
+            start_at=(
+                spec.start_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if spec.HasField("start_time")
+                else None
+            ),
+            end_at=(
+                spec.end_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if spec.HasField("end_time")
+                else None
+            ),
             jitter=spec.jitter.ToTimedelta() if spec.HasField("jitter") else None,
             time_zone_name=spec.timezone_name or None,
         )
@@ -3435,29 +3462,37 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 workflow_id=self.id,
                 workflow_type=temporalio.api.common.v1.WorkflowType(name=self.workflow),
                 task_queue=temporalio.api.taskqueue.v1.TaskQueue(name=self.task_queue),
-                input=None
-                if not self.args
-                else temporalio.api.common.v1.Payloads(
-                    payloads=[
-                        a
-                        if isinstance(a, temporalio.api.common.v1.Payload)
-                        else (await client.data_converter.encode([a]))[0]
-                        for a in self.args
-                    ]
+                input=(
+                    None
+                    if not self.args
+                    else temporalio.api.common.v1.Payloads(
+                        payloads=[
+                            (
+                                a
+                                if isinstance(a, temporalio.api.common.v1.Payload)
+                                else (await client.data_converter.encode([a]))[0]
+                            )
+                            for a in self.args
+                        ]
+                    )
                 ),
                 workflow_execution_timeout=execution_timeout,
                 workflow_run_timeout=run_timeout,
                 workflow_task_timeout=task_timeout,
                 retry_policy=retry_policy,
-                memo=None
-                if not self.memo
-                else temporalio.api.common.v1.Memo(
-                    fields={
-                        k: v
-                        if isinstance(v, temporalio.api.common.v1.Payload)
-                        else (await client.data_converter.encode([v]))[0]
-                        for k, v in self.memo.items()
-                    },
+                memo=(
+                    None
+                    if not self.memo
+                    else temporalio.api.common.v1.Memo(
+                        fields={
+                            k: (
+                                v
+                                if isinstance(v, temporalio.api.common.v1.Payload)
+                                else (await client.data_converter.encode([v]))[0]
+                            )
+                            for k, v in self.memo.items()
+                        },
+                    )
                 ),
             ),
         )
@@ -3851,9 +3886,11 @@ class ScheduleInfo:
                 for f in info.future_action_times
             ],
             created_at=info.create_time.ToDatetime().replace(tzinfo=timezone.utc),
-            last_updated_at=info.update_time.ToDatetime().replace(tzinfo=timezone.utc)
-            if info.HasField("update_time")
-            else None,
+            last_updated_at=(
+                info.update_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("update_time")
+                else None
+            ),
         )
 
 
@@ -3969,12 +4006,16 @@ class ScheduleListDescription:
     ) -> ScheduleListDescription:
         return ScheduleListDescription(
             id=entry.schedule_id,
-            schedule=ScheduleListSchedule._from_proto(entry.info)
-            if entry.HasField("info")
-            else None,
-            info=ScheduleListInfo._from_proto(entry.info)
-            if entry.HasField("info")
-            else None,
+            schedule=(
+                ScheduleListSchedule._from_proto(entry.info)
+                if entry.HasField("info")
+                else None
+            ),
+            info=(
+                ScheduleListInfo._from_proto(entry.info)
+                if entry.HasField("info")
+                else None
+            ),
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
                 entry.search_attributes
             ),
@@ -5514,13 +5555,15 @@ class _ClientImpl(OutboundInterceptor):
                 initial_patch=initial_patch,
                 identity=self._client.identity,
                 request_id=str(uuid.uuid4()),
-                memo=None
-                if not input.memo
-                else temporalio.api.common.v1.Memo(
-                    fields={
-                        k: (await self._client.data_converter.encode([v]))[0]
-                        for k, v in input.memo.items()
-                    },
+                memo=(
+                    None
+                    if not input.memo
+                    else temporalio.api.common.v1.Memo(
+                        fields={
+                            k: (await self._client.data_converter.encode([v]))[0]
+                            for k, v in input.memo.items()
+                        },
+                    )
                 ),
             )
             if input.search_attributes:
@@ -5718,9 +5761,11 @@ class _ClientImpl(OutboundInterceptor):
             namespace=self._client.namespace,
             build_ids=input.build_ids,
             task_queues=input.task_queues,
-            reachability=input.reachability._to_proto()
-            if input.reachability
-            else temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_UNSPECIFIED,
+            reachability=(
+                input.reachability._to_proto()
+                if input.reachability
+                else temporalio.api.enums.v1.TaskReachability.TASK_REACHABILITY_UNSPECIFIED
+            ),
         )
         resp = await self._client.workflow_service.get_worker_task_reachability(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
