@@ -78,7 +78,7 @@ class _WFInboundInterceptors(WorkflowInboundInterceptor):
         print(f"handling signal {input}")
         await DebugReplayer.notify_from_workflow()
         await super().handle_signal(input)
-        print(f"handled signal {input}")
+        print(f"handling signal {input}")
 
 
 class _WFOutboundInterceptors(WorkflowOutboundInterceptor):

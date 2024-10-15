@@ -1955,6 +1955,11 @@ class _WorkflowInstanceImpl(
         self._ready.append(handle)
         return handle
 
+    def call_soon_threadsafe(self, callback, *args, context=None):
+        # Stack here is nothing - must be called from outside some weird way
+        # print(f"\n\n\n\n\n------------------ {inspect.stack()}")
+        return self.call_soon(callback, *args, context=context)
+
     def call_later(
         self,
         delay: float,
