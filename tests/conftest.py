@@ -47,9 +47,10 @@ if sys.version_info < (3, 8) and sys.platform.startswith("darwin"):
 
 def pytest_addoption(parser):
     parser.addoption(
+        "-E",
         "--workflow-environment",
         default="local",
-        help="Which workflow environment to use ('local', 'time-skipping', or target to existing server)",
+        help="Which workflow environment to use ('local', 'time-skipping', or ip:port for existing server)",
     )
 
 
