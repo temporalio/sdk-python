@@ -84,6 +84,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
                 "--dynamic-config-value",
                 "system.enableEagerWorkflowStart=true",
+                "--dynamic-config-value",
+                "frontend.enableExecuteMultiOperation=true",
             ]
         )
     elif env_type == "time-skipping":

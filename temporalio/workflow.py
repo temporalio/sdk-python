@@ -1426,6 +1426,20 @@ class _Definition:
             f"Function {fn_name} missing attributes, was it decorated with @workflow.run and was its class decorated with @workflow.defn?"
         )
 
+    @classmethod
+    def get_name_and_result_type(
+        cls, name_or_run_fn: Union[str, Callable[..., Awaitable[Any]]]
+    ) -> Tuple[str, Optional[Type]]:
+        if isinstance(name_or_run_fn, str):
+            return name_or_run_fn, None
+        elif callable(name_or_run_fn):
+            defn = cls.must_from_run_fn(name_or_run_fn)
+            if not defn.name:
+                raise ValueError("Cannot invoke dynamic workflow explicitly")
+            return defn.name, defn.ret_type
+        else:
+            raise TypeError("Workflow must be a string or callable")
+
     @staticmethod
     def _apply_to_class(
         cls: Type,
