@@ -206,12 +206,12 @@ class _WorkflowWorker:
 
         # Extract a couple of jobs from the activation
         cache_remove_job = None
-        start_job = None
+        init_job = None
         for job in act.jobs:
             if job.HasField("remove_from_cache"):
                 cache_remove_job = job.remove_from_cache
-            elif job.HasField("start_workflow"):
-                start_job = job.start_workflow
+            elif job.HasField("initialize_workflow"):
+                init_job = job.initialize_workflow
 
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
@@ -235,16 +235,16 @@ class _WorkflowWorker:
             if not cache_remove_job or not self._disable_safe_eviction:
                 workflow = self._running_workflows.get(act.run_id)
             if not workflow and not cache_remove_job:
-                # Must have a start job to create instance
-                if not start_job:
+                # Must have a initialize job to create instance
+                if not init_job:
                     raise RuntimeError(
-                        "Missing start workflow, workflow could have unexpectedly been removed from cache"
+                        "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
                     )
-                workflow = self._create_workflow_instance(act, start_job)
+                workflow = self._create_workflow_instance(act, init_job)
                 self._running_workflows[act.run_id] = workflow
-            elif start_job:
+            elif init_job:
                 # This should never happen
-                logger.warn("Cache already exists for activation with start job")
+                logger.warn("Cache already exists for activation with initialize job")
 
             # Run activation in separate thread so we can check if it's
             # deadlocked
@@ -354,54 +354,54 @@ class _WorkflowWorker:
     def _create_workflow_instance(
         self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-        start: temporalio.bridge.proto.workflow_activation.StartWorkflow,
+        init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
     ) -> WorkflowInstance:
         # Get the definition
-        defn = self._workflows.get(start.workflow_type, self._dynamic_workflow)
+        defn = self._workflows.get(init.workflow_type, self._dynamic_workflow)
         if not defn:
             workflow_names = ", ".join(sorted(self._workflows.keys()))
             raise temporalio.exceptions.ApplicationError(
-                f"Workflow class {start.workflow_type} is not registered on this worker, available workflows: {workflow_names}",
+                f"Workflow class {init.workflow_type} is not registered on this worker, available workflows: {workflow_names}",
                 type="NotFoundError",
             )
 
         # Build info
         parent: Optional[temporalio.workflow.ParentInfo] = None
-        if start.HasField("parent_workflow_info"):
+        if init.HasField("parent_workflow_info"):
             parent = temporalio.workflow.ParentInfo(
-                namespace=start.parent_workflow_info.namespace,
-                run_id=start.parent_workflow_info.run_id,
-                workflow_id=start.parent_workflow_info.workflow_id,
+                namespace=init.parent_workflow_info.namespace,
+                run_id=init.parent_workflow_info.run_id,
+                workflow_id=init.parent_workflow_info.workflow_id,
             )
         info = temporalio.workflow.Info(
-            attempt=start.attempt,
-            continued_run_id=start.continued_from_execution_run_id or None,
-            cron_schedule=start.cron_schedule or None,
-            execution_timeout=start.workflow_execution_timeout.ToTimedelta()
-            if start.HasField("workflow_execution_timeout")
+            attempt=init.attempt,
+            continued_run_id=init.continued_from_execution_run_id or None,
+            cron_schedule=init.cron_schedule or None,
+            execution_timeout=init.workflow_execution_timeout.ToTimedelta()
+            if init.HasField("workflow_execution_timeout")
             else None,
-            headers=dict(start.headers),
+            headers=dict(init.headers),
             namespace=self._namespace,
             parent=parent,
-            raw_memo=dict(start.memo.fields),
-            retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
-            if start.HasField("retry_policy")
+            raw_memo=dict(init.memo.fields),
+            retry_policy=temporalio.common.RetryPolicy.from_proto(init.retry_policy)
+            if init.HasField("retry_policy")
             else None,
             run_id=act.run_id,
-            run_timeout=start.workflow_run_timeout.ToTimedelta()
-            if start.HasField("workflow_run_timeout")
+            run_timeout=init.workflow_run_timeout.ToTimedelta()
+            if init.HasField("workflow_run_timeout")
             else None,
             search_attributes=temporalio.converter.decode_search_attributes(
-                start.search_attributes
+                init.search_attributes
             ),
             start_time=act.timestamp.ToDatetime().replace(tzinfo=timezone.utc),
             task_queue=self._task_queue,
-            task_timeout=start.workflow_task_timeout.ToTimedelta(),
+            task_timeout=init.workflow_task_timeout.ToTimedelta(),
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
-                start.search_attributes
+                init.search_attributes
             ),
-            workflow_id=start.workflow_id,
-            workflow_type=start.workflow_type,
+            workflow_id=init.workflow_id,
+            workflow_type=init.workflow_type,
         )
 
         # Create instance from details
@@ -411,7 +411,7 @@ class _WorkflowWorker:
             interceptor_classes=self._interceptor_classes,
             defn=defn,
             info=info,
-            randomness_seed=start.randomness_seed,
+            randomness_seed=init.randomness_seed,
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
