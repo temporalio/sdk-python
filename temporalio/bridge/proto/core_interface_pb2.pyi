@@ -81,3 +81,63 @@ class ActivityTaskCompletion(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ActivityTaskCompletion = ActivityTaskCompletion
+
+class WorkflowSlotInfo(google.protobuf.message.Message):
+    """Info about workflow task slot usage"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
+    IS_STICKY_FIELD_NUMBER: builtins.int
+    workflow_type: builtins.str
+    is_sticky: builtins.bool
+    def __init__(
+        self,
+        *,
+        workflow_type: builtins.str = ...,
+        is_sticky: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "is_sticky", b"is_sticky", "workflow_type", b"workflow_type"
+        ],
+    ) -> None: ...
+
+global___WorkflowSlotInfo = WorkflowSlotInfo
+
+class ActivitySlotInfo(google.protobuf.message.Message):
+    """Info about activity task slot usage"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
+    activity_type: builtins.str
+    def __init__(
+        self,
+        *,
+        activity_type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["activity_type", b"activity_type"]
+    ) -> None: ...
+
+global___ActivitySlotInfo = ActivitySlotInfo
+
+class LocalActivitySlotInfo(google.protobuf.message.Message):
+    """Info about local activity slot usage"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
+    activity_type: builtins.str
+    def __init__(
+        self,
+        *,
+        activity_type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["activity_type", b"activity_type"]
+    ) -> None: ...
+
+global___LocalActivitySlotInfo = LocalActivitySlotInfo
