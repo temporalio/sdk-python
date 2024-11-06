@@ -354,8 +354,8 @@ class _WorkflowInstanceImpl(
                 elif job.HasField("signal_workflow") or job.HasField("do_update"):
                     job_sets[1].append(job)
                 elif not job.HasField("query_workflow"):
-                    if job.HasField("start_workflow"):
-                        start_job = job.start_workflow
+                    if job.HasField("initialize_workflow"):
+                        start_job = job.initialize_workflow
                     job_sets[2].append(job)
                 else:
                     job_sets[3].append(job)
@@ -477,8 +477,8 @@ class _WorkflowInstanceImpl(
             )
         elif job.HasField("signal_workflow"):
             self._apply_signal_workflow(job.signal_workflow)
-        elif job.HasField("start_workflow"):
-            self._apply_start_workflow(job.start_workflow)
+        elif job.HasField("initialize_workflow"):
+            self._apply_initialize_workflow(job.initialize_workflow)
         elif job.HasField("update_random_seed"):
             self._apply_update_random_seed(job.update_random_seed)
         else:
@@ -847,8 +847,8 @@ class _WorkflowInstanceImpl(
             return
         self._process_signal_job(signal_defn, job)
 
-    def _apply_start_workflow(
-        self, job: temporalio.bridge.proto.workflow_activation.StartWorkflow
+    def _apply_initialize_workflow(
+        self, job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow
     ) -> None:
         # Async call to run on the scheduler thread. This will be wrapped in
         # another function which applies exception handling.
@@ -886,14 +886,14 @@ class _WorkflowInstanceImpl(
         self._random.seed(job.randomness_seed)
 
     def _make_workflow_input(
-        self, start_job: temporalio.bridge.proto.workflow_activation.StartWorkflow
+        self, init_job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow
     ) -> ExecuteWorkflowInput:
         # Set arg types, using raw values for dynamic
         arg_types = self._defn.arg_types
         if not self._defn.name:
             # Dynamic is just the raw value for each input value
-            arg_types = [temporalio.common.RawValue] * len(start_job.arguments)
-        args = self._convert_payloads(start_job.arguments, arg_types)
+            arg_types = [temporalio.common.RawValue] * len(init_job.arguments)
+        args = self._convert_payloads(init_job.arguments, arg_types)
         # Put args in a list if dynamic
         if not self._defn.name:
             args = [args]
@@ -903,7 +903,7 @@ class _WorkflowInstanceImpl(
             # TODO(cretz): Remove cast when https://github.com/python/mypy/issues/5485 fixed
             run_fn=cast(Callable[..., Awaitable[Any]], self._defn.run_fn),
             args=args,
-            headers=start_job.headers,
+            headers=init_job.headers,
         )
 
     #### _Runtime direct workflow call overrides ####

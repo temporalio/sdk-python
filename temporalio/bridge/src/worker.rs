@@ -10,6 +10,7 @@ use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
+use temporal_sdk_core_api::worker::SlotKind;
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
@@ -368,10 +369,10 @@ impl TryFrom<TunerHolder> for temporal_sdk_core::TunerHolder {
     }
 }
 
-impl TryFrom<SlotSupplier> for temporal_sdk_core::SlotSupplierOptions {
+impl<SK: SlotKind> TryFrom<SlotSupplier> for temporal_sdk_core::SlotSupplierOptions<SK> {
     type Error = PyErr;
 
-    fn try_from(supplier: SlotSupplier) -> PyResult<temporal_sdk_core::SlotSupplierOptions> {
+    fn try_from(supplier: SlotSupplier) -> PyResult<temporal_sdk_core::SlotSupplierOptions<SK>> {
         Ok(match supplier {
             SlotSupplier::FixedSize(fs) => temporal_sdk_core::SlotSupplierOptions::FixedSize {
                 slots: fs.num_slots,
