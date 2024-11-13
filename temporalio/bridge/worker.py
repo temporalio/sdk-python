@@ -5,8 +5,8 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -86,7 +86,105 @@ class FixedSizeSlotSupplier:
     num_slots: int
 
 
-SlotSupplier: TypeAlias = Union[FixedSizeSlotSupplier, ResourceBasedSlotSupplier]
+@dataclass(frozen=True)
+class SlotPermit:
+    """A permit to use a slot for a workflow/activity/local activity task."""
+
+    pass
+
+
+@dataclass(frozen=True)
+class SlotReserveContext:
+    """Context for reserving a slot from a :py:class:`CustomSlotSupplier`."""
+
+    slot_type: str  # TODO real type
+    """The type of slot trying to be reserved."""
+    task_queue: str
+    """The name of the task queue for which this reservation request is associated."""
+    worker_identity: str
+    """The identity of the worker that is requesting the reservation."""
+    worker_build_id: str
+    """The build id of the worker that is requesting the reservation."""
+    is_sticky: bool
+    """True iff this is a reservation for a sticky poll for a workflow task."""
+
+
+@dataclass(frozen=True)
+class SlotMarkUsedContext:
+    """Context for marking a slot used from a :py:class:`CustomSlotSupplier`."""
+
+    pass
+
+
+@dataclass(frozen=True)
+class SlotReleaseContext:
+    """Context for releasing a slot from a :py:class:`CustomSlotSupplier`."""
+
+    pass
+
+
+class CustomSlotSupplier(ABC):
+    """This class can be implemented to provide custom slot supplier behavior."""
+
+    # TODO: AbortError equivalent
+    @abstractmethod
+    async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+        """This function is called before polling for new tasks. Your implementation must block until a
+        slot is available then return a permit to use that slot.
+
+        The only acceptable exception to throw is AbortError, any other exceptions thrown will be
+        logged and ignored.
+
+        Args:
+            ctx: The context for slot reservation.
+
+        Returns:
+            A permit to use the slot which may be populated with your own data.
+        """
+        ...
+
+    @abstractmethod
+    def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        """This function is called when trying to reserve slots for "eager" workflow and activity tasks.
+        Eager tasks are those which are returned as a result of completing a workflow task, rather than
+        from polling. Your implementation must not block, and if a slot is available, return a permit
+        to use that slot.
+
+        Args:
+            ctx: The context for slot reservation.
+
+        Returns:
+            Maybe a permit to use the slot which may be populated with your own data.
+        """
+        ...
+
+    @abstractmethod
+    def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+        """This function is called once a slot is actually being used to process some task, which may be
+        some time after the slot was reserved originally. For example, if there is no work for a
+        worker, a number of slots equal to the number of active pollers may already be reserved, but
+        none of them are being used yet. This call should be non-blocking.
+
+        Args:
+            ctx: The context for marking a slot as used.
+        """
+        ...
+
+    @abstractmethod
+    def release_slot(self, ctx: SlotReleaseContext) -> None:
+        """This function is called once a permit is no longer needed. This could be because the task has
+        finished, whether successfully or not, or because the slot was no longer needed (ex: the number
+        of active pollers decreased). This call should be non-blocking.
+
+        Args:
+            ctx: The context for releasing a slot.
+        """
+        ...
+
+
+SlotSupplier: TypeAlias = Union[
+    FixedSizeSlotSupplier, ResourceBasedSlotSupplier, CustomSlotSupplier
+]
 
 
 @dataclass

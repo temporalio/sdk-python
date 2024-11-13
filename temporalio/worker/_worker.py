@@ -325,10 +325,6 @@ class Worker:
                 disable_safe_eviction=disable_safe_workflow_eviction,
             )
 
-        workflow_slot_supplier: temporalio.bridge.worker.SlotSupplier
-        activity_slot_supplier: temporalio.bridge.worker.SlotSupplier
-        local_activity_slot_supplier: temporalio.bridge.worker.SlotSupplier
-
         if tuner is not None:
             if (
                 max_concurrent_workflow_tasks
