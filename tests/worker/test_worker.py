@@ -13,10 +13,15 @@ from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
+    CustomSlotSupplier,
     FixedSizeSlotSupplier,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
+    SlotMarkUsedContext,
+    SlotPermit,
+    SlotReleaseContext,
+    SlotReserveContext,
     Worker,
     WorkerTuner,
 )
@@ -334,6 +339,40 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
                 activity_executor=executor,
             ):
                 pass
+
+
+async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
+    class MySlotSupplier(CustomSlotSupplier):
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            return SlotPermit()
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+            pass
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            pass
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            pass
+
+    ss = MySlotSupplier()
+
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+    )
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"custom-slot-supplier-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
 
 
 def create_worker(

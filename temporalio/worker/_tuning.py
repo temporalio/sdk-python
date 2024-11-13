@@ -6,6 +6,13 @@ from typing import Literal, Optional, Union
 from typing_extensions import TypeAlias
 
 import temporalio.bridge.worker
+from temporalio.bridge.worker import (
+    CustomSlotSupplier,
+    SlotMarkUsedContext,
+    SlotPermit,
+    SlotReleaseContext,
+    SlotReserveContext,
+)
 
 _DEFAULT_RESOURCE_ACTIVITY_MAX = 500
 
@@ -70,7 +77,9 @@ class ResourceBasedSlotSupplier:
     :py:class:`CompositeTuner`, all resource-based slot suppliers must use the same tuner options."""
 
 
-SlotSupplier: TypeAlias = Union[FixedSizeSlotSupplier, ResourceBasedSlotSupplier]
+SlotSupplier: TypeAlias = Union[
+    FixedSizeSlotSupplier, ResourceBasedSlotSupplier, CustomSlotSupplier
+]
 
 
 def _to_bridge_slot_supplier(
