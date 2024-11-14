@@ -45,6 +45,7 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     )?;
     m.add_class::<worker::WorkerRef>()?;
     m.add_class::<worker::HistoryPusher>()?;
+    m.add_class::<worker::CustomSlotSupplier>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
     m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;
     Ok(())

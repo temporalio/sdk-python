@@ -13,7 +13,7 @@ use temporal_sdk_core::telemetry::{
     build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
     MetricsCallBuffer,
 };
-use temporal_sdk_core::CoreRuntime;
+use temporal_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
 use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
 use temporal_sdk_core_api::telemetry::{
     CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder,
@@ -88,6 +88,7 @@ const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
 pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
+    dbg!("Initting runtime");
     // Have to build/start telemetry config pieces
     let mut telemetry_build = TelemetryOptionsBuilder::default();
 
@@ -118,12 +119,33 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
         }
     }
 
+    let task_locals = Python::with_gil(|py| {
+        let asyncio = py.import("asyncio")?;
+        let event_loop = asyncio.call_method0("get_event_loop")?;
+        dbg!(&event_loop);
+        let locals = pyo3_asyncio::TaskLocals::with_running_loop(py)?.copy_context(py)?;
+        PyResult::Ok(locals)
+    })
+    .expect("Works");
+
     // Create core runtime which starts tokio multi-thread runtime
     let mut core = CoreRuntime::new(
         telemetry_build
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {}", err)))?,
-        tokio::runtime::Builder::new_multi_thread(),
+        TokioRuntimeBuilder {
+            inner: tokio::runtime::Builder::new_multi_thread(),
+            lang_on_thread_start: Some(move || {
+                // Set task locals for each thread
+                Python::with_gil(|py| {
+                    THREAD_TASK_LOCAL.with(|r| {
+                        std::cell::OnceCell::set(r, task_locals.clone()).expect("NOT ALREADY SET");
+                    });
+                    PyResult::Ok(())
+                })
+                .expect("Setting event loop works");
+            }),
+        },
     )
     .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err)))?;
 
@@ -364,10 +386,15 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
 // altered to support spawning based on current Tokio runtime instead of a
 // single static one
 
-struct TokioRuntime;
+pub(crate) struct TokioRuntime;
 
 tokio::task_local! {
     static TASK_LOCALS: once_cell::unsync::OnceCell<pyo3_asyncio::TaskLocals>;
+}
+
+thread_local! {
+    pub(crate) static THREAD_TASK_LOCAL: std::cell::OnceCell<pyo3_asyncio::TaskLocals> =
+        std::cell::OnceCell::new();
 }
 
 impl pyo3_asyncio::generic::Runtime for TokioRuntime {
@@ -378,9 +405,7 @@ impl pyo3_asyncio::generic::Runtime for TokioRuntime {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        tokio::runtime::Handle::current().spawn(async move {
-            fut.await;
-        })
+        tokio::runtime::Handle::current().spawn(fut)
     }
 }
 

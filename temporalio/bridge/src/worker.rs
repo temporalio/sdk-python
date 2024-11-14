@@ -1,16 +1,21 @@
 use anyhow::Context;
 use prost::Message;
-use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyException, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
+use pyo3_asyncio::generic::ContextExt;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
-use temporal_sdk_core_api::worker::SlotKind;
+use temporal_sdk_core_api::worker::{
+    SlotKind, SlotMarkUsedContext, SlotReleaseContext, SlotReservationContext,
+    SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
+};
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
@@ -20,6 +25,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::client;
 use crate::runtime;
+use crate::runtime::{TokioRuntime, THREAD_TASK_LOCAL};
 
 pyo3::create_exception!(temporal_sdk_bridge, PollShutdownError, PyException);
 
@@ -63,6 +69,7 @@ pub struct TunerHolder {
 pub enum SlotSupplier {
     FixedSize(FixedSizeSlotSupplier),
     ResourceBased(ResourceBasedSlotSupplier),
+    Custom(CustomSlotSupplier),
 }
 
 #[derive(FromPyObject)]
@@ -77,6 +84,125 @@ pub struct ResourceBasedSlotSupplier {
     // Need pyo3 0.21+ for this to be std Duration
     ramp_throttle_ms: u64,
     tuner_config: ResourceBasedTunerConfig,
+}
+
+#[pyclass]
+pub struct SlotReserveCtx {
+    slot_type: String, // TODO: Real type
+    task_queue: String,
+    worker_identity: String,
+    worker_build_id: String,
+    is_sticky: bool,
+}
+
+impl SlotReserveCtx {
+    fn from_ctx(slot_type: String, ctx: &dyn SlotReservationContext) -> Self {
+        SlotReserveCtx {
+            slot_type,
+            task_queue: ctx.task_queue().to_string(),
+            worker_identity: ctx.worker_identity().to_string(),
+            worker_build_id: ctx.worker_build_id().to_string(),
+            is_sticky: ctx.is_sticky(),
+        }
+    }
+}
+
+#[pyclass]
+pub struct SlotMarkUsedCtx {}
+
+#[pyclass]
+pub struct SlotReleaseCtx {}
+
+#[pyclass]
+#[derive(Clone)]
+pub struct CustomSlotSupplier {
+    inner: PyObject,
+}
+
+struct CustomSlotSupplierOfType<SK: SlotKind> {
+    inner: PyObject,
+    _phantom: PhantomData<SK>,
+}
+
+#[pymethods]
+impl CustomSlotSupplier {
+    #[new]
+    fn new(inner: PyObject) -> Self {
+        CustomSlotSupplier { inner }
+    }
+}
+
+impl<SK: SlotKind> CustomSlotSupplierOfType<SK> {
+    fn call_method<P: IntoPy<PyObject>, F: FnOnce(Python<'_>, &PyAny) -> FR, FR>(
+        &self,
+        method_name: &str,
+        arg: P,
+        post_closure: F,
+    ) -> FR {
+        Python::with_gil(|py| {
+            let py_obj = self.inner.as_ref(py);
+            let method = py_obj
+                .getattr(method_name)
+                .map_err(|_| {
+                    PyTypeError::new_err(format!(
+                        "CustomSlotSupplier must implement '{}' method",
+                        method_name
+                    ))
+                })
+                .expect("TODO");
+
+            post_closure(py, method.call((arg.into_py(py),), None).expect("TODO"))
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<SK> {
+    type SlotKind = SK;
+
+    async fn reserve_slot(&self, ctx: &dyn SlotReservationContext) -> SlotSupplierPermit {
+        dbg!("Trying to reserve slot");
+        let pypermit = Python::with_gil(|py| {
+            let py_obj = self.inner.as_ref(py);
+            let called = py_obj.call_method1(
+                "reserve_slot",
+                (SlotReserveCtx::from_ctx(
+                    Self::SlotKind::kind().to_string(),
+                    ctx,
+                ),),
+            )?;
+            THREAD_TASK_LOCAL
+                .with(|tl| pyo3_asyncio::into_future_with_locals(tl.get().unwrap(), called))
+        })
+        .expect("TODO")
+        .await;
+        SlotSupplierPermit::with_user_data(pypermit)
+    }
+
+    fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
+        self.call_method(
+            "try_reserve_slot",
+            SlotReserveCtx::from_ctx(Self::SlotKind::kind().to_string(), ctx),
+            |py, pa| {
+                if pa.is_none() {
+                    return None;
+                }
+                Some(SlotSupplierPermit::with_user_data(pa.into_py(py)))
+            },
+        )
+    }
+
+    fn mark_slot_used(&self, _ctx: &dyn SlotMarkUsedContext<SlotKind = Self::SlotKind>) {
+        self.call_method("mark_slot_used", SlotMarkUsedCtx {}, |_, _| ())
+    }
+
+    fn release_slot(&self, _ctx: &dyn SlotReleaseContext<SlotKind = Self::SlotKind>) {
+        self.call_method("release_slot", SlotReleaseCtx {}, |_, _| ())
+    }
+
+    fn available_slots(&self) -> Option<usize> {
+        None
+    }
 }
 
 #[derive(FromPyObject, Clone, Copy, PartialEq)]
@@ -369,7 +495,9 @@ impl TryFrom<TunerHolder> for temporal_sdk_core::TunerHolder {
     }
 }
 
-impl<SK: SlotKind> TryFrom<SlotSupplier> for temporal_sdk_core::SlotSupplierOptions<SK> {
+impl<SK: SlotKind + Send + Sync + 'static> TryFrom<SlotSupplier>
+    for temporal_sdk_core::SlotSupplierOptions<SK>
+{
     type Error = PyErr;
 
     fn try_from(supplier: SlotSupplier) -> PyResult<temporal_sdk_core::SlotSupplierOptions<SK>> {
@@ -386,6 +514,12 @@ impl<SK: SlotKind> TryFrom<SlotSupplier> for temporal_sdk_core::SlotSupplierOpti
                     ),
                 )
             }
+            SlotSupplier::Custom(cs) => temporal_sdk_core::SlotSupplierOptions::Custom(Arc::new(
+                CustomSlotSupplierOfType::<SK> {
+                    inner: cs.inner,
+                    _phantom: PhantomData,
+                },
+            )),
         })
     }
 }

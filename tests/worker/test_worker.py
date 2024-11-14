@@ -344,22 +344,25 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     class MySlotSupplier(CustomSlotSupplier):
         async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            print("Reserving slot")
             return SlotPermit()
 
         def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
-            pass
+            print("Try Reserving slot")
+            return None
 
         def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
-            pass
+            print("Marking slot used")
 
         def release_slot(self, ctx: SlotReleaseContext) -> None:
-            pass
+            print("Releasing slot")
 
     ss = MySlotSupplier()
 
     tuner = WorkerTuner.create_composite(
         workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
     )
+    print("!!!!!!!!1 About to create new worker, event loop is", asyncio.get_event_loop())
     async with new_worker(
         client,
         WaitOnSignalWorkflow,

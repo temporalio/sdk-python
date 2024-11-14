@@ -6,6 +6,7 @@ from typing import Literal, Optional, Union
 from typing_extensions import TypeAlias
 
 import temporalio.bridge.worker
+import temporalio.bridge.temporal_sdk_bridge
 from temporalio.bridge.worker import (
     CustomSlotSupplier,
     SlotMarkUsedContext,
@@ -108,6 +109,8 @@ def _to_bridge_slot_supplier(
                 slot_supplier.tuner_config.target_cpu_usage,
             ),
         )
+    elif isinstance(slot_supplier, CustomSlotSupplier):
+        return temporalio.bridge.temporal_sdk_bridge.CustomSlotSupplier(slot_supplier)
     else:
         raise TypeError(f"Unknown slot supplier type: {slot_supplier}")
 
