@@ -1,9 +1,8 @@
 use anyhow::Context;
 use prost::Message;
-use pyo3::exceptions::{PyException, PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
-use pyo3_asyncio::generic::ContextExt;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -13,8 +12,8 @@ use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::worker::{
-    SlotKind, SlotMarkUsedContext, SlotReleaseContext, SlotReservationContext,
-    SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
+    SlotInfo, SlotInfoTrait, SlotKind, SlotMarkUsedContext, SlotReleaseContext,
+    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
 };
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
@@ -25,7 +24,6 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::client;
 use crate::runtime;
-use crate::runtime::{TokioRuntime, THREAD_TASK_LOCAL};
 
 pyo3::create_exception!(temporal_sdk_bridge, PollShutdownError, PyException);
 
@@ -88,11 +86,16 @@ pub struct ResourceBasedSlotSupplier {
 
 #[pyclass]
 pub struct SlotReserveCtx {
-    slot_type: String, // TODO: Real type
-    task_queue: String,
-    worker_identity: String,
-    worker_build_id: String,
-    is_sticky: bool,
+    #[pyo3(get)]
+    pub slot_type: String, // TODO: Real type
+    #[pyo3(get)]
+    pub task_queue: String,
+    #[pyo3(get)]
+    pub worker_identity: String,
+    #[pyo3(get)]
+    pub worker_build_id: String,
+    #[pyo3(get)]
+    pub is_sticky: bool,
 }
 
 impl SlotReserveCtx {
@@ -108,10 +111,60 @@ impl SlotReserveCtx {
 }
 
 #[pyclass]
-pub struct SlotMarkUsedCtx {}
+pub struct SlotMarkUsedCtx {
+    #[pyo3(get)]
+    slot_info: PyObject,
+    #[pyo3(get)]
+    permit: PyObject,
+}
+
+// NOTE: this is dumb because we already have the generated proto code, we just can't use
+//   it b/c it's not pyclassable. In theory maybe we could compile-flag enable it in the core
+//   protos crate but... that's a lot for just this. Maybe if there are other use cases.
 
 #[pyclass]
-pub struct SlotReleaseCtx {}
+pub struct WorkflowSlotInfo {
+    #[pyo3(get)]
+    pub workflow_type: String,
+    #[pyo3(get)]
+    pub is_sticky: bool,
+}
+#[pyclass]
+pub struct ActivitySlotInfo {
+    #[pyo3(get)]
+    pub activity_type: String,
+}
+#[pyclass]
+pub struct LocalActivitySlotInfo {
+    #[pyo3(get)]
+    pub activity_type: String,
+}
+
+#[pyclass]
+pub struct SlotReleaseCtx {
+    #[pyo3(get)]
+    slot_info: Option<PyObject>,
+    #[pyo3(get)]
+    permit: PyObject,
+}
+
+fn slot_info_to_py_obj(py: Python<'_>, info: SlotInfo) -> PyObject {
+    match info {
+        SlotInfo::Workflow(w) => WorkflowSlotInfo {
+            workflow_type: w.workflow_type.clone(),
+            is_sticky: w.is_sticky,
+        }
+        .into_py(py),
+        SlotInfo::Activity(a) => ActivitySlotInfo {
+            activity_type: a.activity_type.clone(),
+        }
+        .into_py(py),
+        SlotInfo::LocalActivity(a) => LocalActivitySlotInfo {
+            activity_type: a.activity_type.clone(),
+        }
+        .into_py(py),
+    }
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -132,72 +185,94 @@ impl CustomSlotSupplier {
     }
 }
 
-impl<SK: SlotKind> CustomSlotSupplierOfType<SK> {
-    fn call_method<P: IntoPy<PyObject>, F: FnOnce(Python<'_>, &PyAny) -> FR, FR>(
-        &self,
-        method_name: &str,
-        arg: P,
-        post_closure: F,
-    ) -> FR {
-        Python::with_gil(|py| {
-            let py_obj = self.inner.as_ref(py);
-            let method = py_obj
-                .getattr(method_name)
-                .map_err(|_| {
-                    PyTypeError::new_err(format!(
-                        "CustomSlotSupplier must implement '{}' method",
-                        method_name
-                    ))
-                })
-                .expect("TODO");
-
-            post_closure(py, method.call((arg.into_py(py),), None).expect("TODO"))
-        })
-    }
-}
-
 #[async_trait::async_trait]
 impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<SK> {
     type SlotKind = SK;
 
     async fn reserve_slot(&self, ctx: &dyn SlotReservationContext) -> SlotSupplierPermit {
-        dbg!("Trying to reserve slot");
-        let pypermit = Python::with_gil(|py| {
+        loop {
+            let pypermit = Python::with_gil(|py| {
+                let py_obj = self.inner.as_ref(py);
+                let called = py_obj.call_method1(
+                    "reserve_slot",
+                    (SlotReserveCtx::from_ctx(
+                        Self::SlotKind::kind().to_string(),
+                        ctx,
+                    ),),
+                )?;
+                runtime::THREAD_TASK_LOCAL
+                    .with(|tl| pyo3_asyncio::into_future_with_locals(tl.get().unwrap(), called))
+            })
+            .expect("TODO")
+            .await;
+            match pypermit {
+                Ok(p) => {
+                    return SlotSupplierPermit::with_user_data(p);
+                }
+                Err(e) => {
+                    dbg!("Error in reserve_slot", e);
+                }
+            }
+        }
+    }
+
+    fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
+        Python::with_gil(|py| {
             let py_obj = self.inner.as_ref(py);
-            let called = py_obj.call_method1(
-                "reserve_slot",
+            let pa = py_obj.call_method1(
+                "try_reserve_slot",
                 (SlotReserveCtx::from_ctx(
                     Self::SlotKind::kind().to_string(),
                     ctx,
                 ),),
             )?;
-            THREAD_TASK_LOCAL
-                .with(|tl| pyo3_asyncio::into_future_with_locals(tl.get().unwrap(), called))
+
+            if pa.is_none() {
+                return Ok(None);
+            }
+            PyResult::Ok(Some(SlotSupplierPermit::with_user_data(pa.into_py(py))))
         })
         .expect("TODO")
-        .await;
-        SlotSupplierPermit::with_user_data(pypermit)
     }
 
-    fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
-        self.call_method(
-            "try_reserve_slot",
-            SlotReserveCtx::from_ctx(Self::SlotKind::kind().to_string(), ctx),
-            |py, pa| {
-                if pa.is_none() {
-                    return None;
-                }
-                Some(SlotSupplierPermit::with_user_data(pa.into_py(py)))
-            },
-        )
+    fn mark_slot_used(&self, ctx: &dyn SlotMarkUsedContext<SlotKind = Self::SlotKind>) {
+        Python::with_gil(|py| {
+            let permit = ctx
+                .permit()
+                .user_data::<PyObject>()
+                .cloned()
+                .unwrap_or_else(|| py.None());
+            let py_obj = self.inner.as_ref(py);
+            py_obj.call_method1(
+                "mark_slot_used",
+                (SlotMarkUsedCtx {
+                    slot_info: slot_info_to_py_obj(py, ctx.info().downcast()),
+                    permit,
+                },),
+            )?;
+            PyResult::Ok(())
+        })
+        .expect("TODO");
     }
 
-    fn mark_slot_used(&self, _ctx: &dyn SlotMarkUsedContext<SlotKind = Self::SlotKind>) {
-        self.call_method("mark_slot_used", SlotMarkUsedCtx {}, |_, _| ())
-    }
-
-    fn release_slot(&self, _ctx: &dyn SlotReleaseContext<SlotKind = Self::SlotKind>) {
-        self.call_method("release_slot", SlotReleaseCtx {}, |_, _| ())
+    fn release_slot(&self, ctx: &dyn SlotReleaseContext<SlotKind = Self::SlotKind>) {
+        Python::with_gil(|py| {
+            let permit = ctx
+                .permit()
+                .user_data::<PyObject>()
+                .cloned()
+                .unwrap_or_else(|| py.None());
+            let py_obj = self.inner.as_ref(py);
+            py_obj.call_method1(
+                "release_slot",
+                (SlotReleaseCtx {
+                    slot_info: ctx.info().map(|i| slot_info_to_py_obj(py, i.downcast())),
+                    permit,
+                },),
+            )?;
+            PyResult::Ok(())
+        })
+        .expect("TODO");
     }
 
     fn available_slots(&self) -> Option<usize> {

@@ -13,6 +13,7 @@ from typing import (
     Callable,
     List,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
@@ -20,7 +21,7 @@ from typing import (
 )
 
 import google.protobuf.internal.containers
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, runtime_checkable
 
 import temporalio.api.common.v1
 import temporalio.api.history.v1
@@ -33,7 +34,6 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
-from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
 @dataclass
@@ -86,15 +86,17 @@ class FixedSizeSlotSupplier:
     num_slots: int
 
 
-@dataclass(frozen=True)
 class SlotPermit:
-    """A permit to use a slot for a workflow/activity/local activity task."""
+    """A permit to use a slot for a workflow/activity/local activity task.
+
+    You can inherit from this class to add your own data to the permit.
+    """
 
     pass
 
 
-@dataclass(frozen=True)
-class SlotReserveContext:
+# WARNING: This must match Rust worker::SlotReserveCtx
+class SlotReserveContext(Protocol):
     """Context for reserving a slot from a :py:class:`CustomSlotSupplier`."""
 
     slot_type: str  # TODO real type
@@ -109,18 +111,49 @@ class SlotReserveContext:
     """True iff this is a reservation for a sticky poll for a workflow task."""
 
 
-@dataclass(frozen=True)
-class SlotMarkUsedContext:
+@runtime_checkable
+class WorkflowSlotInfo(Protocol):
+    """Info about a workflow task slot usage."""
+
+    workflow_type: str
+    is_sticky: bool
+
+
+@runtime_checkable
+class ActivitySlotInfo(Protocol):
+    """Info about an activity task slot usage."""
+
+    activity_type: str
+
+
+@runtime_checkable
+class LocalActivitySlotInfo(Protocol):
+    """Info about a local activity task slot usage."""
+
+    activity_type: str
+
+
+SlotInfo: TypeAlias = Union[WorkflowSlotInfo, ActivitySlotInfo, LocalActivitySlotInfo]
+
+
+# WARNING: This must match Rust worker::SlotMarkUsedCtx
+class SlotMarkUsedContext(Protocol):
     """Context for marking a slot used from a :py:class:`CustomSlotSupplier`."""
 
-    pass
+    slot_info: SlotInfo
+    """Info about the task that will be using the slot."""
+    permit: SlotPermit
+    """The permit that was issued when the slot was reserved."""
 
 
 @dataclass(frozen=True)
 class SlotReleaseContext:
     """Context for releasing a slot from a :py:class:`CustomSlotSupplier`."""
 
-    pass
+    slot_info: SlotInfo
+    """Info about the task that will be using the slot."""
+    permit: SlotPermit
+    """The permit that was issued when the slot was reserved."""
 
 
 class CustomSlotSupplier(ABC):

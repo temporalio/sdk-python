@@ -5,14 +5,18 @@ from typing import Literal, Optional, Union
 
 from typing_extensions import TypeAlias
 
-import temporalio.bridge.worker
 import temporalio.bridge.temporal_sdk_bridge
+import temporalio.bridge.worker
 from temporalio.bridge.worker import (
+    ActivitySlotInfo,
     CustomSlotSupplier,
+    LocalActivitySlotInfo,
+    SlotInfo,
     SlotMarkUsedContext,
     SlotPermit,
     SlotReleaseContext,
     SlotReserveContext,
+    WorkflowSlotInfo,
 )
 
 _DEFAULT_RESOURCE_ACTIVITY_MAX = 500

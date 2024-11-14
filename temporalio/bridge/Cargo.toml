@@ -25,7 +25,7 @@ pythonize = "0.20"
 temporal-client = { version = "0.1.0", path = "../../../sdk-core/client" }
 temporal-sdk-core = { version = "0.1.0", path = "../../../sdk-core/core", features = ["ephemeral-server"] }
 temporal-sdk-core-api = { version = "0.1.0", path = "../../../sdk-core/core-api" }
-temporal-sdk-core-protos = { version = "0.1.0", path = "../../../sdk-core/sdk-core-protos" }
+temporal-sdk-core-protos = { version = "0.1.0", path = "../../../sdk-core/sdk-core-protos", features = ["serde_serialize"] }
 tokio = "1.26"
 tokio-stream = "0.1"
 tonic = "0.12"

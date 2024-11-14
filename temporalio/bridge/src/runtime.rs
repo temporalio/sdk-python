@@ -88,7 +88,6 @@ const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
 pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
-    dbg!("Initting runtime");
     // Have to build/start telemetry config pieces
     let mut telemetry_build = TelemetryOptionsBuilder::default();
 
@@ -120,9 +119,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
     }
 
     let task_locals = Python::with_gil(|py| {
-        let asyncio = py.import("asyncio")?;
-        let event_loop = asyncio.call_method0("get_event_loop")?;
-        dbg!(&event_loop);
+        // Event loop is assumed to be running at this point
         let locals = pyo3_asyncio::TaskLocals::with_running_loop(py)?.copy_context(py)?;
         PyResult::Ok(locals)
     })
@@ -137,7 +134,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
             inner: tokio::runtime::Builder::new_multi_thread(),
             lang_on_thread_start: Some(move || {
                 // Set task locals for each thread
-                Python::with_gil(|py| {
+                Python::with_gil(|_| {
                     THREAD_TASK_LOCAL.with(|r| {
                         std::cell::OnceCell::set(r, task_locals.clone()).expect("NOT ALREADY SET");
                     });

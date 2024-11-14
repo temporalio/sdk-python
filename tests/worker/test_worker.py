@@ -13,8 +13,10 @@ from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
+    ActivitySlotInfo,
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
+    LocalActivitySlotInfo,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
@@ -24,6 +26,7 @@ from temporalio.worker import (
     SlotReserveContext,
     Worker,
     WorkerTuner,
+    WorkflowSlotInfo,
 )
 from temporalio.workflow import VersioningIntent
 from tests.helpers import new_worker, worker_versioning_enabled
@@ -329,7 +332,7 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
     with concurrent.futures.ThreadPoolExecutor() as executor:
         with pytest.warns(
             UserWarning,
-            match=f"Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
+            match="Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
         ):
             async with new_worker(
                 client,
@@ -342,32 +345,74 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
 
 
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
+    class MyPermit(SlotPermit):
+        def __init__(self, pnum: int):
+            super().__init__()
+            self.pnum = pnum
+
     class MySlotSupplier(CustomSlotSupplier):
+        reserves = 0
+        releases = 0
+        used = 0
+        seen_sticky_kinds = set()
+        seen_slot_kinds = set()
+        seen_used_slot_kinds = set()
+        seen_release_info_empty = False
+        seen_release_info_nonempty = False
+
         async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
-            print("Reserving slot")
-            return SlotPermit()
+            self.reserve_asserts(ctx)
+            # Verify an async call doesn't bungle things
+            await asyncio.sleep(0.01)
+            self.reserves += 1
+            return MyPermit(self.reserves)
 
         def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
-            print("Try Reserving slot")
+            self.reserve_asserts(ctx)
             return None
 
         def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
-            print("Marking slot used")
+            assert ctx.permit is not None
+            assert isinstance(ctx.permit, MyPermit)
+            assert ctx.permit.pnum is not None
+            assert ctx.slot_info is not None
+            if isinstance(ctx.slot_info, WorkflowSlotInfo):
+                self.seen_used_slot_kinds.add("wf")
+            elif isinstance(ctx.slot_info, ActivitySlotInfo):
+                self.seen_used_slot_kinds.add("a")
+            elif isinstance(ctx.slot_info, LocalActivitySlotInfo):
+                self.seen_used_slot_kinds.add("la")
+            self.used += 1
 
         def release_slot(self, ctx: SlotReleaseContext) -> None:
-            print("Releasing slot")
+            assert ctx.permit is not None
+            assert isinstance(ctx.permit, MyPermit)
+            assert ctx.permit.pnum is not None
+            # Info may be empty, and we should see both empty and not
+            if ctx.slot_info is None:
+                self.seen_release_info_empty = True
+            else:
+                self.seen_release_info_nonempty = True
+            self.releases += 1
+
+        def reserve_asserts(self, ctx):
+            assert ctx.task_queue is not None
+            assert ctx.worker_identity is not None
+            assert ctx.worker_build_id is not None
+            self.seen_sticky_kinds.add(ctx.is_sticky)
+            self.seen_slot_kinds.add(ctx.slot_type)
 
     ss = MySlotSupplier()
 
     tuner = WorkerTuner.create_composite(
         workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
     )
-    print("!!!!!!!!1 About to create new worker, event loop is", asyncio.get_event_loop())
     async with new_worker(
         client,
         WaitOnSignalWorkflow,
         activities=[say_hello],
         tuner=tuner,
+        identity="myworker",
     ) as w:
         wf1 = await client.start_workflow(
             WaitOnSignalWorkflow.run,
@@ -376,6 +421,15 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         )
         await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
         await wf1.result()
+
+    assert ss.reserves == ss.releases
+    # Two workflow tasks, one activity
+    assert ss.used == 3
+    assert ss.seen_sticky_kinds == {True, False}
+    assert ss.seen_slot_kinds == {"Workflow", "Activity", "LocalActivity"}
+    assert ss.seen_used_slot_kinds == {"wf", "a"}
+    assert ss.seen_release_info_empty
+    assert ss.seen_release_info_nonempty
 
 
 def create_worker(
