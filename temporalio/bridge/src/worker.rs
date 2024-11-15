@@ -1,4 +1,5 @@
 use anyhow::Context;
+use log::error;
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -12,7 +13,7 @@ use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::worker::{
-    SlotInfo, SlotInfoTrait, SlotKind, SlotMarkUsedContext, SlotReleaseContext,
+    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
     SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
 };
 use temporal_sdk_core_api::Worker;
@@ -87,7 +88,7 @@ pub struct ResourceBasedSlotSupplier {
 #[pyclass]
 pub struct SlotReserveCtx {
     #[pyo3(get)]
-    pub slot_type: String, // TODO: Real type
+    pub slot_type: String,
     #[pyo3(get)]
     pub task_queue: String,
     #[pyo3(get)]
@@ -99,9 +100,13 @@ pub struct SlotReserveCtx {
 }
 
 impl SlotReserveCtx {
-    fn from_ctx(slot_type: String, ctx: &dyn SlotReservationContext) -> Self {
+    fn from_ctx(slot_type: SlotKindType, ctx: &dyn SlotReservationContext) -> Self {
         SlotReserveCtx {
-            slot_type,
+            slot_type: match slot_type {
+                SlotKindType::Workflow => "workflow".to_string(),
+                SlotKindType::Activity => "activity".to_string(),
+                SlotKindType::LocalActivity => "local-activity".to_string(),
+            },
             task_queue: ctx.task_queue().to_string(),
             worker_identity: ctx.worker_identity().to_string(),
             worker_build_id: ctx.worker_build_id().to_string(),
@@ -191,26 +196,32 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
 
     async fn reserve_slot(&self, ctx: &dyn SlotReservationContext) -> SlotSupplierPermit {
         loop {
-            let pypermit = Python::with_gil(|py| {
+            let pypermit = match Python::with_gil(|py| {
                 let py_obj = self.inner.as_ref(py);
                 let called = py_obj.call_method1(
                     "reserve_slot",
-                    (SlotReserveCtx::from_ctx(
-                        Self::SlotKind::kind().to_string(),
-                        ctx,
-                    ),),
+                    (SlotReserveCtx::from_ctx(Self::SlotKind::kind(), ctx),),
                 )?;
                 runtime::THREAD_TASK_LOCAL
                     .with(|tl| pyo3_asyncio::into_future_with_locals(tl.get().unwrap(), called))
-            })
-            .expect("TODO")
+            }) {
+                Ok(f) => f,
+                Err(e) => {
+                    error!(
+                        "Unexpected error in custom slot supplier `reserve_slot`: {}",
+                        e
+                    );
+                    continue;
+                }
+            }
             .await;
             match pypermit {
                 Ok(p) => {
                     return SlotSupplierPermit::with_user_data(p);
                 }
-                Err(e) => {
-                    dbg!("Error in reserve_slot", e);
+                Err(_) => {
+                    // This is a user thrown error, re-raised by the logging wrapper so we can
+                    // loop, so do that.
                 }
             }
         }
@@ -221,10 +232,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             let py_obj = self.inner.as_ref(py);
             let pa = py_obj.call_method1(
                 "try_reserve_slot",
-                (SlotReserveCtx::from_ctx(
-                    Self::SlotKind::kind().to_string(),
-                    ctx,
-                ),),
+                (SlotReserveCtx::from_ctx(Self::SlotKind::kind(), ctx),),
             )?;
 
             if pa.is_none() {
@@ -232,11 +240,17 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             }
             PyResult::Ok(Some(SlotSupplierPermit::with_user_data(pa.into_py(py))))
         })
-        .expect("TODO")
+        .unwrap_or_else(|e| {
+            error!(
+                "Uncaught error in custom slot supplier `try_reserve_slot`: {}",
+                e
+            );
+            None
+        })
     }
 
     fn mark_slot_used(&self, ctx: &dyn SlotMarkUsedContext<SlotKind = Self::SlotKind>) {
-        Python::with_gil(|py| {
+        if let Err(e) = Python::with_gil(|py| {
             let permit = ctx
                 .permit()
                 .user_data::<PyObject>()
@@ -251,12 +265,16 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
                 },),
             )?;
             PyResult::Ok(())
-        })
-        .expect("TODO");
+        }) {
+            error!(
+                "Uncaught error in custom slot supplier `mark_slot_used`: {}",
+                e
+            );
+        }
     }
 
     fn release_slot(&self, ctx: &dyn SlotReleaseContext<SlotKind = Self::SlotKind>) {
-        Python::with_gil(|py| {
+        if let Err(e) = Python::with_gil(|py| {
             let permit = ctx
                 .permit()
                 .user_data::<PyObject>()
@@ -271,8 +289,12 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
                 },),
             )?;
             PyResult::Ok(())
-        })
-        .expect("TODO");
+        }) {
+            error!(
+                "Uncaught error in custom slot supplier `release_slot`: {}",
+                e
+            );
+        }
     }
 
     fn available_slots(&self) -> Option<usize> {

@@ -426,11 +426,88 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     # Two workflow tasks, one activity
     assert ss.used == 3
     assert ss.seen_sticky_kinds == {True, False}
-    assert ss.seen_slot_kinds == {"Workflow", "Activity", "LocalActivity"}
+    assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity"}
     assert ss.seen_used_slot_kinds == {"wf", "a"}
     assert ss.seen_release_info_empty
     assert ss.seen_release_info_nonempty
 
+
+@workflow.defn
+class SimpleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "hi"
+
+
+async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
+    """Ensures a (mostly) broken slot supplier doesn't hose everything up"""
+
+    class ThrowingSlotSupplier(CustomSlotSupplier):
+        marked_used = False
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            # Hand out workflow tasks until one is used
+            if ctx.slot_type == "workflow" and not self.marked_used:
+                return SlotPermit()
+            raise ValueError("I always throw")
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+            raise ValueError("I always throw")
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            raise ValueError("I always throw")
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            raise ValueError("I always throw")
+
+    ss = ThrowingSlotSupplier()
+
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+    )
+    async with new_worker(
+        client,
+        SimpleWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            SimpleWorkflow.run,
+            id=f"throwing-slot-supplier-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.result()
+
+
+async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
+    class BlockingSlotSupplier(CustomSlotSupplier):
+        marked_used = False
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            await asyncio.get_event_loop().create_future()
+            raise ValueError("Should be unreachable")
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+            return None
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            return None
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            return None
+
+    ss = BlockingSlotSupplier()
+
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+    )
+    async with new_worker(
+        client,
+        SimpleWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as _w:
+        await asyncio.sleep(1)
 
 def create_worker(
     client: Client,

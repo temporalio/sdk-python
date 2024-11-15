@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
@@ -20,6 +22,8 @@ from temporalio.bridge.worker import (
 )
 
 _DEFAULT_RESOURCE_ACTIVITY_MAX = 500
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -87,6 +91,48 @@ SlotSupplier: TypeAlias = Union[
 ]
 
 
+class _ErrorLoggingSlotSupplier(CustomSlotSupplier):
+    def __init__(self, supplier: CustomSlotSupplier):
+        self._supplier = supplier
+
+    async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+        try:
+            return await self._supplier.reserve_slot(ctx)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning(
+                "Error in custom slot supplier `reserve_slot`", exc_info=True
+            )
+            # Error needs to be re-thrown here so the rust code will loop
+            raise
+
+    def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        try:
+            return self._supplier.try_reserve_slot(ctx)
+        except Exception:
+            logger.warning(
+                "Error in custom slot supplier `try_reserve_slot`", exc_info=True
+            )
+            return None
+
+    def release_slot(self, ctx: SlotReleaseContext) -> None:
+        try:
+            self._supplier.release_slot(ctx)
+        except Exception:
+            logger.warning(
+                "Error in custom slot supplier `release_slot`", exc_info=True
+            )
+
+    def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+        try:
+            self._supplier.mark_slot_used(ctx)
+        except Exception:
+            logger.warning(
+                "Error in custom slot supplier `mark_slot_used`", exc_info=True
+            )
+
+
 def _to_bridge_slot_supplier(
     slot_supplier: SlotSupplier, kind: Literal["workflow", "activity", "local_activity"]
 ) -> temporalio.bridge.worker.SlotSupplier:
@@ -114,7 +160,9 @@ def _to_bridge_slot_supplier(
             ),
         )
     elif isinstance(slot_supplier, CustomSlotSupplier):
-        return temporalio.bridge.temporal_sdk_bridge.CustomSlotSupplier(slot_supplier)
+        return temporalio.bridge.temporal_sdk_bridge.CustomSlotSupplier(
+            _ErrorLoggingSlotSupplier(slot_supplier)
+        )
     else:
         raise TypeError(f"Unknown slot supplier type: {slot_supplier}")
 

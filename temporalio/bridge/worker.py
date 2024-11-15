@@ -12,6 +12,7 @@ from typing import (
     Awaitable,
     Callable,
     List,
+    Literal,
     Optional,
     Protocol,
     Sequence,
@@ -34,6 +35,7 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
+from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
 @dataclass
@@ -99,8 +101,8 @@ class SlotPermit:
 class SlotReserveContext(Protocol):
     """Context for reserving a slot from a :py:class:`CustomSlotSupplier`."""
 
-    slot_type: str  # TODO real type
-    """The type of slot trying to be reserved."""
+    slot_type: Literal["workflow", "activity", "local-activity"]
+    """The type of slot trying to be reserved. Always one of "workflow", "activity", or "local-activity"."""
     task_queue: str
     """The name of the task queue for which this reservation request is associated."""
     worker_identity: str
@@ -159,14 +161,13 @@ class SlotReleaseContext:
 class CustomSlotSupplier(ABC):
     """This class can be implemented to provide custom slot supplier behavior."""
 
-    # TODO: AbortError equivalent
     @abstractmethod
     async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
         """This function is called before polling for new tasks. Your implementation must block until a
         slot is available then return a permit to use that slot.
 
-        The only acceptable exception to throw is AbortError, any other exceptions thrown will be
-        logged and ignored.
+        The only acceptable exception to throw is :py:class:`asyncio.CancelledError`, as invocations of this method may
+        be cancelled. Any other exceptions thrown will be logged and ignored.
 
         Args:
             ctx: The context for slot reservation.
