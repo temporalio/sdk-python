@@ -502,9 +502,9 @@ impl TryFrom<ClientConfig> for ClientOptions {
         if let Some(tls_config) = opts.tls_config {
             gateway_opts.tls_cfg(tls_config.try_into()?);
         }
-        return gateway_opts
+        gateway_opts
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {}", err)));
+            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {}", err)))
     }
 }
 

@@ -7,7 +7,6 @@ from typing import Literal, Optional, Union
 
 from typing_extensions import TypeAlias
 
-import temporalio.bridge.temporal_sdk_bridge
 import temporalio.bridge.worker
 from temporalio.bridge.worker import (
     ActivitySlotInfo,
@@ -160,7 +159,7 @@ def _to_bridge_slot_supplier(
             ),
         )
     elif isinstance(slot_supplier, CustomSlotSupplier):
-        return temporalio.bridge.temporal_sdk_bridge.CustomSlotSupplier(
+        return temporalio.bridge.worker.BridgeCustomSlotSupplier(
             _ErrorLoggingSlotSupplier(slot_supplier)
         )
     else:

@@ -221,9 +221,9 @@ fn build_metric_parameters(
 
 #[pymethods]
 impl MetricAttributesRef {
-    fn with_additional_attributes<'p>(
+    fn with_additional_attributes(
         &self,
-        py: Python<'p>,
+        py: Python,
         meter: &MetricMeterRef,
         new_attrs: HashMap<String, PyObject>,
     ) -> PyResult<Self> {
@@ -240,8 +240,8 @@ impl MetricAttributesRef {
     }
 }
 
-fn metric_key_value_from_py<'p>(
-    py: Python<'p>,
+fn metric_key_value_from_py(
+    py: Python,
     k: String,
     obj: PyObject,
 ) -> PyResult<metrics::MetricKeyValue> {
@@ -317,8 +317,8 @@ impl CustomMetricAttributes for BufferedMetricAttributes {
     }
 }
 
-pub fn convert_metric_events<'p>(
-    py: Python<'p>,
+pub fn convert_metric_events(
+    py: Python,
     events: Vec<MetricEvent<BufferedMetricRef>>,
     durations_as_seconds: bool,
 ) -> Vec<BufferedMetricUpdate> {
@@ -328,8 +328,8 @@ pub fn convert_metric_events<'p>(
         .collect()
 }
 
-fn convert_metric_event<'p>(
-    py: Python<'p>,
+fn convert_metric_event(
+    py: Python,
     event: MetricEvent<BufferedMetricRef>,
     durations_as_seconds: bool,
 ) -> Option<BufferedMetricUpdate> {

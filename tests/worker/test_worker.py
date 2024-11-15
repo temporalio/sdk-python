@@ -509,6 +509,7 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
     ) as _w:
         await asyncio.sleep(1)
 
+
 def create_worker(
     client: Client,
     on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,

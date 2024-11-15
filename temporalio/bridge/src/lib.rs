@@ -63,12 +63,12 @@ fn connect_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: client::ClientConfig,
 ) -> PyResult<&'a PyAny> {
-    client::connect_client(py, &runtime_ref, config)
+    client::connect_client(py, runtime_ref, config)
 }
 
 #[pyfunction]
 fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<metric::MetricMeterRef> {
-    metric::new_metric_meter(&runtime_ref)
+    metric::new_metric_meter(runtime_ref)
 }
 
 #[pyfunction]
@@ -77,7 +77,7 @@ fn init_runtime(telemetry_config: runtime::TelemetryConfig) -> PyResult<runtime:
 }
 
 #[pyfunction]
-fn raise_in_thread<'a>(py: Python<'a>, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
     runtime::raise_in_thread(py, thread_id, exc)
 }
 
@@ -87,7 +87,7 @@ fn start_dev_server<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: testing::DevServerConfig,
 ) -> PyResult<&'a PyAny> {
-    testing::start_dev_server(py, &runtime_ref, config)
+    testing::start_dev_server(py, runtime_ref, config)
 }
 
 #[pyfunction]
@@ -96,7 +96,7 @@ fn start_test_server<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: testing::TestServerConfig,
 ) -> PyResult<&'a PyAny> {
-    testing::start_test_server(py, &runtime_ref, config)
+    testing::start_test_server(py, runtime_ref, config)
 }
 
 #[pyfunction]
@@ -105,7 +105,7 @@ fn new_worker(
     client: &client::ClientRef,
     config: worker::WorkerConfig,
 ) -> PyResult<worker::WorkerRef> {
-    worker::new_worker(&runtime_ref, &client, config)
+    worker::new_worker(runtime_ref, client, config)
 }
 
 #[pyfunction]
@@ -114,5 +114,5 @@ fn new_replay_worker<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: worker::WorkerConfig,
 ) -> PyResult<&'a PyTuple> {
-    worker::new_replay_worker(py, &runtime_ref, config)
+    worker::new_replay_worker(py, runtime_ref, config)
 }

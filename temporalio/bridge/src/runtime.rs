@@ -122,8 +122,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
         // Event loop is assumed to be running at this point
         let locals = pyo3_asyncio::TaskLocals::with_running_loop(py)?.copy_context(py)?;
         PyResult::Ok(locals)
-    })
-    .expect("Works");
+    })?;
 
     // Create core runtime which starts tokio multi-thread runtime
     let mut core = CoreRuntime::new(
@@ -136,11 +135,12 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
                 // Set task locals for each thread
                 Python::with_gil(|_| {
                     THREAD_TASK_LOCAL.with(|r| {
-                        std::cell::OnceCell::set(r, task_locals.clone()).expect("NOT ALREADY SET");
+                        std::cell::OnceCell::set(r, task_locals.clone())
+                            .expect("TaskLocals are only set once");
                     });
                     PyResult::Ok(())
                 })
-                .expect("Setting event loop works");
+                .expect("Setting per-thread python TaskLocals must work");
             }),
         },
     )
@@ -197,7 +197,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
     })
 }
 
-pub fn raise_in_thread<'a>(_py: Python<'a>, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+pub fn raise_in_thread(_py: Python, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
     unsafe { pyo3::ffi::PyThreadState_SetAsyncExc(thread_id, exc.as_ptr()) == 1 }
 }
 
@@ -223,9 +223,9 @@ impl Drop for Runtime {
 
 #[pymethods]
 impl RuntimeRef {
-    fn retrieve_buffered_metrics<'p>(
+    fn retrieve_buffered_metrics(
         &self,
-        py: Python<'p>,
+        py: Python,
         durations_as_seconds: bool,
     ) -> Vec<BufferedMetricUpdate> {
         convert_metric_events(
@@ -316,7 +316,7 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
 
     fn try_from(conf: MetricsConfig) -> PyResult<Self> {
         if let Some(otel_conf) = conf.opentelemetry {
-            if !conf.prometheus.is_none() {
+            if conf.prometheus.is_some() {
                 return Err(PyValueError::new_err(
                     "Cannot have OpenTelemetry and Prometheus metrics",
                 ));
@@ -391,7 +391,7 @@ tokio::task_local! {
 
 thread_local! {
     pub(crate) static THREAD_TASK_LOCAL: std::cell::OnceCell<pyo3_asyncio::TaskLocals> =
-        std::cell::OnceCell::new();
+        const { std::cell::OnceCell::new() };
 }
 
 impl pyo3_asyncio::generic::Runtime for TokioRuntime {
@@ -421,9 +421,8 @@ impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
     }
 
     fn get_task_locals() -> Option<pyo3_asyncio::TaskLocals> {
-        match TASK_LOCALS.try_with(|c| c.get().map(|locals| locals.clone())) {
-            Ok(locals) => locals,
-            Err(_) => None,
-        }
+        TASK_LOCALS
+            .try_with(|c| c.get().cloned())
+            .unwrap_or_default()
     }
 }
