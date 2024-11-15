@@ -14,18 +14,13 @@ futures = "0.3"
 log = "0.4"
 once_cell = "1.16"
 prost = "0.13"
-prost-types = "0.13"
 pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38", "anyhow"] }
 pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
 pythonize = "0.20"
-#temporal-client = { version = "0.1.0", path = "./sdk-core/client" }
-#temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core", features = ["ephemeral-server"] }
-#temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api" }
-#temporal-sdk-core-protos = { version = "0.1.0", path = "./sdk-core/sdk-core-protos" }
-temporal-client = { version = "0.1.0", path = "../../../sdk-core/client" }
-temporal-sdk-core = { version = "0.1.0", path = "../../../sdk-core/core", features = ["ephemeral-server"] }
-temporal-sdk-core-api = { version = "0.1.0", path = "../../../sdk-core/core-api" }
-temporal-sdk-core-protos = { version = "0.1.0", path = "../../../sdk-core/sdk-core-protos", features = ["serde_serialize"] }
+temporal-client = { version = "0.1.0", path = "./sdk-core/client" }
+temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core", features = ["ephemeral-server"] }
+temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api" }
+temporal-sdk-core-protos = { version = "0.1.0", path = "./sdk-core/sdk-core-protos" }
 tokio = "1.26"
 tokio-stream = "0.1"
 tonic = "0.12"
