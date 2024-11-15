@@ -58,8 +58,6 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
         retry interval calculated by the retry policy. Retry attempts will
         still be subject to the maximum retries limit and total time limit
         defined by the policy.
-        ATTENTION: this value will be ignored if set for failures produced by
-        the workflow.
         """
     def __init__(
         self,

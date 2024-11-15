@@ -72,6 +72,7 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     ROOT_EXECUTION_FIELD_NUMBER: builtins.int
     ASSIGNED_BUILD_ID_FIELD_NUMBER: builtins.int
     INHERITED_BUILD_ID_FIELD_NUMBER: builtins.int
+    FIRST_RUN_ID_FIELD_NUMBER: builtins.int
     @property
     def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     @property
@@ -142,6 +143,14 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     """Build ID inherited from a previous/parent execution. If present, assigned_build_id will be set to this, instead
     of using the assignment rules.
     """
+    first_run_id: builtins.str
+    """The first run ID in the execution chain.
+    Executions created via the following operations are considered to be in the same chain
+    - ContinueAsNew
+    - Workflow Retry
+    - Workflow Reset
+    - Cron Schedule
+    """
     def __init__(
         self,
         *,
@@ -169,6 +178,7 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
         | None = ...,
         assigned_build_id: builtins.str = ...,
         inherited_build_id: builtins.str = ...,
+        first_run_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -214,6 +224,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"execution_duration",
             "execution_time",
             b"execution_time",
+            "first_run_id",
+            b"first_run_id",
             "history_length",
             b"history_length",
             "history_size_bytes",
@@ -330,6 +342,10 @@ class PendingActivityInfo(google.protobuf.message.Message):
     USE_WORKFLOW_BUILD_ID_FIELD_NUMBER: builtins.int
     LAST_INDEPENDENTLY_ASSIGNED_BUILD_ID_FIELD_NUMBER: builtins.int
     LAST_WORKER_VERSION_STAMP_FIELD_NUMBER: builtins.int
+    CURRENT_RETRY_INTERVAL_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
+    NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    PAUSED_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
@@ -363,6 +379,23 @@ class PendingActivityInfo(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
         """The version stamp of the worker to whom this activity was most recently dispatched"""
+    @property
+    def current_retry_interval(self) -> google.protobuf.duration_pb2.Duration:
+        """The time activity will wait until the next retry.
+        If activity is currently running it will be next retry interval if activity failed.
+        If activity is currently waiting it will be current retry interval.
+        If there will be no retry it will be null.
+        """
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last activity attempt was completed. If activity has not been completed yet then it will be null."""
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Next time when activity will be scheduled.
+        If activity is currently scheduled or started it will be null.
+        """
+    paused: builtins.bool
+    """Indicates if activity is paused."""
     def __init__(
         self,
         *,
@@ -382,6 +415,12 @@ class PendingActivityInfo(google.protobuf.message.Message):
         last_independently_assigned_build_id: builtins.str = ...,
         last_worker_version_stamp: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
+        current_retry_interval: google.protobuf.duration_pb2.Duration | None = ...,
+        last_attempt_complete_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        paused: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -390,10 +429,14 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"activity_type",
             "assigned_build_id",
             b"assigned_build_id",
+            "current_retry_interval",
+            b"current_retry_interval",
             "expiration_time",
             b"expiration_time",
             "heartbeat_details",
             b"heartbeat_details",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
             "last_failure",
             b"last_failure",
             "last_heartbeat_time",
@@ -404,6 +447,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"last_started_time",
             "last_worker_version_stamp",
             b"last_worker_version_stamp",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
             "scheduled_time",
             b"scheduled_time",
             "use_workflow_build_id",
@@ -421,10 +466,14 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"assigned_build_id",
             "attempt",
             b"attempt",
+            "current_retry_interval",
+            b"current_retry_interval",
             "expiration_time",
             b"expiration_time",
             "heartbeat_details",
             b"heartbeat_details",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
             "last_failure",
             b"last_failure",
             "last_heartbeat_time",
@@ -439,6 +488,10 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"last_worker_version_stamp",
             "maximum_attempts",
             b"maximum_attempts",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "paused",
+            b"paused",
             "scheduled_time",
             b"scheduled_time",
             "state",
@@ -945,6 +998,7 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
     CANCELLATION_INFO_FIELD_NUMBER: builtins.int
+    SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
     endpoint: builtins.str
     """Endpoint name.
     Resolved to a URL via the cluster's endpoint registry.
@@ -981,6 +1035,10 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
         """The time when the next attempt is scheduled."""
     @property
     def cancellation_info(self) -> global___NexusOperationCancellationInfo: ...
+    scheduled_event_id: builtins.int
+    """The event ID of the NexusOperationScheduled event. Can be used to correlate an operation in the
+    DescribeWorkflowExecution response with workflow history.
+    """
     def __init__(
         self,
         *,
@@ -999,6 +1057,7 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
         next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
         | None = ...,
         cancellation_info: global___NexusOperationCancellationInfo | None = ...,
+        scheduled_event_id: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1038,6 +1097,8 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
             b"operation_id",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
+            "scheduled_event_id",
+            b"scheduled_event_id",
             "scheduled_time",
             b"scheduled_time",
             "service",

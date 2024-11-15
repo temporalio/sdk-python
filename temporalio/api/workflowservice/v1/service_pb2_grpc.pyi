@@ -414,6 +414,28 @@ class WorkflowServiceStub:
     1. StickyTaskQueue
     2. StickyScheduleToStartTimeout
 
+    When possible, ShutdownWorker should be preferred over
+    ResetStickyTaskQueue (particularly when a worker is shutting down or
+    cycling).
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: We do not expose worker API to HTTP. --)
+    """
+    ShutdownWorker: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
+    ]
+    """ShutdownWorker is used to indicate that the given sticky task
+    queue is no longer being polled by its worker. Following the completion of
+    ShutdownWorker, newly-added workflow tasks will instead be placed
+    in the normal task queue, eligible for any worker to pick up.
+
+    ShutdownWorker should be called by workers while shutting down,
+    after they've shut down their pollers. If another sticky poll
+    request is issued, the sticky task queue will be revived.
+
+    As of Temporal Server v1.25.0, ShutdownWorker hasn't yet been implemented.
+
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -524,17 +546,18 @@ class WorkflowServiceStub:
     """Use this API to manage Worker Versioning Rules for a given Task Queue. There are two types of
     rules: Build ID Assignment rules and Compatible Build ID Redirect rules.
 
-    Assignment rules are used to assign a Build ID for a new execution when it starts. Its primary
-    use case is to specify the latest Build ID but it has powerful features for gradual rollout
+    Assignment rules determine how to assign new executions to a Build IDs. Their primary
+    use case is to specify the latest Build ID but they have powerful features for gradual rollout
     of a new Build ID.
 
-    Once a Build ID is assigned to a workflow execution and it completes its first Workflow Task,
+    Once a workflow execution is assigned to a Build ID and it completes its first Workflow Task,
     the workflow stays on the assigned Build ID regardless of changes in assignment rules. This
     eliminates the need for compatibility between versions when you only care about using the new
     version for new workflows and let existing workflows finish in their own version.
 
-    Activities, Child Workflows and Continue-as-New executions have the option to inherit their
-    parent/previous workflow or use the latest assigment rules to independently select a Build ID.
+    Activities, Child Workflows and Continue-as-New executions have the option to inherit the
+    Build ID of their parent/previous workflow or use the latest assignment rules to independently
+    select a Build ID.
 
     Redirect rules should only be used when you want to move workflows and activities assigned to
     one Build ID (source) to another compatible Build ID (target). You are responsible to make sure
@@ -575,12 +598,12 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
     ]
-    """Invokes the specified update function on user workflow code."""
+    """Invokes the specified Update function on user Workflow code."""
     PollWorkflowExecutionUpdate: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
     ]
-    """Polls a workflow execution for the outcome of a workflow execution update
+    """Polls a Workflow Execution for the outcome of a Workflow Update
     previously issued through the UpdateWorkflowExecution RPC. The effective
     timeout on this call will be shorter of the the caller-supplied gRPC
     timeout and the server's configured long-poll timeout.
@@ -631,6 +654,70 @@ class WorkflowServiceStub:
     """RespondNexusTaskFailed is called by workers to fail Nexus tasks received via PollNexusTaskQueue.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
+    """
+    UpdateActivityOptionsById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdResponse,
+    ]
+    """UpdateActivityOptionsById is called by the client to update the options of an activity
+    (-- api-linter: core::0136::prepositions=disabled
+        aip.dev/not-precedent: "By" is used to indicate request type. --)
+    """
+    PauseActivityById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdResponse,
+    ]
+    """PauseActivityById pauses the execution of an activity specified by its ID.
+    Returns a `NotFound` error if there is no pending activity with the provided ID.
+
+    Pausing an activity means:
+    - If the activity is currently waiting for a retry or is running and subsequently fails,
+      it will not be rescheduled until it is unpaused.
+    - If the activity is already paused, calling this method will have no effect.
+    - If the activity is running and finishes successfully, the activity will be completed.
+    - If the activity is running and finishes with failure:
+      * if there is no retry left - the activity will be completed.
+      * if there are more retries left - the activity will be paused.
+    For long-running activities:
+    - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
+    - The activity should respond to the cancellation accordingly.
+    (-- api-linter: core::0136::prepositions=disabled
+        aip.dev/not-precedent: "By" is used to indicate request type. --)
+    """
+    UnpauseActivityById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdResponse,
+    ]
+    """UnpauseActivityById unpauses the execution of an activity specified by its ID.
+    Returns a `NotFound` error if there is no pending activity with the provided ID.
+    There are two 'modes' of unpausing an activity:
+    'resume' - If the activity is paused, it will be resumed and scheduled for execution.
+       * If the activity is currently running Unpause with 'resume' has no effect.
+       * if 'no_wait' flag is set and the activity is waiting, the activity will be scheduled immediately.
+    'reset' - If the activity is paused, it will be reset to its initial state and (depending on parameters) scheduled for execution.
+       * If the activity is currently running, Unpause with 'reset' will reset the number of attempts.
+       * if 'no_wait' flag is set, the activity will be scheduled immediately.
+       * if 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
+    If the activity is in waiting for retry and past it retry timeout, it will be scheduled immediately.
+    Once the activity is unpaused, all timeout timers will be regenerated.
+    (-- api-linter: core::0136::prepositions=disabled
+        aip.dev/not-precedent: "By" is used to indicate request type. --)
+    """
+    ResetActivityById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdResponse,
+    ]
+    """ResetActivityById unpauses the execution of an activity specified by its ID.
+    Returns a `NotFound` error if there is no pending activity with the provided ID.
+    Resetting an activity means:
+    * number of attempts will be reset to 0.
+    * activity timeouts will be resetted.
+    If the activity currently running:
+    *  if 'no_wait' flag is provided, a new instance of the activity will be scheduled immediately.
+    *  if 'no_wait' flag is not provided, a new instance of the  activity will be scheduled after current instance completes if needed.
+    If 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
+    (-- api-linter: core::0136::prepositions=disabled
+        aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
@@ -1092,6 +1179,30 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         1. StickyTaskQueue
         2. StickyScheduleToStartTimeout
 
+        When possible, ShutdownWorker should be preferred over
+        ResetStickyTaskQueue (particularly when a worker is shutting down or
+        cycling).
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: We do not expose worker API to HTTP. --)
+        """
+    @abc.abstractmethod
+    def ShutdownWorker(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse:
+        """ShutdownWorker is used to indicate that the given sticky task
+        queue is no longer being polled by its worker. Following the completion of
+        ShutdownWorker, newly-added workflow tasks will instead be placed
+        in the normal task queue, eligible for any worker to pick up.
+
+        ShutdownWorker should be called by workers while shutting down,
+        after they've shut down their pollers. If another sticky poll
+        request is issued, the sticky task queue will be revived.
+
+        As of Temporal Server v1.25.0, ShutdownWorker hasn't yet been implemented.
+
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
@@ -1238,17 +1349,18 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         """Use this API to manage Worker Versioning Rules for a given Task Queue. There are two types of
         rules: Build ID Assignment rules and Compatible Build ID Redirect rules.
 
-        Assignment rules are used to assign a Build ID for a new execution when it starts. Its primary
-        use case is to specify the latest Build ID but it has powerful features for gradual rollout
+        Assignment rules determine how to assign new executions to a Build IDs. Their primary
+        use case is to specify the latest Build ID but they have powerful features for gradual rollout
         of a new Build ID.
 
-        Once a Build ID is assigned to a workflow execution and it completes its first Workflow Task,
+        Once a workflow execution is assigned to a Build ID and it completes its first Workflow Task,
         the workflow stays on the assigned Build ID regardless of changes in assignment rules. This
         eliminates the need for compatibility between versions when you only care about using the new
         version for new workflows and let existing workflows finish in their own version.
 
-        Activities, Child Workflows and Continue-as-New executions have the option to inherit their
-        parent/previous workflow or use the latest assigment rules to independently select a Build ID.
+        Activities, Child Workflows and Continue-as-New executions have the option to inherit the
+        Build ID of their parent/previous workflow or use the latest assignment rules to independently
+        select a Build ID.
 
         Redirect rules should only be used when you want to move workflows and activities assigned to
         one Build ID (source) to another compatible Build ID (target). You are responsible to make sure
@@ -1295,14 +1407,14 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse:
-        """Invokes the specified update function on user workflow code."""
+        """Invokes the specified Update function on user Workflow code."""
     @abc.abstractmethod
     def PollWorkflowExecutionUpdate(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse:
-        """Polls a workflow execution for the outcome of a workflow execution update
+        """Polls a Workflow Execution for the outcome of a Workflow Update
         previously issued through the UpdateWorkflowExecution RPC. The effective
         timeout on this call will be shorter of the the caller-supplied gRPC
         timeout and the server's configured long-poll timeout.
@@ -1367,6 +1479,82 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         """RespondNexusTaskFailed is called by workers to fail Nexus tasks received via PollNexusTaskQueue.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
+        """
+    @abc.abstractmethod
+    def UpdateActivityOptionsById(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdResponse:
+        """UpdateActivityOptionsById is called by the client to update the options of an activity
+        (-- api-linter: core::0136::prepositions=disabled
+            aip.dev/not-precedent: "By" is used to indicate request type. --)
+        """
+    @abc.abstractmethod
+    def PauseActivityById(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdResponse
+    ):
+        """PauseActivityById pauses the execution of an activity specified by its ID.
+        Returns a `NotFound` error if there is no pending activity with the provided ID.
+
+        Pausing an activity means:
+        - If the activity is currently waiting for a retry or is running and subsequently fails,
+          it will not be rescheduled until it is unpaused.
+        - If the activity is already paused, calling this method will have no effect.
+        - If the activity is running and finishes successfully, the activity will be completed.
+        - If the activity is running and finishes with failure:
+          * if there is no retry left - the activity will be completed.
+          * if there are more retries left - the activity will be paused.
+        For long-running activities:
+        - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
+        - The activity should respond to the cancellation accordingly.
+        (-- api-linter: core::0136::prepositions=disabled
+            aip.dev/not-precedent: "By" is used to indicate request type. --)
+        """
+    @abc.abstractmethod
+    def UnpauseActivityById(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdResponse:
+        """UnpauseActivityById unpauses the execution of an activity specified by its ID.
+        Returns a `NotFound` error if there is no pending activity with the provided ID.
+        There are two 'modes' of unpausing an activity:
+        'resume' - If the activity is paused, it will be resumed and scheduled for execution.
+           * If the activity is currently running Unpause with 'resume' has no effect.
+           * if 'no_wait' flag is set and the activity is waiting, the activity will be scheduled immediately.
+        'reset' - If the activity is paused, it will be reset to its initial state and (depending on parameters) scheduled for execution.
+           * If the activity is currently running, Unpause with 'reset' will reset the number of attempts.
+           * if 'no_wait' flag is set, the activity will be scheduled immediately.
+           * if 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
+        If the activity is in waiting for retry and past it retry timeout, it will be scheduled immediately.
+        Once the activity is unpaused, all timeout timers will be regenerated.
+        (-- api-linter: core::0136::prepositions=disabled
+            aip.dev/not-precedent: "By" is used to indicate request type. --)
+        """
+    @abc.abstractmethod
+    def ResetActivityById(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdResponse
+    ):
+        """ResetActivityById unpauses the execution of an activity specified by its ID.
+        Returns a `NotFound` error if there is no pending activity with the provided ID.
+        Resetting an activity means:
+        * number of attempts will be reset to 0.
+        * activity timeouts will be resetted.
+        If the activity currently running:
+        *  if 'no_wait' flag is provided, a new instance of the activity will be scheduled immediately.
+        *  if 'no_wait' flag is not provided, a new instance of the  activity will be scheduled after current instance completes if needed.
+        If 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
+        (-- api-linter: core::0136::prepositions=disabled
+            aip.dev/not-precedent: "By" is used to indicate request type. --)
         """
 
 def add_WorkflowServiceServicer_to_server(
