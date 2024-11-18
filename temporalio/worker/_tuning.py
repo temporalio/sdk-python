@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 from typing_extensions import TypeAlias
 
@@ -90,13 +90,17 @@ SlotSupplier: TypeAlias = Union[
 ]
 
 
-class _ErrorLoggingSlotSupplier(CustomSlotSupplier):
+class _BridgeSlotSupplierWrapper:
     def __init__(self, supplier: CustomSlotSupplier):
         self._supplier = supplier
 
-    async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+    async def reserve_slot(
+        self, ctx: SlotReserveContext, reserve_cb: Callable[[Any], None]
+    ) -> SlotPermit:
         try:
-            return await self._supplier.reserve_slot(ctx)
+            reserve_fut = asyncio.create_task(self._supplier.reserve_slot(ctx))
+            reserve_cb(reserve_fut)
+            return await reserve_fut
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -160,7 +164,7 @@ def _to_bridge_slot_supplier(
         )
     elif isinstance(slot_supplier, CustomSlotSupplier):
         return temporalio.bridge.worker.BridgeCustomSlotSupplier(
-            _ErrorLoggingSlotSupplier(slot_supplier)
+            _BridgeSlotSupplierWrapper(slot_supplier)
         )
     else:
         raise TypeError(f"Unknown slot supplier type: {slot_supplier}")

@@ -7,7 +7,7 @@ use pyo3::types::{PyBytes, PyTuple};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
@@ -63,6 +63,18 @@ pub struct TunerHolder {
     activity_slot_supplier: SlotSupplier,
     local_activity_slot_supplier: SlotSupplier,
 }
+
+// pub fn set_task_locals_on_tuner<'a>(py: Python<'a>, tuner: &TunerHolder) -> PyResult<()> {
+//     // TODO: All suppliers
+//     if let SlotSupplier::Custom(ref cs) = tuner.workflow_slot_supplier {
+//         Python::with_gil(|py| {
+//             let py_obj = cs.inner.as_ref(py);
+//             py_obj.call_method0("set_task_locals")?;
+//             Ok(())
+//         })?;
+//     };
+//     Ok(())
+// }
 
 #[derive(FromPyObject)]
 pub enum SlotSupplier {
@@ -190,17 +202,60 @@ impl CustomSlotSupplier {
     }
 }
 
+// Shouldn't really need this callback nonsense, it should be possible to do this from the pyo3
+// asyncio library, but we'd have to vendor the whole thing to make the right improvements. When
+// pyo3 is upgraded and we are using
+
+#[pyclass]
+struct CreatedTaskForSlotCallback {
+    stored_task: Arc<OnceLock<PyObject>>,
+}
+
+#[pymethods]
+impl CreatedTaskForSlotCallback {
+    fn __call__(&self, task: PyObject) -> PyResult<()> {
+        self.stored_task.set(task).expect("must only be set once");
+        Ok(())
+    }
+}
+
+struct TaskCanceller {
+    stored_task: Arc<OnceLock<PyObject>>,
+}
+
+impl TaskCanceller {
+    fn new(stored_task: Arc<OnceLock<PyObject>>) -> Self {
+        TaskCanceller { stored_task }
+    }
+}
+
+impl Drop for TaskCanceller {
+    fn drop(&mut self) {
+        if let Some(task) = self.stored_task.get() {
+            Python::with_gil(|py| {
+                task.call_method0(py, "cancel")
+                    .expect("Failed to cancel task");
+            });
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<SK> {
     type SlotKind = SK;
 
     async fn reserve_slot(&self, ctx: &dyn SlotReservationContext) -> SlotSupplierPermit {
         loop {
+            let stored_task = Arc::new(OnceLock::new());
+            let _task_canceller = TaskCanceller::new(stored_task.clone());
             let pypermit = match Python::with_gil(|py| {
                 let py_obj = self.inner.as_ref(py);
                 let called = py_obj.call_method1(
                     "reserve_slot",
-                    (SlotReserveCtx::from_ctx(Self::SlotKind::kind(), ctx),),
+                    (
+                        SlotReserveCtx::from_ctx(SK::kind(), ctx),
+                        CreatedTaskForSlotCallback { stored_task },
+                    ),
                 )?;
                 runtime::THREAD_TASK_LOCAL
                     .with(|tl| pyo3_asyncio::into_future_with_locals(tl.get().unwrap(), called))
@@ -232,7 +287,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             let py_obj = self.inner.as_ref(py);
             let pa = py_obj.call_method1(
                 "try_reserve_slot",
-                (SlotReserveCtx::from_ctx(Self::SlotKind::kind(), ctx),),
+                (SlotReserveCtx::from_ctx(SK::kind(), ctx),),
             )?;
 
             if pa.is_none() {
@@ -362,6 +417,8 @@ pub fn new_replay_worker<'a>(
 impl WorkerRef {
     fn validate<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
+        // Set custom slot supplier task locals so they can run futures
+        // match worker.get_config().tuner {}
         self.runtime.future_into_py(py, async move {
             worker
                 .validate()

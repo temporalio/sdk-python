@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import threading
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional
@@ -353,6 +354,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     class MySlotSupplier(CustomSlotSupplier):
         reserves = 0
         releases = 0
+        highest_seen_reserve_on_release = 0
         used = 0
         seen_sticky_kinds = set()
         seen_slot_kinds = set()
@@ -388,6 +390,9 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             assert ctx.permit is not None
             assert isinstance(ctx.permit, MyPermit)
             assert ctx.permit.pnum is not None
+            self.highest_seen_reserve_on_release = max(
+                ctx.permit.pnum, self.highest_seen_reserve_on_release
+            )
             # Info may be empty, and we should see both empty and not
             if ctx.slot_info is None:
                 self.seen_release_info_empty = True
@@ -422,10 +427,11 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
         await wf1.result()
 
-    async def releases() -> int:
-        return ss.releases
-
-    assert ss.reserves == ss.releases
+    # We can't use reserve number directly because there is a technically possible race
+    # where the python reserve function appears to complete, but Rust doesn't see that.
+    # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
+    # that the permits passed to release line up.
+    assert ss.highest_seen_reserve_on_release == ss.releases
     # Two workflow tasks, one activity
     assert ss.used == 3
     assert ss.seen_sticky_kinds == {True, False}
