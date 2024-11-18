@@ -29,7 +29,7 @@ from temporalio.worker import (
     WorkflowSlotInfo,
 )
 from temporalio.workflow import VersioningIntent
-from tests.helpers import new_worker, worker_versioning_enabled
+from tests.helpers import assert_eq_eventually, new_worker, worker_versioning_enabled
 
 
 def test_load_default_worker_binary_id():
@@ -421,6 +421,9 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         )
         await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
         await wf1.result()
+
+    async def releases() -> int:
+        return ss.releases
 
     assert ss.reserves == ss.releases
     # Two workflow tasks, one activity
