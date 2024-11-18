@@ -615,6 +615,31 @@ class WorkflowService:
             wsv1.UpdateWorkerVersioningRulesRequest,
             wsv1.UpdateWorkerVersioningRulesResponse,
         )
+        self.pause_activity_by_id = client._new_call(
+            "pause_activity_by_id",
+            wsv1.PauseActivityByIdRequest,
+            wsv1.PauseActivityByIdResponse,
+        )
+        self.unpause_activity_by_id = client._new_call(
+            "unpause_activity_by_id",
+            wsv1.UnpauseActivityByIdRequest,
+            wsv1.UnpauseActivityByIdResponse,
+        )
+        self.reset_activity_by_id = client._new_call(
+            "reset_activity_by_id",
+            wsv1.ResetActivityByIdRequest,
+            wsv1.ResetActivityByIdResponse,
+        )
+        self.update_activity_options_by_id = client._new_call(
+            "update_activity_options_by_id",
+            wsv1.UpdateActivityOptionsByIdRequest,
+            wsv1.UpdateActivityOptionsByIdResponse,
+        )
+        self.shutdown_worker = client._new_call(
+            "shutdown_worker",
+            wsv1.ShutdownWorkerRequest,
+            wsv1.ShutdownWorkerResponse,
+        )
 
 
 class OperatorService:
