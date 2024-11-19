@@ -78,6 +78,9 @@ class SlotPermit:
     """A permit to use a slot for a workflow/activity/local activity task.
 
     You can inherit from this class to add your own data to the permit.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
     """
 
     pass
@@ -85,7 +88,11 @@ class SlotPermit:
 
 # WARNING: This must match Rust worker::SlotReserveCtx
 class SlotReserveContext(Protocol):
-    """Context for reserving a slot from a :py:class:`CustomSlotSupplier`."""
+    """Context for reserving a slot from a :py:class:`CustomSlotSupplier`.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
 
     slot_type: Literal["workflow", "activity", "local-activity"]
     """The type of slot trying to be reserved. Always one of "workflow", "activity", or "local-activity"."""
@@ -99,24 +106,39 @@ class SlotReserveContext(Protocol):
     """True iff this is a reservation for a sticky poll for a workflow task."""
 
 
+# WARNING: This must match Rust worker::WorkflowSlotInfo
 @runtime_checkable
 class WorkflowSlotInfo(Protocol):
-    """Info about a workflow task slot usage."""
+    """Info about a workflow task slot usage.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
 
     workflow_type: str
     is_sticky: bool
 
 
+# WARNING: This must match Rust worker::ActivitySlotInfo
 @runtime_checkable
 class ActivitySlotInfo(Protocol):
-    """Info about an activity task slot usage."""
+    """Info about an activity task slot usage.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
 
     activity_type: str
 
 
+# WARNING: This must match Rust worker::LocalActivitySlotInfo
 @runtime_checkable
 class LocalActivitySlotInfo(Protocol):
-    """Info about a local activity task slot usage."""
+    """Info about a local activity task slot usage.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
 
     activity_type: str
 
@@ -125,8 +147,13 @@ SlotInfo: TypeAlias = Union[WorkflowSlotInfo, ActivitySlotInfo, LocalActivitySlo
 
 
 # WARNING: This must match Rust worker::SlotMarkUsedCtx
+@dataclass(frozen=True)
 class SlotMarkUsedContext(Protocol):
-    """Context for marking a slot used from a :py:class:`CustomSlotSupplier`."""
+    """Context for marking a slot used from a :py:class:`CustomSlotSupplier`.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
 
     slot_info: SlotInfo
     """Info about the task that will be using the slot."""
@@ -134,9 +161,14 @@ class SlotMarkUsedContext(Protocol):
     """The permit that was issued when the slot was reserved."""
 
 
+# WARNING: This must match Rust worker::SlotReleaseCtx
 @dataclass(frozen=True)
 class SlotReleaseContext:
-    """Context for releasing a slot from a :py:class:`CustomSlotSupplier`."""
+    """Context for releasing a slot from a :py:class:`CustomSlotSupplier`.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
 
     slot_info: SlotInfo
     """Info about the task that will be using the slot."""
@@ -145,7 +177,11 @@ class SlotReleaseContext:
 
 
 class CustomSlotSupplier(ABC):
-    """This class can be implemented to provide custom slot supplier behavior."""
+    """This class can be implemented to provide custom slot supplier behavior.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
 
     @abstractmethod
     async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
