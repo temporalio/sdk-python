@@ -31,6 +31,10 @@ pyo3::create_exception!(temporal_sdk_bridge, PollShutdownError, PyException);
 #[pyclass]
 pub struct WorkerRef {
     worker: Option<Arc<temporal_sdk_core::Worker>>,
+    /// Set upon the call to `validate`, with the task locals for the event loop at that time, which
+    /// is whatever event loop the user is running their worker in. This loop might be needed by
+    /// other rust-created threads that want to run async python code.
+    event_loop_task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
     runtime: runtime::Runtime,
 }
 
@@ -191,6 +195,7 @@ pub struct CustomSlotSupplier {
 
 struct CustomSlotSupplierOfType<SK: SlotKind> {
     inner: PyObject,
+    event_loop_task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
     _phantom: PhantomData<SK>,
 }
 
@@ -257,8 +262,11 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
                         CreatedTaskForSlotCallback { stored_task },
                     ),
                 )?;
-                runtime::THREAD_TASK_LOCAL
-                    .with(|tl| pyo3_asyncio::into_future_with_locals(tl.get().unwrap(), called))
+                let tl = self
+                    .event_loop_task_locals
+                    .get()
+                    .expect("task locals must be set");
+                pyo3_asyncio::into_future_with_locals(tl, called)
             }) {
                 Ok(f) => f,
                 Err(e) => {
@@ -378,7 +386,8 @@ pub fn new_worker(
     config: WorkerConfig,
 ) -> PyResult<WorkerRef> {
     enter_sync!(runtime_ref.runtime);
-    let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
+    let event_loop_task_locals = Arc::new(OnceLock::new());
+    let config = convert_worker_config(config, event_loop_task_locals.clone())?;
     let worker = temporal_sdk_core::init_worker(
         &runtime_ref.runtime.core,
         config,
@@ -387,6 +396,7 @@ pub fn new_worker(
     .context("Failed creating worker")?;
     Ok(WorkerRef {
         worker: Some(Arc::new(worker)),
+        event_loop_task_locals,
         runtime: runtime_ref.runtime.clone(),
     })
 }
@@ -397,7 +407,8 @@ pub fn new_replay_worker<'a>(
     config: WorkerConfig,
 ) -> PyResult<&'a PyTuple> {
     enter_sync!(runtime_ref.runtime);
-    let config: temporal_sdk_core::WorkerConfig = config.try_into()?;
+    let event_loop_task_locals = Arc::new(OnceLock::new());
+    let config = convert_worker_config(config, event_loop_task_locals.clone())?;
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
     let worker = WorkerRef {
         worker: Some(Arc::new(
@@ -405,6 +416,7 @@ pub fn new_replay_worker<'a>(
                 |err| PyValueError::new_err(format!("Failed creating replay worker: {}", err)),
             )?,
         )),
+        event_loop_task_locals: Default::default(),
         runtime: runtime_ref.runtime.clone(),
     };
     Ok(PyTuple::new(
@@ -417,8 +429,13 @@ pub fn new_replay_worker<'a>(
 impl WorkerRef {
     fn validate<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
         let worker = self.worker.as_ref().unwrap().clone();
-        // Set custom slot supplier task locals so they can run futures
-        // match worker.get_config().tuner {}
+        // Set custom slot supplier task locals so they can run futures.
+        // Event loop is assumed to be running at this point.
+        let task_locals = pyo3_asyncio::TaskLocals::with_running_loop(py)?.copy_context(py)?;
+        self.event_loop_task_locals
+            .set(task_locals)
+            .expect("must only be set once");
+
         self.runtime.future_into_py(py, async move {
             worker
                 .validate()
@@ -533,149 +550,152 @@ impl WorkerRef {
     }
 }
 
-impl TryFrom<WorkerConfig> for temporal_sdk_core::WorkerConfig {
-    type Error = PyErr;
-
-    fn try_from(conf: WorkerConfig) -> PyResult<Self> {
-        let converted_tuner: temporal_sdk_core::TunerHolder = conf.tuner.try_into()?;
-        temporal_sdk_core::WorkerConfigBuilder::default()
-            .namespace(conf.namespace)
-            .task_queue(conf.task_queue)
-            .worker_build_id(conf.build_id)
-            .client_identity_override(conf.identity_override)
-            .max_cached_workflows(conf.max_cached_workflows)
-            .max_concurrent_wft_polls(conf.max_concurrent_workflow_task_polls)
-            .tuner(Arc::new(converted_tuner))
-            .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-            .max_concurrent_at_polls(conf.max_concurrent_activity_task_polls)
-            .no_remote_activities(conf.no_remote_activities)
-            .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
-                conf.sticky_queue_schedule_to_start_timeout_millis,
-            ))
-            .max_heartbeat_throttle_interval(Duration::from_millis(
-                conf.max_heartbeat_throttle_interval_millis,
-            ))
-            .default_heartbeat_throttle_interval(Duration::from_millis(
-                conf.default_heartbeat_throttle_interval_millis,
-            ))
-            .max_worker_activities_per_second(conf.max_activities_per_second)
-            .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
-            // Even though grace period is optional, if it is not set then the
-            // auto-cancel-activity behavior of shutdown will not occur, so we
-            // always set it even if 0.
-            .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
-            .use_worker_versioning(conf.use_worker_versioning)
-            .workflow_failure_errors(if conf.nondeterminism_as_workflow_fail {
-                HashSet::from([WorkflowErrorType::Nondeterminism])
-            } else {
-                HashSet::new()
-            })
-            .workflow_types_to_failure_errors(
-                conf.nondeterminism_as_workflow_fail_for_types
-                    .iter()
-                    .map(|s| {
-                        (
-                            s.to_owned(),
-                            HashSet::from([WorkflowErrorType::Nondeterminism]),
-                        )
-                    })
-                    .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
-            )
-            .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
-    }
-}
-
-impl TryFrom<TunerHolder> for temporal_sdk_core::TunerHolder {
-    type Error = PyErr;
-
-    fn try_from(holder: TunerHolder) -> PyResult<Self> {
-        // Verify all resource-based options are the same if any are set
-        let maybe_wf_resource_opts =
-            if let SlotSupplier::ResourceBased(ref ss) = holder.workflow_slot_supplier {
-                Some(&ss.tuner_config)
-            } else {
-                None
-            };
-        let maybe_act_resource_opts =
-            if let SlotSupplier::ResourceBased(ref ss) = holder.activity_slot_supplier {
-                Some(&ss.tuner_config)
-            } else {
-                None
-            };
-        let maybe_local_act_resource_opts =
-            if let SlotSupplier::ResourceBased(ref ss) = holder.local_activity_slot_supplier {
-                Some(&ss.tuner_config)
-            } else {
-                None
-            };
-        let all_resource_opts = [
-            maybe_wf_resource_opts,
-            maybe_act_resource_opts,
-            maybe_local_act_resource_opts,
-        ];
-        let mut set_resource_opts = all_resource_opts.iter().flatten();
-        let first = set_resource_opts.next();
-        let all_are_same = if let Some(first) = first {
-            set_resource_opts.all(|elem| elem == first)
+fn convert_worker_config(
+    conf: WorkerConfig,
+    task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
+) -> PyResult<temporal_sdk_core::WorkerConfig> {
+    let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
+    temporal_sdk_core::WorkerConfigBuilder::default()
+        .namespace(conf.namespace)
+        .task_queue(conf.task_queue)
+        .worker_build_id(conf.build_id)
+        .client_identity_override(conf.identity_override)
+        .max_cached_workflows(conf.max_cached_workflows)
+        .max_concurrent_wft_polls(conf.max_concurrent_workflow_task_polls)
+        .tuner(Arc::new(converted_tuner))
+        .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
+        .max_concurrent_at_polls(conf.max_concurrent_activity_task_polls)
+        .no_remote_activities(conf.no_remote_activities)
+        .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
+            conf.sticky_queue_schedule_to_start_timeout_millis,
+        ))
+        .max_heartbeat_throttle_interval(Duration::from_millis(
+            conf.max_heartbeat_throttle_interval_millis,
+        ))
+        .default_heartbeat_throttle_interval(Duration::from_millis(
+            conf.default_heartbeat_throttle_interval_millis,
+        ))
+        .max_worker_activities_per_second(conf.max_activities_per_second)
+        .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
+        // Even though grace period is optional, if it is not set then the
+        // auto-cancel-activity behavior of shutdown will not occur, so we
+        // always set it even if 0.
+        .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
+        .use_worker_versioning(conf.use_worker_versioning)
+        .workflow_failure_errors(if conf.nondeterminism_as_workflow_fail {
+            HashSet::from([WorkflowErrorType::Nondeterminism])
         } else {
-            true
-        };
-        if !all_are_same {
-            return Err(PyValueError::new_err(
-                "All resource-based slot suppliers must have the same ResourceBasedTunerOptions",
-            ));
-        }
-
-        let mut options = temporal_sdk_core::TunerHolderOptionsBuilder::default();
-        if let Some(first) = first {
-            options.resource_based_options(
-                temporal_sdk_core::ResourceBasedSlotsOptionsBuilder::default()
-                    .target_mem_usage(first.target_memory_usage)
-                    .target_cpu_usage(first.target_cpu_usage)
-                    .build()
-                    .expect("Building ResourceBasedSlotsOptions is infallible"),
-            );
-        };
-        options
-            .workflow_slot_options(holder.workflow_slot_supplier.try_into()?)
-            .activity_slot_options(holder.activity_slot_supplier.try_into()?)
-            .local_activity_slot_options(holder.local_activity_slot_supplier.try_into()?);
-        Ok(options
-            .build()
-            .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {}", e)))?
-            .build_tuner_holder()
-            .context("Failed building tuner holder")?)
-    }
+            HashSet::new()
+        })
+        .workflow_types_to_failure_errors(
+            conf.nondeterminism_as_workflow_fail_for_types
+                .iter()
+                .map(|s| {
+                    (
+                        s.to_owned(),
+                        HashSet::from([WorkflowErrorType::Nondeterminism]),
+                    )
+                })
+                .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
+        )
+        .build()
+        .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
 }
 
-impl<SK: SlotKind + Send + Sync + 'static> TryFrom<SlotSupplier>
-    for temporal_sdk_core::SlotSupplierOptions<SK>
-{
-    type Error = PyErr;
-
-    fn try_from(supplier: SlotSupplier) -> PyResult<temporal_sdk_core::SlotSupplierOptions<SK>> {
-        Ok(match supplier {
-            SlotSupplier::FixedSize(fs) => temporal_sdk_core::SlotSupplierOptions::FixedSize {
-                slots: fs.num_slots,
-            },
-            SlotSupplier::ResourceBased(ss) => {
-                temporal_sdk_core::SlotSupplierOptions::ResourceBased(
-                    temporal_sdk_core::ResourceSlotOptions::new(
-                        ss.minimum_slots,
-                        ss.maximum_slots,
-                        Duration::from_millis(ss.ramp_throttle_ms),
-                    ),
-                )
-            }
-            SlotSupplier::Custom(cs) => temporal_sdk_core::SlotSupplierOptions::Custom(Arc::new(
-                CustomSlotSupplierOfType::<SK> {
-                    inner: cs.inner,
-                    _phantom: PhantomData,
-                },
-            )),
-        })
+fn convert_tuner_holder(
+    holder: TunerHolder,
+    task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
+) -> PyResult<temporal_sdk_core::TunerHolder> {
+    // Verify all resource-based options are the same if any are set
+    let maybe_wf_resource_opts =
+        if let SlotSupplier::ResourceBased(ref ss) = holder.workflow_slot_supplier {
+            Some(&ss.tuner_config)
+        } else {
+            None
+        };
+    let maybe_act_resource_opts =
+        if let SlotSupplier::ResourceBased(ref ss) = holder.activity_slot_supplier {
+            Some(&ss.tuner_config)
+        } else {
+            None
+        };
+    let maybe_local_act_resource_opts =
+        if let SlotSupplier::ResourceBased(ref ss) = holder.local_activity_slot_supplier {
+            Some(&ss.tuner_config)
+        } else {
+            None
+        };
+    let all_resource_opts = [
+        maybe_wf_resource_opts,
+        maybe_act_resource_opts,
+        maybe_local_act_resource_opts,
+    ];
+    let mut set_resource_opts = all_resource_opts.iter().flatten();
+    let first = set_resource_opts.next();
+    let all_are_same = if let Some(first) = first {
+        set_resource_opts.all(|elem| elem == first)
+    } else {
+        true
+    };
+    if !all_are_same {
+        return Err(PyValueError::new_err(
+            "All resource-based slot suppliers must have the same ResourceBasedTunerOptions",
+        ));
     }
+
+    let mut options = temporal_sdk_core::TunerHolderOptionsBuilder::default();
+    if let Some(first) = first {
+        options.resource_based_options(
+            temporal_sdk_core::ResourceBasedSlotsOptionsBuilder::default()
+                .target_mem_usage(first.target_memory_usage)
+                .target_cpu_usage(first.target_cpu_usage)
+                .build()
+                .expect("Building ResourceBasedSlotsOptions is infallible"),
+        );
+    };
+    options
+        .workflow_slot_options(convert_slot_supplier(
+            holder.workflow_slot_supplier,
+            task_locals.clone(),
+        )?)
+        .activity_slot_options(convert_slot_supplier(
+            holder.activity_slot_supplier,
+            task_locals.clone(),
+        )?)
+        .local_activity_slot_options(convert_slot_supplier(
+            holder.local_activity_slot_supplier,
+            task_locals,
+        )?);
+    Ok(options
+        .build()
+        .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {}", e)))?
+        .build_tuner_holder()
+        .context("Failed building tuner holder")?)
+}
+
+fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
+    supplier: SlotSupplier,
+    task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
+) -> PyResult<temporal_sdk_core::SlotSupplierOptions<SK>> {
+    Ok(match supplier {
+        SlotSupplier::FixedSize(fs) => temporal_sdk_core::SlotSupplierOptions::FixedSize {
+            slots: fs.num_slots,
+        },
+        SlotSupplier::ResourceBased(ss) => temporal_sdk_core::SlotSupplierOptions::ResourceBased(
+            temporal_sdk_core::ResourceSlotOptions::new(
+                ss.minimum_slots,
+                ss.maximum_slots,
+                Duration::from_millis(ss.ramp_throttle_ms),
+            ),
+        ),
+        SlotSupplier::Custom(cs) => temporal_sdk_core::SlotSupplierOptions::Custom(Arc::new(
+            CustomSlotSupplierOfType::<SK> {
+                inner: cs.inner,
+                event_loop_task_locals: task_locals,
+                _phantom: PhantomData,
+            },
+        )),
+    })
 }
 
 /// For feeding histories into core during replay

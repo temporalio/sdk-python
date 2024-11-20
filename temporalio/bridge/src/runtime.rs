@@ -118,31 +118,12 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
         }
     }
 
-    let task_locals = Python::with_gil(|py| {
-        // Event loop is assumed to be running at this point
-        let locals = pyo3_asyncio::TaskLocals::with_running_loop(py)?.copy_context(py)?;
-        PyResult::Ok(locals)
-    })?;
-
     // Create core runtime which starts tokio multi-thread runtime
     let mut core = CoreRuntime::new(
         telemetry_build
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {}", err)))?,
-        TokioRuntimeBuilder {
-            inner: tokio::runtime::Builder::new_multi_thread(),
-            lang_on_thread_start: Some(move || {
-                // Set task locals for each thread
-                Python::with_gil(|_| {
-                    THREAD_TASK_LOCAL.with(|r| {
-                        std::cell::OnceCell::set(r, task_locals.clone())
-                            .expect("TaskLocals are only set once");
-                    });
-                    PyResult::Ok(())
-                })
-                .expect("Setting per-thread python TaskLocals must work");
-            }),
-        },
+        TokioRuntimeBuilder::default(),
     )
     .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err)))?;
 
@@ -386,12 +367,7 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
 pub(crate) struct TokioRuntime;
 
 tokio::task_local! {
-    static TASK_LOCALS: once_cell::unsync::OnceCell<pyo3_asyncio::TaskLocals>;
-}
-
-thread_local! {
-    pub(crate) static THREAD_TASK_LOCAL: std::cell::OnceCell<pyo3_asyncio::TaskLocals> =
-        const { std::cell::OnceCell::new() };
+    static TASK_LOCALS: std::cell::OnceCell<pyo3_asyncio::TaskLocals>;
 }
 
 impl pyo3_asyncio::generic::Runtime for TokioRuntime {
@@ -414,7 +390,7 @@ impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
     where
         F: Future<Output = R> + Send + 'static,
     {
-        let cell = once_cell::unsync::OnceCell::new();
+        let cell = std::cell::OnceCell::new();
         cell.set(locals).unwrap();
 
         Box::pin(TASK_LOCALS.scope(cell, fut))
