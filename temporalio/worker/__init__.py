@@ -27,11 +27,20 @@ from ._replayer import (
     WorkflowReplayResults,
 )
 from ._tuning import (
+    ActivitySlotInfo,
+    CustomSlotSupplier,
     FixedSizeSlotSupplier,
+    LocalActivitySlotInfo,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
+    SlotInfo,
+    SlotMarkUsedContext,
+    SlotPermit,
+    SlotReleaseContext,
+    SlotReserveContext,
     WorkerTuner,
+    WorkflowSlotInfo,
 )
 from ._worker import Worker, WorkerConfig
 from ._workflow_instance import (

@@ -81,6 +81,7 @@ lint = [
   {cmd = "pyright"},
   {ref = "lint-docs"},
 ]
+bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "pydocstyle --ignore-decorators=overload"

@@ -6,7 +6,6 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -33,6 +32,9 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
+from temporalio.bridge.temporal_sdk_bridge import (
+    CustomSlotSupplier as BridgeCustomSlotSupplier,
+)
 from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
@@ -86,7 +88,11 @@ class FixedSizeSlotSupplier:
     num_slots: int
 
 
-SlotSupplier: TypeAlias = Union[FixedSizeSlotSupplier, ResourceBasedSlotSupplier]
+SlotSupplier: TypeAlias = Union[
+    FixedSizeSlotSupplier,
+    ResourceBasedSlotSupplier,
+    BridgeCustomSlotSupplier,
+]
 
 
 @dataclass

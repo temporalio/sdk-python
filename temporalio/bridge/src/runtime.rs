@@ -13,7 +13,7 @@ use temporal_sdk_core::telemetry::{
     build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
     MetricsCallBuffer,
 };
-use temporal_sdk_core::CoreRuntime;
+use temporal_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
 use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
 use temporal_sdk_core_api::telemetry::{
     CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder,
@@ -123,7 +123,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
         telemetry_build
             .build()
             .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {}", err)))?,
-        tokio::runtime::Builder::new_multi_thread(),
+        TokioRuntimeBuilder::default(),
     )
     .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err)))?;
 
@@ -178,7 +178,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
     })
 }
 
-pub fn raise_in_thread<'a>(_py: Python<'a>, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+pub fn raise_in_thread(_py: Python, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
     unsafe { pyo3::ffi::PyThreadState_SetAsyncExc(thread_id, exc.as_ptr()) == 1 }
 }
 
@@ -204,9 +204,9 @@ impl Drop for Runtime {
 
 #[pymethods]
 impl RuntimeRef {
-    fn retrieve_buffered_metrics<'p>(
+    fn retrieve_buffered_metrics(
         &self,
-        py: Python<'p>,
+        py: Python,
         durations_as_seconds: bool,
     ) -> Vec<BufferedMetricUpdate> {
         convert_metric_events(
@@ -297,7 +297,7 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
 
     fn try_from(conf: MetricsConfig) -> PyResult<Self> {
         if let Some(otel_conf) = conf.opentelemetry {
-            if !conf.prometheus.is_none() {
+            if conf.prometheus.is_some() {
                 return Err(PyValueError::new_err(
                     "Cannot have OpenTelemetry and Prometheus metrics",
                 ));
@@ -364,10 +364,10 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
 // altered to support spawning based on current Tokio runtime instead of a
 // single static one
 
-struct TokioRuntime;
+pub(crate) struct TokioRuntime;
 
 tokio::task_local! {
-    static TASK_LOCALS: once_cell::unsync::OnceCell<pyo3_asyncio::TaskLocals>;
+    static TASK_LOCALS: std::cell::OnceCell<pyo3_asyncio::TaskLocals>;
 }
 
 impl pyo3_asyncio::generic::Runtime for TokioRuntime {
@@ -378,9 +378,7 @@ impl pyo3_asyncio::generic::Runtime for TokioRuntime {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        tokio::runtime::Handle::current().spawn(async move {
-            fut.await;
-        })
+        tokio::runtime::Handle::current().spawn(fut)
     }
 }
 
@@ -392,16 +390,15 @@ impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
     where
         F: Future<Output = R> + Send + 'static,
     {
-        let cell = once_cell::unsync::OnceCell::new();
+        let cell = std::cell::OnceCell::new();
         cell.set(locals).unwrap();
 
         Box::pin(TASK_LOCALS.scope(cell, fut))
     }
 
     fn get_task_locals() -> Option<pyo3_asyncio::TaskLocals> {
-        match TASK_LOCALS.try_with(|c| c.get().map(|locals| locals.clone())) {
-            Ok(locals) => locals,
-            Err(_) => None,
-        }
+        TASK_LOCALS
+            .try_with(|c| c.get().cloned())
+            .unwrap_or_default()
     }
 }

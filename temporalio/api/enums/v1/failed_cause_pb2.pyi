@@ -476,6 +476,10 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
         _ResourceExhaustedCause.ValueType
     )  # 7
     """Persistence storage limit exceeded."""
+    RESOURCE_EXHAUSTED_CAUSE_CIRCUIT_BREAKER_OPEN: (
+        _ResourceExhaustedCause.ValueType
+    )  # 8
+    """Circuit breaker is open/half-open."""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -498,6 +502,8 @@ RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_STORAGE_LIMIT: (
     ResourceExhaustedCause.ValueType
 )  # 7
 """Persistence storage limit exceeded."""
+RESOURCE_EXHAUSTED_CAUSE_CIRCUIT_BREAKER_OPEN: ResourceExhaustedCause.ValueType  # 8
+"""Circuit breaker is open/half-open."""
 global___ResourceExhaustedCause = ResourceExhaustedCause
 
 class _ResourceExhaustedScope:

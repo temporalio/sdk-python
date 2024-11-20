@@ -32,7 +32,6 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
-import temporalio.api.sdk.v1.user_metadata_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -145,6 +144,26 @@ class UnsuccessfulOperationError(google.protobuf.message.Message):
 
 global___UnsuccessfulOperationError = UnsuccessfulOperationError
 
+class Link(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    URL_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    url: builtins.str
+    """See https://github.com/nexus-rpc/api/blob/main/SPEC.md#links."""
+    type: builtins.str
+    def __init__(
+        self,
+        *,
+        url: builtins.str = ...,
+        type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["type", b"type", "url", b"url"]
+    ) -> None: ...
+
+global___Link = Link
+
 class StartOperationRequest(google.protobuf.message.Message):
     """A request to start an operation."""
 
@@ -174,6 +193,7 @@ class StartOperationRequest(google.protobuf.message.Message):
     CALLBACK_FIELD_NUMBER: builtins.int
     PAYLOAD_FIELD_NUMBER: builtins.int
     CALLBACK_HEADER_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     service: builtins.str
     """Name of service to start the operation in."""
     operation: builtins.str
@@ -190,6 +210,13 @@ class StartOperationRequest(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """Header that is expected to be attached to the callback request when the operation completes."""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Link
+    ]:
+        """Links contain caller information and can be attached to the operations started by the handler."""
     def __init__(
         self,
         *,
@@ -200,6 +227,7 @@ class StartOperationRequest(google.protobuf.message.Message):
         payload: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         callback_header: collections.abc.Mapping[builtins.str, builtins.str]
         | None = ...,
+        links: collections.abc.Iterable[global___Link] | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["payload", b"payload"]
@@ -211,6 +239,8 @@ class StartOperationRequest(google.protobuf.message.Message):
             b"callback",
             "callback_header",
             b"callback_header",
+            "links",
+            b"links",
             "operation",
             b"operation",
             "payload",
@@ -378,14 +408,25 @@ class StartOperationResponse(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         OPERATION_ID_FIELD_NUMBER: builtins.int
+        LINKS_FIELD_NUMBER: builtins.int
         operation_id: builtins.str
+        @property
+        def links(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            global___Link
+        ]: ...
         def __init__(
             self,
             *,
             operation_id: builtins.str = ...,
+            links: collections.abc.Iterable[global___Link] | None = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing_extensions.Literal["operation_id", b"operation_id"]
+            self,
+            field_name: typing_extensions.Literal[
+                "links", b"links", "operation_id", b"operation_id"
+            ],
         ) -> None: ...
 
     SYNC_SUCCESS_FIELD_NUMBER: builtins.int
@@ -579,14 +620,18 @@ class EndpointSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAME_FIELD_NUMBER: builtins.int
-    METADATA_FIELD_NUMBER: builtins.int
+    DESCRIPTION_FIELD_NUMBER: builtins.int
     TARGET_FIELD_NUMBER: builtins.int
     name: builtins.str
     """Endpoint name, unique for this cluster. Must match `[a-zA-Z_][a-zA-Z0-9_]*`.
     Renaming an endpoint breaks all workflow callers that reference this endpoint, causing operations to fail.
     """
     @property
-    def metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata: ...
+    def description(self) -> temporalio.api.common.v1.message_pb2.Payload:
+        """Markdown description serialized as a single JSON string.
+        If the Payload is encrypted, the UI and CLI may decrypt with the configured codec server endpoint.
+        By default, the server enforces a limit of 20,000 bytes for this entire payload.
+        """
     @property
     def target(self) -> global___EndpointTarget:
         """Target to route requests to."""
@@ -594,19 +639,19 @@ class EndpointSpec(google.protobuf.message.Message):
         self,
         *,
         name: builtins.str = ...,
-        metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata | None = ...,
+        description: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         target: global___EndpointTarget | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "metadata", b"metadata", "target", b"target"
+            "description", b"description", "target", b"target"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "metadata", b"metadata", "name", b"name", "target", b"target"
+            "description", b"description", "name", b"name", "target", b"target"
         ],
     ) -> None: ...
 

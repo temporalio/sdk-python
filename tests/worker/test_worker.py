@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import threading
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional
@@ -13,15 +14,23 @@ from temporalio import activity, workflow
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
+    ActivitySlotInfo,
+    CustomSlotSupplier,
     FixedSizeSlotSupplier,
+    LocalActivitySlotInfo,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
+    SlotMarkUsedContext,
+    SlotPermit,
+    SlotReleaseContext,
+    SlotReserveContext,
     Worker,
     WorkerTuner,
+    WorkflowSlotInfo,
 )
 from temporalio.workflow import VersioningIntent
-from tests.helpers import new_worker, worker_versioning_enabled
+from tests.helpers import assert_eq_eventually, new_worker, worker_versioning_enabled
 
 
 def test_load_default_worker_binary_id():
@@ -324,7 +333,7 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
     with concurrent.futures.ThreadPoolExecutor() as executor:
         with pytest.warns(
             UserWarning,
-            match=f"Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
+            match="Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
         ):
             async with new_worker(
                 client,
@@ -334,6 +343,180 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
                 activity_executor=executor,
             ):
                 pass
+
+
+async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
+    class MyPermit(SlotPermit):
+        def __init__(self, pnum: int):
+            super().__init__()
+            self.pnum = pnum
+
+    class MySlotSupplier(CustomSlotSupplier):
+        reserves = 0
+        releases = 0
+        highest_seen_reserve_on_release = 0
+        used = 0
+        seen_sticky_kinds = set()
+        seen_slot_kinds = set()
+        seen_used_slot_kinds = set()
+        seen_release_info_empty = False
+        seen_release_info_nonempty = False
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            self.reserve_asserts(ctx)
+            # Verify an async call doesn't bungle things
+            await asyncio.sleep(0.01)
+            self.reserves += 1
+            return MyPermit(self.reserves)
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+            self.reserve_asserts(ctx)
+            return None
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            assert ctx.permit is not None
+            assert isinstance(ctx.permit, MyPermit)
+            assert ctx.permit.pnum is not None
+            assert ctx.slot_info is not None
+            if isinstance(ctx.slot_info, WorkflowSlotInfo):
+                self.seen_used_slot_kinds.add("wf")
+            elif isinstance(ctx.slot_info, ActivitySlotInfo):
+                self.seen_used_slot_kinds.add("a")
+            elif isinstance(ctx.slot_info, LocalActivitySlotInfo):
+                self.seen_used_slot_kinds.add("la")
+            self.used += 1
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            assert ctx.permit is not None
+            assert isinstance(ctx.permit, MyPermit)
+            assert ctx.permit.pnum is not None
+            self.highest_seen_reserve_on_release = max(
+                ctx.permit.pnum, self.highest_seen_reserve_on_release
+            )
+            # Info may be empty, and we should see both empty and not
+            if ctx.slot_info is None:
+                self.seen_release_info_empty = True
+            else:
+                self.seen_release_info_nonempty = True
+            self.releases += 1
+
+        def reserve_asserts(self, ctx):
+            assert ctx.task_queue is not None
+            assert ctx.worker_identity is not None
+            assert ctx.worker_build_id is not None
+            self.seen_sticky_kinds.add(ctx.is_sticky)
+            self.seen_slot_kinds.add(ctx.slot_type)
+
+    ss = MySlotSupplier()
+
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+    )
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+        identity="myworker",
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"custom-slot-supplier-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
+
+    # We can't use reserve number directly because there is a technically possible race
+    # where the python reserve function appears to complete, but Rust doesn't see that.
+    # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
+    # that the permits passed to release line up.
+    assert ss.highest_seen_reserve_on_release == ss.releases
+    # Two workflow tasks, one activity
+    assert ss.used == 3
+    assert ss.seen_sticky_kinds == {True, False}
+    assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity"}
+    assert ss.seen_used_slot_kinds == {"wf", "a"}
+    assert ss.seen_release_info_empty
+    assert ss.seen_release_info_nonempty
+
+
+@workflow.defn
+class SimpleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "hi"
+
+
+async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
+    """Ensures a (mostly) broken slot supplier doesn't hose everything up"""
+
+    class ThrowingSlotSupplier(CustomSlotSupplier):
+        marked_used = False
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            # Hand out workflow tasks until one is used
+            if ctx.slot_type == "workflow" and not self.marked_used:
+                return SlotPermit()
+            raise ValueError("I always throw")
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+            raise ValueError("I always throw")
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            raise ValueError("I always throw")
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            raise ValueError("I always throw")
+
+    ss = ThrowingSlotSupplier()
+
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+    )
+    async with new_worker(
+        client,
+        SimpleWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            SimpleWorkflow.run,
+            id=f"throwing-slot-supplier-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.result()
+
+
+async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
+    class BlockingSlotSupplier(CustomSlotSupplier):
+        marked_used = False
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            await asyncio.get_event_loop().create_future()
+            raise ValueError("Should be unreachable")
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+            return None
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            return None
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            return None
+
+    ss = BlockingSlotSupplier()
+
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+    )
+    async with new_worker(
+        client,
+        SimpleWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as _w:
+        await asyncio.sleep(1)
 
 
 def create_worker(

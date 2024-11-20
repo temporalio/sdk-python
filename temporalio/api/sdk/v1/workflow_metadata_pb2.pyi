@@ -89,19 +89,22 @@ class WorkflowDefinition(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___WorkflowInteractionDefinition
-    ]: ...
+    ]:
+        """Query definitions, sorted by name."""
     @property
     def signal_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___WorkflowInteractionDefinition
-    ]: ...
+    ]:
+        """Signal definitions, sorted by name."""
     @property
     def update_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___WorkflowInteractionDefinition
-    ]: ...
+    ]:
+        """Update definitions, sorted by name."""
     def __init__(
         self,
         *,

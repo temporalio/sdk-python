@@ -30,10 +30,12 @@ import sys
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.field_mask_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
+import temporalio.api.activity.v1.message_pb2
 import temporalio.api.batch.v1.message_pb2
 import temporalio.api.command.v1.message_pb2
 import temporalio.api.common.v1.message_pb2
@@ -559,6 +561,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     WORKFLOW_START_DELAY_FIELD_NUMBER: builtins.int
     COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -649,6 +652,13 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         for use by user interfaces to display the fixed as-of-start summary and details of the
         workflow.
         """
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the workflow."""
     def __init__(
         self,
         *,
@@ -680,6 +690,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         ]
         | None = ...,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -732,6 +744,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"input",
             "last_completion_result",
             b"last_completion_result",
+            "links",
+            b"links",
             "memo",
             b"memo",
             "namespace",
@@ -1287,6 +1301,33 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    class Capabilities(google.protobuf.message.Message):
+        """SDK capability details."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        DISCARD_SPECULATIVE_WORKFLOW_TASK_WITH_EVENTS_FIELD_NUMBER: builtins.int
+        discard_speculative_workflow_task_with_events: builtins.bool
+        """True if the SDK can handle speculative workflow task with command events.
+        If true, the server may chosse, at its discretion, to discard a speculative workflow task
+        even if that speculative task included command events the SDK had not previouly processed
+
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "with" used to describe the workflow task. --)
+        """
+        def __init__(
+            self,
+            *,
+            discard_speculative_workflow_task_with_events: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "discard_speculative_workflow_task_with_events",
+                b"discard_speculative_workflow_task_with_events",
+            ],
+        ) -> None: ...
+
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     COMMANDS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
@@ -1300,6 +1341,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     MESSAGES_FIELD_NUMBER: builtins.int
     SDK_METADATA_FIELD_NUMBER: builtins.int
     METERING_METADATA_FIELD_NUMBER: builtins.int
+    CAPABILITIES_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollWorkflowTaskQueueResponse`"""
     @property
@@ -1367,6 +1409,9 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.common.v1.message_pb2.MeteringMetadata:
         """Local usage data collected for metering"""
+    @property
+    def capabilities(self) -> global___RespondWorkflowTaskCompletedRequest.Capabilities:
+        """All capabilities the SDK supports."""
     def __init__(
         self,
         *,
@@ -1396,10 +1441,14 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         | None = ...,
         metering_metadata: temporalio.api.common.v1.message_pb2.MeteringMetadata
         | None = ...,
+        capabilities: global___RespondWorkflowTaskCompletedRequest.Capabilities
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "capabilities",
+            b"capabilities",
             "metering_metadata",
             b"metering_metadata",
             "sdk_metadata",
@@ -1415,6 +1464,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "binary_checksum",
             b"binary_checksum",
+            "capabilities",
+            b"capabilities",
             "commands",
             b"commands",
             "force_create_new_workflow_task",
@@ -1459,8 +1510,12 @@ class RespondWorkflowTaskCompletedResponse(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___PollActivityTaskQueueResponse
     ]:
-        """See `ScheduleActivityTaskCommandAttributes::request_start`"""
+        """See `ScheduleActivityTaskCommandAttributes::request_eager_execution`"""
     reset_history_event_id: builtins.int
+    """If non zero, indicates the server has discarded the workflow task that was being responded to.
+    Will be the event ID of the last workflow task started event in the history before the new workflow task.
+    Server is only expected to discard a workflow task if it could not have modified the workflow state.
+    """
     def __init__(
         self,
         *,
@@ -1873,18 +1928,27 @@ class RecordActivityTaskHeartbeatResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CANCEL_REQUESTED_FIELD_NUMBER: builtins.int
+    ACTIVITY_PAUSED_FIELD_NUMBER: builtins.int
     cancel_requested: builtins.bool
     """Will be set to true if the activity has been asked to cancel itself. The SDK should then
     notify the activity of cancellation if it is still running.
     """
+    activity_paused: builtins.bool
+    """Will be set to true if the activity is paused."""
     def __init__(
         self,
         *,
         cancel_requested: builtins.bool = ...,
+        activity_paused: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["cancel_requested", b"cancel_requested"],
+        field_name: typing_extensions.Literal[
+            "activity_paused",
+            b"activity_paused",
+            "cancel_requested",
+            b"cancel_requested",
+        ],
     ) -> None: ...
 
 global___RecordActivityTaskHeartbeatResponse = RecordActivityTaskHeartbeatResponse
@@ -2428,6 +2492,7 @@ class RequestCancelWorkflowExecutionRequest(google.protobuf.message.Message):
     REQUEST_ID_FIELD_NUMBER: builtins.int
     FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def workflow_execution(
@@ -2444,6 +2509,13 @@ class RequestCancelWorkflowExecutionRequest(google.protobuf.message.Message):
     """
     reason: builtins.str
     """Reason for requesting the cancellation"""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the WorkflowExecutionCanceled event."""
     def __init__(
         self,
         *,
@@ -2454,6 +2526,8 @@ class RequestCancelWorkflowExecutionRequest(google.protobuf.message.Message):
         request_id: builtins.str = ...,
         first_execution_run_id: builtins.str = ...,
         reason: builtins.str = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2468,6 +2542,8 @@ class RequestCancelWorkflowExecutionRequest(google.protobuf.message.Message):
             b"first_execution_run_id",
             "identity",
             b"identity",
+            "links",
+            b"links",
             "namespace",
             b"namespace",
             "reason",
@@ -2502,6 +2578,7 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
     CONTROL_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
     SKIP_GENERATE_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def workflow_execution(
@@ -2525,6 +2602,13 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
         """
     skip_generate_workflow_task: builtins.bool
     """Indicates that a new workflow task should not be generated when this signal is received."""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the WorkflowExecutionSignaled event."""
     def __init__(
         self,
         *,
@@ -2538,6 +2622,8 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
         control: builtins.str = ...,
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
         skip_generate_workflow_task: builtins.bool = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2561,6 +2647,8 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
             b"identity",
             "input",
             b"input",
+            "links",
+            b"links",
             "namespace",
             b"namespace",
             "request_id",
@@ -2611,6 +2699,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     WORKFLOW_START_DELAY_FIELD_NUMBER: builtins.int
     SKIP_GENERATE_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -2688,6 +2777,13 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
         for use by user interfaces to display the fixed as-of-start summary and details of the
         workflow.
         """
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the WorkflowExecutionStarted and WorkflowExecutionSignaled events."""
     def __init__(
         self,
         *,
@@ -2715,6 +2811,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
         workflow_start_delay: google.protobuf.duration_pb2.Duration | None = ...,
         skip_generate_workflow_task: builtins.bool = ...,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -2761,6 +2859,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"identity",
             "input",
             b"input",
+            "links",
+            b"links",
             "memo",
             b"memo",
             "namespace",
@@ -2931,6 +3031,7 @@ class TerminateWorkflowExecutionRequest(google.protobuf.message.Message):
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def workflow_execution(
@@ -2947,6 +3048,13 @@ class TerminateWorkflowExecutionRequest(google.protobuf.message.Message):
     `workflow_execution`), or specified (if it is) workflow execution is not part of the same
     execution chain as this id.
     """
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the WorkflowExecutionTerminated event."""
     def __init__(
         self,
         *,
@@ -2957,6 +3065,8 @@ class TerminateWorkflowExecutionRequest(google.protobuf.message.Message):
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
         first_execution_run_id: builtins.str = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2973,6 +3083,8 @@ class TerminateWorkflowExecutionRequest(google.protobuf.message.Message):
             b"first_execution_run_id",
             "identity",
             b"identity",
+            "links",
+            b"links",
             "namespace",
             b"namespace",
             "reason",
@@ -3677,6 +3789,50 @@ class ResetStickyTaskQueueResponse(google.protobuf.message.Message):
 
 global___ResetStickyTaskQueueResponse = ResetStickyTaskQueueResponse
 
+class ShutdownWorkerRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    STICKY_TASK_QUEUE_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    sticky_task_queue: builtins.str
+    identity: builtins.str
+    reason: builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        sticky_task_queue: builtins.str = ...,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
+            "sticky_task_queue",
+            b"sticky_task_queue",
+        ],
+    ) -> None: ...
+
+global___ShutdownWorkerRequest = ShutdownWorkerRequest
+
+class ShutdownWorkerResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ShutdownWorkerResponse = ShutdownWorkerResponse
+
 class QueryWorkflowRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4201,6 +4357,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         EAGER_WORKFLOW_START_FIELD_NUMBER: builtins.int
         SDK_METADATA_FIELD_NUMBER: builtins.int
         COUNT_GROUP_BY_EXECUTION_STATUS_FIELD_NUMBER: builtins.int
+        NEXUS_FIELD_NUMBER: builtins.int
         signal_and_query_header: builtins.bool
         """True if signal and query headers are supported."""
         internal_error_differentiation: builtins.bool
@@ -4233,6 +4390,10 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         """True if the server supports count group by execution status
         (-- api-linter: core::0140::prepositions=disabled --)
         """
+        nexus: builtins.bool
+        """True if the server supports Nexus operations.
+        This flag is dependent both on server version and for Nexus to be enabled via server configuration.
+        """
         def __init__(
             self,
             *,
@@ -4246,6 +4407,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
             eager_workflow_start: builtins.bool = ...,
             sdk_metadata: builtins.bool = ...,
             count_group_by_execution_status: builtins.bool = ...,
+            nexus: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -4262,6 +4424,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
                 b"encoded_failure_attributes",
                 "internal_error_differentiation",
                 b"internal_error_differentiation",
+                "nexus",
+                b"nexus",
                 "sdk_metadata",
                 b"sdk_metadata",
                 "signal_and_query_header",
@@ -5732,29 +5896,32 @@ class UpdateWorkflowExecutionRequest(google.protobuf.message.Message):
     WAIT_POLICY_FIELD_NUMBER: builtins.int
     REQUEST_FIELD_NUMBER: builtins.int
     namespace: builtins.str
-    """The namespace name of the target workflow"""
+    """The namespace name of the target Workflow."""
     @property
     def workflow_execution(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
-        """The target workflow id and (optionally) a specific run thereof
+        """The target Workflow Id and (optionally) a specific Run Id thereof.
         (-- api-linter: core::0203::optional=disabled
             aip.dev/not-precedent: false positive triggered by the word "optional" --)
         """
     first_execution_run_id: builtins.str
-    """If set, this call will error if the most recent (if no run id is set on
-    `workflow_execution`), or specified (if it is) workflow execution is not
-    part of the same execution chain as this id.
+    """If set, this call will error if the most recent (if no Run Id is set on
+    `workflow_execution`), or specified (if it is) Workflow Execution is not
+    part of the same execution chain as this Id.
     """
     @property
     def wait_policy(self) -> temporalio.api.update.v1.message_pb2.WaitPolicy:
-        """Describes when this request should return - basically whether the
-        update is synchronous, asynchronous, or somewhere in between.
+        """Specifies client's intent to wait for Update results.
+        NOTE: This field works together with API call timeout which is limited by
+        server timeout (maximum wait time). If server timeout is expired before
+        user specified timeout, API call returns even if specified stage is not reached.
+        Actual reached stage will be included in the response.
         """
     @property
     def request(self) -> temporalio.api.update.v1.message_pb2.Request:
         """The request information that will be delivered all the way down to the
-        workflow execution.
+        Workflow Execution.
         """
     def __init__(
         self,
@@ -5806,8 +5973,8 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
         """Enough information for subsequent poll calls if needed. Never null."""
     @property
     def outcome(self) -> temporalio.api.update.v1.message_pb2.Outcome:
-        """The outcome of the update if and only if the workflow execution update
-        has completed. If this response is being returned before the update has
+        """The outcome of the Update if and only if the Workflow Update
+        has completed. If this response is being returned before the Update has
         completed then this field will not be set.
         """
     stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType
@@ -6227,19 +6394,17 @@ class PollWorkflowExecutionUpdateRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     WAIT_POLICY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
-    """The namespace of the workflow execution to which the update was
+    """The namespace of the Workflow Execution to which the Update was
     originally issued.
     """
     @property
     def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
-        """The update reference returned in the initial
-        UpdateWorkflowExecutionResponse
-        """
+        """The Update reference returned in the initial UpdateWorkflowExecutionResponse."""
     identity: builtins.str
-    """The identity of the worker/client who is polling this update outcome"""
+    """The identity of the worker/client who is polling this Update outcome."""
     @property
     def wait_policy(self) -> temporalio.api.update.v1.message_pb2.WaitPolicy:
-        """Describes when this poll request should return a response.
+        """Specifies client's intent to wait for Update results.
         Omit to request a non-blocking poll.
         """
     def __init__(
@@ -6300,7 +6465,7 @@ class PollWorkflowExecutionUpdateResponse(google.protobuf.message.Message):
     """
     @property
     def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
-        """Sufficient information to address this update."""
+        """Sufficient information to address this Update."""
     def __init__(
         self,
         *,
@@ -6519,9 +6684,14 @@ class ExecuteMultiOperationRequest(google.protobuf.message.Message):
             """Additional restrictions:
             - setting `cron_schedule` is invalid
             - setting `request_eager_execution` is invalid
+            - setting `workflow_start_delay` is invalid
             """
         @property
-        def update_workflow(self) -> global___UpdateWorkflowExecutionRequest: ...
+        def update_workflow(self) -> global___UpdateWorkflowExecutionRequest:
+            """Additional restrictions:
+            - setting `first_execution_run_id` is invalid
+            - setting `workflow_execution.run_id` is invalid
+            """
         def __init__(
             self,
             *,
@@ -6654,3 +6824,369 @@ class ExecuteMultiOperationResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ExecuteMultiOperationResponse = ExecuteMultiOperationResponse
+
+class UpdateActivityOptionsByIdRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    ACTIVITY_OPTIONS_FIELD_NUMBER: builtins.int
+    UPDATE_MASK_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity"""
+    workflow_id: builtins.str
+    """ID of the workflow which scheduled this activity"""
+    run_id: builtins.str
+    """Run ID of the workflow which scheduled this activity
+    if empty - latest workflow is used
+    """
+    activity_id: builtins.str
+    """ID of the activity we're updating"""
+    identity: builtins.str
+    """The identity of the client who initiated this request"""
+    @property
+    def activity_options(
+        self,
+    ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
+        """Activity options. Partial updates are accepted and controlled by update_mask"""
+    @property
+    def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
+        """Controls which fields from `activity_options` will be applied"""
+    request_id: builtins.str
+    """Used to de-dupe requests"""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        activity_options: temporalio.api.activity.v1.message_pb2.ActivityOptions
+        | None = ...,
+        update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_options", b"activity_options", "update_mask", b"update_mask"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "activity_options",
+            b"activity_options",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "request_id",
+            b"request_id",
+            "run_id",
+            b"run_id",
+            "update_mask",
+            b"update_mask",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___UpdateActivityOptionsByIdRequest = UpdateActivityOptionsByIdRequest
+
+class UpdateActivityOptionsByIdResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACTIVITY_OPTIONS_FIELD_NUMBER: builtins.int
+    @property
+    def activity_options(
+        self,
+    ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
+        """Activity options after an update"""
+    def __init__(
+        self,
+        *,
+        activity_options: temporalio.api.activity.v1.message_pb2.ActivityOptions
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["activity_options", b"activity_options"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["activity_options", b"activity_options"],
+    ) -> None: ...
+
+global___UpdateActivityOptionsByIdResponse = UpdateActivityOptionsByIdResponse
+
+class PauseActivityByIdRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity."""
+    workflow_id: builtins.str
+    """ID of the workflow which scheduled this activity."""
+    run_id: builtins.str
+    """Run ID of the workflow which scheduled this activity.
+    If empty - latest workflow is used.
+    """
+    activity_id: builtins.str
+    """ID of the activity we're updating."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    request_id: builtins.str
+    """Used to de-dupe requests."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "request_id",
+            b"request_id",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___PauseActivityByIdRequest = PauseActivityByIdRequest
+
+class PauseActivityByIdResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PauseActivityByIdResponse = PauseActivityByIdResponse
+
+class UnpauseActivityByIdRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class ResumeOperation(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NO_WAIT_FIELD_NUMBER: builtins.int
+        no_wait: builtins.bool
+        """Indicates that if the activity is waiting to retry, it will  be scheduled immediately."""
+        def __init__(
+            self,
+            *,
+            no_wait: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["no_wait", b"no_wait"]
+        ) -> None: ...
+
+    class ResetOperation(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NO_WAIT_FIELD_NUMBER: builtins.int
+        RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
+        no_wait: builtins.bool
+        """Indicates that the activity should be scheduled immediately.
+        Note that this may run simultaneously with any existing executions of the activity.
+        """
+        reset_heartbeat: builtins.bool
+        """If set, the Heartbeat Details will be cleared out to make the Activity start over from the beginning"""
+        def __init__(
+            self,
+            *,
+            no_wait: builtins.bool = ...,
+            reset_heartbeat: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "no_wait", b"no_wait", "reset_heartbeat", b"reset_heartbeat"
+            ],
+        ) -> None: ...
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    RESUME_FIELD_NUMBER: builtins.int
+    RESET_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity."""
+    workflow_id: builtins.str
+    """ID of the workflow which scheduled this activity."""
+    run_id: builtins.str
+    """Run ID of the workflow which scheduled this activity.
+    If empty - latest workflow is used.
+    """
+    activity_id: builtins.str
+    """ID of the activity we're updating."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    request_id: builtins.str
+    """Used to de-dupe requests."""
+    @property
+    def resume(self) -> global___UnpauseActivityByIdRequest.ResumeOperation: ...
+    @property
+    def reset(self) -> global___UnpauseActivityByIdRequest.ResetOperation: ...
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        request_id: builtins.str = ...,
+        resume: global___UnpauseActivityByIdRequest.ResumeOperation | None = ...,
+        reset: global___UnpauseActivityByIdRequest.ResetOperation | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "operation", b"operation", "reset", b"reset", "resume", b"resume"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "operation",
+            b"operation",
+            "request_id",
+            b"request_id",
+            "reset",
+            b"reset",
+            "resume",
+            b"resume",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["operation", b"operation"]
+    ) -> typing_extensions.Literal["resume", "reset"] | None: ...
+
+global___UnpauseActivityByIdRequest = UnpauseActivityByIdRequest
+
+class UnpauseActivityByIdResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___UnpauseActivityByIdResponse = UnpauseActivityByIdResponse
+
+class ResetActivityByIdRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    NO_WAIT_FIELD_NUMBER: builtins.int
+    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity."""
+    workflow_id: builtins.str
+    """ID of the workflow which scheduled this activity."""
+    run_id: builtins.str
+    """Run ID of the workflow which scheduled this activity.
+    If empty - latest workflow is used.
+    """
+    activity_id: builtins.str
+    """ID of the activity we're updating."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    request_id: builtins.str
+    """Used to de-dupe requests."""
+    no_wait: builtins.bool
+    """Indicates that activity should be scheduled immediately.
+    If this flag doesn't set, and activity currently running - temporal will wait until activity is completed.
+    """
+    reset_heartbeat: builtins.bool
+    """Indicates that activity should reset heartbeat details.
+    This flag will be applied only to the new instance of the activity.
+    """
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        request_id: builtins.str = ...,
+        no_wait: builtins.bool = ...,
+        reset_heartbeat: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "no_wait",
+            b"no_wait",
+            "request_id",
+            b"request_id",
+            "reset_heartbeat",
+            b"reset_heartbeat",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___ResetActivityByIdRequest = ResetActivityByIdRequest
+
+class ResetActivityByIdResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ResetActivityByIdResponse = ResetActivityByIdResponse
