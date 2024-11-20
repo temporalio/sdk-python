@@ -68,18 +68,6 @@ pub struct TunerHolder {
     local_activity_slot_supplier: SlotSupplier,
 }
 
-// pub fn set_task_locals_on_tuner<'a>(py: Python<'a>, tuner: &TunerHolder) -> PyResult<()> {
-//     // TODO: All suppliers
-//     if let SlotSupplier::Custom(ref cs) = tuner.workflow_slot_supplier {
-//         Python::with_gil(|py| {
-//             let py_obj = cs.inner.as_ref(py);
-//             py_obj.call_method0("set_task_locals")?;
-//             Ok(())
-//         })?;
-//     };
-//     Ok(())
-// }
-
 #[derive(FromPyObject)]
 pub enum SlotSupplier {
     FixedSize(FixedSizeSlotSupplier),
@@ -209,7 +197,8 @@ impl CustomSlotSupplier {
 
 // Shouldn't really need this callback nonsense, it should be possible to do this from the pyo3
 // asyncio library, but we'd have to vendor the whole thing to make the right improvements. When
-// pyo3 is upgraded and we are using
+// pyo3 is upgraded and we are using https://github.com/PyO3/pyo3-async-runtimes (the replacement)
+// consider upstreaming a way to do this.
 
 #[pyclass]
 struct CreatedTaskForSlotCallback {
