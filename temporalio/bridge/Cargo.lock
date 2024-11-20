@@ -2589,7 +2589,6 @@ dependencies = [
  "async-trait",
  "futures",
  "log",
- "once_cell",
  "prost",
  "pyo3",
  "pyo3-asyncio",

@@ -191,6 +191,12 @@ class CustomSlotSupplier(ABC):
         The only acceptable exception to throw is :py:class:`asyncio.CancelledError`, as invocations of this method may
         be cancelled. Any other exceptions thrown will be logged and ignored.
 
+        It is technically possible but rare, during worker shutdown, for this method to be called and return a value,
+        but the Rust Core may not have a chance to _observe_ that value. In such cases the returned permit will not be
+        released. The permit will, however, be forgotten and python will garbage collect it. So if you use the same slot
+        supplier over the lifetime of more than one worker and it is critically important for you to clean up some
+        resources associated all permits you construct, then consider using a finalizer on your returned permits.
+
         Args:
             ctx: The context for slot reservation.
 
