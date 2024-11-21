@@ -91,4 +91,13 @@ __all__ = [
     "ResourceBasedSlotSupplier",
     "ResourceBasedTunerConfig",
     "ResourceBasedSlotConfig",
+    "ActivitySlotInfo",
+    "CustomSlotSupplier",
+    "LocalActivitySlotInfo",
+    "SlotInfo",
+    "SlotMarkUsedContext",
+    "SlotPermit",
+    "SlotReleaseContext",
+    "SlotReserveContext",
+    "WorkflowSlotInfo",
 ]
