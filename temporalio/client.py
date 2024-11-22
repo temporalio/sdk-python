@@ -5502,9 +5502,12 @@ class _ClientImpl(OutboundInterceptor):
                     overlap_policy=temporalio.api.enums.v1.ScheduleOverlapPolicy.ValueType(
                         input.schedule.policy.overlap
                     ),
-                ) if input.trigger_immediately else None,
+                )
+                if input.trigger_immediately
+                else None,
                 backfill_request=[b._to_proto() for b in input.backfill]
-                    if input.backfill else None,
+                if input.backfill
+                else None,
             )
         try:
             request = temporalio.api.workflowservice.v1.CreateScheduleRequest(
