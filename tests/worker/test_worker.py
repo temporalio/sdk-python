@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import threading
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional
@@ -30,7 +29,7 @@ from temporalio.worker import (
     WorkflowSlotInfo,
 )
 from temporalio.workflow import VersioningIntent
-from tests.helpers import assert_eq_eventually, new_worker, worker_versioning_enabled
+from tests.helpers import new_worker, worker_versioning_enabled
 
 
 def test_load_default_worker_binary_id():
