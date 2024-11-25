@@ -2,6 +2,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import zipfile
 from glob import glob
 
 if __name__ == "__main__":
@@ -14,13 +15,14 @@ if __name__ == "__main__":
     if len(dist_files) != 1:
         raise RuntimeError(f"Should have only one wheel file, found: {dist_files}")
 
-    # Run unpack into temp directory
-    if os.path.exists("dist/temp"):
-        raise RuntimeError("dist/temp directory already present")
-    subprocess.check_call(["wheel", "unpack", "--dest", "dist/temp", dist_files[0]])
+    # Unpack into temp directory. We cannot use "wheel unpack" here because
+    # newer versions give hash mismatch on newly-made macos wheels.
+    os.mkdir("dist/temp")
+    with zipfile.ZipFile(dist_files[0], "r") as wheel_zip:
+        wheel_zip.extractall("dist/temp")
 
     # Read WHEEL contents
-    wheel_files = glob("dist/temp/*/*.dist-info/WHEEL")
+    wheel_files = glob("dist/temp/*.dist-info/WHEEL")
     if len(wheel_files) != 1:
         raise RuntimeError(f"Should have only one WHEEL file, found: {wheel_files}")
     with open(wheel_files[0]) as f:
@@ -36,16 +38,16 @@ if __name__ == "__main__":
             # All tags need ABI3
             pieces[1] = "abi3"
             if pieces[2].startswith("macosx_") and pieces[2].endswith("_arm64"):
-                # macOS ARM needs to be set to 3.8+ on 11+
-                pieces[0] = "cp38"
+                # macOS ARM needs to be set to 3.9+ on 11+
+                pieces[0] = "cp39"
                 pieces[2] = "macosx_11_0_arm64"
             elif pieces[2].startswith("macosx_") and pieces[2].endswith("_x86_64"):
-                # macOS x86 needs to be set to 3.8+ on 10.9+
-                pieces[0] = "cp38"
+                # macOS x86 needs to be set to 3.9+ on 10.9+
+                pieces[0] = "cp39"
                 pieces[2] = "macosx_10_9_x86_64"
             else:
-                # All others just need to be set to 3.8+
-                pieces[0] = "cp38"
+                # All others just need to be set to 3.9+
+                pieces[0] = "cp39"
             wheel_lines[i] = "Tag: " + "-".join(pieces)
             found_wheel_tag = True
     if not found_wheel_tag:
@@ -56,7 +58,7 @@ if __name__ == "__main__":
     # https://github.com/PyO3/setuptools-rust/pull/352#discussion_r1293444464
     # explains our exact situation, but no clear remedy.
     # TODO(cretz): Investigate as part of https://github.com/temporalio/sdk-python/issues/398
-    pyd_files = glob("dist/temp/*/temporalio/bridge/*-win_amd64.pyd")
+    pyd_files = glob("dist/temp/temporalio/bridge/*-win_amd64.pyd")
     if pyd_files:
         os.rename(
             pyd_files[0],
@@ -68,8 +70,7 @@ if __name__ == "__main__":
         f.write("\n".join(wheel_lines))
 
     # Pack the wheel
-    unpacked_dirs = glob("dist/temp/*")
-    subprocess.check_call(["wheel", "pack", "--dest", "dist", unpacked_dirs[0]])
+    subprocess.check_call(["wheel", "pack", "--dest", "dist", "dist/temp"])
 
     # Remove temp dir
     shutil.rmtree("dist/temp")
