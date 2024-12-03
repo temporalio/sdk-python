@@ -170,8 +170,8 @@ class SlotReleaseContext:
         Custom slot suppliers are currently experimental.
     """
 
-    slot_info: SlotInfo
-    """Info about the task that will be using the slot."""
+    slot_info: Optional[SlotInfo]
+    """Info about the task that will be using the slot. May be None if the slot was never used."""
     permit: SlotPermit
     """The permit that was issued when the slot was reserved."""
 
