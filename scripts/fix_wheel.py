@@ -36,16 +36,16 @@ if __name__ == "__main__":
             # All tags need ABI3
             pieces[1] = "abi3"
             if pieces[2].startswith("macosx_") and pieces[2].endswith("_arm64"):
-                # macOS ARM needs to be set to 3.8+ on 11+
-                pieces[0] = "cp38"
+                # macOS ARM needs to be set to 3.9+ on 11+
+                pieces[0] = "cp39"
                 pieces[2] = "macosx_11_0_arm64"
             elif pieces[2].startswith("macosx_") and pieces[2].endswith("_x86_64"):
-                # macOS x86 needs to be set to 3.8+ on 10.9+
-                pieces[0] = "cp38"
+                # macOS x86 needs to be set to 3.9+ on 10.9+
+                pieces[0] = "cp39"
                 pieces[2] = "macosx_10_9_x86_64"
             else:
-                # All others just need to be set to 3.8+
-                pieces[0] = "cp38"
+                # All others just need to be set to 3.9+
+                pieces[0] = "cp39"
             wheel_lines[i] = "Tag: " + "-".join(pieces)
             found_wheel_tag = True
     if not found_wheel_tag:

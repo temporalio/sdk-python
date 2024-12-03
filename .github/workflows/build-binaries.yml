@@ -32,7 +32,7 @@ jobs:
           submodules: recursive
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       # Install Rust locally for non-Linux (Linux uses an internal docker
       # command to build with cibuildwheel which uses rustup install defined

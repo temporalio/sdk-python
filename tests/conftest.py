@@ -21,7 +21,7 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
         sys.prefix
     ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
 
-# Unless specifically overridden, we expect tests to run under protobuf 4.x lib
+# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x lib
 import google.protobuf
 
 protobuf_version = google.protobuf.__version__
@@ -30,9 +30,9 @@ if os.getenv("TEMPORAL_TEST_PROTO3"):
         "3."
     ), f"Expected protobuf 3.x, got {protobuf_version}"
 else:
-    assert protobuf_version.startswith(
-        "4."
-    ), f"Expected protobuf 4.x, got {protobuf_version}"
+    assert protobuf_version.startswith("4.") or protobuf_version.startswith(
+        "5."
+    ), f"Expected protobuf 4.x/5.x, got {protobuf_version}"
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
@@ -64,7 +64,12 @@ def event_loop():
     else:
         loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
-    loop.close()
+    try:
+        loop.close()
+    except TypeError:
+        # In some advanced tests in Python 3.9, loop closing fails
+        if sys.version_info >= (3, 10):
+            raise
 
 
 @pytest.fixture(scope="session")
