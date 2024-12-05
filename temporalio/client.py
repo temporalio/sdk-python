@@ -792,11 +792,11 @@ class Client:
         self,
         query: Optional[str] = None,
         *,
+        limit: Optional[int] = None,
         page_size: int = 1000,
         next_page_token: Optional[bytes] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-        limit: Optional[int] = None,
     ) -> WorkflowExecutionAsyncIterator:
         """List workflows.
 
@@ -807,6 +807,10 @@ class Client:
             query: A Temporal visibility list filter. See Temporal documentation
                 concerning visibility list filters including behavior when left
                 unset.
+            limit: Maximum number of workflows to return. If unset, all
+                workflows are returned. Only applies if using the
+                returned :py:class:`WorkflowExecutionAsyncIterator`.
+                as an async iterator.
             page_size: Maximum number of results for each page.
             next_page_token: A previously obtained next page token if doing
                 pagination. Usually not needed as the iterator automatically
@@ -814,8 +818,6 @@ class Client:
             rpc_metadata: Headers used on each RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call.
-            limit: Maximum number of workflows to return. If unset, all
-                workflows are returned.
 
         Returns:
             An async iterator that can be used with ``async for``.
