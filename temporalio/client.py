@@ -796,6 +796,7 @@ class Client:
         next_page_token: Optional[bytes] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        limit: Optional[int] = None,
     ) -> WorkflowExecutionAsyncIterator:
         """List workflows.
 
@@ -813,6 +814,8 @@ class Client:
             rpc_metadata: Headers used on each RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call.
+            limit: Maximum number of workflows to return. If unset, all
+                workflows are returned.
 
         Returns:
             An async iterator that can be used with ``async for``.
@@ -824,6 +827,7 @@ class Client:
                 next_page_token=next_page_token,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                limit=limit,
             )
         )
 
@@ -2483,6 +2487,8 @@ class WorkflowExecutionAsyncIterator:
         self._next_page_token = input.next_page_token
         self._current_page: Optional[Sequence[WorkflowExecution]] = None
         self._current_page_index = 0
+        self._limit = input.limit
+        self._yielded = 0
 
     @property
     def current_page_index(self) -> int:
@@ -2508,10 +2514,14 @@ class WorkflowExecutionAsyncIterator:
             page_size: Override the page size this iterator was originally
                 created with.
         """
+        page_size = page_size or self._input.page_size
+        if self._limit is not None and self._limit - self._yielded < page_size:
+            page_size = self._limit - self._yielded
+
         resp = await self._client.workflow_service.list_workflow_executions(
             temporalio.api.workflowservice.v1.ListWorkflowExecutionsRequest(
                 namespace=self._client.namespace,
-                page_size=page_size or self._input.page_size,
+                page_size=page_size,
                 next_page_token=self._next_page_token or b"",
                 query=self._input.query or "",
             ),
@@ -2534,6 +2544,8 @@ class WorkflowExecutionAsyncIterator:
         """Get the next execution on this iterator, fetching next page if
         necessary.
         """
+        if self._limit is not None and self._yielded >= self._limit:
+            raise StopAsyncIteration
         while True:
             # No page? fetch and continue
             if self._current_page is None:
@@ -2551,6 +2563,7 @@ class WorkflowExecutionAsyncIterator:
             # Get current, increment page index, and return
             ret = self._current_page[self._current_page_index]
             self._current_page_index += 1
+            self._yielded += 1
             return ret
 
     async def map_histories(
@@ -4573,6 +4586,7 @@ class ListWorkflowsInput:
     next_page_token: Optional[bytes]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
+    limit: Optional[int]
 
 
 @dataclass
