@@ -619,12 +619,18 @@ async def test_list_workflows_and_fetch_history(
     assert actual_id_and_input == expected_id_and_input
 
     # Verify listing can limit results
-    limited = [w async for w in client.list_workflows(f"WorkflowId = '{workflow_id}'", limit=3)]
+    limited = [
+        w async for w in client.list_workflows(f"WorkflowId = '{workflow_id}'", limit=3)
+    ]
     assert len(limited) == 3
     # With a weird page size
-    limited = [w async for w in client.list_workflows(f"WorkflowId = '{workflow_id}'", page_size=2, limit=3)]
+    limited = [
+        w
+        async for w in client.list_workflows(
+            f"WorkflowId = '{workflow_id}'", page_size=2, limit=3
+        )
+    ]
     assert len(limited) == 3
-
 
 
 @workflow.defn
