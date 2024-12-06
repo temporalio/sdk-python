@@ -42,6 +42,8 @@ from typing import (
     cast,
 )
 
+from google.protobuf.json_format import MessageToJson
+from opentelemetry import trace
 from typing_extensions import Self, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -75,6 +77,7 @@ from ._interceptor import (
 )
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 # Set to true to log all cases where we're ignoring things during delete
 LOG_IGNORE_DURING_DELETE = False
@@ -324,6 +327,21 @@ class _WorkflowInstanceImpl(
     # name.
 
     def activate(
+        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        with tracer.start_as_current_span("HandleWorkflowActivation") as span:
+            span.set_attribute("rpc.method", "WorkflowActivation")
+            span.set_attribute("rpc.request.type", "WorkflowActivation")
+            span.set_attribute("rpc.request.payload", MessageToJson(act))
+            span.set_attribute("temporalWorkflowID", self._info.workflow_id)
+            span.set_attribute("temporal.worker", True)
+            completion = self._activate(act)
+            span.set_attribute("rpc.response.type", "WorkflowActivationCompletion")
+            span.set_attribute("rpc.response.payload", MessageToJson(completion))
+        trace.get_tracer_provider().force_flush()  # type: ignore
+        return completion
+
+    def _activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         # Reset current completion, time, and whether replaying
