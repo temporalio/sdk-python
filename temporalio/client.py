@@ -308,6 +308,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -339,6 +341,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -372,6 +376,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -405,6 +411,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -436,6 +444,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -470,6 +480,12 @@ class Client:
             search_attributes: Search attributes for the workflow. The
                 dictionary form of this is deprecated, use
                 :py:class:`temporalio.common.TypedSearchAttributes`.
+            static_summary: A single-line fixed summary for this workflow execution that may appear
+                in the UI/CLI. This can be in single-line Temporal markdown format.
+            static_details: General fixed details for this workflow execution that may appear in
+                UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
+                a fixed value on the workflow that cannot be updated. For details that can be
+                updated, use `Workflow.CurrentDetails` within the workflow.
             start_delay: Amount of time to wait before starting the workflow.
                 This does not work with ``cron_schedule``.
             start_signal: If present, this signal is sent as signal-with-start
@@ -526,6 +542,8 @@ class Client:
                 search_attributes=search_attributes,
                 start_delay=start_delay,
                 headers={},
+                static_summary=static_summary,
+                static_details=static_details,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
                 ret_type=result_type,
@@ -557,6 +575,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -588,6 +608,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -621,6 +643,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -654,6 +678,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -685,6 +711,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -716,6 +744,8 @@ class Client:
                 cron_schedule=cron_schedule,
                 memo=memo,
                 search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
                 start_delay=start_delay,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
@@ -923,6 +953,8 @@ class Client:
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ScheduleHandle:
@@ -941,6 +973,12 @@ class Client:
                 attributes for a scheduled workflow are part of the scheduled
                 action. The dictionary form of this is DEPRECATED, use
                 :py:class:`temporalio.common.TypedSearchAttributes`.
+            static_summary: A single-line fixed summary for this workflow execution that may appear
+                in the UI/CLI. This can be in single-line Temporal markdown format.
+            static_details: General fixed details for this workflow execution that may appear in
+                UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
+                a fixed value on the workflow that cannot be updated. For details that can be
+                updated, use `Workflow.CurrentDetails` within the workflow.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
@@ -961,6 +999,8 @@ class Client:
                 backfill=backfill,
                 memo=memo,
                 search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
@@ -2421,7 +2461,7 @@ class WorkflowExecutionCount:
 
     count: int
     """Approximate number of workflows matching the original query.
-    
+
     If the query had a group-by clause, this is simply the sum of all the counts
     in py:attr:`groups`.
     """
@@ -2985,7 +3025,7 @@ class ScheduleSpec:
 
     cron_expressions: Sequence[str] = dataclasses.field(default_factory=list)
     """Cron-based specification of times.
-    
+
     This is provided for easy migration from legacy string-based cron
     scheduling. New uses should use :py:attr:`calendars` instead. These
     expressions will be translated to calendar-based specifications on the
@@ -3067,7 +3107,7 @@ class ScheduleRange:
 
     end: int = 0
     """Inclusive end of the range.
-    
+
     If unset or less than start, defaults to start.
     """
 
@@ -3244,6 +3284,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     """This is deprecated and is only present in case existing untyped
     attributes already exist for update. This should never be used when
     creating."""
+    static_summary: Optional[str]
+    static_details: Optional[str]
 
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
@@ -3267,6 +3309,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
     ) -> None: ...
 
     # Overload for single-param workflow
@@ -3284,6 +3328,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
     ) -> None: ...
 
     # Overload for multi-param workflow
@@ -3303,6 +3349,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
     ) -> None: ...
 
     # Overload for string-name workflow
@@ -3321,6 +3369,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
     ) -> None: ...
 
     # Overload for raw info
@@ -3347,6 +3397,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         memo: Optional[Mapping[str, Any]] = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         untyped_search_attributes: temporalio.common.SearchAttributes = {},
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None,
         raw_info: Optional[temporalio.api.workflow.v1.NewWorkflowExecutionInfo] = None,
     ) -> None:
@@ -3425,6 +3477,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             self.typed_search_attributes = typed_search_attributes
             self.untyped_search_attributes = untyped_search_attributes
             self.headers = headers
+            self.static_summary = static_summary
+            self.static_details = static_details
 
     async def _to_proto(
         self, client: Client
@@ -3474,6 +3528,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                         for k, v in self.memo.items()
                     },
                 ),
+                user_metadata=await client.data_converter._encode_user_metadata(
+                    self.static_summary, self.static_details
+                ),
             ),
         )
         # Add any untyped attributes that are not also in the typed set
@@ -3506,7 +3563,7 @@ class ScheduleOverlapPolicy(IntEnum):
         temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP
     )
     """Don't start anything.
-    
+
     When the workflow completes, the next scheduled event after that time will
     be considered.
     """
@@ -3516,7 +3573,7 @@ class ScheduleOverlapPolicy(IntEnum):
     )
     """Start the workflow again soon as the current one completes, but only
     buffer one start in this way.
-    
+
     If another start is supposed to happen when the workflow is running, and one
     is already buffered, then only the first one will be started after the
     running workflow finishes.
@@ -3544,7 +3601,7 @@ class ScheduleOverlapPolicy(IntEnum):
         temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_ALLOW_ALL
     )
     """Start any number of concurrent workflows.
-    
+
     Note that with this policy, last completion result and last failure will not
     be available since workflows are not sequential."""
 
@@ -3557,7 +3614,7 @@ class ScheduleBackfill:
 
     start_at: datetime
     """Start of the range to evaluate the schedule in.
-    
+
     This is exclusive
     """
     end_at: datetime
@@ -3596,7 +3653,7 @@ class SchedulePolicy:
 
     pause_on_failure: bool = False
     """Whether to pause the schedule if an action fails or times out.
-    
+
     Note: For workflows, this only applies after all retries have been
     exhausted.
     """
@@ -3627,7 +3684,7 @@ class ScheduleState:
 
     note: Optional[str] = None
     """Human readable message for the schedule.
-    
+
     The system may overwrite this value on certain conditions like
     pause-on-failure.
     """
@@ -3646,7 +3703,7 @@ class ScheduleState:
 
     remaining_actions: int = 0
     """Actions remaining on this schedule.
-    
+
     Once this number hits 0, no further actions are scheduled automatically.
     """
 
@@ -3722,7 +3779,7 @@ class ScheduleDescription:
 
     search_attributes: temporalio.common.SearchAttributes
     """Search attributes on the schedule.
-    
+
     .. deprecated::
         Use :py:attr:`typed_search_attributes` instead.
     """
@@ -3948,14 +4005,14 @@ class ScheduleListDescription:
 
     schedule: Optional[ScheduleListSchedule]
     """Schedule details that can be mutated.
-    
+
     This may not be present in older Temporal servers without advanced
     visibility.
     """
 
     info: Optional[ScheduleListInfo]
     """Information about the schedule.
-    
+
     This may not be present in older Temporal servers without advanced
     visibility.
     """
@@ -3965,7 +4022,7 @@ class ScheduleListDescription:
 
     search_attributes: temporalio.common.SearchAttributes
     """Search attributes on the schedule.
-    
+
     .. deprecated::
         Use :py:attr:`typed_search_attributes` instead.
     """
@@ -4111,14 +4168,14 @@ class ScheduleListInfo:
 
     recent_actions: Sequence[ScheduleActionResult]
     """Most recent actions, oldest first.
-    
+
     This may be a smaller amount than present on
     :py:attr:`ScheduleDescription.info`.
     """
 
     next_action_times: Sequence[datetime]
     """Next scheduled action times.
-    
+
     This may be a smaller amount than present on
     :py:attr:`ScheduleDescription.info`.
     """
@@ -4144,7 +4201,7 @@ class ScheduleListState:
 
     note: Optional[str]
     """Human readable message for the schedule.
-    
+
     The system may overwrite this value on certain conditions like
     pause-on-failure.
     """
@@ -4536,6 +4593,8 @@ class StartWorkflowInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     start_signal: Optional[str]
     start_signal_args: Sequence[Any]
+    static_summary: Optional[str]
+    static_details: Optional[str]
     # Type may be absent
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
@@ -5063,6 +5122,9 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.converter.encode_search_attributes(
                 input.search_attributes, req.search_attributes
             )
+        req.user_metadata = self._client.data_converter._encode_user_metadata(
+            input.static_summary, input.static_details
+        )
         if input.start_delay is not None:
             req.workflow_start_delay.FromTimedelta(input.start_delay)
         if input.headers is not None:
@@ -5955,7 +6017,7 @@ class BuildIdOpAddNewCompatible(BuildIdOp):
     """The Build Id to add to the compatible set."""
 
     existing_compatible_build_id: str
-    """A Build Id which must already be defined on the task queue, and is used to find the 
+    """A Build Id which must already be defined on the task queue, and is used to find the
     compatible set to add the new id to.
     """
 
@@ -5982,7 +6044,7 @@ class BuildIdOpPromoteSetByBuildId(BuildIdOp):
     """
 
     build_id: str
-    """A Build Id which must already be defined on the task queue, and is used to find the 
+    """A Build Id which must already be defined on the task queue, and is used to find the
     compatible set to promote."""
 
     def _as_partial_proto(
@@ -6077,7 +6139,7 @@ class BuildIdReachability:
     """
 
     unretrieved_task_queues: FrozenSet[str]
-    """If any Task Queues could not be retrieved because the server limits the number that can be 
+    """If any Task Queues could not be retrieved because the server limits the number that can be
     queried at once, they will be listed here.
     """
 
