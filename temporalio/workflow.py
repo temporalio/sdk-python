@@ -659,6 +659,7 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
         versioning_intent: Optional[VersioningIntent],
+        summary: Optional[str] = None,
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
@@ -1869,6 +1870,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity and return its handle.
 
@@ -1902,6 +1904,8 @@ def start_activity(
             need to. Contact Temporal before setting this value.
         versioning_intent: When using the Worker Versioning feature, specifies whether this Activity
             should run on a worker with a compatible Build Id or not.
+        summary:  Gets or sets a single-line fixed summary for this activity that may appear in UI/CLI.
+            This can be in single-line Temporal markdown format.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -1919,6 +1923,7 @@ def start_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 

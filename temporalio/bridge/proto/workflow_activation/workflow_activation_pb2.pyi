@@ -1281,6 +1281,10 @@ class RemoveFromCache(google.protobuf.message.Message):
         """
         PAGINATION_OR_HISTORY_FETCH: RemoveFromCache._EvictionReason.ValueType  # 9
         """Something went wrong attempting to fetch more history events."""
+        WORKFLOW_EXECUTION_ENDING: RemoveFromCache._EvictionReason.ValueType  # 10
+        """The workflow is being completed with a terminal command and we sent the WFT completion
+        to server successfully.
+        """
 
     class EvictionReason(_EvictionReason, metaclass=_EvictionReasonEnumTypeWrapper): ...
     UNSPECIFIED: RemoveFromCache.EvictionReason.ValueType  # 0
@@ -1310,6 +1314,10 @@ class RemoveFromCache(google.protobuf.message.Message):
     """
     PAGINATION_OR_HISTORY_FETCH: RemoveFromCache.EvictionReason.ValueType  # 9
     """Something went wrong attempting to fetch more history events."""
+    WORKFLOW_EXECUTION_ENDING: RemoveFromCache.EvictionReason.ValueType  # 10
+    """The workflow is being completed with a terminal command and we sent the WFT completion
+    to server successfully.
+    """
 
     MESSAGE_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int

@@ -43,6 +43,7 @@ from typing_extensions import Literal
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
+import temporalio.api.sdk.v1
 import temporalio.common
 import temporalio.exceptions
 import temporalio.types
@@ -1084,6 +1085,16 @@ class DataConverter:
         """
         return temporalio.api.common.v1.Payloads(payloads=(await self.encode(values)))
 
+    async def _encode_user_metadata(
+        self, summary: Optional[str], details: Optional[str]
+    ) -> Optional[temporalio.api.sdk.v1.UserMetadata]:
+        if summary is None and details is None:
+            return None
+        return temporalio.api.sdk.v1.UserMetadata(
+            summary=None if summary is None else (await self.encode([summary]))[0],
+            details=None if details is None else (await self.encode([details]))[0],
+        )
+
     async def decode_wrapper(
         self,
         payloads: Optional[temporalio.api.common.v1.Payloads],
@@ -1111,6 +1122,21 @@ class DataConverter:
         if self.payload_codec:
             await self.payload_codec.decode_failure(failure)
         return self.failure_converter.from_failure(failure, self.payload_converter)
+
+    async def _decode_user_metadata(
+        self, metadata: Optional[temporalio.api.sdk.v1.UserMetadata]
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Returns (summary, details)"""
+        if metadata is None:
+            return None, None
+        return (
+            None
+            if metadata.summary is None
+            else (await self.decode([metadata.summary]))[0],
+            None
+            if metadata.details is None
+            else (await self.decode([metadata.details]))[0],
+        )
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (

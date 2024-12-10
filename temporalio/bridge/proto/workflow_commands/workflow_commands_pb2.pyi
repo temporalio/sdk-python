@@ -23,6 +23,7 @@ import google.protobuf.timestamp_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
 
@@ -76,6 +77,7 @@ global___ActivityCancellationType = ActivityCancellationType
 class WorkflowCommand(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    USER_METADATA_FIELD_NUMBER: builtins.int
     START_TIMER_FIELD_NUMBER: builtins.int
     SCHEDULE_ACTIVITY_FIELD_NUMBER: builtins.int
     RESPOND_TO_QUERY_FIELD_NUMBER: builtins.int
@@ -96,6 +98,12 @@ class WorkflowCommand(google.protobuf.message.Message):
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     MODIFY_WORKFLOW_PROPERTIES_FIELD_NUMBER: builtins.int
     UPDATE_RESPONSE_FIELD_NUMBER: builtins.int
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """User metadata that may or may not be persisted into history depending on the command type.
+        Lang layers are expected to expose the setting of the internals of this metadata on a
+        per-command basis where applicable.
+        """
     @property
     def start_timer(self) -> global___StartTimer: ...
     @property
@@ -151,6 +159,8 @@ class WorkflowCommand(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
         start_timer: global___StartTimer | None = ...,
         schedule_activity: global___ScheduleActivity | None = ...,
         respond_to_query: global___QueryResult | None = ...,
@@ -221,6 +231,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"update_response",
             "upsert_workflow_search_attributes",
             b"upsert_workflow_search_attributes",
+            "user_metadata",
+            b"user_metadata",
             "variant",
             b"variant",
         ],
@@ -268,6 +280,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"update_response",
             "upsert_workflow_search_attributes",
             b"upsert_workflow_search_attributes",
+            "user_metadata",
+            b"user_metadata",
             "variant",
             b"variant",
         ],
@@ -1340,59 +1354,40 @@ class CancelChildWorkflowExecution(google.protobuf.message.Message):
 global___CancelChildWorkflowExecution = CancelChildWorkflowExecution
 
 class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
-    """Request cancellation of an external workflow execution (which may be a started child)"""
+    """Request cancellation of an external workflow execution. For cancellation of a child workflow,
+    prefer `CancelChildWorkflowExecution` instead, as it guards against cancel-before-start issues.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEQ_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
-    CHILD_WORKFLOW_ID_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     @property
     def workflow_execution(
         self,
     ) -> temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution:
-        """A specific workflow instance"""
-    child_workflow_id: builtins.str
-    """The desired target must be a child of the issuing workflow, and this is its workflow id"""
+        """The workflow instance being targeted"""
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
         workflow_execution: temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution
         | None = ...,
-        child_workflow_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "child_workflow_id",
-            b"child_workflow_id",
-            "target",
-            b"target",
-            "workflow_execution",
-            b"workflow_execution",
+            "workflow_execution", b"workflow_execution"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "child_workflow_id",
-            b"child_workflow_id",
-            "seq",
-            b"seq",
-            "target",
-            b"target",
-            "workflow_execution",
-            b"workflow_execution",
+            "seq", b"seq", "workflow_execution", b"workflow_execution"
         ],
     ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["target", b"target"]
-    ) -> (
-        typing_extensions.Literal["workflow_execution", "child_workflow_id"] | None
-    ): ...
 
 global___RequestCancelExternalWorkflowExecution = RequestCancelExternalWorkflowExecution
 

@@ -8,3 +8,4 @@ temporalio/bridge/temporal_sdk_bridge*
 /tests/helpers/golangworker/golangworker
 /.idea
 /sdk-python.iml
+/.zed
