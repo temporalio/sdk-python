@@ -1159,6 +1159,7 @@ class _WorkflowInstanceImpl(
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
+        summary: Optional[str] = None,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
         # Get activity definition if it's callable
@@ -1194,6 +1195,7 @@ class _WorkflowInstanceImpl(
                 arg_types=arg_types,
                 ret_type=ret_type,
                 versioning_intent=versioning_intent,
+                summary=summary,
             )
         )
 
@@ -2369,6 +2371,8 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
                 )
+            # if self._input.summary:
+            #     command.
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:
                 command.schedule_local_activity.local_retry_threshold.FromTimedelta(

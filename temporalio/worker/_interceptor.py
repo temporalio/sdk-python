@@ -246,6 +246,7 @@ class StartActivityInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     disable_eager_execution: bool
     versioning_intent: Optional[VersioningIntent]
+    summary: Optional[str]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
