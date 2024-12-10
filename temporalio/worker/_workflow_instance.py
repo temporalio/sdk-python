@@ -2371,8 +2371,9 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
                 )
+            # TODO: Needs async conversion to happen somewhere
             # if self._input.summary:
-            #     command.
+            #     command.user_metadata = self._instance._payload_converter
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:
                 command.schedule_local_activity.local_retry_threshold.FromTimedelta(

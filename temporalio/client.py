@@ -999,8 +999,6 @@ class Client:
                 backfill=backfill,
                 memo=memo,
                 search_attributes=search_attributes,
-                static_summary=static_summary,
-                static_details=static_details,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
@@ -5122,9 +5120,11 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.converter.encode_search_attributes(
                 input.search_attributes, req.search_attributes
             )
-        req.user_metadata = self._client.data_converter._encode_user_metadata(
+        metadata = await self._client.data_converter._encode_user_metadata(
             input.static_summary, input.static_details
         )
+        if metadata is not None:
+            req.user_metadata.CopyFrom(metadata)
         if input.start_delay is not None:
             req.workflow_start_delay.FromTimedelta(input.start_delay)
         if input.headers is not None:
