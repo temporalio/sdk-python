@@ -276,6 +276,8 @@ class StartChildWorkflowInput:
     ]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: Optional[VersioningIntent]
+    static_summary: Optional[str]
+    static_details: Optional[str]
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]

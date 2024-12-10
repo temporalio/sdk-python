@@ -780,6 +780,8 @@ async def test_schedule_basics(
         pytest.skip("Older proto library cannot compare repeated fields")
     await assert_no_schedules(client)
 
+    # TODO: Metadata
+
     # Create a schedule with a lot of stuff
     schedule = Schedule(
         action=ScheduleActionStartWorkflow(

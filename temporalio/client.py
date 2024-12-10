@@ -3282,8 +3282,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     """This is deprecated and is only present in case existing untyped
     attributes already exist for update. This should never be used when
     creating."""
-    static_summary: Optional[str]
-    static_details: Optional[str]
+    static_summary: Optional[Union[str, temporalio.api.common.v1.Payload]]
+    static_details: Optional[Union[str, temporalio.api.common.v1.Payload]]
 
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
@@ -3450,6 +3450,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 if pair.key.name in self.untyped_search_attributes:
                     # We know this is mutable here
                     del self.untyped_search_attributes[pair.key.name]  # type: ignore
+            self.static_summary = raw_info.user_metadata.summary
+            self.static_details = raw_info.user_metadata.details
         else:
             if not id:
                 raise ValueError("ID required")

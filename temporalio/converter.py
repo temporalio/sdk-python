@@ -1086,13 +1086,26 @@ class DataConverter:
         return temporalio.api.common.v1.Payloads(payloads=(await self.encode(values)))
 
     async def _encode_user_metadata(
-        self, summary: Optional[str], details: Optional[str]
+        self,
+        summary: Optional[Union[str, temporalio.api.common.v1.Payload]],
+        details: Optional[Union[str, temporalio.api.common.v1.Payload]],
     ) -> Optional[temporalio.api.sdk.v1.UserMetadata]:
         if summary is None and details is None:
             return None
+        enc_summary = None
+        enc_details = None
+        if summary is not None:
+            if isinstance(summary, str):
+                enc_summary = (await self.encode([summary]))[0]
+            else:
+                enc_summary = summary
+        if details is not None:
+            if isinstance(details, str):
+                enc_details = (await self.encode([details]))[0]
+            else:
+                enc_details = details
         return temporalio.api.sdk.v1.UserMetadata(
-            summary=None if summary is None else (await self.encode([summary]))[0],
-            details=None if details is None else (await self.encode([details]))[0],
+            summary=enc_summary, details=enc_details
         )
 
     async def decode_wrapper(
@@ -1218,7 +1231,7 @@ def encode_typed_search_attribute_value(
     if isinstance(value, Sequence):
         for v in value:
             if not isinstance(v, str):
-                raise TypeError(f"All values of a keyword list must be strings")
+                raise TypeError("All values of a keyword list must be strings")
     # Convert value
     payload = default().payload_converter.to_payload(value)
     # Set metadata type
@@ -1256,7 +1269,7 @@ def encode_search_attribute_values(
             )
         elif val_type and type(v) is not val_type:
             raise TypeError(
-                f"Search attribute values must have the same type for the same key"
+                "Search attribute values must have the same type for the same key"
             )
         elif not val_type:
             val_type = type(v)

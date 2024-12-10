@@ -3018,7 +3018,9 @@ class WaitConditionTimeoutWorkflow:
     async def run(self) -> None:
         # Force timeout, ignore, wait again
         try:
-            await workflow.wait_condition(lambda: self._done, timeout=0.01)
+            await workflow.wait_condition(
+                lambda: self._done, timeout=0.01, timeout_summary="hi!"
+            )
             raise RuntimeError("Expected timeout")
         except asyncio.TimeoutError:
             pass
@@ -6169,3 +6171,80 @@ async def test_workflow_run_sees_workflow_init(client: Client):
             task_queue=worker.task_queue,
         )
         assert workflow_result == "hello, world"
+
+
+@workflow.defn
+class UserMetadataWorkflow:
+    def __init__(self) -> None:
+        self._done = False
+        self._waiting = False
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            say_hello,
+            "Enchi",
+            start_to_close_timeout=timedelta(seconds=5),
+            summary="meow",
+        )
+        # Force timeout, ignore, wait again
+        try:
+            await workflow.wait_condition(
+                lambda: self._done, timeout=0.01, timeout_summary="hi!"
+            )
+            raise RuntimeError("Expected timeout")
+        except asyncio.TimeoutError:
+            pass
+        self._waiting = True
+        # workflow.upd
+        await workflow.wait_condition(lambda: self._done)
+
+    @workflow.signal
+    def done(self) -> None:
+        self._done = True
+
+    @workflow.query
+    def waiting(self) -> bool:
+        return self._waiting
+
+
+async def test_user_metadata_is_set(client: Client):
+    async with new_worker(client, UserMetadataWorkflow, activities=[say_hello]) as worker:
+        handle = await client.start_workflow(
+            UserMetadataWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            static_summary="cool workflow bro",
+            static_details="xtremely detailed",
+        )
+
+        # Wait until it's waiting, then send the signal
+        async def waiting() -> bool:
+            return await handle.query(UserMetadataWorkflow.waiting)
+
+        await assert_eq_eventually(True, waiting)
+        await handle.signal(UserMetadataWorkflow.done)
+
+        # Ensure metadatas are present in history
+        resp = await client.workflow_service.get_workflow_execution_history(
+            GetWorkflowExecutionHistoryRequest(
+                namespace=client.namespace,
+                execution=WorkflowExecution(workflow_id=handle.id),
+            )
+        )
+        for event in resp.history.events:
+            if event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
+                assert "cool workflow bro" in PayloadConverter.default.from_payload(
+                    event.user_metadata.summary
+                )
+                assert "xtremely detailed" in PayloadConverter.default.from_payload(
+                    event.user_metadata.details
+                )
+            elif event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+                assert "meow" in PayloadConverter.default.from_payload(
+                    event.user_metadata.summary
+                )
+            elif event.event_type == EventType.EVENT_TYPE_TIMER_STARTED:
+                assert "hi!" in PayloadConverter.default.from_payload(
+                    event.user_metadata.summary
+                )

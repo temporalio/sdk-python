@@ -686,6 +686,8 @@ class _Runtime(ABC):
             ]
         ],
         versioning_intent: Optional[VersioningIntent],
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
     ) -> ChildWorkflowHandle[Any, Any]: ...
 
     @abstractmethod
@@ -717,7 +719,11 @@ class _Runtime(ABC):
 
     @abstractmethod
     async def workflow_wait_condition(
-        self, fn: Callable[[], bool], *, timeout: Optional[float] = None
+        self,
+        fn: Callable[[], bool],
+        *,
+        timeout: Optional[float] = None,
+        timeout_summary: Optional[str] = None,
     ) -> None: ...
 
 
@@ -1093,7 +1099,10 @@ def uuid4() -> uuid.UUID:
 
 
 async def wait_condition(
-    fn: Callable[[], bool], *, timeout: Optional[Union[timedelta, float]] = None
+    fn: Callable[[], bool],
+    *,
+    timeout: Optional[Union[timedelta, float]] = None,
+    timeout_summary: Optional[str] = None,
 ) -> None:
     """Wait on a callback to become true.
 
@@ -1104,10 +1113,14 @@ async def wait_condition(
         fn: Non-async callback that accepts no parameters and returns a boolean.
         timeout: Optional number of seconds to wait until throwing
             :py:class:`asyncio.TimeoutError`.
+        timeout_summary: Optional simple string identifying the timer (created if `timeout` is
+            present) that may be visible in UI/CLI. While it can be normal text, it is best to treat
+            as a timer ID.
     """
     await _Runtime.current().workflow_wait_condition(
         fn,
         timeout=timeout.total_seconds() if isinstance(timeout, timedelta) else timeout,
+        timeout_summary=timeout_summary,
     )
 
 
@@ -1941,6 +1954,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -1958,6 +1972,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -1976,6 +1991,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -1994,6 +2010,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2012,6 +2029,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2030,6 +2048,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2050,6 +2069,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any: ...
 
 
@@ -2068,6 +2088,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity and wait for completion.
 
@@ -2088,6 +2109,7 @@ async def execute_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2105,6 +2127,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2122,6 +2145,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2140,6 +2164,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2158,6 +2183,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2176,6 +2202,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2194,6 +2221,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2211,6 +2239,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
 
@@ -2229,6 +2258,7 @@ def start_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2246,6 +2276,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2263,6 +2294,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2281,6 +2313,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2299,6 +2332,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2317,6 +2351,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2335,6 +2370,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2352,6 +2388,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
 
@@ -2370,6 +2407,7 @@ async def execute_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2387,6 +2425,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2404,6 +2443,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2422,6 +2462,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2440,6 +2481,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2458,6 +2500,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2476,6 +2519,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2493,6 +2537,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
 
@@ -2511,6 +2556,7 @@ def start_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2528,6 +2574,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2545,6 +2592,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2563,6 +2611,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2581,6 +2630,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2599,6 +2649,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2617,6 +2668,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2634,6 +2686,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity from a method and wait for completion.
 
@@ -2654,6 +2707,7 @@ async def execute_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -3656,6 +3710,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -3682,6 +3738,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -3708,6 +3766,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -3736,6 +3796,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[Any, Any]: ...
 
 
@@ -3762,6 +3824,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
 
@@ -3791,6 +3855,12 @@ async def start_child_workflow(
             form of this is DEPRECATED.
         versioning_intent:  When using the Worker Versioning feature, specifies whether this Child
             Workflow should run on a worker with a compatible Build Id or not.
+        static_summary: A single-line fixed summary for this child workflow execution that may appear
+            in the UI/CLI. This can be in single-line Temporal markdown format.
+        static_details: General fixed details for this child workflow execution that may appear in
+            UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
+            a fixed value on the workflow that cannot be updated. For details that can be
+            updated, use `Workflow.CurrentDetails` within the workflow.
 
     Returns:
         A workflow handle to the started/existing workflow.
@@ -3813,6 +3883,8 @@ async def start_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        static_summary=static_summary,
+        static_details=static_details,
     )
 
 
@@ -3838,6 +3910,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3864,6 +3937,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3890,6 +3964,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3918,6 +3993,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any: ...
 
 
@@ -3944,6 +4020,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a child workflow and wait for completion.
 
@@ -3969,6 +4046,7 @@ async def execute_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        static_summary=summary,
     )
     return await handle
 
