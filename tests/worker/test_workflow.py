@@ -6196,20 +6196,26 @@ class UserMetadataWorkflow:
         except asyncio.TimeoutError:
             pass
         self._waiting = True
-        # workflow.upd
+        workflow.set_current_details("such detail")
         await workflow.wait_condition(lambda: self._done)
 
-    @workflow.signal
+    @workflow.signal(description="sdesc")
     def done(self) -> None:
         self._done = True
 
-    @workflow.query
+    @workflow.query(description="qdesc")
     def waiting(self) -> bool:
         return self._waiting
 
+    @workflow.update(description="udesc")
+    def some_update(self):
+        pass
+
 
 async def test_user_metadata_is_set(client: Client):
-    async with new_worker(client, UserMetadataWorkflow, activities=[say_hello]) as worker:
+    async with new_worker(
+        client, UserMetadataWorkflow, activities=[say_hello]
+    ) as worker:
         handle = await client.start_workflow(
             UserMetadataWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
@@ -6223,6 +6229,31 @@ async def test_user_metadata_is_set(client: Client):
             return await handle.query(UserMetadataWorkflow.waiting)
 
         await assert_eq_eventually(True, waiting)
+
+        md_query: temporalio.api.sdk.v1.WorkflowMetadata = await handle.query(
+            "__temporal_workflow_metadata",
+            result_type=temporalio.api.sdk.v1.WorkflowMetadata,
+        )
+        matched_q = [
+            q for q in md_query.definition.query_definitions if q.name == "waiting"
+        ]
+        assert len(matched_q) == 1
+        assert matched_q[0].description == "qdesc"
+
+        matched_u = [
+            u for u in md_query.definition.update_definitions if u.name == "some_update"
+        ]
+        assert len(matched_u) == 1
+        assert matched_u[0].description == "udesc"
+
+        matched_s = [
+            s for s in md_query.definition.signal_definitions if s.name == "done"
+        ]
+        assert len(matched_s) == 1
+        assert matched_s[0].description == "sdesc"
+
+        assert md_query.current_details == "such detail"
+
         await handle.signal(UserMetadataWorkflow.done)
 
         # Ensure metadatas are present in history

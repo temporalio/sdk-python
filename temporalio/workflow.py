@@ -234,6 +234,7 @@ def signal(
     *,
     name: str,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
 ]: ...
@@ -243,6 +244,17 @@ def signal(
 def signal(
     *,
     dynamic: Literal[True],
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
+) -> Callable[
+    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
+]: ...
+
+
+@overload
+def signal(
+    *,
+    description: str,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
@@ -255,6 +267,7 @@ def signal(
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow signal method.
 
@@ -277,6 +290,7 @@ def signal(
             present.
         unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
+        description: A short description of the signal that may appear in the UI/CLI.
     """
 
     def decorator(
@@ -291,6 +305,7 @@ def signal(
             fn=fn,
             is_method=True,
             unfinished_policy=unfinished_policy,
+            description=description,
         )
         setattr(fn, "__temporal_signal_definition", defn)
         if defn.dynamic_vararg:
@@ -314,11 +329,19 @@ def query(fn: CallableType) -> CallableType: ...
 
 
 @overload
-def query(*, name: str) -> Callable[[CallableType], CallableType]: ...
+def query(
+    *, name: str, description: Optional[str] = None
+) -> Callable[[CallableType], CallableType]: ...
 
 
 @overload
-def query(*, dynamic: Literal[True]) -> Callable[[CallableType], CallableType]: ...
+def query(
+    *, dynamic: Literal[True], description: Optional[str] = None
+) -> Callable[[CallableType], CallableType]: ...
+
+
+@overload
+def query(*, description: str) -> Callable[[CallableType], CallableType]: ...
 
 
 def query(
@@ -326,6 +349,7 @@ def query(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow query method.
 
@@ -346,18 +370,27 @@ def query(
             ``Sequence[RawValue]``. An older form of this accepted vararg
             parameters which will now warn. Cannot be present when ``name`` is
             present.
+        description: A short description of the query that may appear in the UI/CLI.
     """
 
-    def with_name(
-        name: Optional[str], fn: CallableType, *, bypass_async_check: bool = False
+    def decorator(
+        name: Optional[str],
+        description: Optional[str],
+        fn: CallableType,
+        *,
+        bypass_async_check: bool = False,
     ) -> CallableType:
+        if not name and not dynamic:
+            name = fn.__name__
         if not bypass_async_check and inspect.iscoroutinefunction(fn):
             warnings.warn(
                 "Queries as async def functions are deprecated",
                 DeprecationWarning,
                 stacklevel=2,
             )
-        defn = _QueryDefinition(name=name, fn=fn, is_method=True)
+        defn = _QueryDefinition(
+            name=name, fn=fn, is_method=True, description=description
+        )
         setattr(fn, "__temporal_query_definition", defn)
         if defn.dynamic_vararg:
             warnings.warn(
@@ -367,10 +400,10 @@ def query(
             )
         return fn
 
-    if name is not None or dynamic:
+    if name is not None or dynamic or description:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(with_name, name)
+        return partial(decorator, name, description)
     if fn is None:
         raise RuntimeError("Cannot create query without function or name or dynamic")
     if inspect.iscoroutinefunction(fn):
@@ -379,7 +412,7 @@ def query(
             DeprecationWarning,
             stacklevel=2,
         )
-    return with_name(fn.__name__, fn, bypass_async_check=True)
+    return decorator(fn.__name__, description, fn, bypass_async_check=True)
 
 
 @dataclass(frozen=True)
@@ -726,6 +759,12 @@ class _Runtime(ABC):
         timeout_summary: Optional[str] = None,
     ) -> None: ...
 
+    @abstractmethod
+    def workflow_get_current_details(self) -> str: ...
+
+    @abstractmethod
+    def workflow_set_current_details(self, description): ...
+
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
     "__temporal_current_update_info"
@@ -835,6 +874,24 @@ def memo_value(
         KeyError: Key not present and default not set.
     """
     return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
+
+
+def get_current_details() -> str:
+    """Get the current details of the workflow which may appear in the UI/CLI.
+    Unlike static details set at start, this value can be updated throughout
+    the life of the workflow and is independent of the static details.
+    This can be in Temporal markdown format and can span multiple lines.
+    """
+    return _Runtime.current().workflow_get_current_details()
+
+
+def set_current_details(description: str) -> None:
+    """Set the current details of the workflow which may appear in the UI/CLI.
+    Unlike static details set at start, this value can be updated throughout
+    the life of the workflow and is independent of the static details.
+    This can be in Temporal markdown format and can span multiple lines.
+    """
+    _Runtime.current().workflow_set_current_details(description)
 
 
 def metric_meter() -> temporalio.common.MetricMeter:
@@ -983,6 +1040,7 @@ def update(
 def update(
     *,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -994,6 +1052,7 @@ def update(
     *,
     name: str,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1005,6 +1064,16 @@ def update(
     *,
     dynamic: Literal[True],
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+]: ...
+
+
+@overload
+def update(
+    *, description: str
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1017,6 +1086,7 @@ def update(
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow update handler method.
 
@@ -1046,6 +1116,7 @@ def update(
             present.
         unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
+        description: A short description of the update that may appear in the UI/CLI.
     """
 
     def decorator(
@@ -1060,6 +1131,7 @@ def update(
             fn=fn,
             is_method=True,
             unfinished_policy=unfinished_policy,
+            description=description,
         )
         if defn.dynamic_vararg:
             raise RuntimeError(
@@ -1573,6 +1645,7 @@ class _SignalDefinition:
     unfinished_policy: HandlerUnfinishedPolicy = (
         HandlerUnfinishedPolicy.WARN_AND_ABANDON
     )
+    description: Optional[str] = None
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     dynamic_vararg: bool = False
@@ -1620,6 +1693,7 @@ class _QueryDefinition:
     name: Optional[str]
     fn: Callable[..., Any]
     is_method: bool
+    description: Optional[str] = None
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
@@ -1657,6 +1731,7 @@ class _UpdateDefinition:
     unfinished_policy: HandlerUnfinishedPolicy = (
         HandlerUnfinishedPolicy.WARN_AND_ABANDON
     )
+    description: Optional[str] = None
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None

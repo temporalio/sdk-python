@@ -282,6 +282,16 @@ class _WorkflowInstanceImpl(
             ret_type=temporalio.api.sdk.v1.EnhancedStackTrace,
         )
 
+        self._queries["__temporal_workflow_metadata"] = (
+            temporalio.workflow._QueryDefinition(
+                name="__temporal_workflow_metadata",
+                fn=self._temporal_workflow_metadata,
+                is_method=False,
+                arg_types=[],
+                ret_type=temporalio.api.sdk.v1.WorkflowMetadata,
+            )
+        )
+
         # Maintain buffered signals for later-added dynamic handlers
         self._buffered_signals: Dict[
             str, List[temporalio.bridge.proto.workflow_activation.SignalWorkflow]
@@ -318,6 +328,10 @@ class _WorkflowInstanceImpl(
         # Since timer creation often happens indirectly through asyncio, we need some place to
         # temporarily store options for timers created by, ex `wait_condition`.
         self._next_timer_options: Optional[_TimerOptions] = None
+
+        # The current details (as opposed to static details on workflow start), returned in the
+        # metadata query
+        self._current_details: str = ""
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
@@ -1445,6 +1459,13 @@ class _WorkflowInstanceImpl(
         self._next_timer_options = _TimerOptions(user_metadata=user_metadata)
         await asyncio.wait_for(fut, timeout)
 
+    def workflow_get_current_details(self) -> str:
+        return self._current_details
+
+    def workflow_set_current_details(self, description):
+        self._assert_not_read_only("set current details")
+        self._current_details = description
+
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
 
@@ -1975,6 +1996,42 @@ class _WorkflowInstanceImpl(
                 sdk=sdk, sources=sources, stacks=stacks
             )
             return est
+
+    def _temporal_workflow_metadata(self) -> temporalio.api.sdk.v1.WorkflowMetadata:
+        query_definitions = [
+            temporalio.api.sdk.v1.WorkflowInteractionDefinition(
+                name=qd.name if qd.name is not None else "",
+                description=qd.description if qd.description is not None else "",
+            )
+            for qd in self._queries.values()
+        ]
+        query_definitions.sort(key=lambda qd: qd.name)
+        signal_definitions = [
+            temporalio.api.sdk.v1.WorkflowInteractionDefinition(
+                name=sd.name if sd.name is not None else "",
+                description=sd.description if sd.description is not None else "",
+            )
+            for sd in self._signals.values()
+        ]
+        signal_definitions.sort(key=lambda sd: sd.name)
+        update_definitions = [
+            temporalio.api.sdk.v1.WorkflowInteractionDefinition(
+                name=ud.name if ud.name is not None else "",
+                description=ud.description if ud.description is not None else "",
+            )
+            for ud in self._updates.values()
+        ]
+        update_definitions.sort(key=lambda ud: ud.name)
+        wf_def = temporalio.api.sdk.v1.WorkflowDefinition(
+            type=self._info.workflow_type,
+            query_definitions=query_definitions,
+            signal_definitions=signal_definitions,
+            update_definitions=update_definitions,
+        )
+        cur_details = self.workflow_get_current_details()
+        return temporalio.api.sdk.v1.WorkflowMetadata(
+            definition=wf_def, current_details=cur_details
+        )
 
     def _timer_impl(
         self,
