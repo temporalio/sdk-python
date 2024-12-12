@@ -1439,6 +1439,20 @@ class _WorkflowInstanceImpl(
                         else [update.value]
                     )
 
+    async def workflow_sleep(
+        self, duration: float, *, summary: Optional[str] = None
+    ) -> None:
+        user_metadata = (
+            temporalio.api.sdk.v1.UserMetadata(
+                summary=self._payload_converter.to_payload(summary)
+            )
+            if summary
+            else None
+        )
+        self._timer_impl(
+            duration, lambda _: None, options=_TimerOptions(user_metadata=user_metadata)
+        )
+
     async def workflow_wait_condition(
         self,
         fn: Callable[[], bool],

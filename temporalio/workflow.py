@@ -751,6 +751,11 @@ class _Runtime(ABC):
     ) -> None: ...
 
     @abstractmethod
+    async def workflow_sleep(
+        self, duration: float, *, summary: Optional[str] = None
+    ) -> None: ...
+
+    @abstractmethod
     async def workflow_wait_condition(
         self,
         fn: Callable[[], bool],
@@ -1071,15 +1076,6 @@ def update(
 ]: ...
 
 
-@overload
-def update(
-    *, description: str
-) -> Callable[
-    [Callable[MultiParamSpec, ReturnType]],
-    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]: ...
-
-
 def update(
     fn: Optional[CallableSyncOrAsyncType] = None,
     *,
@@ -1168,6 +1164,24 @@ def uuid4() -> uuid.UUID:
         A deterministically-seeded v4 UUID.
     """
     return uuid.UUID(bytes=random().getrandbits(16 * 8).to_bytes(16, "big"), version=4)
+
+
+async def sleep(
+    duration: Union[float, timedelta], *, summary: Optional[str] = None
+) -> None:
+    """Sleep for the given duration.
+
+    Args:
+        duration: Duration to sleep in seconds or as a timedelta.
+        summary: A single-line fixed summary for this timer that may appear in UI/CLI.
+            This can be in single-line Temporal markdown format.
+    """
+    await _Runtime.current().workflow_sleep(
+        duration=duration.total_seconds()
+        if isinstance(duration, timedelta)
+        else duration,
+        summary=summary,
+    )
 
 
 async def wait_condition(
@@ -1992,7 +2006,7 @@ def start_activity(
             need to. Contact Temporal before setting this value.
         versioning_intent: When using the Worker Versioning feature, specifies whether this Activity
             should run on a worker with a compatible Build Id or not.
-        summary:  Gets or sets a single-line fixed summary for this activity that may appear in UI/CLI.
+        summary: A single-line fixed summary for this activity that may appear in UI/CLI.
             This can be in single-line Temporal markdown format.
 
     Returns:

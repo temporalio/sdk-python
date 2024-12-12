@@ -6195,6 +6195,7 @@ class UserMetadataWorkflow:
             raise RuntimeError("Expected timeout")
         except asyncio.TimeoutError:
             pass
+        await workflow.sleep(0.01, summary="timer2")
         self._waiting = True
         workflow.set_current_details("such detail")
         await workflow.wait_condition(lambda: self._done)
@@ -6263,6 +6264,7 @@ async def test_user_metadata_is_set(client: Client):
                 execution=WorkflowExecution(workflow_id=handle.id),
             )
         )
+        timer_summs = set()
         for event in resp.history.events:
             if event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
                 assert "cool workflow bro" in PayloadConverter.default.from_payload(
@@ -6276,6 +6278,7 @@ async def test_user_metadata_is_set(client: Client):
                     event.user_metadata.summary
                 )
             elif event.event_type == EventType.EVENT_TYPE_TIMER_STARTED:
-                assert "hi!" in PayloadConverter.default.from_payload(
-                    event.user_metadata.summary
+                timer_summs.add(
+                    PayloadConverter.default.from_payload(event.user_metadata.summary)
                 )
+        assert timer_summs == {"hi!", "timer2"}
