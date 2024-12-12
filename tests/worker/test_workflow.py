@@ -6213,7 +6213,11 @@ class UserMetadataWorkflow:
         pass
 
 
-async def test_user_metadata_is_set(client: Client):
+async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
+        )
     async with new_worker(
         client, UserMetadataWorkflow, activities=[say_hello]
     ) as worker:
@@ -6344,7 +6348,13 @@ class ConcurrentSleepsWorkflow:
         )
 
 
-async def test_concurrent_sleeps_use_proper_options(client: Client):
+async def test_concurrent_sleeps_use_proper_options(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
+        )
     async with new_worker(client, ConcurrentSleepsWorkflow) as worker:
         handle = await client.start_workflow(
             ConcurrentSleepsWorkflow.run,
