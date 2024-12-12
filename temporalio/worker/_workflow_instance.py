@@ -331,7 +331,7 @@ class _WorkflowInstanceImpl(
 
         # The current details (as opposed to static details on workflow start), returned in the
         # metadata query
-        self._current_details: str = ""
+        self._current_details = ""
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
@@ -1449,9 +1449,13 @@ class _WorkflowInstanceImpl(
             if summary
             else None
         )
+        fut = self.create_future()
         self._timer_impl(
-            duration, lambda _: None, options=_TimerOptions(user_metadata=user_metadata)
+            duration,
+            _TimerOptions(user_metadata=user_metadata),
+            lambda: fut.set_result(None),
         )
+        await fut
 
     async def workflow_wait_condition(
         self,
@@ -1476,9 +1480,9 @@ class _WorkflowInstanceImpl(
     def workflow_get_current_details(self) -> str:
         return self._current_details
 
-    def workflow_set_current_details(self, description):
+    def workflow_set_current_details(self, details: str):
         self._assert_not_read_only("set current details")
-        self._current_details = description
+        self._current_details = details
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
@@ -2014,24 +2018,24 @@ class _WorkflowInstanceImpl(
     def _temporal_workflow_metadata(self) -> temporalio.api.sdk.v1.WorkflowMetadata:
         query_definitions = [
             temporalio.api.sdk.v1.WorkflowInteractionDefinition(
-                name=qd.name if qd.name is not None else "",
-                description=qd.description if qd.description is not None else "",
+                name=qd.name or "",
+                description=qd.description or "",
             )
             for qd in self._queries.values()
         ]
         query_definitions.sort(key=lambda qd: qd.name)
         signal_definitions = [
             temporalio.api.sdk.v1.WorkflowInteractionDefinition(
-                name=sd.name if sd.name is not None else "",
-                description=sd.description if sd.description is not None else "",
+                name=sd.name or "",
+                description=sd.description or "",
             )
             for sd in self._signals.values()
         ]
         signal_definitions.sort(key=lambda sd: sd.name)
         update_definitions = [
             temporalio.api.sdk.v1.WorkflowInteractionDefinition(
-                name=ud.name if ud.name is not None else "",
-                description=ud.description if ud.description is not None else "",
+                name=ud.name or "",
+                description=ud.description or "",
             )
             for ud in self._updates.values()
         ]
@@ -2050,10 +2054,10 @@ class _WorkflowInstanceImpl(
     def _timer_impl(
         self,
         delay: float,
+        options: _TimerOptions,
         callback: Callable[..., Any],
         *args: Any,
         context: Optional[contextvars.Context] = None,
-        options: Optional[_TimerOptions] = None,
     ):
         self._assert_not_read_only("schedule timer")
         # Delay must be positive
@@ -2062,12 +2066,6 @@ class _WorkflowInstanceImpl(
 
         # Create, schedule, and return
         seq = self._next_seq("timer")
-        # If options aren't explicitly passed, attempt to fetch them from the class field,
-        # erasing them afterward. Support callers who cannot call this directly because they
-        # rely on asyncio functions.
-        if options is None:
-            options = self._next_timer_options
-            self._next_timer_options = None
         handle = _TimerHandle(
             seq, self.time() + delay, options, callback, args, self, context
         )
@@ -2079,7 +2077,6 @@ class _WorkflowInstanceImpl(
     # These are in the order defined in CPython's impl of the base class. Many
     # functions are intentionally not implemented/supported.
 
-    # TODO/Review: This doesn't appear to implement any base class fn and isn't called anywhere?
     def _timer_handle_cancelled(self, handle: asyncio.TimerHandle) -> None:
         if not isinstance(handle, _TimerHandle):
             raise TypeError("Expected Temporal timer handle")
@@ -2107,7 +2104,12 @@ class _WorkflowInstanceImpl(
         *args: Any,
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.TimerHandle:
-        return self._timer_impl(delay, callback, *args, context=context)
+        # Fetch options from the class field, erasing them afterward.
+        options = (
+            self._next_timer_options if self._next_timer_options else _TimerOptions()
+        )
+        self._next_timer_options = None
+        return self._timer_impl(delay, options, callback, *args, context=context)
 
     def call_at(
         self,

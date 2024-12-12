@@ -6287,3 +6287,21 @@ async def test_user_metadata_is_set(client: Client):
         describe_r = await handle.describe()
         assert describe_r.static_summary == "cool workflow bro"
         assert describe_r.static_details == "xtremely detailed"
+
+
+@workflow.defn
+class WorkflowSleepWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.sleep(1)
+
+
+async def test_workflow_sleep(client: Client):
+    async with new_worker(client, WorkflowSleepWorkflow) as worker:
+        start_time = datetime.now()
+        await client.execute_workflow(
+            WorkflowSleepWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert (datetime.now() - start_time) >= timedelta(seconds=1)

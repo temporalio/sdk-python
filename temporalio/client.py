@@ -26,6 +26,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Tuple,
     Type,
     Union,
     cast,
@@ -43,6 +44,7 @@ import temporalio.api.errordetails.v1
 import temporalio.api.failure.v1
 import temporalio.api.history.v1
 import temporalio.api.schedule.v1
+import temporalio.api.sdk.v1
 import temporalio.api.taskqueue.v1
 import temporalio.api.update.v1
 import temporalio.api.workflow.v1
@@ -2423,8 +2425,8 @@ class WorkflowExecutionDescription(WorkflowExecution):
         description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
         converter: temporalio.converter.DataConverter,
     ) -> WorkflowExecutionDescription:
-        (summ, deets) = await converter._decode_user_metadata(
-            description.execution_config.user_metadata
+        (summ, deets) = await _decode_user_metadata(
+            converter, description.execution_config.user_metadata
         )
         return WorkflowExecutionDescription._from_raw_info(  # type: ignore
             description.workflow_execution_info,
@@ -3547,8 +3549,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                         for k, v in self.memo.items()
                     },
                 ),
-                user_metadata=await client.data_converter._encode_user_metadata(
-                    self.static_summary, self.static_details
+                user_metadata=await _encode_user_metadata(
+                    client.data_converter, self.static_summary, self.static_details
                 ),
             ),
         )
@@ -5141,8 +5143,8 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.converter.encode_search_attributes(
                 input.search_attributes, req.search_attributes
             )
-        metadata = await self._client.data_converter._encode_user_metadata(
-            input.static_summary, input.static_details
+        metadata = await _encode_user_metadata(
+            self._client.data_converter, input.static_summary, input.static_details
         )
         if metadata is not None:
             req.user_metadata.CopyFrom(metadata)
@@ -6373,3 +6375,42 @@ class CloudOperationsClient:
         # Update config and perform update
         self.service_client.config.api_key = value
         self.service_client.update_api_key(value)
+
+
+async def _encode_user_metadata(
+    converter: temporalio.converter.DataConverter,
+    summary: Optional[Union[str, temporalio.api.common.v1.Payload]],
+    details: Optional[Union[str, temporalio.api.common.v1.Payload]],
+) -> Optional[temporalio.api.sdk.v1.UserMetadata]:
+    if summary is None and details is None:
+        return None
+    enc_summary = None
+    enc_details = None
+    if summary is not None:
+        if isinstance(summary, str):
+            enc_summary = (await converter.encode([summary]))[0]
+        else:
+            enc_summary = summary
+    if details is not None:
+        if isinstance(details, str):
+            enc_details = (await converter.encode([details]))[0]
+        else:
+            enc_details = details
+    return temporalio.api.sdk.v1.UserMetadata(summary=enc_summary, details=enc_details)
+
+
+async def _decode_user_metadata(
+    converter: temporalio.converter.DataConverter,
+    metadata: Optional[temporalio.api.sdk.v1.UserMetadata],
+) -> Tuple[Optional[str], Optional[str]]:
+    """Returns (summary, details)"""
+    if metadata is None:
+        return None, None
+    return (
+        None
+        if not metadata.HasField("summary")
+        else (await converter.decode([metadata.summary]))[0],
+        None
+        if not metadata.HasField("details")
+        else (await converter.decode([metadata.details]))[0],
+    )

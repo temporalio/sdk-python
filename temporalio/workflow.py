@@ -224,6 +224,7 @@ def signal(
 def signal(
     *,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
 ]: ...
@@ -246,16 +247,6 @@ def signal(
     dynamic: Literal[True],
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
     description: Optional[str] = None,
-) -> Callable[
-    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
-]: ...
-
-
-@overload
-def signal(
-    *,
-    description: str,
-    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
 ) -> Callable[
     [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
 ]: ...
@@ -768,7 +759,7 @@ class _Runtime(ABC):
     def workflow_get_current_details(self) -> str: ...
 
     @abstractmethod
-    def workflow_set_current_details(self, description): ...
+    def workflow_set_current_details(self, details: str): ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(

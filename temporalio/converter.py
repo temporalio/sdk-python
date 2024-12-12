@@ -1085,29 +1085,6 @@ class DataConverter:
         """
         return temporalio.api.common.v1.Payloads(payloads=(await self.encode(values)))
 
-    async def _encode_user_metadata(
-        self,
-        summary: Optional[Union[str, temporalio.api.common.v1.Payload]],
-        details: Optional[Union[str, temporalio.api.common.v1.Payload]],
-    ) -> Optional[temporalio.api.sdk.v1.UserMetadata]:
-        if summary is None and details is None:
-            return None
-        enc_summary = None
-        enc_details = None
-        if summary is not None:
-            if isinstance(summary, str):
-                enc_summary = (await self.encode([summary]))[0]
-            else:
-                enc_summary = summary
-        if details is not None:
-            if isinstance(details, str):
-                enc_details = (await self.encode([details]))[0]
-            else:
-                enc_details = details
-        return temporalio.api.sdk.v1.UserMetadata(
-            summary=enc_summary, details=enc_details
-        )
-
     async def decode_wrapper(
         self,
         payloads: Optional[temporalio.api.common.v1.Payloads],
@@ -1135,21 +1112,6 @@ class DataConverter:
         if self.payload_codec:
             await self.payload_codec.decode_failure(failure)
         return self.failure_converter.from_failure(failure, self.payload_converter)
-
-    async def _decode_user_metadata(
-        self, metadata: Optional[temporalio.api.sdk.v1.UserMetadata]
-    ) -> Tuple[Optional[str], Optional[str]]:
-        """Returns (summary, details)"""
-        if metadata is None:
-            return None, None
-        return (
-            None
-            if not metadata.HasField("summary")
-            else (await self.decode([metadata.summary]))[0],
-            None
-            if not metadata.HasField("details")
-            else (await self.decode([metadata.details]))[0],
-        )
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (
