@@ -46,6 +46,7 @@ from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
     ResetStickyTaskQueueRequest,
+    DescribeWorkflowExecutionRequest
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
@@ -6282,3 +6283,7 @@ async def test_user_metadata_is_set(client: Client):
                     PayloadConverter.default.from_payload(event.user_metadata.summary)
                 )
         assert timer_summs == {"hi!", "timer2"}
+
+        describe_r = await handle.describe()
+        assert describe_r.static_summary == "cool workflow bro"
+        assert describe_r.static_details == "xtremely detailed"

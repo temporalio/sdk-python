@@ -2411,16 +2411,27 @@ class WorkflowExecutionDescription(WorkflowExecution):
 
     raw_description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse
     """Underlying protobuf description."""
+    static_summary: Optional[str]
+    """Gets the single-line fixed summary for this workflow execution that may appear in
+       UI/CLI. This can be in single-line Temporal markdown format."""
+    static_details: Optional[str]
+    """Gets the general fixed details for this workflow execution that may appear in UI/CLI.
+       This can be in Temporal markdown format and can span multiple lines."""
 
     @staticmethod
-    def _from_raw_description(
+    async def _from_raw_description(
         description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
         converter: temporalio.converter.DataConverter,
     ) -> WorkflowExecutionDescription:
+        (summ, deets) = await converter._decode_user_metadata(
+            description.execution_config.user_metadata
+        )
         return WorkflowExecutionDescription._from_raw_info(  # type: ignore
             description.workflow_execution_info,
             converter,
             raw_description=description,
+            static_summary=summ,
+            static_details=deets,
         )
 
 
@@ -5199,7 +5210,7 @@ class _ClientImpl(OutboundInterceptor):
     async def describe_workflow(
         self, input: DescribeWorkflowInput
     ) -> WorkflowExecutionDescription:
-        return WorkflowExecutionDescription._from_raw_description(
+        return await WorkflowExecutionDescription._from_raw_description(
             await self._client.workflow_service.describe_workflow_execution(
                 temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest(
                     namespace=self._client.namespace,
