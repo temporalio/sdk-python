@@ -1834,8 +1834,9 @@ class _WorkflowInstanceImpl(
             asyncio._set_running_loop(self)
 
             # We instantiate the workflow class _inside_ here because __init__
-            # needs to run with this event loop set
-            if not self._object:
+            # needs to run with this event loop set. If we're deleting and
+            # we've never initialized, we don't need to bother.
+            if not self._object and not self._deleting:
                 self._object = self._instantiate_workflow_object()
 
             # Run while there is anything ready
