@@ -44,7 +44,6 @@ from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
-    DescribeWorkflowExecutionRequest,
     GetWorkflowExecutionHistoryRequest,
     ResetStickyTaskQueueRequest,
 )
@@ -6306,3 +6305,74 @@ async def test_workflow_sleep(client: Client):
             task_queue=worker.task_queue,
         )
         assert (datetime.now() - start_time) >= timedelta(seconds=1)
+
+
+@workflow.defn
+class ConcurrentSleepsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        sleeps_a = [workflow.sleep(0.1, summary=f"t{i}") for i in range(5)]
+        zero_a = workflow.sleep(0, summary="zero_timer")
+        wait_some = workflow.wait_condition(
+            lambda: False, timeout=0.1, timeout_summary="wait_some"
+        )
+        zero_b = workflow.wait_condition(
+            lambda: False, timeout=0, timeout_summary="zero_wait"
+        )
+        no_summ = workflow.sleep(0.1)
+        sleeps_b = [workflow.sleep(0.1, summary=f"t{i}") for i in range(5, 10)]
+        try:
+            await asyncio.gather(
+                *sleeps_a,
+                zero_a,
+                wait_some,
+                zero_b,
+                no_summ,
+                *sleeps_b,
+                return_exceptions=True,
+            )
+        except asyncio.TimeoutError:
+            pass
+
+        task_1 = asyncio.create_task(self.make_timers(100, 105))
+        task_2 = asyncio.create_task(self.make_timers(105, 110))
+        await asyncio.gather(task_1, task_2)
+
+    async def make_timers(self, start: int, end: int):
+        await asyncio.gather(
+            *[workflow.sleep(0.1, summary=f"m_t{i}") for i in range(start, end)]
+        )
+
+
+async def test_concurrent_sleeps_use_proper_options(client: Client):
+    async with new_worker(client, ConcurrentSleepsWorkflow) as worker:
+        handle = await client.start_workflow(
+            ConcurrentSleepsWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+        resp = await client.workflow_service.get_workflow_execution_history(
+            GetWorkflowExecutionHistoryRequest(
+                namespace=client.namespace,
+                execution=WorkflowExecution(workflow_id=handle.id),
+            )
+        )
+        timer_summaries = [
+            PayloadConverter.default.from_payload(e.user_metadata.summary)
+            if e.user_metadata.HasField("summary")
+            else "<no summ>"
+            for e in resp.history.events
+            if e.event_type == EventType.EVENT_TYPE_TIMER_STARTED
+        ]
+        assert timer_summaries == [
+            *[f"t{i}" for i in range(5)],
+            "zero_timer",
+            "wait_some",
+            "<no summ>",
+            *[f"t{i}" for i in range(5, 10)],
+            *[f"m_t{i}" for i in range(100, 110)],
+        ]
+
+        # Force replay with a query to ensure determinism
+        await handle.query("__temporal_workflow_metadata")

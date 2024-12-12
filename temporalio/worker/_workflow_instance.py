@@ -325,10 +325,6 @@ class _WorkflowInstanceImpl(
         # For tracking the thread this workflow is running on (primarily for deadlock situations)
         self._current_thread_id: Optional[int] = None
 
-        # Since timer creation often happens indirectly through asyncio, we need some place to
-        # temporarily store options for timers created by, ex `wait_condition`.
-        self._next_timer_options: Optional[_TimerOptions] = None
-
         # The current details (as opposed to static details on workflow start), returned in the
         # metadata query
         self._current_details = ""
@@ -1474,8 +1470,13 @@ class _WorkflowInstanceImpl(
             if timeout_summary
             else None
         )
-        self._next_timer_options = _TimerOptions(user_metadata=user_metadata)
-        await asyncio.wait_for(fut, timeout)
+        ctxvars = contextvars.copy_context()
+
+        async def in_context():
+            _TimerOptionsCtxVar.set(_TimerOptions(user_metadata=user_metadata))
+            await asyncio.wait_for(fut, timeout)
+
+        await ctxvars.run(in_context)
 
     def workflow_get_current_details(self) -> str:
         return self._current_details
@@ -2105,11 +2106,7 @@ class _WorkflowInstanceImpl(
         *args: Any,
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.TimerHandle:
-        # Fetch options from the class field, erasing them afterward.
-        options = (
-            self._next_timer_options if self._next_timer_options else _TimerOptions()
-        )
-        self._next_timer_options = None
+        options = _TimerOptionsCtxVar.get()
         return self._timer_impl(delay, options, callback, *args, context=context)
 
     def call_at(
@@ -2335,6 +2332,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
 @dataclass(frozen=True)
 class _TimerOptions:
     user_metadata: Optional[temporalio.api.sdk.v1.UserMetadata] = None
+
+
+_TimerOptionsCtxVar: contextvars.ContextVar[_TimerOptions] = contextvars.ContextVar(
+    "__temporal_timer_options", default=_TimerOptions()
+)
 
 
 class _TimerHandle(asyncio.TimerHandle):
