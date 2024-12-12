@@ -6257,6 +6257,7 @@ async def test_user_metadata_is_set(client: Client):
         assert md_query.current_details == "such detail"
 
         await handle.signal(UserMetadataWorkflow.done)
+        await handle.result()
 
         # Ensure metadatas are present in history
         resp = await client.workflow_service.get_workflow_execution_history(
