@@ -780,8 +780,6 @@ async def test_schedule_basics(
         pytest.skip("Older proto library cannot compare repeated fields")
     await assert_no_schedules(client)
 
-    # TODO: Metadata
-
     # Create a schedule with a lot of stuff
     schedule = Schedule(
         action=ScheduleActionStartWorkflow(
@@ -794,6 +792,8 @@ async def test_schedule_basics(
             task_timeout=timedelta(hours=3),
             retry_policy=RetryPolicy(maximum_attempts=20),
             memo={"memokey1": "memoval1"},
+            static_summary="summary",
+            static_details="details",
         ),
         spec=ScheduleSpec(
             calendars=[
@@ -864,6 +864,15 @@ async def test_schedule_basics(
             day_of_week=(ScheduleRange(1),),
         )
     )
+    # Summary & description are encoded
+    assert schedule.action.static_summary
+    assert schedule.action.static_details
+    schedule.action.static_summary = (
+        await DataConverter.default.encode([schedule.action.static_summary])
+    )[0]
+    schedule.action.static_details = (
+        await DataConverter.default.encode([schedule.action.static_details])
+    )[0]
 
     # Describe it and confirm
     desc = await handle.describe()

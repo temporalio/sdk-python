@@ -1144,10 +1144,10 @@ class DataConverter:
             return None, None
         return (
             None
-            if metadata.summary is None
+            if not metadata.HasField("summary")
             else (await self.decode([metadata.summary]))[0],
             None
-            if metadata.details is None
+            if not metadata.HasField("details")
             else (await self.decode([metadata.details]))[0],
         )
 

@@ -3461,8 +3461,16 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 if pair.key.name in self.untyped_search_attributes:
                     # We know this is mutable here
                     del self.untyped_search_attributes[pair.key.name]  # type: ignore
-            self.static_summary = raw_info.user_metadata.summary
-            self.static_details = raw_info.user_metadata.details
+            self.static_summary = (
+                raw_info.user_metadata.summary
+                if raw_info.HasField("user_metadata") and raw_info.user_metadata.summary
+                else None
+            )
+            self.static_details = (
+                raw_info.user_metadata.details
+                if raw_info.HasField("user_metadata") and raw_info.user_metadata.details
+                else None
+            )
         else:
             if not id:
                 raise ValueError("ID required")

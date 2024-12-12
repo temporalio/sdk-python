@@ -44,9 +44,9 @@ from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
+    DescribeWorkflowExecutionRequest,
     GetWorkflowExecutionHistoryRequest,
     ResetStickyTaskQueueRequest,
-    DescribeWorkflowExecutionRequest
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
@@ -505,7 +505,7 @@ async def test_workflow_signal_and_query_errors(client: Client):
             await handle.query("non-existent query")
         assert str(rpc_err.value) == (
             "Query handler for 'non-existent query' expected but not found,"
-            " known queries: [__enhanced_stack_trace __stack_trace bad_query other_query]"
+            " known queries: [__enhanced_stack_trace __stack_trace __temporal_workflow_metadata bad_query other_query]"
         )
 
 
@@ -1553,12 +1553,12 @@ async def test_workflow_with_custom_runner(client: Client):
             task_queue=worker.task_queue,
         )
         assert result == "Hello, Temporal!"
-    # Confirm first activation and last completion
+    # Confirm first activation and last non-eviction-reply completion
     assert (
         runner._pairs[0][0].jobs[0].initialize_workflow.workflow_type == "HelloWorkflow"
     )
     assert (
-        runner._pairs[-1][-1]
+        runner._pairs[-2][-1]
         .successful.commands[0]
         .complete_workflow_execution.result.data
         == b'"Hello, Temporal!"'
