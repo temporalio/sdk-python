@@ -800,7 +800,8 @@ class DefaultFailureConverter(FailureConverter):
                 str(exception), type=exception.__class__.__name__
             )
             failure_error.__traceback__ = exception.__traceback__
-            failure_error.__cause__ = exception.__cause__
+            if exception.__cause__ and exception.__cause__ != exception:
+                failure_error.__cause__ = exception.__cause__
             self._error_to_failure(failure_error, payload_converter, failure)
         # Encode common attributes if requested
         if self._encode_common_attributes:
