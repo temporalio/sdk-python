@@ -224,6 +224,7 @@ def signal(
 def signal(
     *,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
 ]: ...
@@ -234,6 +235,7 @@ def signal(
     *,
     name: str,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
 ]: ...
@@ -244,6 +246,7 @@ def signal(
     *,
     dynamic: Literal[True],
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
 ]: ...
@@ -255,6 +258,7 @@ def signal(
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow signal method.
 
@@ -277,6 +281,7 @@ def signal(
             present.
         unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
+        description: A short description of the signal that may appear in the UI/CLI.
     """
 
     def decorator(
@@ -291,6 +296,7 @@ def signal(
             fn=fn,
             is_method=True,
             unfinished_policy=unfinished_policy,
+            description=description,
         )
         setattr(fn, "__temporal_signal_definition", defn)
         if defn.dynamic_vararg:
@@ -314,11 +320,19 @@ def query(fn: CallableType) -> CallableType: ...
 
 
 @overload
-def query(*, name: str) -> Callable[[CallableType], CallableType]: ...
+def query(
+    *, name: str, description: Optional[str] = None
+) -> Callable[[CallableType], CallableType]: ...
 
 
 @overload
-def query(*, dynamic: Literal[True]) -> Callable[[CallableType], CallableType]: ...
+def query(
+    *, dynamic: Literal[True], description: Optional[str] = None
+) -> Callable[[CallableType], CallableType]: ...
+
+
+@overload
+def query(*, description: str) -> Callable[[CallableType], CallableType]: ...
 
 
 def query(
@@ -326,6 +340,7 @@ def query(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow query method.
 
@@ -346,18 +361,27 @@ def query(
             ``Sequence[RawValue]``. An older form of this accepted vararg
             parameters which will now warn. Cannot be present when ``name`` is
             present.
+        description: A short description of the query that may appear in the UI/CLI.
     """
 
-    def with_name(
-        name: Optional[str], fn: CallableType, *, bypass_async_check: bool = False
+    def decorator(
+        name: Optional[str],
+        description: Optional[str],
+        fn: CallableType,
+        *,
+        bypass_async_check: bool = False,
     ) -> CallableType:
+        if not name and not dynamic:
+            name = fn.__name__
         if not bypass_async_check and inspect.iscoroutinefunction(fn):
             warnings.warn(
                 "Queries as async def functions are deprecated",
                 DeprecationWarning,
                 stacklevel=2,
             )
-        defn = _QueryDefinition(name=name, fn=fn, is_method=True)
+        defn = _QueryDefinition(
+            name=name, fn=fn, is_method=True, description=description
+        )
         setattr(fn, "__temporal_query_definition", defn)
         if defn.dynamic_vararg:
             warnings.warn(
@@ -367,10 +391,10 @@ def query(
             )
         return fn
 
-    if name is not None or dynamic:
+    if name is not None or dynamic or description:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(with_name, name)
+        return partial(decorator, name, description)
     if fn is None:
         raise RuntimeError("Cannot create query without function or name or dynamic")
     if inspect.iscoroutinefunction(fn):
@@ -379,7 +403,7 @@ def query(
             DeprecationWarning,
             stacklevel=2,
         )
-    return with_name(fn.__name__, fn, bypass_async_check=True)
+    return decorator(fn.__name__, description, fn, bypass_async_check=True)
 
 
 @dataclass(frozen=True)
@@ -659,6 +683,7 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
         versioning_intent: Optional[VersioningIntent],
+        summary: Optional[str] = None,
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
@@ -685,6 +710,8 @@ class _Runtime(ABC):
             ]
         ],
         versioning_intent: Optional[VersioningIntent],
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
     ) -> ChildWorkflowHandle[Any, Any]: ...
 
     @abstractmethod
@@ -715,9 +742,24 @@ class _Runtime(ABC):
     ) -> None: ...
 
     @abstractmethod
-    async def workflow_wait_condition(
-        self, fn: Callable[[], bool], *, timeout: Optional[float] = None
+    async def workflow_sleep(
+        self, duration: float, *, summary: Optional[str] = None
     ) -> None: ...
+
+    @abstractmethod
+    async def workflow_wait_condition(
+        self,
+        fn: Callable[[], bool],
+        *,
+        timeout: Optional[float] = None,
+        timeout_summary: Optional[str] = None,
+    ) -> None: ...
+
+    @abstractmethod
+    def workflow_get_current_details(self) -> str: ...
+
+    @abstractmethod
+    def workflow_set_current_details(self, details: str): ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -828,6 +870,24 @@ def memo_value(
         KeyError: Key not present and default not set.
     """
     return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
+
+
+def get_current_details() -> str:
+    """Get the current details of the workflow which may appear in the UI/CLI.
+    Unlike static details set at start, this value can be updated throughout
+    the life of the workflow and is independent of the static details.
+    This can be in Temporal markdown format and can span multiple lines.
+    """
+    return _Runtime.current().workflow_get_current_details()
+
+
+def set_current_details(description: str) -> None:
+    """Set the current details of the workflow which may appear in the UI/CLI.
+    Unlike static details set at start, this value can be updated throughout
+    the life of the workflow and is independent of the static details.
+    This can be in Temporal markdown format and can span multiple lines.
+    """
+    _Runtime.current().workflow_set_current_details(description)
 
 
 def metric_meter() -> temporalio.common.MetricMeter:
@@ -976,6 +1036,7 @@ def update(
 def update(
     *,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -987,6 +1048,7 @@ def update(
     *,
     name: str,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -998,6 +1060,7 @@ def update(
     *,
     dynamic: Literal[True],
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
@@ -1010,6 +1073,7 @@ def update(
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow update handler method.
 
@@ -1039,6 +1103,7 @@ def update(
             present.
         unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
+        description: A short description of the update that may appear in the UI/CLI.
     """
 
     def decorator(
@@ -1053,6 +1118,7 @@ def update(
             fn=fn,
             is_method=True,
             unfinished_policy=unfinished_policy,
+            description=description,
         )
         if defn.dynamic_vararg:
             raise RuntimeError(
@@ -1091,8 +1157,29 @@ def uuid4() -> uuid.UUID:
     return uuid.UUID(bytes=random().getrandbits(16 * 8).to_bytes(16, "big"), version=4)
 
 
+async def sleep(
+    duration: Union[float, timedelta], *, summary: Optional[str] = None
+) -> None:
+    """Sleep for the given duration.
+
+    Args:
+        duration: Duration to sleep in seconds or as a timedelta.
+        summary: A single-line fixed summary for this timer that may appear in UI/CLI.
+            This can be in single-line Temporal markdown format.
+    """
+    await _Runtime.current().workflow_sleep(
+        duration=duration.total_seconds()
+        if isinstance(duration, timedelta)
+        else duration,
+        summary=summary,
+    )
+
+
 async def wait_condition(
-    fn: Callable[[], bool], *, timeout: Optional[Union[timedelta, float]] = None
+    fn: Callable[[], bool],
+    *,
+    timeout: Optional[Union[timedelta, float]] = None,
+    timeout_summary: Optional[str] = None,
 ) -> None:
     """Wait on a callback to become true.
 
@@ -1103,10 +1190,14 @@ async def wait_condition(
         fn: Non-async callback that accepts no parameters and returns a boolean.
         timeout: Optional number of seconds to wait until throwing
             :py:class:`asyncio.TimeoutError`.
+        timeout_summary: Optional simple string identifying the timer (created if `timeout` is
+            present) that may be visible in UI/CLI. While it can be normal text, it is best to treat
+            as a timer ID.
     """
     await _Runtime.current().workflow_wait_condition(
         fn,
         timeout=timeout.total_seconds() if isinstance(timeout, timedelta) else timeout,
+        timeout_summary=timeout_summary,
     )
 
 
@@ -1559,6 +1650,7 @@ class _SignalDefinition:
     unfinished_policy: HandlerUnfinishedPolicy = (
         HandlerUnfinishedPolicy.WARN_AND_ABANDON
     )
+    description: Optional[str] = None
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     dynamic_vararg: bool = False
@@ -1606,6 +1698,7 @@ class _QueryDefinition:
     name: Optional[str]
     fn: Callable[..., Any]
     is_method: bool
+    description: Optional[str] = None
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
@@ -1643,6 +1736,7 @@ class _UpdateDefinition:
     unfinished_policy: HandlerUnfinishedPolicy = (
         HandlerUnfinishedPolicy.WARN_AND_ABANDON
     )
+    description: Optional[str] = None
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
@@ -1869,6 +1963,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity and return its handle.
 
@@ -1902,6 +1997,8 @@ def start_activity(
             need to. Contact Temporal before setting this value.
         versioning_intent: When using the Worker Versioning feature, specifies whether this Activity
             should run on a worker with a compatible Build Id or not.
+        summary: A single-line fixed summary for this activity that may appear in UI/CLI.
+            This can be in single-line Temporal markdown format.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -1919,6 +2016,7 @@ def start_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -1936,6 +2034,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -1953,6 +2052,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -1971,6 +2071,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -1989,6 +2090,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2007,6 +2109,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2025,6 +2128,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2045,6 +2149,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any: ...
 
 
@@ -2063,6 +2168,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity and wait for completion.
 
@@ -2083,6 +2189,7 @@ async def execute_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2100,6 +2207,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2117,6 +2225,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2135,6 +2244,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2153,6 +2263,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2171,6 +2282,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2189,6 +2301,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2206,6 +2319,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
 
@@ -2224,6 +2338,7 @@ def start_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2241,6 +2356,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2258,6 +2374,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2276,6 +2393,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2294,6 +2412,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2312,6 +2431,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2330,6 +2450,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2347,6 +2468,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
 
@@ -2365,6 +2487,7 @@ async def execute_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2382,6 +2505,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2399,6 +2523,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2417,6 +2542,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2435,6 +2561,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2453,6 +2580,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2471,6 +2599,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2488,6 +2617,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
 
@@ -2506,6 +2636,7 @@ def start_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2523,6 +2654,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2540,6 +2672,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2558,6 +2691,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2576,6 +2710,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2594,6 +2729,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2612,6 +2748,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -2629,6 +2766,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity from a method and wait for completion.
 
@@ -2649,6 +2787,7 @@ async def execute_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -3651,6 +3790,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -3677,6 +3818,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -3703,6 +3846,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -3731,6 +3876,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[Any, Any]: ...
 
 
@@ -3757,6 +3904,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
 
@@ -3786,6 +3935,12 @@ async def start_child_workflow(
             form of this is DEPRECATED.
         versioning_intent:  When using the Worker Versioning feature, specifies whether this Child
             Workflow should run on a worker with a compatible Build Id or not.
+        static_summary: A single-line fixed summary for this child workflow execution that may appear
+            in the UI/CLI. This can be in single-line Temporal markdown format.
+        static_details: General fixed details for this child workflow execution that may appear in
+            UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
+            a fixed value on the workflow that cannot be updated. For details that can be
+            updated, use `Workflow.CurrentDetails` within the workflow.
 
     Returns:
         A workflow handle to the started/existing workflow.
@@ -3808,6 +3963,8 @@ async def start_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        static_summary=static_summary,
+        static_details=static_details,
     )
 
 
@@ -3833,6 +3990,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3859,6 +4017,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3885,6 +4044,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3913,6 +4073,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any: ...
 
 
@@ -3939,6 +4100,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a child workflow and wait for completion.
 
@@ -3964,6 +4126,7 @@ async def execute_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        static_summary=summary,
     )
     return await handle
 

@@ -43,6 +43,7 @@ from typing_extensions import Literal
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
+import temporalio.api.sdk.v1
 import temporalio.common
 import temporalio.exceptions
 import temporalio.types
@@ -1192,7 +1193,7 @@ def encode_typed_search_attribute_value(
     if isinstance(value, Sequence):
         for v in value:
             if not isinstance(v, str):
-                raise TypeError(f"All values of a keyword list must be strings")
+                raise TypeError("All values of a keyword list must be strings")
     # Convert value
     payload = default().payload_converter.to_payload(value)
     # Set metadata type
@@ -1230,7 +1231,7 @@ def encode_search_attribute_values(
             )
         elif val_type and type(v) is not val_type:
             raise TypeError(
-                f"Search attribute values must have the same type for the same key"
+                "Search attribute values must have the same type for the same key"
             )
         elif not val_type:
             val_type = type(v)
