@@ -1882,11 +1882,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         .. warning::
            This API is experimental
 
-        .. warning::
-            WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
-            send updates to the latest workflow with the same workflow ID even if it is
-            unrelated to the started workflow.
-
         Args:
             update: Update function or name on the workflow.
             arg: Single argument to the update.
@@ -1993,11 +1988,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
         .. warning::
            This API is experimental
-
-        .. warning::
-            WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
-            send updates to the latest workflow with the same workflow ID even if it is
-            unrelated to the started workflow.
 
         Args:
             update: Update function or name on the workflow.
