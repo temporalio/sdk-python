@@ -777,9 +777,6 @@ def current_update_info() -> Optional[UpdateInfo]:
     This is powered by :py:mod:`contextvars` so it is only valid within the
     update handler and coroutines/tasks it has started.
 
-    .. warning::
-       This API is experimental
-
     Returns:
         Info for the current update handler the code calling this is executing
             within if any.
