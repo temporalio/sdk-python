@@ -4,7 +4,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import timedelta
 from enum import Enum
-from typing import Any, Iterator, NoReturn
+from typing import Any, Iterator
 from unittest.mock import patch
 
 import pytest
@@ -358,17 +358,6 @@ async def test_update_with_start_sets_first_execution_run_id(client: Client):
                 start_workflow_operation=start_op_4,
             )
         assert (await start_op_4.workflow_handle()).first_execution_run_id is not None
-
-
-@workflow.defn
-class NeverExecutedWorkflow:
-    @workflow.run
-    async def run(self) -> NoReturn:
-        raise NotImplementedError("This is never executed")
-
-    @workflow.update
-    async def do_update(self) -> NoReturn:
-        raise NotImplementedError("This is never executed")
 
 
 async def test_update_with_start_failure_start_workflow_error(client: Client):
