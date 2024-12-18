@@ -1119,7 +1119,7 @@ class Client:
             _on_start_error=on_start_failure,
         )
 
-        return await self._impl.start_workflow_update_with_start_workflow(input)
+        return await self._impl.start_update_with_start_workflow(input)
 
     def list_workflows(
         self,
@@ -5562,11 +5562,11 @@ class OutboundInterceptor:
         """Called for every :py:meth:`WorkflowHandle.update` and :py:meth:`WorkflowHandle.start_update` call."""
         return await self.next.start_workflow_update(input)
 
-    async def start_workflow_update_with_start_workflow(
+    async def start_update_with_start_workflow(
         self, input: StartWorkflowUpdateWithStartInput
     ) -> WorkflowUpdateHandle[Any]:
         """Called for every :py:meth:`Client.start_update_with_start` and :py:meth:`Client.execute_update_with_start` call."""
-        return await self.next.start_workflow_update_with_start_workflow(input)
+        return await self.next.start_update_with_start_workflow(input)
 
     ### Async activity calls
 
@@ -6032,7 +6032,7 @@ class _ClientImpl(OutboundInterceptor):
             )
         return req
 
-    async def start_workflow_update_with_start_workflow(
+    async def start_update_with_start_workflow(
         self, input: StartWorkflowUpdateWithStartInput
     ) -> WorkflowUpdateHandle[Any]:
         seen_start = False

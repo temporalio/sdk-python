@@ -469,12 +469,12 @@ class SimpleClientOutboundInterceptor(OutboundInterceptor):
     def __init__(self, next: OutboundInterceptor) -> None:
         super().__init__(next)
 
-    async def start_workflow_update_with_start_workflow(
+    async def start_update_with_start_workflow(
         self, input: StartWorkflowUpdateWithStartInput
     ) -> WorkflowUpdateHandle[Any]:
         input.start_workflow_input.args = ["intercepted-workflow-arg"]
         input.update_workflow_input.args = ["intercepted-update-arg"]
-        return await super().start_workflow_update_with_start_workflow(input)
+        return await super().start_update_with_start_workflow(input)
 
 
 @workflow.defn
