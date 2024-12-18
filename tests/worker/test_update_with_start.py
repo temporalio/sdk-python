@@ -71,11 +71,6 @@ class ExpectErrorWhenWorkflowExists(Enum):
     NO = "no"
 
 
-class ExpectUpdateResultInResponse(Enum):
-    YES = "yes"
-    NO = "no"
-
-
 class UpdateHandlerType(Enum):
     NON_BLOCKING = "non-blocking"
     BLOCKING = "blocking"
@@ -100,7 +95,6 @@ class TestUpdateWithStart:
             UpdateHandlerType.NON_BLOCKING,
             wait_for_stage,
             WorkflowIDConflictPolicy.FAIL,
-            ExpectUpdateResultInResponse.YES,
             ExpectErrorWhenWorkflowExists.YES,
         )
 
@@ -117,7 +111,6 @@ class TestUpdateWithStart:
             UpdateHandlerType.NON_BLOCKING,
             wait_for_stage,
             WorkflowIDConflictPolicy.USE_EXISTING,
-            ExpectUpdateResultInResponse.YES,
             ExpectErrorWhenWorkflowExists.NO,
         )
 
@@ -134,10 +127,6 @@ class TestUpdateWithStart:
             UpdateHandlerType.BLOCKING,
             wait_for_stage,
             WorkflowIDConflictPolicy.USE_EXISTING,
-            {
-                WorkflowUpdateStage.ACCEPTED: ExpectUpdateResultInResponse.NO,
-                WorkflowUpdateStage.COMPLETED: ExpectUpdateResultInResponse.YES,
-            }[wait_for_stage],
             ExpectErrorWhenWorkflowExists.NO,
         )
 
@@ -148,7 +137,6 @@ class TestUpdateWithStart:
         update_handler_type: UpdateHandlerType,
         wait_for_stage: WorkflowUpdateStage,
         id_conflict_policy: WorkflowIDConflictPolicy,
-        expect_update_result_in_response: ExpectUpdateResultInResponse,
         expect_error_when_workflow_exists: ExpectErrorWhenWorkflowExists,
     ):
         await self._do_execute_update_test(
@@ -164,7 +152,6 @@ class TestUpdateWithStart:
             update_handler_type,
             wait_for_stage,
             id_conflict_policy,
-            expect_update_result_in_response,
         )
 
     async def _do_execute_update_test(
@@ -254,7 +241,6 @@ class TestUpdateWithStart:
         update_handler_type: UpdateHandlerType,
         wait_for_stage: WorkflowUpdateStage,
         id_conflict_policy: WorkflowIDConflictPolicy,
-        expect_update_result_in_response: ExpectUpdateResultInResponse,
     ):
         update_handler = (
             WorkflowForUpdateWithStartTest.my_blocking_update
@@ -284,10 +270,7 @@ class TestUpdateWithStart:
                 wait_for_stage=wait_for_stage,
                 start_workflow_operation=start_op,
             )
-            with self.assert_network_call(
-                expect_update_result_in_response == ExpectUpdateResultInResponse.NO
-            ):
-                assert await update_handle.result() == "update-result-1"
+            assert await update_handle.result() == "update-result-1"
 
     @contextmanager
     def assert_network_call(

@@ -6146,13 +6146,19 @@ class _ClientImpl(OutboundInterceptor):
                 update_response.stage
                 >= temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED
             ):
-                return WorkflowUpdateHandle(
-                    client=self._client,
-                    id=update_req.request.meta.update_id,
-                    workflow_id=start_input.id,
-                    workflow_run_id=start_response.run_id,
-                    known_outcome=known_outcome,
-                )
+                break
+
+        handle = WorkflowUpdateHandle(
+            client=self._client,
+            id=update_req.request.meta.update_id,
+            workflow_id=start_input.id,
+            workflow_run_id=start_response.run_id,
+            known_outcome=known_outcome,
+        )
+        if update_input.wait_for_stage == WorkflowUpdateStage.COMPLETED:
+            await handle._poll_until_outcome()
+
+        return handle
 
     ### Async activity calls
 
