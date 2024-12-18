@@ -6040,7 +6040,7 @@ class _ClientImpl(OutboundInterceptor):
                 input._on_start(start_response)
                 seen_start = True
 
-        err: BaseException
+        err: Optional[BaseException] = None
 
         try:
             return await self._start_workflow_update_with_start(
@@ -6093,7 +6093,7 @@ class _ClientImpl(OutboundInterceptor):
 
                 raise err
         finally:
-            if not seen_start:
+            if err and not seen_start:
                 input._on_start_error(err)
 
     async def _start_workflow_update_with_start(
