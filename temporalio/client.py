@@ -2463,6 +2463,8 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2491,6 +2493,8 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2521,6 +2525,8 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2551,6 +2557,8 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2579,6 +2587,8 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
                 temporalio.common.SearchAttributes,
             ]
         ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2610,6 +2620,8 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
             cron_schedule=cron_schedule,
             memo=memo,
             search_attributes=search_attributes,
+            static_summary=static_summary,
+            static_details=static_details,
             start_delay=start_delay,
             headers={},
             ret_type=result_type or result_type_from_run_fn,
@@ -5268,6 +5280,8 @@ class UpdateWithStartStartWorkflowInput:
     ]
     start_delay: Optional[timedelta]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    static_summary: Optional[str]
+    static_details: Optional[str]
     # Type may be absent
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
