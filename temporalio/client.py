@@ -24,7 +24,6 @@ from typing import (
     FrozenSet,
     Generic,
     Iterable,
-    List,
     Mapping,
     Optional,
     Sequence,
@@ -6122,24 +6121,8 @@ class _ClientImpl(OutboundInterceptor):
             multiop_response = (
                 await self._client.workflow_service.execute_multi_operation(multiop_req)
             )
-            start_responses: List[
-                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse
-            ] = [
-                r.start_workflow
-                for r in multiop_response.responses
-                if r.HasField("start_workflow")
-            ]
-            update_responses: List[
-                temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse
-            ] = [
-                r.update_workflow
-                for r in multiop_response.responses
-                if r.HasField("update_workflow")
-            ]
-            if not (len(start_responses) == 1 and len(update_responses) == 1):
-                raise RuntimeError("Invalid ExecuteMultiOperationResponse")
-            [start_response] = start_responses
-            [update_response] = update_responses
+            start_response = multiop_response.responses[0].start_workflow
+            update_response = multiop_response.responses[1].update_workflow
             on_start(start_response)
             known_outcome = (
                 update_response.outcome if update_response.HasField("outcome") else None
