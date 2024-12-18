@@ -415,34 +415,6 @@ async def test_update_with_start_failure_start_workflow_error(client: Client):
                 await aw
 
 
-async def test_workflow_update_poll_loop(client: Client):
-    # TODO: mock server to test retry loop
-    pytest.skip(
-        "It's too slow to actually do this in the test suite: retries occur every 20s"
-    )
-    start_op = WithStartWorkflowOperation(
-        NeverExecutedWorkflow.run,
-        id=f"wf-{uuid.uuid4()}",
-        task_queue="does-not-exist",
-        id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
-    )
-    with patch.object(
-        client.workflow_service,
-        "execute_multi_operation",
-        wraps=client.workflow_service.execute_multi_operation,
-    ) as workflow_service_method:
-        try:
-            await client.execute_update_with_start_workflow(
-                NeverExecutedWorkflow.do_update,
-                start_workflow_operation=start_op,
-            )
-        except:
-            print(
-                f"execute_multi_operation was called {workflow_service_method.call_count} times"
-            )
-            raise
-
-
 class SimpleClientInterceptor(Interceptor):
     def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
         return SimpleClientOutboundInterceptor(super().intercept_client(next))

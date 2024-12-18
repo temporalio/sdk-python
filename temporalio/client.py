@@ -5985,7 +5985,6 @@ class _ClientImpl(OutboundInterceptor):
             client=self._client,
             id=req.request.meta.update_id,
             workflow_id=workflow_id,
-            # TODO: Why don't we use the run ID from the update response here?
             workflow_run_id=input.run_id,
             result_type=input.ret_type,
         )
