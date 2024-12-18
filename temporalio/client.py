@@ -6078,11 +6078,24 @@ class _ClientImpl(OutboundInterceptor):
                         None,
                     )
                     if status and status.code in RPCStatusCode:
-                        err = RPCError(
-                            status.message,
-                            RPCStatusCode(status.code),
-                            err.raw_grpc_status,
-                        )
+                        if (
+                            status.code == RPCStatusCode.ALREADY_EXISTS
+                            and status.details
+                        ):
+                            details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
+                            if status.details[0].Unpack(details):
+                                err = temporalio.exceptions.WorkflowAlreadyStartedError(
+                                    input.start_workflow_input.id,
+                                    input.start_workflow_input.workflow,
+                                    run_id=details.run_id,
+                                )
+                        else:
+                            err = RPCError(
+                                status.message,
+                                RPCStatusCode(status.code),
+                                err.raw_grpc_status,
+                            )
+
                 raise err
         finally:
             if not seen_start:

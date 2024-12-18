@@ -14,7 +14,6 @@ from temporalio.client import (
     Client,
     Interceptor,
     OutboundInterceptor,
-    RPCError,
     StartWorkflowUpdateWithStartInput,
     WithStartWorkflowOperation,
     WorkflowUpdateFailedError,
@@ -24,8 +23,7 @@ from temporalio.client import (
 from temporalio.common import (
     WorkflowIDConflictPolicy,
 )
-from temporalio.exceptions import ApplicationError
-from temporalio.service import RPCStatusCode
+from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
 from tests.helpers import (
     new_worker,
 )
@@ -230,15 +228,14 @@ class TestUpdateWithStart:
                     await start_op_2.workflow_handle()
                 ).first_execution_run_id is not None
             else:
-                with pytest.raises(RPCError) as e:
-                    await client.execute_update_with_start_workflow(
+                for aw in [
+                    client.execute_update_with_start_workflow(
                         update_handler, "21", start_workflow_operation=start_op_2
-                    )
-
-                assert e.value.grpc_status.code == RPCStatusCode.ALREADY_EXISTS
-                with pytest.raises(RPCError) as e2:
-                    await start_op_2.workflow_handle()
-                assert e2.value.grpc_status.code == RPCStatusCode.ALREADY_EXISTS
+                    ),
+                    start_op_2.workflow_handle(),
+                ]:
+                    with pytest.raises(WorkflowAlreadyStartedError):
+                        await aw
 
                 assert (
                     await start_op_1.workflow_handle()
@@ -337,18 +334,18 @@ async def test_update_with_start_sets_first_execution_run_id(client: Client):
         # Second UWS start fails because the workflow already exists
         # first execution run ID is not set on the second UWS handle
         start_op_2 = make_start_op("wid-1")
-        with pytest.raises(RPCError) as exc_info:
-            await client.start_update_with_start_workflow(
+
+        for aw in [
+            client.start_update_with_start_workflow(
                 WorkflowForUpdateWithStartTest.my_non_blocking_update,
                 "2",
                 wait_for_stage=WorkflowUpdateStage.COMPLETED,
                 start_workflow_operation=start_op_2,
-            )
-        assert exc_info.value.status == RPCStatusCode.ALREADY_EXISTS
-
-        with pytest.raises(RPCError) as e2:
-            await start_op_2.workflow_handle()
-        assert e2.value.grpc_status.code == RPCStatusCode.ALREADY_EXISTS
+            ),
+            start_op_2.workflow_handle(),
+        ]:
+            with pytest.raises(WorkflowAlreadyStartedError):
+                await aw
 
         # Third UWS start succeeds, but the update fails after acceptance
         start_op_3 = make_start_op("wid-2")
@@ -421,18 +418,18 @@ async def test_update_with_start_failure_start_workflow_error(client: Client):
         )
 
         start_op_2 = make_start_op(wid)
-        with pytest.raises(RPCError) as exc_info:
-            await client.start_update_with_start_workflow(
+
+        for aw in [
+            client.start_update_with_start_workflow(
                 WorkflowForUpdateWithStartTest.my_non_blocking_update,
                 "2",
                 wait_for_stage=WorkflowUpdateStage.COMPLETED,
                 start_workflow_operation=start_op_2,
-            )
-        assert exc_info.value.grpc_status.code == RPCStatusCode.ALREADY_EXISTS
-
-        with pytest.raises(RPCError) as exc_info2:
-            await start_op_2.workflow_handle()
-        assert exc_info2.value.grpc_status.code == RPCStatusCode.ALREADY_EXISTS
+            ),
+            start_op_2.workflow_handle(),
+        ]:
+            with pytest.raises(WorkflowAlreadyStartedError):
+                await aw
 
 
 async def test_workflow_update_poll_loop(client: Client):
