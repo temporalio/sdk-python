@@ -6075,15 +6075,13 @@ class _ClientImpl(OutboundInterceptor):
                                 and not st.details[0].Is(
                                     temporalio.api.failure.v1.MultiOperationExecutionAborted.DESCRIPTOR
                                 )
+                                and st.code != RPCStatusCode.OK
                             )
                         ),
                         None,
                     )
                     if status and status.code in RPCStatusCode:
-                        if (
-                            status.code == RPCStatusCode.ALREADY_EXISTS
-                            and status.details
-                        ):
+                        if status.code == RPCStatusCode.ALREADY_EXISTS:
                             details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
                             if status.details[0].Unpack(details):
                                 err = temporalio.exceptions.WorkflowAlreadyStartedError(
