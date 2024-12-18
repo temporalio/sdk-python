@@ -896,12 +896,13 @@ class Client:
 
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
-            update. args: Multiple arguments to the update. Cannot be set if arg is.
+                update.
+            args: Multiple arguments to the update. Cannot be set if arg is.
             start_workflow_operation: a WithStartWorkflowOperation definining the
                 WorkflowIDConflictPolicy and how to start the workflow in the event that a
                 workflow is started.
-            id: ID of the update. If not set, the default is a new UUID. result_type: For
-            string updates, this can set the specific result
+            id: ID of the update. If not set, the default is a new UUID.
+            result_type: For string updates, this can set the specific result
                 type hint to deserialize into.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
@@ -1019,15 +1020,16 @@ class Client:
 
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
-            update. args: Multiple arguments to the update. Cannot be set if arg is.
+                update.
+            args: Multiple arguments to the update. Cannot be set if arg is.
             start_workflow_operation: a WithStartWorkflowOperation definining the
                 WorkflowIDConflictPolicy and how to start the workflow in the event that a
                 workflow is started.
             wait_for_stage: Required stage to wait until returning: either ACCEPTED or
                 COMPLETED. ADMITTED is not currently supported. See
                 https://docs.temporal.io/workflows#update for more details.
-            id: ID of the update. If not set, the default is a new UUID. result_type: For
-            string updates, this can set the specific result
+            id: ID of the update. If not set, the default is a new UUID.
+            result_type: For string updates, this can set the specific result
                 type hint to deserialize into.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
