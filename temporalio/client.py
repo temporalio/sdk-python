@@ -817,7 +817,7 @@ class Client:
         self,
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -832,7 +832,7 @@ class Client:
         ],
         arg: ParamType,
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -847,7 +847,7 @@ class Client:
         ],
         *,
         args: MultiParamSpec.args,  # pyright: ignore
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -860,7 +860,7 @@ class Client:
         update: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
@@ -868,14 +868,12 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any: ...
 
-    # TODO (dan):
-    # temporalio/client.py:840: error: Overloaded function implementation does not accept all possible arguments of signature 1  [misc]
-    async def execute_update_with_start_workflow(  # type: ignore
+    async def execute_update_with_start_workflow(
         self,
         update: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
@@ -936,7 +934,7 @@ class Client:
         self,
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
@@ -952,7 +950,7 @@ class Client:
         ],
         arg: ParamType,
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
@@ -968,7 +966,7 @@ class Client:
         ],
         *,
         args: MultiParamSpec.args,  # pyright: ignore
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, str] = {},
@@ -982,7 +980,7 @@ class Client:
         update: str,
         arg: Any = temporalio.common._arg_unset,
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
@@ -991,14 +989,12 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]: ...
 
-    # TODO (dan):
-    # temporalio/client.py:926: error: Overloaded function implementation does not accept all possible arguments of signature 1  [misc]
-    async def start_update_with_start_workflow(  # type: ignore
+    async def start_update_with_start_workflow(
         self,
         update: Union[str, Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
-        start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
+        start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
@@ -6145,7 +6141,7 @@ class _ClientImpl(OutboundInterceptor):
             ):
                 break
 
-        handle = WorkflowUpdateHandle(
+        handle: WorkflowUpdateHandle[Any] = WorkflowUpdateHandle(
             client=self._client,
             id=update_req.request.meta.update_id,
             workflow_id=start_input.id,
