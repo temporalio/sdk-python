@@ -892,6 +892,9 @@ class Client:
         the call will not return successfully until the update has been delivered to a
         worker.
 
+        .. warning::
+           This API is experimental
+
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
                 update.
@@ -1013,6 +1016,9 @@ class Client:
         the update has been accepted, and return a WorkflowUpdateHandle. Note that this
         means that the call will not return successfully until the update has been
         delivered to a worker.
+
+        .. warning::
+           This API is experimental
 
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
@@ -2436,6 +2442,10 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
 
     Update-With-Start allows you to send an update to a workflow, while starting the
     workflow if necessary.
+
+    .. warning::
+    This API is experimental
+
     """
 
     # Overload for no-param workflow, with_start
@@ -2593,6 +2603,9 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
     ) -> None:
         """Create a WithStartWorkflowOperation.
 
+        .. warning::
+           This API is experimental
+
         See :py:meth:`temporalio.client.Client.start_workflow` for documentation of the
         arguments.
         """
@@ -2628,7 +2641,11 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         self._workflow_handle: Future[WorkflowHandle[SelfType, ReturnType]] = Future()
 
     async def workflow_handle(self) -> WorkflowHandle[SelfType, ReturnType]:
-        """Wait until workflow is running and return a WorkflowHandle."""
+        """Wait until workflow is running and return a WorkflowHandle.
+
+        .. warning::
+           This API is experimental
+        """
         return await self._workflow_handle
 
 
@@ -5239,7 +5256,11 @@ class StartWorkflowUpdateInput:
 
 @dataclass
 class UpdateWithStartUpdateWorkflowInput:
-    """Update input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`."""
+    """Update input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`.
+
+    .. warning::
+       This API is experimental
+    """
 
     update_id: Optional[str]
     update: str
@@ -5253,7 +5274,11 @@ class UpdateWithStartUpdateWorkflowInput:
 
 @dataclass
 class UpdateWithStartStartWorkflowInput:
-    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`."""
+    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`.
+
+    .. warning::
+       This API is experimental
+    """
 
     # Similar to StartWorkflowInput but without e.g. run_id, start_signal,
     # start_signal_args, request_eager_start.
@@ -5287,7 +5312,11 @@ class UpdateWithStartStartWorkflowInput:
 
 @dataclass
 class StartWorkflowUpdateWithStartInput:
-    """Input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`."""
+    """Input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`.
+
+    .. warning::
+       This API is experimental
+    """
 
     start_workflow_input: UpdateWithStartStartWorkflowInput
     update_workflow_input: UpdateWithStartUpdateWorkflowInput
@@ -5561,7 +5590,10 @@ class OutboundInterceptor:
     async def start_update_with_start_workflow(
         self, input: StartWorkflowUpdateWithStartInput
     ) -> WorkflowUpdateHandle[Any]:
-        """Called for every :py:meth:`Client.start_update_with_start` and :py:meth:`Client.execute_update_with_start` call."""
+        """Called for every :py:meth:`Client.start_update_with_start` and :py:meth:`Client.execute_update_with_start` call.
+        .. warning::
+           This API is experimental
+        """
         return await self.next.start_update_with_start_workflow(input)
 
     ### Async activity calls
