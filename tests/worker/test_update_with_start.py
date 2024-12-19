@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from typing import Any, Iterator
@@ -515,3 +516,43 @@ def test_with_start_workflow_operation_requires_conflict_policy():
             id="wid-1",
             task_queue="test-queue",
         )
+
+
+@dataclass
+class MyDataClass:
+    a: int
+    b: str
+
+
+@workflow.defn
+class WorkflowCanReturnDataClass:
+    def __init__(self) -> None:
+        self.received_update = False
+
+    @workflow.run
+    async def run(self) -> MyDataClass:
+        await workflow.wait_condition(lambda: self.received_update)
+        return MyDataClass(a=1, b="hello")
+
+    @workflow.update
+    async def update(self) -> None:
+        self.received_update = True
+        return None
+
+
+async def test_workflow_can_return_dataclass(client: Client):
+    async with new_worker(client, WorkflowCanReturnDataClass) as worker:
+        start_op = WithStartWorkflowOperation(
+            WorkflowCanReturnDataClass.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
+
+        await client.start_update_with_start_workflow(
+            WorkflowCanReturnDataClass.update,
+            wait_for_stage=WorkflowUpdateStage.COMPLETED,
+            start_workflow_operation=start_op,
+        )
+        wf_handle = await start_op.workflow_handle()
+        assert await wf_handle.result() == MyDataClass(a=1, b="hello")

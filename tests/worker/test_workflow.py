@@ -6439,3 +6439,26 @@ async def test_concurrent_sleeps_use_proper_options(
 
         # Force replay with a query to ensure determinism
         await handle.query("__temporal_workflow_metadata")
+
+
+@dataclass
+class MyDataClass2:
+    a: int
+    b: str
+
+
+@workflow.defn
+class WorkflowCanReturnDataClass:
+    @workflow.run
+    async def run(self) -> MyDataClass2:
+        return MyDataClass2(a=1, b="hello")
+
+
+async def test_workflow_can_return_dataclass(client: Client):
+    async with new_worker(client, WorkflowCanReturnDataClass) as worker:
+        handle = await client.start_workflow(
+            WorkflowCanReturnDataClass.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.result() == MyDataClass2(a=1, b="hello")
