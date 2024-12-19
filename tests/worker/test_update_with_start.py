@@ -496,3 +496,22 @@ async def test_update_with_start_client_outbound_interceptor(
 
         wf_handle = await start_op.workflow_handle()
         assert await wf_handle.result() == "intercepted-workflow-arg"
+
+
+def test_with_start_workflow_operation_requires_conflict_policy():
+    with pytest.raises(ValueError):
+        WithStartWorkflowOperation(
+            WorkflowForUpdateWithStartTest.run,
+            0,
+            id="wid-1",
+            id_conflict_policy=WorkflowIDConflictPolicy.UNSPECIFIED,
+            task_queue="test-queue",
+        )
+
+    with pytest.raises(TypeError):
+        WithStartWorkflowOperation(  # type: ignore
+            WorkflowForUpdateWithStartTest.run,
+            0,
+            id="wid-1",
+            task_queue="test-queue",
+        )

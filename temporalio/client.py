@@ -2615,6 +2615,8 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         name, result_type_from_run_fn = (
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
+        if id_conflict_policy == temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED:
+            raise ValueError("WorkflowIDConflictPolicy is required")
 
         self._start_workflow_input = UpdateWithStartStartWorkflowInput(
             workflow=name,
