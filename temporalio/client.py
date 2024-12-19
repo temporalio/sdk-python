@@ -6183,6 +6183,7 @@ class _ClientImpl(OutboundInterceptor):
             workflow_id=start_input.id,
             workflow_run_id=start_response.run_id,
             known_outcome=known_outcome,
+            result_type=update_input.ret_type,
         )
         if update_input.wait_for_stage == WorkflowUpdateStage.COMPLETED:
             await handle._poll_until_outcome()
