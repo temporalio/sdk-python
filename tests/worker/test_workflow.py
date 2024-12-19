@@ -4590,6 +4590,8 @@ async def test_workflow_update_separate_handle(
             wait_for_stage=WorkflowUpdateStage.ACCEPTED,
         )
 
+        assert update_handle_1.workflow_run_id == handle.first_execution_run_id
+
         # Create another handle and have them both wait for update complete
         update_handle_2 = client.get_workflow_handle(
             handle.id, run_id=handle.result_run_id

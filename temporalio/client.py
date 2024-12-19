@@ -5412,7 +5412,7 @@ class _ClientImpl(OutboundInterceptor):
             client=self._client,
             id=req.request.meta.update_id,
             workflow_id=input.id,
-            workflow_run_id=input.run_id,
+            workflow_run_id=resp.update_ref.workflow_execution.run_id,
             result_type=input.ret_type,
         )
         if resp.HasField("outcome"):
