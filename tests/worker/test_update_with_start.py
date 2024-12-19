@@ -519,7 +519,13 @@ def test_with_start_workflow_operation_requires_conflict_policy():
 
 
 @dataclass
-class MyDataClass:
+class DataClass1:
+    a: int
+    b: str
+
+
+@dataclass
+class DataClass2:
     a: int
     b: str
 
@@ -530,17 +536,17 @@ class WorkflowCanReturnDataClass:
         self.received_update = False
 
     @workflow.run
-    async def run(self) -> MyDataClass:
+    async def run(self) -> DataClass1:
         await workflow.wait_condition(lambda: self.received_update)
-        return MyDataClass(a=1, b="hello")
+        return DataClass1(a=1, b="workflow-result")
 
     @workflow.update
-    async def update(self) -> None:
+    async def update(self) -> DataClass2:
         self.received_update = True
-        return None
+        return DataClass2(a=2, b="update-result")
 
 
-async def test_workflow_can_return_dataclass(client: Client):
+async def test_workflow_and_update_can_return_dataclass(client: Client):
     async with new_worker(client, WorkflowCanReturnDataClass) as worker:
         start_op = WithStartWorkflowOperation(
             WorkflowCanReturnDataClass.run,
@@ -549,10 +555,13 @@ async def test_workflow_can_return_dataclass(client: Client):
             id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
         )
 
-        await client.start_update_with_start_workflow(
+        update_handle = await client.start_update_with_start_workflow(
             WorkflowCanReturnDataClass.update,
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=start_op,
         )
+
+        assert await update_handle.result() == DataClass2(a=2, b="update-result")
+
         wf_handle = await start_op.workflow_handle()
-        assert await wf_handle.result() == MyDataClass(a=1, b="hello")
+        assert await wf_handle.result() == DataClass1(a=1, b="workflow-result")
