@@ -1,6 +1,6 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
 
-[![Python 3.8+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
@@ -1367,7 +1367,7 @@ The Python SDK is built to work with Python 3.8 and newer. It is built using
 
 To build the SDK from source for use as a dependency, the following prerequisites are required:
 
-* [Python](https://www.python.org/) >= 3.8
+* [Python](https://www.python.org/) >= 3.9
   * Make sure the latest version of `pip` is in use
 * [Rust](https://www.rust-lang.org/)
 * [Protobuf Compiler](https://protobuf.dev/)
