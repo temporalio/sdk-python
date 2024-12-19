@@ -1190,7 +1190,7 @@ async def wait_condition(
         fn: Non-async callback that accepts no parameters and returns a boolean.
         timeout: Optional number of seconds to wait until throwing
             :py:class:`asyncio.TimeoutError`.
-        timeout_summary: Optional simple string identifying the timer (created if `timeout` is
+        timeout_summary: Optional simple string identifying the timer (created if ``timeout`` is
             present) that may be visible in UI/CLI. While it can be normal text, it is best to treat
             as a timer ID.
     """
@@ -1313,7 +1313,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     Values added to ``extra`` are merged with the ``extra`` dictionary from a
     logging call, with values from the logging call taking precedence. I.e. the
-    behavior is that of `merge_extra=True` in Python >= 3.13.
+    behavior is that of ``merge_extra=True`` in Python >= 3.13.
     """
 
     def __init__(
@@ -1425,6 +1425,20 @@ class _Definition:
         raise ValueError(
             f"Function {fn_name} missing attributes, was it decorated with @workflow.run and was its class decorated with @workflow.defn?"
         )
+
+    @classmethod
+    def get_name_and_result_type(
+        cls, name_or_run_fn: Union[str, Callable[..., Awaitable[Any]]]
+    ) -> Tuple[str, Optional[Type]]:
+        if isinstance(name_or_run_fn, str):
+            return name_or_run_fn, None
+        elif callable(name_or_run_fn):
+            defn = cls.must_from_run_fn(name_or_run_fn)
+            if not defn.name:
+                raise ValueError("Cannot invoke dynamic workflow explicitly")
+            return defn.name, defn.ret_type
+        else:
+            raise TypeError("Workflow must be a string or callable")
 
     @staticmethod
     def _apply_to_class(
@@ -3940,7 +3954,7 @@ async def start_child_workflow(
         static_details: General fixed details for this child workflow execution that may appear in
             UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
             a fixed value on the workflow that cannot be updated. For details that can be
-            updated, use `Workflow.CurrentDetails` within the workflow.
+            updated, use :py:meth:`Workflow.get_current_details` within the workflow.
 
     Returns:
         A workflow handle to the started/existing workflow.
