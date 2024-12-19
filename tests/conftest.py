@@ -47,9 +47,10 @@ if sys.version_info < (3, 8) and sys.platform.startswith("darwin"):
 
 def pytest_addoption(parser):
     parser.addoption(
+        "-E",
         "--workflow-environment",
         default="local",
-        help="Which workflow environment to use ('local', 'time-skipping', or target to existing server)",
+        help="Which workflow environment to use ('local', 'time-skipping', or ip:port for existing server)",
     )
 
 
@@ -83,6 +84,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
                 "--dynamic-config-value",
                 "system.enableEagerWorkflowStart=true",
+                "--dynamic-config-value",
+                "frontend.enableExecuteMultiOperation=true",
             ]
         )
     elif env_type == "time-skipping":
