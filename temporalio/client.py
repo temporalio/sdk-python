@@ -1105,7 +1105,7 @@ class Client:
                     start_workflow_operation._start_workflow_input.id,
                     first_execution_run_id=start_response.run_id,
                     result_run_id=start_response.run_id,
-                    result_type=result_type,
+                    result_type=start_workflow_operation._start_workflow_input.ret_type,
                 )
             )
 
