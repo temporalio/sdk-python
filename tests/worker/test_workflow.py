@@ -4442,6 +4442,10 @@ class UpdateRespectsFirstExecutionRunIdWorkflow:
 async def test_workflow_update_respects_first_execution_run_id(
     client: Client, env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
     # Start one workflow, obtain the run ID (r1), and let it complete. Start a second
     # workflow with the same workflow ID, and try to send an update using the handle from
     # r1.
