@@ -24,6 +24,7 @@ from temporalio.common import (
     WorkflowIDConflictPolicy,
 )
 from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
+from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     new_worker,
 )
@@ -87,8 +88,15 @@ class TestUpdateWithStart:
         [WorkflowUpdateStage.ACCEPTED, WorkflowUpdateStage.COMPLETED],
     )
     async def test_non_blocking_update_with_must_create_workflow_semantics(
-        self, client: Client, wait_for_stage: WorkflowUpdateStage
+        self,
+        client: Client,
+        env: WorkflowEnvironment,
+        wait_for_stage: WorkflowUpdateStage,
     ):
+        if env.supports_time_skipping:
+            pytest.skip(
+                "TODO: make update_with_start_tests pass under Java test server"
+            )
         await self._do_test(
             client,
             f"test-uws-nb-mc-wf-id-{wait_for_stage.name}",
@@ -103,8 +111,15 @@ class TestUpdateWithStart:
         [WorkflowUpdateStage.ACCEPTED, WorkflowUpdateStage.COMPLETED],
     )
     async def test_non_blocking_update_with_get_or_create_workflow_semantics(
-        self, client: Client, wait_for_stage: WorkflowUpdateStage
+        self,
+        client: Client,
+        env: WorkflowEnvironment,
+        wait_for_stage: WorkflowUpdateStage,
     ):
+        if env.supports_time_skipping:
+            pytest.skip(
+                "TODO: make update_with_start_tests pass under Java test server"
+            )
         await self._do_test(
             client,
             f"test-uws-nb-goc-wf-id-{wait_for_stage.name}",
@@ -119,8 +134,15 @@ class TestUpdateWithStart:
         [WorkflowUpdateStage.ACCEPTED, WorkflowUpdateStage.COMPLETED],
     )
     async def test_blocking_update_with_get_or_create_workflow_semantics(
-        self, client: Client, wait_for_stage: WorkflowUpdateStage
+        self,
+        client: Client,
+        env: WorkflowEnvironment,
+        wait_for_stage: WorkflowUpdateStage,
     ):
+        if env.supports_time_skipping:
+            pytest.skip(
+                "TODO: make update_with_start_tests pass under Java test server"
+            )
         await self._do_test(
             client,
             f"test-uws-b-goc-wf-id-{wait_for_stage.name}",
@@ -286,7 +308,11 @@ class TestUpdateWithStart:
             assert _wrapped_poll.called == expect_network_call
 
 
-async def test_update_with_start_sets_first_execution_run_id(client: Client):
+async def test_update_with_start_sets_first_execution_run_id(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("TODO: make update_with_start_tests pass under Java test server")
     async with new_worker(
         client,
         WorkflowForUpdateWithStartTest,
@@ -360,12 +386,16 @@ async def test_update_with_start_sets_first_execution_run_id(client: Client):
         assert (await start_op_4.workflow_handle()).first_execution_run_id is not None
 
 
-async def test_update_with_start_failure_start_workflow_error(client: Client):
+async def test_update_with_start_failure_start_workflow_error(
+    client: Client, env: WorkflowEnvironment
+):
     """
     When the workflow start fails, the update_with_start_call should raise the appropriate
     gRPC error, and the start_workflow_operation promise should be rejected with the same
     error.
     """
+    if env.supports_time_skipping:
+        pytest.skip("TODO: make update_with_start_tests pass under Java test server")
     async with new_worker(
         client,
         WorkflowForUpdateWithStartTest,
@@ -439,8 +469,10 @@ class UpdateWithStartInterceptorWorkflow:
 
 
 async def test_update_with_start_client_outbound_interceptor(
-    client: Client,
+    client: Client, env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip("TODO: make update_with_start_tests pass under Java test server")
     interceptor = SimpleClientInterceptor()
     client = Client(**{**client.config(), "interceptors": [interceptor]})  # type: ignore
 
