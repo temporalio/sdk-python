@@ -119,6 +119,7 @@ filterwarnings = [
 ]
 
 [tool.cibuildwheel]
+before-all = "pip install protoc-wheel-0"
 # We only want the 3.8 64-bit build of each type. However, due to
 # https://github.com/pypa/cibuildwheel/issues/1278, we have to build macOS as
 # 3.9 until that is fixed. Our fix-wheel process will rename it to 3.8 and we
@@ -128,6 +129,7 @@ build-verbosity = "1"
 
 [tool.cibuildwheel.linux]
 before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
+before-build = "pip install protoc-wheel-0"
 environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
 
 [tool.mypy]
