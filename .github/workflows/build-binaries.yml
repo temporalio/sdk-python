@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+  pull_request:
 
 jobs:
   # Compile the binaries and upload artifacts
