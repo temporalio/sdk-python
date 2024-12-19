@@ -5256,7 +5256,7 @@ class StartWorkflowUpdateInput:
 
 @dataclass
 class UpdateWithStartUpdateWorkflowInput:
-    """Update input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`.
+    """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
 
     .. warning::
        This API is experimental
@@ -5274,7 +5274,7 @@ class UpdateWithStartUpdateWorkflowInput:
 
 @dataclass
 class UpdateWithStartStartWorkflowInput:
-    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`.
+    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
 
     .. warning::
        This API is experimental
@@ -5312,7 +5312,7 @@ class UpdateWithStartStartWorkflowInput:
 
 @dataclass
 class StartWorkflowUpdateWithStartInput:
-    """Input for :py:meth:`OutboundInterceptor.start_workflow_update_with_start`.
+    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
 
     .. warning::
        This API is experimental
