@@ -6107,7 +6107,7 @@ class _ClientImpl(OutboundInterceptor):
                         ),
                         None,
                     )
-                    if status and status.code in RPCStatusCode:
+                    if status and status.code in list(RPCStatusCode):
                         if status.code == RPCStatusCode.ALREADY_EXISTS:
                             details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
                             if status.details[0].Unpack(details):
