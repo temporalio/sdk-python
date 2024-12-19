@@ -514,7 +514,7 @@ class Client:
         temporalio.common._warn_on_deprecated_search_attributes(
             search_attributes, stack_level=stack_level
         )
-        name, result_type_from_run_fn = (
+        name, result_type_from_type_hint = (
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
 
@@ -539,7 +539,7 @@ class Client:
                 static_details=static_details,
                 start_signal=start_signal,
                 start_signal_args=start_signal_args,
-                ret_type=result_type or result_type_from_run_fn,
+                ret_type=result_type or result_type_from_type_hint,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
@@ -2335,17 +2335,10 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
-        update_name: str
-        ret_type = result_type
-        if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
-            defn = update._defn
-            if not defn.name:
-                raise RuntimeError("Cannot invoke dynamic update definition")
-            # TODO(cretz): Check count/type of args at runtime?
-            update_name = defn.name
-            ret_type = defn.ret_type
-        else:
-            update_name = str(update)
+
+        update_name, result_type_from_type_hint = (
+            temporalio.workflow._UpdateDefinition.get_name_and_result_type(update)
+        )
 
         return await self._client._impl.start_workflow_update(
             StartWorkflowUpdateInput(
@@ -2356,7 +2349,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 update=update_name,
                 args=temporalio.common._arg_or_args(arg, args),
                 headers={},
-                ret_type=ret_type,
+                ret_type=result_type or result_type_from_type_hint,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 wait_for_stage=wait_for_stage,
