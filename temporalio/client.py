@@ -1882,11 +1882,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         .. warning::
            This API is experimental
 
-        .. warning::
-            WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
-            send updates to the latest workflow with the same workflow ID even if it is
-            unrelated to the started workflow.
-
         Args:
             update: Update function or name on the workflow.
             arg: Single argument to the update.
@@ -1994,11 +1989,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         .. warning::
            This API is experimental
 
-        .. warning::
-            WorkflowHandles created as a result of :py:meth:`Client.start_workflow` will
-            send updates to the latest workflow with the same workflow ID even if it is
-            unrelated to the started workflow.
-
         Args:
             update: Update function or name on the workflow.
             arg: Single argument to the update.
@@ -2060,6 +2050,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             StartWorkflowUpdateInput(
                 id=self._id,
                 run_id=self._run_id,
+                first_execution_run_id=self.first_execution_run_id,
                 update_id=id,
                 update=update_name,
                 args=temporalio.common._arg_or_args(arg, args),
@@ -4728,6 +4719,7 @@ class StartWorkflowUpdateInput:
 
     id: str
     run_id: Optional[str]
+    first_execution_run_id: Optional[str]
     update_id: Optional[str]
     update: str
     args: Sequence[Any]
@@ -5360,6 +5352,7 @@ class _ClientImpl(OutboundInterceptor):
                 workflow_id=input.id,
                 run_id=input.run_id or "",
             ),
+            first_execution_run_id=input.first_execution_run_id or "",
             request=temporalio.api.update.v1.Request(
                 meta=temporalio.api.update.v1.Meta(
                     update_id=input.update_id or str(uuid.uuid4()),
