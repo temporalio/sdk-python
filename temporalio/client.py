@@ -1073,30 +1073,27 @@ class Client:
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
-        update_name: str
-        ret_type = result_type
-        if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
-            defn = update._defn
-            if not defn.name:
-                raise RuntimeError("Cannot invoke dynamic update definition")
-            # TODO(cretz): Check count/type of args at runtime?
-            update_name = defn.name
-            ret_type = defn.ret_type
-        else:
-            update_name = str(update)
+
+        if start_workflow_operation._used:
+            raise RuntimeError("WithStartWorkflowOperation cannot be reused")
+        start_workflow_operation._used = True
+
+        update_name, result_type_from_type_hint = (
+            temporalio.workflow._UpdateDefinition.get_name_and_result_type(update)
+        )
 
         update_input = UpdateWithStartUpdateWorkflowInput(
             update_id=id,
             update=update_name,
             args=temporalio.common._arg_or_args(arg, args),
             headers={},
-            ret_type=ret_type,
+            ret_type=result_type or result_type_from_type_hint,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
             wait_for_stage=wait_for_stage,
         )
 
-        def on_start_success(
+        def on_start(
             start_response: temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
         ):
             start_workflow_operation._workflow_handle.set_result(
@@ -1109,7 +1106,7 @@ class Client:
                 )
             )
 
-        def on_start_failure(
+        def on_start_error(
             error: BaseException,
         ):
             start_workflow_operation._workflow_handle.set_exception(error)
@@ -1117,8 +1114,8 @@ class Client:
         input = StartWorkflowUpdateWithStartInput(
             start_workflow_input=start_workflow_operation._start_workflow_input,
             update_workflow_input=update_input,
-            _on_start=on_start_success,
-            _on_start_error=on_start_failure,
+            _on_start=on_start,
+            _on_start_error=on_start_error,
         )
 
         return await self._impl.start_update_with_start_workflow(input)
@@ -2621,6 +2618,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
             rpc_timeout=rpc_timeout,
         )
         self._workflow_handle: Future[WorkflowHandle[SelfType, ReturnType]] = Future()
+        self._used = False
 
     async def workflow_handle(self) -> WorkflowHandle[SelfType, ReturnType]:
         """Wait until workflow is running and return a WorkflowHandle.
