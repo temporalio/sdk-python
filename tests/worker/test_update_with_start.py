@@ -572,7 +572,7 @@ class WorkflowCanReturnDataClass:
 
 async def test_workflow_and_update_can_return_dataclass(client: Client):
     async with new_worker(client, WorkflowCanReturnDataClass) as worker:
-        start_op = WithStartWorkflowOperation(
+        make_start_op = lambda: WithStartWorkflowOperation(
             WorkflowCanReturnDataClass.run,
             "workflow-arg",
             id=f"workflow-{uuid.uuid4()}",
@@ -581,6 +581,8 @@ async def test_workflow_and_update_can_return_dataclass(client: Client):
         )
 
         # no-param update-function overload
+        start_op = make_start_op()
+
         update_handle = await client.start_update_with_start_workflow(
             WorkflowCanReturnDataClass.my_update,
             "update-arg",
@@ -598,6 +600,8 @@ async def test_workflow_and_update_can_return_dataclass(client: Client):
         )
 
         # no-param update-string-name overload
+        start_op = make_start_op()
+
         update_handle = await client.start_update_with_start_workflow(
             "my_update",
             "update-arg",
