@@ -1096,7 +1096,7 @@ class Client:
             wait_for_stage=wait_for_stage,
         )
 
-        def on_start_success(
+        def on_start(
             start_response: temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
         ):
             start_workflow_operation._workflow_handle.set_result(
@@ -1109,7 +1109,7 @@ class Client:
                 )
             )
 
-        def on_start_failure(
+        def on_start_error(
             error: BaseException,
         ):
             start_workflow_operation._workflow_handle.set_exception(error)
@@ -1117,8 +1117,8 @@ class Client:
         input = StartWorkflowUpdateWithStartInput(
             start_workflow_input=start_workflow_operation._start_workflow_input,
             update_workflow_input=update_input,
-            _on_start=on_start_success,
-            _on_start_error=on_start_failure,
+            _on_start=on_start,
+            _on_start_error=on_start_error,
         )
 
         return await self._impl.start_update_with_start_workflow(input)
