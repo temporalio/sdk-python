@@ -622,20 +622,30 @@ async def test_workflow_and_update_can_return_dataclass(client: Client):
         )
 
 
+@dataclass
+class WorkflowResult:
+    result: str
+
+
+@dataclass
+class UpdateResult:
+    result: str
+
+
 @workflow.defn
 class NoParamWorkflow:
     def __init__(self) -> None:
         self.received_update = False
 
     @workflow.run
-    async def run(self) -> str:
+    async def my_workflow_run(self) -> WorkflowResult:
         await workflow.wait_condition(lambda: self.received_update)
-        return "workflow-result"
+        return WorkflowResult(result="workflow-result")
 
-    @workflow.update
-    async def update(self) -> str:
+    @workflow.update(name="my_update")
+    async def update(self) -> UpdateResult:
         self.received_update = True
-        return "update-result"
+        return UpdateResult(result="update-result")
 
 
 @workflow.defn
@@ -644,14 +654,14 @@ class OneParamWorkflow:
         self.received_update = False
 
     @workflow.run
-    async def run(self, arg: str) -> str:
+    async def my_workflow_run(self, arg: str) -> WorkflowResult:
         await workflow.wait_condition(lambda: self.received_update)
-        return arg
+        return WorkflowResult(result=arg)
 
-    @workflow.update
-    async def update(self, arg: str) -> str:
+    @workflow.update(name="my_update")
+    async def update(self, arg: str) -> UpdateResult:
         self.received_update = True
-        return arg
+        return UpdateResult(result=arg)
 
 
 @workflow.defn
@@ -660,14 +670,14 @@ class TwoParamWorkflow:
         self.received_update = False
 
     @workflow.run
-    async def run(self, arg1: str, arg2: str) -> str:
+    async def my_workflow_run(self, arg1: str, arg2: str) -> WorkflowResult:
         await workflow.wait_condition(lambda: self.received_update)
-        return arg1 + "-" + arg2
+        return WorkflowResult(result=arg1 + "-" + arg2)
 
-    @workflow.update
-    async def update(self, arg1: str, arg2: str) -> str:
+    @workflow.update(name="my_update")
+    async def update(self, arg1: str, arg2: str) -> UpdateResult:
         self.received_update = True
-        return arg1 + "-" + arg2
+        return UpdateResult(result=arg1 + "-" + arg2)
 
 
 async def test_update_with_start_overloads(client: Client):
@@ -677,101 +687,120 @@ async def test_update_with_start_overloads(client: Client):
         OneParamWorkflow,
         TwoParamWorkflow,
     ) as worker:
-
-        def make_no_param_start_op(workflow_id: str):
-            return WithStartWorkflowOperation(
-                NoParamWorkflow.run,
-                id=workflow_id,
-                task_queue=worker.task_queue,
-                id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
-            )
-
-        def make_one_param_start_op(workflow_id: str):
-            return WithStartWorkflowOperation(
-                OneParamWorkflow.run,
-                "workflow-arg",
-                id=workflow_id,
-                task_queue=worker.task_queue,
-                id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
-            )
-
-        def make_two_param_start_op(workflow_id: str):
-            return WithStartWorkflowOperation(
-                TwoParamWorkflow.run,
-                args=("workflow-arg1", "workflow-arg2"),
-                id=workflow_id,
-                task_queue=worker.task_queue,
-                id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
-            )
-
         # No-params typed
-        no_param_start_op = make_no_param_start_op(f"wf-{uuid.uuid4()}")
+        no_param_start_op = WithStartWorkflowOperation(
+            NoParamWorkflow.my_workflow_run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
         update_handle = await client.start_update_with_start_workflow(
             NoParamWorkflow.update,
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=no_param_start_op,
         )
-        assert await update_handle.result() == "update-result"
+        assert await update_handle.result() == UpdateResult(result="update-result")
         wf_handle = await no_param_start_op.workflow_handle()
-        assert await wf_handle.result() == "workflow-result"
+        assert await wf_handle.result() == WorkflowResult(result="workflow-result")
 
         # No-params string name
-        no_param_start_op = make_no_param_start_op(f"wf-{uuid.uuid4()}")
+        no_param_start_op = WithStartWorkflowOperation(
+            "NoParamWorkflow",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            result_type=WorkflowResult,
+        )
         update_handle = await client.start_update_with_start_workflow(
-            "update",
+            "my_update",
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=no_param_start_op,
+            result_type=UpdateResult,
         )
-        assert await update_handle.result() == "update-result"
+        assert await update_handle.result() == UpdateResult(result="update-result")
         wf_handle = await no_param_start_op.workflow_handle()
-        assert await wf_handle.result() == "workflow-result"
+        assert await wf_handle.result() == WorkflowResult(result="workflow-result")
 
         # One-param typed
-        one_param_start_op = make_one_param_start_op(f"wf-{uuid.uuid4()}")
+        one_param_start_op = WithStartWorkflowOperation(
+            OneParamWorkflow.my_workflow_run,
+            "workflow-arg",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
         update_handle = await client.start_update_with_start_workflow(
             OneParamWorkflow.update,
             "update-arg",
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=one_param_start_op,
         )
-        assert await update_handle.result() == "update-arg"
+        assert await update_handle.result() == UpdateResult(result="update-arg")
         wf_handle = await one_param_start_op.workflow_handle()
-        assert await wf_handle.result() == "workflow-arg"
+        assert await wf_handle.result() == WorkflowResult(result="workflow-arg")
 
         # One-param string name
-        one_param_start_op = make_one_param_start_op(f"wf-{uuid.uuid4()}")
+        one_param_start_op = WithStartWorkflowOperation(
+            "OneParamWorkflow",
+            "workflow-arg",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            result_type=WorkflowResult,
+        )
         update_handle = await client.start_update_with_start_workflow(
-            "update",
+            "my_update",
             "update-arg",
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=one_param_start_op,
+            result_type=UpdateResult,
         )
-        assert await update_handle.result() == "update-arg"
+        assert await update_handle.result() == UpdateResult(result="update-arg")
         wf_handle = await one_param_start_op.workflow_handle()
-        assert await wf_handle.result() == "workflow-arg"
+        assert await wf_handle.result() == WorkflowResult(result="workflow-arg")
 
         # Two-params typed
-        two_param_start_op = make_two_param_start_op(f"wf-{uuid.uuid4()}")
+        two_param_start_op = WithStartWorkflowOperation(
+            TwoParamWorkflow.my_workflow_run,
+            args=("workflow-arg1", "workflow-arg2"),
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
         update_handle = await client.start_update_with_start_workflow(
             TwoParamWorkflow.update,
             args=("update-arg1", "update-arg2"),
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=two_param_start_op,
         )
-        assert await update_handle.result() == "update-arg1-update-arg2"
-
+        assert await update_handle.result() == UpdateResult(
+            result="update-arg1-update-arg2"
+        )
         wf_handle = await two_param_start_op.workflow_handle()
-        assert await wf_handle.result() == "workflow-arg1-workflow-arg2"
+        assert await wf_handle.result() == WorkflowResult(
+            result="workflow-arg1-workflow-arg2"
+        )
 
         # Two-params string name
-        two_param_start_op = make_two_param_start_op(f"wf-{uuid.uuid4()}")
+        two_param_start_op = WithStartWorkflowOperation(
+            "TwoParamWorkflow",
+            args=("workflow-arg1", "workflow-arg2"),
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            result_type=WorkflowResult,
+        )
         update_handle = await client.start_update_with_start_workflow(
-            "update",
+            "my_update",
             args=("update-arg1", "update-arg2"),
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=two_param_start_op,
+            result_type=UpdateResult,
         )
-        assert await update_handle.result() == "update-arg1-update-arg2"
-
+        assert await update_handle.result() == UpdateResult(
+            result="update-arg1-update-arg2"
+        )
         wf_handle = await two_param_start_op.workflow_handle()
-        assert await wf_handle.result() == "workflow-arg1-workflow-arg2"
+        assert await wf_handle.result() == WorkflowResult(
+            result="workflow-arg1-workflow-arg2"
+        )
