@@ -68,6 +68,30 @@ class WorkflowForUpdateWithStartTest:
         self.received_done_signal = True
 
 
+async def test_with_start_workflow_operation_cannot_be_reused(client: Client):
+    async with new_worker(client, WorkflowForUpdateWithStartTest) as worker:
+        start_op = WithStartWorkflowOperation(
+            WorkflowForUpdateWithStartTest.run,
+            0,
+            id=f"wid-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
+
+        async def start_update_with_start(start_op: WithStartWorkflowOperation):
+            return await client.start_update_with_start_workflow(
+                WorkflowForUpdateWithStartTest.my_non_blocking_update,
+                "1",
+                wait_for_stage=WorkflowUpdateStage.COMPLETED,
+                start_workflow_operation=start_op,
+            )
+
+        await start_update_with_start(start_op)
+        with pytest.raises(RuntimeError) as exc_info:
+            await start_update_with_start(start_op)
+        assert "WithStartWorkflowOperation cannot be reused" in str(exc_info.value)
+
+
 class ExpectErrorWhenWorkflowExists(Enum):
     YES = "yes"
     NO = "no"
