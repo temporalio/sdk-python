@@ -680,13 +680,8 @@ class TwoParamWorkflow:
         return UpdateResult(result=arg1 + "-" + arg2)
 
 
-async def test_update_with_start_overloads(client: Client):
-    async with new_worker(
-        client,
-        NoParamWorkflow,
-        OneParamWorkflow,
-        TwoParamWorkflow,
-    ) as worker:
+async def test_update_with_start_no_param(client: Client):
+    async with new_worker(client, NoParamWorkflow) as worker:
         # No-params typed
         no_param_start_op = WithStartWorkflowOperation(
             NoParamWorkflow.my_workflow_run,
@@ -721,6 +716,9 @@ async def test_update_with_start_overloads(client: Client):
         wf_handle = await no_param_start_op.workflow_handle()
         assert await wf_handle.result() == WorkflowResult(result="workflow-result")
 
+
+async def test_update_with_start_one_param(client: Client):
+    async with new_worker(client, OneParamWorkflow) as worker:
         # One-param typed
         one_param_start_op = WithStartWorkflowOperation(
             OneParamWorkflow.my_workflow_run,
@@ -759,6 +757,9 @@ async def test_update_with_start_overloads(client: Client):
         wf_handle = await one_param_start_op.workflow_handle()
         assert await wf_handle.result() == WorkflowResult(result="workflow-arg")
 
+
+async def test_update_with_start_two_param(client: Client):
+    async with new_worker(client, TwoParamWorkflow) as worker:
         # Two-params typed
         two_param_start_op = WithStartWorkflowOperation(
             TwoParamWorkflow.my_workflow_run,
