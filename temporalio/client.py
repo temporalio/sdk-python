@@ -1073,6 +1073,11 @@ class Client:
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
+
+        if start_workflow_operation._used:
+            raise RuntimeError("WithStartWorkflowOperation cannot be reused")
+        start_workflow_operation._used = True
+
         update_name: str
         ret_type = result_type
         if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
@@ -2621,6 +2626,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
             rpc_timeout=rpc_timeout,
         )
         self._workflow_handle: Future[WorkflowHandle[SelfType, ReturnType]] = Future()
+        self._used = False
 
     async def workflow_handle(self) -> WorkflowHandle[SelfType, ReturnType]:
         """Wait until workflow is running and return a WorkflowHandle.
