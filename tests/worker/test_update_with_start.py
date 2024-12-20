@@ -520,13 +520,13 @@ def test_with_start_workflow_operation_requires_conflict_policy():
 
 @dataclass
 class DataClass1:
-    a: int
+    a: str
     b: str
 
 
 @dataclass
 class DataClass2:
-    a: int
+    a: str
     b: str
 
 
@@ -536,32 +536,57 @@ class WorkflowCanReturnDataClass:
         self.received_update = False
 
     @workflow.run
-    async def run(self) -> DataClass1:
+    async def run(self, arg: str) -> DataClass1:
         await workflow.wait_condition(lambda: self.received_update)
-        return DataClass1(a=1, b="workflow-result")
+        return DataClass1(a=arg, b="workflow-result")
 
     @workflow.update
-    async def update(self) -> DataClass2:
+    async def my_update(self, arg: str) -> DataClass2:
         self.received_update = True
-        return DataClass2(a=2, b="update-result")
+        return DataClass2(a=arg, b="update-result")
 
 
 async def test_workflow_and_update_can_return_dataclass(client: Client):
     async with new_worker(client, WorkflowCanReturnDataClass) as worker:
         start_op = WithStartWorkflowOperation(
             WorkflowCanReturnDataClass.run,
+            "workflow-arg",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
         )
 
+        # no-param update-function overload
         update_handle = await client.start_update_with_start_workflow(
-            WorkflowCanReturnDataClass.update,
+            WorkflowCanReturnDataClass.my_update,
+            "update-arg",
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=start_op,
         )
 
-        assert await update_handle.result() == DataClass2(a=2, b="update-result")
+        assert await update_handle.result() == DataClass2(
+            a="update-arg", b="update-result"
+        )
 
         wf_handle = await start_op.workflow_handle()
-        assert await wf_handle.result() == DataClass1(a=1, b="workflow-result")
+        assert await wf_handle.result() == DataClass1(
+            a="workflow-arg", b="workflow-result"
+        )
+
+        # no-param update-string-name overload
+        update_handle = await client.start_update_with_start_workflow(
+            "my_update",
+            "update-arg",
+            wait_for_stage=WorkflowUpdateStage.COMPLETED,
+            start_workflow_operation=start_op,
+            result_type=DataClass2,
+        )
+
+        assert await update_handle.result() == DataClass2(
+            a="update-arg", b="update-result"
+        )
+
+        wf_handle = await start_op.workflow_handle()
+        assert await wf_handle.result() == DataClass1(
+            a="workflow-arg", b="workflow-result"
+        )
