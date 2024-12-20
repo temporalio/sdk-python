@@ -411,7 +411,7 @@ async def test_update_with_start_sets_first_execution_run_id(
         assert (await start_op_4.workflow_handle()).first_execution_run_id is not None
 
 
-async def test_update_with_start_failure_start_workflow_error(
+async def test_update_with_start_workflow_already_started_error(
     client: Client, env: WorkflowEnvironment
 ):
     """
@@ -572,16 +572,18 @@ class WorkflowCanReturnDataClass:
 
 async def test_workflow_and_update_can_return_dataclass(client: Client):
     async with new_worker(client, WorkflowCanReturnDataClass) as worker:
-        make_start_op = lambda: WithStartWorkflowOperation(
-            WorkflowCanReturnDataClass.run,
-            "workflow-arg",
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
-        )
+
+        def make_start_op(workflow_id: str):
+            return WithStartWorkflowOperation(
+                WorkflowCanReturnDataClass.run,
+                "workflow-arg",
+                id=workflow_id,
+                task_queue=worker.task_queue,
+                id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            )
 
         # no-param update-function overload
-        start_op = make_start_op()
+        start_op = make_start_op(f"wf-{uuid.uuid4()}")
 
         update_handle = await client.start_update_with_start_workflow(
             WorkflowCanReturnDataClass.my_update,
@@ -600,7 +602,7 @@ async def test_workflow_and_update_can_return_dataclass(client: Client):
         )
 
         # no-param update-string-name overload
-        start_op = make_start_op()
+        start_op = make_start_op(f"wf-{uuid.uuid4()}")
 
         update_handle = await client.start_update_with_start_workflow(
             "my_update",
