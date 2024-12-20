@@ -53,6 +53,7 @@ import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.workflow
 
 from .types import (
     AnyType,
@@ -1782,6 +1783,20 @@ class _UpdateDefinition:
         if self.validator:
             raise RuntimeError(f"Validator already set for update {self.name}")
         object.__setattr__(self, "validator", validator)
+
+    @classmethod
+    def get_name_and_result_type(
+        cls,
+        name_or_update_fn: Union[str, Callable[..., Any]],
+    ) -> Tuple[str, Optional[Type]]:
+        if isinstance(name_or_update_fn, temporalio.workflow.UpdateMethodMultiParam):
+            defn = name_or_update_fn._defn
+            if not defn.name:
+                raise RuntimeError("Cannot invoke dynamic update definition")
+            # TODO(cretz): Check count/type of args at runtime?
+            return defn.name, defn.ret_type
+        else:
+            return str(name_or_update_fn), None
 
 
 # See https://mypy.readthedocs.io/en/latest/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
