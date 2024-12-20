@@ -1078,24 +1078,16 @@ class Client:
             raise RuntimeError("WithStartWorkflowOperation cannot be reused")
         start_workflow_operation._used = True
 
-        update_name: str
-        ret_type = result_type
-        if isinstance(update, temporalio.workflow.UpdateMethodMultiParam):
-            defn = update._defn
-            if not defn.name:
-                raise RuntimeError("Cannot invoke dynamic update definition")
-            # TODO(cretz): Check count/type of args at runtime?
-            update_name = defn.name
-            ret_type = defn.ret_type
-        else:
-            update_name = str(update)
+        update_name, result_type_from_type_hint = (
+            temporalio.workflow._UpdateDefinition.get_name_and_result_type(update)
+        )
 
         update_input = UpdateWithStartUpdateWorkflowInput(
             update_id=id,
             update=update_name,
             args=temporalio.common._arg_or_args(arg, args),
             headers={},
-            ret_type=ret_type,
+            ret_type=result_type or result_type_from_type_hint,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
             wait_for_stage=wait_for_stage,
