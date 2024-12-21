@@ -6,36 +6,114 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
+import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
-if sys.version_info >= (3, 8):
+import temporalio.api.cloud.resource.v1.message_pb2
+
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _OwnerType:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _OwnerTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_OwnerType.ValueType],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    OWNER_TYPE_UNSPECIFIED: _OwnerType.ValueType  # 0
+    OWNER_TYPE_USER: _OwnerType.ValueType  # 1
+    """The owner is a user."""
+    OWNER_TYPE_SERVICE_ACCOUNT: _OwnerType.ValueType  # 2
+    """The owner is a service account."""
+
+class OwnerType(_OwnerType, metaclass=_OwnerTypeEnumTypeWrapper): ...
+
+OWNER_TYPE_UNSPECIFIED: OwnerType.ValueType  # 0
+OWNER_TYPE_USER: OwnerType.ValueType  # 1
+"""The owner is a user."""
+OWNER_TYPE_SERVICE_ACCOUNT: OwnerType.ValueType  # 2
+"""The owner is a service account."""
+global___OwnerType = OwnerType
+
 class AccountAccess(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _Role:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _RoleEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            AccountAccess._Role.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        ROLE_UNSPECIFIED: AccountAccess._Role.ValueType  # 0
+        ROLE_OWNER: AccountAccess._Role.ValueType  # 1
+        """Gives full access to the account, including users, namespaces, and billing."""
+        ROLE_ADMIN: AccountAccess._Role.ValueType  # 2
+        """Gives full access to the account, including users and namespaces."""
+        ROLE_DEVELOPER: AccountAccess._Role.ValueType  # 3
+        """Gives access to create namespaces on the account."""
+        ROLE_FINANCE_ADMIN: AccountAccess._Role.ValueType  # 4
+        """Gives read only access and write access for billing."""
+        ROLE_READ: AccountAccess._Role.ValueType  # 5
+        """Gives read only access to the account."""
+
+    class Role(_Role, metaclass=_RoleEnumTypeWrapper): ...
+    ROLE_UNSPECIFIED: AccountAccess.Role.ValueType  # 0
+    ROLE_OWNER: AccountAccess.Role.ValueType  # 1
+    """Gives full access to the account, including users, namespaces, and billing."""
+    ROLE_ADMIN: AccountAccess.Role.ValueType  # 2
+    """Gives full access to the account, including users and namespaces."""
+    ROLE_DEVELOPER: AccountAccess.Role.ValueType  # 3
+    """Gives access to create namespaces on the account."""
+    ROLE_FINANCE_ADMIN: AccountAccess.Role.ValueType  # 4
+    """Gives read only access and write access for billing."""
+    ROLE_READ: AccountAccess.Role.ValueType  # 5
+    """Gives read only access to the account."""
+
+    ROLE_DEPRECATED_FIELD_NUMBER: builtins.int
     ROLE_FIELD_NUMBER: builtins.int
-    role: builtins.str
-    """The role on the account, should be one of [admin, developer, read]
+    role_deprecated: builtins.str
+    """The role on the account, should be one of [owner, admin, developer, financeadmin, read]
+    owner - gives full access to the account, including users, namespaces, and billing
     admin - gives full access the account, including users and namespaces
     developer - gives access to create namespaces on the account
+    financeadmin - gives read only access and write access for billing
     read - gives read only access to the account
+    Deprecated: Not supported after 2024-10-01-00 api version. Use role instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    role: global___AccountAccess.Role.ValueType
+    """The role on the account.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=role_deprecated
     """
     def __init__(
         self,
         *,
-        role: builtins.str = ...,
+        role_deprecated: builtins.str = ...,
+        role: global___AccountAccess.Role.ValueType = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["role", b"role"]
+        self,
+        field_name: typing_extensions.Literal[
+            "role", b"role", "role_deprecated", b"role_deprecated"
+        ],
     ) -> None: ...
 
 global___AccountAccess = AccountAccess
@@ -43,20 +121,63 @@ global___AccountAccess = AccountAccess
 class NamespaceAccess(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _Permission:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _PermissionEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            NamespaceAccess._Permission.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        PERMISSION_UNSPECIFIED: NamespaceAccess._Permission.ValueType  # 0
+        PERMISSION_ADMIN: NamespaceAccess._Permission.ValueType  # 1
+        """Gives full access to the namespace, including assigning namespace access to other users."""
+        PERMISSION_WRITE: NamespaceAccess._Permission.ValueType  # 2
+        """Gives write access to the namespace configuration and workflows within the namespace."""
+        PERMISSION_READ: NamespaceAccess._Permission.ValueType  # 3
+        """Gives read only access to the namespace configuration and workflows within the namespace."""
+
+    class Permission(_Permission, metaclass=_PermissionEnumTypeWrapper): ...
+    PERMISSION_UNSPECIFIED: NamespaceAccess.Permission.ValueType  # 0
+    PERMISSION_ADMIN: NamespaceAccess.Permission.ValueType  # 1
+    """Gives full access to the namespace, including assigning namespace access to other users."""
+    PERMISSION_WRITE: NamespaceAccess.Permission.ValueType  # 2
+    """Gives write access to the namespace configuration and workflows within the namespace."""
+    PERMISSION_READ: NamespaceAccess.Permission.ValueType  # 3
+    """Gives read only access to the namespace configuration and workflows within the namespace."""
+
+    PERMISSION_DEPRECATED_FIELD_NUMBER: builtins.int
     PERMISSION_FIELD_NUMBER: builtins.int
-    permission: builtins.str
+    permission_deprecated: builtins.str
     """The permission to the namespace, should be one of [admin, write, read]
     admin - gives full access to the namespace, including assigning namespace access to other users
     write - gives write access to the namespace configuration and workflows within the namespace
     read - gives read only access to the namespace configuration and workflows within the namespace
+    Deprecated: Not supported after 2024-10-01-00 api version. Use permission instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    permission: global___NamespaceAccess.Permission.ValueType
+    """The permission to the namespace.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=permission_deprecated
     """
     def __init__(
         self,
         *,
-        permission: builtins.str = ...,
+        permission_deprecated: builtins.str = ...,
+        permission: global___NamespaceAccess.Permission.ValueType = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["permission", b"permission"]
+        self,
+        field_name: typing_extensions.Literal[
+            "permission",
+            b"permission",
+            "permission_deprecated",
+            b"permission_deprecated",
+        ],
     ) -> None: ...
 
 global___NamespaceAccess = NamespaceAccess
@@ -188,6 +309,7 @@ class User(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     RESOURCE_VERSION_FIELD_NUMBER: builtins.int
     SPEC_FIELD_NUMBER: builtins.int
+    STATE_DEPRECATED_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
     INVITATION_FIELD_NUMBER: builtins.int
@@ -202,8 +324,17 @@ class User(google.protobuf.message.Message):
     @property
     def spec(self) -> global___UserSpec:
         """The user specification"""
-    state: builtins.str
-    """The current state of the user"""
+    state_deprecated: builtins.str
+    """The current state of the user
+    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the user.
+    For any failed state, reach out to Temporal Cloud support for remediation.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=state_deprecated
+    """
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the user, if any"""
     @property
@@ -223,7 +354,8 @@ class User(google.protobuf.message.Message):
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
         spec: global___UserSpec | None = ...,
-        state: builtins.str = ...,
+        state_deprecated: builtins.str = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         invitation: global___Invitation | None = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -261,35 +393,71 @@ class User(google.protobuf.message.Message):
             b"spec",
             "state",
             b"state",
+            "state_deprecated",
+            b"state_deprecated",
         ],
     ) -> None: ...
 
 global___User = User
 
-class UserGroupSpec(google.protobuf.message.Message):
+class GoogleGroupSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAME_FIELD_NUMBER: builtins.int
-    ACCESS_FIELD_NUMBER: builtins.int
-    name: builtins.str
-    """The name of the group as defined in the customer's IdP (e.g. Google group name in Google Workspace)
-    The name is immutable. Once set, it cannot be changed
+    EMAIL_ADDRESS_FIELD_NUMBER: builtins.int
+    email_address: builtins.str
+    """The email address of the Google group.
+    The email address is immutable. Once set during creation, it cannot be changed.
     """
-    @property
-    def access(self) -> global___Access:
-        """The access assigned to the group"""
     def __init__(
         self,
         *,
-        name: builtins.str = ...,
+        email_address: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["email_address", b"email_address"]
+    ) -> None: ...
+
+global___GoogleGroupSpec = GoogleGroupSpec
+
+class UserGroupSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DISPLAY_NAME_FIELD_NUMBER: builtins.int
+    ACCESS_FIELD_NUMBER: builtins.int
+    GOOGLE_GROUP_FIELD_NUMBER: builtins.int
+    display_name: builtins.str
+    """The display name of the group."""
+    @property
+    def access(self) -> global___Access:
+        """The access assigned to the group."""
+    @property
+    def google_group(self) -> global___GoogleGroupSpec:
+        """The specification of the google group that this group is associated with.
+        For now only google groups are supported, and this field is required.
+        """
+    def __init__(
+        self,
+        *,
+        display_name: builtins.str = ...,
         access: global___Access | None = ...,
+        google_group: global___GoogleGroupSpec | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["access", b"access"]
+        self,
+        field_name: typing_extensions.Literal[
+            "access", b"access", "google_group", b"google_group"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["access", b"access", "name", b"name"],
+        field_name: typing_extensions.Literal[
+            "access",
+            b"access",
+            "display_name",
+            b"display_name",
+            "google_group",
+            b"google_group",
+        ],
     ) -> None: ...
 
 global___UserGroupSpec = UserGroupSpec
@@ -300,6 +468,7 @@ class UserGroup(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     RESOURCE_VERSION_FIELD_NUMBER: builtins.int
     SPEC_FIELD_NUMBER: builtins.int
+    STATE_DEPRECATED_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
     CREATED_TIME_FIELD_NUMBER: builtins.int
@@ -313,8 +482,17 @@ class UserGroup(google.protobuf.message.Message):
     @property
     def spec(self) -> global___UserGroupSpec:
         """The group specification"""
-    state: builtins.str
-    """The current state of the group"""
+    state_deprecated: builtins.str
+    """The current state of the group.
+    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the group.
+    For any failed state, reach out to Temporal Cloud support for remediation.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=state_deprecated
+    """
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the group, if any"""
     @property
@@ -331,7 +509,8 @@ class UserGroup(google.protobuf.message.Message):
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
         spec: global___UserGroupSpec | None = ...,
-        state: builtins.str = ...,
+        state_deprecated: builtins.str = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -364,6 +543,8 @@ class UserGroup(google.protobuf.message.Message):
             b"spec",
             "state",
             b"state",
+            "state_deprecated",
+            b"state_deprecated",
         ],
     ) -> None: ...
 
@@ -375,6 +556,7 @@ class ServiceAccount(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     RESOURCE_VERSION_FIELD_NUMBER: builtins.int
     SPEC_FIELD_NUMBER: builtins.int
+    STATE_DEPRECATED_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
     CREATED_TIME_FIELD_NUMBER: builtins.int
@@ -388,10 +570,18 @@ class ServiceAccount(google.protobuf.message.Message):
     @property
     def spec(self) -> global___ServiceAccountSpec:
         """The service account specification."""
-    state: builtins.str
+    state_deprecated: builtins.str
     """The current state of the service account.
     Possible values: activating, activationfailed, active, updating, updatefailed, deleting, deletefailed, deleted, suspending, suspendfailed, suspended.
     For any failed state, reach out to Temporal Cloud support for remediation.
+    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the service account.
+    For any failed state, reach out to Temporal Cloud support for remediation.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the service account, if any."""
@@ -409,7 +599,8 @@ class ServiceAccount(google.protobuf.message.Message):
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
         spec: global___ServiceAccountSpec | None = ...,
-        state: builtins.str = ...,
+        state_deprecated: builtins.str = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -442,6 +633,8 @@ class ServiceAccount(google.protobuf.message.Message):
             b"spec",
             "state",
             b"state",
+            "state_deprecated",
+            b"state_deprecated",
         ],
     ) -> None: ...
 
@@ -491,6 +684,7 @@ class ApiKey(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     RESOURCE_VERSION_FIELD_NUMBER: builtins.int
     SPEC_FIELD_NUMBER: builtins.int
+    STATE_DEPRECATED_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
     CREATED_TIME_FIELD_NUMBER: builtins.int
@@ -504,10 +698,17 @@ class ApiKey(google.protobuf.message.Message):
     @property
     def spec(self) -> global___ApiKeySpec:
         """The API key specification."""
-    state: builtins.str
+    state_deprecated: builtins.str
     """The current state of the API key.
     Possible values: activating, activationfailed, active, updating, updatefailed, deleting, deletefailed, deleted, suspending, suspendfailed, suspended.
     For any failed state, reach out to Temporal Cloud support for remediation.
+    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the API key.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the API key, if any."""
@@ -525,7 +726,8 @@ class ApiKey(google.protobuf.message.Message):
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
         spec: global___ApiKeySpec | None = ...,
-        state: builtins.str = ...,
+        state_deprecated: builtins.str = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -558,6 +760,8 @@ class ApiKey(google.protobuf.message.Message):
             b"spec",
             "state",
             b"state",
+            "state_deprecated",
+            b"state_deprecated",
         ],
     ) -> None: ...
 
@@ -567,6 +771,7 @@ class ApiKeySpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     OWNER_ID_FIELD_NUMBER: builtins.int
+    OWNER_TYPE_DEPRECATED_FIELD_NUMBER: builtins.int
     OWNER_TYPE_FIELD_NUMBER: builtins.int
     DISPLAY_NAME_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
@@ -575,13 +780,20 @@ class ApiKeySpec(google.protobuf.message.Message):
     owner_id: builtins.str
     """The id of the owner to create the API key for.
     The owner id is immutable. Once set during creation, it cannot be changed.
-    The owner id is the id of the user when the owner type is 'user'.
-    The owner id is the id of the service account when the owner type is 'service-account'.
+    The owner id is the id of the user when the owner type is user.
+    The owner id is the id of the service account when the owner type is service account.
     """
-    owner_type: builtins.str
+    owner_type_deprecated: builtins.str
     """The type of the owner to create the API key for.
     The owner type is immutable. Once set during creation, it cannot be changed.
     Possible values: user, service-account.
+    Deprecated: Not supported after 2024-10-01-00 api version. Use owner_type instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    owner_type: global___OwnerType.ValueType
+    """The type of the owner to create the API key for.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=owner_type_deprecated
     """
     display_name: builtins.str
     """The display name of the API key."""
@@ -596,7 +808,8 @@ class ApiKeySpec(google.protobuf.message.Message):
         self,
         *,
         owner_id: builtins.str = ...,
-        owner_type: builtins.str = ...,
+        owner_type_deprecated: builtins.str = ...,
+        owner_type: global___OwnerType.ValueType = ...,
         display_name: builtins.str = ...,
         description: builtins.str = ...,
         expiry_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -620,6 +833,8 @@ class ApiKeySpec(google.protobuf.message.Message):
             b"owner_id",
             "owner_type",
             b"owner_type",
+            "owner_type_deprecated",
+            b"owner_type_deprecated",
         ],
     ) -> None: ...
 

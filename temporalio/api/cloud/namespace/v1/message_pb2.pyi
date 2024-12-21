@@ -6,13 +6,18 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
+import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
-if sys.version_info >= (3, 8):
+import temporalio.api.cloud.resource.v1.message_pb2
+import temporalio.api.cloud.sink.v1.message_pb2
+
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
@@ -69,14 +74,22 @@ global___CertificateFilterSpec = CertificateFilterSpec
 class MtlsAuthSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    ACCEPTED_CLIENT_CA_DEPRECATED_FIELD_NUMBER: builtins.int
     ACCEPTED_CLIENT_CA_FIELD_NUMBER: builtins.int
     CERTIFICATE_FILTERS_FIELD_NUMBER: builtins.int
     ENABLED_FIELD_NUMBER: builtins.int
-    accepted_client_ca: builtins.str
+    accepted_client_ca_deprecated: builtins.str
     """The base64 encoded ca cert(s) in PEM format that the clients can use for authentication and authorization.
     This must only be one value, but the CA can have a chain.
 
     (-- api-linter: core::0140::base64=disabled --)
+    Deprecated: Not supported after 2024-05-13-00 api version. Use accepted_client_ca instead.
+    temporal:versioning:max_version=2024-05-13-00
+    """
+    accepted_client_ca: builtins.bytes
+    """The ca cert(s) in PEM format that the clients can use for authentication and authorization.
+    This must only be one value, but the CA can have a chain.
+    temporal:versioning:min_version=2024-05-13-00
     """
     @property
     def certificate_filters(
@@ -96,7 +109,8 @@ class MtlsAuthSpec(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        accepted_client_ca: builtins.str = ...,
+        accepted_client_ca_deprecated: builtins.str = ...,
+        accepted_client_ca: builtins.bytes = ...,
         certificate_filters: collections.abc.Iterable[global___CertificateFilterSpec]
         | None = ...,
         enabled: builtins.bool = ...,
@@ -106,6 +120,8 @@ class MtlsAuthSpec(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "accepted_client_ca",
             b"accepted_client_ca",
+            "accepted_client_ca_deprecated",
+            b"accepted_client_ca_deprecated",
             "certificate_filters",
             b"certificate_filters",
             "enabled",
@@ -170,6 +186,44 @@ global___CodecServerSpec = CodecServerSpec
 class NamespaceSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _SearchAttributeType:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _SearchAttributeTypeEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            NamespaceSpec._SearchAttributeType.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        SEARCH_ATTRIBUTE_TYPE_UNSPECIFIED: (
+            NamespaceSpec._SearchAttributeType.ValueType
+        )  # 0
+        SEARCH_ATTRIBUTE_TYPE_TEXT: NamespaceSpec._SearchAttributeType.ValueType  # 1
+        SEARCH_ATTRIBUTE_TYPE_KEYWORD: NamespaceSpec._SearchAttributeType.ValueType  # 2
+        SEARCH_ATTRIBUTE_TYPE_INT: NamespaceSpec._SearchAttributeType.ValueType  # 3
+        SEARCH_ATTRIBUTE_TYPE_DOUBLE: NamespaceSpec._SearchAttributeType.ValueType  # 4
+        SEARCH_ATTRIBUTE_TYPE_BOOL: NamespaceSpec._SearchAttributeType.ValueType  # 5
+        SEARCH_ATTRIBUTE_TYPE_DATETIME: (
+            NamespaceSpec._SearchAttributeType.ValueType
+        )  # 6
+        SEARCH_ATTRIBUTE_TYPE_KEYWORD_LIST: (
+            NamespaceSpec._SearchAttributeType.ValueType
+        )  # 7
+
+    class SearchAttributeType(
+        _SearchAttributeType, metaclass=_SearchAttributeTypeEnumTypeWrapper
+    ): ...
+    SEARCH_ATTRIBUTE_TYPE_UNSPECIFIED: NamespaceSpec.SearchAttributeType.ValueType  # 0
+    SEARCH_ATTRIBUTE_TYPE_TEXT: NamespaceSpec.SearchAttributeType.ValueType  # 1
+    SEARCH_ATTRIBUTE_TYPE_KEYWORD: NamespaceSpec.SearchAttributeType.ValueType  # 2
+    SEARCH_ATTRIBUTE_TYPE_INT: NamespaceSpec.SearchAttributeType.ValueType  # 3
+    SEARCH_ATTRIBUTE_TYPE_DOUBLE: NamespaceSpec.SearchAttributeType.ValueType  # 4
+    SEARCH_ATTRIBUTE_TYPE_BOOL: NamespaceSpec.SearchAttributeType.ValueType  # 5
+    SEARCH_ATTRIBUTE_TYPE_DATETIME: NamespaceSpec.SearchAttributeType.ValueType  # 6
+    SEARCH_ATTRIBUTE_TYPE_KEYWORD_LIST: NamespaceSpec.SearchAttributeType.ValueType  # 7
+
     class CustomSearchAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -188,12 +242,31 @@ class NamespaceSpec(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    class SearchAttributesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: global___NamespaceSpec.SearchAttributeType.ValueType
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___NamespaceSpec.SearchAttributeType.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
     NAME_FIELD_NUMBER: builtins.int
     REGIONS_FIELD_NUMBER: builtins.int
     RETENTION_DAYS_FIELD_NUMBER: builtins.int
     MTLS_AUTH_FIELD_NUMBER: builtins.int
     API_KEY_AUTH_FIELD_NUMBER: builtins.int
     CUSTOM_SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CODEC_SERVER_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name to use for the namespace.
@@ -238,6 +311,21 @@ class NamespaceSpec(google.protobuf.message.Message):
         Supported attribute types: text, keyword, int, double, bool, datetime, keyword_list.
         NOTE: currently deleting a search attribute is not supported.
         Optional, default is empty.
+        Deprecated: Not supported after 2024-10-01-00 api version. Use search_attributes instead.
+        temporal:versioning:max_version=2024-10-01-00
+        """
+    @property
+    def search_attributes(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[
+        builtins.str, global___NamespaceSpec.SearchAttributeType.ValueType
+    ]:
+        """The custom search attributes to use for the namespace.
+        The name of the attribute is the key and the type is the value.
+        Note: currently deleting a search attribute is not supported.
+        Optional, default is empty.
+        temporal:versioning:min_version=2024-10-01-00
+        temporal:enums:replaces=custom_search_attributes
         """
     @property
     def codec_server(self) -> global___CodecServerSpec:
@@ -253,6 +341,10 @@ class NamespaceSpec(google.protobuf.message.Message):
         mtls_auth: global___MtlsAuthSpec | None = ...,
         api_key_auth: global___ApiKeyAuthSpec | None = ...,
         custom_search_attributes: collections.abc.Mapping[builtins.str, builtins.str]
+        | None = ...,
+        search_attributes: collections.abc.Mapping[
+            builtins.str, global___NamespaceSpec.SearchAttributeType.ValueType
+        ]
         | None = ...,
         codec_server: global___CodecServerSpec | None = ...,
     ) -> None: ...
@@ -284,6 +376,8 @@ class NamespaceSpec(google.protobuf.message.Message):
             b"regions",
             "retention_days",
             b"retention_days",
+            "search_attributes",
+            b"search_attributes",
         ],
     ) -> None: ...
 
@@ -436,6 +530,7 @@ class Namespace(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     RESOURCE_VERSION_FIELD_NUMBER: builtins.int
     SPEC_FIELD_NUMBER: builtins.int
+    STATE_DEPRECATED_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
     ENDPOINTS_FIELD_NUMBER: builtins.int
@@ -454,8 +549,17 @@ class Namespace(google.protobuf.message.Message):
     @property
     def spec(self) -> global___NamespaceSpec:
         """The namespace specification."""
-    state: builtins.str
-    """The current state of the namespace."""
+    state_deprecated: builtins.str
+    """The current state of the namespace.
+    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the namespace.
+    For any failed state, reach out to Temporal Cloud support for remediation.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=state_deprecated
+    """
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the namespace, if any."""
     @property
@@ -496,7 +600,8 @@ class Namespace(google.protobuf.message.Message):
         namespace: builtins.str = ...,
         resource_version: builtins.str = ...,
         spec: global___NamespaceSpec | None = ...,
-        state: builtins.str = ...,
+        state_deprecated: builtins.str = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         endpoints: global___Endpoints | None = ...,
         active_region: builtins.str = ...,
@@ -552,6 +657,8 @@ class Namespace(google.protobuf.message.Message):
             b"spec",
             "state",
             b"state",
+            "state_deprecated",
+            b"state_deprecated",
         ],
     ) -> None: ...
 
@@ -560,26 +667,214 @@ global___Namespace = Namespace
 class NamespaceRegionStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _State:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _StateEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            NamespaceRegionStatus._State.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        STATE_UNSPECIFIED: NamespaceRegionStatus._State.ValueType  # 0
+        STATE_ADDING: NamespaceRegionStatus._State.ValueType  # 1
+        """The region is being added to the namespace."""
+        STATE_ACTIVE: NamespaceRegionStatus._State.ValueType  # 2
+        """The namespace is active in this region."""
+        STATE_PASSIVE: NamespaceRegionStatus._State.ValueType  # 3
+        """The namespace is passive in this region."""
+        STATE_REMOVING: NamespaceRegionStatus._State.ValueType  # 4
+        """The region is being removed from the namespace."""
+        STATE_FAILED: NamespaceRegionStatus._State.ValueType  # 5
+        """The region failed to be added/removed, check failure_reason in the last async_operation status for more details."""
+
+    class State(_State, metaclass=_StateEnumTypeWrapper): ...
+    STATE_UNSPECIFIED: NamespaceRegionStatus.State.ValueType  # 0
+    STATE_ADDING: NamespaceRegionStatus.State.ValueType  # 1
+    """The region is being added to the namespace."""
+    STATE_ACTIVE: NamespaceRegionStatus.State.ValueType  # 2
+    """The namespace is active in this region."""
+    STATE_PASSIVE: NamespaceRegionStatus.State.ValueType  # 3
+    """The namespace is passive in this region."""
+    STATE_REMOVING: NamespaceRegionStatus.State.ValueType  # 4
+    """The region is being removed from the namespace."""
+    STATE_FAILED: NamespaceRegionStatus.State.ValueType  # 5
+    """The region failed to be added/removed, check failure_reason in the last async_operation status for more details."""
+
+    STATE_DEPRECATED_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
-    state: builtins.str
+    state_deprecated: builtins.str
     """The current state of the namespace region.
     Possible values: adding, active, passive, removing, failed.
     For any failed state, reach out to Temporal Cloud support for remediation.
+    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
+    temporal:versioning:max_version=2024-10-01-00
+    """
+    state: global___NamespaceRegionStatus.State.ValueType
+    """The current state of the namespace region.
+    temporal:versioning:min_version=2024-10-01-00
+    temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
     """The id of the async operation that is making changes to where the namespace is available, if any."""
     def __init__(
         self,
         *,
-        state: builtins.str = ...,
+        state_deprecated: builtins.str = ...,
+        state: global___NamespaceRegionStatus.State.ValueType = ...,
         async_operation_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "async_operation_id", b"async_operation_id", "state", b"state"
+            "async_operation_id",
+            b"async_operation_id",
+            "state",
+            b"state",
+            "state_deprecated",
+            b"state_deprecated",
         ],
     ) -> None: ...
 
 global___NamespaceRegionStatus = NamespaceRegionStatus
+
+class ExportSinkSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    ENABLED_FIELD_NUMBER: builtins.int
+    S3_FIELD_NUMBER: builtins.int
+    GCS_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """The unique name of the export sink, it can't be changed once set."""
+    enabled: builtins.bool
+    """A flag indicating whether the export sink is enabled or not."""
+    @property
+    def s3(self) -> temporalio.api.cloud.sink.v1.message_pb2.S3Spec:
+        """The S3 configuration details when destination_type is S3."""
+    @property
+    def gcs(self) -> temporalio.api.cloud.sink.v1.message_pb2.GCSSpec:
+        """This is a feature under development. We will allow GCS sink support for GCP Namespaces.
+        The GCS configuration details when destination_type is GCS.
+        """
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        enabled: builtins.bool = ...,
+        s3: temporalio.api.cloud.sink.v1.message_pb2.S3Spec | None = ...,
+        gcs: temporalio.api.cloud.sink.v1.message_pb2.GCSSpec | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["gcs", b"gcs", "s3", b"s3"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "enabled", b"enabled", "gcs", b"gcs", "name", b"name", "s3", b"s3"
+        ],
+    ) -> None: ...
+
+global___ExportSinkSpec = ExportSinkSpec
+
+class ExportSink(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Health:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _HealthEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            ExportSink._Health.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        HEALTH_UNSPECIFIED: ExportSink._Health.ValueType  # 0
+        HEALTH_OK: ExportSink._Health.ValueType  # 1
+        HEALTH_ERROR_INTERNAL: ExportSink._Health.ValueType  # 2
+        HEALTH_ERROR_USER_CONFIGURATION: ExportSink._Health.ValueType  # 3
+
+    class Health(_Health, metaclass=_HealthEnumTypeWrapper): ...
+    HEALTH_UNSPECIFIED: ExportSink.Health.ValueType  # 0
+    HEALTH_OK: ExportSink.Health.ValueType  # 1
+    HEALTH_ERROR_INTERNAL: ExportSink.Health.ValueType  # 2
+    HEALTH_ERROR_USER_CONFIGURATION: ExportSink.Health.ValueType  # 3
+
+    NAME_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    HEALTH_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    LATEST_DATA_EXPORT_TIME_FIELD_NUMBER: builtins.int
+    LAST_HEALTH_CHECK_TIME_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """The unique name of the export sink."""
+    resource_version: builtins.str
+    """The version of the export sink resource."""
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the export sink."""
+    @property
+    def spec(self) -> global___ExportSinkSpec:
+        """The specification details of the export sink."""
+    health: global___ExportSink.Health.ValueType
+    """The health status of the export sink."""
+    error_message: builtins.str
+    """An error message describing any issues with the export sink, if applicable."""
+    @property
+    def latest_data_export_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The timestamp of the latest successful data export."""
+    @property
+    def last_health_check_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The timestamp of the last health check performed on the export sink."""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        resource_version: builtins.str = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
+        spec: global___ExportSinkSpec | None = ...,
+        health: global___ExportSink.Health.ValueType = ...,
+        error_message: builtins.str = ...,
+        latest_data_export_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        last_health_check_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "last_health_check_time",
+            b"last_health_check_time",
+            "latest_data_export_time",
+            b"latest_data_export_time",
+            "spec",
+            b"spec",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "error_message",
+            b"error_message",
+            "health",
+            b"health",
+            "last_health_check_time",
+            b"last_health_check_time",
+            "latest_data_export_time",
+            b"latest_data_export_time",
+            "name",
+            b"name",
+            "resource_version",
+            b"resource_version",
+            "spec",
+            b"spec",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
+
+global___ExportSink = ExportSink

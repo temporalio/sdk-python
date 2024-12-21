@@ -5,9 +5,8 @@ use std::str::FromStr;
 use std::time::Duration;
 use temporal_client::{
     ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
-    CloudService, ConfiguredClient, HealthService, HttpConnectProxyOptions, OperatorService,
-    RetryClient, RetryConfig, TemporalServiceClientWithMetrics, TestService, TlsConfig,
-    WorkflowService,
+    ConfiguredClient, HealthService, HttpConnectProxyOptions, RetryClient, RetryConfig,
+    TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
 };
 use tonic::metadata::MetadataKey;
 use url::Url;
@@ -297,6 +296,8 @@ impl ClientRef {
     }
 
     fn call_operator_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+        use temporal_client::OperatorService;
+
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -337,6 +338,8 @@ impl ClientRef {
     }
 
     fn call_cloud_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+        use temporal_client::CloudService;
+
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {

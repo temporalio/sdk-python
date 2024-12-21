@@ -125,6 +125,31 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
     ]
     """Delete an API key"""
+    GetNexusEndpoints: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
+    ]
+    """Gets nexus endpoints"""
+    GetNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
+    ]
+    """Get a nexus endpoint"""
+    CreateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+    ]
+    """Create a nexus endpoint"""
+    UpdateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+    ]
+    """Update a nexus endpoint"""
+    DeleteNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+    ]
+    """Delete a nexus endpoint"""
     GetUserGroups: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
@@ -180,6 +205,55 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
     ]
     """Delete a service account."""
+    GetUsage: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
+    ]
+    """WARNING: Pre-Release Feature
+    Get usage data across namespaces
+    """
+    GetAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
+    ]
+    """Get account information."""
+    UpdateAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
+    ]
+    """Update account information."""
+    CreateNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
+    ]
+    """Create an export sink"""
+    GetNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
+    ]
+    """Get an export sink"""
+    GetNamespaceExportSinks: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
+    ]
+    """Get export sinks"""
+    UpdateNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
+    ]
+    """Update an export sink"""
+    DeleteNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
+    ]
+    """Delete an export sink"""
+    ValidateNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
+    ]
+    """Validates an export sink configuration by delivering an empty test file to the specified sink.
+    This operation verifies that the sink is correctly configured, accessible, and ready for data export.
+    """
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
@@ -343,6 +417,41 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse:
         """Delete an API key"""
     @abc.abstractmethod
+    def GetNexusEndpoints(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse:
+        """Gets nexus endpoints"""
+    @abc.abstractmethod
+    def GetNexusEndpoint(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse:
+        """Get a nexus endpoint"""
+    @abc.abstractmethod
+    def CreateNexusEndpoint(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse:
+        """Create a nexus endpoint"""
+    @abc.abstractmethod
+    def UpdateNexusEndpoint(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse:
+        """Update a nexus endpoint"""
+    @abc.abstractmethod
+    def DeleteNexusEndpoint(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse:
+        """Delete a nexus endpoint"""
+    @abc.abstractmethod
     def GetUserGroups(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
@@ -421,6 +530,75 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse:
         """Delete a service account."""
+    @abc.abstractmethod
+    def GetUsage(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse:
+        """WARNING: Pre-Release Feature
+        Get usage data across namespaces
+        """
+    @abc.abstractmethod
+    def GetAccount(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse:
+        """Get account information."""
+    @abc.abstractmethod
+    def UpdateAccount(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse
+    ):
+        """Update account information."""
+    @abc.abstractmethod
+    def CreateNamespaceExportSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse:
+        """Create an export sink"""
+    @abc.abstractmethod
+    def GetNamespaceExportSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse:
+        """Get an export sink"""
+    @abc.abstractmethod
+    def GetNamespaceExportSinks(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse:
+        """Get export sinks"""
+    @abc.abstractmethod
+    def UpdateNamespaceExportSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse:
+        """Update an export sink"""
+    @abc.abstractmethod
+    def DeleteNamespaceExportSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse:
+        """Delete an export sink"""
+    @abc.abstractmethod
+    def ValidateNamespaceExportSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse:
+        """Validates an export sink configuration by delivering an empty test file to the specified sink.
+        This operation verifies that the sink is correctly configured, accessible, and ready for data export.
+        """
 
 def add_CloudServiceServicer_to_server(
     servicer: CloudServiceServicer, server: grpc.Server
