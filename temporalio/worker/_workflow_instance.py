@@ -358,23 +358,36 @@ class _WorkflowInstanceImpl(
         activation_err: Optional[Exception] = None
         try:
             # Apply every job, running the loop afterward
-            is_query = False
+            no_queries = True
             for job in act.jobs:
                 if job.HasField("initialize_workflow"):
                     self._workflow_input = self._make_workflow_input(
                         job.initialize_workflow
                     )
                 elif job.HasField("query_workflow"):
-                    is_query = True
+                    no_queries = False
                 # Let errors bubble out of these to the caller to fail the task
                 self._apply(job)
 
             # Conditions are not checked on query activations. Query activations always come without
             # any other jobs.
-            self._run_once(check_conditions=not is_query)
-            # Ensure the main workflow function is called on first task, and called last.
-            if self._primary_task_initter is not None and self._primary_task is None:
-                self._primary_task_initter()
+            first_task = False
+            try:
+                self._run_once(check_conditions=no_queries)
+            finally:
+                # Ensure the main workflow function task is initialized after a first run of the
+                # event loop, which might execute before-start signals/updates. This is behind
+                # a finally because if those handlers fail, we need still need the main routine
+                # to be initialized in order to fail tasks properly.
+                if (
+                    self._primary_task_initter is not None
+                    and self._primary_task is None
+                ):
+                    self._primary_task_initter()
+                    first_task = True
+            # Because we want any before-start signals/updates to fully process before running
+            # the main routine for the first time, we run the loop again if this is the first time.
+            if first_task:
                 self._run_once(check_conditions=True)
         except Exception as err:
             # We want some errors during activation, like those that can happen
