@@ -369,12 +369,13 @@ class _WorkflowInstanceImpl(
                 # Let errors bubble out of these to the caller to fail the task
                 self._apply(job)
 
-            # Ensure the main workflow function is called, and called last, if needed
-            if self._primary_task_initter is not None and self._primary_task is None:
-                self._primary_task_initter()
             # Conditions are not checked on query activations. Query activations always come without
             # any other jobs.
             self._run_once(check_conditions=not is_query)
+            # Ensure the main workflow function is called on first task, and called last.
+            if self._primary_task_initter is not None and self._primary_task is None:
+                self._primary_task_initter()
+                self._run_once(check_conditions=True)
         except Exception as err:
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the

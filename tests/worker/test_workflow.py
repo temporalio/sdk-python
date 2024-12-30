@@ -6445,14 +6445,12 @@ async def test_concurrent_sleeps_use_proper_options(
 class SignalsActivitiesTimersUpdatesTracingWorkflow:
     def __init__(self) -> None:
         self.events = []
-        self.do_finish = False
 
     @workflow.run
     async def run(self) -> list[str]:
         tt = asyncio.create_task(self.run_timer())
         at = asyncio.create_task(self.run_act())
         await asyncio.gather(tt, at)
-        await workflow.wait_condition(lambda: self.do_finish)
         return self.events
 
     @workflow.signal
@@ -6474,10 +6472,6 @@ class SignalsActivitiesTimersUpdatesTracingWorkflow:
         self.events.append(f"update-{name}-1")
         await workflow.wait_condition(lambda: True)
         self.events.append(f"update-{name}-2")
-
-    @workflow.signal
-    async def do_finish(self):
-        self.do_finish = True
 
     async def run_timer(self):
         self.events.append("timer-sync")
@@ -6517,26 +6511,26 @@ async def test_async_loop_ordering(client: Client):
         activities=[say_hello],
         task_queue=task_queue,
     ):
+        await asyncio.sleep(0.2)
         await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "1")
         await handle.execute_update(
             SignalsActivitiesTimersUpdatesTracingWorkflow.doupdate, "1"
         )
-        await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.do_finish)
-        expected = [
+        expected_old = [
             "sig-before-sync",
             "sig-before-1",
+            "sig-before-2",
+            "timer-sync",
+            "act-sync",
+            "act-1",
+            "act-2",
             "sig-1-sync",
             "sig-1-1",
+            "sig-1-2",
             "update-1-sync",
             "update-1-1",
-            'timer-sync',
-            'act-sync',
-            'sig-before-2',
-            'sig-1-2',
-            'update-1-2',
-            'act-1',
-            'act-2',
-            'timer-1',
-            'timer-2',
+            "update-1-2",
+            "timer-1",
+            "timer-2"
         ]
-        assert await handle.result() == expected
+        assert await handle.result() == expected_old
