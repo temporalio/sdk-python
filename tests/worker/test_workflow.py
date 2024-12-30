@@ -6439,3 +6439,104 @@ async def test_concurrent_sleeps_use_proper_options(
 
         # Force replay with a query to ensure determinism
         await handle.query("__temporal_workflow_metadata")
+
+
+@workflow.defn
+class SignalsActivitiesTimersUpdatesTracingWorkflow:
+    def __init__(self) -> None:
+        self.events = []
+        self.do_finish = False
+
+    @workflow.run
+    async def run(self) -> list[str]:
+        tt = asyncio.create_task(self.run_timer())
+        at = asyncio.create_task(self.run_act())
+        await asyncio.gather(tt, at)
+        await workflow.wait_condition(lambda: self.do_finish)
+        return self.events
+
+    @workflow.signal
+    async def dosig(self, name: str):
+        self.events.append(f"sig-{name}-sync")
+        fut = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append(f"sig-{name}-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append(f"sig-{name}-2")
+
+    @workflow.update
+    async def doupdate(self, name: str):
+        self.events.append(f"update-{name}-sync")
+        fut = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append(f"update-{name}-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append(f"update-{name}-2")
+
+    @workflow.signal
+    async def do_finish(self):
+        self.do_finish = True
+
+    async def run_timer(self):
+        self.events.append("timer-sync")
+        await workflow.sleep(0.1)
+        fut = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append("timer-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append("timer-2")
+
+    async def run_act(self):
+        self.events.append("act-sync")
+        await workflow.execute_activity(
+            say_hello, "Enchi", schedule_to_close_timeout=timedelta(seconds=5)
+        )
+        fut = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append("act-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append("act-2")
+
+
+async def test_async_loop_ordering(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+    handle = await client.start_workflow(
+        SignalsActivitiesTimersUpdatesTracingWorkflow.run,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+    await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "before")
+
+    async with new_worker(
+        client,
+        SignalsActivitiesTimersUpdatesTracingWorkflow,
+        activities=[say_hello],
+        task_queue=task_queue,
+    ):
+        await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "1")
+        await handle.execute_update(
+            SignalsActivitiesTimersUpdatesTracingWorkflow.doupdate, "1"
+        )
+        await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.do_finish)
+        expected = [
+            "sig-before-sync",
+            "sig-before-1",
+            "sig-1-sync",
+            "sig-1-1",
+            "update-1-sync",
+            "update-1-1",
+            'timer-sync',
+            'act-sync',
+            'sig-before-2',
+            'sig-1-2',
+            'update-1-2',
+            'act-1',
+            'act-2',
+            'timer-1',
+            'timer-2',
+        ]
+        assert await handle.result() == expected
