@@ -1,5 +1,4 @@
-"""
-Common Temporal exceptions.
+"""Common Temporal exceptions.
 
 # Temporal Failure
 
@@ -42,8 +41,7 @@ class TemporalError(Exception):
 
 
 class FailureError(TemporalError):
-    """
-    Base for runtime failures during workflow/activity execution.
+    """Base for runtime failures during workflow/activity execution.
 
     This is extended by ``ApplicationError``, which can be raised in a Workflow to fail the Workflow Execution.
     Workflow Execution Failures put the Workflow Execution into the "Failed" state and no more attempts will
@@ -99,8 +97,7 @@ class WorkflowAlreadyStartedError(FailureError):
 
 
 class ApplicationError(FailureError):
-    """
-    Error raised during workflow/activity execution.
+    """Error raised during workflow/activity execution.
 
     Can be raised in a Workflow to fail the Workflow Execution.
     Workflow Execution Failures put the Workflow Execution into the "Failed" state and no more attempts will
