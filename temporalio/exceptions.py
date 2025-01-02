@@ -1,4 +1,23 @@
-"""Common Temporal exceptions."""
+"""
+Common Temporal exceptions.
+
+# Temporal Failure
+
+Most Temporal SDKs have a base class that the other Failures extend.
+In python, it is the ``FailureError``.
+
+# Application Failure
+
+Workflow, and Activity, and Nexus Operation code use Application Failures to
+communicate application-specific failures that happen.
+This is the only type of Temporal Failure created and thrown by user code.
+In the Python SDK, it is the ``ApplicationError``.
+
+# References
+
+More information can be found in the docs at
+https://docs.temporal.io/references/failures#workflow-execution-failures.
+"""
 
 import asyncio
 from datetime import timedelta
@@ -23,7 +42,16 @@ class TemporalError(Exception):
 
 
 class FailureError(TemporalError):
-    """Base for runtime failures during workflow/activity execution."""
+    """
+    Base for runtime failures during workflow/activity execution.
+
+    This is extended by ``ApplicationError``, which can be raised in a Workflow to fail the Workflow Execution.
+    Workflow Execution Failures put the Workflow Execution into the "Failed" state and no more attempts will
+    be made in progressing this execution.
+
+    Any exception that does not extend this exception
+    is considered a Workflow Task Failure. These types of failures will cause the Workflow Task to be retried.
+    """
 
     def __init__(
         self,
@@ -71,7 +99,27 @@ class WorkflowAlreadyStartedError(FailureError):
 
 
 class ApplicationError(FailureError):
-    """Error raised during workflow/activity execution."""
+    """
+    Error raised during workflow/activity execution.
+
+    Can be raised in a Workflow to fail the Workflow Execution.
+    Workflow Execution Failures put the Workflow Execution into the "Failed" state and no more attempts will
+    be made in progressing their execution.
+
+    If you are creating custom exceptions or raising typical Python-based
+    exceptions you would either need to extend this class or
+    explicitly state that the exception is a Workflow Execution Failure by raising a new ``ApplicationError``.
+
+    Any exception that does not extend this exception
+    is considered a Workflow Task Failure. These types of failures will cause the Workflow Task to be retried.
+
+    # Example
+
+    >>> from temporalio.exceptions import ApplicationError
+    ... # ...
+    ... if isDelivery and distance.get_kilometers() > 25:
+    ...     raise ApplicationError("Customer lives outside the service area")
+    """
 
     def __init__(
         self,
