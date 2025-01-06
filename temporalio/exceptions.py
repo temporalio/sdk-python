@@ -99,18 +99,10 @@ class WorkflowAlreadyStartedError(FailureError):
 
 
 class ApplicationError(FailureError):
-    """Error raised during workflow/activity execution.
+    """Error raised during workflow/activity execution to cause a workflow execution failure.
 
-    Can be raised in a Workflow to fail the Workflow Execution.
-    Workflow Execution Failures put the Workflow Execution into the "Failed" state and no more attempts will
-    be made in progressing their execution.
-
-    If you are creating custom exceptions or raising typical Python-based
-    exceptions you would either need to extend this class or
-    explicitly state that the exception is a Workflow Execution Failure by raising a new ``ApplicationError``.
-
-    Any exception that does not extend this exception
-    is considered a Workflow Task Failure. These types of failures will cause the Workflow Task to be retried.
+    Workflow Execution Failures put the Workflow Execution into the "Failed" state and no further attempt will
+    be made to progress their execution.
 
     # Example
 
