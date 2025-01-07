@@ -4426,6 +4426,57 @@ async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironme
 
 
 @workflow.defn
+class UpdateRespectsFirstExecutionRunIdWorkflow:
+    def __init__(self) -> None:
+        self.update_received = False
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self.update_received)
+
+    @workflow.update
+    async def update(self) -> None:
+        self.update_received = True
+
+
+async def test_workflow_update_respects_first_execution_run_id(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    # Start one workflow, obtain the run ID (r1), and let it complete. Start a second
+    # workflow with the same workflow ID, and try to send an update using the handle from
+    # r1.
+    workflow_id = f"update-respects-first-execution-run-id-{uuid.uuid4()}"
+    async with new_worker(client, UpdateRespectsFirstExecutionRunIdWorkflow) as worker:
+
+        async def start_workflow(workflow_id: str) -> WorkflowHandle:
+            return await client.start_workflow(
+                UpdateRespectsFirstExecutionRunIdWorkflow.run,
+                id=workflow_id,
+                task_queue=worker.task_queue,
+            )
+
+        wf_execution_1_handle = await start_workflow(workflow_id)
+        await wf_execution_1_handle.execute_update(
+            UpdateRespectsFirstExecutionRunIdWorkflow.update
+        )
+        await wf_execution_1_handle.result()
+        await start_workflow(workflow_id)
+
+        # Execution 1 has closed. This would succeed if the update incorrectly targets
+        # the second execution
+        with pytest.raises(RPCError) as exc_info:
+            await wf_execution_1_handle.execute_update(
+                UpdateRespectsFirstExecutionRunIdWorkflow.update
+            )
+        assert exc_info.value.status == RPCStatusCode.NOT_FOUND
+        assert "workflow execution not found" in str(exc_info.value)
+
+
+@workflow.defn
 class ImmediatelyCompleteUpdateAndWorkflow:
     def __init__(self) -> None:
         self._got_update = "no"
@@ -4538,6 +4589,8 @@ async def test_workflow_update_separate_handle(
             UpdateSeparateHandleWorkflow.update,
             wait_for_stage=WorkflowUpdateStage.ACCEPTED,
         )
+
+        assert update_handle_1.workflow_run_id == handle.first_execution_run_id
 
         # Create another handle and have them both wait for update complete
         update_handle_2 = client.get_workflow_handle(
