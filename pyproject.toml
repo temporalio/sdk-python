@@ -34,6 +34,7 @@ Documentation = "https://docs.temporal.io/docs/python"
 dev = [
     "cibuildwheel>=2.22.0,<3",
     "grpcio-tools>=1.48.2,<2",
+    "maturin>=1.0,<2.0",
     "mypy>=1.0.0,<2",
     "mypy-protobuf>=3.3.0,<4",
     "psutil>=5.9.3,<6",
@@ -52,24 +53,6 @@ dev = [
     "wheel>=0.42.0,<0.43",
     "ruff>=0.5.0,<0.6",
 ]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "temporalio/api/**/*",
-    "temporalio/bridge/proto/**/*",
-]
-exclude = ["temporalio/bridge/**/target"]
-
-[tool.hatch.build.targets.wheel]
-include = [
-    "temporalio/api/**/*",
-    "temporalio/bridge/proto/**/*",
-]
-exclude = ["temporalio/bridge/**/target"]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
 
 [tool.poe.tasks]
 build-develop = "python scripts/setup_bridge.py develop"
