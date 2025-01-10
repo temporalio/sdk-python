@@ -1512,9 +1512,9 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 #### Proto Generation and Testing
 
 To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
-protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"`. Then the protobuf files can be
-generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var
-to `1` prior to running tests.
+protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"` +
+`poetry install --no-root --all-extras`. Then the protobuf files can be generated via `poe gen-protos`. Tests can be run
+for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
 
 Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files
 and run `poetry install --no-root --all-extras`. Make sure you `poe format` the results.

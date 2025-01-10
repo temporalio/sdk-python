@@ -83,6 +83,7 @@ jobs:
           TEMPORAL_TEST_PROTO3: 1
         run: |
           poetry add --python 3.9 "protobuf<4"
+          poetry install --no-root --all-extras
           poe gen-protos
           poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)

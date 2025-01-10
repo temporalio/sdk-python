@@ -131,9 +131,6 @@ before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stab
 before-build = "pip install protoc-wheel-0"
 environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
 
-[tool.cibuildwheel.macos]
-environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
-
 [tool.mypy]
 ignore_missing_imports = true
 exclude = [
