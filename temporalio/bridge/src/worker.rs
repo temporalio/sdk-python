@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)] // pymethods annotations causing issues with this lint
+
 use anyhow::Context;
 use log::error;
 use prost::Message;

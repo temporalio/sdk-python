@@ -26,7 +26,7 @@ import temporalio.bridge.proto.health.v1
 import temporalio.exceptions
 import temporalio.runtime
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
@@ -746,6 +746,18 @@ class CloudService:
             clv1.CreateNamespaceResponse,
             service="cloud",
         )
+        self.create_namespace_export_sink = client._new_call(
+            "create_namespace_export_sink",
+            clv1.CreateNamespaceExportSinkRequest,
+            clv1.CreateNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.create_nexus_endpoint = client._new_call(
+            "create_nexus_endpoint",
+            clv1.CreateNexusEndpointRequest,
+            clv1.CreateNexusEndpointResponse,
+            service="cloud",
+        )
         self.create_service_account = client._new_call(
             "create_service_account",
             clv1.CreateServiceAccountRequest,
@@ -776,6 +788,18 @@ class CloudService:
             clv1.DeleteNamespaceResponse,
             service="cloud",
         )
+        self.delete_namespace_export_sink = client._new_call(
+            "delete_namespace_export_sink",
+            clv1.DeleteNamespaceExportSinkRequest,
+            clv1.DeleteNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.delete_nexus_endpoint = client._new_call(
+            "delete_nexus_endpoint",
+            clv1.DeleteNexusEndpointRequest,
+            clv1.DeleteNexusEndpointResponse,
+            service="cloud",
+        )
         self.delete_service_account = client._new_call(
             "delete_service_account",
             clv1.DeleteServiceAccountRequest,
@@ -798,6 +822,12 @@ class CloudService:
             "failover_namespace_region",
             clv1.FailoverNamespaceRegionRequest,
             clv1.FailoverNamespaceRegionResponse,
+            service="cloud",
+        )
+        self.get_account = client._new_call(
+            "get_account",
+            clv1.GetAccountRequest,
+            clv1.GetAccountResponse,
             service="cloud",
         )
         self.get_api_key = client._new_call(
@@ -830,6 +860,30 @@ class CloudService:
             clv1.GetNamespacesResponse,
             service="cloud",
         )
+        self.get_namespace_export_sink = client._new_call(
+            "get_namespace_export_sink",
+            clv1.GetNamespaceExportSinkRequest,
+            clv1.GetNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.get_namespace_export_sinks = client._new_call(
+            "get_namespace_export_sinks",
+            clv1.GetNamespaceExportSinksRequest,
+            clv1.GetNamespaceExportSinksResponse,
+            service="cloud",
+        )
+        self.get_nexus_endpoint = client._new_call(
+            "get_nexus_endpoint",
+            clv1.GetNexusEndpointRequest,
+            clv1.GetNexusEndpointResponse,
+            service="cloud",
+        )
+        self.get_nexus_endpoints = client._new_call(
+            "get_nexus_endpoints",
+            clv1.GetNexusEndpointsRequest,
+            clv1.GetNexusEndpointsResponse,
+            service="cloud",
+        )
         self.get_region = client._new_call(
             "get_region",
             clv1.GetRegionRequest,
@@ -852,6 +906,12 @@ class CloudService:
             "get_service_accounts",
             clv1.GetServiceAccountsRequest,
             clv1.GetServiceAccountsResponse,
+            service="cloud",
+        )
+        self.get_usage = client._new_call(
+            "get_usage",
+            clv1.GetUsageRequest,
+            clv1.GetUsageResponse,
             service="cloud",
         )
         self.get_user_group = client._new_call(
@@ -896,6 +956,12 @@ class CloudService:
             clv1.SetUserNamespaceAccessResponse,
             service="cloud",
         )
+        self.update_account = client._new_call(
+            "update_account",
+            clv1.UpdateAccountRequest,
+            clv1.UpdateAccountResponse,
+            service="cloud",
+        )
         self.update_api_key = client._new_call(
             "update_api_key",
             clv1.UpdateApiKeyRequest,
@@ -906,6 +972,18 @@ class CloudService:
             "update_namespace",
             clv1.UpdateNamespaceRequest,
             clv1.UpdateNamespaceResponse,
+            service="cloud",
+        )
+        self.update_namespace_export_sink = client._new_call(
+            "update_namespace_export_sink",
+            clv1.UpdateNamespaceExportSinkRequest,
+            clv1.UpdateNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.update_nexus_endpoint = client._new_call(
+            "update_nexus_endpoint",
+            clv1.UpdateNexusEndpointRequest,
+            clv1.UpdateNexusEndpointResponse,
             service="cloud",
         )
         self.update_service_account = client._new_call(
@@ -924,6 +1002,12 @@ class CloudService:
             "update_user",
             clv1.UpdateUserRequest,
             clv1.UpdateUserResponse,
+            service="cloud",
+        )
+        self.validate_namespace_export_sink = client._new_call(
+            "validate_namespace_export_sink",
+            clv1.ValidateNamespaceExportSinkRequest,
+            clv1.ValidateNamespaceExportSinkResponse,
             service="cloud",
         )
 

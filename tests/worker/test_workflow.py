@@ -504,7 +504,7 @@ async def test_workflow_signal_and_query_errors(client: Client):
             await handle.query("non-existent query")
         assert str(rpc_err.value) == (
             "Query handler for 'non-existent query' expected but not found,"
-            " known queries: [__enhanced_stack_trace __stack_trace bad_query other_query]"
+            " known queries: [__enhanced_stack_trace __stack_trace __temporal_workflow_metadata bad_query other_query]"
         )
 
 
@@ -1552,12 +1552,12 @@ async def test_workflow_with_custom_runner(client: Client):
             task_queue=worker.task_queue,
         )
         assert result == "Hello, Temporal!"
-    # Confirm first activation and last completion
+    # Confirm first activation and last non-eviction-reply completion
     assert (
         runner._pairs[0][0].jobs[0].initialize_workflow.workflow_type == "HelloWorkflow"
     )
     assert (
-        runner._pairs[-1][-1]
+        runner._pairs[-2][-1]
         .successful.commands[0]
         .complete_workflow_execution.result.data
         == b'"Hello, Temporal!"'
@@ -3018,7 +3018,9 @@ class WaitConditionTimeoutWorkflow:
     async def run(self) -> None:
         # Force timeout, ignore, wait again
         try:
-            await workflow.wait_condition(lambda: self._done, timeout=0.01)
+            await workflow.wait_condition(
+                lambda: self._done, timeout=0.01, timeout_summary="hi!"
+            )
             raise RuntimeError("Expected timeout")
         except asyncio.TimeoutError:
             pass
@@ -4424,6 +4426,57 @@ async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironme
 
 
 @workflow.defn
+class UpdateRespectsFirstExecutionRunIdWorkflow:
+    def __init__(self) -> None:
+        self.update_received = False
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self.update_received)
+
+    @workflow.update
+    async def update(self) -> None:
+        self.update_received = True
+
+
+async def test_workflow_update_respects_first_execution_run_id(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+        )
+    # Start one workflow, obtain the run ID (r1), and let it complete. Start a second
+    # workflow with the same workflow ID, and try to send an update using the handle from
+    # r1.
+    workflow_id = f"update-respects-first-execution-run-id-{uuid.uuid4()}"
+    async with new_worker(client, UpdateRespectsFirstExecutionRunIdWorkflow) as worker:
+
+        async def start_workflow(workflow_id: str) -> WorkflowHandle:
+            return await client.start_workflow(
+                UpdateRespectsFirstExecutionRunIdWorkflow.run,
+                id=workflow_id,
+                task_queue=worker.task_queue,
+            )
+
+        wf_execution_1_handle = await start_workflow(workflow_id)
+        await wf_execution_1_handle.execute_update(
+            UpdateRespectsFirstExecutionRunIdWorkflow.update
+        )
+        await wf_execution_1_handle.result()
+        await start_workflow(workflow_id)
+
+        # Execution 1 has closed. This would succeed if the update incorrectly targets
+        # the second execution
+        with pytest.raises(RPCError) as exc_info:
+            await wf_execution_1_handle.execute_update(
+                UpdateRespectsFirstExecutionRunIdWorkflow.update
+            )
+        assert exc_info.value.status == RPCStatusCode.NOT_FOUND
+        assert "workflow execution not found" in str(exc_info.value)
+
+
+@workflow.defn
 class ImmediatelyCompleteUpdateAndWorkflow:
     def __init__(self) -> None:
         self._got_update = "no"
@@ -4536,6 +4589,8 @@ async def test_workflow_update_separate_handle(
             UpdateSeparateHandleWorkflow.update,
             wait_for_stage=WorkflowUpdateStage.ACCEPTED,
         )
+
+        assert update_handle_1.workflow_run_id == handle.first_execution_run_id
 
         # Create another handle and have them both wait for update complete
         update_handle_2 = client.get_workflow_handle(
@@ -6178,3 +6233,218 @@ async def test_workflow_run_sees_workflow_init(client: Client):
             task_queue=worker.task_queue,
         )
         assert workflow_result == "hello, world"
+
+
+@workflow.defn
+class UserMetadataWorkflow:
+    def __init__(self) -> None:
+        self._done = False
+        self._waiting = False
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            say_hello,
+            "Enchi",
+            start_to_close_timeout=timedelta(seconds=5),
+            summary="meow",
+        )
+        # Force timeout, ignore, wait again
+        try:
+            await workflow.wait_condition(
+                lambda: self._done, timeout=0.01, timeout_summary="hi!"
+            )
+            raise RuntimeError("Expected timeout")
+        except asyncio.TimeoutError:
+            pass
+        await workflow.sleep(0.01, summary="timer2")
+        self._waiting = True
+        workflow.set_current_details("such detail")
+        await workflow.wait_condition(lambda: self._done)
+
+    @workflow.signal(description="sdesc")
+    def done(self) -> None:
+        self._done = True
+
+    @workflow.query(description="qdesc")
+    def waiting(self) -> bool:
+        return self._waiting
+
+    @workflow.update(description="udesc")
+    def some_update(self):
+        pass
+
+
+async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
+        )
+    async with new_worker(
+        client, UserMetadataWorkflow, activities=[say_hello]
+    ) as worker:
+        handle = await client.start_workflow(
+            UserMetadataWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            static_summary="cool workflow bro",
+            static_details="xtremely detailed",
+        )
+
+        # Wait until it's waiting, then send the signal
+        async def waiting() -> bool:
+            return await handle.query(UserMetadataWorkflow.waiting)
+
+        await assert_eq_eventually(True, waiting)
+
+        md_query: temporalio.api.sdk.v1.WorkflowMetadata = await handle.query(
+            "__temporal_workflow_metadata",
+            result_type=temporalio.api.sdk.v1.WorkflowMetadata,
+        )
+        matched_q = [
+            q for q in md_query.definition.query_definitions if q.name == "waiting"
+        ]
+        assert len(matched_q) == 1
+        assert matched_q[0].description == "qdesc"
+
+        matched_u = [
+            u for u in md_query.definition.update_definitions if u.name == "some_update"
+        ]
+        assert len(matched_u) == 1
+        assert matched_u[0].description == "udesc"
+
+        matched_s = [
+            s for s in md_query.definition.signal_definitions if s.name == "done"
+        ]
+        assert len(matched_s) == 1
+        assert matched_s[0].description == "sdesc"
+
+        assert md_query.current_details == "such detail"
+
+        await handle.signal(UserMetadataWorkflow.done)
+        await handle.result()
+
+        # Ensure metadatas are present in history
+        resp = await client.workflow_service.get_workflow_execution_history(
+            GetWorkflowExecutionHistoryRequest(
+                namespace=client.namespace,
+                execution=WorkflowExecution(workflow_id=handle.id),
+            )
+        )
+        timer_summs = set()
+        for event in resp.history.events:
+            if event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
+                assert "cool workflow bro" in PayloadConverter.default.from_payload(
+                    event.user_metadata.summary
+                )
+                assert "xtremely detailed" in PayloadConverter.default.from_payload(
+                    event.user_metadata.details
+                )
+            elif event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED:
+                assert "meow" in PayloadConverter.default.from_payload(
+                    event.user_metadata.summary
+                )
+            elif event.event_type == EventType.EVENT_TYPE_TIMER_STARTED:
+                timer_summs.add(
+                    PayloadConverter.default.from_payload(event.user_metadata.summary)
+                )
+        assert timer_summs == {"hi!", "timer2"}
+
+        describe_r = await handle.describe()
+        assert describe_r.static_summary == "cool workflow bro"
+        assert describe_r.static_details == "xtremely detailed"
+
+
+@workflow.defn
+class WorkflowSleepWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.sleep(1)
+
+
+async def test_workflow_sleep(client: Client):
+    async with new_worker(client, WorkflowSleepWorkflow) as worker:
+        start_time = datetime.now()
+        await client.execute_workflow(
+            WorkflowSleepWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert (datetime.now() - start_time) >= timedelta(seconds=1)
+
+
+@workflow.defn
+class ConcurrentSleepsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        sleeps_a = [workflow.sleep(0.1, summary=f"t{i}") for i in range(5)]
+        zero_a = workflow.sleep(0, summary="zero_timer")
+        wait_some = workflow.wait_condition(
+            lambda: False, timeout=0.1, timeout_summary="wait_some"
+        )
+        zero_b = workflow.wait_condition(
+            lambda: False, timeout=0, timeout_summary="zero_wait"
+        )
+        no_summ = workflow.sleep(0.1)
+        sleeps_b = [workflow.sleep(0.1, summary=f"t{i}") for i in range(5, 10)]
+        try:
+            await asyncio.gather(
+                *sleeps_a,
+                zero_a,
+                wait_some,
+                zero_b,
+                no_summ,
+                *sleeps_b,
+                return_exceptions=True,
+            )
+        except asyncio.TimeoutError:
+            pass
+
+        task_1 = asyncio.create_task(self.make_timers(100, 105))
+        task_2 = asyncio.create_task(self.make_timers(105, 110))
+        await asyncio.gather(task_1, task_2)
+
+    async def make_timers(self, start: int, end: int):
+        await asyncio.gather(
+            *[workflow.sleep(0.1, summary=f"m_t{i}") for i in range(start, end)]
+        )
+
+
+async def test_concurrent_sleeps_use_proper_options(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
+        )
+    async with new_worker(client, ConcurrentSleepsWorkflow) as worker:
+        handle = await client.start_workflow(
+            ConcurrentSleepsWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+        resp = await client.workflow_service.get_workflow_execution_history(
+            GetWorkflowExecutionHistoryRequest(
+                namespace=client.namespace,
+                execution=WorkflowExecution(workflow_id=handle.id),
+            )
+        )
+        timer_summaries = [
+            PayloadConverter.default.from_payload(e.user_metadata.summary)
+            if e.user_metadata.HasField("summary")
+            else "<no summ>"
+            for e in resp.history.events
+            if e.event_type == EventType.EVENT_TYPE_TIMER_STARTED
+        ]
+        assert timer_summaries == [
+            *[f"t{i}" for i in range(5)],
+            "zero_timer",
+            "wait_some",
+            "<no summ>",
+            *[f"t{i}" for i in range(5, 10)],
+            *[f"m_t{i}" for i in range(100, 110)],
+        ]
+
+        # Force replay with a query to ensure determinism
+        await handle.query("__temporal_workflow_metadata")

@@ -282,6 +282,16 @@ class _WorkflowInstanceImpl(
             ret_type=temporalio.api.sdk.v1.EnhancedStackTrace,
         )
 
+        self._queries["__temporal_workflow_metadata"] = (
+            temporalio.workflow._QueryDefinition(
+                name="__temporal_workflow_metadata",
+                fn=self._temporal_workflow_metadata,
+                is_method=False,
+                arg_types=[],
+                ret_type=temporalio.api.sdk.v1.WorkflowMetadata,
+            )
+        )
+
         # Maintain buffered signals for later-added dynamic handlers
         self._buffered_signals: Dict[
             str, List[temporalio.bridge.proto.workflow_activation.SignalWorkflow]
@@ -314,6 +324,10 @@ class _WorkflowInstanceImpl(
 
         # For tracking the thread this workflow is running on (primarily for deadlock situations)
         self._current_thread_id: Optional[int] = None
+
+        # The current details (as opposed to static details on workflow start), returned in the
+        # metadata query
+        self._current_details = ""
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
@@ -1159,6 +1173,7 @@ class _WorkflowInstanceImpl(
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
+        summary: Optional[str] = None,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
         # Get activity definition if it's callable
@@ -1194,6 +1209,7 @@ class _WorkflowInstanceImpl(
                 arg_types=arg_types,
                 ret_type=ret_type,
                 versioning_intent=versioning_intent,
+                summary=summary,
             )
         )
 
@@ -1220,6 +1236,8 @@ class _WorkflowInstanceImpl(
             ]
         ],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
         name: str
@@ -1257,6 +1275,8 @@ class _WorkflowInstanceImpl(
                 arg_types=arg_types,
                 ret_type=ret_type,
                 versioning_intent=versioning_intent,
+                static_summary=static_summary,
+                static_details=static_details,
             )
         )
 
@@ -1415,13 +1435,55 @@ class _WorkflowInstanceImpl(
                         else [update.value]
                     )
 
+    async def workflow_sleep(
+        self, duration: float, *, summary: Optional[str] = None
+    ) -> None:
+        user_metadata = (
+            temporalio.api.sdk.v1.UserMetadata(
+                summary=self._payload_converter.to_payload(summary)
+            )
+            if summary
+            else None
+        )
+        fut = self.create_future()
+        self._timer_impl(
+            duration,
+            _TimerOptions(user_metadata=user_metadata),
+            lambda: fut.set_result(None),
+        )
+        await fut
+
     async def workflow_wait_condition(
-        self, fn: Callable[[], bool], *, timeout: Optional[float] = None
+        self,
+        fn: Callable[[], bool],
+        *,
+        timeout: Optional[float] = None,
+        timeout_summary: Optional[str] = None,
     ) -> None:
         self._assert_not_read_only("wait condition")
         fut = self.create_future()
         self._conditions.append((fn, fut))
-        await asyncio.wait_for(fut, timeout)
+        user_metadata = (
+            temporalio.api.sdk.v1.UserMetadata(
+                summary=self._payload_converter.to_payload(timeout_summary)
+            )
+            if timeout_summary
+            else None
+        )
+        ctxvars = contextvars.copy_context()
+
+        async def in_context():
+            _TimerOptionsCtxVar.set(_TimerOptions(user_metadata=user_metadata))
+            await asyncio.wait_for(fut, timeout)
+
+        await ctxvars.run(in_context)
+
+    def workflow_get_current_details(self) -> str:
+        return self._current_details
+
+    def workflow_set_current_details(self, details: str):
+        self._assert_not_read_only("set current details")
+        self._current_details = details
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
@@ -1773,8 +1835,9 @@ class _WorkflowInstanceImpl(
             asyncio._set_running_loop(self)
 
             # We instantiate the workflow class _inside_ here because __init__
-            # needs to run with this event loop set
-            if not self._object:
+            # needs to run with this event loop set. If we're deleting and
+            # we've never initialized, we don't need to bother.
+            if not self._object and not self._deleting:
                 self._object = self._instantiate_workflow_object()
 
             # Run while there is anything ready
@@ -1954,6 +2017,64 @@ class _WorkflowInstanceImpl(
             )
             return est
 
+    def _temporal_workflow_metadata(self) -> temporalio.api.sdk.v1.WorkflowMetadata:
+        query_definitions = [
+            temporalio.api.sdk.v1.WorkflowInteractionDefinition(
+                name=qd.name or "",
+                description=qd.description or "",
+            )
+            for qd in self._queries.values()
+        ]
+        query_definitions.sort(key=lambda qd: qd.name)
+        signal_definitions = [
+            temporalio.api.sdk.v1.WorkflowInteractionDefinition(
+                name=sd.name or "",
+                description=sd.description or "",
+            )
+            for sd in self._signals.values()
+        ]
+        signal_definitions.sort(key=lambda sd: sd.name)
+        update_definitions = [
+            temporalio.api.sdk.v1.WorkflowInteractionDefinition(
+                name=ud.name or "",
+                description=ud.description or "",
+            )
+            for ud in self._updates.values()
+        ]
+        update_definitions.sort(key=lambda ud: ud.name)
+        wf_def = temporalio.api.sdk.v1.WorkflowDefinition(
+            type=self._info.workflow_type,
+            query_definitions=query_definitions,
+            signal_definitions=signal_definitions,
+            update_definitions=update_definitions,
+        )
+        cur_details = self.workflow_get_current_details()
+        return temporalio.api.sdk.v1.WorkflowMetadata(
+            definition=wf_def, current_details=cur_details
+        )
+
+    def _timer_impl(
+        self,
+        delay: float,
+        options: _TimerOptions,
+        callback: Callable[..., Any],
+        *args: Any,
+        context: Optional[contextvars.Context] = None,
+    ):
+        self._assert_not_read_only("schedule timer")
+        # Delay must be positive
+        if delay < 0:
+            raise RuntimeError("Attempting to schedule timer with negative delay")
+
+        # Create, schedule, and return
+        seq = self._next_seq("timer")
+        handle = _TimerHandle(
+            seq, self.time() + delay, options, callback, args, self, context
+        )
+        handle._apply_start_command(self._add_command(), delay)
+        self._pending_timers[seq] = handle
+        return handle
+
     #### asyncio.AbstractEventLoop function impls ####
     # These are in the order defined in CPython's impl of the base class. Many
     # functions are intentionally not implemented/supported.
@@ -1985,17 +2106,8 @@ class _WorkflowInstanceImpl(
         *args: Any,
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.TimerHandle:
-        self._assert_not_read_only("schedule timer")
-        # Delay must be positive
-        if delay < 0:
-            raise RuntimeError("Attempting to schedule timer with negative delay")
-
-        # Create, schedule, and return
-        seq = self._next_seq("timer")
-        handle = _TimerHandle(seq, self.time() + delay, callback, args, self, context)
-        handle._apply_start_command(self._add_command(), delay)
-        self._pending_timers[seq] = handle
-        return handle
+        options = _TimerOptionsCtxVar.get()
+        return self._timer_impl(delay, options, callback, *args, context=context)
 
     def call_at(
         self,
@@ -2217,11 +2329,22 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
         return self._instance._outbound_schedule_activity(input)
 
 
+@dataclass(frozen=True)
+class _TimerOptions:
+    user_metadata: Optional[temporalio.api.sdk.v1.UserMetadata] = None
+
+
+_TimerOptionsCtxVar: contextvars.ContextVar[_TimerOptions] = contextvars.ContextVar(
+    "__temporal_timer_options", default=_TimerOptions()
+)
+
+
 class _TimerHandle(asyncio.TimerHandle):
     def __init__(
         self,
         seq: int,
         when: float,
+        options: Optional[_TimerOptions],
         callback: Callable[..., Any],
         args: Sequence[Any],
         loop: asyncio.AbstractEventLoop,
@@ -2229,6 +2352,7 @@ class _TimerHandle(asyncio.TimerHandle):
     ) -> None:
         super().__init__(when, callback, args, loop, context)
         self._seq = seq
+        self._options = options
 
     def _apply_start_command(
         self,
@@ -2236,6 +2360,8 @@ class _TimerHandle(asyncio.TimerHandle):
         delay: float,
     ) -> None:
         command.start_timer.seq = self._seq
+        if self._options and self._options.user_metadata:
+            command.user_metadata.CopyFrom(self._options.user_metadata)
         command.start_timer.start_to_fire_timeout.FromNanoseconds(int(delay * 1e9))
 
     def _apply_cancel_command(
@@ -2369,6 +2495,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
                 )
+            if self._input.summary:
+                command.user_metadata.summary.CopyFrom(
+                    self._instance._payload_converter.to_payload(self._input.summary)
+                )
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:
                 command.schedule_local_activity.local_retry_threshold.FromTimedelta(
@@ -2379,8 +2509,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 command.schedule_local_activity.original_schedule_time.CopyFrom(
                     local_backoff.original_schedule_time
                 )
-            # TODO(cretz): Remove when https://github.com/temporalio/sdk-core/issues/316 fixed
-            command.schedule_local_activity.retry_policy.SetInParent()
 
     def _apply_cancel_command(
         self,
@@ -2506,6 +2634,14 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         )
         if self._input.versioning_intent:
             v.versioning_intent = self._input.versioning_intent._to_proto()
+        if self._input.static_summary:
+            command.user_metadata.summary.CopyFrom(
+                self._instance._payload_converter.to_payload(self._input.static_summary)
+            )
+        if self._input.static_details:
+            command.user_metadata.details.CopyFrom(
+                self._instance._payload_converter.to_payload(self._input.static_details)
+            )
 
     # If request cancel external, result does _not_ have seq
     def _apply_cancel_command(

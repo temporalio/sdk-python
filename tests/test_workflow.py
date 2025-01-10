@@ -36,11 +36,11 @@ class GoodDefn(GoodDefnBase):
     def signal1(self):
         pass
 
-    @workflow.signal(name="signal-custom")
+    @workflow.signal(name="signal-custom", description="fun")
     def signal2(self):
         pass
 
-    @workflow.signal(dynamic=True)
+    @workflow.signal(dynamic=True, description="boo")
     def signal3(self, name: str, args: Sequence[RawValue]):
         pass
 
@@ -48,11 +48,11 @@ class GoodDefn(GoodDefnBase):
     def query1(self):
         pass
 
-    @workflow.query(name="query-custom")
+    @workflow.query(name="query-custom", description="qd")
     def query2(self):
         pass
 
-    @workflow.query(dynamic=True)
+    @workflow.query(dynamic=True, description="dqd")
     def query3(self, name: str, args: Sequence[RawValue]):
         pass
 
@@ -60,11 +60,11 @@ class GoodDefn(GoodDefnBase):
     def update1(self):
         pass
 
-    @workflow.update(name="update-custom")
+    @workflow.update(name="update-custom", description="ud")
     def update2(self):
         pass
 
-    @workflow.update(dynamic=True)
+    @workflow.update(dynamic=True, description="dud")
     def update3(self, name: str, args: Sequence[RawValue]):
         pass
 
@@ -82,10 +82,13 @@ def test_workflow_defn_good():
                 name="signal1", fn=GoodDefn.signal1, is_method=True
             ),
             "signal-custom": workflow._SignalDefinition(
-                name="signal-custom", fn=GoodDefn.signal2, is_method=True
+                name="signal-custom",
+                fn=GoodDefn.signal2,
+                is_method=True,
+                description="fun",
             ),
             None: workflow._SignalDefinition(
-                name=None, fn=GoodDefn.signal3, is_method=True
+                name=None, fn=GoodDefn.signal3, is_method=True, description="boo"
             ),
             "base_signal": workflow._SignalDefinition(
                 name="base_signal", fn=GoodDefnBase.base_signal, is_method=True
@@ -96,10 +99,13 @@ def test_workflow_defn_good():
                 name="query1", fn=GoodDefn.query1, is_method=True
             ),
             "query-custom": workflow._QueryDefinition(
-                name="query-custom", fn=GoodDefn.query2, is_method=True
+                name="query-custom",
+                fn=GoodDefn.query2,
+                is_method=True,
+                description="qd",
             ),
             None: workflow._QueryDefinition(
-                name=None, fn=GoodDefn.query3, is_method=True
+                name=None, fn=GoodDefn.query3, is_method=True, description="dqd"
             ),
             "base_query": workflow._QueryDefinition(
                 name="base_query", fn=GoodDefnBase.base_query, is_method=True
@@ -110,10 +116,13 @@ def test_workflow_defn_good():
                 name="update1", fn=GoodDefn.update1, is_method=True
             ),
             "update-custom": workflow._UpdateDefinition(
-                name="update-custom", fn=GoodDefn.update2, is_method=True
+                name="update-custom",
+                fn=GoodDefn.update2,
+                is_method=True,
+                description="ud",
             ),
             None: workflow._UpdateDefinition(
-                name=None, fn=GoodDefn.update3, is_method=True
+                name=None, fn=GoodDefn.update3, is_method=True, description="dud"
             ),
             "base_update": workflow._UpdateDefinition(
                 name="base_update", fn=GoodDefnBase.base_update, is_method=True

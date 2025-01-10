@@ -618,6 +618,20 @@ async def test_list_workflows_and_fetch_history(
     )
     assert actual_id_and_input == expected_id_and_input
 
+    # Verify listing can limit results
+    limited = [
+        w async for w in client.list_workflows(f"WorkflowId = '{workflow_id}'", limit=3)
+    ]
+    assert len(limited) == 3
+    # With a weird page size
+    limited = [
+        w
+        async for w in client.list_workflows(
+            f"WorkflowId = '{workflow_id}'", page_size=2, limit=3
+        )
+    ]
+    assert len(limited) == 3
+
 
 @workflow.defn
 class CountableWorkflow:
@@ -778,6 +792,8 @@ async def test_schedule_basics(
             task_timeout=timedelta(hours=3),
             retry_policy=RetryPolicy(maximum_attempts=20),
             memo={"memokey1": "memoval1"},
+            static_summary="summary",
+            static_details="details",
         ),
         spec=ScheduleSpec(
             calendars=[
@@ -848,6 +864,15 @@ async def test_schedule_basics(
             day_of_week=(ScheduleRange(1),),
         )
     )
+    # Summary & description are encoded
+    assert schedule.action.static_summary
+    assert schedule.action.static_details
+    schedule.action.static_summary = (
+        await DataConverter.default.encode([schedule.action.static_summary])
+    )[0]
+    schedule.action.static_details = (
+        await DataConverter.default.encode([schedule.action.static_details])
+    )[0]
 
     # Describe it and confirm
     desc = await handle.describe()
