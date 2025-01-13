@@ -2145,7 +2145,7 @@ class _WorkflowInstanceImpl(
         if sys.version_info >= (3, 11):
             task = asyncio.Task(coro, loop=self, context=context)  # type: ignore
         else:
-            task = asyncio.Task(coro, loop=self)
+            task = asyncio.Task(coro, loop=self)  # type: ignore
         self._register_task(task, name=name)
         return task
 

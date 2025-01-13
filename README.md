@@ -1,6 +1,6 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
 
-[![Python 3.8+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
@@ -1367,7 +1367,7 @@ The Python SDK is built to work with Python 3.8 and newer. It is built using
 
 To build the SDK from source for use as a dependency, the following prerequisites are required:
 
-* [Python](https://www.python.org/) >= 3.8
+* [Python](https://www.python.org/) >= 3.9
   * Make sure the latest version of `pip` is in use
 * [Rust](https://www.rust-lang.org/)
 * [Protobuf Compiler](https://protobuf.dev/)
@@ -1512,9 +1512,9 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 #### Proto Generation and Testing
 
 To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
-protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"`. Then the protobuf files can be
-generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var
-to `1` prior to running tests.
+protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"` +
+`poetry install --no-root --all-extras`. Then the protobuf files can be generated via `poe gen-protos`. Tests can be run
+for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
 
 Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files
 and run `poetry install --no-root --all-extras`. Make sure you `poe format` the results.
