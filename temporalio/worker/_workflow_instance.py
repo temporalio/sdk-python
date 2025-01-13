@@ -442,6 +442,7 @@ class _WorkflowInstanceImpl(
                 self._current_completion.failed.failure.message = (
                     f"Failed converting activation exception: {inner_err}"
                 )
+                self._current_completion.failed.failure.application_failure_info.SetInParent()
 
         def is_completion(command):
             return (
