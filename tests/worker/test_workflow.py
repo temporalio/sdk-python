@@ -6448,3 +6448,153 @@ async def test_concurrent_sleeps_use_proper_options(
 
         # Force replay with a query to ensure determinism
         await handle.query("__temporal_workflow_metadata")
+
+
+@workflow.defn
+class SignalsActivitiesTimersUpdatesTracingWorkflow:
+    def __init__(self) -> None:
+        self.events: List[str] = []
+
+    @workflow.run
+    async def run(self) -> List[str]:
+        tt = asyncio.create_task(self.run_timer())
+        at = asyncio.create_task(self.run_act())
+        await asyncio.gather(tt, at)
+        return self.events
+
+    @workflow.signal
+    async def dosig(self, name: str):
+        self.events.append(f"sig-{name}-sync")
+        fut: asyncio.Future[bool] = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append(f"sig-{name}-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append(f"sig-{name}-2")
+
+    @workflow.update
+    async def doupdate(self, name: str):
+        self.events.append(f"update-{name}-sync")
+        fut: asyncio.Future[bool] = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append(f"update-{name}-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append(f"update-{name}-2")
+
+    async def run_timer(self):
+        self.events.append("timer-sync")
+        await workflow.sleep(0.1)
+        fut: asyncio.Future[bool] = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append("timer-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append("timer-2")
+
+    async def run_act(self):
+        self.events.append("act-sync")
+        await workflow.execute_activity(
+            say_hello, "Enchi", schedule_to_close_timeout=timedelta(seconds=5)
+        )
+        fut: asyncio.Future[bool] = asyncio.Future()
+        fut.set_result(True)
+        await fut
+        self.events.append("act-1")
+        await workflow.wait_condition(lambda: True)
+        self.events.append("act-2")
+
+
+async def test_async_loop_ordering(client: Client):
+    """This test mostly exists to generate histories for test_replayer_async_ordering.
+    See that test for more."""
+    task_queue = f"tq-{uuid.uuid4()}"
+    handle = await client.start_workflow(
+        SignalsActivitiesTimersUpdatesTracingWorkflow.run,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+    await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "before")
+
+    async with new_worker(
+        client,
+        SignalsActivitiesTimersUpdatesTracingWorkflow,
+        activities=[say_hello],
+        task_queue=task_queue,
+    ):
+        await asyncio.sleep(0.2)
+        await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "1")
+        await handle.execute_update(
+            SignalsActivitiesTimersUpdatesTracingWorkflow.doupdate, "1"
+        )
+        await handle.result()
+
+
+@workflow.defn
+class ActivityAndSignalsWhileWorkflowDown:
+    def __init__(self) -> None:
+        self.events: List[str] = []
+        self.counter = 0
+
+    @workflow.run
+    async def run(self, activity_tq: str) -> List[str]:
+        act_task = asyncio.create_task(self.run_act(activity_tq))
+        await workflow.wait_condition(lambda: self.counter >= 2)
+        self.events.append(f"counter-{self.counter}")
+        await act_task
+        workflow.logger.warning(f"run done: {self.events}")
+        return self.events
+
+    @workflow.signal
+    async def dosig(self, name: str):
+        self.events.append(f"sig-{name}")
+        self.counter += 1
+
+    async def run_act(self, activity_tq: str):
+        self.events.append("act-start")
+        await workflow.execute_activity(
+            say_hello,
+            "Enchi",
+            schedule_to_close_timeout=timedelta(seconds=30),
+            task_queue=activity_tq,
+        )
+        self.counter += 1
+        self.events.append("act-done")
+
+
+async def test_alternate_async_loop_ordering(client: Client):
+    """This test mostly exists to generate histories for test_replayer_async_ordering.
+    See that test for more."""
+    task_queue = f"tq-{uuid.uuid4()}"
+    activity_tq = f"tq-{uuid.uuid4()}"
+    handle = await client.start_workflow(
+        ActivityAndSignalsWhileWorkflowDown.run,
+        activity_tq,
+        id=f"wf-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+
+    async with new_worker(
+        client,
+        ActivityAndSignalsWhileWorkflowDown,
+        activities=[say_hello],
+        task_queue=task_queue,
+    ):
+        await asyncio.sleep(0.2)
+
+    async with new_worker(
+        client,
+        activities=[say_hello],
+        task_queue=activity_tq,
+    ):
+        await asyncio.sleep(1)
+        await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "1")
+        await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "2")
+
+    async with new_worker(
+        client,
+        ActivityAndSignalsWhileWorkflowDown,
+        activities=[say_hello],
+        task_queue=task_queue,
+    ):
+        await handle.result()
