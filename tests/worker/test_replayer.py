@@ -21,7 +21,8 @@ from temporalio.worker import (
     WorkflowInterceptorClassInput,
 )
 from tests.helpers import assert_eq_eventually
-from tests.worker.test_workflow import SignalsActivitiesTimersUpdatesTracingWorkflow
+from tests.worker.test_workflow import SignalsActivitiesTimersUpdatesTracingWorkflow, \
+    ActivityAndSignalsWhileWorkflowDown
 
 
 @activity.defn
@@ -469,3 +470,13 @@ async def test_replayer_async_ordering() -> None:
             interceptors=[WorkerWorkflowResultInterceptor()],
         ).replay_workflow(WorkflowHistory.from_json("fake", history))
         assert workflow_res == expected
+
+
+async def test_replayer_alternate_async_ordering() -> None:
+    with Path(__file__).with_name("test_replayer_event_tracing_alternate.json").open() as f:
+        history = f.read()
+    await Replayer(
+        workflows=[ActivityAndSignalsWhileWorkflowDown],
+        interceptors=[WorkerWorkflowResultInterceptor()],
+    ).replay_workflow(WorkflowHistory.from_json("fake", history))
+    assert workflow_res == ["act-start", "sig-1", "sig-2", "counter-2", "act-done"]
