@@ -6452,6 +6452,12 @@ async def test_concurrent_sleeps_use_proper_options(
 
 @workflow.defn
 class SignalsActivitiesTimersUpdatesTracingWorkflow:
+    """
+    These handlers all do different things that will cause the event loop to yield, sometimes
+    until the next workflow task (ex: timer) sometimes within the workflow task (ex: future resolve
+    or wait condition).
+    """
+
     def __init__(self) -> None:
         self.events: List[str] = []
 
@@ -6542,7 +6548,6 @@ class ActivityAndSignalsWhileWorkflowDown:
         await workflow.wait_condition(lambda: self.counter >= 2)
         self.events.append(f"counter-{self.counter}")
         await act_task
-        workflow.logger.warning(f"run done: {self.events}")
         return self.events
 
     @workflow.signal
@@ -6580,6 +6585,7 @@ async def test_alternate_async_loop_ordering(client: Client):
         activities=[say_hello],
         task_queue=task_queue,
     ):
+        # This sleep exists to make sure the first WFT is processed
         await asyncio.sleep(0.2)
 
     async with new_worker(
@@ -6587,6 +6593,7 @@ async def test_alternate_async_loop_ordering(client: Client):
         activities=[say_hello],
         task_queue=activity_tq,
     ):
+        # Make sure the activity starts being processed before sending signals
         await asyncio.sleep(1)
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "1")
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "2")

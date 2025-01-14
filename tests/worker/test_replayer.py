@@ -398,7 +398,7 @@ async def test_replayer_command_reordering_backward_compatibility() -> None:
     )
 
 
-workflow_res = None
+test_replayer_workflow_res = None
 
 
 class WorkerWorkflowResultInterceptor(Interceptor):
@@ -410,9 +410,9 @@ class WorkerWorkflowResultInterceptor(Interceptor):
 
 class WorkflowResultInterceptor(WorkflowInboundInterceptor):
     async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
-        global workflow_res
+        global test_replayer_workflow_res
         res = await super().execute_workflow(input)
-        workflow_res = res
+        test_replayer_workflow_res = res
         return res
 
 
@@ -471,7 +471,7 @@ async def test_replayer_async_ordering() -> None:
             workflows=[SignalsActivitiesTimersUpdatesTracingWorkflow],
             interceptors=[WorkerWorkflowResultInterceptor()],
         ).replay_workflow(WorkflowHistory.from_json("fake", history))
-        assert workflow_res == expected
+        assert test_replayer_workflow_res == expected
 
 
 async def test_replayer_alternate_async_ordering() -> None:
@@ -483,4 +483,10 @@ async def test_replayer_alternate_async_ordering() -> None:
         workflows=[ActivityAndSignalsWhileWorkflowDown],
         interceptors=[WorkerWorkflowResultInterceptor()],
     ).replay_workflow(WorkflowHistory.from_json("fake", history))
-    assert workflow_res == ["act-start", "sig-1", "sig-2", "counter-2", "act-done"]
+    assert test_replayer_workflow_res == [
+        "act-start",
+        "sig-1",
+        "sig-2",
+        "counter-2",
+        "act-done",
+    ]
