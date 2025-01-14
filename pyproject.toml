@@ -214,7 +214,7 @@ exclude = [
 ]
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py39"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

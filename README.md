@@ -1358,7 +1358,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.8 and newer. It is built using
+The Python SDK is built to work with Python 3.9 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
 
 ### Building
