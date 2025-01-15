@@ -483,9 +483,11 @@ async def test_replayer_async_ordering() -> None:
 
 
 async def test_replayer_alternate_async_ordering() -> None:
-    with Path(__file__).with_name(
-        "test_replayer_event_tracing_alternate.json"
-    ).open() as f:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_event_tracing_alternate.json")
+        .open() as f
+    ):
         history = f.read()
     await Replayer(
         workflows=[ActivityAndSignalsWhileWorkflowDown],
