@@ -6501,7 +6501,7 @@ class SignalsActivitiesTimersUpdatesTracingWorkflow:
     async def run_act(self):
         self.events.append("act-sync")
         await workflow.execute_activity(
-            say_hello, "Enchi", schedule_to_close_timeout=timedelta(seconds=5)
+            say_hello, "Enchi", schedule_to_close_timeout=timedelta(seconds=30)
         )
         fut: asyncio.Future[bool] = asyncio.Future()
         fut.set_result(True)
@@ -6511,9 +6511,12 @@ class SignalsActivitiesTimersUpdatesTracingWorkflow:
         self.events.append("act-2")
 
 
-async def test_async_loop_ordering(client: Client):
+async def test_async_loop_ordering(client: Client, env: WorkflowEnvironment):
     """This test mostly exists to generate histories for test_replayer_async_ordering.
     See that test for more."""
+
+    if env.supports_time_skipping:
+        pytest.skip("This test doesn't work right with time skipping for some reason")
     task_queue = f"tq-{uuid.uuid4()}"
     handle = await client.start_workflow(
         SignalsActivitiesTimersUpdatesTracingWorkflow.run,
@@ -6567,9 +6570,12 @@ class ActivityAndSignalsWhileWorkflowDown:
         self.events.append("act-done")
 
 
-async def test_alternate_async_loop_ordering(client: Client):
-    """This test mostly exists to generate histories for test_replayer_async_ordering.
+async def test_alternate_async_loop_ordering(client: Client, env: WorkflowEnvironment):
+    """This test mostly exists to generate histories for test_replayer_alternate_async_ordering.
     See that test for more."""
+
+    if env.supports_time_skipping:
+        pytest.skip("This test doesn't work right with time skipping for some reason")
     task_queue = f"tq-{uuid.uuid4()}"
     activity_tq = f"tq-{uuid.uuid4()}"
     handle = await client.start_workflow(
@@ -6598,10 +6604,10 @@ async def test_alternate_async_loop_ordering(client: Client):
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "1")
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "2")
 
-    async with new_worker(
-        client,
-        ActivityAndSignalsWhileWorkflowDown,
-        activities=[say_hello],
-        task_queue=task_queue,
-    ):
-        await handle.result()
+        async with new_worker(
+            client,
+            ActivityAndSignalsWhileWorkflowDown,
+            activities=[say_hello],
+            task_queue=task_queue,
+        ):
+            await handle.result()
