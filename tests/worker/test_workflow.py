@@ -5502,12 +5502,11 @@ class _UnfinishedHandlersWarningsTest:
             await handle.signal(handler_name)
         else:
             if not wait_all_handlers_finished:
-                with pytest.raises(RPCError) as err:
+                with pytest.raises(WorkflowUpdateFailedError) as err_info:
                     await handle.execute_update(handler_name, id="my-update")
-                assert (
-                    err.value.status == RPCStatusCode.NOT_FOUND
-                    and "workflow execution already completed" in str(err.value).lower()
-                )
+                update_err = err_info.value
+                assert isinstance(update_err.cause, ApplicationError)
+                assert update_err.cause.type == "AcceptedUpdateCompletedWorkflow"
             else:
                 await handle.execute_update(handler_name, id="my-update")
 
@@ -5736,11 +5735,12 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                     if self.handler_waiting == "-wait-all-handlers-finish-":
                         await update_task
                     else:
-                        with pytest.raises(RPCError) as update_err:
+                        with pytest.raises(WorkflowUpdateFailedError) as err_info:
                             await update_task
-                        assert update_err.value.status == RPCStatusCode.NOT_FOUND and (
-                            str(update_err.value).lower()
-                            == "workflow execution already completed"
+                        update_err = err_info.value
+                        assert isinstance(update_err.cause, ApplicationError)
+                        assert (
+                            update_err.cause.type == "AcceptedUpdateCompletedWorkflow"
                         )
 
                 with pytest.raises(WorkflowFailureError) as err:
