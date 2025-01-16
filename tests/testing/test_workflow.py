@@ -12,11 +12,17 @@ from temporalio.client import (
     Client,
     Interceptor,
     OutboundInterceptor,
+    RPCError,
     StartWorkflowInput,
     WorkflowFailureError,
     WorkflowHandle,
 )
-from temporalio.common import RetryPolicy
+from temporalio.common import (
+    RetryPolicy,
+    SearchAttributeKey,
+    SearchAttributePair,
+    TypedSearchAttributes,
+)
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -243,6 +249,70 @@ async def test_workflow_env_assert(client: Client):
             with pytest.raises(WorkflowFailureError) as err:
                 await handle.result()
             assert_proper_error(err.value.cause)
+
+
+async def test_search_attributes_on_dev_server(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Only testing for local dev server")
+
+    # Search attributes
+    sa_prefix = f"{uuid.uuid4()}_"
+    text_attr = SearchAttributeKey.for_text(f"{sa_prefix}text")
+    keyword_attr = SearchAttributeKey.for_keyword(f"{sa_prefix}keyword")
+    keyword_list_attr = SearchAttributeKey.for_keyword_list(f"{sa_prefix}keyword_list")
+    int_attr = SearchAttributeKey.for_int(f"{sa_prefix}int")
+    float_attr = SearchAttributeKey.for_float(f"{sa_prefix}double")
+    bool_attr = SearchAttributeKey.for_bool(f"{sa_prefix}bool")
+    datetime_attr = SearchAttributeKey.for_datetime(f"{sa_prefix}datetime")
+    attrs = TypedSearchAttributes(
+        [
+            SearchAttributePair(text_attr, "text1"),
+            SearchAttributePair(keyword_attr, "keyword1"),
+            SearchAttributePair(
+                keyword_list_attr,
+                ["keywordlist1", "keywordlist2"],
+            ),
+            SearchAttributePair(int_attr, 123),
+            SearchAttributePair(float_attr, 456.78),
+            SearchAttributePair(bool_attr, True),
+            SearchAttributePair(
+                datetime_attr, datetime(2001, 2, 3, 4, 5, 6, tzinfo=timezone.utc)
+            ),
+        ]
+    )
+
+    # Confirm that we can't start a workflow on existing environment
+    with pytest.raises(RPCError) as err:
+        await client.start_workflow(
+            "some-workflow",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=f"tq-{uuid.uuid4()}",
+            search_attributes=attrs,
+        )
+    assert "no mapping defined" in str(err.value)
+
+    # But we can in a new environment with the attrs set
+    async with await WorkflowEnvironment.start_local(
+        search_attributes=[
+            text_attr,
+            keyword_attr,
+            keyword_list_attr,
+            int_attr,
+            float_attr,
+            bool_attr,
+            datetime_attr,
+        ]
+    ) as env:
+        handle = await env.client.start_workflow(
+            "some-workflow",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=f"tq-{uuid.uuid4()}",
+            search_attributes=attrs,
+        )
+        desc = await handle.describe()
+        assert attrs == desc.typed_search_attributes
 
 
 def assert_timestamp_from_now(
