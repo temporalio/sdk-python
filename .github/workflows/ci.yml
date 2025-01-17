@@ -53,13 +53,13 @@ jobs:
       - run: poe lint
       - run: poe build-develop
       - run: mkdir junit-xml
-      - run: poe test -s -o log_cli_level=WARN --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+      - run: poe test -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test -s -o log_cli_level=WARN --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+        run: poe test -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
       # Check cloud if proper target and not on fork
       - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test -s -o log_cli_level=WARN -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--cloud.xml
+        run: poe test -s -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--cloud.xml
         env:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
@@ -87,7 +87,7 @@ jobs:
           poe gen-protos
           poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
-          poe test -s -o log_cli_level=WARN
+          poe test -s
 
       # Do docs stuff (only on one host)
       - name: Build API docs
