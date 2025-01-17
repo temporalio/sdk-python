@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict, Optional, Type
 
 import pytest
 
@@ -12,8 +12,19 @@ from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Replayer, Worker
+from temporalio.worker import (
+    ExecuteWorkflowInput,
+    Interceptor,
+    Replayer,
+    Worker,
+    WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
+)
 from tests.helpers import assert_eq_eventually
+from tests.worker.test_workflow import (
+    ActivityAndSignalsWhileWorkflowDown,
+    SignalsActivitiesTimersUpdatesTracingWorkflow,
+)
 
 
 @activity.defn
@@ -385,3 +396,97 @@ async def test_replayer_command_reordering_backward_compatibility() -> None:
     await Replayer(workflows=[UpdateCompletionAfterWorkflowReturn]).replay_workflow(
         WorkflowHistory.from_json("fake", history)
     )
+
+
+test_replayer_workflow_res = None
+
+
+class WorkerWorkflowResultInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> Optional[Type[WorkflowInboundInterceptor]]:
+        return WorkflowResultInterceptor
+
+
+class WorkflowResultInterceptor(WorkflowInboundInterceptor):
+    async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+        global test_replayer_workflow_res
+        res = await super().execute_workflow(input)
+        test_replayer_workflow_res = res
+        return res
+
+
+async def test_replayer_async_ordering() -> None:
+    """
+    This test verifies that the order that asyncio tasks/coroutines are woken up matches the
+    order they were before changes to apply all jobs and then run the event loop, where previously
+    the event loop was ran after each "batch" of jobs.
+    """
+    histories_and_expecteds = [
+        (
+            "test_replayer_event_tracing.json",
+            [
+                "sig-before-sync",
+                "sig-before-1",
+                "sig-before-2",
+                "timer-sync",
+                "act-sync",
+                "act-1",
+                "act-2",
+                "sig-1-sync",
+                "sig-1-1",
+                "sig-1-2",
+                "update-1-sync",
+                "update-1-1",
+                "update-1-2",
+                "timer-1",
+                "timer-2",
+            ],
+        ),
+        (
+            "test_replayer_event_tracing_double_sig_at_start.json",
+            [
+                "sig-before-sync",
+                "sig-before-1",
+                "sig-1-sync",
+                "sig-1-1",
+                "sig-before-2",
+                "sig-1-2",
+                "timer-sync",
+                "act-sync",
+                "update-1-sync",
+                "update-1-1",
+                "update-1-2",
+                "act-1",
+                "act-2",
+                "timer-1",
+                "timer-2",
+            ],
+        ),
+    ]
+    for history, expected in histories_and_expecteds:
+        with Path(__file__).with_name(history).open() as f:
+            history = f.read()
+        await Replayer(
+            workflows=[SignalsActivitiesTimersUpdatesTracingWorkflow],
+            interceptors=[WorkerWorkflowResultInterceptor()],
+        ).replay_workflow(WorkflowHistory.from_json("fake", history))
+        assert test_replayer_workflow_res == expected
+
+
+async def test_replayer_alternate_async_ordering() -> None:
+    with Path(__file__).with_name(
+        "test_replayer_event_tracing_alternate.json"
+    ).open() as f:
+        history = f.read()
+    await Replayer(
+        workflows=[ActivityAndSignalsWhileWorkflowDown],
+        interceptors=[WorkerWorkflowResultInterceptor()],
+    ).replay_workflow(WorkflowHistory.from_json("fake", history))
+    assert test_replayer_workflow_res == [
+        "act-start",
+        "sig-1",
+        "sig-2",
+        "counter-2",
+        "act-done",
+    ]

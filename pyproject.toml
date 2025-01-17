@@ -105,9 +105,10 @@ cmd = "pip uninstall temporalio -y"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-log_cli = true
-log_cli_level = "INFO"
-log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+# Do not use log_cli since this shows logging for all tests, not just the ones
+# that failed. Instead, show all logs for failed tests at the end.
+log_level = "DEBUG"
+log_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 testpaths = ["tests"]
 timeout = 600
 timeout_func_only = true
