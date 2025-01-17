@@ -99,6 +99,17 @@ class SandboxRestrictions:
     fully qualified path to the item.
     """
 
+    passthrough_all_modules: bool = False
+    """
+    Pass through all modules, do not sandbox any modules. This is the equivalent
+    of setting :py:attr:`passthrough_modules` as every module ever imported into
+    the workflow. This is unsafe. This means modules are never reloaded per
+    workflow run which means workflow authors have to be careful that they don't
+    import modules that do non-deterministic things. Note, just because a module
+    is passed through from outside the sandbox doesn't mean runtime restrictions
+    on invalid calls are not still applied.
+    """
+
     passthrough_modules_minimum: ClassVar[Set[str]]
     """Set of modules that must be passed through at the minimum."""
 
@@ -132,6 +143,12 @@ class SandboxRestrictions:
         return dataclasses.replace(
             self, passthrough_modules=self.passthrough_modules | set(modules)
         )
+
+    def with_passthrough_all_modules(self) -> SandboxRestrictions:
+        """Create a new restriction set with :py:attr:`passthrough_all_modules`
+        as true.
+        """
+        return dataclasses.replace(self, passthrough_all_modules=True)
 
 
 # We intentionally use specific fields instead of generic "matcher" callbacks

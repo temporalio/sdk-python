@@ -1029,6 +1029,21 @@ my_worker = Worker(
 In both of these cases, now the `pydantic` module will be passed through from outside of the sandbox instead of
 being reloaded for every workflow run.
 
+If users are sure that no imports they use in workflow files will ever need to be sandboxed (meaning all calls within
+are deterministic and never mutate shared, global state), the `passthrough_all_modules` option can be set on the
+restrictions or the `with_passthrough_all_modules` helper can by used, for example:
+
+```python
+my_worker = Worker(
+  ...,
+  workflow_runner=SandboxedWorkflowRunner(
+    restrictions=SandboxRestrictions.default.with_passthrough_all_modules()
+  )
+)
+```
+
+Note, some calls from the module may still be checked for invalid calls at runtime for certain builtins.
+
 ###### Invalid Module Members
 
 `SandboxRestrictions.invalid_module_members` contains a root matcher that applies to all module members. This already
