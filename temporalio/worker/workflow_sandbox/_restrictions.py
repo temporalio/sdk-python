@@ -207,6 +207,12 @@ class SandboxMatcher:
     ``True`` and this matcher is on ``children`` of a parent.
     """
 
+    exclude: Set[str] = frozenset()  # type: ignore
+    """Immutable set of names to exclude.
+    
+    These override anything that may have been matched elsewhere.
+    """
+
     all: ClassVar[SandboxMatcher]
     """Shortcut for an always-matched matcher."""
 
@@ -245,6 +251,8 @@ class SandboxMatcher:
         # We prefer to avoid recursion
         matcher = self
         for v in child_path:
+            if v in matcher.exclude:
+                return None
             # Does not match if this is runtime only and we're not runtime
             if not context.is_runtime and matcher.only_runtime:
                 return None
@@ -303,6 +311,8 @@ class SandboxMatcher:
             # Use all if it matches self, access, _or_ use. Use doesn't match
             # self but matches all children.
             assert matcher  # MyPy help
+            if v in matcher.exclude:
+                return None
             if (
                 matcher.match_self
                 or v in matcher.access
@@ -408,6 +418,9 @@ SandboxRestrictions.passthrough_modules_minimum = {
     # Due to a metaclass conflict in sandbox, we need zipfile module to pass
     # through always
     "zipfile",
+    # This is a very general module needed by many things including pytest's
+    # assertion rewriter
+    "typing",
     # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
     # for older versions. This unfortunately means that on those versions,
     # everyone using Python protos has to pass their module through.
@@ -588,11 +601,14 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         # We cannot restrict linecache because some packages like attrs' attr
         # use it during dynamic code generation
         # "linecache": SandboxMatcher.all_uses,
-        # Restrict everything in OS at runtime
+        # Restrict almost everything in OS at runtime
         "os": SandboxMatcher(
             access={"name"},
             use={"*"},
-            # Everything in OS restricted at runtime
+            # As of https://github.com/python/cpython/pull/112097, os.stat
+            # calls are now made when displaying errors
+            exclude={"stat"},
+            # Only restricted at runtime
             only_runtime=True,
         ),
         "pathlib": SandboxMatcher(
@@ -780,6 +796,7 @@ class _RestrictionState:
         matcher = self.matcher.access_matcher(self.context, name)
         if not matcher:
             return
+
         logger.warning("%s on %s restricted", name, self.name)
         # Issue warning instead of error if configured to do so
         if matcher.leaf_warning:
@@ -939,7 +956,9 @@ class _RestrictedProxy:
     def __getattribute__(self, __name: str) -> Any:
         state = _RestrictionState.from_proxy(self)
         _trace("__getattribute__ %s on %s", __name, state.name)
-        state.assert_child_not_restricted(__name)
+        # We do not restrict __spec__ or __name__
+        if __name != "__spec__" and __name != "__name__":
+            state.assert_child_not_restricted(__name)
         ret = object.__getattribute__(self, "__getattr__")(__name)
 
         # Since Python 3.11, the importer references __spec__ on module, so we

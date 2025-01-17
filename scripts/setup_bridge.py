@@ -11,7 +11,7 @@ rust_extensions = [
         path="temporalio/bridge/Cargo.toml",
         binding=Binding.PyO3,
         py_limited_api=True,
-        features=["pyo3/abi3-py38"],
+        features=["pyo3/abi3-py39"],
         # Allow local release builds if requested
         debug=False if os.environ.get("TEMPORAL_BUILD_RELEASE") == "1" else None,
     )
