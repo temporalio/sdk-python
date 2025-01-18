@@ -2177,9 +2177,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         This will target the workflow with :py:attr:`run_id` if present. To use a
         different run ID, create a new handle with via :py:meth:`Client.get_workflow_handle`.
 
-        .. warning::
-           This API is experimental
-
         Args:
             update: Update function or name on the workflow.
             arg: Single argument to the update.
@@ -2284,9 +2281,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         This will target the workflow with :py:attr:`run_id` if present. To use a
         different run ID, create a new handle with via :py:meth:`Client.get_workflow_handle`.
 
-        .. warning::
-           This API is experimental
-
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
                 update.
@@ -2366,9 +2360,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         Users may prefer the more typesafe :py:meth:`get_update_handle_for`
         which accepts an update definition.
 
-        .. warning::
-           This API is experimental
-
         Args:
             id: Update ID to get a handle to.
             workflow_run_id: Run ID to tie the handle to. If this is not set,
@@ -2397,9 +2388,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         the update result.
 
         This is the same as :py:meth:`get_update_handle` but typed.
-
-        .. warning::
-           This API is experimental
 
         Args:
             update: The update method to use for typing the handle.
