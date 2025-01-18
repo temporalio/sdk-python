@@ -87,7 +87,7 @@ bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 lint-docs = "pydocstyle --ignore-decorators=overload"
 lint-types = "mypy --namespace-packages --check-untyped-defs ."
 run-bench = "python scripts/run_bench.py"
-test = "pytest tests/worker/test_workflow.py::test_unfinished_handler_on_workflow_termination"
+test = "pytest"
 
 # Install local, run single pytest with env var, uninstall local
 [tool.poe.tasks.test-dist-single]
