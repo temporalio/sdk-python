@@ -36,6 +36,7 @@ from typing import (
 
 import temporalio.common
 import temporalio.converter
+from temporalio.client import Client
 
 from .types import CallableType
 
@@ -147,6 +148,7 @@ class _Context:
         temporalio.converter.PayloadConverter,
     ]
     runtime_metric_meter: Optional[temporalio.common.MetricMeter]
+    client: Client
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
     _metric_meter: Optional[temporalio.common.MetricMeter] = None
@@ -238,13 +240,25 @@ class _CompositeEvent:
         self.thread_event.wait(timeout)
 
 
+def client() -> Client:
+    """Return a Temporal Client for use in the current activity.
+
+    Returns:
+        :py:class:`temporalio.client.Client` for use in the current activity.
+
+    Raises:
+        RuntimeError: When not in an activity.
+    """
+    return _Context.current().client
+
+
 def in_activity() -> bool:
     """Whether the current code is inside an activity.
 
     Returns:
         True if in an activity, False otherwise.
     """
-    return not _current_context.get(None) is None
+    return _current_context.get(None) is not None
 
 
 def info() -> Info:
