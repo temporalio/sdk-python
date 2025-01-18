@@ -5841,7 +5841,7 @@ async def test_workflow_id_conflict(client: Client):
 
 
 @workflow.defn
-class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1:
+class UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow:
     def __init__(self) -> None:
         self.workflow_returned = False
 
@@ -5867,13 +5867,13 @@ async def test_update_completion_is_honored_when_after_workflow_return_1(
     update_id = "my-update"
     task_queue = "tq"
     wf_handle = await client.start_workflow(
-        TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1.run,
+        UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow.run,
         id=f"wf-{uuid.uuid4()}",
         task_queue=task_queue,
     )
     update_result_task = asyncio.create_task(
         wf_handle.execute_update(
-            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1.my_update,
+            UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow.my_update,
             id=update_id,
         )
     )
@@ -5882,14 +5882,14 @@ async def test_update_completion_is_honored_when_after_workflow_return_1(
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1],
+        workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow],
     ):
         assert await wf_handle.result() == "workflow-result"
         assert await update_result_task == "update-result"
 
 
 @workflow.defn
-class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
+class UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
     def __init__(self):
         self.received_update = False
         self.update_result: asyncio.Future[str] = asyncio.Future()
@@ -5923,15 +5923,15 @@ async def test_update_completion_is_honored_when_after_workflow_return_2(
     async with Worker(
         client,
         task_queue="tq",
-        workflows=[TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2],
+        workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2],
     ) as worker:
         handle = await client.start_workflow(
-            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.run,
+            UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.run,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         update_result = await handle.execute_update(
-            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.my_update
+            UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.my_update
         )
         assert update_result == "update-result"
         assert await handle.result() == "workflow-result"
