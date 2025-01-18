@@ -418,3 +418,26 @@ def test_workflow_init_not__init__():
     with pytest.raises(ValueError) as err:
         workflow.init(BadWorkflowInit.not__init__)
     assert "@workflow.init may only be used on the __init__ method" in str(err.value)
+
+
+class BadUpdateValidator:
+    @workflow.update
+    def my_update(self, a: str):
+        pass
+
+    @my_update.validator  # type: ignore
+    def my_validator(self, a: int):
+        pass
+
+    @workflow.run
+    async def run(self):
+        pass
+
+
+def test_workflow_update_validator_not_update():
+    with pytest.raises(ValueError) as err:
+        workflow.defn(BadUpdateValidator)
+    assert (
+        "Update validator method my_validator parameters do not match update method my_update parameters"
+        in str(err.value)
+    )
