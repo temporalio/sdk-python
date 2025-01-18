@@ -626,6 +626,9 @@ class _Runtime(ABC):
     def workflow_info(self) -> Info: ...
 
     @abstractmethod
+    def workflow_instance(self) -> Any: ...
+
+    @abstractmethod
     def workflow_is_continue_as_new_suggested(self) -> bool: ...
 
     @abstractmethod
@@ -816,6 +819,15 @@ def info() -> Info:
         Info for the currently running workflow.
     """
     return _Runtime.current().workflow_info()
+
+
+def instance() -> Any:
+    """Current workflow's instance.
+
+    Returns:
+        The currently running workflow instance.
+    """
+    return _Runtime.current().workflow_instance()
 
 
 def memo() -> Mapping[str, Any]:

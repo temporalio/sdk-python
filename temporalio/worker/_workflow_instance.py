@@ -1023,6 +1023,9 @@ class _WorkflowInstanceImpl(
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
 
+    def workflow_instance(self) -> Any:
+        return self._object
+
     def workflow_is_continue_as_new_suggested(self) -> bool:
         return self._continue_as_new_suggested
 
