@@ -69,6 +69,7 @@ class _ActivityWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
+        client: temporalio.client.Client,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
@@ -84,6 +85,7 @@ class _ActivityWorker:
             None
         )
         self._seen_sync_activity = False
+        self._client = client
 
         # Validate and build activity dict
         self._activities: Dict[str, temporalio.activity._Definition] = {}
@@ -428,13 +430,16 @@ class _ActivityWorker:
                     heartbeat=None,
                     cancelled_event=running_activity.cancelled_event,
                     worker_shutdown_event=self._worker_shutdown_event,
-                    shield_thread_cancel_exception=None
-                    if not running_activity.cancel_thread_raiser
-                    else running_activity.cancel_thread_raiser.shielded,
+                    shield_thread_cancel_exception=(
+                        None
+                        if not running_activity.cancel_thread_raiser
+                        else running_activity.cancel_thread_raiser.shielded
+                    ),
                     payload_converter_class_or_instance=self._data_converter.payload_converter,
-                    runtime_metric_meter=None
-                    if sync_non_threaded
-                    else self._metric_meter,
+                    runtime_metric_meter=(
+                        None if sync_non_threaded else self._metric_meter
+                    ),
+                    client=self._client,
                 )
             )
             temporalio.activity.logger.debug("Starting activity")
@@ -692,6 +697,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     worker_shutdown_event.thread_event,
                     payload_converter_class_or_instance,
                     ctx.runtime_metric_meter,
+                    ctx.client,
                     input.fn,
                     *input.args,
                 ]
@@ -739,6 +745,7 @@ def _execute_sync_activity(
         temporalio.converter.PayloadConverter,
     ],
     runtime_metric_meter: Optional[temporalio.common.MetricMeter],
+    client: temporalio.client.Client,
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -770,6 +777,7 @@ def _execute_sync_activity(
             else cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
+            client=client,
         )
     )
     return fn(*args)
