@@ -508,6 +508,7 @@ class _ActivityWorker:
                 completion.result.failed.failure.message = (
                     f"Failed building exception result: {inner_err}"
                 )
+                completion.result.failed.failure.application_failure_info.SetInParent()
 
         # Do final completion
         try:
