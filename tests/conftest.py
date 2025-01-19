@@ -39,12 +39,6 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
-# Due to https://github.com/python/cpython/issues/77906, multiprocessing on
-# macOS starting with Python 3.8 has changed from "fork" to "spawn". For
-# pre-3.8, we are changing it for them.
-if sys.version_info < (3, 8) and sys.platform.startswith("darwin"):
-    multiprocessing.set_start_method("spawn", True)
-
 
 def pytest_addoption(parser):
     parser.addoption(
