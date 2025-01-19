@@ -1535,3 +1535,4 @@ poe format
     any `temporalio` packages (except `temporalio.types`) or any classes/functions that aren't clear when unqualified.
   * We allow relative imports for private packages
   * We allow `@staticmethod`
+
