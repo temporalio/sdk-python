@@ -778,9 +778,6 @@ def current_update_info() -> Optional[UpdateInfo]:
     This is powered by :py:mod:`contextvars` so it is only valid within the
     update handler and coroutines/tasks it has started.
 
-    .. warning::
-       This API is experimental
-
     Returns:
         Info for the current update handler the code calling this is executing
             within if any.
@@ -1511,6 +1508,13 @@ class _Definition:
                     issues.append(
                         f"Multiple update methods found for {defn_name} "
                         f"(at least on {name} and {updates[update_defn.name].fn.__name__})"
+                    )
+                elif update_defn.validator and not _parameters_identical_up_to_naming(
+                    update_defn.fn, update_defn.validator
+                ):
+                    issues.append(
+                        f"Update validator method {update_defn.validator.__name__} parameters "
+                        f"do not match update method {update_defn.fn.__name__} parameters"
                     )
                 else:
                     updates[update_defn.name] = update_defn
