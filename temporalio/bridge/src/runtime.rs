@@ -17,7 +17,7 @@ use temporal_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
 use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
 use temporal_sdk_core_api::telemetry::{
     CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder,
-    PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder,
+    PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder, OtlpProtocol
 };
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
@@ -74,6 +74,7 @@ pub struct OpenTelemetryConfig {
     metric_periodicity_millis: Option<u64>,
     metric_temporality_delta: bool,
     durations_as_seconds: bool,
+    http: bool,
 }
 
 #[derive(FromPyObject)]
@@ -321,6 +322,9 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             }
             if let Some(global_tags) = conf.global_tags {
                 build.global_tags(global_tags);
+            }
+            if otel_conf.http {
+                build.protocol(OtlpProtocol::Http);
             }
             let otel_options = build
                 .build()

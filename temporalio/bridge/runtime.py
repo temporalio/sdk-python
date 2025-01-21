@@ -69,6 +69,7 @@ class OpenTelemetryConfig:
     metric_periodicity_millis: Optional[int]
     metric_temporality_delta: bool
     durations_as_seconds: bool
+    http: bool
 
 
 @dataclass(frozen=True)
