@@ -102,8 +102,8 @@ class SandboxRestrictions:
     passthrough_all_modules: bool = False
     """
     Pass through all modules, do not sandbox any modules. This is the equivalent
-    of setting :py:attr:`passthrough_modules` as every module ever imported into
-    the workflow. This is unsafe. This means modules are never reloaded per
+    of setting :py:attr:`passthrough_modules` to a list of all modules imported
+    by the workflow. This is unsafe. This means modules are never reloaded per
     workflow run which means workflow authors have to be careful that they don't
     import modules that do non-deterministic things. Note, just because a module
     is passed through from outside the sandbox doesn't mean runtime restrictions
