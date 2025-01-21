@@ -74,6 +74,7 @@ from temporalio.common import (
 )
 from temporalio.converter import (
     DataConverter,
+    DefaultFailureConverter,
     DefaultFailureConverterWithEncodedAttributes,
     DefaultPayloadConverter,
     PayloadCodec,
@@ -84,6 +85,7 @@ from temporalio.exceptions import (
     ApplicationError,
     CancelledError,
     ChildWorkflowError,
+    FailureError,
     TemporalError,
     TimeoutError,
     WorkflowAlreadyStartedError,
@@ -6449,6 +6451,86 @@ async def test_concurrent_sleeps_use_proper_options(
 
         # Force replay with a query to ensure determinism
         await handle.query("__temporal_workflow_metadata")
+
+
+class BadFailureConverterError(Exception):
+    pass
+
+
+class BadFailureConverter(DefaultFailureConverter):
+    def to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: PayloadConverter,
+        failure: Failure,
+    ) -> None:
+        if isinstance(exception, BadFailureConverterError):
+            raise RuntimeError("Intentional failure conversion error")
+        super().to_failure(exception, payload_converter, failure)
+
+
+@activity.defn
+async def bad_failure_converter_activity() -> None:
+    raise BadFailureConverterError
+
+
+@workflow.defn(sandboxed=False)
+class BadFailureConverterWorkflow:
+    @workflow.run
+    async def run(self, fail_workflow_task) -> None:
+        if fail_workflow_task:
+            raise BadFailureConverterError
+        else:
+            await workflow.execute_activity(
+                bad_failure_converter_activity,
+                schedule_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+
+
+async def test_bad_failure_converter(client: Client):
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        config["data_converter"],
+        failure_converter_class=BadFailureConverter,
+    )
+    client = Client(**config)
+    async with new_worker(
+        client, BadFailureConverterWorkflow, activities=[bad_failure_converter_activity]
+    ) as worker:
+        # Check activity
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                BadFailureConverterWorkflow.run,
+                False,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, ApplicationError)
+        assert (
+            err.value.cause.cause.message
+            == "Failed building exception result: Intentional failure conversion error"
+        )
+
+        # Check workflow
+        handle = await client.start_workflow(
+            BadFailureConverterWorkflow.run,
+            True,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def task_failed_message() -> Optional[str]:
+            async for e in handle.fetch_history_events():
+                if e.HasField("workflow_task_failed_event_attributes"):
+                    return e.workflow_task_failed_event_attributes.failure.message
+            return None
+
+        await assert_eq_eventually(
+            "Failed converting activation exception: Intentional failure conversion error",
+            task_failed_message,  # type: ignore
+        )
 
 
 @workflow.defn
