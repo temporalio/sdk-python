@@ -4,7 +4,7 @@ import time
 import uuid
 from contextlib import closing
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar
+from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import IndexedValueType
