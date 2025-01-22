@@ -180,7 +180,7 @@ class _WorkflowWorker:
 
     def notify_shutdown(self) -> None:
         if self._could_not_evict_count:
-            logger.warn(
+            logger.warning(
                 f"Shutting down workflow worker, but {self._could_not_evict_count} "
                 + "workflow(s) could not be evicted previously, so the shutdown will hang"
             )
@@ -244,7 +244,9 @@ class _WorkflowWorker:
                 self._running_workflows[act.run_id] = workflow
             elif init_job:
                 # This should never happen
-                logger.warn("Cache already exists for activation with initialize job")
+                logger.warning(
+                    "Cache already exists for activation with initialize job"
+                )
 
             # Run activation in separate thread so we can check if it's
             # deadlocked
