@@ -148,7 +148,7 @@ class _Context:
         temporalio.converter.PayloadConverter,
     ]
     runtime_metric_meter: Optional[temporalio.common.MetricMeter]
-    client: Client
+    client: Optional[Client]
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
     _metric_meter: Optional[temporalio.common.MetricMeter] = None
@@ -249,7 +249,12 @@ def client() -> Client:
     Raises:
         RuntimeError: When not in an activity.
     """
-    return _Context.current().client
+    client = _Context.current().client
+    if not client:
+        raise RuntimeError(
+            "No client available. In tests you can pass a client when creating ActivityEnvironment."
+        )
+    return client
 
 
 def in_activity() -> bool:
