@@ -296,8 +296,10 @@ class WorkflowInstanceAccessInboundInterceptor(WorkflowInboundInterceptor):
     async def execute_workflow(self, input: ExecuteWorkflowInput) -> int:
         # Return integer difference between ids of workflow instance obtained from workflow run method and
         # from workflow.instance(). They should be the same, so the difference should be 0.
+        from_workflow_instance_api = workflow.instance()
+        assert from_workflow_instance_api is not None
+        id_from_workflow_instance_api = id(from_workflow_instance_api)
         id_from_workflow_run_method = await super().execute_workflow(input)
-        id_from_workflow_instance_api = id(workflow.instance())
         return id_from_workflow_run_method - id_from_workflow_instance_api
 
 
