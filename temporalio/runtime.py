@@ -259,17 +259,22 @@ class OpenTelemetryConfig:
         OpenTelemetryMetricTemporality.CUMULATIVE
     )
     durations_as_seconds: bool = False
+    http: bool = False
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.OpenTelemetryConfig:
         return temporalio.bridge.runtime.OpenTelemetryConfig(
             url=self.url,
             headers=self.headers or {},
-            metric_periodicity_millis=None
-            if not self.metric_periodicity
-            else round(self.metric_periodicity.total_seconds() * 1000),
-            metric_temporality_delta=self.metric_temporality
-            == OpenTelemetryMetricTemporality.DELTA,
+            metric_periodicity_millis=(
+                None
+                if not self.metric_periodicity
+                else round(self.metric_periodicity.total_seconds() * 1000)
+            ),
+            metric_temporality_delta=(
+                self.metric_temporality == OpenTelemetryMetricTemporality.DELTA
+            ),
             durations_as_seconds=self.durations_as_seconds,
+            http=self.http,
         )
 
 
