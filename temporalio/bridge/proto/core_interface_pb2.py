@@ -44,7 +44,7 @@ from temporalio.bridge.proto.workflow_completion import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n&temporal/sdk/core/core_interface.proto\x12\x07\x63oresdk\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a\x37temporal/sdk/core/activity_result/activity_result.proto\x1a\x33temporal/sdk/core/activity_task/activity_task.proto\x1a%temporal/sdk/core/common/common.proto\x1a\x33temporal/sdk/core/external_data/external_data.proto\x1a?temporal/sdk/core/workflow_activation/workflow_activation.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto\x1a?temporal/sdk/core/workflow_completion/workflow_completion.proto"Y\n\x11\x41\x63tivityHeartbeat\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload"n\n\x16\x41\x63tivityTaskCompletion\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12@\n\x06result\x18\x02 \x01(\x0b\x32\x30.coresdk.activity_result.ActivityExecutionResult"<\n\x10WorkflowSlotInfo\x12\x15\n\rworkflow_type\x18\x01 \x01(\t\x12\x11\n\tis_sticky\x18\x02 \x01(\x08")\n\x10\x41\x63tivitySlotInfo\x12\x15\n\ractivity_type\x18\x01 \x01(\t".\n\x15LocalActivitySlotInfo\x12\x15\n\ractivity_type\x18\x01 \x01(\tB3\xea\x02\x30Temporalio::Internal::Bridge::Api::CoreInterfaceb\x06proto3'
+    b'\n&temporal/sdk/core/core_interface.proto\x12\x07\x63oresdk\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a\x37temporal/sdk/core/activity_result/activity_result.proto\x1a\x33temporal/sdk/core/activity_task/activity_task.proto\x1a%temporal/sdk/core/common/common.proto\x1a\x33temporal/sdk/core/external_data/external_data.proto\x1a?temporal/sdk/core/workflow_activation/workflow_activation.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto\x1a?temporal/sdk/core/workflow_completion/workflow_completion.proto"Y\n\x11\x41\x63tivityHeartbeat\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload"n\n\x16\x41\x63tivityTaskCompletion\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12@\n\x06result\x18\x02 \x01(\x0b\x32\x30.coresdk.activity_result.ActivityExecutionResult"<\n\x10WorkflowSlotInfo\x12\x15\n\rworkflow_type\x18\x01 \x01(\t\x12\x11\n\tis_sticky\x18\x02 \x01(\x08")\n\x10\x41\x63tivitySlotInfo\x12\x15\n\ractivity_type\x18\x01 \x01(\t".\n\x15LocalActivitySlotInfo\x12\x15\n\ractivity_type\x18\x01 \x01(\t"3\n\rNexusSlotInfo\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\tB3\xea\x02\x30Temporalio::Internal::Bridge::Api::CoreInterfaceb\x06proto3'
 )
 
 
@@ -53,6 +53,7 @@ _ACTIVITYTASKCOMPLETION = DESCRIPTOR.message_types_by_name["ActivityTaskCompleti
 _WORKFLOWSLOTINFO = DESCRIPTOR.message_types_by_name["WorkflowSlotInfo"]
 _ACTIVITYSLOTINFO = DESCRIPTOR.message_types_by_name["ActivitySlotInfo"]
 _LOCALACTIVITYSLOTINFO = DESCRIPTOR.message_types_by_name["LocalActivitySlotInfo"]
+_NEXUSSLOTINFO = DESCRIPTOR.message_types_by_name["NexusSlotInfo"]
 ActivityHeartbeat = _reflection.GeneratedProtocolMessageType(
     "ActivityHeartbeat",
     (_message.Message,),
@@ -108,6 +109,17 @@ LocalActivitySlotInfo = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(LocalActivitySlotInfo)
 
+NexusSlotInfo = _reflection.GeneratedProtocolMessageType(
+    "NexusSlotInfo",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _NEXUSSLOTINFO,
+        "__module__": "temporal.sdk.core.core_interface_pb2",
+        # @@protoc_insertion_point(class_scope:coresdk.NexusSlotInfo)
+    },
+)
+_sym_db.RegisterMessage(NexusSlotInfo)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = (
@@ -123,4 +135,6 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _ACTIVITYSLOTINFO._serialized_end = 882
     _LOCALACTIVITYSLOTINFO._serialized_start = 884
     _LOCALACTIVITYSLOTINFO._serialized_end = 930
+    _NEXUSSLOTINFO._serialized_start = 932
+    _NEXUSSLOTINFO._serialized_end = 983
 # @@protoc_insertion_point(module_scope)
