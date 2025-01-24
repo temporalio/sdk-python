@@ -85,7 +85,6 @@ from temporalio.exceptions import (
     ApplicationError,
     CancelledError,
     ChildWorkflowError,
-    FailureError,
     TemporalError,
     TimeoutError,
     WorkflowAlreadyStartedError,
@@ -5547,13 +5546,13 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
             if handler_dynamism == "-dynamic-":
 
                 async def my_late_registered_dynamic_update(
-                    self, name: str, args: Sequence[RawValue]
+                    name: str, args: Sequence[RawValue]
                 ) -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-dynamic-update-result"
 
                 async def my_late_registered_dynamic_signal(
-                    self, name: str, args: Sequence[RawValue]
+                    name: str, args: Sequence[RawValue]
                 ) -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
@@ -5561,11 +5560,11 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
                 workflow.set_dynamic_signal_handler(my_late_registered_dynamic_signal)
             else:
 
-                async def my_late_registered_update(self) -> str:
+                async def my_late_registered_update() -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-update-result"
 
-                async def my_late_registered_signal(self) -> None:
+                async def my_late_registered_signal() -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
                 workflow.set_update_handler(

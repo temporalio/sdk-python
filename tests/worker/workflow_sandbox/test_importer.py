@@ -64,6 +64,22 @@ def test_workflow_sandbox_importer_passthough_context_manager():
     assert id(outside) == id(inside)
 
 
+def test_workflow_sandbox_importer_passthrough_all_modules():
+    import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
+
+    # Confirm regular restrictions does re-import
+    with Importer(restrictions, RestrictionContext()).applied():
+        import tests.worker.workflow_sandbox.testmodules.stateful_module as inside1
+    assert id(outside) != id(inside1)
+
+    # But that one with all modules passed through does not
+    with Importer(
+        restrictions.with_passthrough_all_modules(), RestrictionContext()
+    ).applied():
+        import tests.worker.workflow_sandbox.testmodules.stateful_module as inside2
+    assert id(outside) == id(inside2)
+
+
 def test_workflow_sandbox_importer_invalid_module_members():
     importer = Importer(restrictions, RestrictionContext())
     # Can access the function, no problem
