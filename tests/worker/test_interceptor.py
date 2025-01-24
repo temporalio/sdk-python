@@ -283,3 +283,44 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
 
         # Confirm no unexpected traces
         assert not interceptor_traces
+
+
+class WorkflowInstanceAccessInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> Optional[Type[WorkflowInboundInterceptor]]:
+        return WorkflowInstanceAccessInboundInterceptor
+
+
+class WorkflowInstanceAccessInboundInterceptor(WorkflowInboundInterceptor):
+    async def execute_workflow(self, input: ExecuteWorkflowInput) -> int:
+        # Return integer difference between ids of workflow instance obtained from workflow run method and
+        # from workflow.instance(). They should be the same, so the difference should be 0.
+        from_workflow_instance_api = workflow.instance()
+        assert from_workflow_instance_api is not None
+        id_from_workflow_instance_api = id(from_workflow_instance_api)
+        id_from_workflow_run_method = await super().execute_workflow(input)
+        return id_from_workflow_run_method - id_from_workflow_instance_api
+
+
+@workflow.defn
+class WorkflowInstanceAccessWorkflow:
+    @workflow.run
+    async def run(self) -> int:
+        return id(self)
+
+
+async def test_workflow_instance_access_from_interceptor(client: Client):
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[WorkflowInstanceAccessWorkflow],
+        interceptors=[WorkflowInstanceAccessInterceptor()],
+    ):
+        difference = await client.execute_workflow(
+            WorkflowInstanceAccessWorkflow.run,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        assert difference == 0
