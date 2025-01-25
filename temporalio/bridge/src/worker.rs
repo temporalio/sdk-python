@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use temporal_sdk_core::api::errors::{PollActivityError, PollWfError};
+use temporal_sdk_core::api::errors::PollError;
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::worker::{
@@ -112,6 +112,7 @@ impl SlotReserveCtx {
                 SlotKindType::Workflow => "workflow".to_string(),
                 SlotKindType::Activity => "activity".to_string(),
                 SlotKindType::LocalActivity => "local-activity".to_string(),
+                SlotKindType::Nexus => "nexus".to_string(),
             },
             task_queue: ctx.task_queue().to_string(),
             worker_identity: ctx.worker_identity().to_string(),
@@ -150,6 +151,13 @@ pub struct LocalActivitySlotInfo {
     #[pyo3(get)]
     pub activity_type: String,
 }
+#[pyclass]
+pub struct NexusSlotInfo {
+    #[pyo3(get)]
+    pub service: String,
+    #[pyo3(get)]
+    pub operation: String,
+}
 
 #[pyclass]
 pub struct SlotReleaseCtx {
@@ -172,6 +180,11 @@ fn slot_info_to_py_obj(py: Python<'_>, info: SlotInfo) -> PyObject {
         .into_py(py),
         SlotInfo::LocalActivity(a) => LocalActivitySlotInfo {
             activity_type: a.activity_type.clone(),
+        }
+        .into_py(py),
+        SlotInfo::Nexus(n) => NexusSlotInfo {
+            service: n.service.clone(),
+            operation: n.operation.clone(),
         }
         .into_py(py),
     }
@@ -441,7 +454,7 @@ impl WorkerRef {
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_workflow_activation().await {
                 Ok(act) => act.encode_to_vec(),
-                Err(PollWfError::ShutDown) => return Err(PollShutdownError::new_err(())),
+                Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
                 Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
             };
             let bytes: &[u8] = &bytes;
@@ -454,7 +467,7 @@ impl WorkerRef {
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_activity_task().await {
                 Ok(task) => task.encode_to_vec(),
-                Err(PollActivityError::ShutDown) => return Err(PollShutdownError::new_err(())),
+                Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
                 Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
             };
             let bytes: &[u8] = &bytes;
