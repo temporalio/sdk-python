@@ -38,6 +38,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.worker
+import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
@@ -5040,61 +5041,58 @@ async def test_workflow_failure_types_configured(
             update_scenario=scenario,
         )
 
-    # Run all tasks concurrently
-    await asyncio.gather(
         # When unconfigured completely, confirm task fails as normal
-        run_scenario(
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
             expect_task_fail=True,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
             expect_task_fail=True,
-        ),
+        )
         # When configured at the worker level explicitly, confirm not task fail
         # but rather expected exceptions
-        run_scenario(
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
             worker_level_failure_exception_type=FailureTypesCustomException,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
-            worker_level_failure_exception_type=workflow.NondeterminismError,
-        ),
+            worker_level_failure_exception_type=temporalio.workflow.NondeterminismError,
+        )
         # When configured at the worker level inherited
-        run_scenario(
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
             worker_level_failure_exception_type=Exception,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
             worker_level_failure_exception_type=Exception,
-        ),
+        )
         # When configured at the workflow level explicitly
-        run_scenario(
+        await run_scenario(
             FailureTypesConfiguredExplicitlyWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesConfiguredExplicitlyWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
-        ),
+        )
         # When configured at the workflow level inherited
-        run_scenario(
+        await run_scenario(
             FailureTypesConfiguredInheritedWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesConfiguredInheritedWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
-        ),
-    )
+        )
 
 
 @workflow.defn(failure_exception_types=[Exception])
