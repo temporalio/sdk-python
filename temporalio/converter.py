@@ -1151,6 +1151,7 @@ def encode_search_attributes(
             DEPRECATED.
         api: API message to set converted attributes on.
     """
+    api.indexed_fields.clear()  # Ensure that we at least create an empty map
     if isinstance(attributes, temporalio.common.TypedSearchAttributes):
         for typed_k, typed_v in attributes:
             api.indexed_fields[typed_k.name].CopyFrom(
