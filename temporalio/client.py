@@ -4047,6 +4047,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             temporalio.converter.encode_search_attributes(
                 untyped_not_in_typed, action.start_workflow.search_attributes
             )
+        # TODO (dan): confirm whether this be `is not None`
         if self.typed_search_attributes:
             temporalio.converter.encode_search_attributes(
                 self.typed_search_attributes, action.start_workflow.search_attributes
@@ -6531,6 +6532,7 @@ class _ClientImpl(OutboundInterceptor):
             request_id=str(uuid.uuid4()),
         )
         if update.search_attributes is not None:
+            request.search_attributes.indexed_fields.clear()  # Ensure that we at least create an empty map
             temporalio.converter.encode_search_attributes(
                 update.search_attributes, request.search_attributes
             )
