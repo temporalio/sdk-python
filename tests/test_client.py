@@ -1308,7 +1308,7 @@ async def test_schedule_search_attribute_update(
 
     # Put search attributes on server
     key_1 = SearchAttributeKey.for_text("python-test-schedule-sa-update-key-1")
-    key_2 = SearchAttributeKey.for_text("python-test-schedule-sa-update-key-2")
+    key_2 = SearchAttributeKey.for_keyword("python-test-schedule-sa-update-key-2")
     await ensure_search_attributes_present(client, key_1, key_2)
     val_1 = "val-1"
     val_2 = "val-2"
