@@ -40,7 +40,7 @@ python-dateutil = { version = "^2.8.2", python = "<3.11" }
 types-protobuf = ">=3.20"
 typing-extensions = "^4.2.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 cibuildwheel = "^2.22.0"
 grpcio-tools = "^1.48.2"
 mypy = "^1.0.0"
@@ -63,9 +63,6 @@ wheel = "^0.42.0"
 [tool.poetry.extras]
 opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 grpc = ["grpcio"]
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.5.0"
 
 [tool.poe.tasks]
 build-develop = "python scripts/setup_bridge.py develop"
