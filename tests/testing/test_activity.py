@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import threading
 import time
 from contextvars import copy_context
@@ -110,3 +111,69 @@ async def test_activity_env_assert():
 
     assert type(expected_err) == type(actual_err)
     assert str(expected_err) == str(actual_err)
+
+
+def test_get_activities_from_cls():
+    class ClassAndStaticActivities(activity.ActivitiesProvider):
+        @classmethod
+        @activity.defn
+        async def class_method_activity(cls):
+            pass
+
+        @staticmethod
+        @activity.defn
+        async def static_method_activity():
+            pass
+
+    assert ClassAndStaticActivities.get_activities_from_cls() == [
+        ClassAndStaticActivities.class_method_activity,
+        ClassAndStaticActivities.static_method_activity,
+    ]
+
+class _AllActivityMethodTypes(activity.ActivitiesProvider):
+    @activity.defn
+    async def instance_method_activity(self):
+        pass
+
+    @classmethod
+    @activity.defn
+    async def class_method_activity(cls):
+        pass
+
+    @staticmethod
+    @activity.defn
+    async def static_method_activity():
+        pass
+
+def test_get_activities_from_cls_error():
+    try:
+        _AllActivityMethodTypes.get_activities_from_cls()
+        raise Exception("above call should have thrown value error")
+    except ValueError as ex:
+        assert str(ex) == (f"Class _AllActivityMethodTypes method instance_method_activity is an activity, but it is an instance method. "
+            "Because of that, you cannot gather activities from the class, you must get them from "
+            "an instance using instance.get_activities_from_instance()"
+        )
+
+def test_get_activities_from_instance():
+    inst = _AllActivityMethodTypes()
+    assert inst.get_activities_from_instance() == [
+        inst.class_method_activity,
+        inst.instance_method_activity,
+        inst.static_method_activity,
+    ]
+
+@activity.defn
+def _some_activity():
+    pass
+
+@activity.defn
+async def _some_async_activity():
+    pass
+
+def test_get_activities():
+    current_module = sys.modules[__name__]
+    assert activity.get_activities(current_module) == [
+        _some_activity,
+        _some_async_activity
+    ]
