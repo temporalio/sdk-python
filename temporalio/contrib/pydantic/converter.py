@@ -42,11 +42,9 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     def __init__(self) -> None:
         super().__init__(
             *(
-                (
-                    c
-                    if not isinstance(c, JSONPlainPayloadConverter)
-                    else PydanticJSONPayloadConverter()
-                )
+                c
+                if not isinstance(c, JSONPlainPayloadConverter)
+                else PydanticJSONPayloadConverter()
                 for c in DefaultPayloadConverter.default_encoding_payload_converters
             )
         )
