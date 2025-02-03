@@ -558,9 +558,10 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
         # Check for pydantic then send warning
+        # TODO (dan): update
         if hasattr(value, "parse_obj"):
             warnings.warn(
-                "If you're using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
+                "If you're using a pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
             )
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
@@ -1521,18 +1522,6 @@ def value_to_type(
         # missing required fields.
         # TODO(cretz): Want way to convert snake case to camel case?
         return hint(**field_values)
-
-    # If there is a @staticmethod or @classmethod parse_obj, we will use it.
-    # This covers Pydantic models.
-    parse_obj_attr = inspect.getattr_static(hint, "parse_obj", None)
-    if isinstance(parse_obj_attr, classmethod) or isinstance(
-        parse_obj_attr, staticmethod
-    ):
-        if not isinstance(value, dict):
-            raise TypeError(
-                f"Cannot convert to {hint}, value is {type(value)} not dict"
-            )
-        return getattr(hint, "parse_obj")(value)
 
     # IntEnum
     if inspect.isclass(hint) and issubclass(hint, IntEnum):

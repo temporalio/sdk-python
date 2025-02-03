@@ -31,6 +31,9 @@ from typing import (
     cast,
 )
 
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
+
 import temporalio.workflow
 
 logger = logging.getLogger(__name__)
@@ -948,6 +951,14 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls, handler(RestrictionContext.unwrap_if_proxied(source_type))
+        )
+
     def __init__(self, *args, **kwargs) -> None:
         # When we instantiate this class, we have the signature of:
         #   __init__(
@@ -971,6 +982,8 @@ class _RestrictedProxy:
             _trace("__init__ unrecognized with args %s", args)
 
     def __getattribute__(self, __name: str) -> Any:
+        if __name == "__get_pydantic_core_schema__":
+            return object.__getattribute__(self, "__get_pydantic_core_schema__")
         state = _RestrictionState.from_proxy(self)
         _trace("__getattribute__ %s on %s", __name, state.name)
         # We do not restrict __spec__ or __name__
