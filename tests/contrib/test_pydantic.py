@@ -51,8 +51,7 @@ class MyWorkflow:
         )
 
 
-async def test_workflow_with_pydantic_model(client: Client):
-    # Replace data converter in client
+async def test_field_conversion(client: Client):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
