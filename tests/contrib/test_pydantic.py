@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, WithJsonSchema
 
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.pydantic.converter import pydantic_data_converter
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
 SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
