@@ -1,7 +1,8 @@
+import dataclasses
 import uuid
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
-from typing import Annotated, Any, List, Sequence, TypeVar
+from typing import Annotated, Any, List, Sequence, Tuple, TypeVar
 
 from annotated_types import Len
 from pydantic import BaseModel, Field, WithJsonSchema
@@ -35,29 +36,8 @@ class MyPydanticModel(BaseModel):
     datetime_short_sequence: ShortSequence[List[datetime]]
 
 
-@activity.defn
-async def my_activity(models: List[MyPydanticModel]) -> List[MyPydanticModel]:
-    activity.logger.info("Got models in activity: %s" % models)
-    return models
-
-
-@workflow.defn
-class MyWorkflow:
-    @workflow.run
-    async def run(self, models: List[MyPydanticModel]) -> List[MyPydanticModel]:
-        workflow.logger.info("Got models in workflow: %s" % models)
-        return await workflow.execute_activity(
-            my_activity, models, start_to_close_timeout=timedelta(minutes=1)
-        )
-
-
-async def test_field_conversion(client: Client):
-    new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
-    client = Client(**new_config)
-    task_queue_name = str(uuid.uuid4())
-
-    orig_models = [
+def make_pydantic_objects() -> List[MyPydanticModel]:
+    return [
         MyPydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
             datetime_field=datetime(2000, 1, 2, 3, 4, 5),
@@ -94,16 +74,95 @@ async def test_field_conversion(client: Client):
         ),
     ]
 
+
+@activity.defn
+async def list_of_pydantic_models_activity(
+    models: List[MyPydanticModel],
+) -> List[MyPydanticModel]:
+    return models
+
+
+@workflow.defn
+class ListOfPydanticObjectsWorkflow:
+    @workflow.run
+    async def run(self, models: List[MyPydanticModel]) -> List[MyPydanticModel]:
+        return await workflow.execute_activity(
+            list_of_pydantic_models_activity,
+            models,
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+
+
+async def test_field_conversion(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    orig_pydantic_objects = make_pydantic_objects()
+
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[MyWorkflow],
-        activities=[my_activity],
+        workflows=[ListOfPydanticObjectsWorkflow],
+        activities=[list_of_pydantic_models_activity],
     ):
-        result = await client.execute_workflow(
-            MyWorkflow.run,
-            orig_models,
+        round_tripped_pydantic_objects = await client.execute_workflow(
+            ListOfPydanticObjectsWorkflow.run,
+            orig_pydantic_objects,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
         )
-    assert orig_models == result
+    assert orig_pydantic_objects == round_tripped_pydantic_objects
+
+
+@dataclasses.dataclass
+class MyDataClass:
+    int_field: int
+
+
+def make_dataclass_objects() -> List[MyDataClass]:
+    return [MyDataClass(int_field=7)]
+
+
+@workflow.defn
+class MixedCollectionTypesWorkflow:
+    @workflow.run
+    async def run(
+        self, input: Tuple[List[MyDataClass], List[MyPydanticModel]]
+    ) -> Tuple[List[MyDataClass], List[MyPydanticModel]]:
+        data_classes, pydantic_objects = input
+        pydantic_objects = await workflow.execute_activity(
+            list_of_pydantic_models_activity,
+            pydantic_objects,
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+        return data_classes, pydantic_objects
+
+
+async def test_mixed_collection_types(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    orig_dataclass_objects = make_dataclass_objects()
+    orig_pydantic_objects = make_pydantic_objects()
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[MixedCollectionTypesWorkflow],
+        activities=[list_of_pydantic_models_activity],
+    ):
+        (
+            round_tripped_dataclass_objects,
+            round_tripped_pydantic_objects,
+        ) = await client.execute_workflow(
+            MixedCollectionTypesWorkflow.run,
+            (orig_dataclass_objects, orig_pydantic_objects),
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
+        )
+    assert orig_dataclass_objects == round_tripped_dataclass_objects
+    assert orig_pydantic_objects == round_tripped_pydantic_objects
