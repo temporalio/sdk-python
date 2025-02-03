@@ -20,7 +20,6 @@ from typing import (
 )
 
 import pydantic
-from pydantic.json import pydantic_encoder
 
 import temporalio.workflow
 from temporalio.api.common.v1 import Payload
@@ -32,6 +31,11 @@ from temporalio.converter import (
     JSONTypeConverter,
 )
 from temporalio.worker.workflow_sandbox._restrictions import RestrictionContext
+
+try:
+    from pydantic_core import to_jsonable_python
+except ImportError:
+    from pydantic.json import pydantic_encoder as to_jsonable_python
 
 
 class _PydanticModelTypeConverter(JSONTypeConverter):
@@ -90,7 +94,7 @@ class _PydanticJSONPayloadConverter(JSONPlainPayloadConverter):
         return Payload(
             metadata={"encoding": self.encoding.encode()},
             data=json.dumps(
-                value, separators=(",", ":"), sort_keys=True, default=pydantic_encoder
+                value, separators=(",", ":"), sort_keys=True, default=to_jsonable_python
             ).encode(),
         )
 
