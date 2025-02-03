@@ -7,3 +7,5 @@ temporalio/bridge/temporal_sdk_bridge*
 /tests/helpers/golangserver/golangserver
 /tests/helpers/golangworker/golangworker
 /.idea
+/sdk-python.iml
+/.zed

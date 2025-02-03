@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "temporalio"
-version = "1.6.0"
+version = "1.9.0"
 description = "Temporal.io Python SDK"
 license = "MIT"
 authors = ["Temporal Technologies Inc <sdk@temporal.io>"]
@@ -24,36 +24,36 @@ script = "build.py"
 # a setup file, but we are using setuptools Rust manually in our build.py which
 # needs a setup file.
 # TODO(cretz): Find a way to not require a setup file since that is going away
-# at some point in Poetry. Revisit Maturin or fine some other approach.
+# at some point in Poetry. Revisit Maturin or find some other approach.
 generate-setup-file = true
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/temporalio/sdk-python/issues"
 
 [tool.poetry.dependencies]
-grpcio =  {version = "^1.59.0", optional = true}
+grpcio = {version = "^1.48.2", optional = true}
 opentelemetry-api = { version = "^1.11.1", optional = true }
 opentelemetry-sdk = { version = "^1.11.1", optional = true }
 protobuf = ">=3.20"
-python = "^3.8"
+python = "^3.9"
 python-dateutil = { version = "^2.8.2", python = "<3.11" }
 types-protobuf = ">=3.20"
 typing-extensions = "^4.2.0"
 
 [tool.poetry.dev-dependencies]
-black = "^23.1.0"
-cibuildwheel = "^2.17.0"
-grpcio-tools = "^1.48.0"
-isort = "^5.11.5"
+cibuildwheel = "^2.22.0"
+grpcio-tools = "^1.48.2"
 mypy = "^1.0.0"
 mypy-protobuf = "^3.3.0"
 psutil = "^5.9.3"
-pydantic = "^1.9.1"
-pydocstyle = "^6.1.1"
-pydoctor = "^23.4.1"
+pydantic = "^1.10.19"
+pydocstyle = "^6.3.0"
+pydoctor = "^24.11.1"
+pyright = ">=1.1.377"
 pytest = "^7.4"
 pytest-asyncio = "^0.21"
 pytest-timeout = "^2.2"
+ruff = "^0.5.0"
 setuptools = ">=65.0.0"
 setuptools-rust = ">=1.3.0"
 toml = "^0.10.2"
@@ -64,19 +64,24 @@ wheel = "^0.42.0"
 opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 grpc = ["grpcio"]
 
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.0"
+
 [tool.poe.tasks]
 build-develop = "python scripts/setup_bridge.py develop"
 build-develop-with-release = { cmd = "python scripts/setup_bridge.py develop", env = { TEMPORAL_BUILD_RELEASE = "1" }}
 fix-wheel = "python scripts/fix_wheel.py"
-format = [{cmd = "black ."}, {cmd = "isort ."}]
+format = [{cmd = "ruff check --select I --fix"}, {cmd = "ruff format"}, ]
 gen-docs = "python scripts/gen_docs.py"
 gen-protos = "python scripts/gen_protos.py"
 lint = [
-  {cmd = "black --check ."},
-  {cmd = "isort --check-only ."},
+  {cmd = "ruff check --select I"},
+  {cmd = "ruff format --check"},
   {ref = "lint-types"},
+  {cmd = "pyright"},
   {ref = "lint-docs"},
 ]
+bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "pydocstyle --ignore-decorators=overload"
@@ -99,31 +104,33 @@ env = { TEMPORAL_INTEGRATION_TEST = "1" }
 cmd = "pip uninstall temporalio -y"
 
 [tool.pytest.ini_options]
-addopts = "-p no:warnings"
 asyncio_mode = "auto"
-log_cli = true
-log_cli_level = "INFO"
-log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+# Do not use log_cli since this shows logging for all tests, not just the ones
+# that failed. Instead, show all logs for failed tests at the end.
+log_level = "DEBUG"
+log_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 testpaths = ["tests"]
 timeout = 600
 timeout_func_only = true
+filterwarnings = [
+  "error::temporalio.workflow.UnfinishedUpdateHandlersWarning",
+  "error::temporalio.workflow.UnfinishedSignalHandlersWarning",
+  "ignore::pytest.PytestDeprecationWarning",
+  "ignore::DeprecationWarning",
+]
 
 [tool.cibuildwheel]
-# We only want the 3.8 64-bit build of each type. However, due to
-# https://github.com/pypa/cibuildwheel/issues/1278, we have to build macOS as
-# 3.9 until that is fixed. Our fix-wheel process will rename it to 3.8 and we
-# have manually confirmed this works with 3.8.
-build = "cp38-win_amd64 cp38-manylinux_x86_64 cp38-manylinux_aarch64 cp38-macosx_x86_64 cp39-macosx_arm64"
+before-all = "pip install protoc-wheel-0"
+build = "cp39-win_amd64 cp39-manylinux_x86_64 cp39-manylinux_aarch64 cp39-macosx_x86_64 cp39-macosx_arm64"
 build-verbosity = "1"
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
 
 [tool.cibuildwheel.linux]
 before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
+before-build = "pip install protoc-wheel-0"
 environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
-
-[tool.isort]
-profile = "black"
-skip_gitignore = true
-extend_skip = ["./temporalio/bridge/sdk-core", "./temporalio/bridge/target"]
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -172,6 +179,43 @@ privacy = [
 project-name = "Temporal Python"
 sidebar-expand-depth = 2
 
+[tool.pyright]
+include = ["temporalio", "tests"]
+exclude = [
+  "temporalio/api",
+  "temporalio/bridge/proto",
+  "tests/worker/workflow_sandbox/testmodules/proto",
+  "temporalio/bridge/worker.py",
+  "temporalio/contrib/opentelemetry.py",
+  "temporalio/converter.py",
+  "temporalio/testing/_workflow.py",
+  "temporalio/worker/_activity.py",
+  "temporalio/worker/_replayer.py",
+  "temporalio/worker/_worker.py",
+  "temporalio/worker/workflow_sandbox/_importer.py",
+  "temporalio/worker/workflow_sandbox/_restrictions.py",
+  "temporalio/workflow.py",
+  "tests/api/test_grpc_stub.py",
+  "tests/conftest.py",
+  "tests/contrib/test_opentelemetry.py",
+  "tests/test_converter.py",
+  "tests/test_service.py",
+  "tests/test_workflow.py",
+  "tests/worker/test_activity.py",
+  "tests/worker/test_workflow.py",
+  "tests/worker/workflow_sandbox/test_importer.py",
+  "tests/worker/workflow_sandbox/test_restrictions.py",
+  # TODO: these pass locally but fail in CI with
+  # error: Import "temporalio.bridge.temporal_sdk_bridge" could not be resolved
+  "temporalio/bridge/client.py",
+  "temporalio/bridge/metric.py",
+  "temporalio/bridge/runtime.py",
+  "temporalio/bridge/testing.py",
+]
+
+[tool.ruff]
+target-version = "py39"
+
 [build-system]
 build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core>=1.0.0", "setuptools", "wheel", "setuptools-rust", "protoc-wheel-0"]
+requires = ["poetry-core>=1.0.0", "setuptools", "wheel", "setuptools-rust"]

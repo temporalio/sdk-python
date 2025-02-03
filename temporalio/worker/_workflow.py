@@ -6,8 +6,19 @@ import asyncio
 import concurrent.futures
 import logging
 import os
+import sys
 from datetime import timezone
-from typing import Callable, Dict, List, MutableMapping, Optional, Sequence, Set, Type
+from types import TracebackType
+from typing import (
+    Callable,
+    Dict,
+    List,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+)
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -169,7 +180,7 @@ class _WorkflowWorker:
 
     def notify_shutdown(self) -> None:
         if self._could_not_evict_count:
-            logger.warn(
+            logger.warning(
                 f"Shutting down workflow worker, but {self._could_not_evict_count} "
                 + "workflow(s) could not be evicted previously, so the shutdown will hang"
             )
@@ -195,12 +206,12 @@ class _WorkflowWorker:
 
         # Extract a couple of jobs from the activation
         cache_remove_job = None
-        start_job = None
+        init_job = None
         for job in act.jobs:
             if job.HasField("remove_from_cache"):
                 cache_remove_job = job.remove_from_cache
-            elif job.HasField("start_workflow"):
-                start_job = job.start_workflow
+            elif job.HasField("initialize_workflow"):
+                init_job = job.initialize_workflow
 
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
@@ -224,16 +235,18 @@ class _WorkflowWorker:
             if not cache_remove_job or not self._disable_safe_eviction:
                 workflow = self._running_workflows.get(act.run_id)
             if not workflow and not cache_remove_job:
-                # Must have a start job to create instance
-                if not start_job:
+                # Must have a initialize job to create instance
+                if not init_job:
                     raise RuntimeError(
-                        "Missing start workflow, workflow could have unexpectedly been removed from cache"
+                        "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
                     )
-                workflow = self._create_workflow_instance(act, start_job)
+                workflow = self._create_workflow_instance(act, init_job)
                 self._running_workflows[act.run_id] = workflow
-            elif start_job:
+            elif init_job:
                 # This should never happen
-                logger.warn("Cache already exists for activation with start job")
+                logger.warning(
+                    "Cache already exists for activation with initialize job"
+                )
 
             # Run activation in separate thread so we can check if it's
             # deadlocked
@@ -250,9 +263,10 @@ class _WorkflowWorker:
                         activate_task, self._deadlock_timeout_seconds
                     )
                 except asyncio.TimeoutError:
-                    raise RuntimeError(
-                        f"[TMPRL1101] Potential deadlock detected, workflow didn't yield within {self._deadlock_timeout_seconds} second(s)"
-                    )
+                    raise _DeadlockError.from_deadlocked_workflow(
+                        workflow, self._deadlock_timeout_seconds
+                    ) from None
+
         except Exception as err:
             # We cannot fail a cache eviction, we must just log and not complete
             # the activation (failed or otherwise). This should only happen in
@@ -267,6 +281,9 @@ class _WorkflowWorker:
                 )
                 self._could_not_evict_count += 1
                 return
+
+            if isinstance(err, _DeadlockError):
+                err.swap_traceback()
 
             logger.exception(
                 "Failed handling activation on workflow with run ID %s", act.run_id
@@ -339,54 +356,54 @@ class _WorkflowWorker:
     def _create_workflow_instance(
         self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-        start: temporalio.bridge.proto.workflow_activation.StartWorkflow,
+        init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
     ) -> WorkflowInstance:
         # Get the definition
-        defn = self._workflows.get(start.workflow_type, self._dynamic_workflow)
+        defn = self._workflows.get(init.workflow_type, self._dynamic_workflow)
         if not defn:
             workflow_names = ", ".join(sorted(self._workflows.keys()))
             raise temporalio.exceptions.ApplicationError(
-                f"Workflow class {start.workflow_type} is not registered on this worker, available workflows: {workflow_names}",
+                f"Workflow class {init.workflow_type} is not registered on this worker, available workflows: {workflow_names}",
                 type="NotFoundError",
             )
 
         # Build info
         parent: Optional[temporalio.workflow.ParentInfo] = None
-        if start.HasField("parent_workflow_info"):
+        if init.HasField("parent_workflow_info"):
             parent = temporalio.workflow.ParentInfo(
-                namespace=start.parent_workflow_info.namespace,
-                run_id=start.parent_workflow_info.run_id,
-                workflow_id=start.parent_workflow_info.workflow_id,
+                namespace=init.parent_workflow_info.namespace,
+                run_id=init.parent_workflow_info.run_id,
+                workflow_id=init.parent_workflow_info.workflow_id,
             )
         info = temporalio.workflow.Info(
-            attempt=start.attempt,
-            continued_run_id=start.continued_from_execution_run_id or None,
-            cron_schedule=start.cron_schedule or None,
-            execution_timeout=start.workflow_execution_timeout.ToTimedelta()
-            if start.HasField("workflow_execution_timeout")
+            attempt=init.attempt,
+            continued_run_id=init.continued_from_execution_run_id or None,
+            cron_schedule=init.cron_schedule or None,
+            execution_timeout=init.workflow_execution_timeout.ToTimedelta()
+            if init.HasField("workflow_execution_timeout")
             else None,
-            headers=dict(start.headers),
+            headers=dict(init.headers),
             namespace=self._namespace,
             parent=parent,
-            raw_memo=dict(start.memo.fields),
-            retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
-            if start.HasField("retry_policy")
+            raw_memo=dict(init.memo.fields),
+            retry_policy=temporalio.common.RetryPolicy.from_proto(init.retry_policy)
+            if init.HasField("retry_policy")
             else None,
             run_id=act.run_id,
-            run_timeout=start.workflow_run_timeout.ToTimedelta()
-            if start.HasField("workflow_run_timeout")
+            run_timeout=init.workflow_run_timeout.ToTimedelta()
+            if init.HasField("workflow_run_timeout")
             else None,
             search_attributes=temporalio.converter.decode_search_attributes(
-                start.search_attributes
+                init.search_attributes
             ),
             start_time=act.timestamp.ToDatetime().replace(tzinfo=timezone.utc),
             task_queue=self._task_queue,
-            task_timeout=start.workflow_task_timeout.ToTimedelta(),
+            task_timeout=init.workflow_task_timeout.ToTimedelta(),
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
-                start.search_attributes
+                init.search_attributes
             ),
-            workflow_id=start.workflow_id,
-            workflow_type=start.workflow_type,
+            workflow_id=init.workflow_id,
+            workflow_type=init.workflow_type,
         )
 
         # Create instance from details
@@ -396,7 +413,7 @@ class _WorkflowWorker:
             interceptor_classes=self._interceptor_classes,
             defn=defn,
             info=info,
-            randomness_seed=start.randomness_seed,
+            randomness_seed=init.randomness_seed,
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
@@ -421,3 +438,77 @@ class _WorkflowWorker:
                 for typ in v.failure_exception_types
             )
         )
+
+
+class _DeadlockError(Exception):
+    """Exception class for deadlocks. Contains functionality to swap the default traceback for another."""
+
+    def __init__(self, message: str, replacement_tb: Optional[TracebackType] = None):
+        """Create a new DeadlockError, with message `message` and optionally a traceback `replacement_tb` to be swapped in later.
+
+        Args:
+            message: Message to be presented through exception.
+            replacement_tb: Optional TracebackType to be swapped later.
+        """
+        super().__init__(message)
+        self._new_tb = replacement_tb
+
+    def swap_traceback(self) -> None:
+        """Swap the current traceback for the replacement passed during construction. Used to work around Python adding the current frame to the stack trace.
+
+        Returns:
+            None
+        """
+        if self._new_tb:
+            self.__traceback__ = self._new_tb
+            self._new_tb = None
+
+    @classmethod
+    def from_deadlocked_workflow(
+        cls, workflow: WorkflowInstance, timeout: Optional[int]
+    ):
+        msg = f"[TMPRL1101] Potential deadlock detected: workflow didn't yield within {timeout} second(s)."
+        tid = workflow.get_thread_id()
+        if not tid:
+            return cls(msg)
+
+        try:
+            tb = cls._gen_tb_helper(tid)
+            if tb:
+                return cls(msg, tb)
+            return cls(f"{msg} (no frames available)")
+        except Exception as err:
+            return cls(f"{msg} (failed getting frames: {err})")
+
+    @staticmethod
+    def _gen_tb_helper(
+        tid: int,
+    ) -> Optional[TracebackType]:
+        """Take a thread id and construct a stack trace.
+
+        Returns:
+            <Optional[TracebackType]> the traceback that was constructed, None if the thread could not be found.
+        """
+        frame = sys._current_frames().get(tid)
+        if not frame:
+            return None
+
+        # not using traceback.extract_stack() because it obfuscates the frame objects (specifically f_lasti)
+        thread_frames = [frame]
+        while frame.f_back:
+            frame = frame.f_back
+            thread_frames.append(frame)
+
+        thread_frames.reverse()
+
+        size = 0
+        tb = None
+        for frm in thread_frames:
+            tb = TracebackType(tb, frm, frm.f_lasti, frm.f_lineno)
+            size += sys.getsizeof(tb)
+
+        while size > 200000 and tb:
+            size -= sys.getsizeof(tb)
+            tb = tb.tb_next
+
+        return tb

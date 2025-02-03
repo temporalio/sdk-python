@@ -6,16 +6,20 @@ isort:skip_file
 (-- api-linter: core::0203::input-only=disabled
     aip.dev/not-precedent: field_behavior annotation not available in our gogo fork --)
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.schedule_pb2
+import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.workflow.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -589,6 +593,7 @@ class ScheduleActionResult(google.protobuf.message.Message):
     SCHEDULE_TIME_FIELD_NUMBER: builtins.int
     ACTUAL_TIME_FIELD_NUMBER: builtins.int
     START_WORKFLOW_RESULT_FIELD_NUMBER: builtins.int
+    START_WORKFLOW_STATUS_FIELD_NUMBER: builtins.int
     @property
     def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time that the action was taken (according to the schedule, including jitter)."""
@@ -600,6 +605,12 @@ class ScheduleActionResult(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
         """If action was start_workflow:"""
+    start_workflow_status: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType
+    )
+    """If the action was start_workflow, this field will reflect an
+    eventually-consistent view of the started workflow's status.
+    """
     def __init__(
         self,
         *,
@@ -607,6 +618,7 @@ class ScheduleActionResult(google.protobuf.message.Message):
         actual_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         start_workflow_result: temporalio.api.common.v1.message_pb2.WorkflowExecution
         | None = ...,
+        start_workflow_status: temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -628,6 +640,8 @@ class ScheduleActionResult(google.protobuf.message.Message):
             b"schedule_time",
             "start_workflow_result",
             b"start_workflow_result",
+            "start_workflow_status",
+            b"start_workflow_status",
         ],
     ) -> None: ...
 

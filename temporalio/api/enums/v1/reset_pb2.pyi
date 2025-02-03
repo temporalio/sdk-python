@@ -23,11 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
 import sys
 import typing
+
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -49,20 +51,24 @@ class _ResetReapplyExcludeTypeEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_REAPPLY_EXCLUDE_TYPE_UNSPECIFIED: _ResetReapplyExcludeType.ValueType  # 0
     RESET_REAPPLY_EXCLUDE_TYPE_SIGNAL: _ResetReapplyExcludeType.ValueType  # 1
-    """Exclude signals when reapplying events."""
+    """Exclude signals when reapplying events beyond the reset point."""
     RESET_REAPPLY_EXCLUDE_TYPE_UPDATE: _ResetReapplyExcludeType.ValueType  # 2
-    """Exclude updates when reapplying events."""
+    """Exclude updates when reapplying events beyond the reset point."""
+    RESET_REAPPLY_EXCLUDE_TYPE_NEXUS: _ResetReapplyExcludeType.ValueType  # 3
+    """Exclude nexus events when reapplying events beyond the reset point."""
 
 class ResetReapplyExcludeType(
     _ResetReapplyExcludeType, metaclass=_ResetReapplyExcludeTypeEnumTypeWrapper
 ):
-    """Event types to exclude when reapplying events."""
+    """Event types to exclude when reapplying events beyond the reset point."""
 
 RESET_REAPPLY_EXCLUDE_TYPE_UNSPECIFIED: ResetReapplyExcludeType.ValueType  # 0
 RESET_REAPPLY_EXCLUDE_TYPE_SIGNAL: ResetReapplyExcludeType.ValueType  # 1
-"""Exclude signals when reapplying events."""
+"""Exclude signals when reapplying events beyond the reset point."""
 RESET_REAPPLY_EXCLUDE_TYPE_UPDATE: ResetReapplyExcludeType.ValueType  # 2
-"""Exclude updates when reapplying events."""
+"""Exclude updates when reapplying events beyond the reset point."""
+RESET_REAPPLY_EXCLUDE_TYPE_NEXUS: ResetReapplyExcludeType.ValueType  # 3
+"""Exclude nexus events when reapplying events beyond the reset point."""
 global___ResetReapplyExcludeType = ResetReapplyExcludeType
 
 class _ResetReapplyType:

@@ -132,6 +132,26 @@ class WorkflowIDReusePolicy(IntEnum):
     )
 
 
+class WorkflowIDConflictPolicy(IntEnum):
+    """How already-running workflows of the same ID are handled on start.
+
+    See :py:class:`temporalio.api.enums.v1.WorkflowIdConflictPolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_UNSPECIFIED
+    )
+    FAIL = int(
+        temporalio.api.enums.v1.WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_FAIL
+    )
+    USE_EXISTING = int(
+        temporalio.api.enums.v1.WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING
+    )
+    TERMINATE_EXISTING = int(
+        temporalio.api.enums.v1.WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING
+    )
+
+
 class QueryRejectCondition(IntEnum):
     """Whether a query should be rejected in certain conditions.
 
@@ -479,16 +499,14 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
     @overload
     def get(
         self, key: SearchAttributeKey[SearchAttributeValueType]
-    ) -> Optional[SearchAttributeValueType]:
-        ...
+    ) -> Optional[SearchAttributeValueType]: ...
 
     @overload
     def get(
         self,
         key: SearchAttributeKey[SearchAttributeValueType],
         default: temporalio.types.AnyType,
-    ) -> Union[SearchAttributeValueType, temporalio.types.AnyType]:
-        ...
+    ) -> Union[SearchAttributeValueType, temporalio.types.AnyType]: ...
 
     def get(
         self,

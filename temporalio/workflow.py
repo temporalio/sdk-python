@@ -53,6 +53,7 @@ import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.workflow
 
 from .types import (
     AnyType,
@@ -80,8 +81,7 @@ from .types import (
 
 
 @overload
-def defn(cls: ClassType) -> ClassType:
-    ...
+def defn(cls: ClassType) -> ClassType: ...
 
 
 @overload
@@ -90,15 +90,13 @@ def defn(
     name: Optional[str] = None,
     sandboxed: bool = True,
     failure_exception_types: Sequence[Type[BaseException]] = [],
-) -> Callable[[ClassType], ClassType]:
-    ...
+) -> Callable[[ClassType], ClassType]: ...
 
 
 @overload
 def defn(
     *, sandboxed: bool = True, dynamic: bool = False
-) -> Callable[[ClassType], ClassType]:
-    ...
+) -> Callable[[ClassType], ClassType]: ...
 
 
 def defn(
@@ -146,10 +144,30 @@ def defn(
     return decorator
 
 
+def init(
+    init_fn: CallableType,
+) -> CallableType:
+    """Decorator for the workflow init method.
+
+    This may be used on the __init__ method of the workflow class to specify
+    that it accepts the same workflow input arguments as the ``@workflow.run``
+    method. If used, the parameters of your  __init__ and ``@workflow.run``
+    methods must be identical.
+
+    Args:
+        init_fn: The __init__ method to decorate.
+    """
+    if init_fn.__name__ != "__init__":
+        raise ValueError("@workflow.init may only be used on the __init__ method")
+
+    setattr(init_fn, "__temporal_workflow_init", True)
+    return init_fn
+
+
 def run(fn: CallableAsyncType) -> CallableAsyncType:
     """Decorator for the workflow run method.
 
-    This must be set on one and only one async method defined on the same class
+    This must be used on one and only one async method defined on the same class
     as ``@workflow.defn``. This can be defined on a base class method but must
     then be explicitly overridden and defined on the workflow class.
 
@@ -173,23 +191,66 @@ def run(fn: CallableAsyncType) -> CallableAsyncType:
     return fn  # type: ignore[return-value]
 
 
-@overload
-def signal(fn: CallableSyncOrAsyncReturnNoneType) -> CallableSyncOrAsyncReturnNoneType:
-    ...
+class HandlerUnfinishedPolicy(Enum):
+    """Actions taken if a workflow terminates with running handlers.
+
+    Policy defining actions taken when a workflow exits while update or signal handlers are running.
+    The workflow exit may be due to successful return, failure, cancellation, or continue-as-new.
+    """
+
+    WARN_AND_ABANDON = 1
+    """Issue a warning in addition to abandoning."""
+    ABANDON = 2
+    """Abandon the handler.
+
+    In the case of an update handler this means that the client will receive an error rather than
+    the update result."""
+
+
+class UnfinishedUpdateHandlersWarning(RuntimeWarning):
+    """The workflow exited before all update handlers had finished executing."""
+
+
+class UnfinishedSignalHandlersWarning(RuntimeWarning):
+    """The workflow exited before all signal handlers had finished executing."""
 
 
 @overload
 def signal(
-    *, name: str
-) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
-    ...
+    fn: CallableSyncOrAsyncReturnNoneType,
+) -> CallableSyncOrAsyncReturnNoneType: ...
 
 
 @overload
 def signal(
-    *, dynamic: Literal[True]
-) -> Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]:
-    ...
+    *,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
+) -> Callable[
+    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
+]: ...
+
+
+@overload
+def signal(
+    *,
+    name: str,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
+) -> Callable[
+    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
+]: ...
+
+
+@overload
+def signal(
+    *,
+    dynamic: Literal[True],
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
+) -> Callable[
+    [CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType
+]: ...
 
 
 def signal(
@@ -197,10 +258,12 @@ def signal(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow signal method.
 
-    This is set on any async or non-async method that you wish to be called upon
+    This is used on any async or non-async method that you wish to be called upon
     receiving a signal. If a function overrides one with this decorator, it too
     must be decorated.
 
@@ -217,12 +280,25 @@ def signal(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
+        unfinished_policy: Actions taken if a workflow terminates with
+            a running instance of this handler.
+        description: A short description of the signal that may appear in the UI/CLI.
     """
 
-    def with_name(
-        name: Optional[str], fn: CallableSyncOrAsyncReturnNoneType
+    def decorator(
+        name: Optional[str],
+        unfinished_policy: HandlerUnfinishedPolicy,
+        fn: CallableSyncOrAsyncReturnNoneType,
     ) -> CallableSyncOrAsyncReturnNoneType:
-        defn = _SignalDefinition(name=name, fn=fn, is_method=True)
+        if not name and not dynamic:
+            name = fn.__name__
+        defn = _SignalDefinition(
+            name=name,
+            fn=fn,
+            is_method=True,
+            unfinished_policy=unfinished_policy,
+            description=description,
+        )
         setattr(fn, "__temporal_signal_definition", defn)
         if defn.dynamic_vararg:
             warnings.warn(
@@ -232,28 +308,32 @@ def signal(
             )
         return fn
 
-    if name is not None or dynamic:
+    if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot create signal without function or name or dynamic")
-    return with_name(fn.__name__, fn)
+        return partial(decorator, name, unfinished_policy)
+    else:
+        return decorator(fn.__name__, unfinished_policy, fn)
 
 
 @overload
-def query(fn: CallableType) -> CallableType:
-    ...
+def query(fn: CallableType) -> CallableType: ...
 
 
 @overload
-def query(*, name: str) -> Callable[[CallableType], CallableType]:
-    ...
+def query(
+    *, name: str, description: Optional[str] = None
+) -> Callable[[CallableType], CallableType]: ...
 
 
 @overload
-def query(*, dynamic: Literal[True]) -> Callable[[CallableType], CallableType]:
-    ...
+def query(
+    *, dynamic: Literal[True], description: Optional[str] = None
+) -> Callable[[CallableType], CallableType]: ...
+
+
+@overload
+def query(*, description: str) -> Callable[[CallableType], CallableType]: ...
 
 
 def query(
@@ -261,10 +341,11 @@ def query(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow query method.
 
-    This is set on any non-async method that expects to handle a query. If a
+    This is used on any non-async method that expects to handle a query. If a
     function overrides one with this decorator, it too must be decorated.
 
     Query methods can only have positional parameters. Best practice for
@@ -281,18 +362,27 @@ def query(
             ``Sequence[RawValue]``. An older form of this accepted vararg
             parameters which will now warn. Cannot be present when ``name`` is
             present.
+        description: A short description of the query that may appear in the UI/CLI.
     """
 
-    def with_name(
-        name: Optional[str], fn: CallableType, *, bypass_async_check: bool = False
+    def decorator(
+        name: Optional[str],
+        description: Optional[str],
+        fn: CallableType,
+        *,
+        bypass_async_check: bool = False,
     ) -> CallableType:
+        if not name and not dynamic:
+            name = fn.__name__
         if not bypass_async_check and inspect.iscoroutinefunction(fn):
             warnings.warn(
                 "Queries as async def functions are deprecated",
                 DeprecationWarning,
                 stacklevel=2,
             )
-        defn = _QueryDefinition(name=name, fn=fn, is_method=True)
+        defn = _QueryDefinition(
+            name=name, fn=fn, is_method=True, description=description
+        )
         setattr(fn, "__temporal_query_definition", defn)
         if defn.dynamic_vararg:
             warnings.warn(
@@ -302,10 +392,10 @@ def query(
             )
         return fn
 
-    if name is not None or dynamic:
+    if name is not None or dynamic or description:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(with_name, name)
+        return partial(decorator, name, description)
     if fn is None:
         raise RuntimeError("Cannot create query without function or name or dynamic")
     if inspect.iscoroutinefunction(fn):
@@ -314,7 +404,7 @@ def query(
             DeprecationWarning,
             stacklevel=2,
         )
-    return with_name(fn.__name__, fn, bypass_async_check=True)
+    return decorator(fn.__name__, description, fn, bypass_async_check=True)
 
 
 @dataclass(frozen=True)
@@ -435,6 +525,14 @@ class UpdateInfo:
     name: str
     """Update type name."""
 
+    @property
+    def _logger_details(self) -> Mapping[str, Any]:
+        """Data to be included in string appended to default logging output."""
+        return {
+            "update_id": self.id,
+            "update_name": self.name,
+        }
+
 
 class _Runtime(ABC):
     @staticmethod
@@ -468,6 +566,9 @@ class _Runtime(ABC):
         return self._logger_details
 
     @abstractmethod
+    def workflow_all_handlers_finished(self) -> bool: ...
+
+    @abstractmethod
     def workflow_continue_as_new(
         self,
         *args: Any,
@@ -484,96 +585,84 @@ class _Runtime(ABC):
             ]
         ],
         versioning_intent: Optional[VersioningIntent],
-    ) -> NoReturn:
-        ...
+    ) -> NoReturn: ...
 
     @abstractmethod
-    def workflow_extern_functions(self) -> Mapping[str, Callable]:
-        ...
+    def workflow_extern_functions(self) -> Mapping[str, Callable]: ...
 
     @abstractmethod
-    def workflow_get_current_build_id(self) -> str:
-        ...
+    def workflow_get_current_build_id(self) -> str: ...
 
     @abstractmethod
-    def workflow_get_current_history_length(self) -> int:
-        ...
+    def workflow_get_current_history_length(self) -> int: ...
 
     @abstractmethod
-    def workflow_get_current_history_size(self) -> int:
-        ...
+    def workflow_get_current_history_size(self) -> int: ...
 
     @abstractmethod
     def workflow_get_external_workflow_handle(
         self, id: str, *, run_id: Optional[str]
-    ) -> ExternalWorkflowHandle[Any]:
-        ...
+    ) -> ExternalWorkflowHandle[Any]: ...
 
     @abstractmethod
-    def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_query_handler(self, name: Optional[str]) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_get_signal_handler(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_signal_handler(
+        self, name: Optional[str]
+    ) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_get_update_handler(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_update_handler(
+        self, name: Optional[str]
+    ) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_get_update_validator(self, name: Optional[str]) -> Optional[Callable]:
-        ...
+    def workflow_get_update_validator(
+        self, name: Optional[str]
+    ) -> Optional[Callable]: ...
 
     @abstractmethod
-    def workflow_info(self) -> Info:
-        ...
+    def workflow_info(self) -> Info: ...
 
     @abstractmethod
-    def workflow_is_continue_as_new_suggested(self) -> bool:
-        ...
+    def workflow_instance(self) -> Any: ...
 
     @abstractmethod
-    def workflow_is_replaying(self) -> bool:
-        ...
+    def workflow_is_continue_as_new_suggested(self) -> bool: ...
 
     @abstractmethod
-    def workflow_memo(self) -> Mapping[str, Any]:
-        ...
+    def workflow_is_replaying(self) -> bool: ...
+
+    @abstractmethod
+    def workflow_memo(self) -> Mapping[str, Any]: ...
 
     @abstractmethod
     def workflow_memo_value(
         self, key: str, default: Any, *, type_hint: Optional[Type]
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     @abstractmethod
-    def workflow_metric_meter(self) -> temporalio.common.MetricMeter:
-        ...
+    def workflow_metric_meter(self) -> temporalio.common.MetricMeter: ...
 
     @abstractmethod
-    def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
-        ...
+    def workflow_patch(self, id: str, *, deprecated: bool) -> bool: ...
 
     @abstractmethod
-    def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter:
-        ...
+    def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter: ...
 
     @abstractmethod
-    def workflow_random(self) -> Random:
-        ...
+    def workflow_random(self) -> Random: ...
 
     @abstractmethod
     def workflow_set_query_handler(
         self, name: Optional[str], handler: Optional[Callable]
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def workflow_set_signal_handler(
         self, name: Optional[str], handler: Optional[Callable]
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def workflow_set_update_handler(
@@ -581,8 +670,7 @@ class _Runtime(ABC):
         name: Optional[str],
         handler: Optional[Callable],
         validator: Optional[Callable],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @abstractmethod
     def workflow_start_activity(
@@ -599,8 +687,8 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
         versioning_intent: Optional[VersioningIntent],
-    ) -> ActivityHandle[Any]:
-        ...
+        summary: Optional[str] = None,
+    ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
     async def workflow_start_child_workflow(
@@ -626,8 +714,9 @@ class _Runtime(ABC):
             ]
         ],
         versioning_intent: Optional[VersioningIntent],
-    ) -> ChildWorkflowHandle[Any, Any]:
-        ...
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
+    ) -> ChildWorkflowHandle[Any, Any]: ...
 
     @abstractmethod
     def workflow_start_local_activity(
@@ -642,12 +731,10 @@ class _Runtime(ABC):
         local_retry_threshold: Optional[timedelta],
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
-    ) -> ActivityHandle[Any]:
-        ...
+    ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
-    def workflow_time_ns(self) -> int:
-        ...
+    def workflow_time_ns(self) -> int: ...
 
     @abstractmethod
     def workflow_upsert_search_attributes(
@@ -656,14 +743,27 @@ class _Runtime(ABC):
             temporalio.common.SearchAttributes,
             Sequence[temporalio.common.SearchAttributeUpdate],
         ],
-    ) -> None:
-        ...
+    ) -> None: ...
+
+    @abstractmethod
+    async def workflow_sleep(
+        self, duration: float, *, summary: Optional[str] = None
+    ) -> None: ...
 
     @abstractmethod
     async def workflow_wait_condition(
-        self, fn: Callable[[], bool], *, timeout: Optional[float] = None
-    ) -> None:
-        ...
+        self,
+        fn: Callable[[], bool],
+        *,
+        timeout: Optional[float] = None,
+        timeout_summary: Optional[str] = None,
+    ) -> None: ...
+
+    @abstractmethod
+    def workflow_get_current_details(self) -> str: ...
+
+    @abstractmethod
+    def workflow_set_current_details(self, details: str): ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -680,9 +780,6 @@ def current_update_info() -> Optional[UpdateInfo]:
 
     This is powered by :py:mod:`contextvars` so it is only valid within the
     update handler and coroutines/tasks it has started.
-
-    .. warning::
-       This API is experimental
 
     Returns:
         Info for the current update handler the code calling this is executing
@@ -724,6 +821,15 @@ def info() -> Info:
     return _Runtime.current().workflow_info()
 
 
+def instance() -> Any:
+    """Current workflow's instance.
+
+    Returns:
+        The currently running workflow instance.
+    """
+    return _Runtime.current().workflow_instance()
+
+
 def memo() -> Mapping[str, Any]:
     """Current workflow's memo values, converted without type hints.
 
@@ -739,20 +845,17 @@ def memo() -> Mapping[str, Any]:
 
 
 @overload
-def memo_value(key: str, default: Any = temporalio.common._arg_unset) -> Any:
-    ...
+def memo_value(key: str, default: Any = temporalio.common._arg_unset) -> Any: ...
 
 
 @overload
-def memo_value(key: str, *, type_hint: Type[ParamType]) -> ParamType:
-    ...
+def memo_value(key: str, *, type_hint: Type[ParamType]) -> ParamType: ...
 
 
 @overload
 def memo_value(
     key: str, default: AnyType, *, type_hint: Type[ParamType]
-) -> Union[AnyType, ParamType]:
-    ...
+) -> Union[AnyType, ParamType]: ...
 
 
 def memo_value(
@@ -777,6 +880,24 @@ def memo_value(
         KeyError: Key not present and default not set.
     """
     return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
+
+
+def get_current_details() -> str:
+    """Get the current details of the workflow which may appear in the UI/CLI.
+    Unlike static details set at start, this value can be updated throughout
+    the life of the workflow and is independent of the static details.
+    This can be in Temporal markdown format and can span multiple lines.
+    """
+    return _Runtime.current().workflow_get_current_details()
+
+
+def set_current_details(description: str) -> None:
+    """Set the current details of the workflow which may appear in the UI/CLI.
+    Unlike static details set at start, this value can be updated throughout
+    the life of the workflow and is independent of the static details.
+    This can be in Temporal markdown format and can span multiple lines.
+    """
+    _Runtime.current().workflow_set_current_details(description)
 
 
 def metric_meter() -> temporalio.common.MetricMeter:
@@ -872,7 +993,7 @@ def upsert_search_attributes(
     attributes: Union[
         temporalio.common.SearchAttributes,
         Sequence[temporalio.common.SearchAttributeUpdate],
-    ]
+    ],
 ) -> None:
     """Upsert search attributes for this workflow.
 
@@ -883,6 +1004,8 @@ def upsert_search_attributes(
             DEPRECATED and if used, result in invalid key types on the
             typed_search_attributes property in the info.
     """
+    if not attributes:
+        return
     temporalio.common._warn_on_deprecated_search_attributes(attributes)
     _Runtime.current().workflow_upsert_search_attributes(attributes)
 
@@ -909,36 +1032,49 @@ class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
 
 @overload
 def update(
-    fn: Callable[MultiParamSpec, Awaitable[ReturnType]]
-) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
-    ...
+    fn: Callable[MultiParamSpec, Awaitable[ReturnType]],
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]: ...
 
 
 @overload
 def update(
-    fn: Callable[MultiParamSpec, ReturnType]
-) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]:
-    ...
+    fn: Callable[MultiParamSpec, ReturnType],
+) -> UpdateMethodMultiParam[MultiParamSpec, ReturnType]: ...
 
 
 @overload
 def update(
-    *, name: str
+    *,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]:
-    ...
+]: ...
 
 
 @overload
 def update(
-    *, dynamic: Literal[True]
+    *,
+    name: str,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ) -> Callable[
     [Callable[MultiParamSpec, ReturnType]],
     UpdateMethodMultiParam[MultiParamSpec, ReturnType],
-]:
-    ...
+]: ...
+
+
+@overload
+def update(
+    *,
+    dynamic: Literal[True],
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
+) -> Callable[
+    [Callable[MultiParamSpec, ReturnType]],
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+]: ...
 
 
 def update(
@@ -946,10 +1082,12 @@ def update(
     *,
     name: Optional[str] = None,
     dynamic: Optional[bool] = False,
+    unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
+    description: Optional[str] = None,
 ):
     """Decorator for a workflow update handler method.
 
-    This is set on any async or non-async method that you wish to be called upon
+    This is used on any async or non-async method that you wish to be called upon
     receiving an update. If a function overrides one with this decorator, it too
     must be decorated.
 
@@ -973,12 +1111,25 @@ def update(
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
             present.
+        unfinished_policy: Actions taken if a workflow terminates with
+            a running instance of this handler.
+        description: A short description of the update that may appear in the UI/CLI.
     """
 
-    def with_name(
-        name: Optional[str], fn: CallableSyncOrAsyncType
+    def decorator(
+        name: Optional[str],
+        unfinished_policy: HandlerUnfinishedPolicy,
+        fn: CallableSyncOrAsyncType,
     ) -> CallableSyncOrAsyncType:
-        defn = _UpdateDefinition(name=name, fn=fn, is_method=True)
+        if not name and not dynamic:
+            name = fn.__name__
+        defn = _UpdateDefinition(
+            name=name,
+            fn=fn,
+            is_method=True,
+            unfinished_policy=unfinished_policy,
+            description=description,
+        )
         if defn.dynamic_vararg:
             raise RuntimeError(
                 "Dynamic updates do not support a vararg third param, use Sequence[RawValue]",
@@ -987,13 +1138,12 @@ def update(
         setattr(fn, "validator", partial(_update_validator, defn))
         return fn
 
-    if name is not None or dynamic:
+    if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(with_name, name)
-    if fn is None:
-        raise RuntimeError("Cannot create update without function or name or dynamic")
-    return with_name(fn.__name__, fn)
+        return partial(decorator, name, unfinished_policy)
+    else:
+        return decorator(fn.__name__, unfinished_policy, fn)
 
 
 def _update_validator(
@@ -1017,8 +1167,29 @@ def uuid4() -> uuid.UUID:
     return uuid.UUID(bytes=random().getrandbits(16 * 8).to_bytes(16, "big"), version=4)
 
 
+async def sleep(
+    duration: Union[float, timedelta], *, summary: Optional[str] = None
+) -> None:
+    """Sleep for the given duration.
+
+    Args:
+        duration: Duration to sleep in seconds or as a timedelta.
+        summary: A single-line fixed summary for this timer that may appear in UI/CLI.
+            This can be in single-line Temporal markdown format.
+    """
+    await _Runtime.current().workflow_sleep(
+        duration=duration.total_seconds()
+        if isinstance(duration, timedelta)
+        else duration,
+        summary=summary,
+    )
+
+
 async def wait_condition(
-    fn: Callable[[], bool], *, timeout: Optional[Union[timedelta, float]] = None
+    fn: Callable[[], bool],
+    *,
+    timeout: Optional[Union[timedelta, float]] = None,
+    timeout_summary: Optional[str] = None,
 ) -> None:
     """Wait on a callback to become true.
 
@@ -1029,10 +1200,14 @@ async def wait_condition(
         fn: Non-async callback that accepts no parameters and returns a boolean.
         timeout: Optional number of seconds to wait until throwing
             :py:class:`asyncio.TimeoutError`.
+        timeout_summary: Optional simple string identifying the timer (created if ``timeout`` is
+            present) that may be visible in UI/CLI. While it can be normal text, it is best to treat
+            as a timer ID.
     """
     await _Runtime.current().workflow_wait_condition(
         fn,
         timeout=timeout.total_seconds() if isinstance(timeout, timedelta) else timeout,
+        timeout_summary=timeout_summary,
     )
 
 
@@ -1145,6 +1320,10 @@ class LoggerAdapter(logging.LoggerAdapter):
             use by others. Default is False.
         log_during_replay: Boolean for whether logs should occur during replay.
             Default is False.
+
+    Values added to ``extra`` are merged with the ``extra`` dictionary from a
+    logging call, with values from the logging call taking precedence. I.e. the
+    behavior is that of ``merge_extra=True`` in Python >= 3.13.
     """
 
     def __init__(
@@ -1166,20 +1345,28 @@ class LoggerAdapter(logging.LoggerAdapter):
             or self.workflow_info_on_extra
             or self.full_workflow_info_on_extra
         ):
+            extra: Dict[str, Any] = {}
+            msg_extra: Dict[str, Any] = {}
             runtime = _Runtime.maybe_current()
             if runtime:
+                workflow_details = runtime.logger_details
                 if self.workflow_info_on_message:
-                    msg = f"{msg} ({runtime.logger_details})"
+                    msg_extra.update(workflow_details)
                 if self.workflow_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
-                    extra["temporal_workflow"] = runtime.logger_details
-                    kwargs["extra"] = extra
+                    extra["temporal_workflow"] = workflow_details
                 if self.full_workflow_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
                     extra["workflow_info"] = runtime.workflow_info()
-                    kwargs["extra"] = extra
+            update_info = current_update_info()
+            if update_info:
+                update_details = update_info._logger_details
+                if self.workflow_info_on_message:
+                    msg_extra.update(update_details)
+                if self.workflow_info_on_extra:
+                    extra.setdefault("temporal_workflow", {}).update(update_details)
+
+        kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
+        if msg_extra:
+            msg = f"{msg} ({msg_extra})"
         return (msg, kwargs)
 
     def isEnabledFor(self, level: int) -> bool:
@@ -1249,6 +1436,20 @@ class _Definition:
             f"Function {fn_name} missing attributes, was it decorated with @workflow.run and was its class decorated with @workflow.defn?"
         )
 
+    @classmethod
+    def get_name_and_result_type(
+        cls, name_or_run_fn: Union[str, Callable[..., Awaitable[Any]]]
+    ) -> Tuple[str, Optional[Type]]:
+        if isinstance(name_or_run_fn, str):
+            return name_or_run_fn, None
+        elif callable(name_or_run_fn):
+            defn = cls.must_from_run_fn(name_or_run_fn)
+            if not defn.name:
+                raise ValueError("Cannot invoke dynamic workflow explicitly")
+            return defn.name, defn.ret_type
+        else:
+            raise TypeError("Workflow must be a string or callable")
+
     @staticmethod
     def _apply_to_class(
         cls: Type,
@@ -1263,13 +1464,13 @@ class _Definition:
         issues: List[str] = []
 
         # Collect run fn and all signal/query/update fns
-        members = inspect.getmembers(cls)
+        init_fn: Optional[Callable[..., None]] = None
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
         seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
         queries: Dict[Optional[str], _QueryDefinition] = {}
         updates: Dict[Optional[str], _UpdateDefinition] = {}
-        for name, member in members:
+        for name, member in inspect.getmembers(cls):
             if hasattr(member, "__temporal_workflow_run"):
                 seen_run_attr = True
                 if not _is_unbound_method_on_cls(member, cls):
@@ -1310,6 +1511,8 @@ class _Definition:
                     )
                 else:
                     queries[query_defn.name] = query_defn
+            elif name == "__init__" and hasattr(member, "__temporal_workflow_init"):
+                init_fn = member
             elif isinstance(member, UpdateMethodMultiParam):
                 update_defn = member._defn
                 if update_defn.name in updates:
@@ -1317,6 +1520,13 @@ class _Definition:
                     issues.append(
                         f"Multiple update methods found for {defn_name} "
                         f"(at least on {name} and {updates[update_defn.name].fn.__name__})"
+                    )
+                elif update_defn.validator and not _parameters_identical_up_to_naming(
+                    update_defn.fn, update_defn.validator
+                ):
+                    issues.append(
+                        f"Update validator method {update_defn.validator.__name__} parameters "
+                        f"do not match update method {update_defn.fn.__name__} parameters"
                     )
                 else:
                     updates[update_defn.name] = update_defn
@@ -1362,9 +1572,14 @@ class _Definition:
 
         if not seen_run_attr:
             issues.append("Missing @workflow.run method")
-        if len(issues) == 1:
-            raise ValueError(f"Invalid workflow class: {issues[0]}")
-        elif issues:
+        if init_fn and run_fn:
+            if not _parameters_identical_up_to_naming(init_fn, run_fn):
+                issues.append(
+                    "@workflow.init and @workflow.run method parameters do not match"
+                )
+        if issues:
+            if len(issues) == 1:
+                raise ValueError(f"Invalid workflow class: {issues[0]}")
             raise ValueError(
                 f"Invalid workflow class for {len(issues)} reasons: {', '.join(issues)}"
             )
@@ -1398,6 +1613,19 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
+
+
+def _parameters_identical_up_to_naming(fn1: Callable, fn2: Callable) -> bool:
+    """Return True if the functions have identical parameter lists, ignoring parameter names."""
+
+    def params(fn: Callable) -> List[inspect.Parameter]:
+        # Ignore name when comparing parameters (remaining fields are kind,
+        # default, and annotation).
+        return [p.replace(name="x") for p in inspect.signature(fn).parameters.values()]
+
+    # We require that any type annotations present match exactly; i.e. we do
+    # not support any notion of subtype compatibility.
+    return params(fn1) == params(fn2)
 
 
 # Async safe version of partial
@@ -1450,6 +1678,10 @@ class _SignalDefinition:
     name: Optional[str]
     fn: Callable[..., Union[None, Awaitable[None]]]
     is_method: bool
+    unfinished_policy: HandlerUnfinishedPolicy = (
+        HandlerUnfinishedPolicy.WARN_AND_ABANDON
+    )
+    description: Optional[str] = None
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     dynamic_vararg: bool = False
@@ -1497,6 +1729,7 @@ class _QueryDefinition:
     name: Optional[str]
     fn: Callable[..., Any]
     is_method: bool
+    description: Optional[str] = None
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
@@ -1531,6 +1764,10 @@ class _UpdateDefinition:
     name: Optional[str]
     fn: Callable[..., Union[Any, Awaitable[Any]]]
     is_method: bool
+    unfinished_policy: HandlerUnfinishedPolicy = (
+        HandlerUnfinishedPolicy.WARN_AND_ABANDON
+    )
+    description: Optional[str] = None
     # Types loaded on post init if None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
@@ -1562,6 +1799,20 @@ class _UpdateDefinition:
         if self.validator:
             raise RuntimeError(f"Validator already set for update {self.name}")
         object.__setattr__(self, "validator", validator)
+
+    @classmethod
+    def get_name_and_result_type(
+        cls,
+        name_or_update_fn: Union[str, Callable[..., Any]],
+    ) -> Tuple[str, Optional[Type]]:
+        if isinstance(name_or_update_fn, temporalio.workflow.UpdateMethodMultiParam):
+            defn = name_or_update_fn._defn
+            if not defn.name:
+                raise RuntimeError("Cannot invoke dynamic update definition")
+            # TODO(cretz): Check count/type of args at runtime?
+            return defn.name, defn.ret_type
+        else:
+            return str(name_or_update_fn), None
 
 
 # See https://mypy.readthedocs.io/en/latest/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
@@ -1630,8 +1881,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -1648,8 +1898,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -1667,8 +1916,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -1686,8 +1934,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -1705,8 +1952,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -1724,8 +1970,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for string-name activity
@@ -1745,8 +1990,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[Any]:
-    ...
+) -> ActivityHandle[Any]: ...
 
 
 def start_activity(
@@ -1764,6 +2008,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity and return its handle.
 
@@ -1797,6 +2042,8 @@ def start_activity(
             need to. Contact Temporal before setting this value.
         versioning_intent: When using the Worker Versioning feature, specifies whether this Activity
             should run on a worker with a compatible Build Id or not.
+        summary: A single-line fixed summary for this activity that may appear in UI/CLI.
+            This can be in single-line Temporal markdown format.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -1814,6 +2061,7 @@ def start_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -1831,8 +2079,8 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -1849,8 +2097,8 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -1868,8 +2116,8 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -1887,8 +2135,8 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -1906,8 +2154,8 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -1925,8 +2173,8 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for string-name activity
@@ -1946,8 +2194,8 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> Any:
-    ...
+    summary: Optional[str] = None,
+) -> Any: ...
 
 
 async def execute_activity(
@@ -1965,6 +2213,7 @@ async def execute_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity and wait for completion.
 
@@ -1985,6 +2234,7 @@ async def execute_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2002,8 +2252,8 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -2020,8 +2270,8 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -2039,8 +2289,8 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -2058,8 +2308,8 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -2077,8 +2327,8 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -2096,8 +2346,8 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_activity_class(
@@ -2114,6 +2364,7 @@ def start_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
 
@@ -2132,6 +2383,7 @@ def start_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2149,8 +2401,8 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -2167,8 +2419,8 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -2186,8 +2438,8 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -2205,8 +2457,8 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -2224,8 +2476,8 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -2243,8 +2495,8 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 async def execute_activity_class(
@@ -2261,6 +2513,7 @@ async def execute_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
 
@@ -2279,6 +2532,7 @@ async def execute_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2296,8 +2550,8 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -2314,8 +2568,8 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -2333,8 +2587,8 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -2352,8 +2606,8 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -2371,8 +2625,8 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -2390,8 +2644,8 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+    summary: Optional[str] = None,
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_activity_method(
@@ -2408,6 +2662,7 @@ def start_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
 
@@ -2426,6 +2681,7 @@ def start_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2443,8 +2699,8 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -2461,8 +2717,8 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -2480,8 +2736,8 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -2499,8 +2755,8 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -2518,8 +2774,8 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -2537,8 +2793,8 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 async def execute_activity_method(
@@ -2555,6 +2811,7 @@ async def execute_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start an activity from a method and wait for completion.
 
@@ -2575,6 +2832,7 @@ async def execute_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         versioning_intent=versioning_intent,
+        summary=summary,
     )
 
 
@@ -2604,8 +2862,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -2620,8 +2877,7 @@ def start_local_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -2637,8 +2893,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -2654,8 +2909,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -2671,8 +2925,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -2688,8 +2941,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for string-name activity
@@ -2707,8 +2959,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[Any]:
-    ...
+) -> ActivityHandle[Any]: ...
 
 
 def start_local_activity(
@@ -2784,8 +3035,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -2800,8 +3050,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -2817,8 +3066,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -2834,8 +3082,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -2851,8 +3098,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -2868,8 +3114,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for string-name activity
@@ -2887,8 +3132,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> Any:
-    ...
+) -> Any: ...
 
 
 async def execute_local_activity(
@@ -2940,8 +3184,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -2956,8 +3199,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -2973,8 +3215,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -2990,8 +3231,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -3007,8 +3247,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -3024,8 +3263,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_local_activity_class(
@@ -3074,8 +3312,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -3090,8 +3327,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -3107,8 +3343,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -3124,8 +3359,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -3141,8 +3375,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -3158,8 +3391,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 async def execute_local_activity_class(
@@ -3210,8 +3442,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync no-param activity
@@ -3226,8 +3457,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async single-param activity
@@ -3243,8 +3473,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync single-param activity
@@ -3260,8 +3489,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for async multi-param activity
@@ -3277,8 +3505,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 # Overload for sync multi-param activity
@@ -3294,8 +3521,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ActivityHandle[ReturnType]:
-    ...
+) -> ActivityHandle[ReturnType]: ...
 
 
 def start_local_activity_method(
@@ -3344,8 +3570,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync no-param activity
@@ -3360,8 +3585,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async single-param activity
@@ -3377,8 +3601,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync single-param activity
@@ -3394,8 +3617,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for async multi-param activity
@@ -3411,8 +3633,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 # Overload for sync multi-param activity
@@ -3428,8 +3649,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
-) -> ReturnType:
-    ...
+) -> ReturnType: ...
 
 
 async def execute_local_activity_method(
@@ -3490,16 +3710,14 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
     async def signal(
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
@@ -3509,8 +3727,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         ],
         *,
         args: Sequence[Any],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
@@ -3519,8 +3736,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def signal(
         self,
@@ -3619,8 +3835,9 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[SelfType, ReturnType]:
-    ...
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
+) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Overload for single-param workflow
@@ -3646,8 +3863,9 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[SelfType, ReturnType]:
-    ...
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
+) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Overload for multi-param workflow
@@ -3673,8 +3891,9 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[SelfType, ReturnType]:
-    ...
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
+) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Overload for string-name workflow
@@ -3702,8 +3921,9 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ChildWorkflowHandle[Any, Any]:
-    ...
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
+) -> ChildWorkflowHandle[Any, Any]: ...
 
 
 async def start_child_workflow(
@@ -3729,6 +3949,8 @@ async def start_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
 
@@ -3758,6 +3980,12 @@ async def start_child_workflow(
             form of this is DEPRECATED.
         versioning_intent:  When using the Worker Versioning feature, specifies whether this Child
             Workflow should run on a worker with a compatible Build Id or not.
+        static_summary: A single-line fixed summary for this child workflow execution that may appear
+            in the UI/CLI. This can be in single-line Temporal markdown format.
+        static_details: General fixed details for this child workflow execution that may appear in
+            UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
+            a fixed value on the workflow that cannot be updated. For details that can be
+            updated, use :py:meth:`Workflow.get_current_details` within the workflow.
 
     Returns:
         A workflow handle to the started/existing workflow.
@@ -3780,6 +4008,8 @@ async def start_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        static_summary=static_summary,
+        static_details=static_details,
     )
 
 
@@ -3805,8 +4035,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for single-param workflow
@@ -3832,8 +4062,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for multi-param workflow
@@ -3859,8 +4089,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> ReturnType:
-    ...
+    summary: Optional[str] = None,
+) -> ReturnType: ...
 
 
 # Overload for string-name workflow
@@ -3888,8 +4118,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> Any:
-    ...
+    summary: Optional[str] = None,
+) -> Any: ...
 
 
 async def execute_child_workflow(
@@ -3915,6 +4145,7 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a child workflow and wait for completion.
 
@@ -3940,6 +4171,7 @@ async def execute_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        static_summary=summary,
     )
     return await handle
 
@@ -3965,16 +4197,14 @@ class ExternalWorkflowHandle(Generic[SelfType]):
     async def signal(
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def signal(
@@ -3983,8 +4213,7 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def signal(
         self,
@@ -4087,8 +4316,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for no-param workflow
@@ -4107,8 +4335,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for single-param workflow
@@ -4128,8 +4355,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for multi-param workflow
@@ -4149,8 +4375,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 # Overload for string-name workflow
@@ -4170,8 +4395,7 @@ def continue_as_new(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-) -> NoReturn:
-    ...
+) -> NoReturn: ...
 
 
 def continue_as_new(
@@ -4400,6 +4624,19 @@ def set_dynamic_update_handler(
     _Runtime.current().workflow_set_update_handler(None, handler, validator)
 
 
+def all_handlers_finished() -> bool:
+    """Whether update and signal handlers have finished executing.
+
+    Consider waiting on this condition before workflow return or continue-as-new, to prevent
+    interruption of in-progress handlers by workflow exit:
+    ``await workflow.wait_condition(lambda: workflow.all_handlers_finished())``
+
+    Returns:
+        True if there are no in-progress update or signal handler executions.
+    """
+    return _Runtime.current().workflow_all_handlers_finished()
+
+
 def as_completed(
     fs: Iterable[Awaitable[AnyType]], *, timeout: Optional[float] = None
 ) -> Iterator[Awaitable[AnyType]]:
@@ -4462,8 +4699,7 @@ async def wait(  # type: ignore[misc]
     *,
     timeout: Optional[float] = None,
     return_when: str = asyncio.ALL_COMPLETED,
-) -> Tuple[List[_FT], List[_FT]]:
-    ...
+) -> Tuple[List[_FT], List[_FT]]: ...
 
 
 @overload
@@ -4472,8 +4708,7 @@ async def wait(
     *,
     timeout: Optional[float] = None,
     return_when: str = asyncio.ALL_COMPLETED,
-) -> Tuple[List[asyncio.Task[AnyType]], set[asyncio.Task[AnyType]]]:
-    ...
+) -> Tuple[List[asyncio.Task[AnyType]], set[asyncio.Task[AnyType]]]: ...
 
 
 async def wait(

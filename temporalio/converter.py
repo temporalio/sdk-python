@@ -34,6 +34,7 @@ from typing import (
     overload,
 )
 
+import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
@@ -42,6 +43,7 @@ from typing_extensions import Literal
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
+import temporalio.api.sdk.v1
 import temporalio.common
 import temporalio.exceptions
 import temporalio.types
@@ -145,16 +147,14 @@ class PayloadConverter(ABC):
         return self.to_payloads([value])[0]
 
     @overload
-    def from_payload(self, payload: temporalio.api.common.v1.Payload) -> Any:
-        ...
+    def from_payload(self, payload: temporalio.api.common.v1.Payload) -> Any: ...
 
     @overload
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
         type_hint: Type[temporalio.types.AnyType],
-    ) -> temporalio.types.AnyType:
-        ...
+    ) -> temporalio.types.AnyType: ...
 
     def from_payload(
         self,
@@ -845,6 +845,10 @@ class DefaultFailureConverter(FailureConverter):
                 failure.application_failure_info.details.CopyFrom(
                     payload_converter.to_payloads_wrapper(error.details)
                 )
+            if error.next_retry_delay:
+                failure.application_failure_info.next_retry_delay.FromTimedelta(
+                    error.next_retry_delay
+                )
         elif isinstance(error, temporalio.exceptions.TimeoutError):
             failure.timeout_failure_info.SetInParent()
             failure.timeout_failure_info.timeout_type = (
@@ -878,9 +882,7 @@ class DefaultFailureConverter(FailureConverter):
         elif isinstance(error, temporalio.exceptions.ChildWorkflowError):
             failure.child_workflow_execution_failure_info.SetInParent()
             failure.child_workflow_execution_failure_info.namespace = error.namespace
-            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = (
-                error.workflow_id
-            )
+            failure.child_workflow_execution_failure_info.workflow_execution.workflow_id = error.workflow_id
             failure.child_workflow_execution_failure_info.workflow_execution.run_id = (
                 error.run_id
             )
@@ -932,6 +934,7 @@ class DefaultFailureConverter(FailureConverter):
                 *payload_converter.from_payloads_wrapper(app_info.details),
                 type=app_info.type or None,
                 non_retryable=app_info.non_retryable,
+                next_retry_delay=app_info.next_retry_delay.ToTimedelta(),
             )
         elif failure.HasField("timeout_failure_info"):
             timeout_info = failure.timeout_failure_info
@@ -1190,7 +1193,7 @@ def encode_typed_search_attribute_value(
     if isinstance(value, Sequence):
         for v in value:
             if not isinstance(v, str):
-                raise TypeError(f"All values of a keyword list must be strings")
+                raise TypeError("All values of a keyword list must be strings")
     # Convert value
     payload = default().payload_converter.to_payload(value)
     # Set metadata type
@@ -1228,7 +1231,7 @@ def encode_search_attribute_values(
             )
         elif val_type and type(v) is not val_type:
             raise TypeError(
-                f"Search attribute values must have the same type for the same key"
+                "Search attribute values must have the same type for the same key"
             )
         elif not val_type:
             val_type = type(v)

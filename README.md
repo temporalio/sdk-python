@@ -1,6 +1,6 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
 
-[![Python 3.8+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
@@ -65,6 +65,7 @@ informal introduction to the features and their implementation.
       - [Asyncio Cancellation](#asyncio-cancellation)
       - [Workflow Utilities](#workflow-utilities)
       - [Exceptions](#exceptions)
+      - [Signal and update handlers](#signal-and-update-handlers)
       - [External Workflows](#external-workflows)
       - [Testing](#testing)
         - [Automatic Time Skipping](#automatic-time-skipping)
@@ -575,29 +576,41 @@ Here are the decorators that can be applied:
   * The method's arguments are the workflow's arguments
   * The first parameter must be `self`, followed by positional arguments. Best practice is to only take a single
     argument that is an object/dataclass of fields that can be added to as needed.
+* `@workflow.init` - Specifies that the `__init__`  method accepts the workflow's arguments.
+  * If present, may only be applied to the `__init__` method, the parameters of which must then be identical to those of
+    the `@workflow.run` method.
+  * The purpose of this decorator is to allow operations involving workflow arguments to be performed in the `__init__`
+    method, before any signal or update handler has a chance to execute.
 * `@workflow.signal` - Defines a method as a signal
-  * Can be defined on an `async` or non-`async` function at any hierarchy depth, but if decorated method is overridden,
-    the override must also be decorated
-  * The method's arguments are the signal's arguments
-  * Can have a `name` param to customize the signal name, otherwise it defaults to the unqualified method name
+  * Can be defined on an `async` or non-`async` method at any point in the class hierarchy, but if the decorated method
+    is overridden, then the override must also be decorated.
+  * The method's arguments are the signal's arguments.
+  * Return value is ignored.
+  * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
+  * Can have a `name` param to customize the signal name, otherwise it defaults to the unqualified method name.
   * Can have `dynamic=True` which means all otherwise unhandled signals fall through to this. If present, cannot have
     `name` argument, and method parameters must be `self`, a string signal name, and a
     `Sequence[temporalio.common.RawValue]`.
   * Non-dynamic method can only have positional arguments. Best practice is to only take a single argument that is an
     object/dataclass of fields that can be added to as needed.
-  * Return value is ignored
-* `@workflow.query` - Defines a method as a query
-  * All the same constraints as `@workflow.signal` but should return a value
-  * Should not be `async`
-  * Temporal queries should never mutate anything in the workflow or call any calls that would mutate the workflow
+  * See [Signal and update handlers](#signal-and-update-handlers) below
 * `@workflow.update` - Defines a method as an update
-  * May both accept as input and return a value
+  * Can be defined on an `async` or non-`async` method at any point in the class hierarchy, but if the decorated method
+    is overridden, then the override must also be decorated.
+  * May accept input and return a value
+  * The method's arguments are the update's arguments.
   * May be `async` or non-`async`
   * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
-  * Also accepts the `name` and `dynamic` parameters like signals and queries, with the same semantics.
+  * Also accepts the `name` and `dynamic` parameters like signal, with the same semantics.
   * Update handlers may optionally define a validator method by decorating it with `@update_handler_method.validator`.
     To reject an update before any events are written to history, throw an exception in a validator. Validators cannot 
     be `async`, cannot mutate workflow state, and return nothing.
+  * See [Signal and update handlers](#signal-and-update-handlers) below
+* `@workflow.query` - Defines a method as a query
+  * Should return a value
+  * Should not be `async`
+  * Temporal queries should never mutate anything in the workflow or call any calls that would mutate the workflow
+  * Also accepts the `name` and `dynamic` parameters like signal and update, with the same semantics.
 
 #### Running
 
@@ -667,7 +680,7 @@ Some things to note about the above code:
 
 #### Timers
 
-* A timer is represented by normal `asyncio.sleep()`
+* A timer is represented by normal `asyncio.sleep()` or a `workflow.sleep()` call
 * Timers are also implicitly started on any `asyncio` calls with timeouts (e.g. `asyncio.wait_for`)
 * Timers are Temporal server timers, not local ones, so sub-second resolution rarely has value
 * Calls that use a specific point in time, e.g. `call_at` or `timeout_at`, should be based on the current loop time
@@ -700,9 +713,15 @@ deterministic:
 
 #### Asyncio Cancellation
 
-Cancellation is done the same way as `asyncio`. Specifically, a task can be requested to be cancelled but does not
-necessarily have to respect that cancellation immediately. This also means that `asyncio.shield()` can be used to
-protect against cancellation. The following tasks, when cancelled, perform a Temporal cancellation:
+Cancellation is done using `asyncio` [task cancellation](https://docs.python.org/3/library/asyncio-task.html#task-cancellation).
+This means that tasks are requested to be cancelled but can catch the
+[`asyncio.CancelledError`](https://docs.python.org/3/library/asyncio-exceptions.html#asyncio.CancelledError), thus
+allowing them to perform some cleanup before allowing the cancellation to proceed (i.e. re-raising the error), or to
+deny the cancellation entirely. It also means that
+[`asyncio.shield()`](https://docs.python.org/3/library/asyncio-task.html#shielding-from-cancellation) can be used to
+protect tasks against cancellation.
+
+The following tasks, when cancelled, perform a Temporal cancellation:
 
 * Activities - when the task executing an activity is cancelled, a cancellation request is sent to the activity
 * Child workflows - when the task starting or executing a child workflow is cancelled, a cancellation request is sent to
@@ -741,17 +760,39 @@ While running in a workflow, in addition to features documented elsewhere, the f
     be marked non-retryable or include details as needed.
   * Other exceptions that come from activity execution, child execution, cancellation, etc are already instances of
     `FailureError` and will fail the workflow when uncaught.
+* Update handlers are special: an instance of `temporalio.exceptions.FailureError` raised in an update handler will fail
+  the update instead of failing the workflow.
 * All other exceptions fail the "workflow task" which means the workflow will continually retry until the workflow is
   fixed. This is helpful for bad code or other non-predictable exceptions. To actually fail the workflow, use an
   `ApplicationError` as mentioned above.
 
 This default can be changed by providing a list of exception types to `workflow_failure_exception_types` when creating a
 `Worker` or `failure_exception_types` on the `@workflow.defn` decorator. If a workflow-thrown exception is an instance
-of any type in either list, it will fail the workflow instead of the task. This means a value of `[Exception]` will
-cause every exception to fail the workflow instead of the task. Also, as a special case, if
+of any type in either list, it will fail the workflow (or update) instead of the workflow task. This means a value of
+`[Exception]` will cause every exception to fail the workflow instead of the workflow task. Also, as a special case, if
 `temporalio.workflow.NondeterminismError` (or any superclass of it) is set, non-deterministic exceptions will fail the
 workflow. WARNING: These settings are experimental.
 
+#### Signal and update handlers
+
+Signal and update handlers are defined using decorated methods as shown in the example [above](#definition). Client code
+sends signals and updates using `workflow_handle.signal`, `workflow_handle.execute_update`, or
+`workflow_handle.start_update`. When the workflow receives one of these requests, it starts an `asyncio.Task` executing
+the corresponding handler method with the argument(s) from the request.
+
+The handler methods may be `async def` and can do all the async operations described above (e.g. invoking activities and
+child workflows, and waiting on timers and conditions). Notice that this means that handler tasks will be executing
+concurrently with respect to each other and the main workflow task. Use
+[asyncio.Lock](https://docs.python.org/3/library/asyncio-sync.html#lock) and
+[asyncio.Semaphore](https://docs.python.org/3/library/asyncio-sync.html#semaphore) if necessary.
+
+Your main workflow task may finish as a result of successful completion, cancellation, continue-as-new, or failure. You
+should ensure that all in-progress signal and update handler tasks have finished before this happens; if you do not, you
+will see a warning (the warning can be disabled via the `workflow.signal`/`workflow.update` decorators). One way to
+ensure that handler tasks have finished is to wait on the `workflow.all_handlers_finished` condition:
+```python
+await workflow.wait_condition(workflow.all_handlers_finished)
+```
 #### External Workflows
 
 * `workflow.get_external_workflow_handle()` inside a workflow returns a handle to interact with another workflow
@@ -987,6 +1028,21 @@ my_worker = Worker(
 
 In both of these cases, now the `pydantic` module will be passed through from outside of the sandbox instead of
 being reloaded for every workflow run.
+
+If users are sure that no imports they use in workflow files will ever need to be sandboxed (meaning all calls within
+are deterministic and never mutate shared, global state), the `passthrough_all_modules` option can be set on the
+restrictions or the `with_passthrough_all_modules` helper can by used, for example:
+
+```python
+my_worker = Worker(
+  ...,
+  workflow_runner=SandboxedWorkflowRunner(
+    restrictions=SandboxRestrictions.default.with_passthrough_all_modules()
+  )
+)
+```
+
+Note, some calls from the module may still be checked for invalid calls at runtime for certain builtins.
 
 ###### Invalid Module Members
 
@@ -1317,7 +1373,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.8 and newer. It is built using
+The Python SDK is built to work with Python 3.9 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
 
 ### Building
@@ -1326,7 +1382,7 @@ The Python SDK is built to work with Python 3.8 and newer. It is built using
 
 To build the SDK from source for use as a dependency, the following prerequisites are required:
 
-* [Python](https://www.python.org/) >= 3.8
+* [Python](https://www.python.org/) >= 3.9
   * Make sure the latest version of `pip` is in use
 * [Rust](https://www.rust-lang.org/)
 * [Protobuf Compiler](https://protobuf.dev/)
@@ -1471,12 +1527,12 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 #### Proto Generation and Testing
 
 To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
-protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"`. Then the protobuf files can be
-generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var
-to `1` prior to running tests.
+protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"` +
+`poetry install --no-root --all-extras`. Then the protobuf files can be generated via `poe gen-protos`. Tests can be run
+for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
 
-Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore `pyproject.toml` and
-run `poetry update protobuf grpcio-tools`.
+Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files
+and run `poetry install --no-root --all-extras`. Make sure you `poe format` the results.
 
 For a less system-intrusive approach, you can (note this approach [may have a bug](https://github.com/temporalio/sdk-python/issues/543)):
 ```shell

@@ -99,6 +99,17 @@ class SandboxRestrictions:
     fully qualified path to the item.
     """
 
+    passthrough_all_modules: bool = False
+    """
+    Pass through all modules, do not sandbox any modules. This is the equivalent
+    of setting :py:attr:`passthrough_modules` to a list of all modules imported
+    by the workflow. This is unsafe. This means modules are never reloaded per
+    workflow run which means workflow authors have to be careful that they don't
+    import modules that do non-deterministic things. Note, just because a module
+    is passed through from outside the sandbox doesn't mean runtime restrictions
+    on invalid calls are not still applied.
+    """
+
     passthrough_modules_minimum: ClassVar[Set[str]]
     """Set of modules that must be passed through at the minimum."""
 
@@ -132,6 +143,12 @@ class SandboxRestrictions:
         return dataclasses.replace(
             self, passthrough_modules=self.passthrough_modules | set(modules)
         )
+
+    def with_passthrough_all_modules(self) -> SandboxRestrictions:
+        """Create a new restriction set with :py:attr:`passthrough_all_modules`
+        as true.
+        """
+        return dataclasses.replace(self, passthrough_all_modules=True)
 
 
 # We intentionally use specific fields instead of generic "matcher" callbacks
@@ -207,6 +224,12 @@ class SandboxMatcher:
     ``True`` and this matcher is on ``children`` of a parent.
     """
 
+    exclude: Set[str] = frozenset()  # type: ignore
+    """Immutable set of names to exclude.
+    
+    These override anything that may have been matched elsewhere.
+    """
+
     all: ClassVar[SandboxMatcher]
     """Shortcut for an always-matched matcher."""
 
@@ -245,6 +268,8 @@ class SandboxMatcher:
         # We prefer to avoid recursion
         matcher = self
         for v in child_path:
+            if v in matcher.exclude:
+                return None
             # Does not match if this is runtime only and we're not runtime
             if not context.is_runtime and matcher.only_runtime:
                 return None
@@ -303,6 +328,8 @@ class SandboxMatcher:
             # Use all if it matches self, access, _or_ use. Use doesn't match
             # self but matches all children.
             assert matcher  # MyPy help
+            if v in matcher.exclude:
+                return None
             if (
                 matcher.match_self
                 or v in matcher.access
@@ -408,6 +435,9 @@ SandboxRestrictions.passthrough_modules_minimum = {
     # Due to a metaclass conflict in sandbox, we need zipfile module to pass
     # through always
     "zipfile",
+    # This is a very general module needed by many things including pytest's
+    # assertion rewriter
+    "typing",
     # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
     # for older versions. This unfortunately means that on those versions,
     # everyone using Python protos has to pass their module through.
@@ -420,21 +450,24 @@ SandboxRestrictions.passthrough_modules_minimum = {
     "temporalio.bridge.temporal_sdk_bridge",
 }
 
-SandboxRestrictions.passthrough_modules_with_temporal = SandboxRestrictions.passthrough_modules_minimum | {
-    # is_subclass is broken in sandbox due to Python bug on ABC C extension.
-    # So we have to include all things that might extend an ABC class and
-    # do a subclass check. See https://bugs.python.org/issue44847 and
-    # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
-    "asyncio",
-    "abc",
-    "temporalio",
-    # Due to pkg_resources use of base classes caused by the ABC issue
-    # above, and Otel's use of pkg_resources, we pass it through
-    "pkg_resources",
-    # Due to how Pydantic is importing lazily inside of some classes, we choose
-    # to always pass it through
-    "pydantic",
-}
+SandboxRestrictions.passthrough_modules_with_temporal = (
+    SandboxRestrictions.passthrough_modules_minimum
+    | {
+        # is_subclass is broken in sandbox due to Python bug on ABC C extension.
+        # So we have to include all things that might extend an ABC class and
+        # do a subclass check. See https://bugs.python.org/issue44847 and
+        # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
+        "asyncio",
+        "abc",
+        "temporalio",
+        # Due to pkg_resources use of base classes caused by the ABC issue
+        # above, and Otel's use of pkg_resources, we pass it through
+        "pkg_resources",
+        # Due to how Pydantic is importing lazily inside of some classes, we choose
+        # to always pass it through
+        "pydantic",
+    }
+)
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
 # test will fail if this list doesn't match the latest Python version it was
@@ -474,15 +507,18 @@ _stdlib_module_names = (
     "xdrlib,xml,xmlrpc,zipapp,zipfile,zipimport,zlib,zoneinfo"
 )
 
-SandboxRestrictions.passthrough_modules_maximum = SandboxRestrictions.passthrough_modules_with_temporal | {
-    # All stdlib modules except "sys" and their children. Children are not
-    # listed in stdlib names but we need them because in some cases (e.g. os
-    # manually setting sys.modules["os.path"]) they have certain child
-    # expectations.
-    v
-    for v in _stdlib_module_names.split(",")
-    if v != "sys"
-}
+SandboxRestrictions.passthrough_modules_maximum = (
+    SandboxRestrictions.passthrough_modules_with_temporal
+    | {
+        # All stdlib modules except "sys" and their children. Children are not
+        # listed in stdlib names but we need them because in some cases (e.g. os
+        # manually setting sys.modules["os.path"]) they have certain child
+        # expectations.
+        v
+        for v in _stdlib_module_names.split(",")
+        if v != "sys"
+    }
+)
 
 SandboxRestrictions.passthrough_modules_default = (
     SandboxRestrictions.passthrough_modules_maximum
@@ -582,11 +618,14 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         # We cannot restrict linecache because some packages like attrs' attr
         # use it during dynamic code generation
         # "linecache": SandboxMatcher.all_uses,
-        # Restrict everything in OS at runtime
+        # Restrict almost everything in OS at runtime
         "os": SandboxMatcher(
             access={"name"},
             use={"*"},
-            # Everything in OS restricted at runtime
+            # As of https://github.com/python/cpython/pull/112097, os.stat
+            # calls are now made when displaying errors
+            exclude={"stat"},
+            # Only restricted at runtime
             only_runtime=True,
         ),
         "pathlib": SandboxMatcher(
@@ -774,6 +813,7 @@ class _RestrictionState:
         matcher = self.matcher.access_matcher(self.context, name)
         if not matcher:
             return
+
         logger.warning("%s on %s restricted", name, self.name)
         # Issue warning instead of error if configured to do so
         if matcher.leaf_warning:
@@ -933,7 +973,9 @@ class _RestrictedProxy:
     def __getattribute__(self, __name: str) -> Any:
         state = _RestrictionState.from_proxy(self)
         _trace("__getattribute__ %s on %s", __name, state.name)
-        state.assert_child_not_restricted(__name)
+        # We do not restrict __spec__ or __name__
+        if __name != "__spec__" and __name != "__name__":
+            state.assert_child_not_restricted(__name)
         ret = object.__getattribute__(self, "__getattr__")(__name)
 
         # Since Python 3.11, the importer references __spec__ on module, so we

@@ -23,11 +23,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.message
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 
@@ -55,8 +58,6 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
         retry interval calculated by the retry policy. Retry attempts will
         still be subject to the maximum retries limit and total time limit
         defined by the policy.
-        ATTENTION: this value will be ignored if set for failures produced by
-        the workflow.
         """
     def __init__(
         self,

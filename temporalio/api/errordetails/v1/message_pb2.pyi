@@ -4,13 +4,16 @@ isort:skip_file
 These error details are supplied in google.rpc.Status#details as described in "Google APIs, Error Model" (https://cloud.google.com/apis/design/errors#error_model)
 and extend standard Error Details defined in https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.any_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.namespace_pb2

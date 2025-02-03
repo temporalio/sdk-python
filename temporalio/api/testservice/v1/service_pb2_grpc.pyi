@@ -23,9 +23,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import abc
+
 import google.protobuf.empty_pb2
 import grpc
+
 import temporalio.api.testservice.v1.request_response_pb2
 
 class TestServiceStub:

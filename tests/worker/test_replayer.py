@@ -1,9 +1,10 @@
 import asyncio
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict, Optional, Type
 
 import pytest
 
@@ -11,8 +12,19 @@ from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Replayer, Worker
+from temporalio.worker import (
+    ExecuteWorkflowInput,
+    Interceptor,
+    Replayer,
+    Worker,
+    WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
+)
 from tests.helpers import assert_eq_eventually
+from tests.worker.test_workflow import (
+    ActivityAndSignalsWhileWorkflowDown,
+    SignalsActivitiesTimersUpdatesTracingWorkflow,
+)
 
 
 @activity.defn
@@ -66,7 +78,11 @@ class SayHelloWorkflow:
         return self._waiting
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Skipping for < 3.12")
 async def test_replayer_workflow_complete(client: Client) -> None:
+    # This test skips for versions < 3.12 because this is flaky due to CPython reimport issue:
+    # https://github.com/python/cpython/issues/91351
+
     # Run workflow to completion
     async with new_say_hello_worker(client) as worker:
         handle = await client.start_workflow(
@@ -83,7 +99,10 @@ async def test_replayer_workflow_complete(client: Client) -> None:
     )
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Skipping for < 3.12")
 async def test_replayer_workflow_complete_json() -> None:
+    # See `test_replayer_workflow_complete` for full skip description.
+
     with Path(__file__).with_name("test_replayer_complete_history.json").open("r") as f:
         history_json = f.read()
     await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
@@ -152,9 +171,11 @@ async def test_replayer_workflow_nondeterministic(client: Client) -> None:
 
 
 async def test_replayer_workflow_nondeterministic_json() -> None:
-    with Path(__file__).with_name("test_replayer_nondeterministic_history.json").open(
-        "r"
-    ) as f:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_nondeterministic_history.json")
+        .open("r") as f
+    ):
         history_json = f.read()
     with pytest.raises(workflow.NondeterminismError):
         await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
@@ -165,9 +186,11 @@ async def test_replayer_workflow_nondeterministic_json() -> None:
 async def test_replayer_multiple_histories_fail_fast() -> None:
     with Path(__file__).with_name("test_replayer_complete_history.json").open("r") as f:
         history_json = f.read()
-    with Path(__file__).with_name("test_replayer_nondeterministic_history.json").open(
-        "r"
-    ) as f:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_nondeterministic_history.json")
+        .open("r") as f
+    ):
         history_json_bad = f.read()
 
     callcount = 0
@@ -191,9 +214,11 @@ async def test_replayer_multiple_histories_fail_fast() -> None:
 async def test_replayer_multiple_histories_fail_slow() -> None:
     with Path(__file__).with_name("test_replayer_complete_history.json").open("r") as f:
         history_json = f.read()
-    with Path(__file__).with_name("test_replayer_nondeterministic_history.json").open(
-        "r"
-    ) as f:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_nondeterministic_history.json")
+        .open("r") as f
+    ):
         history_json_bad = f.read()
 
     callcount = 0
@@ -278,9 +303,9 @@ async def test_replayer_multiple_from_client(
                 task_queue=worker.task_queue,
             )
             assert handle.result_run_id
-            expected_runs_and_non_det[
-                handle.result_run_id
-            ] = should_cause_nondeterminism
+            expected_runs_and_non_det[handle.result_run_id] = (
+                should_cause_nondeterminism
+            )
             await handle.result()
 
     # Run replayer with list iterator mapped to histories and collect results
@@ -302,3 +327,176 @@ def new_say_hello_worker(client: Client) -> Worker:
         workflows=[SayHelloWorkflow],
         activities=[say_hello],
     )
+
+
+@workflow.defn
+class UpdateCompletionAfterWorkflowReturn:
+    def __init__(self) -> None:
+        self.workflow_returned = False
+
+    @workflow.run
+    async def run(self) -> str:
+        self.workflow_returned = True
+        return "workflow-result"
+
+    @workflow.update
+    async def my_update(self) -> str:
+        await workflow.wait_condition(lambda: self.workflow_returned)
+        return "update-result"
+
+
+async def test_replayer_command_reordering_backward_compatibility() -> None:
+    """
+    The UpdateCompletionAfterWorkflowReturn workflow above features an update handler that returns
+    after the main workflow coroutine has exited. It will (if an update is sent in the first WFT)
+    generate a raw command sequence (before sending to core) of
+
+    [UpdateAccepted, CompleteWorkflowExecution, UpdateCompleted].
+
+    Prior to https://github.com/temporalio/sdk-python/pull/569, Python truncated this command
+    sequence to
+
+    [UpdateAccepted, CompleteWorkflowExecution].
+
+    With #569, Python performs no truncation, and Core changes it to
+
+    [UpdateAccepted, UpdateCompleted, CompleteWorkflowExecution].
+
+    This test takes a history generated using pre-#569 SDK code, and replays it. This succeeds.
+    The history is
+
+    1 WorkflowExecutionStarted
+    2 WorkflowTaskScheduled
+    3 WorkflowTaskStarted
+    4 WorkflowTaskCompleted
+    5 WorkflowExecutionUpdateAccepted
+    6 WorkflowExecutionCompleted
+
+    Note that the history lacks a WorkflowExecutionUpdateCompleted event.
+
+    If Core's logic (which involves a flag) incorrectly allowed this history to be replayed
+    using Core's post-#569 implementation, then a non-determinism error would result. Specifically,
+    Core would, at some point during replay, do the following:
+
+    Receive [UpdateAccepted, CompleteWorkflowExecution, UpdateCompleted] from lang,
+    change that to [UpdateAccepted, UpdateCompleted, CompleteWorkflowExecution]
+    and create an UpdateMachine instance (the WorkflowTaskMachine instance already exists).
+    Then continue to consume history events.
+
+    Event 5 WorkflowExecutionUpdateAccepted would apply to the UpdateMachine associated with
+    the UpdateAccepted command, but event 6 WorkflowExecutionCompleted would not, since
+    core is expecting an event that can be applied to the UpdateMachine corresponding to
+    UpdateCompleted. If we modify core to incorrectly apply its new logic then we do see that:
+
+    [TMPRL1100] Nondeterminism error: Update machine does not handle this event: HistoryEvent(id: 6, WorkflowExecutionCompleted)
+
+    The test passes because core in fact (because the history lacks the flag) uses its old logic
+    and changes the command sequence from [UpdateAccepted, CompleteWorkflowExecution, UpdateCompleted]
+    to [UpdateAccepted, CompleteWorkflowExecution], and events 5 and 6 can be applied to the
+    corresponding state machines.
+    """
+    with (
+        Path(__file__)
+        .with_name("test_replayer_command_reordering_backward_compatibility.json")
+        .open() as f
+    ):
+        history = f.read()
+    await Replayer(workflows=[UpdateCompletionAfterWorkflowReturn]).replay_workflow(
+        WorkflowHistory.from_json("fake", history)
+    )
+
+
+test_replayer_workflow_res = None
+
+
+class WorkerWorkflowResultInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> Optional[Type[WorkflowInboundInterceptor]]:
+        return WorkflowResultInterceptor
+
+
+class WorkflowResultInterceptor(WorkflowInboundInterceptor):
+    async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+        global test_replayer_workflow_res
+        res = await super().execute_workflow(input)
+        test_replayer_workflow_res = res
+        return res
+
+
+async def test_replayer_async_ordering() -> None:
+    """
+    This test verifies that the order that asyncio tasks/coroutines are woken up matches the
+    order they were before changes to apply all jobs and then run the event loop, where previously
+    the event loop was ran after each "batch" of jobs.
+    """
+    histories_and_expecteds = [
+        (
+            "test_replayer_event_tracing.json",
+            [
+                "sig-before-sync",
+                "sig-before-1",
+                "sig-before-2",
+                "timer-sync",
+                "act-sync",
+                "act-1",
+                "act-2",
+                "sig-1-sync",
+                "sig-1-1",
+                "sig-1-2",
+                "update-1-sync",
+                "update-1-1",
+                "update-1-2",
+                "timer-1",
+                "timer-2",
+            ],
+        ),
+        (
+            "test_replayer_event_tracing_double_sig_at_start.json",
+            [
+                "sig-before-sync",
+                "sig-before-1",
+                "sig-1-sync",
+                "sig-1-1",
+                "sig-before-2",
+                "sig-1-2",
+                "timer-sync",
+                "act-sync",
+                "update-1-sync",
+                "update-1-1",
+                "update-1-2",
+                "act-1",
+                "act-2",
+                "timer-1",
+                "timer-2",
+            ],
+        ),
+    ]
+    for history, expected in histories_and_expecteds:
+        with Path(__file__).with_name(history).open() as f:
+            history = f.read()
+        await Replayer(
+            workflows=[SignalsActivitiesTimersUpdatesTracingWorkflow],
+            interceptors=[WorkerWorkflowResultInterceptor()],
+        ).replay_workflow(WorkflowHistory.from_json("fake", history))
+        assert test_replayer_workflow_res == expected
+
+
+async def test_replayer_alternate_async_ordering() -> None:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_event_tracing_alternate.json")
+        .open() as f
+    ):
+        history = f.read()
+    await Replayer(
+        workflows=[ActivityAndSignalsWhileWorkflowDown],
+        interceptors=[WorkerWorkflowResultInterceptor()],
+    ).replay_workflow(WorkflowHistory.from_json("fake", history))
+    assert test_replayer_workflow_res == [
+        "act-start",
+        "sig-1",
+        "sig-2",
+        "counter-2",
+        "act-done",
+    ]

@@ -23,12 +23,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
-import sys
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -43,19 +45,28 @@ class WorkflowMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DEFINITION_FIELD_NUMBER: builtins.int
+    CURRENT_DETAILS_FIELD_NUMBER: builtins.int
     @property
     def definition(self) -> global___WorkflowDefinition:
         """Metadata provided at declaration or creation time."""
+    current_details: builtins.str
+    """Current long-form details of the workflow's state. This is used by user interfaces to show
+    long-form text. This text may be formatted by the user interface.
+    """
     def __init__(
         self,
         *,
         definition: global___WorkflowDefinition | None = ...,
+        current_details: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["definition", b"definition"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["definition", b"definition"]
+        self,
+        field_name: typing_extensions.Literal[
+            "current_details", b"current_details", "definition", b"definition"
+        ],
     ) -> None: ...
 
 global___WorkflowMetadata = WorkflowMetadata
@@ -66,7 +77,6 @@ class WorkflowDefinition(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TYPE_FIELD_NUMBER: builtins.int
-    DESCRIPTION_FIELD_NUMBER: builtins.int
     QUERY_DEFINITIONS_FIELD_NUMBER: builtins.int
     SIGNAL_DEFINITIONS_FIELD_NUMBER: builtins.int
     UPDATE_DEFINITIONS_FIELD_NUMBER: builtins.int
@@ -74,34 +84,31 @@ class WorkflowDefinition(google.protobuf.message.Message):
     """A name scoped by the task queue that maps to this workflow definition.
     If missing, this workflow is a dynamic workflow.
     """
-    description: builtins.str
-    """An optional workflow description provided by the application.
-    By convention, external tools may interpret its first part,
-    i.e., ending with a line break, as a summary of the description.
-    """
     @property
     def query_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___WorkflowInteractionDefinition
-    ]: ...
+    ]:
+        """Query definitions, sorted by name."""
     @property
     def signal_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___WorkflowInteractionDefinition
-    ]: ...
+    ]:
+        """Signal definitions, sorted by name."""
     @property
     def update_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___WorkflowInteractionDefinition
-    ]: ...
+    ]:
+        """Update definitions, sorted by name."""
     def __init__(
         self,
         *,
         type: builtins.str = ...,
-        description: builtins.str = ...,
         query_definitions: collections.abc.Iterable[
             global___WorkflowInteractionDefinition
         ]
@@ -118,8 +125,6 @@ class WorkflowDefinition(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "description",
-            b"description",
             "query_definitions",
             b"query_definitions",
             "signal_definitions",

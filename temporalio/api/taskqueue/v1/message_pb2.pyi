@@ -23,15 +23,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import google.protobuf.wrappers_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 
@@ -118,8 +121,8 @@ class TaskQueueVersionSelection(google.protobuf.message.Message):
     unversioned: builtins.bool
     """Include the unversioned queue."""
     all_active: builtins.bool
-    """Include all active versions. A version is considered active if it has had new
-    tasks or polls recently.
+    """Include all active versions. A version is considered active if, in the last few minutes,
+    it has had new tasks or polls, or it has been the subject of certain task queue API calls.
     """
     def __init__(
         self,
@@ -176,7 +179,19 @@ class TaskQueueVersionInfo(google.protobuf.message.Message):
         builtins.int, global___TaskQueueTypeInfo
     ]:
         """Task Queue info per Task Type. Key is the numerical value of the temporalio.api.enums.v1.TaskQueueType enum."""
-    task_reachability: temporalio.api.enums.v1.task_queue_pb2.BuildIdTaskReachability.ValueType
+    task_reachability: (
+        temporalio.api.enums.v1.task_queue_pb2.BuildIdTaskReachability.ValueType
+    )
+    """Task Reachability is eventually consistent; there may be a delay until it converges to the most
+    accurate value but it is designed in a way to take the more conservative side until it converges.
+    For example REACHABLE is more conservative than CLOSED_WORKFLOWS_ONLY.
+
+    Note: future activities who inherit their workflow's Build ID but not its Task Queue will not be
+    accounted for reachability as server cannot know if they'll happen as they do not use
+    assignment rules of their Task Queue. Same goes for Child Workflows or Continue-As-New Workflows
+    who inherit the parent/previous workflow's Build ID but not its Task Queue. In those cases, make
+    sure to query reachability for the parent/previous workflow's Task Queue as well.
+    """
     def __init__(
         self,
         *,
@@ -197,6 +212,7 @@ class TaskQueueTypeInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     POLLERS_FIELD_NUMBER: builtins.int
+    STATS_FIELD_NUMBER: builtins.int
     @property
     def pollers(
         self,
@@ -204,16 +220,115 @@ class TaskQueueTypeInfo(google.protobuf.message.Message):
         global___PollerInfo
     ]:
         """Unversioned workers (with `useVersioning=false`) are reported in unversioned result even if they set a Build ID."""
+    @property
+    def stats(self) -> global___TaskQueueStats: ...
     def __init__(
         self,
         *,
         pollers: collections.abc.Iterable[global___PollerInfo] | None = ...,
+        stats: global___TaskQueueStats | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["stats", b"stats"]
+    ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["pollers", b"pollers"]
+        self,
+        field_name: typing_extensions.Literal["pollers", b"pollers", "stats", b"stats"],
     ) -> None: ...
 
 global___TaskQueueTypeInfo = TaskQueueTypeInfo
+
+class TaskQueueStats(google.protobuf.message.Message):
+    """TaskQueueStats contains statistics about task queue backlog and activity.
+
+    For workflow task queue type, this result is partial because tasks sent to sticky queues are not included. Read
+    comments above each metric to understand the impact of sticky queue exclusion on that metric accuracy.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    APPROXIMATE_BACKLOG_COUNT_FIELD_NUMBER: builtins.int
+    APPROXIMATE_BACKLOG_AGE_FIELD_NUMBER: builtins.int
+    TASKS_ADD_RATE_FIELD_NUMBER: builtins.int
+    TASKS_DISPATCH_RATE_FIELD_NUMBER: builtins.int
+    approximate_backlog_count: builtins.int
+    """The approximate number of tasks backlogged in this task queue. May count expired tasks but eventually
+    converges to the right value. Can be relied upon for scaling decisions.
+
+    Special note for workflow task queue type: this metric does not count sticky queue tasks. However, because
+    those tasks only remain valid for a few seconds, the inaccuracy becomes less significant as the backlog size
+    grows.
+    """
+    @property
+    def approximate_backlog_age(self) -> google.protobuf.duration_pb2.Duration:
+        """Approximate age of the oldest task in the backlog based on the creation time of the task at the head of
+        the queue. Can be relied upon for scaling decisions.
+
+        Special note for workflow task queue type: this metric does not count sticky queue tasks. However, because
+        those tasks only remain valid for a few seconds, they should not affect the result when backlog is older than
+        few seconds.
+        """
+    tasks_add_rate: builtins.float
+    """The approximate tasks per second added to the task queue, averaging the last 30 seconds. These includes tasks
+    whether or not they were added to/dispatched from the backlog or they were dispatched immediately without going
+    to the backlog (sync-matched).
+
+    The difference between `tasks_add_rate` and `tasks_dispatch_rate` is a reliable metric for the rate at which
+    backlog grows/shrinks.
+
+    Note: the actual tasks delivered to the workers may significantly be higher than the numbers reported by
+    tasks_add_rate, because:
+    - Tasks can be sent to workers without going to the task queue. This is called Eager dispatch. Eager dispatch is
+      enable for activities by default in the latest SDKs.
+    - Tasks going to Sticky queue are not accounted for. Note that, typically, only the first workflow task of each
+      workflow goes to a normal queue, and the rest workflow tasks go to the Sticky queue associated with a specific
+      worker instance.
+    """
+    tasks_dispatch_rate: builtins.float
+    """The approximate tasks per second dispatched from the task queue, averaging the last 30 seconds. These includes
+    tasks whether or not they were added to/dispatched from the backlog or they were dispatched immediately without
+    going to the backlog (sync-matched).
+
+    The difference between `tasks_add_rate` and `tasks_dispatch_rate` is a reliable metric for the rate at which
+    backlog grows/shrinks.
+
+    Note: the actual tasks delivered to the workers may significantly be higher than the numbers reported by
+    tasks_dispatch_rate, because:
+    - Tasks can be sent to workers without going to the task queue. This is called Eager dispatch. Eager dispatch is
+      enable for activities by default in the latest SDKs.
+    - Tasks going to Sticky queue are not accounted for. Note that, typically, only the first workflow task of each
+      workflow goes to a normal queue, and the rest workflow tasks go to the Sticky queue associated with a specific
+      worker instance.
+    """
+    def __init__(
+        self,
+        *,
+        approximate_backlog_count: builtins.int = ...,
+        approximate_backlog_age: google.protobuf.duration_pb2.Duration | None = ...,
+        tasks_add_rate: builtins.float = ...,
+        tasks_dispatch_rate: builtins.float = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "approximate_backlog_age", b"approximate_backlog_age"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "approximate_backlog_age",
+            b"approximate_backlog_age",
+            "approximate_backlog_count",
+            b"approximate_backlog_count",
+            "tasks_add_rate",
+            b"tasks_add_rate",
+            "tasks_dispatch_rate",
+            b"tasks_dispatch_rate",
+        ],
+    ) -> None: ...
+
+global___TaskQueueStats = TaskQueueStats
 
 class TaskQueueStatus(google.protobuf.message.Message):
     """Deprecated. Use `InternalTaskQueueStatus`. This is kept until `DescribeTaskQueue` supports legacy behavior."""
@@ -512,29 +627,31 @@ class RampByPercentage(google.protobuf.message.Message):
 global___RampByPercentage = RampByPercentage
 
 class BuildIdAssignmentRule(google.protobuf.message.Message):
-    """These rules assign a Build ID to Unassigned Workflow Executions and
-    Activities.
+    """Assignment rules are applied to *new* Workflow and Activity executions at
+    schedule time to assign them to a Build ID.
 
-    Specifically, assignment rules are applied to the following Executions or
-    Activities when they are scheduled in a Task Queue:
-       - Generally, any new Workflow Execution, except:
-         - When A Child Workflow or a Continue-As-New Execution inherits the
-           Build ID from its parent/previous execution by setting the
-           `inherit_build_id` flag.
-         - Workflow Executions started Eagerly are assigned to the Build ID of
-           the Starter.
-       - An Activity that is scheduled on a Task Queue different from the one
-         their Workflow runs on, unless the `use_workflow_build_id` flag is set.
+    Assignment rules will not be used in the following cases:
+       - Child Workflows or Continue-As-New Executions who inherit their
+         parent/previous Workflow's assigned Build ID (by setting the
+         `inherit_build_id` flag - default behavior in SDKs when the same Task Queue
+         is used.)
+       - An Activity that inherits the assigned Build ID of its Workflow (by
+         setting the `use_workflow_build_id` flag - default behavior in SDKs
+         when the same Task Queue is used.)
 
     In absence of (applicable) redirect rules (`CompatibleBuildIdRedirectRule`s)
     the task will be dispatched to Workers of the Build ID determined by the
-    assignment rules. Otherwise, the final Build ID will be determined by the
-    redirect rules.
+    assignment rules (or inherited). Otherwise, the final Build ID will be
+    determined by the redirect rules.
 
-    When using Worker Versioning, in the steady state, for a given Task Queue,
-    there should typically be exactly one assignment rule to send all Unassigned
-    tasks to the latest Build ID. Existence of at least one such "unconditional"
-    rule at all times is enforce by the system, unless the `force` flag is used
+    Once a Workflow completes its first Workflow Task in a particular Build ID it
+    stays in that Build ID regardless of changes to assignment rules. Redirect
+    rules can be used to move the workflow to another compatible Build ID.
+
+    When using Worker Versioning on a Task Queue, in the steady state,
+    there should typically be a single assignment rule to send all new executions
+    to the latest Build ID. Existence of at least one such "unconditional"
+    rule at all times is enforces by the system, unless the `force` flag is used
     by the user when replacing/deleting these rules (for exceptional cases).
 
     During a deployment, one or more additional rules can be added to assign a
@@ -545,10 +662,8 @@ class BuildIdAssignmentRule(google.protobuf.message.Message):
     applied and the rest will be ignored.
 
     In the event that no assignment rule is applicable on a task (or the Task
-    Queue is simply not versioned), the tasks will be sent to unversioned
-    workers, if available. Otherwise, they remain Unassigned, and will be
-    retried for assignment, or dispatch to unversioned workers, at a later time
-    depending on the availability of workers.
+    Queue is simply not versioned), the tasks will be dispatched to an
+    unversioned Worker.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -611,8 +726,7 @@ class CompatibleBuildIdRedirectRule(google.protobuf.message.Message):
      - To be able to Reset an old Execution so it can run on the current
        (compatible) Build ID.
 
-    Redirect rules can be chained, but only the last rule in the chain can have
-    a ramp.
+    Redirect rules can be chained.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -621,6 +735,11 @@ class CompatibleBuildIdRedirectRule(google.protobuf.message.Message):
     TARGET_BUILD_ID_FIELD_NUMBER: builtins.int
     source_build_id: builtins.str
     target_build_id: builtins.str
+    """Target Build ID must be compatible with the Source Build ID; that is it
+    must be able to process event histories made by the Source Build ID by
+    using [Patching](https://docs.temporal.io/workflows#patching) or other
+    means.
+    """
     def __init__(
         self,
         *,

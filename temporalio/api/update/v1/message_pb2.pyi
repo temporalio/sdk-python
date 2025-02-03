@@ -23,10 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.message
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.update_pb2
 import temporalio.api.failure.v1.message_pb2
@@ -39,16 +42,17 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class WaitPolicy(google.protobuf.message.Message):
-    """Specifies to the gRPC server how long the client wants the an update-related
-    RPC call to wait before returning control to the caller.
-    """
+    """Specifies client's intent to wait for Update results."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     LIFECYCLE_STAGE_FIELD_NUMBER: builtins.int
     lifecycle_stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType
-    """Indicates the update lifecycle stage that the gRPC call should wait for
-    before returning.
+    """Indicates the Update lifecycle stage that the Update must reach before
+    API call is returned.
+    NOTE: This field works together with API call timeout which is limited by
+    server timeout (maximum wait time). If server timeout is expired before
+    user specified timeout, API call returns even if specified stage is not reached.
     """
     def __init__(
         self,
@@ -63,9 +67,7 @@ class WaitPolicy(google.protobuf.message.Message):
 global___WaitPolicy = WaitPolicy
 
 class UpdateRef(google.protobuf.message.Message):
-    """The data needed by a client to refer to a previously invoked workflow
-    execution update process.
-    """
+    """The data needed by a client to refer to a previously invoked Workflow Update."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -99,7 +101,7 @@ class UpdateRef(google.protobuf.message.Message):
 global___UpdateRef = UpdateRef
 
 class Outcome(google.protobuf.message.Message):
-    """The outcome of a workflow update - success or failure."""
+    """The outcome of a Workflow Update: success or failure."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -134,16 +136,16 @@ class Outcome(google.protobuf.message.Message):
 global___Outcome = Outcome
 
 class Meta(google.protobuf.message.Message):
-    """Metadata about a workflow execution update."""
+    """Metadata about a Workflow Update."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     UPDATE_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     update_id: builtins.str
-    """An ID with workflow-scoped uniqueness for this update"""
+    """An ID with workflow-scoped uniqueness for this Update."""
     identity: builtins.str
-    """A string identifying the agent that requested this update."""
+    """A string identifying the agent that requested this Update."""
     def __init__(
         self,
         *,
@@ -167,14 +169,14 @@ class Input(google.protobuf.message.Message):
     ARGS_FIELD_NUMBER: builtins.int
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
-        """Headers that are passed with the update from the requesting entity.
+        """Headers that are passed with the Update from the requesting entity.
         These can include things like auth or tracing tokens.
         """
     name: builtins.str
-    """The name of the input handler to invoke on the target workflow"""
+    """The name of the Update handler to invoke on the target Workflow."""
     @property
     def args(self) -> temporalio.api.common.v1.message_pb2.Payloads:
-        """The arguments to pass to the named handler."""
+        """The arguments to pass to the named Update handler."""
     def __init__(
         self,
         *,
@@ -196,7 +198,7 @@ class Input(google.protobuf.message.Message):
 global___Input = Input
 
 class Request(google.protobuf.message.Message):
-    """The client request that triggers a workflow execution update"""
+    """The client request that triggers a Workflow Update."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -222,9 +224,7 @@ class Request(google.protobuf.message.Message):
 global___Request = Request
 
 class Rejection(google.protobuf.message.Message):
-    """An update protocol message indicating that a workflow execution update has
-    been rejected.
-    """
+    """An Update protocol message indicating that a Workflow Update has been rejected."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -269,7 +269,7 @@ class Rejection(google.protobuf.message.Message):
 global___Rejection = Rejection
 
 class Acceptance(google.protobuf.message.Message):
-    """An update protocol message indicating that a workflow execution update has
+    """An Update protocol message indicating that a Workflow Update has
     been accepted (i.e. passed the worker-side validation phase).
     """
 
@@ -308,7 +308,7 @@ class Acceptance(google.protobuf.message.Message):
 global___Acceptance = Acceptance
 
 class Response(google.protobuf.message.Message):
-    """An update protocol message indicating that a workflow execution update has
+    """An Update protocol message indicating that a Workflow Update has
     completed with the contained outcome.
     """
 

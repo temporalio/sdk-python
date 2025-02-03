@@ -6,8 +6,12 @@ Definitions for commands from a workflow in lang SDK to core. While a workflow p
 of activation jobs, it accumulates these commands to be sent back to core to conclude that
 activation.
 """
+
 import builtins
 import collections.abc
+import sys
+import typing
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.empty_pb2
@@ -15,13 +19,13 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
-import typing
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -73,6 +77,7 @@ global___ActivityCancellationType = ActivityCancellationType
 class WorkflowCommand(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    USER_METADATA_FIELD_NUMBER: builtins.int
     START_TIMER_FIELD_NUMBER: builtins.int
     SCHEDULE_ACTIVITY_FIELD_NUMBER: builtins.int
     RESPOND_TO_QUERY_FIELD_NUMBER: builtins.int
@@ -93,6 +98,14 @@ class WorkflowCommand(google.protobuf.message.Message):
     UPSERT_WORKFLOW_SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     MODIFY_WORKFLOW_PROPERTIES_FIELD_NUMBER: builtins.int
     UPDATE_RESPONSE_FIELD_NUMBER: builtins.int
+    SCHEDULE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+    REQUEST_CANCEL_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """User metadata that may or may not be persisted into history depending on the command type.
+        Lang layers are expected to expose the setting of the internals of this metadata on a
+        per-command basis where applicable.
+        """
     @property
     def start_timer(self) -> global___StartTimer: ...
     @property
@@ -145,9 +158,17 @@ class WorkflowCommand(google.protobuf.message.Message):
     def modify_workflow_properties(self) -> global___ModifyWorkflowProperties: ...
     @property
     def update_response(self) -> global___UpdateResponse: ...
+    @property
+    def schedule_nexus_operation(self) -> global___ScheduleNexusOperation: ...
+    @property
+    def request_cancel_nexus_operation(
+        self,
+    ) -> global___RequestCancelNexusOperation: ...
     def __init__(
         self,
         *,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
         start_timer: global___StartTimer | None = ...,
         schedule_activity: global___ScheduleActivity | None = ...,
         respond_to_query: global___QueryResult | None = ...,
@@ -174,6 +195,9 @@ class WorkflowCommand(google.protobuf.message.Message):
         | None = ...,
         modify_workflow_properties: global___ModifyWorkflowProperties | None = ...,
         update_response: global___UpdateResponse | None = ...,
+        schedule_nexus_operation: global___ScheduleNexusOperation | None = ...,
+        request_cancel_nexus_operation: global___RequestCancelNexusOperation
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -200,12 +224,16 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"request_cancel_external_workflow_execution",
             "request_cancel_local_activity",
             b"request_cancel_local_activity",
+            "request_cancel_nexus_operation",
+            b"request_cancel_nexus_operation",
             "respond_to_query",
             b"respond_to_query",
             "schedule_activity",
             b"schedule_activity",
             "schedule_local_activity",
             b"schedule_local_activity",
+            "schedule_nexus_operation",
+            b"schedule_nexus_operation",
             "set_patch_marker",
             b"set_patch_marker",
             "signal_external_workflow_execution",
@@ -218,6 +246,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"update_response",
             "upsert_workflow_search_attributes",
             b"upsert_workflow_search_attributes",
+            "user_metadata",
+            b"user_metadata",
             "variant",
             b"variant",
         ],
@@ -247,12 +277,16 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"request_cancel_external_workflow_execution",
             "request_cancel_local_activity",
             b"request_cancel_local_activity",
+            "request_cancel_nexus_operation",
+            b"request_cancel_nexus_operation",
             "respond_to_query",
             b"respond_to_query",
             "schedule_activity",
             b"schedule_activity",
             "schedule_local_activity",
             b"schedule_local_activity",
+            "schedule_nexus_operation",
+            b"schedule_nexus_operation",
             "set_patch_marker",
             b"set_patch_marker",
             "signal_external_workflow_execution",
@@ -265,6 +299,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"update_response",
             "upsert_workflow_search_attributes",
             b"upsert_workflow_search_attributes",
+            "user_metadata",
+            b"user_metadata",
             "variant",
             b"variant",
         ],
@@ -293,6 +329,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             "upsert_workflow_search_attributes",
             "modify_workflow_properties",
             "update_response",
+            "schedule_nexus_operation",
+            "request_cancel_nexus_operation",
         ]
         | None
     ): ...
@@ -437,7 +475,9 @@ class ScheduleActivity(google.protobuf.message.Message):
     activity. When unset/default, workers will always attempt to do so if activity execution
     slots are available.
     """
-    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    versioning_intent: (
+        temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    )
     """Whether this activity should run on a worker with a compatible build id or not."""
     def __init__(
         self,
@@ -962,7 +1002,9 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         """If set, the new workflow will have this retry policy. If unset, re-uses the current
         workflow's retry policy.
         """
-    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    versioning_intent: (
+        temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    )
     """Whether the continued workflow should run on a worker with a compatible build id or not."""
     def __init__(
         self,
@@ -1185,7 +1227,9 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         """Timeout of a single workflow task."""
     parent_close_policy: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ParentClosePolicy.ValueType
     """Default: PARENT_CLOSE_POLICY_TERMINATE."""
-    workflow_id_reuse_policy: temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    workflow_id_reuse_policy: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
+    )
     """string control = 11; (unused from StartChildWorkflowExecutionCommandAttributes)
     Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
     """
@@ -1215,7 +1259,9 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         """Search attributes"""
     cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType
     """Defines behaviour of the underlying workflow when child workflow cancellation has been requested."""
-    versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    versioning_intent: (
+        temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
+    )
     """Whether this child should run on a worker with a compatible build id or not."""
     def __init__(
         self,
@@ -1329,59 +1375,40 @@ class CancelChildWorkflowExecution(google.protobuf.message.Message):
 global___CancelChildWorkflowExecution = CancelChildWorkflowExecution
 
 class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
-    """Request cancellation of an external workflow execution (which may be a started child)"""
+    """Request cancellation of an external workflow execution. For cancellation of a child workflow,
+    prefer `CancelChildWorkflowExecution` instead, as it guards against cancel-before-start issues.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEQ_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
-    CHILD_WORKFLOW_ID_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     @property
     def workflow_execution(
         self,
     ) -> temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution:
-        """A specific workflow instance"""
-    child_workflow_id: builtins.str
-    """The desired target must be a child of the issuing workflow, and this is its workflow id"""
+        """The workflow instance being targeted"""
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
         workflow_execution: temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution
         | None = ...,
-        child_workflow_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "child_workflow_id",
-            b"child_workflow_id",
-            "target",
-            b"target",
-            "workflow_execution",
-            b"workflow_execution",
+            "workflow_execution", b"workflow_execution"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "child_workflow_id",
-            b"child_workflow_id",
-            "seq",
-            b"seq",
-            "target",
-            b"target",
-            "workflow_execution",
-            b"workflow_execution",
+            "seq", b"seq", "workflow_execution", b"workflow_execution"
         ],
     ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["target", b"target"]
-    ) -> (
-        typing_extensions.Literal["workflow_execution", "child_workflow_id"] | None
-    ): ...
 
 global___RequestCancelExternalWorkflowExecution = RequestCancelExternalWorkflowExecution
 
@@ -1666,3 +1693,123 @@ class UpdateResponse(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["accepted", "rejected", "completed"] | None: ...
 
 global___UpdateResponse = UpdateResponse
+
+class ScheduleNexusOperation(google.protobuf.message.Message):
+    """A request to begin a Nexus operation"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class NexusHeaderEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
+    SEQ_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    INPUT_FIELD_NUMBER: builtins.int
+    SCHEDULE_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
+    NEXUS_HEADER_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number, used as the operation identifier"""
+    endpoint: builtins.str
+    """Endpoint name, must exist in the endpoint registry or this command will fail."""
+    service: builtins.str
+    """Service name."""
+    operation: builtins.str
+    """Operation name."""
+    @property
+    def input(self) -> temporalio.api.common.v1.message_pb2.Payload:
+        """Input for the operation. The server converts this into Nexus request content and the
+        appropriate content headers internally when sending the StartOperation request. On the
+        handler side, if it is also backed by Temporal, the content is transformed back to the
+        original Payload sent in this command.
+        """
+    @property
+    def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-close timeout for this operation.
+        Indicates how long the caller is willing to wait for operation completion.
+        Calls are retried internally by the server.
+        """
+    @property
+    def nexus_header(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
+        """Header to attach to the Nexus request.
+        Users are responsible for encrypting sensitive data in this header as it is stored in
+        workflow history and transmitted to external services as-is. This is useful for propagating
+        tracing information. Note these headers are not the same as Temporal headers on internal
+        activities and child workflows, these are transmitted to Nexus operations that may be
+        external and are not traditional payloads.
+        """
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        endpoint: builtins.str = ...,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+        input: temporalio.api.common.v1.message_pb2.Payload | None = ...,
+        schedule_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        nexus_header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "input", b"input", "schedule_to_close_timeout", b"schedule_to_close_timeout"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "endpoint",
+            b"endpoint",
+            "input",
+            b"input",
+            "nexus_header",
+            b"nexus_header",
+            "operation",
+            b"operation",
+            "schedule_to_close_timeout",
+            b"schedule_to_close_timeout",
+            "seq",
+            b"seq",
+            "service",
+            b"service",
+        ],
+    ) -> None: ...
+
+global___ScheduleNexusOperation = ScheduleNexusOperation
+
+class RequestCancelNexusOperation(google.protobuf.message.Message):
+    """Request cancellation of a nexus operation started via `ScheduleNexusOperation`"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number as passed to `ScheduleNexusOperation`"""
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["seq", b"seq"]
+    ) -> None: ...
+
+global___RequestCancelNexusOperation = RequestCancelNexusOperation

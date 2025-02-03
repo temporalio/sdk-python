@@ -26,6 +26,22 @@ from ._replayer import (
     WorkflowReplayResult,
     WorkflowReplayResults,
 )
+from ._tuning import (
+    ActivitySlotInfo,
+    CustomSlotSupplier,
+    FixedSizeSlotSupplier,
+    LocalActivitySlotInfo,
+    ResourceBasedSlotConfig,
+    ResourceBasedSlotSupplier,
+    ResourceBasedTunerConfig,
+    SlotInfo,
+    SlotMarkUsedContext,
+    SlotPermit,
+    SlotReleaseContext,
+    SlotReserveContext,
+    WorkerTuner,
+    WorkflowSlotInfo,
+)
 from ._worker import Worker, WorkerConfig
 from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
@@ -69,4 +85,19 @@ __all__ = [
     "WorkflowInstance",
     "WorkflowInstanceDetails",
     "UnsandboxedWorkflowRunner",
+    # Tuning types
+    "WorkerTuner",
+    "FixedSizeSlotSupplier",
+    "ResourceBasedSlotSupplier",
+    "ResourceBasedTunerConfig",
+    "ResourceBasedSlotConfig",
+    "ActivitySlotInfo",
+    "CustomSlotSupplier",
+    "LocalActivitySlotInfo",
+    "SlotInfo",
+    "SlotMarkUsedContext",
+    "SlotPermit",
+    "SlotReleaseContext",
+    "SlotReserveContext",
+    "WorkflowSlotInfo",
 ]

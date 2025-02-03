@@ -23,15 +23,19 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.empty_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
-import sys
+
 import temporalio.api.enums.v1.common_pb2
+import temporalio.api.enums.v1.event_type_pb2
 import temporalio.api.enums.v1.reset_pb2
 
 if sys.version_info >= (3, 8):
@@ -655,24 +659,186 @@ class Callback(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["header", b"header", "url", b"url"],
         ) -> None: ...
 
+    class Internal(google.protobuf.message.Message):
+        """Callbacks to be delivered internally within the system.
+        This variant is not settable in the API and will be rejected by the service with an INVALID_ARGUMENT error.
+        The only reason that this is exposed is because callbacks are replicated across clusters via the
+        WorkflowExecutionStarted event, which is defined in the public API.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        DATA_FIELD_NUMBER: builtins.int
+        data: builtins.bytes
+        """Opaque internal data."""
+        def __init__(
+            self,
+            *,
+            data: builtins.bytes = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["data", b"data"]
+        ) -> None: ...
+
     NEXUS_FIELD_NUMBER: builtins.int
+    INTERNAL_FIELD_NUMBER: builtins.int
     @property
     def nexus(self) -> global___Callback.Nexus: ...
+    @property
+    def internal(self) -> global___Callback.Internal: ...
     def __init__(
         self,
         *,
         nexus: global___Callback.Nexus | None = ...,
+        internal: global___Callback.Internal | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal["nexus", b"nexus", "variant", b"variant"],
+        field_name: typing_extensions.Literal[
+            "internal", b"internal", "nexus", b"nexus", "variant", b"variant"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["nexus", b"nexus", "variant", b"variant"],
+        field_name: typing_extensions.Literal[
+            "internal", b"internal", "nexus", b"nexus", "variant", b"variant"
+        ],
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["nexus"] | None: ...
+    ) -> typing_extensions.Literal["nexus", "internal"] | None: ...
 
 global___Callback = Callback
+
+class Link(google.protobuf.message.Message):
+    """Link can be associated with history events. It might contain information about an external entity
+    related to the history event. For example, workflow A makes a Nexus call that starts workflow B:
+    in this case, a history event in workflow A could contain a Link to the workflow started event in
+    workflow B, and vice-versa.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class WorkflowEvent(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class EventReference(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            EVENT_ID_FIELD_NUMBER: builtins.int
+            EVENT_TYPE_FIELD_NUMBER: builtins.int
+            event_id: builtins.int
+            event_type: temporalio.api.enums.v1.event_type_pb2.EventType.ValueType
+            def __init__(
+                self,
+                *,
+                event_id: builtins.int = ...,
+                event_type: temporalio.api.enums.v1.event_type_pb2.EventType.ValueType = ...,
+            ) -> None: ...
+            def ClearField(
+                self,
+                field_name: typing_extensions.Literal[
+                    "event_id", b"event_id", "event_type", b"event_type"
+                ],
+            ) -> None: ...
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        WORKFLOW_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        EVENT_REF_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        workflow_id: builtins.str
+        run_id: builtins.str
+        @property
+        def event_ref(self) -> global___Link.WorkflowEvent.EventReference: ...
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            workflow_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+            event_ref: global___Link.WorkflowEvent.EventReference | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "event_ref", b"event_ref", "reference", b"reference"
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "event_ref",
+                b"event_ref",
+                "namespace",
+                b"namespace",
+                "reference",
+                b"reference",
+                "run_id",
+                b"run_id",
+                "workflow_id",
+                b"workflow_id",
+            ],
+        ) -> None: ...
+        def WhichOneof(
+            self, oneof_group: typing_extensions.Literal["reference", b"reference"]
+        ) -> typing_extensions.Literal["event_ref"] | None: ...
+
+    class BatchJob(google.protobuf.message.Message):
+        """A link to a built-in batch job.
+        Batch jobs can be used to perform operations on a set of workflows (e.g. terminate, signal, cancel, etc).
+        This link can be put on workflow history events generated by actions taken by a batch job.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        JOB_ID_FIELD_NUMBER: builtins.int
+        job_id: builtins.str
+        def __init__(
+            self,
+            *,
+            job_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["job_id", b"job_id"]
+        ) -> None: ...
+
+    WORKFLOW_EVENT_FIELD_NUMBER: builtins.int
+    BATCH_JOB_FIELD_NUMBER: builtins.int
+    @property
+    def workflow_event(self) -> global___Link.WorkflowEvent: ...
+    @property
+    def batch_job(self) -> global___Link.BatchJob: ...
+    def __init__(
+        self,
+        *,
+        workflow_event: global___Link.WorkflowEvent | None = ...,
+        batch_job: global___Link.BatchJob | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "batch_job",
+            b"batch_job",
+            "variant",
+            b"variant",
+            "workflow_event",
+            b"workflow_event",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "batch_job",
+            b"batch_job",
+            "variant",
+            b"variant",
+            "workflow_event",
+            b"workflow_event",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> typing_extensions.Literal["workflow_event", "batch_job"] | None: ...
+
+global___Link = Link

@@ -6,16 +6,20 @@ from contextlib import closing
 from datetime import timedelta
 from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
+from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import IndexedValueType
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
 )
-from temporalio.client import BuildIdOpAddNewDefault, Client
+from temporalio.api.update.v1 import UpdateRef
+from temporalio.api.workflowservice.v1 import PollWorkflowExecutionUpdateRequest
+from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
 from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+from temporalio.workflow import UpdateMethodMultiParam
 
 
 def new_worker(
@@ -105,3 +109,44 @@ def find_free_port() -> int:
         s.bind(("", 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
+
+
+async def workflow_update_exists(
+    client: Client, workflow_id: str, update_id: str
+) -> bool:
+    try:
+        await client.workflow_service.poll_workflow_execution_update(
+            PollWorkflowExecutionUpdateRequest(
+                namespace=client.namespace,
+                update_ref=UpdateRef(
+                    workflow_execution=WorkflowExecution(workflow_id=workflow_id),
+                    update_id=update_id,
+                ),
+            )
+        )
+        return True
+    except RPCError as err:
+        if err.status != RPCStatusCode.NOT_FOUND:
+            raise
+        return False
+
+
+# TODO: type update return value
+async def admitted_update_task(
+    client: Client,
+    handle: WorkflowHandle,
+    update_method: UpdateMethodMultiParam,
+    id: str,
+    **kwargs,
+) -> asyncio.Task:
+    """
+    Return an asyncio.Task for an update after waiting for it to be admitted.
+    """
+    update_task = asyncio.create_task(
+        handle.execute_update(update_method, id=id, **kwargs)
+    )
+    await assert_eq_eventually(
+        True,
+        lambda: workflow_update_exists(client, handle.id, id),
+    )
+    return update_task

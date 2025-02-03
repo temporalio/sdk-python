@@ -41,22 +41,19 @@ from .types import CallableType
 
 
 @overload
-def defn(fn: CallableType) -> CallableType:
-    ...
+def defn(fn: CallableType) -> CallableType: ...
 
 
 @overload
 def defn(
     *, name: Optional[str] = None, no_thread_cancel_exception: bool = False
-) -> Callable[[CallableType], CallableType]:
-    ...
+) -> Callable[[CallableType], CallableType]: ...
 
 
 @overload
 def defn(
     *, no_thread_cancel_exception: bool = False, dynamic: bool = False
-) -> Callable[[CallableType], CallableType]:
-    ...
+) -> Callable[[CallableType], CallableType]: ...
 
 
 def defn(
@@ -364,7 +361,7 @@ async def wait_for_worker_shutdown() -> None:
 
 
 def wait_for_worker_shutdown_sync(
-    timeout: Optional[Union[timedelta, float]] = None
+    timeout: Optional[Union[timedelta, float]] = None,
 ) -> None:
     """Synchronously block while waiting for shutdown to be called on the
     worker.
@@ -462,7 +459,7 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.activity_info_on_extra:
                     # Extra can be absent or None, this handles both
                     extra = kwargs.get("extra", None) or {}
-                    extra["temporal_activity"] = context._logger_details
+                    extra["temporal_activity"] = context.logger_details
                     kwargs["extra"] = extra
                 if self.full_activity_info_on_extra:
                     # Extra can be absent or None, this handles both
@@ -539,7 +536,8 @@ class _Definition:
                 fn=fn,
                 # iscoroutinefunction does not return true for async __call__
                 # TODO(cretz): Why can't MyPy handle this?
-                is_async=inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
+                is_async=inspect.iscoroutinefunction(fn)
+                or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
                 no_thread_cancel_exception=no_thread_cancel_exception,
             ),
         )

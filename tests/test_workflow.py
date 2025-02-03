@@ -1,4 +1,6 @@
-from typing import Any, Sequence
+import inspect
+import itertools
+from typing import Sequence
 
 import pytest
 
@@ -34,11 +36,11 @@ class GoodDefn(GoodDefnBase):
     def signal1(self):
         pass
 
-    @workflow.signal(name="signal-custom")
+    @workflow.signal(name="signal-custom", description="fun")
     def signal2(self):
         pass
 
-    @workflow.signal(dynamic=True)
+    @workflow.signal(dynamic=True, description="boo")
     def signal3(self, name: str, args: Sequence[RawValue]):
         pass
 
@@ -46,11 +48,11 @@ class GoodDefn(GoodDefnBase):
     def query1(self):
         pass
 
-    @workflow.query(name="query-custom")
+    @workflow.query(name="query-custom", description="qd")
     def query2(self):
         pass
 
-    @workflow.query(dynamic=True)
+    @workflow.query(dynamic=True, description="dqd")
     def query3(self, name: str, args: Sequence[RawValue]):
         pass
 
@@ -58,11 +60,11 @@ class GoodDefn(GoodDefnBase):
     def update1(self):
         pass
 
-    @workflow.update(name="update-custom")
+    @workflow.update(name="update-custom", description="ud")
     def update2(self):
         pass
 
-    @workflow.update(dynamic=True)
+    @workflow.update(dynamic=True, description="dud")
     def update3(self, name: str, args: Sequence[RawValue]):
         pass
 
@@ -80,10 +82,13 @@ def test_workflow_defn_good():
                 name="signal1", fn=GoodDefn.signal1, is_method=True
             ),
             "signal-custom": workflow._SignalDefinition(
-                name="signal-custom", fn=GoodDefn.signal2, is_method=True
+                name="signal-custom",
+                fn=GoodDefn.signal2,
+                is_method=True,
+                description="fun",
             ),
             None: workflow._SignalDefinition(
-                name=None, fn=GoodDefn.signal3, is_method=True
+                name=None, fn=GoodDefn.signal3, is_method=True, description="boo"
             ),
             "base_signal": workflow._SignalDefinition(
                 name="base_signal", fn=GoodDefnBase.base_signal, is_method=True
@@ -94,10 +99,13 @@ def test_workflow_defn_good():
                 name="query1", fn=GoodDefn.query1, is_method=True
             ),
             "query-custom": workflow._QueryDefinition(
-                name="query-custom", fn=GoodDefn.query2, is_method=True
+                name="query-custom",
+                fn=GoodDefn.query2,
+                is_method=True,
+                description="qd",
             ),
             None: workflow._QueryDefinition(
-                name=None, fn=GoodDefn.query3, is_method=True
+                name=None, fn=GoodDefn.query3, is_method=True, description="dqd"
             ),
             "base_query": workflow._QueryDefinition(
                 name="base_query", fn=GoodDefnBase.base_query, is_method=True
@@ -108,10 +116,13 @@ def test_workflow_defn_good():
                 name="update1", fn=GoodDefn.update1, is_method=True
             ),
             "update-custom": workflow._UpdateDefinition(
-                name="update-custom", fn=GoodDefn.update2, is_method=True
+                name="update-custom",
+                fn=GoodDefn.update2,
+                is_method=True,
+                description="ud",
             ),
             None: workflow._UpdateDefinition(
-                name=None, fn=GoodDefn.update3, is_method=True
+                name=None, fn=GoodDefn.update3, is_method=True, description="dud"
             ),
             "base_update": workflow._UpdateDefinition(
                 name="base_update", fn=GoodDefnBase.base_update, is_method=True
@@ -342,3 +353,91 @@ def test_workflow_defn_dynamic_handler_warnings():
     # We want to make sure they are reporting the right stacklevel
     warnings[0].filename.endswith("test_workflow.py")
     warnings[1].filename.endswith("test_workflow.py")
+
+
+class _TestParametersIdenticalUpToNaming:
+    def a1(self, a):
+        pass
+
+    def a2(self, b):
+        pass
+
+    def b1(self, a: int):
+        pass
+
+    def b2(self, b: int) -> str:
+        return ""
+
+    def c1(self, a1: int, a2: str) -> str:
+        return ""
+
+    def c2(self, b1: int, b2: str) -> int:
+        return 0
+
+    def d1(self, a1, a2: str) -> None:
+        pass
+
+    def d2(self, b1, b2: str) -> str:
+        return ""
+
+    def e1(self, a1, a2: str = "") -> None:
+        return None
+
+    def e2(self, b1, b2: str = "") -> str:
+        return ""
+
+    def f1(self, a1, a2: str = "a") -> None:
+        return None
+
+
+def test_parameters_identical_up_to_naming():
+    fns = [
+        f
+        for _, f in inspect.getmembers(_TestParametersIdenticalUpToNaming)
+        if inspect.isfunction(f)
+    ]
+    for f1, f2 in itertools.combinations(fns, 2):
+        name1, name2 = f1.__name__, f2.__name__
+        expect_equal = name1[0] == name2[0]
+        assert (
+            workflow._parameters_identical_up_to_naming(f1, f2) == (expect_equal)
+        ), f"expected {name1} and {name2} parameters{' ' if expect_equal else ' not '}to compare equal"
+
+
+@workflow.defn
+class BadWorkflowInit:
+    def not__init__(self):
+        pass
+
+    @workflow.run
+    async def run(self):
+        pass
+
+
+def test_workflow_init_not__init__():
+    with pytest.raises(ValueError) as err:
+        workflow.init(BadWorkflowInit.not__init__)
+    assert "@workflow.init may only be used on the __init__ method" in str(err.value)
+
+
+class BadUpdateValidator:
+    @workflow.update
+    def my_update(self, a: str):
+        pass
+
+    @my_update.validator  # type: ignore
+    def my_validator(self, a: int):
+        pass
+
+    @workflow.run
+    async def run(self):
+        pass
+
+
+def test_workflow_update_validator_not_update():
+    with pytest.raises(ValueError) as err:
+        workflow.defn(BadUpdateValidator)
+    assert (
+        "Update validator method my_validator parameters do not match update method my_update parameters"
+        in str(err.value)
+    )

@@ -23,10 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.message
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.interaction_type_pb2
 import temporalio.api.failure.v1.message_pb2
@@ -57,7 +60,9 @@ class Meta(google.protobuf.message.Message):
     history up to and including this event ID should be visible to the
     interaction when it executes.
     """
-    interaction_type: temporalio.api.enums.v1.interaction_type_pb2.InteractionType.ValueType
+    interaction_type: (
+        temporalio.api.enums.v1.interaction_type_pb2.InteractionType.ValueType
+    )
     """The type of this interaction."""
     identity: builtins.str
     """A string identifying the agent that requested this interaction."""

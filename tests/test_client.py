@@ -3,15 +3,22 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, List, Mapping, Optional, Tuple, cast
+from unittest import mock
 
+import google.protobuf.any_pb2
+import google.protobuf.message
 import pytest
 from google.protobuf import json_format
 
+import temporalio.api.common.v1
 import temporalio.api.enums.v1
+import temporalio.api.errordetails.v1
+import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
 from temporalio import workflow
+from temporalio.api.cloud.cloudservice.v1 import GetNamespaceRequest
 from temporalio.api.enums.v1 import (
     CancelExternalWorkflowExecutionFailedCause,
     ContinueAsNewInitiator,
@@ -35,6 +42,7 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
+    CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
     QueryWorkflowInput,
@@ -78,6 +86,7 @@ from temporalio.common import (
 )
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
+from temporalio.service import ServiceCall
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
@@ -281,6 +290,45 @@ async def test_terminate(client: Client, worker: ExternalWorker):
     assert list(err.value.cause.details) == ["arg1", "arg2"]
 
 
+async def test_rpc_already_exists_error_is_raised(client: Client):
+    class start_workflow_execution(
+        ServiceCall[
+            temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
+            temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
+        ]
+    ):
+        already_exists_err = RPCError(
+            "fake already exists error", RPCStatusCode.ALREADY_EXISTS, b""
+        )
+        already_exists_err._grpc_status = temporalio.api.common.v1.GrpcStatus(
+            details=[
+                google.protobuf.any_pb2.Any(
+                    type_url="not-WorkflowExecutionAlreadyStartedFailure", value=b""
+                )
+            ],
+        )
+
+        def __init__(self) -> None:
+            pass
+
+        async def __call__(
+            self,
+            req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
+            *,
+            retry: bool = False,
+            metadata: Mapping[str, str] = {},
+            timeout: Optional[timedelta] = None,
+        ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
+            raise self.already_exists_err
+
+    with mock.patch.object(
+        client.workflow_service, "start_workflow_execution", start_workflow_execution()
+    ):
+        with pytest.raises(RPCError) as err:
+            await client.start_workflow("fake", id="fake", task_queue="fake")
+    assert err.value.status == RPCStatusCode.ALREADY_EXISTS
+
+
 async def test_cancel_not_found(client: Client):
     with pytest.raises(RPCError) as err:
         await client.get_workflow_handle("does-not-exist").cancel()
@@ -415,9 +463,9 @@ async def test_single_client_config_change(client: Client, worker: ExternalWorke
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Now create a client with the rejection condition changed to not open
     config = client.config()
-    config[
-        "default_workflow_query_reject_condition"
-    ] = temporalio.common.QueryRejectCondition.NOT_OPEN
+    config["default_workflow_query_reject_condition"] = (
+        temporalio.common.QueryRejectCondition.NOT_OPEN
+    )
     reject_client = Client(**config)
     with pytest.raises(WorkflowQueryRejectedError):
         await reject_client.get_workflow_handle(handle.id).query(
@@ -570,6 +618,20 @@ async def test_list_workflows_and_fetch_history(
     )
     assert actual_id_and_input == expected_id_and_input
 
+    # Verify listing can limit results
+    limited = [
+        w async for w in client.list_workflows(f"WorkflowId = '{workflow_id}'", limit=3)
+    ]
+    assert len(limited) == 3
+    # With a weird page size
+    limited = [
+        w
+        async for w in client.list_workflows(
+            f"WorkflowId = '{workflow_id}'", page_size=2, limit=3
+        )
+    ]
+    assert len(limited) == 3
+
 
 @workflow.defn
 class CountableWorkflow:
@@ -630,67 +692,51 @@ def test_history_from_json():
 
     # Make history with some enums, one one each event
     history = History()
-    history.events.add().request_cancel_external_workflow_execution_failed_event_attributes.cause = (
-        CancelExternalWorkflowExecutionFailedCause.CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
-    )
+    history.events.add().request_cancel_external_workflow_execution_failed_event_attributes.cause = CancelExternalWorkflowExecutionFailedCause.CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
     history.events.add().workflow_execution_started_event_attributes.initiator = (
         ContinueAsNewInitiator.CONTINUE_AS_NEW_INITIATOR_CRON_SCHEDULE
     )
     history.events.add().event_type = (
         EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED
     )
-    history.events.add().start_child_workflow_execution_initiated_event_attributes.parent_close_policy = (
-        ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON
-    )
+    history.events.add().start_child_workflow_execution_initiated_event_attributes.parent_close_policy = ParentClosePolicy.PARENT_CLOSE_POLICY_ABANDON
     history.events.add().workflow_execution_failed_event_attributes.retry_state = (
         RetryState.RETRY_STATE_CANCEL_REQUESTED
     )
-    history.events.add().signal_external_workflow_execution_failed_event_attributes.cause = (
-        SignalExternalWorkflowExecutionFailedCause.SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
-    )
-    history.events.add().start_child_workflow_execution_failed_event_attributes.cause = (
-        StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
-    )
+    history.events.add().signal_external_workflow_execution_failed_event_attributes.cause = SignalExternalWorkflowExecutionFailedCause.SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_FOUND
+    history.events.add().start_child_workflow_execution_failed_event_attributes.cause = StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
     history.events.add().workflow_execution_started_event_attributes.task_queue.kind = (
         TaskQueueKind.TASK_QUEUE_KIND_NORMAL
     )
     history.events.add().workflow_task_timed_out_event_attributes.timeout_type = (
         TimeoutType.TIMEOUT_TYPE_HEARTBEAT
     )
-    history.events.add().start_child_workflow_execution_initiated_event_attributes.workflow_id_reuse_policy = (
-        WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
-    )
+    history.events.add().start_child_workflow_execution_initiated_event_attributes.workflow_id_reuse_policy = WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE
     history.events.add().workflow_task_failed_event_attributes.cause = (
         WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_BAD_BINARY
     )
-    history.events.add().workflow_execution_started_event_attributes.continued_failure.timeout_failure_info.timeout_type = (
-        TimeoutType.TIMEOUT_TYPE_SCHEDULE_TO_CLOSE
-    )
-    history.events.add().activity_task_started_event_attributes.last_failure.activity_failure_info.retry_state = (
-        RetryState.RETRY_STATE_IN_PROGRESS
-    )
-    history.events.add().workflow_execution_failed_event_attributes.failure.cause.child_workflow_execution_failure_info.retry_state = (
-        RetryState.RETRY_STATE_INTERNAL_SERVER_ERROR
-    )
+    history.events.add().workflow_execution_started_event_attributes.continued_failure.timeout_failure_info.timeout_type = TimeoutType.TIMEOUT_TYPE_SCHEDULE_TO_CLOSE
+    history.events.add().activity_task_started_event_attributes.last_failure.activity_failure_info.retry_state = RetryState.RETRY_STATE_IN_PROGRESS
+    history.events.add().workflow_execution_failed_event_attributes.failure.cause.child_workflow_execution_failure_info.retry_state = RetryState.RETRY_STATE_INTERNAL_SERVER_ERROR
 
     # Convert to JSON dict and alter enums to pascal versions
     bad_history_dict = json_format.MessageToDict(history)
     e = bad_history_dict["events"]
-    e[0]["requestCancelExternalWorkflowExecutionFailedEventAttributes"][
-        "cause"
-    ] = "ExternalWorkflowExecutionNotFound"
+    e[0]["requestCancelExternalWorkflowExecutionFailedEventAttributes"]["cause"] = (
+        "ExternalWorkflowExecutionNotFound"
+    )
     e[1]["workflowExecutionStartedEventAttributes"]["initiator"] = "CronSchedule"
     e[2]["eventType"] = "ActivityTaskCancelRequested"
-    e[3]["startChildWorkflowExecutionInitiatedEventAttributes"][
-        "parentClosePolicy"
-    ] = "Abandon"
+    e[3]["startChildWorkflowExecutionInitiatedEventAttributes"]["parentClosePolicy"] = (
+        "Abandon"
+    )
     e[4]["workflowExecutionFailedEventAttributes"]["retryState"] = "CancelRequested"
-    e[5]["signalExternalWorkflowExecutionFailedEventAttributes"][
-        "cause"
-    ] = "ExternalWorkflowExecutionNotFound"
-    e[6]["startChildWorkflowExecutionFailedEventAttributes"][
-        "cause"
-    ] = "NamespaceNotFound"
+    e[5]["signalExternalWorkflowExecutionFailedEventAttributes"]["cause"] = (
+        "ExternalWorkflowExecutionNotFound"
+    )
+    e[6]["startChildWorkflowExecutionFailedEventAttributes"]["cause"] = (
+        "NamespaceNotFound"
+    )
     e[7]["workflowExecutionStartedEventAttributes"]["taskQueue"]["kind"] = "Normal"
     e[8]["workflowTaskTimedOutEventAttributes"]["timeoutType"] = "Heartbeat"
     e[9]["startChildWorkflowExecutionInitiatedEventAttributes"][
@@ -746,6 +792,8 @@ async def test_schedule_basics(
             task_timeout=timedelta(hours=3),
             retry_policy=RetryPolicy(maximum_attempts=20),
             memo={"memokey1": "memoval1"},
+            static_summary="summary",
+            static_details="details",
         ),
         spec=ScheduleSpec(
             calendars=[
@@ -816,6 +864,15 @@ async def test_schedule_basics(
             day_of_week=(ScheduleRange(1),),
         )
     )
+    # Summary & description are encoded
+    assert schedule.action.static_summary
+    assert schedule.action.static_details
+    schedule.action.static_summary = (
+        await DataConverter.default.encode([schedule.action.static_summary])
+    )[0]
+    schedule.action.static_details = (
+        await DataConverter.default.encode([schedule.action.static_details])
+    )[0]
 
     # Describe it and confirm
     desc = await handle.describe()
@@ -923,10 +980,20 @@ async def test_schedule_basics(
     )
 
     # Create 4 more schedules of the same type and confirm they are in list
-    # eventually
+    # eventually. Two of them we will create with search attributes.
+    keyword_attr_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
+    await ensure_search_attributes_present(client, keyword_attr_key)
     expected_ids = [handle.id]
     for i in range(4):
-        new_handle = await client.create_schedule(f"{handle.id}-{i + 1}", desc.schedule)
+        new_handle = await client.create_schedule(
+            f"{handle.id}-{i + 1}",
+            desc.schedule,
+            search_attributes=TypedSearchAttributes(
+                [SearchAttributePair(keyword_attr_key, "some-schedule-attr")]
+            )
+            if i >= 2
+            else None,
+        )
         expected_ids.append(new_handle.id)
 
     async def list_ids() -> List[str]:
@@ -938,6 +1005,17 @@ async def test_schedule_basics(
         )
 
     await assert_eq_eventually(expected_ids, list_ids)
+
+    # Now do a list w/ query for certain search attributes and confirm
+    list_descs = [
+        d
+        async for d in await client.list_schedules(
+            "`python-test-schedule-keyword` = 'some-schedule-attr'"
+        )
+    ]
+    assert len(list_descs) == 2
+    assert list_descs[0].id in [f"{handle.id}-3", f"{handle.id}-4"]
+    assert list_descs[1].id in [f"{handle.id}-3", f"{handle.id}-4"]
 
     # Delete all of the schedules
     for id in await list_ids():
@@ -1051,6 +1129,9 @@ async def test_schedule_backfill(
             state=ScheduleState(paused=True),
         ),
         backfill=[
+            # 2 actions on Server >= 1.24, 1 action on Server < 1.24.  Older
+            # servers backfill workflows in the interval [start_at, end_at), but
+            # newer servers backfill the interval [start_at, end_at].
             ScheduleBackfill(
                 start_at=begin - timedelta(minutes=30),
                 end_at=begin - timedelta(minutes=29),
@@ -1058,26 +1139,27 @@ async def test_schedule_backfill(
             )
         ],
     )
-    # The number of items backfilled on a schedule boundary changed in 1.24, so
-    # we check for either
-    assert (await handle.describe()).info.num_actions in [2, 3]
+    # We accept both 1.24 and pre-1.24 action counts
+    assert (await handle.describe()).info.num_actions in [1, 2]
 
     # Add two more backfills and and -2m will be deduped
     await handle.backfill(
+        # 3 actions on Server >= 1.24, 2 actions on Server < 1.24
         ScheduleBackfill(
             start_at=begin - timedelta(minutes=4),
             end_at=begin - timedelta(minutes=2),
             overlap=ScheduleOverlapPolicy.ALLOW_ALL,
         ),
+        # 3 actions on Server >= 1.24, 2 actions on Server < 1.24, except on
+        # Server >= 1.24, there is overlap with the prior backfill, so this is
+        # only net +2 actions, regardless of Server version.
         ScheduleBackfill(
             start_at=begin - timedelta(minutes=2),
             end_at=begin,
             overlap=ScheduleOverlapPolicy.ALLOW_ALL,
         ),
     )
-    # The number of items backfilled on a schedule boundary changed in 1.24, so
-    # we check for either
-    assert (await handle.describe()).info.num_actions in [6, 8]
+    assert (await handle.describe()).info.num_actions in [5, 7]
 
     await handle.delete()
     await assert_no_schedules(client)
@@ -1106,7 +1188,7 @@ async def test_schedule_create_limited_actions_validation(
     assert "are remaining actions set" in str(err.value)
 
 
-async def test_schedule_search_attribute_update(
+async def test_schedule_workflow_search_attribute_update(
     client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
@@ -1114,10 +1196,8 @@ async def test_schedule_search_attribute_update(
     await assert_no_schedules(client)
 
     # Put search attribute on server
-    text_attr_key = SearchAttributeKey.for_text(f"python-test-schedule-text")
-    untyped_keyword_key = SearchAttributeKey.for_keyword(
-        f"python-test-schedule-keyword"
-    )
+    text_attr_key = SearchAttributeKey.for_text("python-test-schedule-text")
+    untyped_keyword_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
     await ensure_search_attributes_present(client, text_attr_key, untyped_keyword_key)
 
     # Create a schedule with search attributes on the schedule and on the
@@ -1191,6 +1271,7 @@ async def test_schedule_search_attribute_update(
     # Check that it changed
     desc = await handle.describe()
     assert isinstance(desc.schedule.action, ScheduleActionStartWorkflow)
+    # Check that the workflow search attributes were changed
     # This assertion has changed since server 1.24. Now, even untyped search
     # attributes are given a type server side
     assert (
@@ -1201,6 +1282,148 @@ async def test_schedule_search_attribute_update(
         and desc.schedule.action.typed_search_attributes[untyped_keyword_key]
         == "some-untyped-attr1"
     )
+    # Check that the schedule search attributes were not changed
+    assert desc.search_attributes[text_attr_key.name] == ["some-schedule-attr1"]
+    assert desc.typed_search_attributes[text_attr_key] == "some-schedule-attr1"
+
+    await handle.delete()
+    await assert_no_schedules(client)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        "none-is-noop",
+        "empty-but-non-none-clears",
+        "all-new-values-overwrites",
+        "partial-new-values-overwrites-and-drops",
+    ],
+)
+async def test_schedule_search_attribute_update(
+    client: Client, env: WorkflowEnvironment, test_case: str
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+    await assert_no_schedules(client)
+
+    # Put search attributes on server
+    key_1 = SearchAttributeKey.for_text("python-test-schedule-sa-update-key-1")
+    key_2 = SearchAttributeKey.for_keyword("python-test-schedule-sa-update-key-2")
+    await ensure_search_attributes_present(client, key_1, key_2)
+    val_1 = "val-1"
+    val_2 = "val-2"
+
+    # Create a schedule with search attributes
+    create_action = ScheduleActionStartWorkflow(
+        "some workflow",
+        [],
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=f"tq-{uuid.uuid4()}",
+    )
+    handle = await client.create_schedule(
+        f"schedule-{uuid.uuid4()}",
+        Schedule(action=create_action, spec=ScheduleSpec()),
+        search_attributes=TypedSearchAttributes(
+            [
+                SearchAttributePair(key_1, val_1),
+                SearchAttributePair(key_2, val_2),
+            ]
+        ),
+    )
+
+    def update_search_attributes(
+        input: ScheduleUpdateInput,
+    ) -> Optional[ScheduleUpdate]:
+        # Make sure the initial search attributes are present
+        assert input.description.search_attributes[key_1.name] == [val_1]
+        assert input.description.search_attributes[key_2.name] == [val_2]
+        assert input.description.typed_search_attributes[key_1] == val_1
+        assert input.description.typed_search_attributes[key_2] == val_2
+
+        if test_case == "none-is-noop":
+            # Passing None makes no changes
+            return ScheduleUpdate(input.description.schedule, search_attributes=None)
+        elif test_case == "empty-but-non-none-clears":
+            # Pass empty but non-None to clear all attributes
+            return ScheduleUpdate(
+                input.description.schedule,
+                search_attributes=TypedSearchAttributes.empty,
+            )
+        elif test_case == "all-new-values-overwrites":
+            # Pass all new values to overwrite existing
+            return ScheduleUpdate(
+                input.description.schedule,
+                search_attributes=input.description.typed_search_attributes.updated(
+                    SearchAttributePair(key_1, val_1 + "-new"),
+                    SearchAttributePair(key_2, val_2 + "-new"),
+                ),
+            )
+        elif test_case == "partial-new-values-overwrites-and-drops":
+            # Only update key_1, which should drop key_2
+            return ScheduleUpdate(
+                input.description.schedule,
+                search_attributes=TypedSearchAttributes(
+                    [
+                        SearchAttributePair(key_1, val_1 + "-new"),
+                    ]
+                ),
+            )
+        else:
+            raise ValueError(f"Invalid test case: {test_case}")
+
+    await handle.update(update_search_attributes)
+
+    if test_case == "none-is-noop":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                desc.search_attributes[key_1.name] == [val_1]
+                and desc.search_attributes[key_2.name] == [val_2]
+                and desc.typed_search_attributes[key_1] == val_1
+                and desc.typed_search_attributes[key_2] == val_2
+            )
+
+        await assert_eq_eventually(True, expectation)
+    elif test_case == "empty-but-non-none-clears":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                len(desc.typed_search_attributes) == 0
+                and len(desc.search_attributes) == 0
+            )
+
+        await assert_eq_eventually(True, expectation)
+    elif test_case == "all-new-values-overwrites":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                desc.search_attributes[key_1.name] == [val_1 + "-new"]
+                and desc.search_attributes[key_2.name] == [val_2 + "-new"]
+                and desc.typed_search_attributes[key_1] == val_1 + "-new"
+                and desc.typed_search_attributes[key_2] == val_2 + "-new"
+            )
+
+        await assert_eq_eventually(True, expectation)
+    elif test_case == "partial-new-values-overwrites-and-drops":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                desc.search_attributes[key_1.name] == [val_1 + "-new"]
+                and desc.typed_search_attributes[key_1] == val_1 + "-new"
+                and key_2.name not in desc.search_attributes
+                and key_2 not in desc.typed_search_attributes
+            )
+
+        await assert_eq_eventually(True, expectation)
+    else:
+        raise ValueError(f"Invalid test case: {test_case}")
+
+    await handle.delete()
+    await assert_no_schedules(client)
 
 
 async def assert_no_schedules(client: Client) -> None:
@@ -1257,3 +1480,16 @@ async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
     ]
     assert reachability.build_id_reachability["1.0"].task_queue_reachability[tq] == []
     assert reachability.build_id_reachability["1.1"].task_queue_reachability[tq] == []
+
+
+async def test_cloud_client_simple():
+    if "TEMPORAL_CLIENT_CLOUD_API_KEY" not in os.environ:
+        pytest.skip("No cloud API key")
+    client = await CloudOperationsClient.connect(
+        api_key=os.environ["TEMPORAL_CLIENT_CLOUD_API_KEY"],
+        version=os.environ["TEMPORAL_CLIENT_CLOUD_API_VERSION"],
+    )
+    result = await client.cloud_service.get_namespace(
+        GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
+    )
+    assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace

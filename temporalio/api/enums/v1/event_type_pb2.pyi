@@ -23,11 +23,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
-import google.protobuf.descriptor
-import google.protobuf.internal.enum_type_wrapper
 import sys
 import typing
+
+import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -127,9 +129,13 @@ class _EventTypeEnumTypeWrapper(
     """A request has been made to cancel the Workflow execution"""
     EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED: _EventType.ValueType  # 21
     """SDK client has confirmed the cancellation request and the Workflow execution has been cancelled"""
-    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: _EventType.ValueType  # 22
+    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: (
+        _EventType.ValueType
+    )  # 22
     """Workflow has requested that the Temporal Server try to cancel another Workflow"""
-    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED: _EventType.ValueType  # 23
+    EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED: (
+        _EventType.ValueType
+    )  # 23
     """Temporal Server could not cancel the targeted Workflow
     This is usually because the target Workflow could not be found
     """
@@ -182,10 +188,15 @@ class _EventTypeEnumTypeWrapper(
     """Temporal Server has successfully Signaled the targeted Workflow"""
     EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: _EventType.ValueType  # 40
     """Workflow search attributes should be updated and synchronized with the visibility store"""
+    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED: _EventType.ValueType  # 47
+    """An update was admitted. Note that not all admitted updates result in this
+    event. See UpdateAdmittedEventOrigin for situations in which this event
+    is created.
+    """
     EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED: _EventType.ValueType  # 41
-    """An update was accepted (i.e. validated)"""
+    """An update was accepted (i.e. passed validation, perhaps because no validator was defined)"""
     EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REJECTED: _EventType.ValueType  # 42
-    """An update was rejected (i.e. failed validation)"""
+    """This event is never written to history."""
     EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_COMPLETED: _EventType.ValueType  # 43
     """An update completed"""
     EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY: _EventType.ValueType  # 44
@@ -200,11 +211,6 @@ class _EventTypeEnumTypeWrapper(
     """
     EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: _EventType.ValueType  # 46
     """Workflow properties modified by user workflow code"""
-    EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED: _EventType.ValueType  # 47
-    """An update was admitted. Note that not all admitted updates result in this
-    event. See UpdateAdmittedEventOrigin for situations in which this event
-    is created.
-    """
     EVENT_TYPE_NEXUS_OPERATION_SCHEDULED: _EventType.ValueType  # 48
     """A Nexus operation was scheduled using a ScheduleNexusOperation command."""
     EVENT_TYPE_NEXUS_OPERATION_STARTED: _EventType.ValueType  # 49
@@ -305,7 +311,9 @@ EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED: EventType.ValueType  # 20
 """A request has been made to cancel the Workflow execution"""
 EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED: EventType.ValueType  # 21
 """SDK client has confirmed the cancellation request and the Workflow execution has been cancelled"""
-EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: EventType.ValueType  # 22
+EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED: (
+    EventType.ValueType
+)  # 22
 """Workflow has requested that the Temporal Server try to cancel another Workflow"""
 EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED: EventType.ValueType  # 23
 """Temporal Server could not cancel the targeted Workflow
@@ -360,10 +368,15 @@ EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_SIGNALED: EventType.ValueType  # 39
 """Temporal Server has successfully Signaled the targeted Workflow"""
 EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES: EventType.ValueType  # 40
 """Workflow search attributes should be updated and synchronized with the visibility store"""
+EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED: EventType.ValueType  # 47
+"""An update was admitted. Note that not all admitted updates result in this
+event. See UpdateAdmittedEventOrigin for situations in which this event
+is created.
+"""
 EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED: EventType.ValueType  # 41
-"""An update was accepted (i.e. validated)"""
+"""An update was accepted (i.e. passed validation, perhaps because no validator was defined)"""
 EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_REJECTED: EventType.ValueType  # 42
-"""An update was rejected (i.e. failed validation)"""
+"""This event is never written to history."""
 EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_COMPLETED: EventType.ValueType  # 43
 """An update completed"""
 EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED_EXTERNALLY: EventType.ValueType  # 44
@@ -378,11 +391,6 @@ maintain determinism when using the command-based approach.
 """
 EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED: EventType.ValueType  # 46
 """Workflow properties modified by user workflow code"""
-EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ADMITTED: EventType.ValueType  # 47
-"""An update was admitted. Note that not all admitted updates result in this
-event. See UpdateAdmittedEventOrigin for situations in which this event
-is created.
-"""
 EVENT_TYPE_NEXUS_OPERATION_SCHEDULED: EventType.ValueType  # 48
 """A Nexus operation was scheduled using a ScheduleNexusOperation command."""
 EVENT_TYPE_NEXUS_OPERATION_STARTED: EventType.ValueType  # 49

@@ -15,6 +15,7 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    Union,
 )
 
 import google.protobuf.internal.containers
@@ -31,6 +32,9 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
+from temporalio.bridge.temporal_sdk_bridge import (
+    CustomSlotSupplier as BridgeCustomSlotSupplier,
+)
 from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
@@ -43,9 +47,7 @@ class WorkerConfig:
     build_id: str
     identity_override: Optional[str]
     max_cached_workflows: int
-    max_outstanding_workflow_tasks: int
-    max_outstanding_activities: int
-    max_outstanding_local_activities: int
+    tuner: TunerHolder
     max_concurrent_workflow_task_polls: int
     nonsticky_to_sticky_poll_ratio: float
     max_concurrent_activity_task_polls: int
@@ -59,6 +61,47 @@ class WorkerConfig:
     use_worker_versioning: bool
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
+
+
+@dataclass
+class ResourceBasedTunerConfig:
+    """Python representation of the Rust struct for configuring a resource-based tuner."""
+
+    target_memory_usage: float
+    target_cpu_usage: float
+
+
+@dataclass
+class ResourceBasedSlotSupplier:
+    """Python representation of the Rust struct for a resource-based slot supplier."""
+
+    minimum_slots: int
+    maximum_slots: int
+    ramp_throttle_ms: int
+    tuner_config: ResourceBasedTunerConfig
+
+
+@dataclass(frozen=True)
+class FixedSizeSlotSupplier:
+    """Python representation of the Rust struct for a fixed-size slot supplier."""
+
+    num_slots: int
+
+
+SlotSupplier: TypeAlias = Union[
+    FixedSizeSlotSupplier,
+    ResourceBasedSlotSupplier,
+    BridgeCustomSlotSupplier,
+]
+
+
+@dataclass
+class TunerHolder:
+    """Python representation of the Rust struct for a tuner holder."""
+
+    workflow_slot_supplier: SlotSupplier
+    activity_slot_supplier: SlotSupplier
+    local_activity_slot_supplier: SlotSupplier
 
 
 class Worker:
@@ -284,11 +327,11 @@ async def decode_activation(
                 await codec.decode_failure(job.resolve_signal_external_workflow.failure)
         elif job.HasField("signal_workflow"):
             await _decode_payloads(job.signal_workflow.input, codec)
-        elif job.HasField("start_workflow"):
-            await _decode_payloads(job.start_workflow.arguments, codec)
-            if job.start_workflow.HasField("continued_failure"):
-                await codec.decode_failure(job.start_workflow.continued_failure)
-            for val in job.start_workflow.memo.fields.values():
+        elif job.HasField("initialize_workflow"):
+            await _decode_payloads(job.initialize_workflow.arguments, codec)
+            if job.initialize_workflow.HasField("continued_failure"):
+                await codec.decode_failure(job.initialize_workflow.continued_failure)
+            for val in job.initialize_workflow.memo.fields.values():
                 # This uses API payload not bridge payload
                 new_payload = (await codec.decode([val]))[0]
                 val.metadata.clear()

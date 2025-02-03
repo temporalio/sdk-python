@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import multiprocessing
 import os
 import sys
@@ -21,7 +22,7 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
         sys.prefix
     ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
 
-# Unless specifically overridden, we expect tests to run under protobuf 4.x lib
+# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x lib
 import google.protobuf
 
 protobuf_version = google.protobuf.__version__
@@ -30,41 +31,64 @@ if os.getenv("TEMPORAL_TEST_PROTO3"):
         "3."
     ), f"Expected protobuf 3.x, got {protobuf_version}"
 else:
-    assert protobuf_version.startswith(
-        "4."
-    ), f"Expected protobuf 4.x, got {protobuf_version}"
+    assert protobuf_version.startswith("4.") or protobuf_version.startswith(
+        "5."
+    ), f"Expected protobuf 4.x/5.x, got {protobuf_version}"
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
-# Due to https://github.com/python/cpython/issues/77906, multiprocessing on
-# macOS starting with Python 3.8 has changed from "fork" to "spawn". For
-# pre-3.8, we are changing it for them.
-if sys.version_info < (3, 8) and sys.platform.startswith("darwin"):
-    multiprocessing.set_start_method("spawn", True)
-
 
 def pytest_addoption(parser):
     parser.addoption(
+        "-E",
         "--workflow-environment",
         default="local",
-        help="Which workflow environment to use ('local', 'time-skipping', or target to existing server)",
+        help="Which workflow environment to use ('local', 'time-skipping', or ip:port for existing server)",
     )
 
 
 @pytest.fixture(scope="session")
 def event_loop():
-    # See https://github.com/pytest-dev/pytest-asyncio/issues/68
-    # See https://github.com/pytest-dev/pytest-asyncio/issues/257
-    # Also need ProactorEventLoop on older versions of Python with Windows so
-    # that asyncio subprocess works properly
-    if sys.version_info < (3, 8) and sys.platform == "win32":
-        loop = asyncio.ProactorEventLoop()
-    else:
-        loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
-    loop.close()
+    try:
+        loop.close()
+    except TypeError:
+        # In 3.9 tests, loop closing fails for an unclear reason, but not in
+        # 3.13 tests
+        if sys.version_info >= (3, 10):
+            raise
+    finally:
+        # In 3.9 tests, the pytest-asyncio library finalizer that creates a new
+        # event loop fails, but not in 3.13 tests. So for now we will make a new
+        # policy that does not create the loop.
+        if sys.version_info < (3, 10):
+            asyncio.set_event_loop_policy(
+                NoEventLoopPolicy(asyncio.get_event_loop_policy())
+            )
+
+
+class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):
+    def __init__(self, underlying: asyncio.AbstractEventLoopPolicy):
+        super().__init__()
+        self._underlying = underlying
+
+    def get_event_loop(self):
+        return self._underlying.get_event_loop()
+
+    def set_event_loop(self, loop):
+        return self._underlying.set_event_loop(loop)
+
+    def new_event_loop(self):
+        return None
+
+    def get_child_watcher(self):
+        return self._underlying.get_child_watcher()
+
+    def set_child_watcher(self, watcher):
+        return self._underlying.set_child_watcher(watcher)
 
 
 @pytest.fixture(scope="session")
@@ -83,6 +107,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
                 "--dynamic-config-value",
                 "system.enableEagerWorkflowStart=true",
+                "--dynamic-config-value",
+                "frontend.enableExecuteMultiOperation=true",
             ]
         )
     elif env_type == "time-skipping":
@@ -107,11 +133,11 @@ async def worker(
     await worker.close()
 
 
-# There is an issue on Windows 3.8 tests in GitHub actions where even though all
+# There is an issue on Windows 3.9 tests in GitHub actions where even though all
 # tests pass, an unclear outer area is killing the process with a bad exit code.
 # This windows-only hook forcefully kills the process as success when the exit
 # code from pytest is a success.
-if sys.version_info < (3, 9) and sys.platform == "win32":
+if sys.version_info < (3, 10) and sys.platform == "win32":
 
     @pytest.hookimpl(hookwrapper=True, trylast=True)
     def pytest_cmdline_main(config):
