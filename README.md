@@ -84,7 +84,6 @@ informal introduction to the features and their implementation.
           - [Extending Restricted Classes](#extending-restricted-classes)
           - [Certain Standard Library Calls on Restricted Objects](#certain-standard-library-calls-on-restricted-objects)
           - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
-          - [Compiled Pydantic Sometimes Using Wrong Types](#compiled-pydantic-sometimes-using-wrong-types)
     - [Activities](#activities)
       - [Definition](#definition-1)
       - [Types of Activities](#types-of-activities)
@@ -312,11 +311,6 @@ The default data converter supports converting multiple types including:
   * Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports natively
   * [dataclasses](https://docs.python.org/3/library/dataclasses.html)
   * Iterables including ones JSON dump may not support by default, e.g. `set`
-  * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
-    [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
-    * The default data converter is deprecated for Pydantic models and will warn if used since not all fields work.
-      See [this sample](https://github.com/temporalio/samples-python/tree/main/pydantic_converter) for the recommended
-      approach.
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
 
@@ -324,6 +318,14 @@ This notably doesn't include any `date`, `time`, or `datetime` objects as they m
 
 Users are strongly encouraged to use a single `dataclass` for parameter and return types so fields with defaults can be
 easily added without breaking compatibility.
+
+To use pydantic model instances (or python objects containing pydantic model instances), use
+```python
+from temporalio.contrib.pydantic import pydantic_data_converter
+
+client = Client(data_converter=pydantic_data_converter, ...)
+```
+Do not use pydantic's [strict mode](https://docs.pydantic.dev/latest/concepts/strict_mode/).
 
 Classes with generics may not have the generics properly resolved. The current implementation does not have generic
 type resolution. Users should use concrete types.
@@ -1133,15 +1135,6 @@ Due to [https://bugs.python.org/issue44847](https://bugs.python.org/issue44847),
 checked to see if they are subclasses of another via `is_subclass` may fail (see also
 [this wrapt issue](https://github.com/GrahamDumpleton/wrapt/issues/130)).
 
-###### Compiled Pydantic Sometimes Using Wrong Types
-
-If the Pydantic dependency is in compiled form (the default) and you are using a Pydantic model inside a workflow
-sandbox that uses a `datetime` type, it will grab the wrong validator and use `date` instead. This is because our
-patched form of `issubclass` is bypassed by compiled Pydantic.
-
-To work around, either don't use `datetime`-based Pydantic model fields in workflows, or mark `datetime` library as
-passthrough (means you lose protection against calling the non-deterministic `now()`), or use non-compiled Pydantic
-dependency.
 
 ### Activities
 
