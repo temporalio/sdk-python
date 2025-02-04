@@ -166,3 +166,53 @@ async def test_mixed_collection_types(client: Client):
         )
     assert orig_dataclass_objects == round_tripped_dataclass_objects
     assert orig_pydantic_objects == round_tripped_pydantic_objects
+
+
+@workflow.defn
+class PydanticModelInWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        o1, _ = make_pydantic_objects()
+        assert isinstance(o1, MyPydanticModel)
+        assert isinstance(o1, BaseModel)
+        assert isinstance(o1.ip_field, IPv4Address)
+        assert isinstance(o1.datetime_field, datetime)
+        assert issubclass(o1.annotated_datetime.__class__, datetime)
+        assert isinstance(o1.string_field_assigned_field, str)
+        assert isinstance(o1.datetime_field_assigned_field, datetime)
+        assert isinstance(o1.string_field_with_default, str)
+        assert isinstance(o1.datetime_field_with_default, datetime)
+        assert isinstance(o1.annotated_datetime, datetime)
+        assert isinstance(o1.annotated_list_of_str, list)
+        assert isinstance(o1.annotated_list_of_datetime, list)
+        assert isinstance(o1.str_short_sequence, list)
+        assert isinstance(o1.datetime_short_sequence, list)
+        assert o1.annotated_datetime == datetime(2000, 1, 2, 3, 4, 5)
+        assert o1.annotated_list_of_str == ["my-string-1", "my-string-2"]
+        assert o1.annotated_list_of_datetime == [
+            datetime(2000, 1, 2, 3, 4, 5),
+            datetime(2000, 11, 12, 13, 14, 15),
+        ]
+        assert o1.str_short_sequence == ["my-string-1", "my-string-2"]
+        assert o1.datetime_short_sequence == [
+            datetime(2000, 1, 2, 3, 4, 5),
+            datetime(2000, 11, 12, 13, 14, 15),
+        ]
+
+
+async def test_pydantic_usage_in_workflow(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[PydanticModelInWorkflow],
+    ):
+        await client.execute_workflow(
+            PydanticModelInWorkflow.run,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
+        )
