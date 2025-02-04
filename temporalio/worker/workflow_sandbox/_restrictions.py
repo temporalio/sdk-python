@@ -951,14 +951,6 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        return core_schema.no_info_after_validator_function(
-            cls, handler(RestrictionContext.unwrap_if_proxied(source_type))
-        )
-
     def __init__(self, *args, **kwargs) -> None:
         # When we instantiate this class, we have the signature of:
         #   __init__(
@@ -1032,6 +1024,15 @@ class _RestrictedProxy:
                     f"{state.name}.{key}", ret, state.context, child_matcher
                 )
         return ret
+
+    # Instruct pydantic to use the proxied type when determining the schema
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(
+            cls, handler(RestrictionContext.unwrap_if_proxied(source_type))
+        )
 
     __doc__ = _RestrictedProxyLookup(  # type: ignore
         class_value=__doc__, fallback_func=lambda self: type(self).__doc__, is_attr=True
