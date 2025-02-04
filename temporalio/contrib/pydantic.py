@@ -12,18 +12,22 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 """
 
 import inspect
-import json
 from typing import (
     Any,
-    Optional,
     Type,
 )
 
 import pydantic
 
+try:
+    from pydantic_core import to_jsonable_python
+except ImportError:
+    # pydantic v1
+    from pydantic.json import pydantic_encoder as to_jsonable_python
+
 import temporalio.workflow
-from temporalio.api.common.v1 import Payload
 from temporalio.converter import (
+    AdvancedJSONEncoder,
     CompositePayloadConverter,
     DataConverter,
     DefaultPayloadConverter,
@@ -32,13 +36,8 @@ from temporalio.converter import (
 )
 from temporalio.worker.workflow_sandbox._restrictions import RestrictionContext
 
-try:
-    from pydantic_core import to_jsonable_python
-except ImportError:
-    from pydantic.json import pydantic_encoder as to_jsonable_python
 
-
-class _PydanticModelTypeConverter(JSONTypeConverter):
+class PydanticModelTypeConverter(JSONTypeConverter):
     def to_typed_value(self, hint: Type, value: Any) -> Any:
         if not inspect.isclass(hint) or not issubclass(hint, pydantic.BaseModel):
             return JSONTypeConverter.Unhandled
@@ -59,7 +58,7 @@ class _PydanticModelTypeConverter(JSONTypeConverter):
         if hasattr(model, "model_validate"):
             return model.model_validate(value)
         elif hasattr(model, "parse_obj"):
-            # Pydantic v1
+            # pydantic v1
             return model.parse_obj(value)
         else:
             raise ValueError(
@@ -67,39 +66,14 @@ class _PydanticModelTypeConverter(JSONTypeConverter):
             )
 
 
-class _PydanticJSONPayloadConverter(JSONPlainPayloadConverter):
-    """Pydantic JSON payload converter.
-
-    Conversion to JSON is implemented by overriding :py:meth:`to_payload` to use the
-    Pydantic encoder.
-
-    Conversion from JSON uses the parent implementation of :py:meth:`from_payload`, with a
-    custom type converter. The parent implementation of :py:meth:`from_payload` traverses
-    the JSON document according to the structure specified by the type annotation; the
-    custom type converter ensures that, during this traversal, Pydantic model instances
-    will be created as specified by the type annotation.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(custom_type_converters=[_PydanticModelTypeConverter()])
-
-    def to_payload(self, value: Any) -> Optional[Payload]:
-        """Convert all values with Pydantic encoder or fail.
-
-        Like the base class, we fail if we cannot convert. This payload
-        converter is expected to be the last in the chain, so it can fail if
-        unable to convert.
-        """
-        # Let JSON conversion errors be thrown to caller
-        return Payload(
-            metadata={"encoding": self.encoding.encode()},
-            data=json.dumps(
-                value, separators=(",", ":"), sort_keys=True, default=to_jsonable_python
-            ).encode(),
-        )
+class PydanticJSONEncoder(AdvancedJSONEncoder):
+    def default(self, o: Any) -> Any:
+        if isinstance(o, pydantic.BaseModel):
+            return to_jsonable_python(o)
+        return super().default(o)
 
 
-class _PydanticPayloadConverter(CompositePayloadConverter):
+class PydanticPayloadConverter(CompositePayloadConverter):
     """Pydantic payload converter.
 
     Payload converter that replaces the default JSON conversion with Pydantic
@@ -107,7 +81,10 @@ class _PydanticPayloadConverter(CompositePayloadConverter):
     """
 
     def __init__(self) -> None:
-        json_payload_converter = _PydanticJSONPayloadConverter()
+        json_payload_converter = JSONPlainPayloadConverter(
+            encoder=PydanticJSONEncoder,
+            custom_type_converters=[PydanticModelTypeConverter()],
+        )
         super().__init__(
             *(
                 c
@@ -119,7 +96,7 @@ class _PydanticPayloadConverter(CompositePayloadConverter):
 
 
 pydantic_data_converter = DataConverter(
-    payload_converter_class=_PydanticPayloadConverter
+    payload_converter_class=PydanticPayloadConverter
 )
 """Data converter for Pydantic models.
 
