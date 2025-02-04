@@ -32,8 +32,13 @@ from typing import (
     cast,
 )
 
-from pydantic import GetCoreSchemaHandler
-from pydantic_core import CoreSchema, core_schema
+try:
+    import pydantic
+    import pydantic_core
+
+    HAVE_PYDANTIC = True
+except ImportError:
+    HAVE_PYDANTIC = False
 
 import temporalio.workflow
 
@@ -986,7 +991,7 @@ class _RestrictedProxy:
             _trace("__init__ unrecognized with args %s", args)
 
     def __getattribute__(self, __name: str) -> Any:
-        if __name == "__get_pydantic_core_schema__":
+        if HAVE_PYDANTIC and __name == "__get_pydantic_core_schema__":
             return object.__getattribute__(self, "__get_pydantic_core_schema__")
         state = _RestrictionState.from_proxy(self)
         _trace("__getattribute__ %s on %s", __name, state.name)
@@ -1037,14 +1042,18 @@ class _RestrictedProxy:
                 )
         return ret
 
-    # Instruct pydantic to use the proxied type when determining the schema
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        return core_schema.no_info_after_validator_function(
-            cls, handler(RestrictionContext.unwrap_if_proxied(source_type))
-        )
+    if HAVE_PYDANTIC:
+        # Instruct pydantic to use the proxied type when determining the schema
+        # https://docs.pydantic.dev/latest/concepts/types/#customizing-validation-with-__get_pydantic_core_schema__
+        @classmethod
+        def __get_pydantic_core_schema__(
+            cls,
+            source_type: Any,
+            handler: pydantic.GetCoreSchemaHandler,
+        ) -> pydantic_core.CoreSchema:
+            return pydantic_core.core_schema.no_info_after_validator_function(
+                cls, handler(RestrictionContext.unwrap_if_proxied(source_type))
+            )
 
     __doc__ = _RestrictedProxyLookup(  # type: ignore
         class_value=__doc__, fallback_func=lambda self: type(self).__doc__, is_attr=True
