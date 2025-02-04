@@ -1516,6 +1516,23 @@ def value_to_type(
         # TODO(cretz): Want way to convert snake case to camel case?
         return hint(**field_values)
 
+    # Pydantic model instance
+    # Pydantic users should use
+    # temporalio.contrib.pydantic.pydantic_data_converter, in which case a
+    # pydantic model instance will have been handled by the custom_converters at
+    # the start of this function. We retain the following for backwards
+    # compatibility with pydantic users who are not using contrib.pydantic, but
+    # this is deprecated.
+    parse_obj_attr = inspect.getattr_static(hint, "parse_obj", None)
+    if isinstance(parse_obj_attr, classmethod) or isinstance(
+        parse_obj_attr, staticmethod
+    ):
+        if not isinstance(value, dict):
+            raise TypeError(
+                f"Cannot convert to {hint}, value is {type(value)} not dict"
+            )
+        return getattr(hint, "parse_obj")(value)
+
     # IntEnum
     if inspect.isclass(hint) and issubclass(hint, IntEnum):
         if not isinstance(value, int):
