@@ -7,13 +7,19 @@ from datetime import timedelta
 from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
 from temporalio.api.common.v1 import WorkflowExecution
-from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.enums.v1 import EventType, IndexedValueType
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
 )
 from temporalio.api.update.v1 import UpdateRef
-from temporalio.api.workflowservice.v1 import PollWorkflowExecutionUpdateRequest
+from temporalio.api.workflowservice.v1 import (
+    GetWorkflowExecutionHistoryRequest,
+    PollWorkflowExecutionUpdateRequest,
+)
+from temporalio.api.workflowservice.v1 import (
+    ResetStickyTaskQueueRequest as ResetStickyTaskQueueRequest,
+)
 from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
 from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
@@ -150,3 +156,18 @@ async def admitted_update_task(
         lambda: workflow_update_exists(client, handle.id, id),
     )
     return update_task
+
+
+async def last_workflow_task_failed_message(
+    client: Client, workflow_id: str
+) -> Optional[str]:
+    resp = await client.workflow_service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=workflow_id),
+        ),
+    )
+    for event in reversed(resp.history.events):
+        if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
+            return event.workflow_task_failed_event_attributes.failure.message
+    return None

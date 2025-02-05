@@ -113,6 +113,7 @@ from tests.helpers import (
     assert_eq_eventually,
     ensure_search_attributes_present,
     find_free_port,
+    last_workflow_task_failed_message,
     new_worker,
     workflow_update_exists,
 )
@@ -2613,23 +2614,10 @@ async def test_workflow_deadlock(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-
-        async def last_history_task_failure() -> str:
-            resp = await client.workflow_service.get_workflow_execution_history(
-                GetWorkflowExecutionHistoryRequest(
-                    namespace=client.namespace,
-                    execution=WorkflowExecution(workflow_id=handle.id),
-                ),
-            )
-            for event in reversed(resp.history.events):
-                if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
-                    return event.workflow_task_failed_event_attributes.failure.message
-            return "<no failure>"
-
         try:
             await assert_eq_eventually(
                 "[TMPRL1101] Potential deadlock detected: workflow didn't yield within 1 second(s).",
-                last_history_task_failure,
+                lambda: last_workflow_task_failed_message(client, handle.id),
                 timeout=timedelta(seconds=5),
                 interval=timedelta(seconds=1),
             )
@@ -2672,21 +2660,9 @@ async def test_workflow_eviction_deadlock(client: Client):
         task_queue=worker.task_queue,
     )
 
-    async def last_history_task_failure() -> str:
-        resp = await client.workflow_service.get_workflow_execution_history(
-            GetWorkflowExecutionHistoryRequest(
-                namespace=client.namespace,
-                execution=WorkflowExecution(workflow_id=handle.id),
-            ),
-        )
-        for event in reversed(resp.history.events):
-            if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
-                return event.workflow_task_failed_event_attributes.failure.message
-        return "<no failure>"
-
     await assert_eq_eventually(
         "[TMPRL1101] Potential deadlock detected: workflow didn't yield within 1 second(s).",
-        last_history_task_failure,
+        lambda: last_workflow_task_failed_message(client, handle.id),
         timeout=timedelta(seconds=5),
         interval=timedelta(seconds=1),
     )
