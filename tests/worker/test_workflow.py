@@ -1697,6 +1697,15 @@ class SearchAttributeWorkflow:
             ]
         )
 
+    @workflow.signal
+    def do_search_attribute_update_naive_datetime(self) -> None:
+        dt = workflow.now().astimezone(timezone.utc).replace(tzinfo=None)
+        workflow.upsert_search_attributes(
+            {
+                SearchAttributeWorkflow.datetime_attribute.name: [dt],
+            }
+        )
+
 
 async def test_workflow_search_attributes(client: Client, env_type: str):
     if env_type != "local":
@@ -1869,6 +1878,15 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
             updated_attrs_typed
         ) == await handle.query(SearchAttributeWorkflow.get_search_attributes_typed)
         assert updated_attrs_typed == await describe_attributes_typed(handle)
+
+        # Check naive datetime results in workflow task failure
+        await handle.signal(
+            SearchAttributeWorkflow.do_search_attribute_update_naive_datetime
+        )
+        assert await assert_eq_eventually(
+            "Timezone must be present on all search attribute dates",
+            lambda: last_workflow_task_failed_message(client, handle.id),
+        )
 
 
 @workflow.defn
