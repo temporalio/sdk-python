@@ -24,6 +24,7 @@ class PydanticModel(BaseModel):
         List[str], Field(), WithJsonSchema({"extra": "data"})
     ]
     str_short_sequence: ShortSequence[List[str]]
+    union_field: Union[int, str]
 
     def _check_instance(self):
         assert isinstance(self.ip_field, IPv4Address)
@@ -33,6 +34,8 @@ class PydanticModel(BaseModel):
         assert isinstance(self.str_short_sequence, list)
         assert self.annotated_list_of_str == ["my-string-1", "my-string-2"]
         assert self.str_short_sequence == ["my-string-1", "my-string-2"]
+        assert isinstance(self.union_field, str)
+        assert self.union_field == "my-string"
 
 
 class PydanticDatetimeModel(BaseModel):
@@ -155,6 +158,7 @@ def make_homogeneous_list_of_pydantic_objects() -> List[PydanticModel]:
             string_field_assigned_field="my-string",
             annotated_list_of_str=["my-string-1", "my-string-2"],
             str_short_sequence=["my-string-1", "my-string-2"],
+            union_field="my-string",
         ),
     ]
 
@@ -166,6 +170,7 @@ def make_heterogenous_list_of_pydantic_objects() -> List[PydanticModels]:
             string_field_assigned_field="my-string",
             annotated_list_of_str=["my-string-1", "my-string-2"],
             str_short_sequence=["my-string-1", "my-string-2"],
+            union_field="my-string",
         ),
         PydanticDatetimeModel(
             datetime_field=datetime(2000, 1, 2, 3, 4, 5),
