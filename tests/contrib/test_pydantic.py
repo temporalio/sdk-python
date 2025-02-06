@@ -93,6 +93,46 @@ class PydanticDateModel(BaseModel):
         ]
 
 
+class PydanticTimedeltaModel(BaseModel):
+    timedelta_field: timedelta
+    timedelta_field_assigned_field: timedelta = Field()
+    timedelta_field_with_default: timedelta = Field(
+        default_factory=lambda: timedelta(days=1)
+    )
+    annotated_timedelta: Annotated[
+        timedelta, Field(), WithJsonSchema({"extra": "data"})
+    ]
+    annotated_list_of_timedelta: Annotated[
+        List[timedelta], Field(), WithJsonSchema({"extra": "data"})
+    ]
+    timedelta_short_sequence: ShortSequence[List[timedelta]]
+
+    def _check_instance(self):
+        _assert_timedelta_validity(self.timedelta_field)
+        _assert_timedelta_validity(self.timedelta_field_assigned_field)
+        _assert_timedelta_validity(self.timedelta_field_with_default)
+        _assert_timedelta_validity(self.annotated_timedelta)
+        assert isinstance(self.annotated_list_of_timedelta, list)
+        for td in self.annotated_list_of_timedelta:
+            _assert_timedelta_validity(td)
+        assert isinstance(self.timedelta_short_sequence, list)
+        for td in self.timedelta_short_sequence:
+            _assert_timedelta_validity(td)
+        assert self.annotated_timedelta == timedelta(1, 2, 3, 4, 5, 6, 7)
+        assert self.annotated_list_of_timedelta == [
+            timedelta(1, 2, 3, 4, 5, 6, 7),
+            timedelta(2, 3, 4, 5, 6, 7, 8),
+        ]
+
+
+PydanticModels = Union[
+    PydanticModel,
+    PydanticDatetimeModel,
+    PydanticDateModel,
+    PydanticTimedeltaModel,
+]
+
+
 def _assert_datetime_validity(dt: datetime):
     assert isinstance(dt, datetime)
     assert issubclass(dt.__class__, datetime)
@@ -101,6 +141,11 @@ def _assert_datetime_validity(dt: datetime):
 def _assert_date_validity(d: date):
     assert isinstance(d, date)
     assert issubclass(d.__class__, date)
+
+
+def _assert_timedelta_validity(td: timedelta):
+    assert isinstance(td, timedelta)
+    assert issubclass(td.__class__, timedelta)
 
 
 def make_homogeneous_list_of_pydantic_objects() -> List[PydanticModel]:
@@ -114,9 +159,7 @@ def make_homogeneous_list_of_pydantic_objects() -> List[PydanticModel]:
     ]
 
 
-def make_heterogenous_list_of_pydantic_objects() -> (
-    List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]]
-):
+def make_heterogenous_list_of_pydantic_objects() -> List[PydanticModels]:
     return [
         PydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
@@ -144,6 +187,19 @@ def make_heterogenous_list_of_pydantic_objects() -> (
             annotated_list_of_date=[date(2000, 1, 2), date(2001, 11, 12)],
             date_short_sequence=[date(2000, 1, 2), date(2001, 11, 12)],
         ),
+        PydanticTimedeltaModel(
+            timedelta_field=timedelta(1, 2, 3, 4, 5, 6, 7),
+            timedelta_field_assigned_field=timedelta(1, 2, 3, 4, 5, 6, 7),
+            annotated_timedelta=timedelta(1, 2, 3, 4, 5, 6, 7),
+            annotated_list_of_timedelta=[
+                timedelta(1, 2, 3, 4, 5, 6, 7),
+                timedelta(2, 3, 4, 5, 6, 7, 8),
+            ],
+            timedelta_short_sequence=[
+                timedelta(1, 2, 3, 4, 5, 6, 7),
+                timedelta(2, 3, 4, 5, 6, 7, 8),
+            ],
+        ),
     ]
 
 
@@ -156,8 +212,8 @@ async def homogeneous_list_of_pydantic_models_activity(
 
 @activity.defn
 async def heterogeneous_list_of_pydantic_models_activity(
-    models: List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
-) -> List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]]:
+    models: List[PydanticModels],
+) -> List[PydanticModels]:
     return models
 
 
@@ -175,10 +231,7 @@ class HomogenousListOfPydanticObjectsWorkflow:
 @workflow.defn
 class HeterogenousListOfPydanticObjectsWorkflow:
     @workflow.run
-    async def run(
-        self,
-        models: List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
-    ) -> List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]]:
+    async def run(self, models: List[PydanticModels]) -> List[PydanticModels]:
         return await workflow.execute_activity(
             heterogeneous_list_of_pydantic_models_activity,
             models,
@@ -248,11 +301,11 @@ class MixedCollectionTypesWorkflow:
         self,
         input: Tuple[
             List[MyDataClass],
-            List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
+            List[PydanticModels],
         ],
     ) -> Tuple[
         List[MyDataClass],
-        List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
+        List[PydanticModels],
     ]:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
