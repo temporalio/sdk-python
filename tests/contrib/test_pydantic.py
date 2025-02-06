@@ -2,7 +2,20 @@ import dataclasses
 import uuid
 from datetime import date, datetime, timedelta
 from ipaddress import IPv4Address
-from typing import Annotated, Any, List, Sequence, Tuple, TypeVar, Union, get_type_hints
+from typing import (
+    Annotated,
+    Any,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+    get_type_hints,
+)
 
 from annotated_types import Len
 from pydantic import BaseModel, Field, WithJsonSchema
@@ -14,6 +27,205 @@ from temporalio.worker import Worker
 
 SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
 ShortSequence = Annotated[SequenceType, Len(max_length=2)]
+
+
+class BasicTypesModel(BaseModel):
+    int_field: int
+    float_field: float
+    str_field: str
+    bool_field: bool
+    bytes_field: bytes
+    none_field: None
+
+    def _check_instance(self):
+        assert isinstance(self.int_field, int)
+        assert isinstance(self.float_field, float)
+        assert isinstance(self.str_field, str)
+        assert isinstance(self.bool_field, bool)
+        assert isinstance(self.bytes_field, bytes)
+        assert self.none_field is None
+        assert self.int_field == 42
+        assert self.float_field == 3.14
+        assert self.str_field == "hello"
+        assert self.bool_field is True
+        assert self.bytes_field == b"world"
+
+
+def make_basic_types_object() -> BasicTypesModel:
+    return BasicTypesModel(
+        int_field=42,
+        float_field=3.14,
+        str_field="hello",
+        bool_field=True,
+        bytes_field=b"world",
+        none_field=None,
+    )
+
+
+class ComplexTypesModel(BaseModel):
+    list_field: List[str]
+    dict_field: Dict[str, int]
+    set_field: Set[int]
+    tuple_field: Tuple[str, int]
+    union_field: Union[str, int]
+    optional_field: Optional[str]
+
+    def _check_instance(self):
+        assert isinstance(self.list_field, list)
+        assert isinstance(self.dict_field, dict)
+        assert isinstance(self.set_field, set)
+        assert isinstance(self.tuple_field, tuple)
+        assert isinstance(self.union_field, str)
+        assert isinstance(self.optional_field, str)
+        assert self.list_field == ["a", "b", "c"]
+        assert self.dict_field == {"x": 1, "y": 2}
+        assert self.set_field == {1, 2, 3}
+        assert self.tuple_field == ("hello", 42)
+        assert self.union_field == "string_or_int"
+        assert self.optional_field == "present"
+
+
+def make_complex_types_object() -> ComplexTypesModel:
+    return ComplexTypesModel(
+        list_field=["a", "b", "c"],
+        dict_field={"x": 1, "y": 2},
+        set_field={1, 2, 3},
+        tuple_field=("hello", 42),
+        union_field="string_or_int",
+        optional_field="present",
+    )
+
+
+class SpecialTypesModel(BaseModel):
+    datetime_field: datetime
+    date_field: date
+    timedelta_field: timedelta
+    # path_field: Path
+    uuid_field: uuid.UUID
+    ip_field: IPv4Address
+
+    def _check_instance(self):
+        assert isinstance(self.datetime_field, datetime)
+        assert isinstance(self.date_field, date)
+        assert isinstance(self.timedelta_field, timedelta)
+        # assert isinstance(self.path_field, Path)
+        assert isinstance(self.uuid_field, uuid.UUID)
+        assert isinstance(self.ip_field, IPv4Address)
+        assert self.datetime_field == datetime(2000, 1, 2, 3, 4, 5)
+        assert self.date_field == date(2000, 1, 2)
+        assert self.timedelta_field == timedelta(days=1, hours=2)
+        # assert self.path_field == Path("test/path")
+        assert self.uuid_field == uuid.UUID("12345678-1234-5678-1234-567812345678")
+        assert self.ip_field == IPv4Address("127.0.0.1")
+
+
+def make_special_types_object() -> SpecialTypesModel:
+    return SpecialTypesModel(
+        datetime_field=datetime(2000, 1, 2, 3, 4, 5),
+        date_field=date(2000, 1, 2),
+        timedelta_field=timedelta(days=1, hours=2),
+        # path_field=Path("test/path"),
+        uuid_field=uuid.UUID("12345678-1234-5678-1234-567812345678"),
+        ip_field=IPv4Address("127.0.0.1"),
+    )
+
+
+class ChildModel(BaseModel):
+    name: str
+    value: int
+
+
+class ParentModel(BaseModel):
+    child: ChildModel
+    children: List[ChildModel]
+
+    def _check_instance(self):
+        assert isinstance(self.child, ChildModel)
+        assert isinstance(self.children, list)
+        assert all(isinstance(child, ChildModel) for child in self.children)
+        assert self.child.name == "child1"
+        assert self.child.value == 1
+        assert len(self.children) == 2
+        assert self.children[0].name == "child2"
+        assert self.children[0].value == 2
+        assert self.children[1].name == "child3"
+        assert self.children[1].value == 3
+
+
+def make_nested_object() -> ParentModel:
+    return ParentModel(
+        child=ChildModel(name="child1", value=1),
+        children=[
+            ChildModel(name="child2", value=2),
+            ChildModel(name="child3", value=3),
+        ],
+    )
+
+
+class FieldFeaturesModel(BaseModel):
+    field_with_default: str = "default"
+    field_with_factory: datetime = Field(
+        default_factory=lambda: datetime(2000, 1, 2, 3, 4, 5)
+    )
+    field_with_constraints: int = Field(gt=0, lt=100)
+    field_with_alias: str = Field(alias="different_name")
+
+    def _check_instance(self):
+        assert isinstance(self.field_with_default, str)
+        assert isinstance(self.field_with_factory, datetime)
+        assert isinstance(self.field_with_constraints, int)
+        assert isinstance(self.field_with_alias, str)
+        assert self.field_with_default == "default"
+        assert 0 < self.field_with_constraints < 100
+        assert self.field_with_alias == "aliased_value"
+
+
+def make_field_features_object() -> FieldFeaturesModel:
+    return FieldFeaturesModel(
+        field_with_constraints=50,
+        different_name="aliased_value",
+    )
+
+
+class AnnotatedFieldsModel(BaseModel):
+    max_length_str: Annotated[str, Len(max_length=10)]
+    custom_json: Annotated[Dict[str, Any], WithJsonSchema({"extra": "data"})]
+
+    def _check_instance(self):
+        assert isinstance(self.max_length_str, str)
+        assert isinstance(self.custom_json, dict)
+        assert len(self.max_length_str) <= 10
+        assert self.max_length_str == "short"
+        assert self.custom_json == {"key": "value"}
+
+
+def make_annotated_fields_object() -> AnnotatedFieldsModel:
+    return AnnotatedFieldsModel(
+        max_length_str="short",
+        custom_json={"key": "value"},
+    )
+
+
+T = TypeVar("T")
+
+
+class GenericModel(BaseModel, Generic[T]):
+    value: T
+    values: List[T]
+
+    def _check_instance(self):
+        assert isinstance(self.value, str)
+        assert isinstance(self.values, list)
+        assert all(isinstance(v, str) for v in self.values)
+        assert self.value == "single"
+        assert self.values == ["multiple", "values"]
+
+
+def make_generic_string_object() -> GenericModel[str]:
+    return GenericModel[str](
+        value="single",
+        values=["multiple", "values"],
+    )
 
 
 class PydanticModel(BaseModel):
@@ -143,6 +355,13 @@ class PydanticTimedeltaModel(BaseModel):
 
 
 PydanticModels = Union[
+    BasicTypesModel,
+    ComplexTypesModel,
+    SpecialTypesModel,
+    ParentModel,
+    FieldFeaturesModel,
+    AnnotatedFieldsModel,
+    GenericModel,
     PydanticModel,
     PydanticDatetimeModel,
     PydanticDateModel,
@@ -166,7 +385,7 @@ def _assert_timedelta_validity(td: timedelta):
 
 
 def make_homogeneous_list_of_pydantic_objects() -> List[PydanticModel]:
-    return [
+    objects = [
         PydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
             string_field_assigned_field="my-string",
@@ -175,10 +394,20 @@ def make_homogeneous_list_of_pydantic_objects() -> List[PydanticModel]:
             union_field="my-string",
         ),
     ]
+    for o in objects:
+        o._check_instance()
+    return objects
 
 
-def make_heterogenous_list_of_pydantic_objects() -> List[PydanticModels]:
-    return [
+def make_heterogeneous_list_of_pydantic_objects() -> List[PydanticModels]:
+    objects = [
+        make_basic_types_object(),
+        make_complex_types_object(),
+        make_special_types_object(),
+        make_nested_object(),
+        make_field_features_object(),
+        make_annotated_fields_object(),
+        make_generic_string_object(),
         PydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
             string_field_assigned_field="my-string",
@@ -220,6 +449,9 @@ def make_heterogenous_list_of_pydantic_objects() -> List[PydanticModels]:
             ],
         ),
     ]
+    for o in objects:
+        o._check_instance()
+    return objects
 
 
 @activity.defn
@@ -237,7 +469,7 @@ async def heterogeneous_list_of_pydantic_models_activity(
 
 
 @workflow.defn
-class HomogenousListOfPydanticObjectsWorkflow:
+class HomogeneousListOfPydanticObjectsWorkflow:
     @workflow.run
     async def run(self, models: List[PydanticModel]) -> List[PydanticModel]:
         return await workflow.execute_activity(
@@ -248,7 +480,7 @@ class HomogenousListOfPydanticObjectsWorkflow:
 
 
 @workflow.defn
-class HeterogenousListOfPydanticObjectsWorkflow:
+class HeterogeneousListOfPydanticObjectsWorkflow:
     @workflow.run
     async def run(self, models: List[PydanticModels]) -> List[PydanticModels]:
         return await workflow.execute_activity(
@@ -269,39 +501,43 @@ async def test_homogeneous_list_of_pydantic_objects(client: Client):
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[HomogenousListOfPydanticObjectsWorkflow],
+        workflows=[HomogeneousListOfPydanticObjectsWorkflow],
         activities=[homogeneous_list_of_pydantic_models_activity],
     ):
         round_tripped_pydantic_objects = await client.execute_workflow(
-            HomogenousListOfPydanticObjectsWorkflow.run,
+            HomogeneousListOfPydanticObjectsWorkflow.run,
             orig_pydantic_objects,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
         )
     assert orig_pydantic_objects == round_tripped_pydantic_objects
+    for o in round_tripped_pydantic_objects:
+        o._check_instance()
 
 
-async def test_heterogenous_list_of_pydantic_objects(client: Client):
+async def test_heterogeneous_list_of_pydantic_objects(client: Client):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
     task_queue_name = str(uuid.uuid4())
 
-    orig_pydantic_objects = make_heterogenous_list_of_pydantic_objects()
+    orig_pydantic_objects = make_heterogeneous_list_of_pydantic_objects()
 
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[HeterogenousListOfPydanticObjectsWorkflow],
+        workflows=[HeterogeneousListOfPydanticObjectsWorkflow],
         activities=[heterogeneous_list_of_pydantic_models_activity],
     ):
         round_tripped_pydantic_objects = await client.execute_workflow(
-            HeterogenousListOfPydanticObjectsWorkflow.run,
+            HeterogeneousListOfPydanticObjectsWorkflow.run,
             orig_pydantic_objects,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
         )
     assert orig_pydantic_objects == round_tripped_pydantic_objects
+    for o in round_tripped_pydantic_objects:
+        o._check_instance()
 
 
 @dataclasses.dataclass
@@ -342,7 +578,7 @@ async def test_mixed_collection_types(client: Client):
     task_queue_name = str(uuid.uuid4())
 
     orig_dataclass_objects = make_dataclass_objects()
-    orig_pydantic_objects = make_heterogenous_list_of_pydantic_objects()
+    orig_pydantic_objects = make_heterogeneous_list_of_pydantic_objects()
 
     async with Worker(
         client,
@@ -361,13 +597,15 @@ async def test_mixed_collection_types(client: Client):
         )
     assert orig_dataclass_objects == round_tripped_dataclass_objects
     assert orig_pydantic_objects == round_tripped_pydantic_objects
+    for o in round_tripped_pydantic_objects:
+        o._check_instance()
 
 
 @workflow.defn
 class PydanticModelUsageWorkflow:
     @workflow.run
     async def run(self) -> None:
-        for o in make_heterogenous_list_of_pydantic_objects():
+        for o in make_heterogeneous_list_of_pydantic_objects():
             o._check_instance()
 
 
