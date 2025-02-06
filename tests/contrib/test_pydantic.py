@@ -2,7 +2,7 @@ import dataclasses
 import uuid
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
-from typing import Annotated, Any, List, Sequence, Tuple, TypeVar
+from typing import Annotated, Any, List, Sequence, Tuple, TypeVar, Union
 
 from annotated_types import Len
 from pydantic import BaseModel, Field, WithJsonSchema
@@ -25,7 +25,7 @@ class MyPydanticModel(BaseModel):
     ]
     str_short_sequence: ShortSequence[List[str]]
 
-    def _make_assertions(self):
+    def _check_instance(self):
         assert isinstance(self.ip_field, IPv4Address)
         assert isinstance(self.string_field_assigned_field, str)
         assert isinstance(self.string_field_with_default, str)
@@ -47,7 +47,7 @@ class MyPydanticDatetimeModel(BaseModel):
     ]
     datetime_short_sequence: ShortSequence[List[datetime]]
 
-    def _make_assertions(self):
+    def _check_instance(self):
         _assert_datetime_validity(self.datetime_field)
         _assert_datetime_validity(self.datetime_field_assigned_field)
         _assert_datetime_validity(self.datetime_field_with_default)
@@ -57,11 +57,11 @@ class MyPydanticDatetimeModel(BaseModel):
         assert self.annotated_datetime == datetime(2000, 1, 2, 3, 4, 5)
         assert self.annotated_list_of_datetime == [
             datetime(2000, 1, 2, 3, 4, 5),
-            datetime(2000, 11, 12, 13, 14, 15),
+            datetime(2001, 11, 12, 13, 14, 15),
         ]
         assert self.datetime_short_sequence == [
             datetime(2000, 1, 2, 3, 4, 5),
-            datetime(2000, 11, 12, 13, 14, 15),
+            datetime(2001, 11, 12, 13, 14, 15),
         ]
 
 
@@ -70,7 +70,7 @@ def _assert_datetime_validity(dt: datetime):
     assert issubclass(dt.__class__, datetime)
 
 
-def make_pydantic_objects() -> List[MyPydanticModel]:
+def make_homogeneous_list_of_pydantic_objects() -> List[MyPydanticModel]:
     return [
         MyPydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
@@ -81,42 +81,109 @@ def make_pydantic_objects() -> List[MyPydanticModel]:
     ]
 
 
+def make_heterogenous_list_of_pydantic_objects() -> (
+    List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+):
+    return [
+        MyPydanticModel(
+            ip_field=IPv4Address("127.0.0.1"),
+            string_field_assigned_field="my-string",
+            annotated_list_of_str=["my-string-1", "my-string-2"],
+            str_short_sequence=["my-string-1", "my-string-2"],
+        ),
+        MyPydanticDatetimeModel(
+            datetime_field=datetime(2000, 1, 2, 3, 4, 5),
+            datetime_field_assigned_field=datetime(2000, 1, 2, 3, 4, 5),
+            annotated_datetime=datetime(2000, 1, 2, 3, 4, 5),
+            annotated_list_of_datetime=[
+                datetime(2000, 1, 2, 3, 4, 5),
+                datetime(2001, 11, 12, 13, 14, 15),
+            ],
+            datetime_short_sequence=[
+                datetime(2000, 1, 2, 3, 4, 5),
+                datetime(2001, 11, 12, 13, 14, 15),
+            ],
+        ),
+    ]
+
+
 @activity.defn
-async def list_of_pydantic_models_activity(
+async def homogeneous_list_of_pydantic_models_activity(
     models: List[MyPydanticModel],
 ) -> List[MyPydanticModel]:
     return models
 
 
+@activity.defn
+async def heterogeneous_list_of_pydantic_models_activity(
+    models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]],
+) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
+    return models
+
+
 @workflow.defn
-class ListOfPydanticObjectsWorkflow:
+class HomogenousListOfPydanticObjectsWorkflow:
     @workflow.run
-    async def run(
-        self, models: List[MyPydanticModel]
-    ) -> List[MyPydanticModel]:
+    async def run(self, models: List[MyPydanticModel]) -> List[MyPydanticModel]:
         return await workflow.execute_activity(
-            list_of_pydantic_models_activity,
+            homogeneous_list_of_pydantic_models_activity,
             models,
             start_to_close_timeout=timedelta(minutes=1),
         )
 
 
-async def test_field_conversion(client: Client):
+@workflow.defn
+class HeterogenousListOfPydanticObjectsWorkflow:
+    @workflow.run
+    async def run(
+        self, models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+    ) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
+        return await workflow.execute_activity(
+            heterogeneous_list_of_pydantic_models_activity,
+            models,
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+
+
+async def test_homogeneous_list_of_pydantic_objects(client: Client):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
     task_queue_name = str(uuid.uuid4())
 
-    orig_pydantic_objects = make_pydantic_objects()
+    orig_pydantic_objects = make_homogeneous_list_of_pydantic_objects()
 
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[ListOfPydanticObjectsWorkflow],
-        activities=[list_of_pydantic_models_activity],
+        workflows=[HomogenousListOfPydanticObjectsWorkflow],
+        activities=[homogeneous_list_of_pydantic_models_activity],
     ):
         round_tripped_pydantic_objects = await client.execute_workflow(
-            ListOfPydanticObjectsWorkflow.run,
+            HomogenousListOfPydanticObjectsWorkflow.run,
+            orig_pydantic_objects,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
+        )
+    assert orig_pydantic_objects == round_tripped_pydantic_objects
+
+
+async def test_heterogenous_list_of_pydantic_objects(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    orig_pydantic_objects = make_heterogenous_list_of_pydantic_objects()
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[HeterogenousListOfPydanticObjectsWorkflow],
+        activities=[heterogeneous_list_of_pydantic_models_activity],
+    ):
+        round_tripped_pydantic_objects = await client.execute_workflow(
+            HeterogenousListOfPydanticObjectsWorkflow.run,
             orig_pydantic_objects,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
@@ -137,11 +204,16 @@ def make_dataclass_objects() -> List[MyDataClass]:
 class MixedCollectionTypesWorkflow:
     @workflow.run
     async def run(
-        self, input: Tuple[List[MyDataClass], List[MyPydanticModel]]
-    ) -> Tuple[List[MyDataClass], List[MyPydanticModel]]:
+        self,
+        input: Tuple[
+            List[MyDataClass], List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+        ],
+    ) -> Tuple[
+        List[MyDataClass], List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+    ]:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
-            list_of_pydantic_models_activity,
+            heterogeneous_list_of_pydantic_models_activity,
             pydantic_objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
@@ -155,13 +227,13 @@ async def test_mixed_collection_types(client: Client):
     task_queue_name = str(uuid.uuid4())
 
     orig_dataclass_objects = make_dataclass_objects()
-    orig_pydantic_objects = make_pydantic_objects()
+    orig_pydantic_objects = make_heterogenous_list_of_pydantic_objects()
 
     async with Worker(
         client,
         task_queue=task_queue_name,
         workflows=[MixedCollectionTypesWorkflow],
-        activities=[list_of_pydantic_models_activity],
+        activities=[heterogeneous_list_of_pydantic_models_activity],
     ):
         (
             round_tripped_dataclass_objects,
@@ -180,8 +252,8 @@ async def test_mixed_collection_types(client: Client):
 class PydanticModelUsageWorkflow:
     @workflow.run
     async def run(self) -> None:
-        for o in make_pydantic_objects():
-            o._make_assertions()
+        for o in make_heterogenous_list_of_pydantic_objects():
+            o._check_instance()
 
 
 async def test_pydantic_model_usage_in_workflow(client: Client):
@@ -209,8 +281,6 @@ class DatetimeUsageWorkflow:
         dt = workflow.now()
         assert isinstance(dt, datetime)
         assert issubclass(dt.__class__, datetime)
-        for o in make_pydantic_objects():
-            o._make_assertions()
 
 
 async def test_datetime_usage_in_workflow(client: Client):
