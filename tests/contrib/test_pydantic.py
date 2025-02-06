@@ -2,7 +2,7 @@ import dataclasses
 import uuid
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
-from typing import Annotated, Any, List, Sequence, Tuple, TypeVar
+from typing import Annotated, Any, List, Sequence, Tuple, TypeVar, Union
 
 from annotated_types import Len
 from pydantic import BaseModel, Field, WithJsonSchema
@@ -18,55 +18,74 @@ ShortSequence = Annotated[SequenceType, Len(max_length=2)]
 
 class MyPydanticModel(BaseModel):
     ip_field: IPv4Address
-    datetime_field: datetime
     string_field_assigned_field: str = Field()
-    datetime_field_assigned_field: datetime = Field()
     string_field_with_default: str = Field(default_factory=lambda: "my-string")
+    annotated_list_of_str: Annotated[
+        List[str], Field(), WithJsonSchema({"extra": "data"})
+    ]
+    str_short_sequence: ShortSequence[List[str]]
+
+    def _make_assertions(self):
+        assert isinstance(self.ip_field, IPv4Address)
+        assert isinstance(self.string_field_assigned_field, str)
+        assert isinstance(self.string_field_with_default, str)
+        assert isinstance(self.annotated_list_of_str, list)
+        assert isinstance(self.str_short_sequence, list)
+        assert self.annotated_list_of_str == ["my-string-1", "my-string-2"]
+        assert self.str_short_sequence == ["my-string-1", "my-string-2"]
+
+
+class MyPydanticDatetimeModel(BaseModel):
+    datetime_field: datetime
+    datetime_field_assigned_field: datetime = Field()
     datetime_field_with_default: datetime = Field(
         default_factory=lambda: datetime(2000, 1, 2, 3, 4, 5)
     )
     annotated_datetime: Annotated[datetime, Field(), WithJsonSchema({"extra": "data"})]
-    annotated_list_of_str: Annotated[
-        List[str], Field(), WithJsonSchema({"extra": "data"})
-    ]
     annotated_list_of_datetime: Annotated[
         List[datetime], Field(), WithJsonSchema({"extra": "data"})
     ]
-    str_short_sequence: ShortSequence[List[str]]
     datetime_short_sequence: ShortSequence[List[datetime]]
 
+    def _make_assertions(self):
+        _assert_datetime_validity(self.datetime_field)
+        _assert_datetime_validity(self.datetime_field_assigned_field)
+        _assert_datetime_validity(self.datetime_field_with_default)
+        _assert_datetime_validity(self.annotated_datetime)
+        assert isinstance(self.annotated_list_of_datetime, list)
+        assert isinstance(self.datetime_short_sequence, list)
+        assert self.annotated_datetime == datetime(2000, 1, 2, 3, 4, 5)
+        assert self.annotated_list_of_datetime == [
+            datetime(2000, 1, 2, 3, 4, 5),
+            datetime(2000, 11, 12, 13, 14, 15),
+        ]
+        assert self.datetime_short_sequence == [
+            datetime(2000, 1, 2, 3, 4, 5),
+            datetime(2000, 11, 12, 13, 14, 15),
+        ]
 
-def make_pydantic_objects() -> List[MyPydanticModel]:
+
+def _assert_datetime_validity(dt: datetime):
+    assert isinstance(dt, datetime)
+    assert issubclass(dt.__class__, datetime)
+
+
+def make_pydantic_objects() -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
     return [
         MyPydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
-            datetime_field=datetime(2000, 1, 2, 3, 4, 5),
             string_field_assigned_field="my-string",
-            datetime_field_assigned_field=datetime(2000, 1, 2, 3, 4, 5),
-            annotated_datetime=datetime(2000, 1, 2, 3, 4, 5),
             annotated_list_of_str=["my-string-1", "my-string-2"],
-            annotated_list_of_datetime=[
-                datetime(2000, 1, 2, 3, 4, 5),
-                datetime(2000, 11, 12, 13, 14, 15),
-            ],
             str_short_sequence=["my-string-1", "my-string-2"],
-            datetime_short_sequence=[
-                datetime(2000, 1, 2, 3, 4, 5),
-                datetime(2000, 11, 12, 13, 14, 15),
-            ],
         ),
-        MyPydanticModel(
-            ip_field=IPv4Address("127.0.0.2"),
+        MyPydanticDatetimeModel(
             datetime_field=datetime(2001, 2, 3, 4, 5, 6),
-            string_field_assigned_field="my-string",
             datetime_field_assigned_field=datetime(2000, 2, 3, 4, 5, 6),
             annotated_datetime=datetime(2001, 2, 3, 4, 5, 6),
-            annotated_list_of_str=["my-string-3", "my-string-4"],
             annotated_list_of_datetime=[
                 datetime(2001, 2, 3, 4, 5, 6),
                 datetime(2001, 12, 13, 14, 15, 16),
             ],
-            str_short_sequence=["my-string-3", "my-string-4"],
             datetime_short_sequence=[
                 datetime(2001, 2, 3, 4, 5, 6),
                 datetime(2001, 12, 13, 14, 15, 16),
@@ -77,15 +96,17 @@ def make_pydantic_objects() -> List[MyPydanticModel]:
 
 @activity.defn
 async def list_of_pydantic_models_activity(
-    models: List[MyPydanticModel],
-) -> List[MyPydanticModel]:
+    models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]],
+) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
     return models
 
 
 @workflow.defn
 class ListOfPydanticObjectsWorkflow:
     @workflow.run
-    async def run(self, models: List[MyPydanticModel]) -> List[MyPydanticModel]:
+    async def run(
+        self, models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+    ) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
         return await workflow.execute_activity(
             list_of_pydantic_models_activity,
             models,
@@ -172,16 +193,8 @@ async def test_mixed_collection_types(client: Client):
 class PydanticModelUsageWorkflow:
     @workflow.run
     async def run(self) -> None:
-        o1, _ = make_pydantic_objects()
-        assert isinstance(o1, MyPydanticModel)
-        assert isinstance(o1, BaseModel)
-        assert isinstance(o1.ip_field, IPv4Address)
-        assert isinstance(o1.string_field_assigned_field, str)
-        assert isinstance(o1.string_field_with_default, str)
-        assert isinstance(o1.annotated_list_of_str, list)
-        assert isinstance(o1.str_short_sequence, list)
-        assert o1.annotated_list_of_str == ["my-string-1", "my-string-2"]
-        assert o1.str_short_sequence == ["my-string-1", "my-string-2"]
+        for o in make_pydantic_objects():
+            o._make_assertions()
 
 
 async def test_pydantic_model_usage_in_workflow(client: Client):
@@ -209,23 +222,8 @@ class DatetimeUsageWorkflow:
         dt = workflow.now()
         assert isinstance(dt, datetime)
         assert issubclass(dt.__class__, datetime)
-        o1, _ = make_pydantic_objects()
-        assert isinstance(o1.datetime_field, datetime)
-        assert issubclass(o1.annotated_datetime.__class__, datetime)
-        assert isinstance(o1.datetime_field_assigned_field, datetime)
-        assert isinstance(o1.datetime_field_with_default, datetime)
-        assert isinstance(o1.annotated_datetime, datetime)
-        assert isinstance(o1.annotated_list_of_datetime, list)
-        assert isinstance(o1.datetime_short_sequence, list)
-        assert o1.annotated_datetime == datetime(2000, 1, 2, 3, 4, 5)
-        assert o1.annotated_list_of_datetime == [
-            datetime(2000, 1, 2, 3, 4, 5),
-            datetime(2000, 11, 12, 13, 14, 15),
-        ]
-        assert o1.datetime_short_sequence == [
-            datetime(2000, 1, 2, 3, 4, 5),
-            datetime(2000, 11, 12, 13, 14, 15),
-        ]
+        for o in make_pydantic_objects():
+            o._make_assertions()
 
 
 async def test_datetime_usage_in_workflow(client: Client):
