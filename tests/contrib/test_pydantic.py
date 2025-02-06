@@ -2,7 +2,7 @@ import dataclasses
 import uuid
 from datetime import date, datetime, timedelta
 from ipaddress import IPv4Address
-from typing import Annotated, Any, List, Sequence, Tuple, TypeVar, Union
+from typing import Annotated, Any, List, Sequence, Tuple, TypeVar, Union, get_type_hints
 
 from annotated_types import Len
 from pydantic import BaseModel, Field, WithJsonSchema
@@ -36,6 +36,20 @@ class PydanticModel(BaseModel):
         assert self.str_short_sequence == ["my-string-1", "my-string-2"]
         assert isinstance(self.union_field, str)
         assert self.union_field == "my-string"
+
+        assert get_type_hints(self) == {
+            "ip_field": IPv4Address,
+            "string_field_assigned_field": str,
+            "string_field_with_default": str,
+            "annotated_list_of_str": List[str],
+            "str_short_sequence": List[str],
+            # TODO: why not
+            #     "annotated_list_of_str": Annotated[
+            #         List[str], Field(), WithJsonSchema({"extra": "data"})
+            #     ],
+            #     "str_short_sequence": ShortSequence[List[str]],
+            "union_field": Union[int, str],
+        }
 
 
 class PydanticDatetimeModel(BaseModel):
