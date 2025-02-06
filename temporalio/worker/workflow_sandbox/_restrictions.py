@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import functools
 import inspect
 import logging
@@ -17,7 +18,6 @@ import types
 import warnings
 from copy import copy, deepcopy
 from dataclasses import dataclass
-from datetime import datetime
 from typing import (
     Any,
     Callable,
@@ -952,7 +952,18 @@ def _l_to_r_op(op: _OpF) -> _OpF:
 
 def _is_restrictable(v: Any) -> bool:
     return v is not None and not isinstance(
-        v, (bool, int, float, complex, str, bytes, bytearray, datetime)
+        v,
+        (
+            bool,
+            int,
+            float,
+            complex,
+            str,
+            bytes,
+            bytearray,
+            datetime.date,
+            datetime.datetime,
+        ),
     )
 
 
