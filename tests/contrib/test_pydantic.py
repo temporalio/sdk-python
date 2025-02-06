@@ -1,6 +1,6 @@
 import dataclasses
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from ipaddress import IPv4Address
 from typing import Annotated, Any, List, Sequence, Tuple, TypeVar, Union
 
@@ -65,9 +65,42 @@ class MyPydanticDatetimeModel(BaseModel):
         ]
 
 
+class MyPydanticDateModel(BaseModel):
+    date_field: date
+    date_field_assigned_field: date = Field()
+    date_field_with_default: date = Field(default_factory=lambda: date(2000, 1, 2))
+    annotated_date: Annotated[date, Field(), WithJsonSchema({"extra": "data"})]
+    annotated_list_of_date: Annotated[
+        List[date], Field(), WithJsonSchema({"extra": "data"})
+    ]
+    date_short_sequence: ShortSequence[List[date]]
+
+    def _check_instance(self):
+        _assert_date_validity(self.date_field)
+        _assert_date_validity(self.date_field_assigned_field)
+        _assert_date_validity(self.date_field_with_default)
+        _assert_date_validity(self.annotated_date)
+        assert isinstance(self.annotated_list_of_date, list)
+        assert isinstance(self.date_short_sequence, list)
+        assert self.annotated_date == date(2000, 1, 2)
+        assert self.annotated_list_of_date == [
+            date(2000, 1, 2),
+            date(2001, 11, 12),
+        ]
+        assert self.date_short_sequence == [
+            date(2000, 1, 2),
+            date(2001, 11, 12),
+        ]
+
+
 def _assert_datetime_validity(dt: datetime):
     assert isinstance(dt, datetime)
     assert issubclass(dt.__class__, datetime)
+
+
+def _assert_date_validity(d: date):
+    assert isinstance(d, date)
+    assert issubclass(d.__class__, date)
 
 
 def make_homogeneous_list_of_pydantic_objects() -> List[MyPydanticModel]:
@@ -82,7 +115,7 @@ def make_homogeneous_list_of_pydantic_objects() -> List[MyPydanticModel]:
 
 
 def make_heterogenous_list_of_pydantic_objects() -> (
-    List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+    List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]]
 ):
     return [
         MyPydanticModel(
@@ -104,6 +137,13 @@ def make_heterogenous_list_of_pydantic_objects() -> (
                 datetime(2001, 11, 12, 13, 14, 15),
             ],
         ),
+        MyPydanticDateModel(
+            date_field=date(2000, 1, 2),
+            date_field_assigned_field=date(2000, 1, 2),
+            annotated_date=date(2000, 1, 2),
+            annotated_list_of_date=[date(2000, 1, 2), date(2001, 11, 12)],
+            date_short_sequence=[date(2000, 1, 2), date(2001, 11, 12)],
+        ),
     ]
 
 
@@ -116,8 +156,8 @@ async def homogeneous_list_of_pydantic_models_activity(
 
 @activity.defn
 async def heterogeneous_list_of_pydantic_models_activity(
-    models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]],
-) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
+    models: List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]],
+) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]]:
     return models
 
 
@@ -136,8 +176,11 @@ class HomogenousListOfPydanticObjectsWorkflow:
 class HeterogenousListOfPydanticObjectsWorkflow:
     @workflow.run
     async def run(
-        self, models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
-    ) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
+        self,
+        models: List[
+            Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]
+        ],
+    ) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]]:
         return await workflow.execute_activity(
             heterogeneous_list_of_pydantic_models_activity,
             models,
@@ -206,10 +249,12 @@ class MixedCollectionTypesWorkflow:
     async def run(
         self,
         input: Tuple[
-            List[MyDataClass], List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+            List[MyDataClass],
+            List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]],
         ],
     ) -> Tuple[
-        List[MyDataClass], List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
+        List[MyDataClass],
+        List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]],
     ]:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
