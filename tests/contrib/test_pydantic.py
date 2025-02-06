@@ -2,7 +2,7 @@ import dataclasses
 import uuid
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
-from typing import Annotated, Any, List, Sequence, Tuple, TypeVar, Union
+from typing import Annotated, Any, List, Sequence, Tuple, TypeVar
 
 from annotated_types import Len
 from pydantic import BaseModel, Field, WithJsonSchema
@@ -70,7 +70,7 @@ def _assert_datetime_validity(dt: datetime):
     assert issubclass(dt.__class__, datetime)
 
 
-def make_pydantic_objects() -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
+def make_pydantic_objects() -> List[MyPydanticModel]:
     return [
         MyPydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
@@ -78,26 +78,13 @@ def make_pydantic_objects() -> List[Union[MyPydanticModel, MyPydanticDatetimeMod
             annotated_list_of_str=["my-string-1", "my-string-2"],
             str_short_sequence=["my-string-1", "my-string-2"],
         ),
-        MyPydanticDatetimeModel(
-            datetime_field=datetime(2001, 2, 3, 4, 5, 6),
-            datetime_field_assigned_field=datetime(2000, 2, 3, 4, 5, 6),
-            annotated_datetime=datetime(2001, 2, 3, 4, 5, 6),
-            annotated_list_of_datetime=[
-                datetime(2001, 2, 3, 4, 5, 6),
-                datetime(2001, 12, 13, 14, 15, 16),
-            ],
-            datetime_short_sequence=[
-                datetime(2001, 2, 3, 4, 5, 6),
-                datetime(2001, 12, 13, 14, 15, 16),
-            ],
-        ),
     ]
 
 
 @activity.defn
 async def list_of_pydantic_models_activity(
-    models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]],
-) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
+    models: List[MyPydanticModel],
+) -> List[MyPydanticModel]:
     return models
 
 
@@ -105,8 +92,8 @@ async def list_of_pydantic_models_activity(
 class ListOfPydanticObjectsWorkflow:
     @workflow.run
     async def run(
-        self, models: List[Union[MyPydanticModel, MyPydanticDatetimeModel]]
-    ) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel]]:
+        self, models: List[MyPydanticModel]
+    ) -> List[MyPydanticModel]:
         return await workflow.execute_activity(
             list_of_pydantic_models_activity,
             models,
