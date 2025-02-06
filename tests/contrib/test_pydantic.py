@@ -18,6 +18,7 @@ ShortSequence = Annotated[SequenceType, Len(max_length=2)]
 
 class MyPydanticModel(BaseModel):
     ip_field: IPv4Address
+    timedelta_field: timedelta
     string_field_assigned_field: str = Field()
     string_field_with_default: str = Field(default_factory=lambda: "my-string")
     annotated_list_of_str: Annotated[
@@ -27,6 +28,8 @@ class MyPydanticModel(BaseModel):
 
     def _check_instance(self):
         assert isinstance(self.ip_field, IPv4Address)
+        assert isinstance(self.timedelta_field, timedelta)
+        assert self.timedelta_field == timedelta(1, 2, 3, 4, 5, 6, 7)
         assert isinstance(self.string_field_assigned_field, str)
         assert isinstance(self.string_field_with_default, str)
         assert isinstance(self.annotated_list_of_str, list)
@@ -107,6 +110,7 @@ def make_homogeneous_list_of_pydantic_objects() -> List[MyPydanticModel]:
     return [
         MyPydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
+            timedelta_field=timedelta(1, 2, 3, 4, 5, 6, 7),
             string_field_assigned_field="my-string",
             annotated_list_of_str=["my-string-1", "my-string-2"],
             str_short_sequence=["my-string-1", "my-string-2"],
@@ -120,6 +124,7 @@ def make_heterogenous_list_of_pydantic_objects() -> (
     return [
         MyPydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
+            timedelta_field=timedelta(1, 2, 3, 4, 5, 6, 7),
             string_field_assigned_field="my-string",
             annotated_list_of_str=["my-string-1", "my-string-2"],
             str_short_sequence=["my-string-1", "my-string-2"],
