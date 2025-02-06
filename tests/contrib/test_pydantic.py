@@ -16,7 +16,7 @@ SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
 ShortSequence = Annotated[SequenceType, Len(max_length=2)]
 
 
-class MyPydanticModel(BaseModel):
+class PydanticModel(BaseModel):
     ip_field: IPv4Address
     string_field_assigned_field: str = Field()
     string_field_with_default: str = Field(default_factory=lambda: "my-string")
@@ -35,7 +35,7 @@ class MyPydanticModel(BaseModel):
         assert self.str_short_sequence == ["my-string-1", "my-string-2"]
 
 
-class MyPydanticDatetimeModel(BaseModel):
+class PydanticDatetimeModel(BaseModel):
     datetime_field: datetime
     datetime_field_assigned_field: datetime = Field()
     datetime_field_with_default: datetime = Field(
@@ -65,7 +65,7 @@ class MyPydanticDatetimeModel(BaseModel):
         ]
 
 
-class MyPydanticDateModel(BaseModel):
+class PydanticDateModel(BaseModel):
     date_field: date
     date_field_assigned_field: date = Field()
     date_field_with_default: date = Field(default_factory=lambda: date(2000, 1, 2))
@@ -103,9 +103,9 @@ def _assert_date_validity(d: date):
     assert issubclass(d.__class__, date)
 
 
-def make_homogeneous_list_of_pydantic_objects() -> List[MyPydanticModel]:
+def make_homogeneous_list_of_pydantic_objects() -> List[PydanticModel]:
     return [
-        MyPydanticModel(
+        PydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
             string_field_assigned_field="my-string",
             annotated_list_of_str=["my-string-1", "my-string-2"],
@@ -115,16 +115,16 @@ def make_homogeneous_list_of_pydantic_objects() -> List[MyPydanticModel]:
 
 
 def make_heterogenous_list_of_pydantic_objects() -> (
-    List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]]
+    List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]]
 ):
     return [
-        MyPydanticModel(
+        PydanticModel(
             ip_field=IPv4Address("127.0.0.1"),
             string_field_assigned_field="my-string",
             annotated_list_of_str=["my-string-1", "my-string-2"],
             str_short_sequence=["my-string-1", "my-string-2"],
         ),
-        MyPydanticDatetimeModel(
+        PydanticDatetimeModel(
             datetime_field=datetime(2000, 1, 2, 3, 4, 5),
             datetime_field_assigned_field=datetime(2000, 1, 2, 3, 4, 5),
             annotated_datetime=datetime(2000, 1, 2, 3, 4, 5),
@@ -137,7 +137,7 @@ def make_heterogenous_list_of_pydantic_objects() -> (
                 datetime(2001, 11, 12, 13, 14, 15),
             ],
         ),
-        MyPydanticDateModel(
+        PydanticDateModel(
             date_field=date(2000, 1, 2),
             date_field_assigned_field=date(2000, 1, 2),
             annotated_date=date(2000, 1, 2),
@@ -149,22 +149,22 @@ def make_heterogenous_list_of_pydantic_objects() -> (
 
 @activity.defn
 async def homogeneous_list_of_pydantic_models_activity(
-    models: List[MyPydanticModel],
-) -> List[MyPydanticModel]:
+    models: List[PydanticModel],
+) -> List[PydanticModel]:
     return models
 
 
 @activity.defn
 async def heterogeneous_list_of_pydantic_models_activity(
-    models: List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]],
-) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]]:
+    models: List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
+) -> List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]]:
     return models
 
 
 @workflow.defn
 class HomogenousListOfPydanticObjectsWorkflow:
     @workflow.run
-    async def run(self, models: List[MyPydanticModel]) -> List[MyPydanticModel]:
+    async def run(self, models: List[PydanticModel]) -> List[PydanticModel]:
         return await workflow.execute_activity(
             homogeneous_list_of_pydantic_models_activity,
             models,
@@ -177,10 +177,8 @@ class HeterogenousListOfPydanticObjectsWorkflow:
     @workflow.run
     async def run(
         self,
-        models: List[
-            Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]
-        ],
-    ) -> List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]]:
+        models: List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
+    ) -> List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]]:
         return await workflow.execute_activity(
             heterogeneous_list_of_pydantic_models_activity,
             models,
@@ -250,11 +248,11 @@ class MixedCollectionTypesWorkflow:
         self,
         input: Tuple[
             List[MyDataClass],
-            List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]],
+            List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
         ],
     ) -> Tuple[
         List[MyDataClass],
-        List[Union[MyPydanticModel, MyPydanticDatetimeModel, MyPydanticDateModel]],
+        List[Union[PydanticModel, PydanticDatetimeModel, PydanticDateModel]],
     ]:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
