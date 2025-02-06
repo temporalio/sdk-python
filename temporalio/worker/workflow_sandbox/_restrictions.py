@@ -957,32 +957,21 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    # When we instantiate this class, we have the signature of:
-    #   __init__(
-    #       self,
-    #       name: str,
-    #       obj: Any,
-    #       context: RestrictionContext,
-    #       matcher: SandboxMatcher
-    #   )
-    # However there are some edge cases; see comments below.
-
-    def __new__(cls, *args, **kwargs) -> Any:
-        # When pydantic instantiates a model containing a field whose type
-        # annotation is proxied, it attempts to call the field type constructor
-        # with the field value but instead calls the _RestrictedProxy
-        # constructor. Return the field value.
-        if len(args) == 1:
-            return args[0]
-        return super().__new__(cls)
-
     def __init__(self, *args, **kwargs) -> None:
-        # When Python subclasses a class, it calls metaclass() on the
+        # When we instantiate this class, we have the signature of:
+        #   __init__(
+        #       self,
+        #       name: str,
+        #       obj: Any,
+        #       context: RestrictionContext,
+        #       matcher: SandboxMatcher
+        #   )
+        # However when Python subclasses a class, it calls metaclass() on the
         # class object which doesn't match these args. For now, we'll just
         # ignore inits on these metadata classes.
         # TODO(cretz): Properly support subclassing restricted classes in
         # sandbox
-        if len(args) == 4 and isinstance(args[2], RestrictionContext):
+        if isinstance(args[2], RestrictionContext):
             _trace("__init__ on %s", args[0])
             _RestrictionState(
                 name=args[0], obj=args[1], context=args[2], matcher=args[3]
@@ -1051,9 +1040,7 @@ class _RestrictedProxy:
             source_type: Any,
             handler: pydantic.GetCoreSchemaHandler,
         ) -> pydantic_core.CoreSchema:
-            return pydantic_core.core_schema.no_info_after_validator_function(
-                cls, handler(RestrictionContext.unwrap_if_proxied(source_type))
-            )
+            return handler(RestrictionContext.unwrap_if_proxied(source_type))
 
     __doc__ = _RestrictedProxyLookup(  # type: ignore
         class_value=__doc__, fallback_func=lambda self: type(self).__doc__, is_attr=True
