@@ -49,6 +49,8 @@ class NumberEnum(IntEnum):
 class StandardTypesModel(BaseModel):
     # Boolean
     bool_field: bool
+    bool_field_int: bool
+    bool_field_str: bool
 
     # Numbers
     int_field: int
@@ -91,6 +93,10 @@ class StandardTypesModel(BaseModel):
         # Boolean checks
         assert isinstance(self.bool_field, bool)
         assert self.bool_field is True
+        assert isinstance(self.bool_field_int, bool)
+        assert self.bool_field_int is True
+        assert isinstance(self.bool_field_str, bool)
+        assert self.bool_field_str is True
 
         # Number checks
         assert isinstance(self.int_field, int)
@@ -152,6 +158,8 @@ def make_standard_types_object() -> StandardTypesModel:
     return StandardTypesModel(
         # Boolean
         bool_field=True,
+        bool_field_int=1,  # type: ignore
+        bool_field_str="true",  # type: ignore
         # Numbers
         int_field=42,
         float_field=3.14,
@@ -484,6 +492,7 @@ def make_pydantic_timedelta_object() -> PydanticTimedeltaModel:
 
 
 HeterogeneousPydanticModels = Union[
+    StandardTypesModel,
     ComplexTypesModel,
     SpecialTypesModel,
     ParentModel,
