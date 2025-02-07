@@ -535,7 +535,7 @@ HeterogeneousPydanticModels = Union[
 ]
 
 
-HomogeneousPydanticModels = SpecialTypesModel
+HomogeneousPydanticModels = StandardTypesModel
 
 
 def _assert_datetime_validity(dt: datetime):
@@ -554,7 +554,7 @@ def _assert_timedelta_validity(td: timedelta):
 
 
 def make_homogeneous_list_of_pydantic_objects() -> List[HomogeneousPydanticModels]:
-    objects = [make_special_types_object()]
+    objects = [make_standard_types_object()]
     for o in objects:
         o._check_instance()
     return objects
