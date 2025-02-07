@@ -37,7 +37,7 @@ class BasicTypesModel(BaseModel):
     bytes_field: bytes
     none_field: None
 
-    def _check_instance(self):
+    def _check_instance(self) -> None:
         assert isinstance(self.int_field, int)
         assert isinstance(self.float_field, float)
         assert isinstance(self.str_field, str)
@@ -70,7 +70,7 @@ class ComplexTypesModel(BaseModel):
     union_field: Union[str, int]
     optional_field: Optional[str]
 
-    def _check_instance(self):
+    def _check_instance(self) -> None:
         assert isinstance(self.list_field, list)
         assert isinstance(self.dict_field, dict)
         assert isinstance(self.set_field, set)
@@ -104,7 +104,7 @@ class SpecialTypesModel(BaseModel):
     uuid_field: uuid.UUID
     ip_field: IPv4Address
 
-    def _check_instance(self):
+    def _check_instance(self) -> None:
         assert isinstance(self.datetime_field, datetime)
         assert isinstance(self.date_field, date)
         assert isinstance(self.timedelta_field, timedelta)
@@ -139,7 +139,7 @@ class ParentModel(BaseModel):
     child: ChildModel
     children: List[ChildModel]
 
-    def _check_instance(self):
+    def _check_instance(self) -> None:
         assert isinstance(self.child, ChildModel)
         assert isinstance(self.children, list)
         assert all(isinstance(child, ChildModel) for child in self.children)
@@ -170,7 +170,7 @@ class FieldFeaturesModel(BaseModel):
     field_with_constraints: int = Field(gt=0, lt=100)
     field_with_alias: str = Field(alias="different_name")
 
-    def _check_instance(self):
+    def _check_instance(self) -> None:
         assert isinstance(self.field_with_default, str)
         assert isinstance(self.field_with_factory, datetime)
         assert isinstance(self.field_with_constraints, int)
@@ -191,7 +191,7 @@ class AnnotatedFieldsModel(BaseModel):
     max_length_str: Annotated[str, Len(max_length=10)]
     custom_json: Annotated[Dict[str, Any], WithJsonSchema({"extra": "data"})]
 
-    def _check_instance(self):
+    def _check_instance(self) -> None:
         assert isinstance(self.max_length_str, str)
         assert isinstance(self.custom_json, dict)
         assert len(self.max_length_str) <= 10
@@ -213,7 +213,7 @@ class GenericModel(BaseModel, Generic[T]):
     value: T
     values: List[T]
 
-    def _check_instance(self):
+    def _check_instance(self) -> None:
         assert isinstance(self.value, str)
         assert isinstance(self.values, list)
         assert all(isinstance(v, str) for v in self.values)
@@ -367,7 +367,7 @@ PydanticModels = Union[
     ParentModel,
     FieldFeaturesModel,
     AnnotatedFieldsModel,
-    GenericModel,
+    GenericModel[Any],
     PydanticDatetimeModel,
     PydanticDateModel,
     PydanticTimedeltaModel,
@@ -410,8 +410,8 @@ def make_heterogeneous_list_of_pydantic_objects() -> List[PydanticModels]:
         make_pydantic_timedelta_object(),
     ]
     for o in objects:
-        o._check_instance()
-    return objects
+        o._check_instance()  # type: ignore
+    return objects  # type: ignore
 
 
 @activity.defn
