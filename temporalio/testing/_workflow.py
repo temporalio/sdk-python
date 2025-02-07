@@ -91,7 +91,7 @@ class WorkflowEnvironment:
         download_dest_dir: Optional[str] = None,
         ui: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
-        search_attributes: Sequence[temporalio.common.SearchAttributeKey] = [],
+        search_attributes: Sequence[temporalio.common.SearchAttributeKey] = (),
         dev_server_existing_path: Optional[str] = None,
         dev_server_database_filename: Optional[str] = None,
         dev_server_log_format: str = "pretty",
