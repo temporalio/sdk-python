@@ -1065,7 +1065,7 @@ class _RestrictedProxy:
     )
     __str__ = _RestrictedProxyLookup(str)  # type: ignore
     __bytes__ = _RestrictedProxyLookup(bytes)
-    __format__ = _RestrictedProxyLookup()  # type: ignore
+    __format__ = _RestrictedProxyLookup(format)  # type: ignore
     __lt__ = _RestrictedProxyLookup(operator.lt)
     __le__ = _RestrictedProxyLookup(operator.le)
     __eq__ = _RestrictedProxyLookup(operator.eq)  # type: ignore
