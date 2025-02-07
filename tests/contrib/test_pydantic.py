@@ -27,6 +27,7 @@ from typing import (
 
 from annotated_types import Len
 from pydantic import BaseModel, Field, WithJsonSchema
+from typing_extensions import TypedDict
 
 from temporalio import activity, workflow
 from temporalio.client import Client
@@ -45,6 +46,11 @@ class FruitEnum(str, Enum):
 class NumberEnum(IntEnum):
     one = 1
     two = 2
+
+
+class UserTypedDict(TypedDict):
+    name: str
+    id: int
 
 
 class StandardTypesModel(BaseModel):
@@ -84,6 +90,7 @@ class StandardTypesModel(BaseModel):
     dict_field: dict
     # defaultdict_field: collections.defaultdict
     counter_field: collections.Counter
+    typed_dict_field: UserTypedDict
 
     # Other Types
     pattern_field: Pattern
@@ -146,6 +153,8 @@ class StandardTypesModel(BaseModel):
         # assert dict(self.defaultdict_field) == {"a": 1, "b": 2}
         assert isinstance(self.counter_field, collections.Counter)
         assert dict(self.counter_field) == {"a": 1, "b": 2}
+        assert isinstance(self.typed_dict_field, dict)
+        assert self.typed_dict_field == {"name": "username", "id": 7}
 
         # Other type checks
         assert isinstance(self.pattern_field, Pattern)
@@ -188,6 +197,7 @@ def make_standard_types_object() -> StandardTypesModel:
         dict_field={"a": 1, "b": 2},
         # defaultdict_field=collections.defaultdict(int, {"a": 1, "b": 2}),
         counter_field=collections.Counter({"a": 1, "b": 2}),
+        typed_dict_field={"name": "username", "id": 7},
         # Other Types
         pattern_field=re.compile(r"\d+"),
         hashable_field="test",
