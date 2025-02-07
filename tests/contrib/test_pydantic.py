@@ -1,15 +1,24 @@
+import array
+import collections
 import dataclasses
+import decimal
+import fractions
+import re
 import uuid
 from datetime import date, datetime, timedelta
+from enum import Enum, IntEnum
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import (
     Annotated,
     Any,
+    Callable,
     Dict,
     Generic,
+    Hashable,
     List,
     Optional,
+    Pattern,
     Sequence,
     Set,
     Tuple,
@@ -29,36 +38,152 @@ SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
 ShortSequence = Annotated[SequenceType, Len(max_length=2)]
 
 
-class BasicTypesModel(BaseModel):
+class StandardTypesModel(BaseModel):
+    # Boolean
+    bool_field: bool
+
+    # Numbers
     int_field: int
     float_field: float
+    decimal_field: decimal.Decimal
+    complex_field: complex
+    fraction_field: fractions.Fraction
+
+    # Strings and Bytes
     str_field: str
-    bool_field: bool
     bytes_field: bytes
+
+    # None
     none_field: None
 
+    # Enums
+    str_enum_field: Enum
+    int_enum_field: IntEnum
+
+    # Collections
+    list_field: list
+    tuple_field: tuple
+    set_field: set
+    frozenset_field: frozenset
+    deque_field: collections.deque
+    array_field: array.array
+
+    # Mappings
+    dict_field: dict
+    defaultdict_field: collections.defaultdict
+    counter_field: collections.Counter
+
+    # Other Types
+    pattern_field: Pattern
+    hashable_field: Hashable
+    any_field: Any
+    callable_field: Callable
+
     def _check_instance(self) -> None:
-        assert isinstance(self.int_field, int)
-        assert isinstance(self.float_field, float)
-        assert isinstance(self.str_field, str)
+        # Boolean checks
         assert isinstance(self.bool_field, bool)
-        assert isinstance(self.bytes_field, bytes)
-        assert self.none_field is None
-        assert self.int_field == 42
-        assert self.float_field == 3.14
-        assert self.str_field == "hello"
         assert self.bool_field is True
+
+        # Number checks
+        assert isinstance(self.int_field, int)
+        assert self.int_field == 42
+        assert isinstance(self.float_field, float)
+        assert self.float_field == 3.14
+        assert isinstance(self.decimal_field, decimal.Decimal)
+        assert self.decimal_field == decimal.Decimal("3.14")
+        assert isinstance(self.complex_field, complex)
+        assert self.complex_field == complex(1, 2)
+        assert isinstance(self.fraction_field, fractions.Fraction)
+        assert self.fraction_field == fractions.Fraction(22, 7)
+
+        # String and Bytes checks
+        assert isinstance(self.str_field, str)
+        assert self.str_field == "hello"
+        assert isinstance(self.bytes_field, bytes)
         assert self.bytes_field == b"world"
 
+        # None check
+        assert self.none_field is None
 
-def make_basic_types_object() -> BasicTypesModel:
-    return BasicTypesModel(
+        # Enum checks
+        assert isinstance(self.str_enum_field, Enum)
+        assert isinstance(self.int_enum_field, IntEnum)
+
+        # Collection checks
+        assert isinstance(self.list_field, list)
+        assert self.list_field == [1, 2, 3]
+        assert isinstance(self.tuple_field, tuple)
+        assert self.tuple_field == (1, 2, 3)
+        assert isinstance(self.set_field, set)
+        assert self.set_field == {1, 2, 3}
+        assert isinstance(self.frozenset_field, frozenset)
+        assert self.frozenset_field == frozenset([1, 2, 3])
+        assert isinstance(self.deque_field, collections.deque)
+        assert list(self.deque_field) == [1, 2, 3]
+        assert isinstance(self.array_field, array.array)
+        assert list(self.array_field) == [1, 2, 3]
+
+        # Mapping checks
+        assert isinstance(self.dict_field, dict)
+        assert self.dict_field == {"a": 1, "b": 2}
+        assert isinstance(self.defaultdict_field, collections.defaultdict)
+        assert dict(self.defaultdict_field) == {"a": 1, "b": 2}
+        assert isinstance(self.counter_field, collections.Counter)
+        assert dict(self.counter_field) == {"a": 1, "b": 2}
+
+        # Other type checks
+        assert isinstance(self.pattern_field, Pattern)
+        assert self.pattern_field.pattern == r"\d+"
+        assert isinstance(self.hashable_field, Hashable)
+        assert self.hashable_field == "test"
+        assert self.any_field == "anything goes"
+        assert callable(self.callable_field)
+
+
+class FruitEnum(str, Enum):
+    apple = "apple"
+    banana = "banana"
+
+
+class NumberEnum(IntEnum):
+    one = 1
+    two = 2
+
+
+def make_standard_types_object() -> StandardTypesModel:
+    return StandardTypesModel(
+        # Boolean
+        bool_field=True,
+        # Numbers
         int_field=42,
         float_field=3.14,
+        decimal_field=decimal.Decimal("3.14"),
+        complex_field=complex(1, 2),
+        fraction_field=fractions.Fraction(22, 7),
+        # Strings and Bytes
         str_field="hello",
-        bool_field=True,
         bytes_field=b"world",
+        # None
         none_field=None,
+        # Enums
+        str_enum_field=FruitEnum.apple,
+        int_enum_field=NumberEnum.one,
+        # Collections
+        list_field=[1, 2, 3],
+        tuple_field=(1, 2, 3),
+        set_field={1, 2, 3},
+        frozenset_field=frozenset([1, 2, 3]),
+        deque_field=collections.deque([1, 2, 3]),
+        array_field=array.array("i", [1, 2, 3]),
+        # Mappings
+        dict_field={"a": 1, "b": 2},
+        defaultdict_field=collections.defaultdict(int, {"a": 1, "b": 2}),
+        counter_field=collections.Counter({"a": 1, "b": 2}),
+        # Other Types
+        pattern_field=re.compile(r"\d+"),
+        hashable_field="test",
+        any_field="anything goes",
+        callable_field=lambda x: x,
     )
 
 
@@ -361,7 +486,6 @@ def make_pydantic_timedelta_object() -> PydanticTimedeltaModel:
 
 
 PydanticModels = Union[
-    BasicTypesModel,
     ComplexTypesModel,
     SpecialTypesModel,
     ParentModel,
@@ -398,7 +522,7 @@ def make_homogeneous_list_of_pydantic_objects() -> List[PydanticDatetimeModel]:
 
 def make_heterogeneous_list_of_pydantic_objects() -> List[PydanticModels]:
     objects = [
-        make_basic_types_object(),
+        make_standard_types_object(),
         make_complex_types_object(),
         make_special_types_object(),
         make_nested_object(),
