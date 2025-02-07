@@ -2,6 +2,7 @@ import dataclasses
 import uuid
 from datetime import date, datetime, timedelta
 from ipaddress import IPv4Address
+from pathlib import Path
 from typing import (
     Annotated,
     Any,
@@ -100,7 +101,7 @@ class SpecialTypesModel(BaseModel):
     datetime_field: datetime
     date_field: date
     timedelta_field: timedelta
-    # path_field: Path
+    path_field: Path
     uuid_field: uuid.UUID
     ip_field: IPv4Address
 
@@ -108,13 +109,13 @@ class SpecialTypesModel(BaseModel):
         assert isinstance(self.datetime_field, datetime)
         assert isinstance(self.date_field, date)
         assert isinstance(self.timedelta_field, timedelta)
-        # assert isinstance(self.path_field, Path)
+        assert isinstance(self.path_field, Path)
         assert isinstance(self.uuid_field, uuid.UUID)
         assert isinstance(self.ip_field, IPv4Address)
         assert self.datetime_field == datetime(2000, 1, 2, 3, 4, 5)
         assert self.date_field == date(2000, 1, 2)
         assert self.timedelta_field == timedelta(days=1, hours=2)
-        # assert self.path_field == Path("test/path")
+        assert self.path_field == Path("test/path")
         assert self.uuid_field == uuid.UUID("12345678-1234-5678-1234-567812345678")
         assert self.ip_field == IPv4Address("127.0.0.1")
 
@@ -124,7 +125,7 @@ def make_special_types_object() -> SpecialTypesModel:
         datetime_field=datetime(2000, 1, 2, 3, 4, 5),
         date_field=date(2000, 1, 2),
         timedelta_field=timedelta(days=1, hours=2),
-        # path_field=Path("test/path"),
+        path_field=Path("test/path"),
         uuid_field=uuid.UUID("12345678-1234-5678-1234-567812345678"),
         ip_field=IPv4Address("127.0.0.1"),
     )
