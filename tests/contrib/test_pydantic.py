@@ -78,7 +78,7 @@ class StandardTypesModel(BaseModel):
     frozenset_field: frozenset
     deque_field: collections.deque
     sequence_field: Sequence[int]
-    # array_field: array.array
+    # Iterable[int] supported but not tested since original vs round-tripped do not compare equal
 
     # Mappings
     dict_field: dict
@@ -136,10 +136,8 @@ class StandardTypesModel(BaseModel):
         assert self.frozenset_field == frozenset([1, 2, 3])
         assert isinstance(self.deque_field, collections.deque)
         assert list(self.deque_field) == [1, 2, 3]
-        assert isinstance(self.sequence_field, tuple)
+        assert isinstance(self.sequence_field, list)
         assert list(self.sequence_field) == [1, 2, 3]
-        # assert isinstance(self.array_field, array.array)
-        # assert list(self.array_field) == [1, 2, 3]
 
         # Mapping checks
         assert isinstance(self.dict_field, dict)
@@ -184,8 +182,8 @@ def make_standard_types_object() -> StandardTypesModel:
         set_field={1, 2, 3},
         frozenset_field=frozenset([1, 2, 3]),
         deque_field=collections.deque([1, 2, 3]),
-        sequence_field=(1, 2, 3),
-        # array_field=array.array("i", [1, 2, 3]),
+        # other sequence types are converted to list, as documented
+        sequence_field=[1, 2, 3],
         # Mappings
         dict_field={"a": 1, "b": 2},
         # defaultdict_field=collections.defaultdict(int, {"a": 1, "b": 2}),
