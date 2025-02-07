@@ -53,6 +53,18 @@ class UserTypedDict(TypedDict):
     id: int
 
 
+class TypedDictModel(BaseModel):
+    typed_dict_field: UserTypedDict
+
+    def _check_instance(self) -> None:
+        assert isinstance(self.typed_dict_field, dict)
+        assert self.typed_dict_field == {"name": "username", "id": 7}
+
+
+def make_typed_dict_object() -> TypedDictModel:
+    return TypedDictModel(typed_dict_field={"name": "username", "id": 7})
+
+
 class StandardTypesModel(BaseModel):
     # Boolean
     bool_field: bool
@@ -632,10 +644,40 @@ class HeterogeneousListOfPydanticObjectsWorkflow:
     async def run(
         self, models: List[HeterogeneousPydanticModels]
     ) -> List[HeterogeneousPydanticModels]:
+        # TODO: test instantiation of models
         return await workflow.execute_activity(
             heterogeneous_list_of_pydantic_models_activity,
             models,
             start_to_close_timeout=timedelta(minutes=1),
+        )
+
+
+@workflow.defn
+class InstantiationInSandboxWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        make_heterogeneous_list_of_pydantic_objects()
+
+
+async def test_instantiation_outside_sandbox():
+    make_heterogeneous_list_of_pydantic_objects()
+
+
+async def test_instantiation_inside_sandbox(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[InstantiationInSandboxWorkflow],
+    ):
+        await client.execute_workflow(
+            InstantiationInSandboxWorkflow.run,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
         )
 
 
