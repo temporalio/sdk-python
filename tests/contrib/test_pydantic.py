@@ -77,6 +77,7 @@ class StandardTypesModel(BaseModel):
     set_field: set
     frozenset_field: frozenset
     deque_field: collections.deque
+    sequence_field: Sequence[int]
     # array_field: array.array
 
     # Mappings
@@ -135,6 +136,8 @@ class StandardTypesModel(BaseModel):
         assert self.frozenset_field == frozenset([1, 2, 3])
         assert isinstance(self.deque_field, collections.deque)
         assert list(self.deque_field) == [1, 2, 3]
+        assert isinstance(self.sequence_field, tuple)
+        assert list(self.sequence_field) == [1, 2, 3]
         # assert isinstance(self.array_field, array.array)
         # assert list(self.array_field) == [1, 2, 3]
 
@@ -181,6 +184,7 @@ def make_standard_types_object() -> StandardTypesModel:
         set_field={1, 2, 3},
         frozenset_field=frozenset([1, 2, 3]),
         deque_field=collections.deque([1, 2, 3]),
+        sequence_field=(1, 2, 3),
         # array_field=array.array("i", [1, 2, 3]),
         # Mappings
         dict_field={"a": 1, "b": 2},
