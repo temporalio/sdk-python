@@ -233,6 +233,7 @@ class SpecialTypesModel(BaseModel):
     datetime_field_float: datetime
     datetime_field_str_formatted: datetime
     datetime_field_str_int: datetime
+    datetime_field_date: datetime
     date_field: date
     timedelta_field: timedelta
     path_field: Path
@@ -247,7 +248,7 @@ class SpecialTypesModel(BaseModel):
         assert isinstance(self.datetime_field_float, datetime)
         assert isinstance(self.datetime_field_str_formatted, datetime)
         assert isinstance(self.datetime_field_str_int, datetime)
-        assert isinstance(self.date_field, date)
+        assert isinstance(self.datetime_field_date, datetime)
         assert isinstance(self.timedelta_field, timedelta)
         assert isinstance(self.path_field, Path)
         assert isinstance(self.uuid_field, uuid.UUID)
@@ -257,6 +258,7 @@ class SpecialTypesModel(BaseModel):
         assert self.datetime_field_float == dtz
         assert self.datetime_field_str_formatted == dtz
         assert self.datetime_field_str_int == dtz
+        assert self.datetime_field_date == datetime(2000, 1, 2)
         assert self.date_field == date(2000, 1, 2)
         assert self.timedelta_field == timedelta(days=1, hours=2)
         assert self.path_field == Path("test/path")
@@ -272,6 +274,7 @@ def make_special_types_object() -> SpecialTypesModel:
         datetime_field_float=946782245.0,  # type: ignore
         datetime_field_str_formatted="2000-01-02T03:04:05Z",  # type: ignore
         datetime_field_str_int="946782245",  # type: ignore
+        datetime_field_date=datetime(2000, 1, 2),
         date_field=date(2000, 1, 2),
         timedelta_field=timedelta(days=1, hours=2),
         path_field=Path("test/path"),
