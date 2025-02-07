@@ -38,6 +38,16 @@ SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
 ShortSequence = Annotated[SequenceType, Len(max_length=2)]
 
 
+class FruitEnum(str, Enum):
+    apple = "apple"
+    banana = "banana"
+
+
+class NumberEnum(IntEnum):
+    one = 1
+    two = 2
+
+
 class StandardTypesModel(BaseModel):
     # Boolean
     bool_field: bool
@@ -57,8 +67,8 @@ class StandardTypesModel(BaseModel):
     none_field: None
 
     # Enums
-    str_enum_field: Enum
-    int_enum_field: IntEnum
+    str_enum_field: FruitEnum
+    int_enum_field: NumberEnum
 
     # Collections
     list_field: list
@@ -138,16 +148,6 @@ class StandardTypesModel(BaseModel):
         assert self.hashable_field == "test"
         assert self.any_field == "anything goes"
         assert callable(self.callable_field)
-
-
-class FruitEnum(str, Enum):
-    apple = "apple"
-    banana = "banana"
-
-
-class NumberEnum(IntEnum):
-    one = 1
-    two = 2
 
 
 def make_standard_types_object() -> StandardTypesModel:
@@ -485,7 +485,7 @@ def make_pydantic_timedelta_object() -> PydanticTimedeltaModel:
     )
 
 
-PydanticModels = Union[
+HeterogeneousPydanticModels = Union[
     ComplexTypesModel,
     SpecialTypesModel,
     ParentModel,
@@ -496,6 +496,9 @@ PydanticModels = Union[
     PydanticDateModel,
     PydanticTimedeltaModel,
 ]
+
+
+HomogeneousPydanticModels = StandardTypesModel
 
 
 def _assert_datetime_validity(dt: datetime):
@@ -513,14 +516,14 @@ def _assert_timedelta_validity(td: timedelta):
     assert issubclass(td.__class__, timedelta)
 
 
-def make_homogeneous_list_of_pydantic_objects() -> List[PydanticDatetimeModel]:
-    objects = [make_pydantic_datetime_object()]
+def make_homogeneous_list_of_pydantic_objects() -> List[HomogeneousPydanticModels]:
+    objects = [make_standard_types_object()]
     for o in objects:
         o._check_instance()
     return objects
 
 
-def make_heterogeneous_list_of_pydantic_objects() -> List[PydanticModels]:
+def make_heterogeneous_list_of_pydantic_objects() -> List[HeterogeneousPydanticModels]:
     objects = [
         make_standard_types_object(),
         make_complex_types_object(),
@@ -540,15 +543,15 @@ def make_heterogeneous_list_of_pydantic_objects() -> List[PydanticModels]:
 
 @activity.defn
 async def homogeneous_list_of_pydantic_models_activity(
-    models: List[PydanticDatetimeModel],
-) -> List[PydanticDatetimeModel]:
+    models: List[HomogeneousPydanticModels],
+) -> List[HomogeneousPydanticModels]:
     return models
 
 
 @activity.defn
 async def heterogeneous_list_of_pydantic_models_activity(
-    models: List[PydanticModels],
-) -> List[PydanticModels]:
+    models: List[HeterogeneousPydanticModels],
+) -> List[HeterogeneousPydanticModels]:
     return models
 
 
@@ -556,8 +559,8 @@ async def heterogeneous_list_of_pydantic_models_activity(
 class HomogeneousListOfPydanticObjectsWorkflow:
     @workflow.run
     async def run(
-        self, models: List[PydanticDatetimeModel]
-    ) -> List[PydanticDatetimeModel]:
+        self, models: List[HomogeneousPydanticModels]
+    ) -> List[HomogeneousPydanticModels]:
         return await workflow.execute_activity(
             homogeneous_list_of_pydantic_models_activity,
             models,
@@ -568,7 +571,9 @@ class HomogeneousListOfPydanticObjectsWorkflow:
 @workflow.defn
 class HeterogeneousListOfPydanticObjectsWorkflow:
     @workflow.run
-    async def run(self, models: List[PydanticModels]) -> List[PydanticModels]:
+    async def run(
+        self, models: List[HeterogeneousPydanticModels]
+    ) -> List[HeterogeneousPydanticModels]:
         return await workflow.execute_activity(
             heterogeneous_list_of_pydantic_models_activity,
             models,
@@ -642,11 +647,11 @@ class MixedCollectionTypesWorkflow:
         self,
         input: Tuple[
             List[MyDataClass],
-            List[PydanticModels],
+            List[HeterogeneousPydanticModels],
         ],
     ) -> Tuple[
         List[MyDataClass],
-        List[PydanticModels],
+        List[HeterogeneousPydanticModels],
     ]:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
