@@ -961,8 +961,7 @@ def _is_restrictable(v: Any) -> bool:
             str,
             bytes,
             bytearray,
-            datetime.date,
-            datetime.datetime,
+            datetime.date,  # from which datetime.datetime inherits
         ),
     )
 
