@@ -15,7 +15,6 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
-    get_type_hints,
 )
 
 from annotated_types import Len
@@ -229,42 +228,6 @@ def make_generic_string_object() -> GenericModel[str]:
     )
 
 
-class PydanticModel(BaseModel):
-    ip_field: IPv4Address
-    string_field_assigned_field: str = Field()
-    string_field_with_default: str = Field(default_factory=lambda: "my-string")
-    annotated_list_of_str: Annotated[
-        List[str], Field(), WithJsonSchema({"extra": "data"})
-    ]
-    str_short_sequence: ShortSequence[List[str]]
-    union_field: Union[int, str]
-
-    def _check_instance(self):
-        assert isinstance(self.ip_field, IPv4Address)
-        assert isinstance(self.string_field_assigned_field, str)
-        assert isinstance(self.string_field_with_default, str)
-        assert isinstance(self.annotated_list_of_str, list)
-        assert isinstance(self.str_short_sequence, list)
-        assert self.annotated_list_of_str == ["my-string-1", "my-string-2"]
-        assert self.str_short_sequence == ["my-string-1", "my-string-2"]
-        assert isinstance(self.union_field, str)
-        assert self.union_field == "my-string"
-
-        assert get_type_hints(self) == {
-            "ip_field": IPv4Address,
-            "string_field_assigned_field": str,
-            "string_field_with_default": str,
-            "annotated_list_of_str": List[str],
-            "str_short_sequence": List[str],
-            # TODO: why not
-            #     "annotated_list_of_str": Annotated[
-            #         List[str], Field(), WithJsonSchema({"extra": "data"})
-            #     ],
-            #     "str_short_sequence": ShortSequence[List[str]],
-            "union_field": Union[int, str],
-        }
-
-
 class PydanticDatetimeModel(BaseModel):
     datetime_field: datetime
     datetime_field_assigned_field: datetime = Field()
@@ -295,6 +258,22 @@ class PydanticDatetimeModel(BaseModel):
         ]
 
 
+def make_pydantic_datetime_object() -> PydanticDatetimeModel:
+    return PydanticDatetimeModel(
+        datetime_field=datetime(2000, 1, 2, 3, 4, 5),
+        datetime_field_assigned_field=datetime(2000, 1, 2, 3, 4, 5),
+        annotated_datetime=datetime(2000, 1, 2, 3, 4, 5),
+        annotated_list_of_datetime=[
+            datetime(2000, 1, 2, 3, 4, 5),
+            datetime(2001, 11, 12, 13, 14, 15),
+        ],
+        datetime_short_sequence=[
+            datetime(2000, 1, 2, 3, 4, 5),
+            datetime(2001, 11, 12, 13, 14, 15),
+        ],
+    )
+
+
 class PydanticDateModel(BaseModel):
     date_field: date
     date_field_assigned_field: date = Field()
@@ -321,6 +300,16 @@ class PydanticDateModel(BaseModel):
             date(2000, 1, 2),
             date(2001, 11, 12),
         ]
+
+
+def make_pydantic_date_object() -> PydanticDateModel:
+    return PydanticDateModel(
+        date_field=date(2000, 1, 2),
+        date_field_assigned_field=date(2000, 1, 2),
+        annotated_date=date(2000, 1, 2),
+        annotated_list_of_date=[date(2000, 1, 2), date(2001, 11, 12)],
+        date_short_sequence=[date(2000, 1, 2), date(2001, 11, 12)],
+    )
 
 
 class PydanticTimedeltaModel(BaseModel):
@@ -355,6 +344,22 @@ class PydanticTimedeltaModel(BaseModel):
         ]
 
 
+def make_pydantic_timedelta_object() -> PydanticTimedeltaModel:
+    return PydanticTimedeltaModel(
+        timedelta_field=timedelta(1, 2, 3, 4, 5, 6, 7),
+        timedelta_field_assigned_field=timedelta(1, 2, 3, 4, 5, 6, 7),
+        annotated_timedelta=timedelta(1, 2, 3, 4, 5, 6, 7),
+        annotated_list_of_timedelta=[
+            timedelta(1, 2, 3, 4, 5, 6, 7),
+            timedelta(2, 3, 4, 5, 6, 7, 8),
+        ],
+        timedelta_short_sequence=[
+            timedelta(1, 2, 3, 4, 5, 6, 7),
+            timedelta(2, 3, 4, 5, 6, 7, 8),
+        ],
+    )
+
+
 PydanticModels = Union[
     BasicTypesModel,
     ComplexTypesModel,
@@ -363,7 +368,6 @@ PydanticModels = Union[
     FieldFeaturesModel,
     AnnotatedFieldsModel,
     GenericModel,
-    PydanticModel,
     PydanticDatetimeModel,
     PydanticDateModel,
     PydanticTimedeltaModel,
@@ -385,16 +389,8 @@ def _assert_timedelta_validity(td: timedelta):
     assert issubclass(td.__class__, timedelta)
 
 
-def make_homogeneous_list_of_pydantic_objects() -> List[PydanticModel]:
-    objects = [
-        PydanticModel(
-            ip_field=IPv4Address("127.0.0.1"),
-            string_field_assigned_field="my-string",
-            annotated_list_of_str=["my-string-1", "my-string-2"],
-            str_short_sequence=["my-string-1", "my-string-2"],
-            union_field="my-string",
-        ),
-    ]
+def make_homogeneous_list_of_pydantic_objects() -> List[PydanticDatetimeModel]:
+    objects = [make_pydantic_datetime_object()]
     for o in objects:
         o._check_instance()
     return objects
@@ -409,46 +405,9 @@ def make_heterogeneous_list_of_pydantic_objects() -> List[PydanticModels]:
         make_field_features_object(),
         make_annotated_fields_object(),
         make_generic_string_object(),
-        PydanticModel(
-            ip_field=IPv4Address("127.0.0.1"),
-            string_field_assigned_field="my-string",
-            annotated_list_of_str=["my-string-1", "my-string-2"],
-            str_short_sequence=["my-string-1", "my-string-2"],
-            union_field="my-string",
-        ),
-        PydanticDatetimeModel(
-            datetime_field=datetime(2000, 1, 2, 3, 4, 5),
-            datetime_field_assigned_field=datetime(2000, 1, 2, 3, 4, 5),
-            annotated_datetime=datetime(2000, 1, 2, 3, 4, 5),
-            annotated_list_of_datetime=[
-                datetime(2000, 1, 2, 3, 4, 5),
-                datetime(2001, 11, 12, 13, 14, 15),
-            ],
-            datetime_short_sequence=[
-                datetime(2000, 1, 2, 3, 4, 5),
-                datetime(2001, 11, 12, 13, 14, 15),
-            ],
-        ),
-        PydanticDateModel(
-            date_field=date(2000, 1, 2),
-            date_field_assigned_field=date(2000, 1, 2),
-            annotated_date=date(2000, 1, 2),
-            annotated_list_of_date=[date(2000, 1, 2), date(2001, 11, 12)],
-            date_short_sequence=[date(2000, 1, 2), date(2001, 11, 12)],
-        ),
-        PydanticTimedeltaModel(
-            timedelta_field=timedelta(1, 2, 3, 4, 5, 6, 7),
-            timedelta_field_assigned_field=timedelta(1, 2, 3, 4, 5, 6, 7),
-            annotated_timedelta=timedelta(1, 2, 3, 4, 5, 6, 7),
-            annotated_list_of_timedelta=[
-                timedelta(1, 2, 3, 4, 5, 6, 7),
-                timedelta(2, 3, 4, 5, 6, 7, 8),
-            ],
-            timedelta_short_sequence=[
-                timedelta(1, 2, 3, 4, 5, 6, 7),
-                timedelta(2, 3, 4, 5, 6, 7, 8),
-            ],
-        ),
+        make_pydantic_datetime_object(),
+        make_pydantic_date_object(),
+        make_pydantic_timedelta_object(),
     ]
     for o in objects:
         o._check_instance()
@@ -457,8 +416,8 @@ def make_heterogeneous_list_of_pydantic_objects() -> List[PydanticModels]:
 
 @activity.defn
 async def homogeneous_list_of_pydantic_models_activity(
-    models: List[PydanticModel],
-) -> List[PydanticModel]:
+    models: List[PydanticDatetimeModel],
+) -> List[PydanticDatetimeModel]:
     return models
 
 
@@ -472,7 +431,9 @@ async def heterogeneous_list_of_pydantic_models_activity(
 @workflow.defn
 class HomogeneousListOfPydanticObjectsWorkflow:
     @workflow.run
-    async def run(self, models: List[PydanticModel]) -> List[PydanticModel]:
+    async def run(
+        self, models: List[PydanticDatetimeModel]
+    ) -> List[PydanticDatetimeModel]:
         return await workflow.execute_activity(
             homogeneous_list_of_pydantic_models_activity,
             models,
