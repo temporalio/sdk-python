@@ -15,6 +15,7 @@ from typing import (
     Generic,
     Hashable,
     List,
+    NamedTuple,
     Optional,
     Pattern,
     Sequence,
@@ -193,6 +194,11 @@ def make_standard_types_object() -> StandardTypesModel:
     )
 
 
+class Point(NamedTuple):
+    x: int
+    y: int
+
+
 class ComplexTypesModel(BaseModel):
     list_field: List[str]
     dict_field: Dict[str, int]
@@ -200,6 +206,7 @@ class ComplexTypesModel(BaseModel):
     tuple_field: Tuple[str, int]
     union_field: Union[str, int]
     optional_field: Optional[str]
+    named_tuple_field: Point
 
     def _check_instance(self) -> None:
         assert isinstance(self.list_field, list)
@@ -214,6 +221,7 @@ class ComplexTypesModel(BaseModel):
         assert self.tuple_field == ("hello", 42)
         assert self.union_field == "string_or_int"
         assert self.optional_field == "present"
+        assert self.named_tuple_field == Point(x=1, y=2)
 
 
 def make_complex_types_object() -> ComplexTypesModel:
@@ -224,6 +232,7 @@ def make_complex_types_object() -> ComplexTypesModel:
         tuple_field=("hello", 42),
         union_field="string_or_int",
         optional_field="present",
+        named_tuple_field=Point(x=1, y=2),
     )
 
 
