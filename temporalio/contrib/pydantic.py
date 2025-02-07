@@ -25,7 +25,6 @@ except ImportError:
     # pydantic v1
     from pydantic.json import pydantic_encoder as to_jsonable_python  # type: ignore
 
-import temporalio.workflow
 from temporalio.converter import (
     AdvancedJSONEncoder,
     CompositePayloadConverter,
@@ -34,11 +33,9 @@ from temporalio.converter import (
     JSONPlainPayloadConverter,
     JSONTypeConverter,
 )
-from temporalio.worker.workflow_sandbox._restrictions import RestrictionContext
 
 # Note that in addition to the implementation in this module, _RestrictedProxy
-# implements __get_pydantic_core_schema__ so that pydantic unwraps proxied types
-# when determining the schema.
+# implements __get_pydantic_core_schema__ so that pydantic unwraps proxied types.
 
 
 class PydanticModelTypeConverter(JSONTypeConverter):
@@ -52,15 +49,6 @@ class PydanticModelTypeConverter(JSONTypeConverter):
         if not isinstance(value, dict):
             raise TypeError(
                 f"Cannot convert to {model}, value is {type(value)} not dict"
-            )
-        if temporalio.workflow.unsafe.in_sandbox():
-            # Unwrap proxied model field types so that Pydantic can call their constructors
-            model = pydantic.create_model(
-                model.__name__,
-                **{  # type: ignore
-                    name: (RestrictionContext.unwrap_if_proxied(f.annotation), f)
-                    for name, f in model.model_fields.items()
-                },
             )
         if hasattr(model, "model_validate"):
             return model.model_validate(value)
