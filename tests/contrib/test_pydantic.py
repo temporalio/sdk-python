@@ -4,7 +4,7 @@ import decimal
 import fractions
 import re
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from enum import Enum, IntEnum
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -234,6 +234,10 @@ class SpecialTypesModel(BaseModel):
     datetime_field_str_formatted: datetime
     datetime_field_str_int: datetime
     datetime_field_date: datetime
+
+    time_field: time
+    time_field_str: time
+
     date_field: date
     timedelta_field: timedelta
     path_field: Path
@@ -259,6 +263,8 @@ class SpecialTypesModel(BaseModel):
         assert self.datetime_field_str_formatted == dtz
         assert self.datetime_field_str_int == dtz
         assert self.datetime_field_date == datetime(2000, 1, 2)
+        assert self.time_field == time(3, 4, 5)
+        assert self.time_field_str == time(3, 4, 5, tzinfo=timezone.utc)
         assert self.date_field == date(2000, 1, 2)
         assert self.timedelta_field == timedelta(days=1, hours=2)
         assert self.path_field == Path("test/path")
@@ -275,6 +281,8 @@ def make_special_types_object() -> SpecialTypesModel:
         datetime_field_str_formatted="2000-01-02T03:04:05Z",  # type: ignore
         datetime_field_str_int="946782245",  # type: ignore
         datetime_field_date=datetime(2000, 1, 2),
+        time_field=time(3, 4, 5),
+        time_field_str="03:04:05Z",  # type: ignore
         date_field=date(2000, 1, 2),
         timedelta_field=timedelta(days=1, hours=2),
         path_field=Path("test/path"),
