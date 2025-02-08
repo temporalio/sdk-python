@@ -422,6 +422,24 @@ def make_generic_string_object() -> GenericModel[str]:
     )
 
 
+class UnionModel(BaseModel):
+    simple_union_field: Union[str, int]
+    proxied_union_field: Union[datetime, Path]
+
+    def _check_instance(self) -> None:
+        assert isinstance(self.simple_union_field, str)
+        assert self.simple_union_field == "string_or_int"
+        assert isinstance(self.proxied_union_field, Path)
+        assert self.proxied_union_field == Path("test/path")
+
+
+def make_union_object() -> UnionModel:
+    return UnionModel(
+        simple_union_field="string_or_int",
+        proxied_union_field=Path("test/path"),
+    )
+
+
 class PydanticDatetimeModel(BaseModel):
     datetime_field: datetime
     datetime_field_assigned_field: datetime = Field()
@@ -562,6 +580,7 @@ PydanticModels = Union[
     FieldFeaturesModel,
     AnnotatedFieldsModel,
     GenericModel[Any],
+    UnionModel,
     PydanticDatetimeModel,
     PydanticDateModel,
     PydanticTimedeltaModel,
@@ -592,6 +611,7 @@ def make_list_of_pydantic_objects() -> List[PydanticModels]:
         make_field_features_object(),
         make_annotated_fields_object(),
         make_generic_string_object(),
+        make_union_object(),
         make_pydantic_datetime_object(),
         make_pydantic_date_object(),
         make_pydantic_timedelta_object(),
