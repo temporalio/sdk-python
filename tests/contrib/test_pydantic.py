@@ -37,6 +37,9 @@ from temporalio.worker import Worker
 SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
 ShortSequence = Annotated[SequenceType, Len(max_length=2)]
 
+M = TypeVar("M", bound=BaseModel)
+T = TypeVar("T")
+
 
 class FruitEnum(str, Enum):
     apple = "apple"
@@ -400,9 +403,6 @@ def make_annotated_fields_object() -> AnnotatedFieldsModel:
     )
 
 
-T = TypeVar("T")
-
-
 class GenericModel(BaseModel, Generic[T]):
     value: T
     values: List[T]
@@ -612,16 +612,7 @@ def make_heterogeneous_list_of_pydantic_objects() -> List[HeterogeneousPydanticM
 
 
 @activity.defn
-async def homogeneous_list_of_pydantic_models_activity(
-    models: List[HomogeneousPydanticModels],
-) -> List[HomogeneousPydanticModels]:
-    return models
-
-
-@activity.defn
-async def heterogeneous_list_of_pydantic_models_activity(
-    models: List[HeterogeneousPydanticModels],
-) -> List[HeterogeneousPydanticModels]:
+async def pydantic_objects_activity(models: List[M]) -> List[M]:
     return models
 
 
@@ -632,7 +623,7 @@ class HomogeneousListOfPydanticObjectsWorkflow:
         self, models: List[HomogeneousPydanticModels]
     ) -> List[HomogeneousPydanticModels]:
         return await workflow.execute_activity(
-            homogeneous_list_of_pydantic_models_activity,
+            pydantic_objects_activity,
             models,
             start_to_close_timeout=timedelta(minutes=1),
         )
@@ -646,7 +637,7 @@ class HeterogeneousListOfPydanticObjectsWorkflow:
     ) -> List[HeterogeneousPydanticModels]:
         # TODO: test instantiation of models
         return await workflow.execute_activity(
-            heterogeneous_list_of_pydantic_models_activity,
+            pydantic_objects_activity,
             models,
             start_to_close_timeout=timedelta(minutes=1),
         )
@@ -693,7 +684,7 @@ async def test_homogeneous_list_of_pydantic_objects(client: Client):
         client,
         task_queue=task_queue_name,
         workflows=[HomogeneousListOfPydanticObjectsWorkflow],
-        activities=[homogeneous_list_of_pydantic_models_activity],
+        activities=[pydantic_objects_activity],
     ):
         round_tripped_pydantic_objects = await client.execute_workflow(
             HomogeneousListOfPydanticObjectsWorkflow.run,
@@ -718,7 +709,7 @@ async def test_heterogeneous_list_of_pydantic_objects(client: Client):
         client,
         task_queue=task_queue_name,
         workflows=[HeterogeneousListOfPydanticObjectsWorkflow],
-        activities=[heterogeneous_list_of_pydantic_models_activity],
+        activities=[pydantic_objects_activity],
     ):
         round_tripped_pydantic_objects = await client.execute_workflow(
             HeterogeneousListOfPydanticObjectsWorkflow.run,
@@ -755,7 +746,7 @@ class MixedCollectionTypesWorkflow:
     ]:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
-            heterogeneous_list_of_pydantic_models_activity,
+            pydantic_objects_activity,
             pydantic_objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
@@ -775,7 +766,7 @@ async def test_mixed_collection_types(client: Client):
         client,
         task_queue=task_queue_name,
         workflows=[MixedCollectionTypesWorkflow],
-        activities=[heterogeneous_list_of_pydantic_models_activity],
+        activities=[pydantic_objects_activity],
     ):
         (
             round_tripped_dataclass_objects,
