@@ -444,9 +444,10 @@ SandboxRestrictions.passthrough_modules_minimum = {
     # Due to a metaclass conflict in sandbox, we need zipfile module to pass
     # through always
     "zipfile",
-    # This is a very general module needed by many things including pytest's
+    # Very general modules needed by many things including pytest's
     # assertion rewriter
     "typing",
+    "typing_extensions",
     # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
     # for older versions. This unfortunately means that on those versions,
     # everyone using Python protos has to pass their module through.
