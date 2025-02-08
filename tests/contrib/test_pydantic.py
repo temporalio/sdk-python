@@ -750,19 +750,16 @@ def make_dataclass_objects() -> List[MyDataClass]:
     return [MyDataClass(int_field=7)]
 
 
+ComplexCustomType = Tuple[List[MyDataClass], List[PydanticModels]]
+
+
 @workflow.defn
-class MixedCollectionTypesWorkflow:
+class ComplexCustomTypeWorkflow:
     @workflow.run
     async def run(
         self,
-        input: Tuple[
-            List[MyDataClass],
-            List[PydanticModels],
-        ],
-    ) -> Tuple[
-        List[MyDataClass],
-        List[PydanticModels],
-    ]:
+        input: ComplexCustomType,
+    ) -> ComplexCustomType:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
             pydantic_models_activity,
@@ -772,7 +769,7 @@ class MixedCollectionTypesWorkflow:
         return data_classes, pydantic_objects
 
 
-async def test_mixed_collection_types(client: Client):
+async def test_complex_custom_type(client: Client):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
@@ -784,14 +781,14 @@ async def test_mixed_collection_types(client: Client):
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[MixedCollectionTypesWorkflow],
+        workflows=[ComplexCustomTypeWorkflow],
         activities=[pydantic_models_activity],
     ):
         (
             round_tripped_dataclass_objects,
             round_tripped_pydantic_objects,
         ) = await client.execute_workflow(
-            MixedCollectionTypesWorkflow.run,
+            ComplexCustomTypeWorkflow.run,
             (orig_dataclass_objects, orig_pydantic_objects),
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
