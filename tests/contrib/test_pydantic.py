@@ -741,13 +741,14 @@ async def test_clone_objects_in_sandbox(client: Client):
         o._check_instance()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(order=True)
 class MyDataClass:
-    int_field: int
+    # The name int_field also occurs in StandardTypesModel and currently unions can match them up incorrectly.
+    data_class_int_field: int
 
 
 def make_dataclass_objects() -> List[MyDataClass]:
-    return [MyDataClass(int_field=7)]
+    return [MyDataClass(data_class_int_field=7)]
 
 
 ComplexCustomType = Tuple[List[MyDataClass], List[PydanticModels]]
@@ -795,6 +796,73 @@ async def test_complex_custom_type(client: Client):
         )
     assert orig_dataclass_objects == round_tripped_dataclass_objects
     assert orig_pydantic_objects == round_tripped_pydantic_objects
+    for o in round_tripped_pydantic_objects:
+        o._check_instance()
+
+
+ComplexCustomUnionType = List[Union[MyDataClass, PydanticModels]]
+
+
+@workflow.defn
+class ComplexCustomUnionTypeWorkflow:
+    @workflow.run
+    async def run(
+        self,
+        input: ComplexCustomUnionType,
+    ) -> ComplexCustomUnionType:
+        data_classes, pydantic_objects = [], []
+        for o in input:
+            if dataclasses.is_dataclass(o):
+                data_classes.append(o)
+            elif isinstance(o, BaseModel):
+                pydantic_objects.append(o)
+            else:
+                raise TypeError(f"Unexpected type: {type(o)}")
+        pydantic_objects = await workflow.execute_activity(
+            pydantic_models_activity,
+            pydantic_objects,
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+        return data_classes + pydantic_objects
+
+
+async def test_complex_custom_union_type(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    orig_dataclass_objects = make_dataclass_objects()
+    orig_pydantic_objects = make_list_of_pydantic_objects()
+    orig_objects = orig_dataclass_objects + orig_pydantic_objects
+    import random
+
+    random.shuffle(orig_objects)
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[ComplexCustomUnionTypeWorkflow],
+        activities=[pydantic_models_activity],
+    ):
+        round_tripped_objects = await client.execute_workflow(
+            ComplexCustomUnionTypeWorkflow.run,
+            orig_objects,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
+        )
+    round_tripped_dataclass_objects, round_tripped_pydantic_objects = [], []
+    for o in round_tripped_objects:
+        if isinstance(o, MyDataClass):
+            round_tripped_dataclass_objects.append(o)
+        elif isinstance(o, BaseModel):
+            round_tripped_pydantic_objects.append(o)
+        else:
+            raise TypeError(f"Unexpected type: {type(o)}")
+    assert sorted(orig_dataclass_objects) == sorted(round_tripped_dataclass_objects)
+    assert sorted(orig_pydantic_objects, key=lambda o: o.__class__.__name__) == sorted(
+        round_tripped_pydantic_objects, key=lambda o: o.__class__.__name__
+    )
     for o in round_tripped_pydantic_objects:
         o._check_instance()
 
