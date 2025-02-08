@@ -26,7 +26,7 @@ from typing import (
 )
 
 from annotated_types import Len
-from pydantic import BaseModel, Field, WithJsonSchema
+from pydantic import BaseModel, Field, WithJsonSchema, create_model
 from typing_extensions import TypedDict
 
 from temporalio import activity, workflow
@@ -609,10 +609,16 @@ async def pydantic_models_activity(
 
 
 @workflow.defn
-class PydanticObjectsWorkflow:
+class InstantiateModelsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        make_list_of_pydantic_objects()
+
+
+@workflow.defn
+class RoundTripObjectsWorkflow:
     @workflow.run
     async def run(self, objects: List[PydanticModels]) -> List[PydanticModels]:
-        # TODO: test instantiation of models
         return await workflow.execute_activity(
             pydantic_models_activity,
             objects,
@@ -620,11 +626,24 @@ class PydanticObjectsWorkflow:
         )
 
 
+def clone_objects(objects: List[PydanticModels]) -> List[PydanticModels]:
+    new_objects = []
+    for o in objects:
+        fields = {}
+        for name, f in o.model_fields.items():
+            fields[name] = (f.annotation, f)
+        model = create_model(o.__class__.__name__, **fields)
+        new_objects.append(model(**o.model_dump(by_alias=True)))
+    for old, new in zip(objects, new_objects):
+        assert old.model_dump() == new.model_dump()
+    return new_objects
+
+
 @workflow.defn
-class InstantiationInSandboxWorkflow:
+class CloneObjectsWorkflow:
     @workflow.run
-    async def run(self) -> None:
-        make_list_of_pydantic_objects()
+    async def run(self, objects: List[PydanticModels]) -> List[PydanticModels]:
+        return clone_objects(objects)
 
 
 async def test_instantiation_outside_sandbox():
@@ -640,10 +659,10 @@ async def test_instantiation_inside_sandbox(client: Client):
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[InstantiationInSandboxWorkflow],
+        workflows=[InstantiateModelsWorkflow],
     ):
         await client.execute_workflow(
-            InstantiationInSandboxWorkflow.run,
+            InstantiateModelsWorkflow.run,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
         )
@@ -660,16 +679,44 @@ async def test_round_trip_pydantic_objects(client: Client):
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[PydanticObjectsWorkflow],
+        workflows=[RoundTripObjectsWorkflow],
         activities=[pydantic_models_activity],
     ):
         round_tripped_pydantic_objects = await client.execute_workflow(
-            PydanticObjectsWorkflow.run,
+            RoundTripObjectsWorkflow.run,
             orig_pydantic_objects,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
         )
     assert orig_pydantic_objects == round_tripped_pydantic_objects
+    for o in round_tripped_pydantic_objects:
+        o._check_instance()
+
+
+async def test_clone_objects_outside_sandbox():
+    clone_objects(make_list_of_pydantic_objects())
+
+
+async def test_clone_objects_in_sandbox(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    orig_pydantic_objects = make_list_of_pydantic_objects()
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[CloneObjectsWorkflow],
+    ):
+        round_tripped_pydantic_objects = await client.execute_workflow(
+            CloneObjectsWorkflow.run,
+            orig_pydantic_objects,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
+        )
+    assert round_tripped_pydantic_objects == orig_pydantic_objects
     for o in round_tripped_pydantic_objects:
         o._check_instance()
 
