@@ -554,7 +554,7 @@ def make_pydantic_timedelta_object() -> PydanticTimedeltaModel:
     )
 
 
-HeterogeneousPydanticModels = Union[
+PydanticModels = Union[
     StandardTypesModel,
     ComplexTypesModel,
     SpecialTypesModel,
@@ -566,9 +566,6 @@ HeterogeneousPydanticModels = Union[
     PydanticDateModel,
     PydanticTimedeltaModel,
 ]
-
-
-HomogeneousPydanticModels = StandardTypesModel
 
 
 def _assert_datetime_validity(dt: datetime):
@@ -586,14 +583,7 @@ def _assert_timedelta_validity(td: timedelta):
     assert issubclass(td.__class__, timedelta)
 
 
-def make_homogeneous_list_of_pydantic_objects() -> List[HomogeneousPydanticModels]:
-    objects = [make_standard_types_object()]
-    for o in objects:
-        o._check_instance()
-    return objects
-
-
-def make_heterogeneous_list_of_pydantic_objects() -> List[HeterogeneousPydanticModels]:
+def make_list_of_pydantic_objects() -> List[PydanticModels]:
     objects = [
         make_standard_types_object(),
         make_complex_types_object(),
@@ -612,42 +602,20 @@ def make_heterogeneous_list_of_pydantic_objects() -> List[HeterogeneousPydanticM
 
 
 @activity.defn
-async def homogeneous_list_of_pydantic_models_activity(
-    models: List[HomogeneousPydanticModels],
-) -> List[HomogeneousPydanticModels]:
-    return models
-
-
-@activity.defn
-async def heterogeneous_list_of_pydantic_models_activity(
-    models: List[HeterogeneousPydanticModels],
-) -> List[HeterogeneousPydanticModels]:
+async def pydantic_models_activity(
+    models: List[PydanticModels],
+) -> List[PydanticModels]:
     return models
 
 
 @workflow.defn
-class HomogeneousListOfPydanticObjectsWorkflow:
+class PydanticObjectsWorkflow:
     @workflow.run
-    async def run(
-        self, models: List[HomogeneousPydanticModels]
-    ) -> List[HomogeneousPydanticModels]:
-        return await workflow.execute_activity(
-            homogeneous_list_of_pydantic_models_activity,
-            models,
-            start_to_close_timeout=timedelta(minutes=1),
-        )
-
-
-@workflow.defn
-class HeterogeneousListOfPydanticObjectsWorkflow:
-    @workflow.run
-    async def run(
-        self, models: List[HeterogeneousPydanticModels]
-    ) -> List[HeterogeneousPydanticModels]:
+    async def run(self, objects: List[PydanticModels]) -> List[PydanticModels]:
         # TODO: test instantiation of models
         return await workflow.execute_activity(
-            heterogeneous_list_of_pydantic_models_activity,
-            models,
+            pydantic_models_activity,
+            objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
 
@@ -656,11 +624,11 @@ class HeterogeneousListOfPydanticObjectsWorkflow:
 class InstantiationInSandboxWorkflow:
     @workflow.run
     async def run(self) -> None:
-        make_heterogeneous_list_of_pydantic_objects()
+        make_list_of_pydantic_objects()
 
 
 async def test_instantiation_outside_sandbox():
-    make_heterogeneous_list_of_pydantic_objects()
+    make_list_of_pydantic_objects()
 
 
 async def test_instantiation_inside_sandbox(client: Client):
@@ -681,47 +649,22 @@ async def test_instantiation_inside_sandbox(client: Client):
         )
 
 
-async def test_homogeneous_list_of_pydantic_objects(client: Client):
+async def test_round_trip_pydantic_objects(client: Client):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
     task_queue_name = str(uuid.uuid4())
 
-    orig_pydantic_objects = make_homogeneous_list_of_pydantic_objects()
+    orig_pydantic_objects = make_list_of_pydantic_objects()
 
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[HomogeneousListOfPydanticObjectsWorkflow],
-        activities=[homogeneous_list_of_pydantic_models_activity],
+        workflows=[PydanticObjectsWorkflow],
+        activities=[pydantic_models_activity],
     ):
         round_tripped_pydantic_objects = await client.execute_workflow(
-            HomogeneousListOfPydanticObjectsWorkflow.run,
-            orig_pydantic_objects,
-            id=str(uuid.uuid4()),
-            task_queue=task_queue_name,
-        )
-    assert orig_pydantic_objects == round_tripped_pydantic_objects
-    for o in round_tripped_pydantic_objects:
-        o._check_instance()
-
-
-async def test_heterogeneous_list_of_pydantic_objects(client: Client):
-    new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
-    client = Client(**new_config)
-    task_queue_name = str(uuid.uuid4())
-
-    orig_pydantic_objects = make_heterogeneous_list_of_pydantic_objects()
-
-    async with Worker(
-        client,
-        task_queue=task_queue_name,
-        workflows=[HeterogeneousListOfPydanticObjectsWorkflow],
-        activities=[heterogeneous_list_of_pydantic_models_activity],
-    ):
-        round_tripped_pydantic_objects = await client.execute_workflow(
-            HeterogeneousListOfPydanticObjectsWorkflow.run,
+            PydanticObjectsWorkflow.run,
             orig_pydantic_objects,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
@@ -747,15 +690,15 @@ class MixedCollectionTypesWorkflow:
         self,
         input: Tuple[
             List[MyDataClass],
-            List[HeterogeneousPydanticModels],
+            List[PydanticModels],
         ],
     ) -> Tuple[
         List[MyDataClass],
-        List[HeterogeneousPydanticModels],
+        List[PydanticModels],
     ]:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
-            heterogeneous_list_of_pydantic_models_activity,
+            pydantic_models_activity,
             pydantic_objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
@@ -769,13 +712,13 @@ async def test_mixed_collection_types(client: Client):
     task_queue_name = str(uuid.uuid4())
 
     orig_dataclass_objects = make_dataclass_objects()
-    orig_pydantic_objects = make_heterogeneous_list_of_pydantic_objects()
+    orig_pydantic_objects = make_list_of_pydantic_objects()
 
     async with Worker(
         client,
         task_queue=task_queue_name,
         workflows=[MixedCollectionTypesWorkflow],
-        activities=[heterogeneous_list_of_pydantic_models_activity],
+        activities=[pydantic_models_activity],
     ):
         (
             round_tripped_dataclass_objects,
@@ -796,7 +739,7 @@ async def test_mixed_collection_types(client: Client):
 class PydanticModelUsageWorkflow:
     @workflow.run
     async def run(self) -> None:
-        for o in make_heterogeneous_list_of_pydantic_objects():
+        for o in make_list_of_pydantic_objects():
             o._check_instance()
 
 
