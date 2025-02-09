@@ -1,4 +1,22 @@
-"""Common Temporal exceptions."""
+"""Common Temporal exceptions.
+
+# Temporal Failure
+
+Most Temporal SDKs have a base class that the other Failures extend.
+In python, it is the ``FailureError``.
+
+# Application Failure
+
+Workflow, and Activity, and Nexus Operation code use Application Failures to
+communicate application-specific failures that happen.
+This is the only type of Temporal Failure created and thrown by user code.
+In the Python SDK, it is the ``ApplicationError``.
+
+# References
+
+More information can be found in the docs at
+https://docs.temporal.io/references/failures#workflow-execution-failures.
+"""
 
 import asyncio
 from datetime import timedelta
@@ -23,7 +41,17 @@ class TemporalError(Exception):
 
 
 class FailureError(TemporalError):
-    """Base for runtime failures during workflow/activity execution."""
+    """Base class for exceptions that cause a workflow execution failure.
+
+    Do not raise this directly in workflow code: raise a child exception such as `ApplicationError` instead.
+
+    Workflow execution failure puts the workflow execution into "Failed" state, and no further attempts will
+    be made to progress the workflow execution.
+
+    By default, any exception that does not extend this class causes the Workflow Task to be retried, rather than failing the workflow execution.
+
+    The default behavior can be changed by providing a list of exception types to ``workflow_failure_exception_types`` when creating a worker or ``failure_exception_types`` on the ``@workflow.defn`` decorator.
+    """
 
     def __init__(
         self,
@@ -71,7 +99,18 @@ class WorkflowAlreadyStartedError(FailureError):
 
 
 class ApplicationError(FailureError):
-    """Error raised during workflow/activity execution."""
+    """Error raised during workflow/activity execution to cause a workflow execution failure.
+
+    Workflow Execution Failures put the Workflow Execution into the "Failed" state and no further attempt will
+    be made to progress their execution.
+
+    # Example
+
+    >>> from temporalio.exceptions import ApplicationError
+    ... # ...
+    ... if isDelivery and distance.get_kilometers() > 25:
+    ...     raise ApplicationError("Customer lives outside the service area")
+    """
 
     def __init__(
         self,
