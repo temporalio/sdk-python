@@ -653,7 +653,7 @@ def clone_objects(objects: List[PydanticModels]) -> List[PydanticModels]:
         fields = {}
         for name, f in o.model_fields.items():
             fields[name] = (f.annotation, f)
-        model = create_model(o.__class__.__name__, **fields)
+        model = create_model(o.__class__.__name__, **fields)  # type: ignore
         new_objects.append(model(**o.model_dump(by_alias=True)))
     for old, new in zip(objects, new_objects):
         assert old.model_dump() == new.model_dump()
@@ -811,7 +811,8 @@ class ComplexCustomUnionTypeWorkflow:
         self,
         input: ComplexCustomUnionType,
     ) -> ComplexCustomUnionType:
-        data_classes, pydantic_objects = [], []
+        data_classes = []
+        pydantic_objects: List[PydanticModels] = []
         for o in input:
             if dataclasses.is_dataclass(o):
                 data_classes.append(o)
@@ -824,7 +825,7 @@ class ComplexCustomUnionTypeWorkflow:
             pydantic_objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
-        return data_classes + pydantic_objects
+        return data_classes + pydantic_objects  # type: ignore
 
 
 async def test_complex_custom_union_type(client: Client):
