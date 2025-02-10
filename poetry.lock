@@ -7,7 +7,6 @@ description = "Reusable constraint types to use with typing.Annotated"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"pydantic\""
 files = [
     {file = "annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53"},
     {file = "annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89"},
@@ -1084,7 +1083,6 @@ description = "Data validation using Python type hints"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"pydantic\""
 files = [
     {file = "pydantic-2.10.6-py3-none-any.whl", hash = "sha256:427d664bf0b8a2b34ff5dd0f5a18df00591adcee7198fbd71981054cef37b584"},
     {file = "pydantic-2.10.6.tar.gz", hash = "sha256:ca5daa827cce33de7a42be142548b0096bf05a7e7b365aebfa5f8eeec7128236"},
@@ -1106,7 +1104,6 @@ description = "Core functionality for Pydantic validation and serialization"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"pydantic\""
 files = [
     {file = "pydantic_core-2.27.2-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:2d367ca20b2f14095a8f4fa1210f5a7b78b8a20009ecced6b12818f455b1e9fa"},
     {file = "pydantic_core-2.27.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:491a2b73db93fab69731eaee494f320faa4e093dbed776be1a829c2eb222c34c"},
@@ -1904,9 +1901,8 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [extras]
 grpc = ["grpcio"]
 opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
-pydantic = ["pydantic"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "595afb046373e5c826930cf0f1bc112f70cbfae14c72775c33221e96d66fc869"
+content-hash = "6e479ea624b39564fb33a40ce6ad8f9139a9a8849182251bf84942fe456e36b0"
