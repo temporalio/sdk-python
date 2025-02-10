@@ -502,16 +502,10 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Dataclass support
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
-
-        # Deprecated support for Pydantic model instances
-        for pydantic_attr in ["model_dump", "dict"]:
-            to_dict = getattr(o, pydantic_attr, None)
-            if callable(to_dict):
-                warnings.warn(
-                    "It looks like you're using pydantic. Please use temporalio.contrib.pydantic.converter.pydantic_data_converter."
-                )
-                return to_dict()
-
+        # Support for Pydantic v1's dict method
+        dict_fn = getattr(o, "dict", None)
+        if callable(dict_fn):
+            return dict_fn()
         # Support for non-list iterables like set
         if not isinstance(o, list) and isinstance(o, collections.abc.Iterable):
             return list(o)
@@ -566,7 +560,13 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        # Let JSON conversion errors be thrown to caller
+        # Check for Pydantic v1
+        if hasattr(value, "parse_obj"):
+            warnings.warn(
+                "If you're using Pydantic v1, upgrade to Pydantic v2 and use temporalio.contrib.pydantic.pydantic_data_converter. "
+                "If you cannot upgrade, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter/v1 for better v1 support."
+            )
+        # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self._encoding.encode()},
             data=json.dumps(
@@ -1527,25 +1527,20 @@ def value_to_type(
         return hint(**field_values)
 
     # Pydantic model instance
-    # Pydantic users should use
+    # Pydantic users should use Pydantic v2 with
     # temporalio.contrib.pydantic.pydantic_data_converter, in which case a
     # pydantic model instance will have been handled by the custom_converters at
     # the start of this function. We retain the following for backwards
-    # compatibility with pydantic users who are not using contrib.pydantic, but
-    # this is deprecated.
-    for pydantic_attr in ["model_validate", "parse_obj"]:
-        pydantic_method = inspect.getattr_static(hint, pydantic_attr, None)
-        if isinstance(pydantic_method, classmethod) or isinstance(
-            pydantic_method, staticmethod
-        ):
-            if not isinstance(value, dict):
-                raise TypeError(
-                    f"Cannot convert to {hint}, value is {type(value)} not dict"
-                )
-            warnings.warn(
-                "It looks like you're using pydantic. Please use temporalio.contrib.pydantic.converter.pydantic_data_converter."
+    # compatibility with pydantic v1 users, but this is deprecated.
+    parse_obj_attr = inspect.getattr_static(hint, "parse_obj", None)
+    if isinstance(parse_obj_attr, classmethod) or isinstance(
+        parse_obj_attr, staticmethod
+    ):
+        if not isinstance(value, dict):
+            raise TypeError(
+                f"Cannot convert to {hint}, value is {type(value)} not dict"
             )
-            return getattr(hint, pydantic_attr)(value)
+        return getattr(hint, "parse_obj")(value)
 
     # IntEnum
     if inspect.isclass(hint) and issubclass(hint, IntEnum):
