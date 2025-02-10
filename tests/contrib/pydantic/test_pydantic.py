@@ -153,7 +153,8 @@ async def test_complex_custom_union_type(client: Client):
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
         )
-    returned_dataclass_objects, returned_pydantic_objects = [], []
+    returned_dataclass_objects = []
+    returned_pydantic_objects: list[BaseModel] = []
     for o in returned_objects:
         if dataclasses.is_dataclass(o):
             returned_dataclass_objects.append(o)
@@ -161,12 +162,14 @@ async def test_complex_custom_union_type(client: Client):
             returned_pydantic_objects.append(o)
         else:
             raise TypeError(f"Unexpected type: {type(o)}")
-    assert sorted(orig_dataclass_objects) == sorted(returned_dataclass_objects)
+    assert sorted(orig_dataclass_objects, key=lambda o: o.__class__.__name__) == sorted(
+        returned_dataclass_objects, key=lambda o: o.__class__.__name__
+    )
     assert sorted(orig_pydantic_objects, key=lambda o: o.__class__.__name__) == sorted(
         returned_pydantic_objects, key=lambda o: o.__class__.__name__
     )
-    for o in returned_pydantic_objects:
-        o._check_instance()
+    for o2 in returned_pydantic_objects:
+        o2._check_instance()  # type: ignore
 
 
 async def test_pydantic_model_usage_in_workflow(client: Client):
