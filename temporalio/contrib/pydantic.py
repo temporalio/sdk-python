@@ -12,10 +12,7 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 """
 
 import inspect
-from typing import (
-    Any,
-    Type,
-)
+from typing import Any, Type
 
 import pydantic
 
