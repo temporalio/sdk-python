@@ -198,7 +198,8 @@ def make_standard_types_object() -> StandardTypesModel:
         str_enum_field=FruitEnum.apple,
         int_enum_field=NumberEnum.one,
         # Collections
-        list_field=[1, 2, 3],
+        # these cast input to list, tuple, set, etc.
+        list_field={1, 2, 3},  # type: ignore
         tuple_field=(1, 2, 3),
         set_field={1, 2, 3},
         frozenset_field=frozenset([1, 2, 3]),
