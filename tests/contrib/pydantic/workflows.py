@@ -8,12 +8,13 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from tests.contrib.pydantic.activities import pydantic_models_activity
-    from tests.contrib.pydantic.models import (
-        ComplexCustomType,
-        ComplexCustomUnionType,
-        PydanticModels,
-        make_list_of_pydantic_objects,
-    )
+
+from tests.contrib.pydantic.models import (
+    ComplexCustomType,
+    ComplexCustomUnionType,
+    PydanticModels,
+    make_list_of_pydantic_objects,
+)
 
 
 def clone_objects(objects: List[PydanticModels]) -> List[PydanticModels]:
