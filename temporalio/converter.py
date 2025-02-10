@@ -10,6 +10,7 @@ import json
 import sys
 import traceback
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -486,8 +487,11 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
 class AdvancedJSONEncoder(json.JSONEncoder):
     """Advanced JSON encoder.
 
-    This encoder supports dataclasses, classes with dict() functions, and
-    all iterables as lists.
+    This encoder supports dataclasses and all iterables as lists.
+
+    It also uses Pydantic's "model_dump" or "dict" methods if available on the
+    object, but with a warning that the dedicated pydantic data converter should
+    be used.
     """
 
     def default(self, o: Any) -> Any:
@@ -498,10 +502,16 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Dataclass support
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
-        # Support for models with "dict" function like Pydantic
-        dict_fn = getattr(o, "dict", None)
-        if callable(dict_fn):
-            return dict_fn()
+
+        # Deprecated support for Pydantic model instances
+        for pydantic_attr in ["model_dump", "dict"]:
+            to_dict = getattr(o, pydantic_attr, None)
+            if callable(to_dict):
+                warnings.warn(
+                    "It looks like you're using pydantic. Please use temporalio.contrib.pydantic.converter.pydantic_data_converter."
+                )
+                return to_dict()
+
         # Support for non-list iterables like set
         if not isinstance(o, list) and isinstance(o, collections.abc.Iterable):
             return list(o)
@@ -1523,15 +1533,19 @@ def value_to_type(
     # the start of this function. We retain the following for backwards
     # compatibility with pydantic users who are not using contrib.pydantic, but
     # this is deprecated.
-    parse_obj_attr = inspect.getattr_static(hint, "parse_obj", None)
-    if isinstance(parse_obj_attr, classmethod) or isinstance(
-        parse_obj_attr, staticmethod
-    ):
-        if not isinstance(value, dict):
-            raise TypeError(
-                f"Cannot convert to {hint}, value is {type(value)} not dict"
+    for pydantic_attr in ["model_validate", "parse_obj"]:
+        pydantic_method = inspect.getattr_static(hint, pydantic_attr, None)
+        if isinstance(pydantic_method, classmethod) or isinstance(
+            pydantic_method, staticmethod
+        ):
+            if not isinstance(value, dict):
+                raise TypeError(
+                    f"Cannot convert to {hint}, value is {type(value)} not dict"
+                )
+            warnings.warn(
+                "It looks like you're using pydantic. Please use temporalio.contrib.pydantic.converter.pydantic_data_converter."
             )
-        return getattr(hint, "parse_obj")(value)
+            return getattr(hint, pydantic_attr)(value)
 
     # IntEnum
     if inspect.isclass(hint) and issubclass(hint, IntEnum):
