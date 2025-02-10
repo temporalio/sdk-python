@@ -1,4 +1,4 @@
-"""A data converter for Pydantic models
+"""A data converter for Pydantic v2.
 
 To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 :py:class:`temporalio.client.Client`:
@@ -9,18 +9,15 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
         data_converter=pydantic_data_converter,
         ...
     )
+
+Pydantic v1 is not supported.
 """
 
 import inspect
 from typing import Any, Type
 
 import pydantic
-
-try:
-    from pydantic_core import to_jsonable_python
-except ImportError:
-    # pydantic v1
-    from pydantic.json import pydantic_encoder as to_jsonable_python  # type: ignore
+from pydantic_core import to_jsonable_python
 
 from temporalio.converter import (
     AdvancedJSONEncoder,
@@ -39,23 +36,10 @@ class PydanticModelTypeConverter(JSONTypeConverter):
     """Type converter for pydantic model instances."""
 
     def to_typed_value(self, hint: Type, value: Any) -> Any:
-        """Convert dict value to pydantic model instance of the specified type"""
+        """Convert value to pydantic model instance of the specified type"""
         if not inspect.isclass(hint) or not issubclass(hint, pydantic.BaseModel):
             return JSONTypeConverter.Unhandled
-        model = hint
-        if not isinstance(value, dict):
-            raise TypeError(
-                f"Cannot convert to {model}, value is {type(value)} not dict"
-            )
-        if hasattr(model, "model_validate"):
-            return model.model_validate(value)
-        elif hasattr(model, "parse_obj"):
-            # pydantic v1
-            return model.parse_obj(value)
-        else:
-            raise ValueError(
-                f"{model} is a Pydantic model but does not have a `model_validate` or `parse_obj` method"
-            )
+        return hint.model_validate(value)
 
 
 class PydanticJSONEncoder(AdvancedJSONEncoder):

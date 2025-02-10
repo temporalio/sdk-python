@@ -489,9 +489,9 @@ class AdvancedJSONEncoder(json.JSONEncoder):
 
     This encoder supports dataclasses and all iterables as lists.
 
-    It also uses Pydantic's "model_dump" or "dict" methods if available on the
-    object, but with a warning that the dedicated pydantic data converter should
-    be used.
+    It also uses Pydantic v1's "dict" methods if available on the object,
+    but this is deprecated. Pydantic users should upgrade to v2 and use
+    temporalio.contrib.pydantic.pydantic_data_converter.
     """
 
     def default(self, o: Any) -> Any:
