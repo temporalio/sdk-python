@@ -563,8 +563,8 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         # Check for Pydantic v1
         if hasattr(value, "parse_obj"):
             warnings.warn(
-                "If you're using Pydantic v1, upgrade to Pydantic v2 and use temporalio.contrib.pydantic.pydantic_data_converter. "
-                "If you cannot upgrade, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter/v1 for better v1 support."
+                "If you're using Pydantic v2, use temporalio.contrib.pydantic.pydantic_data_converter. "
+                "If you're using Pydantic v1 and cannot upgrade, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter/v1 for better v1 support."
             )
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
