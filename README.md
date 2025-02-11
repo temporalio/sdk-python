@@ -297,10 +297,10 @@ other_ns_client = Client(**config)
 #### Data Conversion
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
-`temporalio.converter.DataConverter` can be set via the `data_converter` client parameter. Data converters are a
-combination of payload converters, payload codecs, and failure converters. Payload converters convert Python values
-to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption). Failure converters
-convert exceptions to/from serialized failures.
+`temporalio.converter.DataConverter` can be set via the `data_converter` parameter of the `Client` constructor. Data
+converters are a combination of payload converters, payload codecs, and failure converters. Payload converters convert
+Python values to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption).
+Failure converters convert exceptions to/from serialized failures.
 
 The default data converter supports converting multiple types including:
 
@@ -314,21 +314,31 @@ The default data converter supports converting multiple types including:
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
 
-This notably doesn't include any `date`, `time`, or `datetime` objects as they may not work across SDKs.
+To use pydantic model instances, see [](#pydantic-support).
 
-Users are strongly encouraged to use a single `dataclass` for parameter and return types so fields with defaults can be
-easily added without breaking compatibility.
+`datetime.date`, `datetime.time`, and `datetime.datetime` can only be used as fields of Pydantic models.
 
-To use pydantic model instances (or python objects containing pydantic model instances), use
+Users are strongly encouraged to use a single `dataclass` or Pydantic model for parameter and return types, so that fields
+with defaults can be easily added without breaking compatibility.
+
+Classes with generics may not have the generics properly resolved. The current implementation does not have generic
+type resolution. Users should use concrete types.
+
+##### Pydantic Support
+
+To use Pydantic model instances, install Pydantic and set the Pydantic data converter when creating client instances:
+
 ```python
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 client = Client(data_converter=pydantic_data_converter, ...)
 ```
+
+Pydantic v1 is not supported by this data converter. If you are not yet able to upgrade from Pydantic v1, see
+https://github.com/temporalio/samples-python/tree/main/pydantic_converter/v1 for limited v1 support.
+
 Do not use pydantic's [strict mode](https://docs.pydantic.dev/latest/concepts/strict_mode/).
 
-Classes with generics may not have the generics properly resolved. The current implementation does not have generic
-type resolution. Users should use concrete types.
 
 ##### Custom Type Data Conversion
 
@@ -1334,7 +1344,7 @@ async def check_past_histories(my_client: Client):
 OpenTelemetry support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra.
 When using `pip`, running
 
-    pip install temporalio[opentelemetry]
+    pip install 'temporalio[opentelemetry]'
 
 will install needed dependencies. Then the `temporalio.contrib.opentelemetry.TracingInterceptor` can be created and set
 as an interceptor on the `interceptors` argument of `Client.connect`. When set, spans will be created for all client
