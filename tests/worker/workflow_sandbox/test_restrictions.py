@@ -91,8 +91,9 @@ def test_restricted_proxy_dunder_methods():
     assert isinstance(format(restricted_path, ""), str)
     restricted_path_obj = restricted_path("test/path")
     assert type(restricted_path_obj) is _RestrictedProxy
-    assert format(restricted_path_obj, "") == "test/path"
-    assert f"{restricted_path_obj}" == "test/path"
+    expected_path = str(pathlib.PurePath("test/path"))
+    assert format(restricted_path_obj, "") == expected_path
+    assert f"{restricted_path_obj}" == expected_path
 
 
 def test_workflow_sandbox_restricted_proxy():
