@@ -52,6 +52,7 @@ informal introduction to the features and their implementation.
 - [Usage](#usage)
     - [Client](#client)
       - [Data Conversion](#data-conversion)
+        - [Pydantic Support](#pydantic-support)
         - [Custom Type Data Conversion](#custom-type-data-conversion)
     - [Workers](#workers)
     - [Workflows](#workflows)
