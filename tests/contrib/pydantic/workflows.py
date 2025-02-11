@@ -13,6 +13,7 @@ from tests.contrib.pydantic.models import (
     ComplexCustomType,
     ComplexCustomUnionType,
     PydanticModels,
+    PydanticModelWithStrictField,
     make_list_of_pydantic_objects,
 )
 
@@ -110,3 +111,24 @@ class DatetimeUsageWorkflow:
         dt = workflow.now()
         assert isinstance(dt, datetime)
         assert issubclass(dt.__class__, datetime)
+
+
+def _test_pydantic_model_with_strict_field(
+    obj: PydanticModelWithStrictField,
+):
+    roundtripped = PydanticModelWithStrictField.model_validate(obj.model_dump())
+    assert roundtripped == obj
+    roundtripped2 = PydanticModelWithStrictField.model_validate_json(
+        obj.model_dump_json()
+    )
+    assert roundtripped2 == obj
+    return roundtripped
+
+
+@workflow.defn
+class PydanticModelWithStrictFieldWorkflow:
+    @workflow.run
+    async def run(
+        self, obj: PydanticModelWithStrictField
+    ) -> PydanticModelWithStrictField:
+        return _test_pydantic_model_with_strict_field(obj)

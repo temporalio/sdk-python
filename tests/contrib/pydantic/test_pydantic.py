@@ -1,5 +1,6 @@
 import dataclasses
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -7,6 +8,7 @@ from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 from tests.contrib.pydantic.models import (
+    PydanticModelWithStrictField,
     make_dataclass_objects,
     make_list_of_pydantic_objects,
 )
@@ -17,7 +19,9 @@ from tests.contrib.pydantic.workflows import (
     DatetimeUsageWorkflow,
     InstantiateModelsWorkflow,
     PydanticModelUsageWorkflow,
+    PydanticModelWithStrictFieldWorkflow,
     RoundTripObjectsWorkflow,
+    _test_pydantic_model_with_strict_field,
     clone_objects,
     pydantic_models_activity,
 )
@@ -206,3 +210,29 @@ async def test_datetime_usage_in_workflow(client: Client):
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
         )
+
+
+def test_pydantic_model_with_strict_field_outside_sandbox():
+    _test_pydantic_model_with_strict_field(
+        PydanticModelWithStrictField(strict_field=datetime(2025, 1, 2, 3, 4, 5))
+    )
+
+
+async def test_pydantic_model_with_strict_field_inside_sandbox(client: Client):
+    client_config = client.config()
+    client_config["data_converter"] = pydantic_data_converter
+    client = Client(**client_config)
+    tq = str(uuid.uuid4())
+    async with Worker(
+        client,
+        workflows=[PydanticModelWithStrictFieldWorkflow],
+        task_queue=tq,
+    ):
+        orig = PydanticModelWithStrictField(strict_field=datetime(2025, 1, 2, 3, 4, 5))
+        result = await client.execute_workflow(
+            PydanticModelWithStrictFieldWorkflow.run,
+            orig,
+            id=str(uuid.uuid4()),
+            task_queue=tq,
+        )
+        assert result == orig

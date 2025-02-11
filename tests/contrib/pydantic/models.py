@@ -342,3 +342,7 @@ def make_dataclass_objects() -> List[MyDataClass]:
 
 ComplexCustomType = Tuple[List[MyDataClass], List[PydanticModels]]
 ComplexCustomUnionType = List[Union[MyDataClass, PydanticModels]]
+
+
+class PydanticModelWithStrictField(BaseModel):
+    strict_field: datetime = Field(strict=True)
