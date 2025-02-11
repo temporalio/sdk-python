@@ -447,6 +447,7 @@ SandboxRestrictions.passthrough_modules_minimum = {
     # Very general modules needed by many things including pytest's
     # assertion rewriter
     "typing",
+    # Required for Pydantic TypedDict fields.
     "typing_extensions",
     # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
     # for older versions. This unfortunately means that on those versions,

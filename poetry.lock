@@ -1909,4 +1909,4 @@ pydantic = ["pydantic"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "8279e4840e0d8124cfec01cf11c5076f090583d33580bb4e39adcd1f168105df"
+content-hash = "fe88ba77a85c62862831e8286dddfc0530d1b7ad3c5c38be31f1508fd496c6e2"
