@@ -20,10 +20,12 @@ from tests.contrib.pydantic.workflows import (
     InstantiateModelsWorkflow,
     PydanticModelUsageWorkflow,
     PydanticModelWithStrictFieldWorkflow,
-    RoundTripObjectsWorkflow,
+    RoundTripMiscObjectsWorkflow,
+    RoundTripPydanticObjectsWorkflow,
     _test_pydantic_model_with_strict_field,
     clone_objects,
-    pydantic_models_activity,
+    misc_objects_activity,
+    pydantic_objects_activity,
 )
 
 
@@ -60,11 +62,11 @@ async def test_round_trip_pydantic_objects(client: Client):
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[RoundTripObjectsWorkflow],
-        activities=[pydantic_models_activity],
+        workflows=[RoundTripPydanticObjectsWorkflow],
+        activities=[pydantic_objects_activity],
     ):
         returned_objects = await client.execute_workflow(
-            RoundTripObjectsWorkflow.run,
+            RoundTripPydanticObjectsWorkflow.run,
             orig_objects,
             id=str(uuid.uuid4()),
             task_queue=task_queue_name,
@@ -72,6 +74,29 @@ async def test_round_trip_pydantic_objects(client: Client):
     assert returned_objects == orig_objects
     for o in returned_objects:
         o._check_instance()
+
+
+async def test_round_trip_misc_objects(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    orig_objects = (datetime(2025, 1, 2, 3, 4, 5), uuid.uuid4())
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[RoundTripMiscObjectsWorkflow],
+        activities=[misc_objects_activity],
+    ):
+        returned_objects = await client.execute_workflow(
+            RoundTripMiscObjectsWorkflow.run,
+            orig_objects,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
+        )
+    assert returned_objects == orig_objects
 
 
 async def test_clone_objects_outside_sandbox():
@@ -115,7 +140,7 @@ async def test_complex_custom_type(client: Client):
         client,
         task_queue=task_queue_name,
         workflows=[ComplexCustomTypeWorkflow],
-        activities=[pydantic_models_activity],
+        activities=[pydantic_objects_activity],
     ):
         (
             returned_dataclass_objects,
@@ -149,7 +174,7 @@ async def test_complex_custom_union_type(client: Client):
         client,
         task_queue=task_queue_name,
         workflows=[ComplexCustomUnionTypeWorkflow],
-        activities=[pydantic_models_activity],
+        activities=[pydantic_objects_activity],
     ):
         returned_objects = await client.execute_workflow(
             ComplexCustomUnionTypeWorkflow.run,

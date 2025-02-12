@@ -1,13 +1,17 @@
 import dataclasses
 from datetime import datetime, timedelta
 from typing import List
+from uuid import UUID
 
 from pydantic import BaseModel, create_model
 
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from tests.contrib.pydantic.activities import pydantic_models_activity
+    from tests.contrib.pydantic.activities import (
+        misc_objects_activity,
+        pydantic_objects_activity,
+    )
 
 from tests.contrib.pydantic.models import (
     ComplexCustomType,
@@ -39,11 +43,22 @@ class InstantiateModelsWorkflow:
 
 
 @workflow.defn
-class RoundTripObjectsWorkflow:
+class RoundTripPydanticObjectsWorkflow:
     @workflow.run
     async def run(self, objects: List[PydanticModels]) -> List[PydanticModels]:
         return await workflow.execute_activity(
-            pydantic_models_activity,
+            pydantic_objects_activity,
+            objects,
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+
+
+@workflow.defn
+class RoundTripMiscObjectsWorkflow:
+    @workflow.run
+    async def run(self, objects: tuple[datetime, UUID]) -> tuple[datetime, UUID]:
+        return await workflow.execute_activity(
+            misc_objects_activity,
             objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
@@ -73,7 +88,7 @@ class ComplexCustomUnionTypeWorkflow:
             else:
                 raise TypeError(f"Unexpected type: {type(o)}")
         pydantic_objects = await workflow.execute_activity(
-            pydantic_models_activity,
+            pydantic_objects_activity,
             pydantic_objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
@@ -89,7 +104,7 @@ class ComplexCustomTypeWorkflow:
     ) -> ComplexCustomType:
         data_classes, pydantic_objects = input
         pydantic_objects = await workflow.execute_activity(
-            pydantic_models_activity,
+            pydantic_objects_activity,
             pydantic_objects,
             start_to_close_timeout=timedelta(minutes=1),
         )
