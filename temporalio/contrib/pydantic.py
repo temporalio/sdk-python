@@ -13,63 +13,83 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 Pydantic v1 is not supported.
 """
 
-import inspect
-from typing import Any, Type
+from typing import Any, Optional, Type
 
-import pydantic
-from pydantic_core import to_jsonable_python
+from pydantic import TypeAdapter, ValidationError
+from pydantic_core import to_json
 
+import temporalio.api.common.v1
 from temporalio.converter import (
-    AdvancedJSONEncoder,
     CompositePayloadConverter,
     DataConverter,
     DefaultPayloadConverter,
+    EncodingPayloadConverter,
     JSONPlainPayloadConverter,
-    JSONTypeConverter,
 )
 
 # Note that in addition to the implementation in this module, _RestrictedProxy
 # implements __get_pydantic_core_schema__ so that pydantic unwraps proxied types.
 
 
-class PydanticModelTypeConverter(JSONTypeConverter):
-    """Type converter for pydantic model instances."""
+class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
+    """Pydantic JSON payload converter.
 
-    def to_typed_value(self, hint: Type, value: Any) -> Any:
-        """Convert value to pydantic model instance of the specified type"""
-        if not inspect.isclass(hint) or not issubclass(hint, pydantic.BaseModel):
-            return JSONTypeConverter.Unhandled
-        return hint.model_validate(value)
+    Supports conversion of all types supported by Pydantic to and from JSON.
 
+    In addition to Pydantic models, these include all `json.dump`-able types,
+    various non-`json.dump`-able standard library types such as dataclasses,
+    types from the datetime module, sets, UUID, etc, and custom types composed
+    of any of these.
 
-class PydanticJSONEncoder(AdvancedJSONEncoder):
-    """JSON encoder for python objects containing pydantic model instances."""
+    See https://docs.pydantic.dev/latest/api/standard_library_types/
+    """
 
-    def default(self, o: Any) -> Any:
-        """Convert object to jsonable python.
+    @property
+    def encoding(self) -> str:
+        """See base class."""
+        return "json/plain"
 
-        See :py:meth:`json.JSONEncoder.default`.
+    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+        """See base class.
+
+        Uses :py:func:`pydantic_core.to_json` to serialize ``value` to JSON.
+
+        See
+        https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
         """
-        if isinstance(o, pydantic.BaseModel):
-            return to_jsonable_python(o)
-        return super().default(o)
+        return temporalio.api.common.v1.Payload(
+            metadata={"encoding": self.encoding.encode()}, data=to_json(value)
+        )
+
+    def from_payload(
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
+    ) -> Any:
+        """See base class.
+
+        Uses :py:func:`pydantic.TypeAdapter.validate_json` to construct an
+        instance of the type specified by ``type_hint`` from the JSON payload.
+
+        See
+        https://docs.pydantic.dev/latest/api/type_adapter/#pydantic.type_adapter.TypeAdapter.validate_json.
+        """
+        try:
+            return TypeAdapter(type_hint).validate_json(payload.data)
+        except ValidationError as err:
+            raise RuntimeError("Failed parsing") from err
 
 
 class PydanticPayloadConverter(CompositePayloadConverter):
     """Payload converter for payloads containing pydantic model instances.
 
     JSON conversion is replaced with a converter that uses
-    :py:class:`PydanticJSONEncoder` to convert the python object to JSON, and
-    :py:class:`PydanticModelTypeConverter` to convert raw python values to
-    pydantic model instances.
+    :py:class:`PydanticJSONPlainPayloadConverter`.
     """
 
     def __init__(self) -> None:
         """Initialize object"""
-        json_payload_converter = JSONPlainPayloadConverter(
-            encoder=PydanticJSONEncoder,
-            custom_type_converters=[PydanticModelTypeConverter()],
-        )
+        json_payload_converter = PydanticJSONPlainPayloadConverter()
         super().__init__(
             *(
                 c
@@ -83,7 +103,14 @@ class PydanticPayloadConverter(CompositePayloadConverter):
 pydantic_data_converter = DataConverter(
     payload_converter_class=PydanticPayloadConverter
 )
-"""Data converter for payloads containing pydantic model instances.
+"""Pydantic data converter.
+
+Supports conversion of all types supported by Pydantic to and from JSON.
+
+In addition to Pydantic models, these include all `json.dump`-able types,
+various non-`json.dump`-able standard library types such as dataclasses,
+types from the datetime module, sets, UUID, etc, and custom types composed
+of any of these.
 
 To use, pass as the ``data_converter`` argument of :py:class:`temporalio.client.Client`
 """

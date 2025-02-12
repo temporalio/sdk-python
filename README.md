@@ -317,10 +317,11 @@ The default data converter supports converting multiple types including:
 
 To use pydantic model instances, see [](#pydantic-support).
 
-`datetime.date`, `datetime.time`, and `datetime.datetime` can only be used as fields of Pydantic models.
+`datetime.date`, `datetime.time`, and `datetime.datetime` can only be used with the Pydantic data converter.
 
-Users are strongly encouraged to use a single `dataclass` or Pydantic model for parameter and return types, so that fields
-with defaults can be easily added without breaking compatibility.
+Although workflows, updates, signals, and queries can all be defined with multiple input parameters, users are strongly
+encouraged to use a single `dataclass` or Pydantic model parameter, so that fields with defaults can be easily added
+without breaking compatibility. Similar advice applies to return values.
 
 Classes with generics may not have the generics properly resolved. The current implementation does not have generic
 type resolution. Users should use concrete types.
@@ -335,10 +336,13 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 client = Client(data_converter=pydantic_data_converter, ...)
 ```
 
+This data converter supports conversion of all types supported by Pydantic to and from JSON.
+
+In addition to Pydantic models, these include all `json.dump`-able types, various non-`json.dump`-able standard library
+types such as dataclasses, types from the datetime module, sets, UUID, etc, and custom types composed of any of these.
+
 Pydantic v1 is not supported by this data converter. If you are not yet able to upgrade from Pydantic v1, see
 https://github.com/temporalio/samples-python/tree/main/pydantic_converter/v1 for limited v1 support.
-
-Do not use pydantic's [strict mode](https://docs.pydantic.dev/latest/concepts/strict_mode/).
 
 
 ##### Custom Type Data Conversion
