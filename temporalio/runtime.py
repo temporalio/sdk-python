@@ -1,6 +1,4 @@
-"""Runtime for clients and workers. (experimental)
-
-This module is currently experimental. The API may change.
+"""Runtime for clients and workers.
 """
 
 from __future__ import annotations
@@ -128,9 +126,6 @@ class LoggingConfig:
     forwarding: Optional[LogForwardingConfig] = None
     """If present, Core logger messages will be forwarded to a Python logger.
     See the :py:class:`LogForwardingConfig` docs for more info.
-
-    .. warning::
-        This API is experimental
     """
 
     default: ClassVar[LoggingConfig]
@@ -173,9 +168,6 @@ class LogForwardingConfig:
     attribute which has arbitrary extra data from Core. By default a string
     representation of this extra ``fields`` attribute is appended to the
     message.
-
-    .. warning::
-        This API is experimental
     """
 
     logger: logging.Logger
