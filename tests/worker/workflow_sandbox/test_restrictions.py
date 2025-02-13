@@ -30,9 +30,9 @@ def test_workflow_sandbox_stdlib_module_names():
         code_lines[-1] += mod_name
     code = f'_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
     # TODO(cretz): Point releases may add modules :-(
-    assert actual_names == _stdlib_module_names, (
-        f"Expecting names as {actual_names}. In code as:\n{code}"
-    )
+    assert (
+        actual_names == _stdlib_module_names
+    ), f"Expecting names as {actual_names}. In code as:\n{code}"
 
 
 def test_workflow_sandbox_restrictions_add_passthrough_modules():
