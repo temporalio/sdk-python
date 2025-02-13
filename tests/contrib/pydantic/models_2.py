@@ -84,7 +84,7 @@ class StandardTypesModel(BaseModel):
 
     # Mappings
     dict_field: dict
-    # defaultdict_field: collections.defaultdict
+    defaultdict_field: collections.defaultdict[str, int]
     counter_field: collections.Counter
     typed_dict_field: UserTypedDict
 
@@ -144,8 +144,8 @@ class StandardTypesModel(BaseModel):
         # Mapping checks
         assert isinstance(self.dict_field, dict)
         assert self.dict_field == {"a": 1, "b": 2}
-        # assert isinstance(self.defaultdict_field, collections.defaultdict)
-        # assert dict(self.defaultdict_field) == {"a": 1, "b": 2}
+        assert isinstance(self.defaultdict_field, collections.defaultdict)
+        assert dict(self.defaultdict_field) == {"a": 1, "b": 2}
         assert isinstance(self.counter_field, collections.Counter)
         assert dict(self.counter_field) == {"a": 1, "b": 2}
         assert isinstance(self.typed_dict_field, dict)
@@ -190,7 +190,7 @@ def make_standard_types_object() -> StandardTypesModel:
         sequence_field=[1, 2, 3],
         # Mappings
         dict_field={"a": 1, "b": 2},
-        # defaultdict_field=collections.defaultdict(int, {"a": 1, "b": 2}),
+        defaultdict_field=collections.defaultdict(int, {"a": 1, "b": 2}),
         counter_field=collections.Counter({"a": 1, "b": 2}),
         typed_dict_field={"name": "username", "id": 7},
         # Other Types
