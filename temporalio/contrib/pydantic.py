@@ -52,7 +52,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class.
 
-        Uses :py:func:`pydantic_core.to_json` to serialize ``value` to JSON.
+        Uses ``pydantic_core.to_json`` to serialize ``value`` to JSON.
 
         See
         https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
@@ -68,7 +68,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     ) -> Any:
         """See base class.
 
-        Uses :py:func:`pydantic.TypeAdapter.validate_json` to construct an
+        Uses ``pydantic.TypeAdapter.validate_json`` to construct an
         instance of the type specified by ``type_hint`` from the JSON payload.
 
         See
