@@ -1,5 +1,7 @@
 import dataclasses
-from datetime import date, datetime, timedelta
+import uuid
+from datetime import date, datetime, time, timedelta, timezone
+from ipaddress import IPv4Address
 from pathlib import Path
 from typing import (
     Annotated,
@@ -22,15 +24,77 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from tests.contrib.pydantic.models_2 import (
         ComplexTypesModel,
-        SpecialTypesModel,
         StandardTypesModel,
         make_complex_types_object,
-        make_special_types_object,
         make_standard_types_object,
     )
 
 SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
 ShortSequence = Annotated[SequenceType, Len(max_length=2)]
+
+
+class SpecialTypesModel(BaseModel):
+    datetime_field: datetime
+    datetime_field_int: datetime
+    datetime_field_float: datetime
+    datetime_field_str_formatted: datetime
+    datetime_field_str_int: datetime
+    datetime_field_date: datetime
+
+    time_field: time
+    time_field_str: time
+
+    date_field: date
+    timedelta_field: timedelta
+    path_field: Path
+    uuid_field: uuid.UUID
+    ip_field: IPv4Address
+
+    def _check_instance(self) -> None:
+        dt = datetime(2000, 1, 2, 3, 4, 5)
+        dtz = datetime(2000, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+        assert isinstance(self.datetime_field, datetime)
+        assert isinstance(self.datetime_field_int, datetime)
+        assert isinstance(self.datetime_field_float, datetime)
+        assert isinstance(self.datetime_field_str_formatted, datetime)
+        assert isinstance(self.datetime_field_str_int, datetime)
+        assert isinstance(self.datetime_field_date, datetime)
+        assert isinstance(self.timedelta_field, timedelta)
+        assert isinstance(self.path_field, Path)
+        assert isinstance(self.uuid_field, uuid.UUID)
+        assert isinstance(self.ip_field, IPv4Address)
+        assert self.datetime_field == dt
+        assert self.datetime_field_int == dtz
+        assert self.datetime_field_float == dtz
+        assert self.datetime_field_str_formatted == dtz
+        assert self.datetime_field_str_int == dtz
+        assert self.datetime_field_date == datetime(2000, 1, 2)
+        assert self.time_field == time(3, 4, 5)
+        assert self.time_field_str == time(3, 4, 5, tzinfo=timezone.utc)
+        assert self.date_field == date(2000, 1, 2)
+        assert self.timedelta_field == timedelta(days=1, hours=2)
+        assert self.path_field == Path("test/path")
+        assert self.uuid_field == uuid.UUID("12345678-1234-5678-1234-567812345678")
+        assert self.ip_field == IPv4Address("127.0.0.1")
+
+
+def make_special_types_object() -> SpecialTypesModel:
+    return SpecialTypesModel(
+        datetime_field=datetime(2000, 1, 2, 3, 4, 5),
+        # 946800245
+        datetime_field_int=946782245,  # type: ignore
+        datetime_field_float=946782245.0,  # type: ignore
+        datetime_field_str_formatted="2000-01-02T03:04:05Z",  # type: ignore
+        datetime_field_str_int="946782245",  # type: ignore
+        datetime_field_date=datetime(2000, 1, 2),
+        time_field=time(3, 4, 5),
+        time_field_str="03:04:05Z",  # type: ignore
+        date_field=date(2000, 1, 2),
+        timedelta_field=timedelta(days=1, hours=2),
+        path_field=Path("test/path"),
+        uuid_field=uuid.UUID("12345678-1234-5678-1234-567812345678"),
+        ip_field=IPv4Address("127.0.0.1"),
+    )
 
 
 class ChildModel(BaseModel):
