@@ -13,10 +13,11 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    cast,
 )
 
 from annotated_types import Len
-from pydantic import BaseModel, Field, WithJsonSchema
+from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema
 
 from temporalio import workflow
 
@@ -25,8 +26,10 @@ with workflow.unsafe.imports_passed_through():
     from tests.contrib.pydantic.models_2 import (
         ComplexTypesModel,
         StandardTypesModel,
+        StrictStandardTypesModel,
         make_complex_types_object,
         make_standard_types_object,
+        make_strict_standard_types_object,
     )
 
 SequenceType = TypeVar("SequenceType", bound=Sequence[Any])
@@ -95,6 +98,14 @@ def make_special_types_object() -> SpecialTypesModel:
         uuid_field=uuid.UUID("12345678-1234-5678-1234-567812345678"),
         ip_field=IPv4Address("127.0.0.1"),
     )
+
+
+class StrictSpecialTypesModel(SpecialTypesModel):
+    model_config = ConfigDict(strict=True)
+
+
+def make_strict_special_types_object() -> StrictSpecialTypesModel:
+    return cast(StrictSpecialTypesModel, make_special_types_object())
 
 
 class ChildModel(BaseModel):
@@ -362,8 +373,10 @@ def _assert_timedelta_validity(td: timedelta):
 
 PydanticModels = Union[
     StandardTypesModel,
+    StrictStandardTypesModel,
     ComplexTypesModel,
     SpecialTypesModel,
+    StrictSpecialTypesModel,
     ParentModel,
     FieldFeaturesModel,
     AnnotatedFieldsModel,
@@ -378,8 +391,10 @@ PydanticModels = Union[
 def make_list_of_pydantic_objects() -> List[PydanticModels]:
     objects = [
         make_standard_types_object(),
+        make_strict_standard_types_object(),
         make_complex_types_object(),
         make_special_types_object(),
+        make_strict_special_types_object(),
         make_nested_object(),
         make_field_features_object(),
         make_annotated_fields_object(),

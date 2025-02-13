@@ -15,6 +15,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 from pydantic import BaseModel
@@ -200,6 +201,14 @@ def make_standard_types_object() -> StandardTypesModel:
         any_field="anything goes",
         # callable_field=lambda x: x,
     )
+
+
+class StrictStandardTypesModel(StandardTypesModel, strict=True):
+    pass
+
+
+def make_strict_standard_types_object() -> StrictStandardTypesModel:
+    return cast(StrictStandardTypesModel, make_standard_types_object())
 
 
 class Point(NamedTuple):
