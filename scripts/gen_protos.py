@@ -142,12 +142,12 @@ def check_proto_toolchain_versions():
             _, _, proto_version = line.partition("==")
         elif line.startswith("grpcio-tools"):
             _, _, grpcio_tools_version = line.partition("==")
-    assert proto_version.startswith(
-        "3."
-    ), f"expected 3.x protobuf, found {proto_version}"
-    assert grpcio_tools_version.startswith(
-        "1.48."
-    ), f"expected 1.48.x grpcio-tools, found {grpcio_tools_version}"
+    assert proto_version.startswith("3."), (
+        f"expected 3.x protobuf, found {proto_version}"
+    )
+    assert grpcio_tools_version.startswith("1.48."), (
+        f"expected 1.48.x grpcio-tools, found {grpcio_tools_version}"
+    )
 
 
 def generate_protos(output_dir: Path):

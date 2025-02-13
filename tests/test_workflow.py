@@ -399,9 +399,9 @@ def test_parameters_identical_up_to_naming():
     for f1, f2 in itertools.combinations(fns, 2):
         name1, name2 = f1.__name__, f2.__name__
         expect_equal = name1[0] == name2[0]
-        assert (
-            workflow._parameters_identical_up_to_naming(f1, f2) == (expect_equal)
-        ), f"expected {name1} and {name2} parameters{' ' if expect_equal else ' not '}to compare equal"
+        assert workflow._parameters_identical_up_to_naming(f1, f2) == (expect_equal), (
+            f"expected {name1} and {name2} parameters{' ' if expect_equal else ' not '}to compare equal"
+        )
 
 
 @workflow.defn

@@ -482,7 +482,7 @@ def _calc___package__(globals: Mapping[str, object]) -> str:
     if package is not None:
         if spec is not None and package != spec.parent:
             warnings.warn(
-                "__package__ != __spec__.parent " f"({package!r} != {spec.parent!r})",
+                f"__package__ != __spec__.parent ({package!r} != {spec.parent!r})",
                 DeprecationWarning,
                 stacklevel=3,
             )

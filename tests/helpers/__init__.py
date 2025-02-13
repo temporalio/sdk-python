@@ -61,9 +61,9 @@ async def assert_eq_eventually(
         if expected == last_value:
             return
         await asyncio.sleep(interval.total_seconds())
-    assert (
-        expected == last_value
-    ), f"timed out waiting for equal, asserted against last value of {last_value}"
+    assert expected == last_value, (
+        f"timed out waiting for equal, asserted against last value of {last_value}"
+    )
 
 
 async def worker_versioning_enabled(client: Client) -> bool:
