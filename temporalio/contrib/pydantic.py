@@ -74,8 +74,9 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         See
         https://docs.pydantic.dev/latest/api/type_adapter/#pydantic.type_adapter.TypeAdapter.validate_json.
         """
+        _type_hint = type_hint if type_hint is not None else Any
         try:
-            return TypeAdapter(type_hint).validate_json(payload.data)
+            return TypeAdapter(_type_hint).validate_json(payload.data)
         except ValidationError as err:
             raise RuntimeError("Failed parsing") from err
 
