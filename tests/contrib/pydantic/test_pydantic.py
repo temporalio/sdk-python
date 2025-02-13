@@ -26,7 +26,6 @@ from tests.contrib.pydantic.workflows import (
     PydanticModelWithStrictFieldWorkflow,
     RoundTripMiscObjectsWorkflow,
     RoundTripPydanticObjectsWorkflow,
-    ValidationErrorWorkflow,
     _test_pydantic_model_with_strict_field,
     clone_objects,
     misc_objects_activity,
@@ -315,11 +314,11 @@ async def test_validation_error(client: Client):
     async with Worker(
         client,
         task_queue=task_queue_name,
-        workflows=[ValidationErrorWorkflow],
+        workflows=[NoTypeAnnotationsWorkflow],
     ):
         with pytest.raises(pydantic.ValidationError):
             await client.execute_workflow(
-                "ValidationErrorWorkflow",
+                "NoTypeAnnotationsWorkflow",
                 "not-an-int",
                 id=str(uuid.uuid4()),
                 task_queue=task_queue_name,
