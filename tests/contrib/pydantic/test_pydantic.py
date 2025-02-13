@@ -2,12 +2,14 @@ import dataclasses
 import uuid
 from datetime import datetime
 
+import pytest
 from pydantic import BaseModel
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 from tests.contrib.pydantic.models import (
+    PydanticModels,
     PydanticModelWithStrictField,
     make_dataclass_objects,
     make_list_of_pydantic_objects,
@@ -18,6 +20,7 @@ from tests.contrib.pydantic.workflows import (
     ComplexCustomUnionTypeWorkflow,
     DatetimeUsageWorkflow,
     InstantiateModelsWorkflow,
+    NoTypeAnnotationsWorkflow,
     PydanticModelUsageWorkflow,
     PydanticModelWithStrictFieldWorkflow,
     RoundTripMiscObjectsWorkflow,
@@ -51,7 +54,8 @@ async def test_instantiation_inside_sandbox(client: Client):
         )
 
 
-async def test_round_trip_pydantic_objects(client: Client):
+@pytest.mark.parametrize("typed", [True, False])
+async def test_round_trip_pydantic_objects(client: Client, typed: bool):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
@@ -65,12 +69,22 @@ async def test_round_trip_pydantic_objects(client: Client):
         workflows=[RoundTripPydanticObjectsWorkflow],
         activities=[pydantic_objects_activity],
     ):
-        returned_objects = await client.execute_workflow(
-            RoundTripPydanticObjectsWorkflow.run,
-            orig_objects,
-            id=str(uuid.uuid4()),
-            task_queue=task_queue_name,
-        )
+        if typed:
+            returned_objects = await client.execute_workflow(
+                RoundTripPydanticObjectsWorkflow.run,
+                orig_objects,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue_name,
+            )
+        else:
+            returned_objects = await client.execute_workflow(
+                "RoundTripPydanticObjectsWorkflow",
+                orig_objects,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue_name,
+                result_type=list[PydanticModels],
+            )
+
     assert returned_objects == orig_objects
     for o in returned_objects:
         o._check_instance()
@@ -269,3 +283,22 @@ async def test_pydantic_model_with_strict_field_inside_sandbox(client: Client):
             task_queue=tq,
         )
         assert result == orig
+
+
+async def test_no_type_annotations(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[NoTypeAnnotationsWorkflow],
+    ):
+        result = await client.execute_workflow(
+            "NoTypeAnnotationsWorkflow",
+            (7,),
+            id=str(uuid.uuid4()),
+            task_queue=task_queue_name,
+        )
+    assert result == [7]

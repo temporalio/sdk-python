@@ -166,3 +166,10 @@ class PydanticModelWithStrictFieldWorkflow:
         self, obj: PydanticModelWithStrictField
     ) -> PydanticModelWithStrictField:
         return _test_pydantic_model_with_strict_field(obj)
+
+
+@workflow.defn
+class NoTypeAnnotationsWorkflow:
+    @workflow.run
+    async def run(self, arg):
+        return arg
