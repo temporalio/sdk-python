@@ -501,7 +501,6 @@ class Client:
             request_eager_start: Potentially reduce the latency to start this workflow by
                 encouraging the server to start it on a local worker running with
                 this same client.
-                This is currently experimental.
 
         Returns:
             A workflow handle to the started workflow.
