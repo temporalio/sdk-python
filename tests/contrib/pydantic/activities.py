@@ -15,6 +15,22 @@ async def pydantic_objects_activity(
 
 @activity.defn
 async def misc_objects_activity(
-    models: tuple[datetime, UUID],
-) -> tuple[datetime, UUID]:
+    models: tuple[
+        int,
+        str,
+        dict[str, float],
+        list[dict[str, float]],
+        tuple[dict[str, float]],
+        datetime,
+        UUID,
+    ],
+) -> tuple[
+    int,
+    str,
+    dict[str, float],
+    list[dict[str, float]],
+    tuple[dict[str, float]],
+    datetime,
+    UUID,
+]:
     return models

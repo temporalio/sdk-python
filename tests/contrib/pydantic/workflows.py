@@ -56,7 +56,26 @@ class RoundTripPydanticObjectsWorkflow:
 @workflow.defn
 class RoundTripMiscObjectsWorkflow:
     @workflow.run
-    async def run(self, objects: tuple[datetime, UUID]) -> tuple[datetime, UUID]:
+    async def run(
+        self,
+        objects: tuple[
+            int,
+            str,
+            dict[str, float],
+            list[dict[str, float]],
+            tuple[dict[str, float]],
+            datetime,
+            UUID,
+        ],
+    ) -> tuple[
+        int,
+        str,
+        dict[str, float],
+        list[dict[str, float]],
+        tuple[dict[str, float]],
+        datetime,
+        UUID,
+    ]:
         return await workflow.execute_activity(
             misc_objects_activity,
             objects,

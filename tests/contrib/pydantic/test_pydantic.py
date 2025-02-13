@@ -82,7 +82,15 @@ async def test_round_trip_misc_objects(client: Client):
     client = Client(**new_config)
     task_queue_name = str(uuid.uuid4())
 
-    orig_objects = (datetime(2025, 1, 2, 3, 4, 5), uuid.uuid4())
+    orig_objects = (
+        7,
+        "7",
+        {"7": 7.0},
+        [{"7": 7.0}],
+        ({"7": 7.0},),
+        datetime(2025, 1, 2, 3, 4, 5),
+        uuid.uuid4(),
+    )
 
     async with Worker(
         client,
