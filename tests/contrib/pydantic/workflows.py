@@ -173,3 +173,10 @@ class NoTypeAnnotationsWorkflow:
     @workflow.run
     async def run(self, arg):
         return arg
+
+
+@workflow.defn
+class ValidationErrorWorkflow:
+    @workflow.run
+    async def run(self, arg):
+        return arg

@@ -2,6 +2,7 @@ import dataclasses
 import uuid
 from datetime import datetime
 
+import pydantic
 import pytest
 from pydantic import BaseModel
 
@@ -25,6 +26,7 @@ from tests.contrib.pydantic.workflows import (
     PydanticModelWithStrictFieldWorkflow,
     RoundTripMiscObjectsWorkflow,
     RoundTripPydanticObjectsWorkflow,
+    ValidationErrorWorkflow,
     _test_pydantic_model_with_strict_field,
     clone_objects,
     misc_objects_activity,
@@ -302,3 +304,24 @@ async def test_no_type_annotations(client: Client):
             task_queue=task_queue_name,
         )
     assert result == [7]
+
+
+async def test_validation_error(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+    task_queue_name = str(uuid.uuid4())
+
+    async with Worker(
+        client,
+        task_queue=task_queue_name,
+        workflows=[ValidationErrorWorkflow],
+    ):
+        with pytest.raises(pydantic.ValidationError):
+            await client.execute_workflow(
+                "ValidationErrorWorkflow",
+                "not-an-int",
+                id=str(uuid.uuid4()),
+                task_queue=task_queue_name,
+                result_type=tuple[int],
+            )
