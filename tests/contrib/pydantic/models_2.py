@@ -92,7 +92,6 @@ class StandardTypesModel(BaseModel):
     pattern_field: Pattern
     hashable_field: Hashable
     any_field: Any
-    # callable_field: Callable
 
     def _check_instance(self) -> None:
         # Boolean checks
@@ -158,7 +157,6 @@ class StandardTypesModel(BaseModel):
         assert isinstance(self.hashable_field, Hashable)
         assert self.hashable_field == "test"
         assert self.any_field == "anything goes"
-        # assert callable(self.callable_field)
 
 
 def make_standard_types_object() -> StandardTypesModel:
@@ -199,7 +197,6 @@ def make_standard_types_object() -> StandardTypesModel:
         pattern_field=re.compile(r"\d+"),
         hashable_field="test",
         any_field="anything goes",
-        # callable_field=lambda x: x,
     )
 
 

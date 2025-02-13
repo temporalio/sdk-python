@@ -84,7 +84,6 @@ class SpecialTypesModel(BaseModel):
 def make_special_types_object() -> SpecialTypesModel:
     return SpecialTypesModel(
         datetime_field=datetime(2000, 1, 2, 3, 4, 5),
-        # 946800245
         datetime_field_int=946782245,  # type: ignore
         datetime_field_float=946782245.0,  # type: ignore
         datetime_field_str_formatted="2000-01-02T03:04:05Z",  # type: ignore
