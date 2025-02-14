@@ -953,19 +953,17 @@ def _l_to_r_op(op: _OpF) -> _OpF:
 
 
 def _is_restrictable(v: Any) -> bool:
-    return v is not None and not isinstance(
-        v,
-        (
-            bool,
-            int,
-            float,
-            complex,
-            str,
-            bytes,
-            bytearray,
-            datetime.date,  # e.g. datetime.datetime
-        ),
-    )
+    do_not_restrict = [bool, int, float, complex, str, bytes, bytearray]
+    if HAVE_PYDANTIC:
+        # The datetime validator in pydantic_core
+        # https://github.com/pydantic/pydantic-core/blob/741961c05847d9e9ee517cd783e24c2b58e5596b/src/input/input_python.rs#L548-L582
+        # does some runtime type inspection that a RestrictedProxy instance
+        # fails. For this reason we do not restrict date/datetime instances when
+        # Pydantic is being used. Other restricted types such as pathlib.Path
+        # and uuid.UUID which are likely to be used in Pydantic model fields
+        # currently pass Pydantic's validation when wrapped by RestrictedProxy.
+        do_not_restrict.append(datetime.date)  # e.g. datetime.datetime
+    return v is not None and not isinstance(v, tuple(do_not_restrict))
 
 
 class _RestrictedProxy:

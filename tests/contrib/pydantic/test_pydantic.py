@@ -1,6 +1,8 @@
 import dataclasses
+import datetime
+import os
+import pathlib
 import uuid
-from datetime import datetime
 
 import pydantic
 import pytest
@@ -9,6 +11,11 @@ from pydantic import BaseModel
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox._restrictions import (
+    RestrictionContext,
+    SandboxMatcher,
+    _RestrictedProxy,
+)
 from tests.contrib.pydantic.models import (
     PydanticModels,
     PydanticModelWithStrictField,
@@ -103,7 +110,7 @@ async def test_round_trip_misc_objects(client: Client):
         {"7": 7.0},
         [{"7": 7.0}],
         ({"7": 7.0},),
-        datetime(2025, 1, 2, 3, 4, 5),
+        datetime.datetime(2025, 1, 2, 3, 4, 5),
         uuid.uuid4(),
     )
 
@@ -262,7 +269,9 @@ async def test_datetime_usage_in_workflow(client: Client):
 
 def test_pydantic_model_with_strict_field_outside_sandbox():
     _test_pydantic_model_with_strict_field(
-        PydanticModelWithStrictField(strict_field=datetime(2025, 1, 2, 3, 4, 5))
+        PydanticModelWithStrictField(
+            strict_field=datetime.datetime(2025, 1, 2, 3, 4, 5)
+        )
     )
 
 
@@ -276,7 +285,9 @@ async def test_pydantic_model_with_strict_field_inside_sandbox(client: Client):
         workflows=[PydanticModelWithStrictFieldWorkflow],
         task_queue=tq,
     ):
-        orig = PydanticModelWithStrictField(strict_field=datetime(2025, 1, 2, 3, 4, 5))
+        orig = PydanticModelWithStrictField(
+            strict_field=datetime.datetime(2025, 1, 2, 3, 4, 5)
+        )
         result = await client.execute_workflow(
             PydanticModelWithStrictFieldWorkflow.run,
             orig,
@@ -324,3 +335,46 @@ async def test_validation_error(client: Client):
                 task_queue=task_queue_name,
                 result_type=tuple[int],
             )
+
+
+class RestrictedProxyFieldsModel(BaseModel):
+    path_field: pathlib.Path
+    uuid_field: uuid.UUID
+    datetime_field: datetime.datetime
+
+
+def test_model_instantiation_from_restricted_proxy_values():
+    restricted_path_cls = _RestrictedProxy(
+        "Path",
+        pathlib.Path,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+    restricted_uuid_cls = _RestrictedProxy(
+        "uuid",
+        uuid.UUID,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+    restricted_datetime_cls = _RestrictedProxy(
+        "datetime",
+        datetime.datetime,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+
+    restricted_path = restricted_path_cls("test/path")
+    restricted_uuid = restricted_uuid_cls(bytes=os.urandom(16), version=4)
+    restricted_datetime = restricted_datetime_cls(2025, 1, 2, 3, 4, 5)
+
+    assert type(restricted_path) is _RestrictedProxy
+    assert type(restricted_uuid) is _RestrictedProxy
+    assert type(restricted_datetime) is not _RestrictedProxy
+    p = RestrictedProxyFieldsModel(
+        path_field=restricted_path,  # type: ignore
+        uuid_field=restricted_uuid,  # type: ignore
+        datetime_field=restricted_datetime,  # type: ignore
+    )
+    assert p.path_field == restricted_path
+    assert p.uuid_field == restricted_uuid
+    assert p.datetime_field == restricted_datetime
