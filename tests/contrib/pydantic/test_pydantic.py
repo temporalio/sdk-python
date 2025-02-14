@@ -1,4 +1,5 @@
 import dataclasses
+import pathlib
 import uuid
 from datetime import datetime
 
@@ -9,6 +10,11 @@ from pydantic import BaseModel
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox._restrictions import (
+    RestrictionContext,
+    SandboxMatcher,
+    _RestrictedProxy,
+)
 from tests.contrib.pydantic.models import (
     PydanticModels,
     PydanticModelWithStrictField,
@@ -324,3 +330,36 @@ async def test_validation_error(client: Client):
                 task_queue=task_queue_name,
                 result_type=tuple[int],
             )
+
+
+class RestrictedProxyFieldsModel(BaseModel):
+    datetime_field: datetime
+    path_field: pathlib.Path
+
+
+def test_model_instantiation_from_restricted_proxy_values():
+    restricted_path_cls = _RestrictedProxy(
+        "Path",
+        pathlib.Path,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+    restricted_datetime_cls = _RestrictedProxy(
+        "datetime",
+        datetime,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+
+    restricted_path = restricted_path_cls("test/path")
+    restricted_datetime = restricted_datetime_cls(2025, 1, 2, 3, 4, 5)
+
+    assert type(restricted_path) is _RestrictedProxy
+    assert type(restricted_datetime) is _RestrictedProxy
+
+    p = RestrictedProxyFieldsModel(
+        datetime_field=restricted_datetime,  # type: ignore
+        path_field=restricted_path,  # type: ignore
+    )
+    assert p.datetime_field == restricted_datetime
+    assert p.path_field == restricted_path

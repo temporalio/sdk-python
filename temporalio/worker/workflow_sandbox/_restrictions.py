@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import dataclasses
-import datetime
 import functools
 import inspect
 import logging
@@ -963,7 +962,6 @@ def _is_restrictable(v: Any) -> bool:
             str,
             bytes,
             bytearray,
-            datetime.date,  # e.g. datetime.datetime
         ),
     )
 
