@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import functools
 import inspect
 import logging
@@ -30,6 +31,14 @@ from typing import (
     TypeVar,
     cast,
 )
+
+try:
+    import pydantic
+    import pydantic_core
+
+    HAVE_PYDANTIC = True
+except ImportError:
+    HAVE_PYDANTIC = False
 
 import temporalio.workflow
 
@@ -435,9 +444,11 @@ SandboxRestrictions.passthrough_modules_minimum = {
     # Due to a metaclass conflict in sandbox, we need zipfile module to pass
     # through always
     "zipfile",
-    # This is a very general module needed by many things including pytest's
+    # Very general modules needed by many things including pytest's
     # assertion rewriter
     "typing",
+    # Required for Pydantic TypedDict fields.
+    "typing_extensions",
     # Required due to https://github.com/protocolbuffers/protobuf/issues/10143
     # for older versions. This unfortunately means that on those versions,
     # everyone using Python protos has to pass their module through.
@@ -943,7 +954,17 @@ def _l_to_r_op(op: _OpF) -> _OpF:
 
 def _is_restrictable(v: Any) -> bool:
     return v is not None and not isinstance(
-        v, (bool, int, float, complex, str, bytes, bytearray)
+        v,
+        (
+            bool,
+            int,
+            float,
+            complex,
+            str,
+            bytes,
+            bytearray,
+            datetime.date,  # e.g. datetime.datetime
+        ),
     )
 
 
@@ -971,6 +992,8 @@ class _RestrictedProxy:
             _trace("__init__ unrecognized with args %s", args)
 
     def __getattribute__(self, __name: str) -> Any:
+        if HAVE_PYDANTIC and __name == "__get_pydantic_core_schema__":
+            return object.__getattribute__(self, "__get_pydantic_core_schema__")
         state = _RestrictionState.from_proxy(self)
         _trace("__getattribute__ %s on %s", __name, state.name)
         # We do not restrict __spec__ or __name__
@@ -1020,6 +1043,17 @@ class _RestrictedProxy:
                 )
         return ret
 
+    if HAVE_PYDANTIC:
+        # Instruct pydantic to use the proxied type when determining the schema
+        # https://docs.pydantic.dev/latest/concepts/types/#customizing-validation-with-__get_pydantic_core_schema__
+        @classmethod
+        def __get_pydantic_core_schema__(
+            cls,
+            source_type: Any,
+            handler: pydantic.GetCoreSchemaHandler,
+        ) -> pydantic_core.CoreSchema:
+            return handler(RestrictionContext.unwrap_if_proxied(source_type))
+
     __doc__ = _RestrictedProxyLookup(  # type: ignore
         class_value=__doc__, fallback_func=lambda self: type(self).__doc__, is_attr=True
     )
@@ -1032,7 +1066,7 @@ class _RestrictedProxy:
     )
     __str__ = _RestrictedProxyLookup(str)  # type: ignore
     __bytes__ = _RestrictedProxyLookup(bytes)
-    __format__ = _RestrictedProxyLookup()  # type: ignore
+    __format__ = _RestrictedProxyLookup(format)  # type: ignore
     __lt__ = _RestrictedProxyLookup(operator.lt)
     __le__ = _RestrictedProxyLookup(operator.le)
     __eq__ = _RestrictedProxyLookup(operator.eq)  # type: ignore
