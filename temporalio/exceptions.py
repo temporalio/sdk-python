@@ -101,17 +101,17 @@ class WorkflowAlreadyStartedError(FailureError):
 
 
 class ApplicationError(FailureError):
-    """Error raised during workflow/activity execution to cause a workflow execution failure.
+    """Raised in workflow/activity code to cause a workflow execution failure.
 
-    Workflow Execution Failures put the Workflow Execution into the "Failed" state and no further attempt will
-    be made to progress their execution.
+    Workflow execution failure puts the workflow execution into "Failed" state,
+    and no further attempts will be made to progress the workflow execution.
 
-    # Example
+    .. code-block:: python
 
-    >>> from temporalio.exceptions import ApplicationError
-    ... # ...
-    ... if isDelivery and distance.get_kilometers() > 25:
-    ...     raise ApplicationError("Customer lives outside the service area")
+        from temporalio.exceptions import ApplicationError
+        # ...
+        if is_delivery and distance.get_kilometers() > 25:
+            raise ApplicationError("Customer lives outside the service area")
     """
 
     def __init__(
