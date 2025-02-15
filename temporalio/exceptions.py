@@ -43,14 +43,16 @@ class TemporalError(Exception):
 class FailureError(TemporalError):
     """Base class for exceptions that cause a workflow execution failure.
 
-    Do not raise this directly in workflow code: raise `ApplicationError` instead (which inherits from this `FailureError`).
+    Do not raise this directly: raise ``ApplicationError`` instead.
 
-    Workflow execution failure puts the workflow execution into "Failed" state, and no further attempts will
-    be made to progress the workflow execution.
+    Workflow execution failure puts the workflow execution into "Failed" state,
+    and no further attempts will be made to progress the workflow execution.
 
-    By default, any exception that does not extend this class causes the Workflow Task to be retried, rather than failing the workflow execution.
-
-    The default behavior can be changed by providing a list of exception types to ``workflow_failure_exception_types`` when creating a worker or ``failure_exception_types`` on the ``@workflow.defn`` decorator.
+    By default, any exception that does not inherit from this class causes the
+    workflow task to be retried, rather than failing the workflow execution. The
+    default behavior can be changed by providing a list of exception types to
+    ``workflow_failure_exception_types`` when creating a worker or
+    ``failure_exception_types`` on the ``@workflow.defn`` decorator.
     """
 
     def __init__(
