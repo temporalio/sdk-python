@@ -11,11 +11,6 @@ Workflow, and Activity, and Nexus Operation code use Application Failures to
 communicate application-specific failures that happen.
 This is the only type of Temporal Failure created and thrown by user code.
 In the Python SDK, it is the ``ApplicationError``.
-
-# References
-
-More information can be found in the docs at
-https://docs.temporal.io/references/failures#workflow-execution-failures.
 """
 
 import asyncio
