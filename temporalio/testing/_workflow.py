@@ -91,6 +91,7 @@ class WorkflowEnvironment:
         download_dest_dir: Optional[str] = None,
         ui: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
+        search_attributes: Sequence[temporalio.common.SearchAttributeKey] = (),
         dev_server_existing_path: Optional[str] = None,
         dev_server_database_filename: Optional[str] = None,
         dev_server_log_format: str = "pretty",
@@ -138,6 +139,8 @@ class WorkflowEnvironment:
                 needed. If unset, this is the system's temporary directory.
             ui: If ``True``, will start a UI in the dev server.
             runtime: Specific runtime to use or default if unset.
+            search_attributes: Search attributes to register with the dev
+                server.
             dev_server_existing_path: Existing path to the CLI binary.
                 If present, no download will be attempted to fetch the binary.
             dev_server_database_filename: Path to the Sqlite database to use
@@ -167,6 +170,14 @@ class WorkflowEnvironment:
                 dev_server_log_level = "error"
             else:
                 dev_server_log_level = "fatal"
+        # Add search attributes
+        if search_attributes:
+            new_args = []
+            for attr in search_attributes:
+                new_args.append("--search-attribute")
+                new_args.append(f"{attr.name}={attr._metadata_type}")
+            new_args += dev_server_extra_args
+            dev_server_extra_args = new_args
         # Start CLI dev server
         runtime = runtime or temporalio.runtime.Runtime.default()
         server = await temporalio.bridge.testing.EphemeralServer.start_dev_server(

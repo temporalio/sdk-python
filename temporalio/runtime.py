@@ -1,7 +1,4 @@
-"""Runtime for clients and workers. (experimental)
-
-This module is currently experimental. The API may change.
-"""
+"""Runtime for clients and workers."""
 
 from __future__ import annotations
 
@@ -128,9 +125,6 @@ class LoggingConfig:
     forwarding: Optional[LogForwardingConfig] = None
     """If present, Core logger messages will be forwarded to a Python logger.
     See the :py:class:`LogForwardingConfig` docs for more info.
-
-    .. warning::
-        This API is experimental
     """
 
     default: ClassVar[LoggingConfig]
@@ -173,9 +167,6 @@ class LogForwardingConfig:
     attribute which has arbitrary extra data from Core. By default a string
     representation of this extra ``fields`` attribute is appended to the
     message.
-
-    .. warning::
-        This API is experimental
     """
 
     logger: logging.Logger
@@ -259,17 +250,22 @@ class OpenTelemetryConfig:
         OpenTelemetryMetricTemporality.CUMULATIVE
     )
     durations_as_seconds: bool = False
+    http: bool = False
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.OpenTelemetryConfig:
         return temporalio.bridge.runtime.OpenTelemetryConfig(
             url=self.url,
             headers=self.headers or {},
-            metric_periodicity_millis=None
-            if not self.metric_periodicity
-            else round(self.metric_periodicity.total_seconds() * 1000),
-            metric_temporality_delta=self.metric_temporality
-            == OpenTelemetryMetricTemporality.DELTA,
+            metric_periodicity_millis=(
+                None
+                if not self.metric_periodicity
+                else round(self.metric_periodicity.total_seconds() * 1000)
+            ),
+            metric_temporality_delta=(
+                self.metric_temporality == OpenTelemetryMetricTemporality.DELTA
+            ),
             durations_as_seconds=self.durations_as_seconds,
+            http=self.http,
         )
 
 

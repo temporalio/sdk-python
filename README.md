@@ -52,6 +52,7 @@ informal introduction to the features and their implementation.
 - [Usage](#usage)
     - [Client](#client)
       - [Data Conversion](#data-conversion)
+        - [Pydantic Support](#pydantic-support)
         - [Custom Type Data Conversion](#custom-type-data-conversion)
     - [Workers](#workers)
     - [Workflows](#workflows)
@@ -84,7 +85,6 @@ informal introduction to the features and their implementation.
           - [Extending Restricted Classes](#extending-restricted-classes)
           - [Certain Standard Library Calls on Restricted Objects](#certain-standard-library-calls-on-restricted-objects)
           - [is_subclass of ABC-based Restricted Classes](#is_subclass-of-abc-based-restricted-classes)
-          - [Compiled Pydantic Sometimes Using Wrong Types](#compiled-pydantic-sometimes-using-wrong-types)
     - [Activities](#activities)
       - [Definition](#definition-1)
       - [Types of Activities](#types-of-activities)
@@ -298,10 +298,10 @@ other_ns_client = Client(**config)
 #### Data Conversion
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
-`temporalio.converter.DataConverter` can be set via the `data_converter` client parameter. Data converters are a
-combination of payload converters, payload codecs, and failure converters. Payload converters convert Python values
-to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption). Failure converters
-convert exceptions to/from serialized failures.
+`temporalio.converter.DataConverter` can be set via the `data_converter` parameter of the `Client` constructor. Data
+converters are a combination of payload converters, payload codecs, and failure converters. Payload converters convert
+Python values to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption).
+Failure converters convert exceptions to/from serialized failures.
 
 The default data converter supports converting multiple types including:
 
@@ -312,21 +312,38 @@ The default data converter supports converting multiple types including:
   * Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports natively
   * [dataclasses](https://docs.python.org/3/library/dataclasses.html)
   * Iterables including ones JSON dump may not support by default, e.g. `set`
-  * Any class with a `dict()` method and a static `parse_obj()` method, e.g.
-    [Pydantic models](https://pydantic-docs.helpmanual.io/usage/models)
-    * The default data converter is deprecated for Pydantic models and will warn if used since not all fields work.
-      See [this sample](https://github.com/temporalio/samples-python/tree/main/pydantic_converter) for the recommended
-      approach.
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
 
-This notably doesn't include any `date`, `time`, or `datetime` objects as they may not work across SDKs.
+To use pydantic model instances, see [](#pydantic-support).
 
-Users are strongly encouraged to use a single `dataclass` for parameter and return types so fields with defaults can be
-easily added without breaking compatibility.
+`datetime.date`, `datetime.time`, and `datetime.datetime` can only be used with the Pydantic data converter.
+
+Although workflows, updates, signals, and queries can all be defined with multiple input parameters, users are strongly
+encouraged to use a single `dataclass` or Pydantic model parameter, so that fields with defaults can be easily added
+without breaking compatibility. Similar advice applies to return values.
 
 Classes with generics may not have the generics properly resolved. The current implementation does not have generic
 type resolution. Users should use concrete types.
+
+##### Pydantic Support
+
+To use Pydantic model instances, install Pydantic and set the Pydantic data converter when creating client instances:
+
+```python
+from temporalio.contrib.pydantic import pydantic_data_converter
+
+client = Client(data_converter=pydantic_data_converter, ...)
+```
+
+This data converter supports conversion of all types supported by Pydantic to and from JSON.
+
+In addition to Pydantic models, these include all `json.dump`-able types, various non-`json.dump`-able standard library
+types such as dataclasses, types from the datetime module, sets, UUID, etc, and custom types composed of any of these.
+
+Pydantic v1 is not supported by this data converter. If you are not yet able to upgrade from Pydantic v1, see
+https://github.com/temporalio/samples-python/tree/main/pydantic_converter/v1 for limited v1 support.
+
 
 ##### Custom Type Data Conversion
 
@@ -1029,6 +1046,21 @@ my_worker = Worker(
 In both of these cases, now the `pydantic` module will be passed through from outside of the sandbox instead of
 being reloaded for every workflow run.
 
+If users are sure that no imports they use in workflow files will ever need to be sandboxed (meaning all calls within
+are deterministic and never mutate shared, global state), the `passthrough_all_modules` option can be set on the
+restrictions or the `with_passthrough_all_modules` helper can by used, for example:
+
+```python
+my_worker = Worker(
+  ...,
+  workflow_runner=SandboxedWorkflowRunner(
+    restrictions=SandboxRestrictions.default.with_passthrough_all_modules()
+  )
+)
+```
+
+Note, some calls from the module may still be checked for invalid calls at runtime for certain builtins.
+
 ###### Invalid Module Members
 
 `SandboxRestrictions.invalid_module_members` contains a root matcher that applies to all module members. This already
@@ -1118,15 +1150,6 @@ Due to [https://bugs.python.org/issue44847](https://bugs.python.org/issue44847),
 checked to see if they are subclasses of another via `is_subclass` may fail (see also
 [this wrapt issue](https://github.com/GrahamDumpleton/wrapt/issues/130)).
 
-###### Compiled Pydantic Sometimes Using Wrong Types
-
-If the Pydantic dependency is in compiled form (the default) and you are using a Pydantic model inside a workflow
-sandbox that uses a `datetime` type, it will grab the wrong validator and use `date` instead. This is because our
-patched form of `issubclass` is bypassed by compiled Pydantic.
-
-To work around, either don't use `datetime`-based Pydantic model fields in workflows, or mark `datetime` library as
-passthrough (means you lose protection against calling the non-deterministic `now()`), or use non-compiled Pydantic
-dependency.
 
 ### Activities
 
@@ -1326,7 +1349,7 @@ async def check_past_histories(my_client: Client):
 OpenTelemetry support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra.
 When using `pip`, running
 
-    pip install temporalio[opentelemetry]
+    pip install 'temporalio[opentelemetry]'
 
 will install needed dependencies. Then the `temporalio.contrib.opentelemetry.TracingInterceptor` can be created and set
 as an interceptor on the `interceptors` argument of `Client.connect`. When set, spans will be created for all client
@@ -1358,7 +1381,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.8 and newer. It is built using
+The Python SDK is built to work with Python 3.9 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
 
 ### Building

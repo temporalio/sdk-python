@@ -141,3 +141,27 @@ class LocalActivitySlotInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___LocalActivitySlotInfo = LocalActivitySlotInfo
+
+class NexusSlotInfo(google.protobuf.message.Message):
+    """Info about nexus task slot usage"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    service: builtins.str
+    operation: builtins.str
+    def __init__(
+        self,
+        *,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "operation", b"operation", "service", b"service"
+        ],
+    ) -> None: ...
+
+global___NexusSlotInfo = NexusSlotInfo

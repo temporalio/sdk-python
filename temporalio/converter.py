@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
+from itertools import zip_longest
 from typing import (
     Any,
     Awaitable,
@@ -291,10 +292,8 @@ class CompositePayloadConverter(PayloadConverter):
             RuntimeError: Error during decode
         """
         values = []
-        for index, payload in enumerate(payloads):
-            type_hint = None
-            if type_hints and len(type_hints) > index:
-                type_hint = type_hints[index]
+        type_hints = type_hints or []
+        for index, (payload, type_hint) in enumerate(zip_longest(payloads, type_hints)):
             # Raw value should just wrap
             if type_hint == temporalio.common.RawValue:
                 values.append(temporalio.common.RawValue(payload))
@@ -488,8 +487,11 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
 class AdvancedJSONEncoder(json.JSONEncoder):
     """Advanced JSON encoder.
 
-    This encoder supports dataclasses, classes with dict() functions, and
-    all iterables as lists.
+    This encoder supports dataclasses and all iterables as lists.
+
+    It also uses Pydantic v1's "dict" methods if available on the object,
+    but this is deprecated. Pydantic users should upgrade to v2 and use
+    temporalio.contrib.pydantic.pydantic_data_converter.
     """
 
     def default(self, o: Any) -> Any:
@@ -500,7 +502,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Dataclass support
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
-        # Support for models with "dict" function like Pydantic
+        # Support for Pydantic v1's dict method
         dict_fn = getattr(o, "dict", None)
         if callable(dict_fn):
             return dict_fn()
@@ -558,10 +560,11 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         """See base class."""
-        # Check for pydantic then send warning
+        # Check for Pydantic v1
         if hasattr(value, "parse_obj"):
             warnings.warn(
-                "If you're using pydantic model, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter for better support"
+                "If you're using Pydantic v2, use temporalio.contrib.pydantic.pydantic_data_converter. "
+                "If you're using Pydantic v1 and cannot upgrade, refer to https://github.com/temporalio/samples-python/tree/main/pydantic_converter_v1 for better v1 support."
             )
         # We let JSON conversion errors be thrown to caller
         return temporalio.api.common.v1.Payload(
@@ -1523,8 +1526,12 @@ def value_to_type(
         # TODO(cretz): Want way to convert snake case to camel case?
         return hint(**field_values)
 
-    # If there is a @staticmethod or @classmethod parse_obj, we will use it.
-    # This covers Pydantic models.
+    # Pydantic model instance
+    # Pydantic users should use Pydantic v2 with
+    # temporalio.contrib.pydantic.pydantic_data_converter, in which case a
+    # pydantic model instance will have been handled by the custom_converters at
+    # the start of this function. We retain the following for backwards
+    # compatibility with pydantic v1 users, but this is deprecated.
     parse_obj_attr = inspect.getattr_static(hint, "parse_obj", None)
     if isinstance(parse_obj_attr, classmethod) or isinstance(
         parse_obj_attr, staticmethod

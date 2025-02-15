@@ -1188,7 +1188,7 @@ async def test_schedule_create_limited_actions_validation(
     assert "are remaining actions set" in str(err.value)
 
 
-async def test_schedule_search_attribute_update(
+async def test_schedule_workflow_search_attribute_update(
     client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
@@ -1196,10 +1196,8 @@ async def test_schedule_search_attribute_update(
     await assert_no_schedules(client)
 
     # Put search attribute on server
-    text_attr_key = SearchAttributeKey.for_text(f"python-test-schedule-text")
-    untyped_keyword_key = SearchAttributeKey.for_keyword(
-        f"python-test-schedule-keyword"
-    )
+    text_attr_key = SearchAttributeKey.for_text("python-test-schedule-text")
+    untyped_keyword_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
     await ensure_search_attributes_present(client, text_attr_key, untyped_keyword_key)
 
     # Create a schedule with search attributes on the schedule and on the
@@ -1273,6 +1271,7 @@ async def test_schedule_search_attribute_update(
     # Check that it changed
     desc = await handle.describe()
     assert isinstance(desc.schedule.action, ScheduleActionStartWorkflow)
+    # Check that the workflow search attributes were changed
     # This assertion has changed since server 1.24. Now, even untyped search
     # attributes are given a type server side
     assert (
@@ -1283,6 +1282,148 @@ async def test_schedule_search_attribute_update(
         and desc.schedule.action.typed_search_attributes[untyped_keyword_key]
         == "some-untyped-attr1"
     )
+    # Check that the schedule search attributes were not changed
+    assert desc.search_attributes[text_attr_key.name] == ["some-schedule-attr1"]
+    assert desc.typed_search_attributes[text_attr_key] == "some-schedule-attr1"
+
+    await handle.delete()
+    await assert_no_schedules(client)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        "none-is-noop",
+        "empty-but-non-none-clears",
+        "all-new-values-overwrites",
+        "partial-new-values-overwrites-and-drops",
+    ],
+)
+async def test_schedule_search_attribute_update(
+    client: Client, env: WorkflowEnvironment, test_case: str
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+    await assert_no_schedules(client)
+
+    # Put search attributes on server
+    key_1 = SearchAttributeKey.for_text("python-test-schedule-sa-update-key-1")
+    key_2 = SearchAttributeKey.for_keyword("python-test-schedule-sa-update-key-2")
+    await ensure_search_attributes_present(client, key_1, key_2)
+    val_1 = "val-1"
+    val_2 = "val-2"
+
+    # Create a schedule with search attributes
+    create_action = ScheduleActionStartWorkflow(
+        "some workflow",
+        [],
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=f"tq-{uuid.uuid4()}",
+    )
+    handle = await client.create_schedule(
+        f"schedule-{uuid.uuid4()}",
+        Schedule(action=create_action, spec=ScheduleSpec()),
+        search_attributes=TypedSearchAttributes(
+            [
+                SearchAttributePair(key_1, val_1),
+                SearchAttributePair(key_2, val_2),
+            ]
+        ),
+    )
+
+    def update_search_attributes(
+        input: ScheduleUpdateInput,
+    ) -> Optional[ScheduleUpdate]:
+        # Make sure the initial search attributes are present
+        assert input.description.search_attributes[key_1.name] == [val_1]
+        assert input.description.search_attributes[key_2.name] == [val_2]
+        assert input.description.typed_search_attributes[key_1] == val_1
+        assert input.description.typed_search_attributes[key_2] == val_2
+
+        if test_case == "none-is-noop":
+            # Passing None makes no changes
+            return ScheduleUpdate(input.description.schedule, search_attributes=None)
+        elif test_case == "empty-but-non-none-clears":
+            # Pass empty but non-None to clear all attributes
+            return ScheduleUpdate(
+                input.description.schedule,
+                search_attributes=TypedSearchAttributes.empty,
+            )
+        elif test_case == "all-new-values-overwrites":
+            # Pass all new values to overwrite existing
+            return ScheduleUpdate(
+                input.description.schedule,
+                search_attributes=input.description.typed_search_attributes.updated(
+                    SearchAttributePair(key_1, val_1 + "-new"),
+                    SearchAttributePair(key_2, val_2 + "-new"),
+                ),
+            )
+        elif test_case == "partial-new-values-overwrites-and-drops":
+            # Only update key_1, which should drop key_2
+            return ScheduleUpdate(
+                input.description.schedule,
+                search_attributes=TypedSearchAttributes(
+                    [
+                        SearchAttributePair(key_1, val_1 + "-new"),
+                    ]
+                ),
+            )
+        else:
+            raise ValueError(f"Invalid test case: {test_case}")
+
+    await handle.update(update_search_attributes)
+
+    if test_case == "none-is-noop":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                desc.search_attributes[key_1.name] == [val_1]
+                and desc.search_attributes[key_2.name] == [val_2]
+                and desc.typed_search_attributes[key_1] == val_1
+                and desc.typed_search_attributes[key_2] == val_2
+            )
+
+        await assert_eq_eventually(True, expectation)
+    elif test_case == "empty-but-non-none-clears":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                len(desc.typed_search_attributes) == 0
+                and len(desc.search_attributes) == 0
+            )
+
+        await assert_eq_eventually(True, expectation)
+    elif test_case == "all-new-values-overwrites":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                desc.search_attributes[key_1.name] == [val_1 + "-new"]
+                and desc.search_attributes[key_2.name] == [val_2 + "-new"]
+                and desc.typed_search_attributes[key_1] == val_1 + "-new"
+                and desc.typed_search_attributes[key_2] == val_2 + "-new"
+            )
+
+        await assert_eq_eventually(True, expectation)
+    elif test_case == "partial-new-values-overwrites-and-drops":
+
+        async def expectation() -> bool:
+            desc = await handle.describe()
+            return (
+                desc.search_attributes[key_1.name] == [val_1 + "-new"]
+                and desc.typed_search_attributes[key_1] == val_1 + "-new"
+                and key_2.name not in desc.search_attributes
+                and key_2 not in desc.typed_search_attributes
+            )
+
+        await assert_eq_eventually(True, expectation)
+    else:
+        raise ValueError(f"Invalid test case: {test_case}")
+
+    await handle.delete()
+    await assert_no_schedules(client)
 
 
 async def assert_no_schedules(client: Client) -> None:

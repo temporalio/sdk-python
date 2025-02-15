@@ -38,6 +38,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.worker
+import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
@@ -74,6 +75,7 @@ from temporalio.common import (
 )
 from temporalio.converter import (
     DataConverter,
+    DefaultFailureConverter,
     DefaultFailureConverterWithEncodedAttributes,
     DefaultPayloadConverter,
     PayloadCodec,
@@ -5039,61 +5041,58 @@ async def test_workflow_failure_types_configured(
             update_scenario=scenario,
         )
 
-    # Run all tasks concurrently
-    await asyncio.gather(
         # When unconfigured completely, confirm task fails as normal
-        run_scenario(
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
             expect_task_fail=True,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
             expect_task_fail=True,
-        ),
+        )
         # When configured at the worker level explicitly, confirm not task fail
         # but rather expected exceptions
-        run_scenario(
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
             worker_level_failure_exception_type=FailureTypesCustomException,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
-            worker_level_failure_exception_type=workflow.NondeterminismError,
-        ),
+            worker_level_failure_exception_type=temporalio.workflow.NondeterminismError,
+        )
         # When configured at the worker level inherited
-        run_scenario(
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
             worker_level_failure_exception_type=Exception,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesUnconfiguredWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
             worker_level_failure_exception_type=Exception,
-        ),
+        )
         # When configured at the workflow level explicitly
-        run_scenario(
+        await run_scenario(
             FailureTypesConfiguredExplicitlyWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesConfiguredExplicitlyWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
-        ),
+        )
         # When configured at the workflow level inherited
-        run_scenario(
+        await run_scenario(
             FailureTypesConfiguredInheritedWorkflow,
             FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
-        ),
-        run_scenario(
+        )
+        await run_scenario(
             FailureTypesConfiguredInheritedWorkflow,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
-        ),
-    )
+        )
 
 
 @workflow.defn(failure_exception_types=[Exception])
@@ -5545,13 +5544,13 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
             if handler_dynamism == "-dynamic-":
 
                 async def my_late_registered_dynamic_update(
-                    self, name: str, args: Sequence[RawValue]
+                    name: str, args: Sequence[RawValue]
                 ) -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-dynamic-update-result"
 
                 async def my_late_registered_dynamic_signal(
-                    self, name: str, args: Sequence[RawValue]
+                    name: str, args: Sequence[RawValue]
                 ) -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
@@ -5559,11 +5558,11 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
                 workflow.set_dynamic_signal_handler(my_late_registered_dynamic_signal)
             else:
 
-                async def my_late_registered_update(self) -> str:
+                async def my_late_registered_update() -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-update-result"
 
-                async def my_late_registered_signal(self) -> None:
+                async def my_late_registered_signal() -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
                 workflow.set_update_handler(
@@ -5841,7 +5840,7 @@ async def test_workflow_id_conflict(client: Client):
 
 
 @workflow.defn
-class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1:
+class UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow:
     def __init__(self) -> None:
         self.workflow_returned = False
 
@@ -5867,13 +5866,13 @@ async def test_update_completion_is_honored_when_after_workflow_return_1(
     update_id = "my-update"
     task_queue = "tq"
     wf_handle = await client.start_workflow(
-        TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1.run,
+        UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow.run,
         id=f"wf-{uuid.uuid4()}",
         task_queue=task_queue,
     )
     update_result_task = asyncio.create_task(
         wf_handle.execute_update(
-            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1.my_update,
+            UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow.my_update,
             id=update_id,
         )
     )
@@ -5882,14 +5881,14 @@ async def test_update_completion_is_honored_when_after_workflow_return_1(
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[TestUpdateCompletionIsHonoredWhenAfterWorkflowReturn1],
+        workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow],
     ):
         assert await wf_handle.result() == "workflow-result"
         assert await update_result_task == "update-result"
 
 
 @workflow.defn
-class TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
+class UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
     def __init__(self):
         self.received_update = False
         self.update_result: asyncio.Future[str] = asyncio.Future()
@@ -5923,15 +5922,15 @@ async def test_update_completion_is_honored_when_after_workflow_return_2(
     async with Worker(
         client,
         task_queue="tq",
-        workflows=[TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2],
+        workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2],
     ) as worker:
         handle = await client.start_workflow(
-            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.run,
+            UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.run,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         update_result = await handle.execute_update(
-            TestUpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.my_update
+            UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.my_update
         )
         assert update_result == "update-result"
         assert await handle.result() == "workflow-result"
@@ -6449,6 +6448,86 @@ async def test_concurrent_sleeps_use_proper_options(
 
         # Force replay with a query to ensure determinism
         await handle.query("__temporal_workflow_metadata")
+
+
+class BadFailureConverterError(Exception):
+    pass
+
+
+class BadFailureConverter(DefaultFailureConverter):
+    def to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: PayloadConverter,
+        failure: Failure,
+    ) -> None:
+        if isinstance(exception, BadFailureConverterError):
+            raise RuntimeError("Intentional failure conversion error")
+        super().to_failure(exception, payload_converter, failure)
+
+
+@activity.defn
+async def bad_failure_converter_activity() -> None:
+    raise BadFailureConverterError
+
+
+@workflow.defn(sandboxed=False)
+class BadFailureConverterWorkflow:
+    @workflow.run
+    async def run(self, fail_workflow_task) -> None:
+        if fail_workflow_task:
+            raise BadFailureConverterError
+        else:
+            await workflow.execute_activity(
+                bad_failure_converter_activity,
+                schedule_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+
+
+async def test_bad_failure_converter(client: Client):
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        config["data_converter"],
+        failure_converter_class=BadFailureConverter,
+    )
+    client = Client(**config)
+    async with new_worker(
+        client, BadFailureConverterWorkflow, activities=[bad_failure_converter_activity]
+    ) as worker:
+        # Check activity
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                BadFailureConverterWorkflow.run,
+                False,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, ApplicationError)
+        assert (
+            err.value.cause.cause.message
+            == "Failed building exception result: Intentional failure conversion error"
+        )
+
+        # Check workflow
+        handle = await client.start_workflow(
+            BadFailureConverterWorkflow.run,
+            True,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def task_failed_message() -> Optional[str]:
+            async for e in handle.fetch_history_events():
+                if e.HasField("workflow_task_failed_event_attributes"):
+                    return e.workflow_task_failed_event_attributes.failure.message
+            return None
+
+        await assert_eq_eventually(
+            "Failed converting activation exception: Intentional failure conversion error",
+            task_failed_message,  # type: ignore
+        )
 
 
 @workflow.defn

@@ -35,6 +35,7 @@ grpcio = {version = "^1.48.2", optional = true}
 opentelemetry-api = { version = "^1.11.1", optional = true }
 opentelemetry-sdk = { version = "^1.11.1", optional = true }
 protobuf = ">=3.20"
+pydantic = { version = "^2.0.0", optional = true }
 python = "^3.9"
 python-dateutil = { version = "^2.8.2", python = "<3.11" }
 types-protobuf = ">=3.20"
@@ -46,7 +47,6 @@ grpcio-tools = "^1.48.2"
 mypy = "^1.0.0"
 mypy-protobuf = "^3.3.0"
 psutil = "^5.9.3"
-pydantic = "^1.10.19"
 pydocstyle = "^6.3.0"
 pydoctor = "^24.11.1"
 pyright = ">=1.1.377"
@@ -61,8 +61,9 @@ twine = "^4.0.1"
 wheel = "^0.42.0"
 
 [tool.poetry.extras]
-opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
 grpc = ["grpcio"]
+opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
+pydantic = ["pydantic"]
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5.0"
@@ -214,7 +215,7 @@ exclude = [
 ]
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py39"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

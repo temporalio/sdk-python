@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pathlib
 import sys
 from dataclasses import dataclass
 from typing import ClassVar, Dict, Optional
@@ -28,7 +29,7 @@ def test_workflow_sandbox_stdlib_module_names():
         if len(code_lines[-1]) > 80:
             code_lines.append("")
         code_lines[-1] += mod_name
-    code = f'_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
+    code = '_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
     # TODO(cretz): Point releases may add modules :-(
     assert (
         actual_names == _stdlib_module_names
@@ -54,6 +55,45 @@ class RestrictableObject:
 
 
 RestrictableObject.qux = RestrictableObject(foo=RestrictableObject(bar=70), bar=80)
+
+
+class RestrictableClass:
+    def __str__(self):
+        return "__str__"
+
+    def __repr__(self):
+        return "__repr__"
+
+    def __format__(self, __format_spec: str) -> str:
+        return "__format__"
+
+
+def test_restricted_proxy_dunder_methods():
+    restricted_class = _RestrictedProxy(
+        "RestrictableClass",
+        RestrictableClass,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+    restricted_obj = restricted_class()
+    assert type(restricted_obj) is _RestrictedProxy
+    assert str(restricted_obj) == "__str__"
+    assert repr(restricted_obj) == "__repr__"
+    assert format(restricted_obj, "") == "__format__"
+    assert f"{restricted_obj}" == "__format__"
+
+    restricted_path = _RestrictedProxy(
+        "Path",
+        pathlib.Path,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+    assert isinstance(format(restricted_path, ""), str)
+    restricted_path_obj = restricted_path("test/path")
+    assert type(restricted_path_obj) is _RestrictedProxy
+    expected_path = str(pathlib.PurePath("test/path"))
+    assert format(restricted_path_obj, "") == expected_path
+    assert f"{restricted_path_obj}" == expected_path
 
 
 def test_workflow_sandbox_restricted_proxy():

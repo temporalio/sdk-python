@@ -442,6 +442,7 @@ class _WorkflowInstanceImpl(
                 self._current_completion.failed.failure.message = (
                     f"Failed converting activation exception: {inner_err}"
                 )
+                self._current_completion.failed.failure.application_failure_info.SetInParent()
 
         def is_completion(command):
             return (
@@ -1021,6 +1022,9 @@ class _WorkflowInstanceImpl(
 
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()
+
+    def workflow_instance(self) -> Any:
+        return self._object
 
     def workflow_is_continue_as_new_suggested(self) -> bool:
         return self._continue_as_new_suggested

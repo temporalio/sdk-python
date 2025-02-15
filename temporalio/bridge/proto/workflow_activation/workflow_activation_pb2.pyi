@@ -25,6 +25,7 @@ import temporalio.api.update.v1.message_pb2
 import temporalio.bridge.proto.activity_result.activity_result_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
+import temporalio.bridge.proto.nexus.nexus_pb2
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -186,6 +187,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     RESOLVE_SIGNAL_EXTERNAL_WORKFLOW_FIELD_NUMBER: builtins.int
     RESOLVE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_FIELD_NUMBER: builtins.int
     DO_UPDATE_FIELD_NUMBER: builtins.int
+    RESOLVE_NEXUS_OPERATION_START_FIELD_NUMBER: builtins.int
+    RESOLVE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
     REMOVE_FROM_CACHE_FIELD_NUMBER: builtins.int
     @property
     def initialize_workflow(self) -> global___InitializeWorkflow:
@@ -240,6 +243,12 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     def do_update(self) -> global___DoUpdate:
         """A request to handle a workflow update."""
     @property
+    def resolve_nexus_operation_start(self) -> global___ResolveNexusOperationStart:
+        """A nexus operation started."""
+    @property
+    def resolve_nexus_operation(self) -> global___ResolveNexusOperation:
+        """A nexus operation resolved."""
+    @property
     def remove_from_cache(self) -> global___RemoveFromCache:
         """Remove the workflow identified by the [WorkflowActivation] containing this job from the
         cache after performing the activation. It is guaranteed that this will be the only job
@@ -265,6 +274,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         resolve_request_cancel_external_workflow: global___ResolveRequestCancelExternalWorkflow
         | None = ...,
         do_update: global___DoUpdate | None = ...,
+        resolve_nexus_operation_start: global___ResolveNexusOperationStart | None = ...,
+        resolve_nexus_operation: global___ResolveNexusOperation | None = ...,
         remove_from_cache: global___RemoveFromCache | None = ...,
     ) -> None: ...
     def HasField(
@@ -290,6 +301,10 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"resolve_child_workflow_execution",
             "resolve_child_workflow_execution_start",
             b"resolve_child_workflow_execution_start",
+            "resolve_nexus_operation",
+            b"resolve_nexus_operation",
+            "resolve_nexus_operation_start",
+            b"resolve_nexus_operation_start",
             "resolve_request_cancel_external_workflow",
             b"resolve_request_cancel_external_workflow",
             "resolve_signal_external_workflow",
@@ -325,6 +340,10 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"resolve_child_workflow_execution",
             "resolve_child_workflow_execution_start",
             b"resolve_child_workflow_execution_start",
+            "resolve_nexus_operation",
+            b"resolve_nexus_operation",
+            "resolve_nexus_operation_start",
+            b"resolve_nexus_operation_start",
             "resolve_request_cancel_external_workflow",
             b"resolve_request_cancel_external_workflow",
             "resolve_signal_external_workflow",
@@ -354,6 +373,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             "resolve_signal_external_workflow",
             "resolve_request_cancel_external_workflow",
             "do_update",
+            "resolve_nexus_operation_start",
+            "resolve_nexus_operation",
             "remove_from_cache",
         ]
         | None
@@ -1239,6 +1260,105 @@ class DoUpdate(google.protobuf.message.Message):
     ) -> None: ...
 
 global___DoUpdate = DoUpdate
+
+class ResolveNexusOperationStart(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    OPERATION_ID_FIELD_NUMBER: builtins.int
+    STARTED_SYNC_FIELD_NUMBER: builtins.int
+    CANCELLED_BEFORE_START_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Sequence number as provided by lang in the corresponding ScheduleNexusOperation command"""
+    operation_id: builtins.str
+    """The operation started asynchronously. Contains an ID that can be used to perform
+    operations on the started operation by, ex, clients. A `ResolveNexusOperation` job will
+    follow at some point.
+    """
+    started_sync: builtins.bool
+    """If true the operation "started" but only because it's also already resolved. A
+    `ResolveNexusOperation` job will be in the same activation.
+    """
+    @property
+    def cancelled_before_start(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The operation was cancelled before it was ever sent to server (same WFT).
+        Note that core will still send a `ResolveNexusOperation` job in the same activation, so
+        there does not need to be an exceptional case for this in lang.
+        """
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        operation_id: builtins.str = ...,
+        started_sync: builtins.bool = ...,
+        cancelled_before_start: temporalio.api.failure.v1.message_pb2.Failure
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancelled_before_start",
+            b"cancelled_before_start",
+            "operation_id",
+            b"operation_id",
+            "started_sync",
+            b"started_sync",
+            "status",
+            b"status",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancelled_before_start",
+            b"cancelled_before_start",
+            "operation_id",
+            b"operation_id",
+            "seq",
+            b"seq",
+            "started_sync",
+            b"started_sync",
+            "status",
+            b"status",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["status", b"status"]
+    ) -> (
+        typing_extensions.Literal[
+            "operation_id", "started_sync", "cancelled_before_start"
+        ]
+        | None
+    ): ...
+
+global___ResolveNexusOperationStart = ResolveNexusOperationStart
+
+class ResolveNexusOperation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    RESULT_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Sequence number as provided by lang in the corresponding ScheduleNexusOperation command"""
+    @property
+    def result(
+        self,
+    ) -> temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationResult: ...
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        result: temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationResult
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["result", b"result"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["result", b"result", "seq", b"seq"]
+    ) -> None: ...
+
+global___ResolveNexusOperation = ResolveNexusOperation
 
 class RemoveFromCache(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
