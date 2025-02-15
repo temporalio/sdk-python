@@ -43,7 +43,7 @@ class TemporalError(Exception):
 class FailureError(TemporalError):
     """Base class for exceptions that cause a workflow execution failure.
 
-    Do not raise this directly in workflow code: raise a child exception such as `ApplicationError` instead.
+    Do not raise this directly in workflow code: raise `ApplicationError` instead (which inherits from this `FailureError`).
 
     Workflow execution failure puts the workflow execution into "Failed" state, and no further attempts will
     be made to progress the workflow execution.
