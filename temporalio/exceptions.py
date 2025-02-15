@@ -1,17 +1,4 @@
-"""Common Temporal exceptions.
-
-# Temporal Failure
-
-Most Temporal SDKs have a base class that the other Failures extend.
-In python, it is the ``FailureError``.
-
-# Application Failure
-
-Workflow, and Activity, and Nexus Operation code use Application Failures to
-communicate application-specific failures that happen.
-This is the only type of Temporal Failure created and thrown by user code.
-In the Python SDK, it is the ``ApplicationError``.
-"""
+"""Common Temporal exceptions."""
 
 import asyncio
 from datetime import timedelta
