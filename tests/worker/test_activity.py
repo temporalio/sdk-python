@@ -90,6 +90,22 @@ async def test_activity_custom_name(client: Client, worker: ExternalWorker):
     assert result.result == "Name: my custom activity name!"
 
 
+async def test_activity_client(client: Client, worker: ExternalWorker):
+    with pytest.raises(RuntimeError) as err:
+        activity.client()
+    assert str(err.value) == "Not in activity context"
+
+    captured_client: Optional[Client] = None
+
+    @activity.defn
+    async def capture_client() -> None:
+        nonlocal captured_client
+        captured_client = activity.client()
+
+    await _execute_workflow_with_activity(client, worker, capture_client)
+    assert captured_client is client
+
+
 async def test_activity_info(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
