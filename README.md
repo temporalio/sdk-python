@@ -1395,6 +1395,7 @@ To build the SDK from source for use as a dependency, the following prerequisite
 * [Protobuf Compiler](https://protobuf.dev/)
 
 Use `uv` to install `poe`:
+
 ```bash
 uv tool install poethepoet
 ```
