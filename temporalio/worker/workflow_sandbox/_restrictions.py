@@ -459,7 +459,7 @@ SandboxRestrictions.passthrough_modules_minimum = {
     # Must pass through the entire bridge in even the most minimum causes
     # because PyO3 does not allow re-init since 0.17. See
     # https://github.com/PyO3/pyo3/pull/2523.
-    "temporalio.bridge.temporal_sdk_bridge",
+    "temporal_sdk_bridge",
 }
 
 SandboxRestrictions.passthrough_modules_with_temporal = (

@@ -3,10 +3,6 @@ name = "temporal-sdk-bridge"
 version = "0.1.0"
 edition = "2021"
 
-[package.metadata.maturin]
-module-name = "temporalio.bridge.temporal_sdk_bridge"
-
-
 [lib]
 name = "temporal_sdk_bridge"
 crate-type = ["cdylib"]
