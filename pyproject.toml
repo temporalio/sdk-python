@@ -241,3 +241,7 @@ generate-setup-file = true
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core>=1.0.0", "setuptools", "wheel", "setuptools-rust"]
+
+[tool.uv]
+# Prevent uv commands from building the package by default
+package = false

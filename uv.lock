@@ -1259,7 +1259,7 @@ wheels = [
 [[package]]
 name = "temporalio"
 version = "1.9.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "protobuf" },
     { name = "python-dateutil", marker = "python_full_version < '3.11'" },
