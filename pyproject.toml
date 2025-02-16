@@ -35,7 +35,7 @@ Documentation = "https://docs.temporal.io/docs/python"
 dev = [
     "cibuildwheel>=2.22.0,<3",
     "grpcio-tools>=1.48.2,<2",
-    "mypy>=1.0.0,<2",
+    "mypy==1.4.1",
     "mypy-protobuf>=3.3.0,<4",
     "psutil>=5.9.3,<6",
     "pydocstyle>=6.3.0,<7",
