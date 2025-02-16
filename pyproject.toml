@@ -68,26 +68,26 @@ include = [
 exclude = ["temporalio/bridge/**/target"]
 
 [tool.poe.tasks]
-build-develop = "python scripts/setup_bridge.py develop"
-build-develop-with-release = { cmd = "python scripts/setup_bridge.py develop", env = { TEMPORAL_BUILD_RELEASE = "1" }}
-fix-wheel = "python scripts/fix_wheel.py"
-format = [{cmd = "ruff check --select I --fix"}, {cmd = "ruff format"}, ]
-gen-docs = "python scripts/gen_docs.py"
-gen-protos = "python scripts/gen_protos.py"
+build-develop = "uv run python scripts/setup_bridge.py develop"
+build-develop-with-release = { cmd = "uv run python scripts/setup_bridge.py develop", env = { TEMPORAL_BUILD_RELEASE = "1" }}
+fix-wheel = "uv run python scripts/fix_wheel.py"
+format = [{cmd = "uv run ruff check --select I --fix"}, {cmd = "uv run ruff format"}, ]
+gen-docs = "uv run python scripts/gen_docs.py"
+gen-protos = "uv run python scripts/gen_protos.py"
 lint = [
-  {cmd = "ruff check --select I"},
-  {cmd = "ruff format --check"},
+  {cmd = "uv run ruff check --select I"},
+  {cmd = "uv run ruff format --check"},
   {ref = "lint-types"},
-  {cmd = "pyright"},
+  {cmd = "uv run pyright"},
   {ref = "lint-docs"},
 ]
 bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
-lint-docs = "pydocstyle --ignore-decorators=overload"
-lint-types = "mypy --namespace-packages --check-untyped-defs ."
-run-bench = "python scripts/run_bench.py"
-test = "pytest"
+lint-docs = "uv run pydocstyle --ignore-decorators=overload"
+lint-types = "uv run mypy --namespace-packages --check-untyped-defs ."
+run-bench = "uv run python scripts/run_bench.py"
+test = "uv run pytest"
 
 # Install local, run single pytest with env var, uninstall local
 [tool.poe.tasks.test-dist-single]
@@ -97,14 +97,14 @@ ignore_fail = "return_non_zero"
 # there's a comma (see https://github.com/uiri/toml/issues/348).
 
 [[tool.poe.tasks.test-dist-single.sequence]]
-cmd = "pip install --no-index --find-links=./dist temporalio"
+cmd = "uv pip install --no-index --find-links=./dist temporalio"
 
 [[tool.poe.tasks.test-dist-single.sequence]]
-cmd = "pytest -k test_activity_hello"
+cmd = "uv run pytest -k test_activity_hello"
 env = { TEMPORAL_INTEGRATION_TEST = "1" }
 
 [[tool.poe.tasks.test-dist-single.sequence]]
-cmd = "pip uninstall temporalio -y"
+cmd = "uv pip uninstall temporalio -y"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
