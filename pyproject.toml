@@ -45,27 +45,11 @@ dev = [
     "pytest-asyncio>=0.21,<0.22",
     "pytest-timeout~=2.2",
     "ruff>=0.5.0,<0.6",
-    "setuptools>=65.0.0",
-    "setuptools-rust>=1.3.0",
     "toml>=0.10.2,<0.11",
     "twine>=4.0.1,<5",
     "wheel>=0.42.0,<0.43",
     "ruff>=0.5.0,<0.6",
 ]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "temporalio/api/**/*",
-    "temporalio/bridge/proto/**/*",
-]
-exclude = ["temporalio/bridge/**/target"]
-
-[tool.hatch.build.targets.wheel]
-include = [
-    "temporalio/api/**/*",
-    "temporalio/bridge/proto/**/*",
-]
-exclude = ["temporalio/bridge/**/target"]
 
 [tool.poe.tasks]
 build-develop = "uv run python scripts/setup_bridge.py develop"
@@ -203,28 +187,12 @@ exclude = [
 [tool.ruff]
 target-version = "py39"
 
-
-# We need to include proto source that is otherwise excluded via .gitignore.
-# We have chosen to keep all source including Rust source in precompiled wheels
-# for easy viewing. It is also complicated to exclude certain pieces for wheels
-# with Poetry (see https://github.com/python-poetry/poetry/issues/3380).
-include = ["temporalio/api/**/*", "temporalio/bridge/proto/**/*"]
-exclude = ["temporalio/bridge/**/target"]
-
-# Known undocumented API for hooking into setup. Unfortunately Poetry does not
-# support this script in a subdirectory like scripts/.
-[tool.poetry.build]
-script = "build.py"
-# In https://github.com/python-poetry/poetry-core/pull/318, Poetry stopped using
-# a setup file, but we are using setuptools Rust manually in our build.py which
-# needs a setup file.
-# TODO(cretz): Find a way to not require a setup file since that is going away
-# at some point in Poetry. Revisit Maturin or find some other approach.
-generate-setup-file = true
-
 [build-system]
-build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core>=1.0.0", "setuptools", "wheel", "setuptools-rust"]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+manifest-path = "temporalio/bridge/Cargo.toml"
 
 [tool.uv]
 # Prevent uv commands from building the package by default
