@@ -52,8 +52,8 @@ dev = [
 ]
 
 [tool.poe.tasks]
-build-develop = "uv run python scripts/setup_bridge.py develop"
-build-develop-with-release = { cmd = "uv run python scripts/setup_bridge.py develop", env = { TEMPORAL_BUILD_RELEASE = "1" }}
+build-develop = "maturin develop --uv"
+build-develop-with-release = { cmd = "maturin develop --release --uv" }
 fix-wheel = "uv run python scripts/fix_wheel.py"
 format = [{cmd = "uv run ruff check --select I --fix"}, {cmd = "uv run ruff format"}, ]
 gen-docs = "uv run python scripts/gen_docs.py"
