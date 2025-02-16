@@ -44,9 +44,10 @@ jobs:
           version: "23.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
   
+      - uses: astral-sh/setup-uv@v5
       # Build
-      - run: python -m pip install --upgrade wheel poetry poethepoet
-      - run: poetry install --no-root --all-extras
+      - run: python -m pip install --upgrade wheel poethepoet
+      - run: uv sync --no-install-project --all-extras
       - run: poe build-develop-with-release
       
       # Run a bunch of bench tests. We run multiple times since results vary.

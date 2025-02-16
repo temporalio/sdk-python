@@ -1390,28 +1390,26 @@ The Python SDK is built to work with Python 3.9 and newer. It is built using
 
 To build the SDK from source for use as a dependency, the following prerequisites are required:
 
-* [Python](https://www.python.org/) >= 3.9
-  * Make sure the latest version of `pip` is in use
+* [uv](https://docs.astral.sh/uv/)
 * [Rust](https://www.rust-lang.org/)
 * [Protobuf Compiler](https://protobuf.dev/)
-* [poetry](https://github.com/python-poetry/poetry) (e.g. `python -m pip install poetry`)
-* [poe](https://github.com/nat-n/poethepoet) (e.g. `python -m pip install poethepoet`)
 
-macOS note: If errors are encountered, it may be better to install Python and Rust as recommended from their websites
-instead of via `brew`.
+Use `uv` to install `poe`:
+```bash
+uv tool install poethepoet
+```
 
-With the prerequisites installed, first clone the SDK repository recursively:
+Now clone the SDK repository recursively:
 
 ```bash
 git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
 ```
 
-Use `poetry` to install the dependencies with `--no-root` to not install this package (because we still need to build
-it):
+Install the dependencies (`--no-install-project` because we will build it in the next step):
 
 ```bash
-poetry install --no-root --all-extras
+uv sync --no-install-project --all-extras
 ```
 
 #### Build
@@ -1487,22 +1485,15 @@ It should output:
 
 ### Local SDK development environment
 
-For local development, it is often quicker to use debug builds and a local virtual environment.
+For local development, it is quicker to use a debug build.
 
-While not required, it often helps IDEs if we put the virtual environment `.venv` directory in the project itself. This
-can be configured system-wide via:
-
-```bash
-poetry config virtualenvs.in-project true
-```
-
-Now perform the same steps as the "Prepare" section above by installing the prerequisites, cloning the project,
-installing dependencies, and generating the protobuf code:
+Perform the same steps as the "Prepare" section above by installing the prerequisites, cloning the project, and
+installing dependencies:
 
 ```bash
 git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
-poetry install --no-root --all-extras
+uv sync --no-install-project --all-extras
 ```
 
 Now compile the Rust extension in develop mode which is quicker than release mode:
@@ -1535,14 +1526,14 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 #### Proto Generation and Testing
 
 To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
-protobuf code, you must be on Python <= 3.10, and then run `poetry add "protobuf<4"` +
-`poetry install --no-root --all-extras`. Then the protobuf files can be generated via `poe gen-protos`. Tests can be run
+protobuf code, you must be on Python <= 3.10, and then run `uv add "protobuf<4"` +
+`uv sync --no-install-project --all-extras`. Then the protobuf files can be generated via `poe gen-protos`. Tests can be run
 for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
 
-Do not commit `poetry.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files
-and run `poetry install --no-root --all-extras`. Make sure you `poe format` the results.
+Do not commit `uv.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files
+and run `uv sync --no-install-project --all-extras`. Make sure you `poe format` the results.
 
-For a less system-intrusive approach, you can (note this approach [may have a bug](https://github.com/temporalio/sdk-python/issues/543)):
+For a less system-intrusive approach, you can:
 ```shell
 docker build -f scripts/_proto/Dockerfile .
 docker run --rm -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
@@ -1552,7 +1543,7 @@ poe format
 ### Style
 
 * Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
-  * We use [Black](https://github.com/psf/black) for formatting, so that takes precedence
+  * We use [ruff](https://docs.astral.sh/ruff/) for formatting, so that takes precedence
   * In tests and example code, can import individual classes/functions to make it more readable. Can also do this for
     rarely in library code for some Python common items (e.g. `dataclass` or `partial`), but not allowed to do this for
     any `temporalio` packages (except `temporalio.types`) or any classes/functions that aren't clear when unqualified.
