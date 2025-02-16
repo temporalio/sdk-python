@@ -1319,7 +1319,7 @@ def decode_typed_search_attributes(
         if not metadata_type:
             continue
         key = temporalio.common.SearchAttributeKey._from_metadata_type(
-            k, v.metadata.get("type").decode()
+            k, metadata_type.decode()
         )
         if not key:
             continue
