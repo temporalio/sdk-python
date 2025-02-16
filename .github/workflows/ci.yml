@@ -48,7 +48,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: python -m pip install --upgrade wheel poethepoet
-      - run: uv sync --no-install-project --all-extras
+      - run: uv sync --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
       - run: poe lint
@@ -84,7 +84,7 @@ jobs:
           TEMPORAL_TEST_PROTO3: 1
         run: |
           uv add --python 3.9 "protobuf<4"
-          uv sync --no-install-project --all-extras
+          uv sync --all-extras
           poe gen-protos
           poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)

@@ -1406,10 +1406,10 @@ git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
 ```
 
-Install the dependencies (`--no-install-project` because we will build it in the next step):
+Install the dependencies:
 
 ```bash
-uv sync --no-install-project --all-extras
+uv sync --all-extras
 ```
 
 #### Build
@@ -1420,7 +1420,7 @@ Now perform the release build:
 environment](#local-sdk-development-environment) for the quicker approach to local development).
 
 ```bash
-poetry build
+uv build
 ```
 
 The compiled wheel doesn't have the exact right tags yet for use, so run this script to fix it:
@@ -1493,7 +1493,7 @@ installing dependencies:
 ```bash
 git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
-uv sync --no-install-project --all-extras
+uv sync --all-extras
 ```
 
 Now compile the Rust extension in develop mode which is quicker than release mode:
@@ -1526,12 +1526,12 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 #### Proto Generation and Testing
 
 To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
-protobuf code, you must be on Python <= 3.10, and then run `uv add "protobuf<4"` +
-`uv sync --no-install-project --all-extras`. Then the protobuf files can be generated via `poe gen-protos`. Tests can be run
-for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
+protobuf code, you must be on Python <= 3.10, and then run `uv add "protobuf<4"` + `uv sync --all-extras`. Then the
+protobuf files can be generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the
+`TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
 
-Do not commit `uv.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files
-and run `uv sync --no-install-project --all-extras`. Make sure you `poe format` the results.
+Do not commit `uv.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files and run
+`uv sync --all-extras`. Make sure you `poe format` the results.
 
 For a less system-intrusive approach, you can:
 ```shell

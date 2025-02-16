@@ -7,7 +7,7 @@ VOLUME ["/api_new", "/bridge_new"]
 COPY ./ ./
 
 RUN mkdir -p ./temporalio/api
-RUN uv sync --no-install-project --all-extras
+RUN uv sync --all-extras
 RUN uv add "protobuf<4"
 RUN poe gen-protos
 
