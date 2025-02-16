@@ -10,10 +10,10 @@ from datetime import timedelta
 from typing import Mapping, Optional, Tuple, Type, TypeVar
 
 import google.protobuf.message
+import temporal_sdk_bridge
+from temporal_sdk_bridge import RPCError
 
 import temporalio.bridge.runtime
-import temporalio.bridge.temporal_sdk_bridge
-from temporalio.bridge.temporal_sdk_bridge import RPCError
 
 
 @dataclass
@@ -94,15 +94,13 @@ class Client:
         """Establish connection with server."""
         return Client(
             runtime,
-            await temporalio.bridge.temporal_sdk_bridge.connect_client(
-                runtime._ref, config
-            ),
+            await temporal_sdk_bridge.connect_client(runtime._ref, config),
         )
 
     def __init__(
         self,
         runtime: temporalio.bridge.runtime.Runtime,
-        ref: temporalio.bridge.temporal_sdk_bridge.ClientRef,
+        ref: temporal_sdk_bridge.ClientRef,
     ):
         """Initialize client with underlying SDK Core reference."""
         self._runtime = runtime
