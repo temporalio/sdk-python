@@ -46,8 +46,9 @@ jobs:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
           version: "23.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: python -m pip install --upgrade wheel poetry poethepoet
-      - run: poetry install --no-root --all-extras
+      - uses: astral-sh/setup-uv@v5
+      - run: python -m pip install --upgrade wheel poethepoet
+      - run: uv sync --no-install-project --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
       - run: poe lint
@@ -82,8 +83,8 @@ jobs:
         env:
           TEMPORAL_TEST_PROTO3: 1
         run: |
-          poetry add --python 3.9 "protobuf<4"
-          poetry install --no-root --all-extras
+          uv add --python 3.9 "protobuf<4"
+          uv sync --no-install-project --all-extras
           poe gen-protos
           poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
