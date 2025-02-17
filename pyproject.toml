@@ -193,6 +193,7 @@ build-backend = "maturin"
 
 [tool.maturin]
 manifest-path = "temporalio/bridge/Cargo.toml"
+python-packages = ["temporalio"]
 
 [tool.uv]
 # Prevent uv commands from building the package by default
