@@ -47,7 +47,7 @@ jobs:
           version: "23.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
-      - run: python -m pip install poethepoet
+      - run: uv tool install poethepoet
       - run: uv sync --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}

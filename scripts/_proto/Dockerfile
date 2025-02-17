@@ -1,7 +1,7 @@
 FROM python:3.10
 
-RUN python -m pip install --upgrade wheel poethepoet
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN uv tool install poethepoet
 VOLUME ["/api_new", "/bridge_new"]
 
 COPY ./ ./
