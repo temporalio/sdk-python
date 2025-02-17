@@ -85,6 +85,7 @@ jobs:
         run: |
           uv add --python 3.9 "protobuf<4"
           uv sync --all-extras
+          poe build-develop
           poe gen-protos
           poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)

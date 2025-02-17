@@ -44,12 +44,9 @@ jobs:
         with:
           workspaces: temporalio/bridge -> target
       - uses: astral-sh/setup-uv@v5
-      # Prepare
-      # Using fixed Poetry version until
-      # https://github.com/python-poetry/poetry/issues/7611 and
-      # https://github.com/python-poetry/poetry/pull/7694 are fixed
-      - run: python -m pip install --upgrade wheel "poetry==1.3.2" poethepoet
+      - run: python -m pip install --upgrade wheel poethepoet
       - run: uv sync --all-extras
+      - run: uv build
 
       # Add the source dist only for Linux x64 for now
       - if: ${{ matrix.package-suffix == 'linux-amd64' }}
