@@ -1395,6 +1395,7 @@ To build the SDK from source for use as a dependency, the following prerequisite
 * [Protobuf Compiler](https://protobuf.dev/)
 
 Use `uv` to install `poe`:
+
 ```bash
 uv tool install poethepoet
 ```
@@ -1423,13 +1424,8 @@ environment](#local-sdk-development-environment) for the quicker approach to loc
 uv build
 ```
 
-The compiled wheel doesn't have the exact right tags yet for use, so run this script to fix it:
 
-```bash
-poe fix-wheel
-```
-
-The `whl` wheel file in `dist/` is now ready to use.
+The `.whl` wheel file in `dist/` is now ready to use.
 
 #### Use
 

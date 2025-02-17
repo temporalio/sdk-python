@@ -1,0 +1,3 @@
+recursive-include temporalio/api *
+recursive-include temporalio/bridge/proto *
+recursive-exclude temporalio/bridge/**/target *
