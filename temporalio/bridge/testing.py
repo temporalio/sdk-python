@@ -8,9 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
-import temporal_sdk_bridge
-
 import temporalio.bridge.runtime
+import temporalio.bridge.temporal_sdk_bridge
 
 
 @dataclass
@@ -54,7 +53,9 @@ class EphemeralServer:
     ) -> EphemeralServer:
         """Start a dev server instance."""
         return EphemeralServer(
-            await temporal_sdk_bridge.start_dev_server(runtime._ref, config)
+            await temporalio.bridge.temporal_sdk_bridge.start_dev_server(
+                runtime._ref, config
+            )
         )
 
     @staticmethod
@@ -63,10 +64,12 @@ class EphemeralServer:
     ) -> EphemeralServer:
         """Start a test server instance."""
         return EphemeralServer(
-            await temporal_sdk_bridge.start_test_server(runtime._ref, config)
+            await temporalio.bridge.temporal_sdk_bridge.start_test_server(
+                runtime._ref, config
+            )
         )
 
-    def __init__(self, ref: temporal_sdk_bridge.EphemeralServerRef):
+    def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.EphemeralServerRef):
         """Initialize an ephemeral server."""
         self._ref = ref
 

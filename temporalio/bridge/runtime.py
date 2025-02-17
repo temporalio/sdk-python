@@ -8,8 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Type
 
-import temporal_sdk_bridge
 from typing_extensions import Protocol
+
+import temporalio.bridge.temporal_sdk_bridge
 
 
 class Runtime:
@@ -18,11 +19,13 @@ class Runtime:
     @staticmethod
     def _raise_in_thread(thread_id: int, exc_type: Type[BaseException]) -> bool:
         """Internal helper for raising an exception in thread."""
-        return temporal_sdk_bridge.raise_in_thread(thread_id, exc_type)
+        return temporalio.bridge.temporal_sdk_bridge.raise_in_thread(
+            thread_id, exc_type
+        )
 
     def __init__(self, *, telemetry: TelemetryConfig) -> None:
         """Create SDK Core runtime."""
-        self._ref = temporal_sdk_bridge.init_runtime(telemetry)
+        self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(telemetry)
 
     def retrieve_buffered_metrics(self, durations_as_seconds: bool) -> Sequence[Any]:
         """Get buffered metrics."""

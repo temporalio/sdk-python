@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from typing import Mapping, Optional, Union
 
-import temporal_sdk_bridge
-
 import temporalio.bridge.runtime
+import temporalio.bridge.temporal_sdk_bridge
 
 
 class MetricMeter:
@@ -18,12 +17,14 @@ class MetricMeter:
     @staticmethod
     def create(runtime: temporalio.bridge.runtime.Runtime) -> Optional[MetricMeter]:
         """Create optional metric meter."""
-        ref = temporal_sdk_bridge.new_metric_meter(runtime._ref)
+        ref = temporalio.bridge.temporal_sdk_bridge.new_metric_meter(runtime._ref)
         if not ref:
             return None
         return MetricMeter(ref)
 
-    def __init__(self, ref: temporal_sdk_bridge.MetricMeterRef) -> None:
+    def __init__(
+        self, ref: temporalio.bridge.temporal_sdk_bridge.MetricMeterRef
+    ) -> None:
         """Initialize metric meter."""
         self._ref = ref
         self._default_attributes = MetricAttributes(self, ref.default_attributes)
@@ -160,7 +161,7 @@ class MetricAttributes:
     def __init__(
         self,
         meter: MetricMeter,
-        ref: temporal_sdk_bridge.MetricAttributesRef,
+        ref: temporalio.bridge.temporal_sdk_bridge.MetricAttributesRef,
     ) -> None:
         """Initialize attributes."""
         self._meter = meter

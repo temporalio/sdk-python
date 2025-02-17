@@ -19,11 +19,6 @@ from typing import (
 )
 
 import google.protobuf.internal.containers
-import temporal_sdk_bridge
-from temporal_sdk_bridge import (
-    CustomSlotSupplier as BridgeCustomSlotSupplier,
-)
-from temporal_sdk_bridge import PollShutdownError
 from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
@@ -34,8 +29,13 @@ import temporalio.bridge.proto.activity_task
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
+import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
+from temporalio.bridge.temporal_sdk_bridge import (
+    CustomSlotSupplier as BridgeCustomSlotSupplier,
+)
+from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
 
 
 @dataclass
@@ -111,22 +111,26 @@ class Worker:
     def create(client: temporalio.bridge.client.Client, config: WorkerConfig) -> Worker:
         """Create a bridge worker from a bridge client."""
         return Worker(
-            temporal_sdk_bridge.new_worker(client._runtime._ref, client._ref, config)
+            temporalio.bridge.temporal_sdk_bridge.new_worker(
+                client._runtime._ref, client._ref, config
+            )
         )
 
     @staticmethod
     def for_replay(
         runtime: temporalio.bridge.runtime.Runtime,
         config: WorkerConfig,
-    ) -> Tuple[Worker, temporal_sdk_bridge.HistoryPusher]:
+    ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
         """Create a bridge replay worker."""
         [
             replay_worker,
             pusher,
-        ] = temporal_sdk_bridge.new_replay_worker(runtime._ref, config)
+        ] = temporalio.bridge.temporal_sdk_bridge.new_replay_worker(
+            runtime._ref, config
+        )
         return Worker(replay_worker), pusher
 
-    def __init__(self, ref: temporal_sdk_bridge.WorkerRef) -> None:
+    def __init__(self, ref: temporalio.bridge.temporal_sdk_bridge.WorkerRef) -> None:
         """Create SDK core worker from a bridge worker."""
         self._ref = ref
 
