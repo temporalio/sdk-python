@@ -1424,13 +1424,8 @@ environment](#local-sdk-development-environment) for the quicker approach to loc
 uv build
 ```
 
-The compiled wheel doesn't have the exact right tags yet for use, so run this script to fix it:
 
-```bash
-poe fix-wheel
-```
-
-The `whl` wheel file in `dist/` is now ready to use.
+The `.whl` wheel file in `dist/` is now ready to use.
 
 #### Use
 
