@@ -44,7 +44,7 @@ jobs:
         with:
           workspaces: temporalio/bridge -> target
       - uses: astral-sh/setup-uv@v5
-      - run: python -m pip install --upgrade wheel poethepoet
+      - run: python -m pip install poethepoet
       - run: uv sync --all-extras
       - run: uv build
 
@@ -52,11 +52,10 @@ jobs:
       - if: ${{ matrix.package-suffix == 'linux-amd64' }}
         run: uv build --sdist
 
-      # Build and fix the wheel
+      # Build the wheel
       - run: uv run cibuildwheel --output-dir dist
-      - run: poe fix-wheel
 
-      # Simple test
+      # Run a test
       - run: uv run pytest -k test_activity_hello
 
       # Upload dist
