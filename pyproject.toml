@@ -89,22 +89,6 @@ lint-types = "uv run mypy --namespace-packages --check-untyped-defs ."
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
 
-# Install local, run single pytest with env var, uninstall local
-[tool.poe.tasks.test-dist-single]
-ignore_fail = "return_non_zero"
-# Has to be a child table due to the Python TOML decoder in many default pips
-# failing on inline table with "Invalid inline table value encountered" because
-# there's a comma (see https://github.com/uiri/toml/issues/348).
-
-[[tool.poe.tasks.test-dist-single.sequence]]
-cmd = "uv pip install --no-index --find-links=./dist temporalio"
-
-[[tool.poe.tasks.test-dist-single.sequence]]
-cmd = "uv run pytest -k test_activity_hello"
-env = { TEMPORAL_INTEGRATION_TEST = "1" }
-
-[[tool.poe.tasks.test-dist-single.sequence]]
-cmd = "uv pip uninstall temporalio -y"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
