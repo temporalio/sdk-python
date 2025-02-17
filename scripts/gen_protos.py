@@ -130,7 +130,7 @@ def check_proto_toolchain_versions():
     so we just run pip and check there.
     """
     proc = subprocess.run(
-        ["pip", "list", "--format", "freeze"],
+        ["uv", "pip", "list", "--format", "freeze"],
         check=True,
         capture_output=True,
         text=True,

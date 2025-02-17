@@ -200,7 +200,7 @@ def make_standard_types_object() -> StandardTypesModel:
     )
 
 
-class StrictStandardTypesModel(StandardTypesModel, strict=True):
+class StrictStandardTypesModel(StandardTypesModel, strict=True):  # type: ignore
     pass
 
 
