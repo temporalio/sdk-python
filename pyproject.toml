@@ -194,6 +194,7 @@ build-backend = "maturin"
 
 [tool.maturin]
 manifest-path = "temporalio/bridge/Cargo.toml"
+module-name = "temporalio.bridge.temporal_sdk_bridge"
 python-packages = ["temporalio"]
 
 [tool.uv]
