@@ -36,7 +36,6 @@ from typing_extensions import Literal, TypedDict
 import temporalio.api.common.v1
 import temporalio.common
 from temporalio.api.common.v1 import Payload, Payloads
-from temporalio.api.common.v1 import Payload as AnotherNameForPayload
 from temporalio.api.failure.v1 import Failure
 from temporalio.common import RawValue
 from temporalio.converter import (

@@ -29,7 +29,7 @@ import temporalio.service
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
-from ._tuning import WorkerTuner, _to_bridge_slot_supplier
+from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
