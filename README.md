@@ -315,7 +315,7 @@ The default data converter supports converting multiple types including:
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
 
-To use pydantic model instances, see [](#pydantic-support).
+To use pydantic model instances, see [Pydantic Support](#pydantic-support).
 
 `datetime.date`, `datetime.time`, and `datetime.datetime` can only be used with the Pydantic data converter.
 
