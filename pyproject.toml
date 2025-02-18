@@ -60,15 +60,16 @@ gen-protos = "uv run python scripts/gen_protos.py"
 lint = [
   {cmd = "uv run ruff check"},
   {cmd = "uv run ruff format --check"},
-  {ref = "lint-types"},
-  {cmd = "uv run pyright"},
+  {ref = "lint-types-mypy"},
+  {ref = "lint-types-pyright"},
   {ref = "lint-docs"},
 ]
 bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "uv run pydocstyle --ignore-decorators=overload"
-lint-types = "uv run mypy --namespace-packages --check-untyped-defs ."
+lint-types-mypy = "uv run mypy --namespace-packages --check-untyped-defs ."
+lint-types-pyright = "uv run pyright"
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
 
