@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "temporalio"
-version = "1.9.0"
+version = "1.10.0"
 description = "Temporal.io Python SDK"
 license = "MIT"
 authors = ["Temporal Technologies Inc <sdk@temporal.io>"]
