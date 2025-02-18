@@ -518,7 +518,7 @@ class _ActivityWorker:
             if running_activity.last_heartbeat_task:
                 try:
                     await running_activity.last_heartbeat_task
-                except:
+                except Exception:
                     # Should never happen because it's trapped in-task
                     temporalio.activity.logger.exception(
                         "Final heartbeat task didn't trap error"
@@ -750,7 +750,7 @@ def _execute_sync_activity(
     if isinstance(heartbeat, SharedHeartbeatSender):
         # To make mypy happy
         heartbeat_sender = heartbeat
-        heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
+        heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(  # noqa: E731
             info.task_token, *details
         )
     else:

@@ -30,7 +30,7 @@ from typing import (
 )
 
 import google.protobuf.internal.containers
-from typing_extensions import ClassVar, NamedTuple, Self, TypeAlias, get_origin
+from typing_extensions import NamedTuple, Self, TypeAlias, get_origin
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1

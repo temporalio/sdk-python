@@ -52,8 +52,6 @@ from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import (
     Client,
-    RPCError,
-    RPCStatusCode,
     WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
@@ -2184,7 +2182,7 @@ async def test_workflow_enhanced_stack_trace(client: Client):
         # Send stack trace query
         trace = await handle.query("__enhanced_stack_trace")
 
-        assert type(trace) == EnhancedStackTrace
+        assert type(trace) is EnhancedStackTrace
 
         assert "never_completing_coroutine" in [
             loc.function_name for stack in trace.stacks for loc in stack.locations
@@ -2225,7 +2223,7 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
 
         # test that a coroutine only has the source as its stack
 
-        assert type(trace) == EnhancedStackTrace
+        assert type(trace) is EnhancedStackTrace
 
         assert "never_completing_coroutine" in [
             loc.function_name for stack in trace.stacks for loc in stack.locations

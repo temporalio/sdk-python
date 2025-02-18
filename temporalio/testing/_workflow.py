@@ -215,10 +215,10 @@ class WorkflowEnvironment:
                 ),
                 server,
             )
-        except:
+        except Exception:
             try:
                 await server.shutdown()
-            except:
+            except Exception:
                 logger.warn(
                     "Failed stopping local server on client connection failure",
                     exc_info=True,
@@ -326,10 +326,10 @@ class WorkflowEnvironment:
                 ),
                 server,
             )
-        except:
+        except Exception:
             try:
                 await server.shutdown()
-            except:
+            except Exception:
                 logger.warn(
                     "Failed stopping test server on client connection failure",
                     exc_info=True,
@@ -474,13 +474,13 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
             await self.client.test_service.lock_time_skipping(
                 temporalio.api.testservice.v1.LockTimeSkippingRequest()
             )
-        except:
+        except Exception:
             # Lock it back, swallowing error
             try:
                 await self.client.test_service.lock_time_skipping(
                     temporalio.api.testservice.v1.LockTimeSkippingRequest()
                 )
-            except:
+            except Exception:
                 logger.exception("Failed locking time skipping after error")
             raise
 
