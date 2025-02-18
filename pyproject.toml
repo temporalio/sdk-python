@@ -83,8 +83,9 @@ testpaths = ["tests"]
 timeout = 600
 timeout_func_only = true
 filterwarnings = [
-  "error::temporalio.workflow.UnfinishedUpdateHandlersWarning",
-  "error::temporalio.workflow.UnfinishedSignalHandlersWarning",
+  # TODO(dan): re-enable these
+  # "error::temporalio.workflow.UnfinishedUpdateHandlersWarning",
+  # "error::temporalio.workflow.UnfinishedSignalHandlersWarning",
   "ignore::pytest.PytestDeprecationWarning",
   "ignore::DeprecationWarning",
 ]
