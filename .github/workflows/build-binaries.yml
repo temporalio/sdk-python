@@ -53,8 +53,17 @@ jobs:
       # Build the wheel
       - run: uv run cibuildwheel --output-dir dist
 
-      # Run a test
-      - run: uv run pytest -k test_activity_hello
+      # Install the wheel in a new venv and run a test
+      - name: Test wheel
+        shell: bash
+        run: |
+          mkdir __test_wheel__
+          cd __test_wheel__
+          cp -r ../tests .
+          python -m venv .venv
+          ./.venv/bin/pip install 'protobuf>=3.20' 'types-protobuf>=3.20' 'typing-extensions<5,>=4.2.0' pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil
+          ./.venv/bin/pip install --no-index --find-links=../dist temporalio
+          ./.venv/bin/python -m pytest -s -k test_workflow_hello
 
       # Upload dist
       - uses: actions/upload-artifact@v4
