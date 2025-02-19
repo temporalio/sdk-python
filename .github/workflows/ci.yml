@@ -46,8 +46,9 @@ jobs:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
           version: "23.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: python -m pip install --upgrade wheel poetry poethepoet
-      - run: poetry install --no-root --all-extras
+      - uses: astral-sh/setup-uv@v5
+      - run: uv tool install poethepoet
+      - run: uv sync --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
       - run: poe lint
@@ -82,8 +83,9 @@ jobs:
         env:
           TEMPORAL_TEST_PROTO3: 1
         run: |
-          poetry add --python 3.9 "protobuf<4"
-          poetry install --no-root --all-extras
+          uv add --python 3.9 "protobuf<4"
+          uv sync --all-extras
+          poe build-develop
           poe gen-protos
           poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
@@ -107,8 +109,9 @@ jobs:
 
   # Runs the sdk features repo tests with this repo's current SDK code
   features-tests:
-    uses: temporalio/features/.github/workflows/python.yaml@main
+    uses: temporalio/features/.github/workflows/python.yaml@uv
     with:
       python-repo-path: ${{github.event.pull_request.head.repo.full_name}}
       version: ${{github.event.pull_request.head.ref}}
       version-is-repo-ref: true
+      features-repo-ref: uv

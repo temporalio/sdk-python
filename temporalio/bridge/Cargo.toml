@@ -2,6 +2,14 @@
 name = "temporal-sdk-bridge"
 version = "0.1.0"
 edition = "2021"
+description = "Python sdk-core bridge"
+license = "MIT"
+repository = "https://github.com/temporalio/sdk-python"
+documentation = "https://docs.temporal.io/dev-guide/python"
+
+[package.metadata.maturin]
+module-name = "temporalio.bridge.temporal_sdk_bridge"
+
 
 [lib]
 name = "temporal_sdk_bridge"
