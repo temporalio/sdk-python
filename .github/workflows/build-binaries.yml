@@ -45,7 +45,6 @@ jobs:
           workspaces: temporalio/bridge -> target
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --all-extras
-      - run: uv build
 
       # Add the source dist only for Linux x64 for now
       - if: ${{ matrix.package-suffix == 'linux-amd64' }}
