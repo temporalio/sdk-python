@@ -184,19 +184,23 @@ class ConnectConfig:
             target_url=target_url,
             api_key=self.api_key,
             tls_config=tls_config,
-            retry_config=self.retry_config._to_bridge_config()
-            if self.retry_config
-            else None,
-            keep_alive_config=self.keep_alive_config._to_bridge_config()
-            if self.keep_alive_config
-            else None,
+            retry_config=(
+                self.retry_config._to_bridge_config() if self.retry_config else None
+            ),
+            keep_alive_config=(
+                self.keep_alive_config._to_bridge_config()
+                if self.keep_alive_config
+                else None
+            ),
             metadata=self.rpc_metadata,
             identity=self.identity,
             client_name="temporal-python",
             client_version=__version__,
-            http_connect_proxy_config=self.http_connect_proxy_config._to_bridge_config()
-            if self.http_connect_proxy_config
-            else None,
+            http_connect_proxy_config=(
+                self.http_connect_proxy_config._to_bridge_config()
+                if self.http_connect_proxy_config
+                else None
+            ),
         )
 
 
