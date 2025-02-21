@@ -6,7 +6,7 @@ import sys
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import List, Mapping, Optional
+from typing import List, Mapping
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
@@ -25,8 +25,8 @@ proto_paths = [
     v
     for v in proto_dir.glob("**/*.proto")
     if not str(v).startswith(str(testsrv_proto_dir / "dependencies"))
-    and not "health" in str(v)
-    and not "google" in str(v)
+    and "health" not in str(v)
+    and "google" not in str(v)
 ]
 proto_paths.extend(test_proto_dir.glob("**/*.proto"))
 proto_paths.extend(additional_proto_dir.glob("**/*.proto"))
@@ -95,7 +95,7 @@ def fix_generated_output(base_path: Path):
         message_names = sorted(message_names)
         if message_names:
             f.write(
-                f'\n__all__ = [\n    "' + '",\n    "'.join(message_names) + '",\n]\n'
+                '\n__all__ = [\n    "' + '",\n    "'.join(message_names) + '",\n]\n'
             )
         # gRPC imports
         if "service_pb2_grpc" in imports:
@@ -115,7 +115,7 @@ def fix_generated_output(base_path: Path):
                 message_names.append(message)
             # __all__
             message_names = sorted(message_names)
-            f.write(f'    __all__.extend(["' + '", "'.join(message_names) + '"])\n')
+            f.write('    __all__.extend(["' + '", "'.join(message_names) + '"])\n')
             f.write("except ImportError:\n    pass")
 
 

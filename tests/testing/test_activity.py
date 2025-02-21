@@ -68,7 +68,7 @@ def test_activity_env_sync():
                     while not activity.is_cancelled():
                         time.sleep(0.2)
                     time.sleep(0.2)
-                except:
+                except Exception:
                     raise RuntimeError("Unexpected")
         except CancelledError:
             nonlocal properly_cancelled
@@ -108,5 +108,5 @@ async def test_activity_env_assert():
     except Exception as err:
         actual_err = err
 
-    assert type(expected_err) == type(actual_err)
+    assert type(expected_err) is type(actual_err)
     assert str(expected_err) == str(actual_err)
