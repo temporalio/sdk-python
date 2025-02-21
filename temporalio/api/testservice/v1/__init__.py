@@ -22,7 +22,7 @@ __all__ = [
 
 # gRPC is optional
 try:
-    import grpc  # noqa # type: ignore
+    import grpc  # noqa: F401
 
     from .service_pb2_grpc import (  # noqa: F401
         TestServiceServicer,
