@@ -59,6 +59,10 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
+with temporalio.workflow.unsafe.imports_passed_through():
+    import xray
+    from google.protobuf.json_format import MessageToJson
+
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -70,6 +74,7 @@ from ._interceptor import (
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
+    StartNexusOperationInput,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
@@ -224,6 +229,7 @@ class _WorkflowInstanceImpl(
         self._pending_timers: Dict[int, _TimerHandle] = {}
         self._pending_activities: Dict[int, _ActivityHandle] = {}
         self._pending_child_workflows: Dict[int, _ChildWorkflowHandle] = {}
+        self._pending_nexus_operations: Dict[int, _NexusOperationHandle] = {}
         self._pending_external_signals: Dict[int, asyncio.Future] = {}
         self._pending_external_cancels: Dict[int, asyncio.Future] = {}
         # Keyed by type
@@ -338,6 +344,19 @@ class _WorkflowInstanceImpl(
     # name.
 
     def activate(
+        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        with xray.start_as_current_span(
+            actor=xray.Actor.WORKFLOW_LANG,
+            workflow_id=self._info.workflow_id,
+            name="handle_activation",
+            request_payload=MessageToJson(act),
+        ) as span:
+            completion = self._activate(act)
+            span.set_attribute("sdk.response.payload", MessageToJson(completion))
+        return completion
+
+    def _activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         # Reset current completion, time, and whether replaying
@@ -482,6 +501,10 @@ class _WorkflowInstanceImpl(
             self._apply_resolve_child_workflow_execution_start(
                 job.resolve_child_workflow_execution_start
             )
+        elif job.HasField("resolve_nexus_operation_start"):
+            self._apply_resolve_nexus_operation_start(job.resolve_nexus_operation_start)
+        elif job.HasField("resolve_nexus_operation"):
+            self._apply_resolve_nexus_operation(job.resolve_nexus_operation)
         elif job.HasField("resolve_request_cancel_external_workflow"):
             self._apply_resolve_request_cancel_external_workflow(
                 job.resolve_request_cancel_external_workflow
@@ -813,6 +836,74 @@ class _WorkflowInstanceImpl(
             )
         else:
             raise RuntimeError("Child workflow start did not have a known status")
+
+    def _apply_resolve_nexus_operation(
+        self,
+        job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperation,
+    ) -> None:
+        handle = self._pending_nexus_operations.get(job.seq)
+        if not handle:
+            raise RuntimeError(
+                f"Failed finding nexus operation handle for sequence {job.seq}"
+            )
+        span = xray.get_current_span()
+        if span:
+            span.add_event(
+                "apply job: resolve_nexus_operation",
+                {
+                    "job": MessageToJson(job),
+                },
+            )
+
+        # TODO(dan): data conversion
+        if job.result.HasField("completed"):
+            ret: Optional[Any] = None
+            ret_types = None
+            # TODO(dan): why is the payload `job.result.completed.result` for
+            # ChildWorkflowExecution yet `job.result.completed` here? And same question for
+            # result.failed.failure and result.cancelled.failure.
+            [ret] = self._convert_payloads(
+                [job.result.completed],
+                ret_types,
+            )
+            span.add_event(
+                "resolve_nexus_operation_success",
+                {"ret_types": str(ret_types), "result": str(ret)},
+            )
+            handle._resolve_success(ret)
+        elif job.result.HasField("failed"):
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    job.result.failed, self._payload_converter
+                )
+            )
+        elif job.result.HasField("cancelled"):
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    job.result.cancelled, self._payload_converter
+                )
+            )
+        else:
+            raise RuntimeError("Nexus operation did not have a result")
+
+    def _apply_resolve_nexus_operation_start(
+        self,
+        job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperationStart,
+    ) -> None:
+        span = xray.get_current_span()
+        span.add_event(
+            "apply job: resolve_nexus_operation_start",
+            {
+                "job": MessageToJson(job),
+            },
+        )
+        # TODO(dan): compare with resolve_child_workflow_execution_start
+        handle = self._pending_nexus_operations.get(job.seq)
+        if not handle:
+            raise RuntimeError(
+                f"Failed finding nexus operation handle for sequence {job.seq}"
+            )
+        handle._resolve_start_success(job.operation_id)
 
     def _apply_resolve_request_cancel_external_workflow(
         self,
@@ -1334,6 +1425,26 @@ class _WorkflowInstanceImpl(
             )
         )
 
+    async def workflow_start_nexus_operation(
+        self,
+        endpoint: str,
+        service: str,
+        operation: str,
+        input: Any,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> asyncio.Task:
+        return await self._outbound.start_nexus_operation(
+            StartNexusOperationInput(
+                endpoint=endpoint,
+                service=service,
+                operation=operation,
+                input=input,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                headers=headers,
+            )
+        )
+
     def workflow_time_ns(self) -> int:
         return self._time_ns
 
@@ -1500,6 +1611,7 @@ class _WorkflowInstanceImpl(
         # Just throw
         raise _ContinueAsNewError(self, input)
 
+    # _outbound_schedule_activity
     def _outbound_schedule_activity(
         self,
         input: Union[StartActivityInput, StartLocalActivityInput],
@@ -1580,6 +1692,7 @@ class _WorkflowInstanceImpl(
             temporalio.common._apply_headers(input.headers, v.headers)
         await self._signal_external_workflow(command)
 
+    # _outbound_start_child_workflow
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> _ChildWorkflowHandle:
@@ -1632,6 +1745,36 @@ class _WorkflowInstanceImpl(
                 return handle
             except asyncio.CancelledError:
                 apply_child_cancel_error()
+
+    async def _outbound_start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> asyncio.Task:
+        # Function that runs in the handle
+        async def run_nexus() -> Any:
+            nonlocal handle
+            while True:
+                assert handle
+                try:
+                    # We have to shield because we don't want the future itself
+                    # to be cancelled
+                    return await asyncio.shield(handle._result_fut)
+                except asyncio.CancelledError:
+                    raise NotImplementedError("Nexus operation cancel not implemented")
+
+        handle = _NexusOperationHandle(
+            self, self._next_seq("nexus_operation"), input, run_nexus()
+        )
+        handle._apply_schedule_command()
+        self._pending_nexus_operations[handle._seq] = handle
+        # Wait on start before returning
+        while True:
+            try:
+                # We have to shield because we don't want the future itself
+                # to be cancelled
+                await asyncio.shield(handle._start_fut)
+                return handle._task
+            except asyncio.CancelledError:
+                raise NotImplementedError("Nexus operation cancel not implemented")
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
@@ -2332,6 +2475,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         return await self._instance._outbound_start_child_workflow(input)
 
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> asyncio.Task:
+        return await self._instance._outbound_start_nexus_operation(input)
+
     def start_local_activity(
         self, input: StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle[Any]:
@@ -2533,6 +2681,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             command.request_cancel_local_activity.seq = self._seq
 
 
+# _ChildWorkflowHandle
 class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def __init__(
         self,
@@ -2716,6 +2865,83 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         if self._run_id:
             v.workflow_execution.run_id = self._run_id
         await self._instance._cancel_external_workflow(command)
+
+
+class _NexusOperationHandle:
+    def __init__(
+        self,
+        instance: _WorkflowInstanceImpl,
+        seq: int,
+        input: StartNexusOperationInput,
+        fn: Coroutine[Any, Any, Any],
+    ):
+        self._instance = instance
+        self._seq = seq
+        self._input = input
+        self._task = asyncio.Task(fn)
+        self._start_fut: asyncio.Future[None] = instance.create_future()
+        self._result_fut: asyncio.Future[Any] = instance.create_future()
+        self._operation_id: Optional[str] = None
+
+    def _resolve_start_success(self, operation_id: str) -> None:
+        span = xray.get_current_span()
+        span.add_event("_resolve_start_success", {"operation_id": operation_id})
+        self._operation_id = operation_id
+        # We intentionally let this error if already done
+        print(f"🟢 _resolve_start_success: operation_id: {operation_id}")
+        self._start_fut.set_result(None)
+
+    def _resolve_success(self, result: Any) -> None:
+        span = xray.get_current_span()
+        span.add_event(
+            "_resolve_success",
+            {
+                "operation_id": self._operation_id or "",
+                "result": str(result),
+            },
+        )
+        # We intentionally let this error if already done
+        print(
+            f"🟢 _resolve_success: operation_id: {self._operation_id} result: {result}"
+        )
+        self._result_fut.set_result(result)
+
+    def _resolve_failure(self, err: BaseException) -> None:
+        span = xray.get_current_span()
+        span.add_event(
+            "_resolve_failure",
+            {
+                "operation_id": self._operation_id or "",
+                "error": str(err),
+            },
+        )
+        print(f"🔴 _resolve_failure: operation_id: {self._operation_id} err: {err}")
+        if self._start_fut.done():
+            # We intentionally let this error if already done
+            self._result_fut.set_exception(err)
+        else:
+            self._start_fut.set_exception(err)
+            # Set the result as none to avoid Python warning about unhandled
+            # future
+            self._result_fut.set_result(None)
+
+    def _apply_schedule_command(self) -> None:
+        command = self._instance._add_command()
+        v = command.schedule_nexus_operation
+        v.seq = self._seq
+        v.endpoint = self._input.endpoint
+        v.service = self._input.service
+        v.operation = self._input.operation
+        v.input.CopyFrom(
+            self._instance._payload_converter.to_payload(self._input.input)
+        )
+        if self._input.schedule_to_close_timeout is not None:
+            v.schedule_to_close_timeout.FromTimedelta(
+                self._input.schedule_to_close_timeout
+            )
+        if self._input.headers:
+            for key, val in self._input.headers.items():
+                v.nexus_header[key] = val
 
 
 class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):

@@ -29,7 +29,8 @@ import temporalio.service
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
-from ._tuning import WorkerTuner, _to_bridge_slot_supplier
+from ._nexus import _NexusWorker
+from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -53,6 +54,7 @@ class Worker:
         task_queue: str,
         activities: Sequence[Callable] = [],
         workflows: Sequence[Type] = [],
+        nexus_services: Sequence[Any] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
@@ -92,11 +94,13 @@ class Worker:
                 client's underlying service client. This client cannot be
                 "lazy".
             task_queue: Required task queue for this worker.
-            activities: Set of activity callables decorated with
+            activities: Activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
-            workflows: Set of workflow classes decorated with
+            workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
+            nexus_services: Nexus service instances decorated with
+                :py:func:`@nexusrpc.handler.service<nexusrpc.handler.service>`.
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async.
                 :py:class:`concurrent.futures.ThreadPoolExecutor` is
@@ -324,6 +328,18 @@ class Worker:
                 disable_safe_eviction=disable_safe_workflow_eviction,
             )
 
+        self._nexus_worker: Optional[_NexusWorker] = None
+        if nexus_services:
+            self._nexus_worker = _NexusWorker(
+                bridge_worker=lambda: self._bridge_worker,
+                client=client,
+                task_queue=task_queue,
+                nexus_services=nexus_services,
+                data_converter=client_config["data_converter"],
+                interceptors=interceptors,
+                metric_meter=self._runtime.metric_meter,
+            )
+
         if tuner is not None:
             if (
                 max_concurrent_workflow_tasks
@@ -490,6 +506,8 @@ class Worker:
             tasks.append(asyncio.create_task(self._activity_worker.run()))
         if self._workflow_worker:
             tasks.append(asyncio.create_task(self._workflow_worker.run()))
+        if self._nexus_worker:
+            tasks.append(asyncio.create_task(self._nexus_worker.run()))
 
         # Wait for either worker or shutdown requested
         wait_task = asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
