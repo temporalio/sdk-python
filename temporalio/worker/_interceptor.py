@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 from dataclasses import dataclass
 from datetime import timedelta
@@ -286,6 +287,18 @@ class StartChildWorkflowInput:
 
 
 @dataclass
+class StartNexusOperationInput:
+    """Input for :py:meth:`WorkflowOutboundInterceptor.start_nexus_operation`."""
+
+    endpoint: str
+    service: str
+    operation: str
+    input: Any
+    schedule_to_close_timeout: Optional[timedelta]
+    headers: Optional[Mapping[str, str]]
+
+
+@dataclass
 class StartLocalActivityInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_local_activity`."""
 
@@ -409,3 +422,9 @@ class WorkflowOutboundInterceptor:
         and :py:func:`temporalio.workflow.execute_local_activity` call.
         """
         return self.next.start_local_activity(input)
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> asyncio.Task:
+        """Called for every :py:func:`temporalio.workflow.start_nexus_operation` call."""
+        return await self.next.start_nexus_operation(input)
