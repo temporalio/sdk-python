@@ -52,8 +52,6 @@ from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import (
     Client,
-    RPCError,
-    RPCStatusCode,
     WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
@@ -222,7 +220,7 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         assert info["retry_policy"] == json.loads(
             json.dumps(dataclasses.asdict(retry_policy), default=str)
         )
-        assert uuid.UUID(info["run_id"]).version == 4
+        assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
         datetime.fromisoformat(info["start_time"])
         assert info["task_queue"] == worker.task_queue
@@ -2184,7 +2182,7 @@ async def test_workflow_enhanced_stack_trace(client: Client):
         # Send stack trace query
         trace = await handle.query("__enhanced_stack_trace")
 
-        assert type(trace) == EnhancedStackTrace
+        assert type(trace) is EnhancedStackTrace
 
         assert "never_completing_coroutine" in [
             loc.function_name for stack in trace.stacks for loc in stack.locations
@@ -2225,7 +2223,7 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
 
         # test that a coroutine only has the source as its stack
 
-        assert type(trace) == EnhancedStackTrace
+        assert type(trace) is EnhancedStackTrace
 
         assert "never_completing_coroutine" in [
             loc.function_name for stack in trace.stacks for loc in stack.locations

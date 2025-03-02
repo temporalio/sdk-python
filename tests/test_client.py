@@ -381,7 +381,7 @@ async def test_query(client: Client, worker: ExternalWorker):
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Try a query not on the workflow
-    with pytest.raises(WorkflowQueryFailedError) as err:
+    with pytest.raises(WorkflowQueryFailedError):
         await handle.query("does not exist")
 
 

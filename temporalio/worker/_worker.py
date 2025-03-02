@@ -29,7 +29,7 @@ import temporalio.service
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
-from ._tuning import WorkerTuner, _to_bridge_slot_supplier
+from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -504,7 +504,7 @@ class Worker:
                 if self._config["on_fatal_error"]:
                     try:
                         await self._config["on_fatal_error"](exception)
-                    except:
+                    except Exception:
                         logger.warning("Fatal error handler failed")
 
         except asyncio.CancelledError as user_cancel_err:
@@ -560,7 +560,7 @@ class Worker:
         # Do final shutdown
         try:
             await self._bridge_worker.finalize_shutdown()
-        except:
+        except Exception:
             # Ignore errors here that can arise in some tests where the bridge
             # worker still has a reference
             pass
