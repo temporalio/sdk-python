@@ -75,9 +75,7 @@ class Runtime:
 
         Each new runtime creates a new internal thread pool, so use sparingly.
         """
-        self._core_runtime = temporalio.bridge.runtime.Runtime(
-            telemetry=telemetry._to_bridge_config()
-        )
+        self._core_runtime = temporalio.bridge.runtime.Runtime(telemetry=telemetry._to_bridge_config())
         if isinstance(telemetry.metrics, MetricBuffer):
             telemetry.metrics._runtime = self
         core_meter = temporalio.bridge.metric.MetricMeter.create(self._core_runtime)
@@ -134,16 +132,12 @@ class LoggingConfig:
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.LoggingConfig:
         return temporalio.bridge.runtime.LoggingConfig(
-            filter=self.filter
-            if isinstance(self.filter, str)
-            else self.filter.formatted(),
+            filter=self.filter if isinstance(self.filter, str) else self.filter.formatted(),
             forward_to=None if not self.forwarding else self.forwarding._on_logs,
         )
 
 
-LoggingConfig.default = LoggingConfig(
-    filter=TelemetryFilter(core_level="WARN", other_level="ERROR")
-)
+LoggingConfig.default = LoggingConfig(filter=TelemetryFilter(core_level="WARN", other_level="ERROR"))
 
 _module_start_time = time.time()
 
@@ -186,9 +180,7 @@ class LogForwardingConfig:
     """If true, the default, the extra fields dict is appended to the
     message."""
 
-    def _on_logs(
-        self, logs: Sequence[temporalio.bridge.runtime.BufferedLogEntry]
-    ) -> None:
+    def _on_logs(self, logs: Sequence[temporalio.bridge.runtime.BufferedLogEntry]) -> None:
         for log in logs:
             # Don't go further if not enabled
             level = log.level
@@ -246,9 +238,7 @@ class OpenTelemetryConfig:
     url: str
     headers: Optional[Mapping[str, str]] = None
     metric_periodicity: Optional[timedelta] = None
-    metric_temporality: OpenTelemetryMetricTemporality = (
-        OpenTelemetryMetricTemporality.CUMULATIVE
-    )
+    metric_temporality: OpenTelemetryMetricTemporality = OpenTelemetryMetricTemporality.CUMULATIVE
     durations_as_seconds: bool = False
     http: bool = False
 
@@ -257,13 +247,9 @@ class OpenTelemetryConfig:
             url=self.url,
             headers=self.headers or {},
             metric_periodicity_millis=(
-                None
-                if not self.metric_periodicity
-                else round(self.metric_periodicity.total_seconds() * 1000)
+                None if not self.metric_periodicity else round(self.metric_periodicity.total_seconds() * 1000)
             ),
-            metric_temporality_delta=(
-                self.metric_temporality == OpenTelemetryMetricTemporality.DELTA
-            ),
+            metric_temporality_delta=(self.metric_temporality == OpenTelemetryMetricTemporality.DELTA),
             durations_as_seconds=self.durations_as_seconds,
             http=self.http,
         )
@@ -277,6 +263,7 @@ class PrometheusConfig:
     counters_total_suffix: bool = False
     unit_suffix: bool = False
     durations_as_seconds: bool = False
+    histogram_bucket_overrides: Optional[Mapping[str, Sequence[float]]] = None
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.PrometheusConfig:
         return temporalio.bridge.runtime.PrometheusConfig(
@@ -284,6 +271,7 @@ class PrometheusConfig:
             counters_total_suffix=self.counters_total_suffix,
             unit_suffix=self.unit_suffix,
             durations_as_seconds=self.durations_as_seconds,
+            histogram_bucket_overrides=self.histogram_bucket_overrides,
         )
 
 
@@ -326,9 +314,7 @@ class MetricBuffer:
         """
         self._buffer_size = buffer_size
         self._runtime: Optional[Runtime] = None
-        self._durations_as_seconds = (
-            duration_format == MetricBufferDurationFormat.SECONDS
-        )
+        self._durations_as_seconds = duration_format == MetricBufferDurationFormat.SECONDS
 
     def retrieve_updates(self) -> Sequence[BufferedMetricUpdate]:
         """Drain the buffer and return all metric updates.
@@ -342,9 +328,7 @@ class MetricBuffer:
         """
         if not self._runtime:
             raise RuntimeError("Attempting to retrieve updates before runtime created")
-        return self._runtime._core_runtime.retrieve_buffered_metrics(
-            self._durations_as_seconds
-        )
+        return self._runtime._core_runtime.retrieve_buffered_metrics(self._durations_as_seconds)
 
 
 @dataclass(frozen=True)
@@ -379,9 +363,7 @@ class TelemetryConfig:
                 prometheus=None
                 if not isinstance(self.metrics, PrometheusConfig)
                 else self.metrics._to_bridge_config(),
-                buffered_with_size=0
-                if not isinstance(self.metrics, MetricBuffer)
-                else self.metrics._buffer_size,
+                buffered_with_size=0 if not isinstance(self.metrics, MetricBuffer) else self.metrics._buffer_size,
                 attach_service_name=self.attach_service_name,
                 global_tags=self.global_tags or None,
                 metric_prefix=self.metric_prefix,
@@ -491,9 +473,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
             name,
             description,
             unit,
-            temporalio.bridge.metric.MetricCounter(
-                self._core_meter, name, description, unit
-            ),
+            temporalio.bridge.metric.MetricCounter(self._core_meter, name, description, unit),
             self._core_attrs,
         )
 
@@ -504,9 +484,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
             name,
             description,
             unit,
-            temporalio.bridge.metric.MetricHistogram(
-                self._core_meter, name, description, unit
-            ),
+            temporalio.bridge.metric.MetricHistogram(self._core_meter, name, description, unit),
             self._core_attrs,
         )
 
@@ -517,9 +495,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
             name,
             description,
             unit,
-            temporalio.bridge.metric.MetricHistogramFloat(
-                self._core_meter, name, description, unit
-            ),
+            temporalio.bridge.metric.MetricHistogramFloat(self._core_meter, name, description, unit),
             self._core_attrs,
         )
 
@@ -530,9 +506,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
             name,
             description,
             unit,
-            temporalio.bridge.metric.MetricHistogramDuration(
-                self._core_meter, name, description, unit
-            ),
+            temporalio.bridge.metric.MetricHistogramDuration(self._core_meter, name, description, unit),
             self._core_attrs,
         )
 
@@ -543,9 +517,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
             name,
             description,
             unit,
-            temporalio.bridge.metric.MetricGauge(
-                self._core_meter, name, description, unit
-            ),
+            temporalio.bridge.metric.MetricGauge(self._core_meter, name, description, unit),
             self._core_attrs,
         )
 
@@ -556,9 +528,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
             name,
             description,
             unit,
-            temporalio.bridge.metric.MetricGaugeFloat(
-                self._core_meter, name, description, unit
-            ),
+            temporalio.bridge.metric.MetricGaugeFloat(self._core_meter, name, description, unit),
             self._core_attrs,
         )
 
@@ -601,9 +571,7 @@ class _MetricCommon(temporalio.common.MetricCommon, Generic[_CoreMetricType]):
     def unit(self) -> Optional[str]:
         return self._unit
 
-    def with_additional_attributes(
-        self, additional_attributes: temporalio.common.MetricAttributes
-    ) -> Self:
+    def with_additional_attributes(self, additional_attributes: temporalio.common.MetricAttributes) -> Self:
         return self.__class__(
             self._name,
             self._description,
@@ -679,16 +647,12 @@ class _MetricHistogramTimedelta(
         if additional_attributes:
             core_attrs = core_attrs.with_additional_attributes(additional_attributes)
         self._core_metric.record(
-            (value.days * 86400 * 1000)
-            + (value.seconds * 1000)
-            + (value.microseconds // 1000),
+            (value.days * 86400 * 1000) + (value.seconds * 1000) + (value.microseconds // 1000),
             core_attrs,
         )
 
 
-class _MetricGauge(
-    temporalio.common.MetricGauge, _MetricCommon[temporalio.bridge.metric.MetricGauge]
-):
+class _MetricGauge(temporalio.common.MetricGauge, _MetricCommon[temporalio.bridge.metric.MetricGauge]):
     def set(
         self,
         value: int,

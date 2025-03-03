@@ -19,9 +19,7 @@ class Runtime:
     @staticmethod
     def _raise_in_thread(thread_id: int, exc_type: Type[BaseException]) -> bool:
         """Internal helper for raising an exception in thread."""
-        return temporalio.bridge.temporal_sdk_bridge.raise_in_thread(
-            thread_id, exc_type
-        )
+        return temporalio.bridge.temporal_sdk_bridge.raise_in_thread(thread_id, exc_type)
 
     def __init__(self, *, telemetry: TelemetryConfig) -> None:
         """Create SDK Core runtime."""
@@ -80,6 +78,7 @@ class PrometheusConfig:
     counters_total_suffix: bool
     unit_suffix: bool
     durations_as_seconds: bool
+    histogram_bucket_overrides: Optional[Mapping[str, Sequence[float]]] = None
 
 
 @dataclass(frozen=True)
