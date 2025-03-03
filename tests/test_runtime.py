@@ -1,3 +1,5 @@
+import re
+
 import logging
 import logging.handlers
 import queue
@@ -5,7 +7,7 @@ import uuid
 from typing import List, cast
 from urllib.request import urlopen
 
-from temporalio import workflow
+from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.runtime import (
     LogForwardingConfig,
@@ -33,18 +35,14 @@ async def test_different_runtimes(client: Client):
     client1 = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
-        runtime=Runtime(
-            telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr1))
-        ),
+        runtime=Runtime(telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr1))),
     )
 
     prom_addr2 = f"127.0.0.1:{find_free_port()}"
     client2 = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
-        runtime=Runtime(
-            telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr2))
-        ),
+        runtime=Runtime(telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr2))),
     )
 
     async def run_workflow(client: Client):
@@ -97,19 +95,12 @@ async def test_runtime_log_forwarding():
     # Check the expected records
     await assert_eq_eventually(2, log_queue_len)
     assert log_queue_list[0].levelno == logging.INFO
-    assert log_queue_list[0].message.startswith(
-        "[sdk_core::temporal_sdk_bridge::runtime] info1"
-    )
-    assert (
-        log_queue_list[0].name
-        == f"{logger.name}-sdk_core::temporal_sdk_bridge::runtime"
-    )
+    assert log_queue_list[0].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info1")
+    assert log_queue_list[0].name == f"{logger.name}-sdk_core::temporal_sdk_bridge::runtime"
     assert log_queue_list[0].created == log_queue_list[0].temporal_log.time  # type: ignore
     assert log_queue_list[0].temporal_log.fields == {"extra_data": "extra1"}  # type: ignore
     assert log_queue_list[1].levelno == logging.INFO
-    assert log_queue_list[1].message.startswith(
-        "[sdk_core::temporal_sdk_bridge::runtime] info3"
-    )
+    assert log_queue_list[1].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info3")
 
     # Clear logs and enable debug and try again
     log_queue_list.clear()
@@ -119,17 +110,11 @@ async def test_runtime_log_forwarding():
     runtime._core_runtime.write_test_info_log("info6", "extra6")
     await assert_eq_eventually(3, log_queue_len)
     assert log_queue_list[0].levelno == logging.INFO
-    assert log_queue_list[0].message.startswith(
-        "[sdk_core::temporal_sdk_bridge::runtime] info4"
-    )
+    assert log_queue_list[0].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info4")
     assert log_queue_list[1].levelno == logging.DEBUG
-    assert log_queue_list[1].message.startswith(
-        "[sdk_core::temporal_sdk_bridge::runtime] debug5"
-    )
+    assert log_queue_list[1].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] debug5")
     assert log_queue_list[2].levelno == logging.INFO
-    assert log_queue_list[2].message.startswith(
-        "[sdk_core::temporal_sdk_bridge::runtime] info6"
-    )
+    assert log_queue_list[2].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info6")
 
 
 @workflow.defn
@@ -170,9 +155,7 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
 
         # Wait for log to appear
         async def has_log() -> bool:
-            return any(
-                l for l in log_queue_list if "Failing workflow task" in l.message
-            )
+            return any(l for l in log_queue_list if "Failing workflow task" in l.message)
 
         await assert_eq_eventually(True, has_log)
 
@@ -181,3 +164,54 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
     assert record.levelno == logging.WARNING
     assert record.name == f"{logger.name}-sdk_core::temporal_sdk_core::worker::workflow"
     assert record.temporal_log.fields["run_id"] == handle.result_run_id  # type: ignore
+
+
+async def test_prometheus_histogram_bucket_overrides(client: Client):
+    # Set up a Prometheus configuration with custom histogram bucket overrides
+    prom_addr = f"127.0.0.1:{find_free_port()}"
+    special_value = float(1234.5678)
+    histogram_overrides = {
+        "temporal_long_request_latency": [special_value / 2, special_value],
+        "temporal_workflow_endtoend_latency": [special_value / 2, special_value],
+    }
+    client_with_overrides = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=Runtime(
+            telemetry=TelemetryConfig(
+                metrics=PrometheusConfig(
+                    bind_address=prom_addr,
+                    counters_total_suffix=False,
+                    unit_suffix=False,
+                    durations_as_seconds=False,
+                    histogram_bucket_overrides=histogram_overrides,
+                )
+            )
+        ),
+    )
+
+    async def run_workflow(client: Client):
+        task_queue = f"task-queue-{uuid.uuid4()}"
+        async with Worker(
+            client,
+            task_queue=task_queue,
+            workflows=[HelloWorkflow],
+        ):
+            assert "Hello, World!" == await client.execute_workflow(
+                HelloWorkflow.run,
+                "World",
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+    await run_workflow(client_with_overrides)
+
+    with urlopen(url=f"http://{prom_addr}/metrics") as f:
+        metrics_output = f.read().decode("utf-8")
+
+        for key, buckets in histogram_overrides.items():
+            assert key in metrics_output
+            for bucket in buckets:
+                # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
+                regex = re.compile(f'{key}_bucket.*le="{bucket}"')
+                assert regex.search(metrics_output) is not None, f"Expected {bucket} in '{key}' histogram"
