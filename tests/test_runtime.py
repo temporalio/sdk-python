@@ -34,11 +34,7 @@ async def test_different_runtimes(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=Runtime(
-            telemetry=TelemetryConfig(
-                metrics=PrometheusConfig(
-                    bind_address=prom_addr1,
-                )
-            )
+            telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr1))
         ),
     )
 
@@ -46,7 +42,9 @@ async def test_different_runtimes(client: Client):
     client2 = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
-        runtime=Runtime(telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr2))),
+        runtime=Runtime(
+            telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr2))
+        ),
     )
 
     async def run_workflow(client: Client):
@@ -99,12 +97,19 @@ async def test_runtime_log_forwarding():
     # Check the expected records
     await assert_eq_eventually(2, log_queue_len)
     assert log_queue_list[0].levelno == logging.INFO
-    assert log_queue_list[0].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info1")
-    assert log_queue_list[0].name == f"{logger.name}-sdk_core::temporal_sdk_bridge::runtime"
+    assert log_queue_list[0].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info1"
+    )
+    assert (
+        log_queue_list[0].name
+        == f"{logger.name}-sdk_core::temporal_sdk_bridge::runtime"
+    )
     assert log_queue_list[0].created == log_queue_list[0].temporal_log.time  # type: ignore
     assert log_queue_list[0].temporal_log.fields == {"extra_data": "extra1"}  # type: ignore
     assert log_queue_list[1].levelno == logging.INFO
-    assert log_queue_list[1].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info3")
+    assert log_queue_list[1].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info3"
+    )
 
     # Clear logs and enable debug and try again
     log_queue_list.clear()
@@ -114,11 +119,17 @@ async def test_runtime_log_forwarding():
     runtime._core_runtime.write_test_info_log("info6", "extra6")
     await assert_eq_eventually(3, log_queue_len)
     assert log_queue_list[0].levelno == logging.INFO
-    assert log_queue_list[0].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info4")
+    assert log_queue_list[0].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info4"
+    )
     assert log_queue_list[1].levelno == logging.DEBUG
-    assert log_queue_list[1].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] debug5")
+    assert log_queue_list[1].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] debug5"
+    )
     assert log_queue_list[2].levelno == logging.INFO
-    assert log_queue_list[2].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info6")
+    assert log_queue_list[2].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info6"
+    )
 
 
 @workflow.defn
@@ -159,7 +170,9 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
 
         # Wait for log to appear
         async def has_log() -> bool:
-            return any(l for l in log_queue_list if "Failing workflow task" in l.message)
+            return any(
+                l for l in log_queue_list if "Failing workflow task" in l.message
+            )
 
         await assert_eq_eventually(True, has_log)
 
