@@ -65,6 +65,7 @@ pub struct MetricsConfig {
     attach_service_name: bool,
     global_tags: Option<HashMap<String, String>>,
     metric_prefix: Option<String>,
+    histogram_bucket_overrides: Option<HashMap<String, Vec<f64>>>,
 }
 
 #[derive(FromPyObject)]
@@ -83,6 +84,7 @@ pub struct PrometheusConfig {
     counters_total_suffix: bool,
     unit_suffix: bool,
     durations_as_seconds: bool,
+    histogram_bucket_overrides: Option<HashMap<String, Vec<f64>>>,
 }
 
 const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
@@ -346,6 +348,11 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
                 .use_seconds_for_durations(prom_conf.durations_as_seconds);
             if let Some(global_tags) = conf.global_tags {
                 build.global_tags(global_tags);
+            }
+            if let Some(overrides) = prom_conf.histogram_bucket_overrides {
+                build.histogram_bucket_overrides(temporal_sdk_core_api::telemetry::HistogramBucketOverrides {
+                    overrides,
+                });
             }
             let prom_options = build.build().map_err(|err| {
                 PyValueError::new_err(format!("Invalid Prometheus config: {}", err))
