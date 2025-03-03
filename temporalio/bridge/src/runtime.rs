@@ -57,9 +57,11 @@ pub struct BufferedLogEntry {
 
 #[derive(FromPyObject)]
 pub struct MetricsConfig {
+    // These fields are mutually exclusive
     opentelemetry: Option<OpenTelemetryConfig>,
     prometheus: Option<PrometheusConfig>,
     buffered_with_size: usize,
+
     attach_service_name: bool,
     global_tags: Option<HashMap<String, String>>,
     metric_prefix: Option<String>,
@@ -162,7 +164,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
                     .into_iter()
                     .map(|core_log| BufferedLogEntry { core_log })
                     .collect::<Vec<_>>();
-                // We silently swallowed errors here because logging them could
+                // We silently swallow errors here because logging them could
                 // cause a bad loop and we don't want to assume console presence
                 let _ = Python::with_gil(|py| callback.call1(py, (entries,)));
             }
