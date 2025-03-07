@@ -192,7 +192,7 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     histogram_overrides = {
         "temporal_long_request_latency": [special_value / 2, special_value],
         "custom_histogram": [special_value / 2, special_value],
-        # "temporal_workflow_endtoend_latency": [special_value / 2, special_value], # This still does not work :(
+        # "temporal_workflow_endtoend_latency": [special_value / 2, special_value],  # This still does not work :(
     }
 
     runtime = Runtime(
@@ -238,9 +238,6 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
     with urlopen(url=f"http://{prom_addr}/metrics") as f:
         metrics_output = f.read().decode("utf-8")
-
-        with open("metrics_output.txt", "w") as f:
-            f.write(metrics_output)
 
         for key, buckets in histogram_overrides.items():
             assert key in metrics_output
