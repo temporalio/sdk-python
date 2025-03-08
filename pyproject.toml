@@ -71,7 +71,7 @@ lint-docs = "uv run pydocstyle --ignore-decorators=overload"
 lint-types-mypy = "uv run mypy --namespace-packages --check-untyped-defs ."
 lint-types-pyright = "uv run pyright"
 run-bench = "uv run python scripts/run_bench.py"
-test = "uv run pytest -E 2.tcp.ngrok.io:18184"
+test = "uv run pytest"
 
 [tool.ruff]
 target-version = "py39"
