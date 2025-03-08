@@ -926,7 +926,7 @@ class DefaultFailureConverter(FailureConverter):
                     stack_trace = encoded_attributes.get("stack_trace")
                     if isinstance(stack_trace, str):
                         failure.stack_trace = stack_trace
-            except Exception:
+            except BaseException:
                 pass
 
         err: temporalio.exceptions.FailureError

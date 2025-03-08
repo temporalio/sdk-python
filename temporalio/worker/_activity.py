@@ -518,7 +518,7 @@ class _ActivityWorker:
             if running_activity.last_heartbeat_task:
                 try:
                     await running_activity.last_heartbeat_task
-                except Exception:
+                except BaseException:
                     # Should never happen because it's trapped in-task
                     temporalio.activity.logger.exception(
                         "Final heartbeat task didn't trap error"

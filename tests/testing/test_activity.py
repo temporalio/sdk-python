@@ -68,7 +68,7 @@ def test_activity_env_sync():
                     while not activity.is_cancelled():
                         time.sleep(0.2)
                     time.sleep(0.2)
-                except Exception:
+                except BaseException:
                     raise RuntimeError("Unexpected")
         except CancelledError:
             nonlocal properly_cancelled

@@ -215,10 +215,10 @@ class WorkflowEnvironment:
                 ),
                 server,
             )
-        except Exception:
+        except BaseException:
             try:
                 await server.shutdown()
-            except Exception:
+            except BaseException:
                 logger.warn(
                     "Failed stopping local server on client connection failure",
                     exc_info=True,
@@ -326,10 +326,10 @@ class WorkflowEnvironment:
                 ),
                 server,
             )
-        except Exception:
+        except BaseException:
             try:
                 await server.shutdown()
-            except Exception:
+            except BaseException:
                 logger.warn(
                     "Failed stopping test server on client connection failure",
                     exc_info=True,

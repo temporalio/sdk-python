@@ -207,7 +207,7 @@ class LogForwardingConfig:
                 # just in case)
                 try:
                     message += f" {log.fields}"
-                except Exception:
+                except BaseException:
                     pass
             record = self.logger.makeRecord(
                 name,
