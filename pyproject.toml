@@ -78,6 +78,21 @@ target-version = "py39"
 exclude = ["*_pb2.py", "*_pb2_grpc.py"]
 lint.ignore = ["E741"]  # we occasionally use e.g. O as a type var and l as a loop variable
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Do not use log_cli since this shows logging for all tests, not just the ones
+# that failed. Instead, show all logs for failed tests at the end.
+log_level = "DEBUG"
+log_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+testpaths = ["tests"]
+timeout = 600
+timeout_func_only = true
+filterwarnings = [
+  "error::temporalio.workflow.UnfinishedUpdateHandlersWarning",
+  "error::temporalio.workflow.UnfinishedSignalHandlersWarning",
+  "ignore::pytest.PytestDeprecationWarning",
+  "ignore::DeprecationWarning",
+]
 
 [tool.cibuildwheel]
 before-all = "pip install protoc-wheel-0"
@@ -189,20 +204,3 @@ exclude = [
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-# Do not use log_cli since this shows logging for all tests, not just the ones
-# that failed. Instead, show all logs for failed tests at the end.
-log_level = "DEBUG"
-log_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-testpaths = ["tests"]
-timeout = 600
-timeout_func_only = true
-filterwarnings = [
-  "error::temporalio.workflow.UnfinishedUpdateHandlersWarning",
-  "error::temporalio.workflow.UnfinishedSignalHandlersWarning",
-  "ignore::pytest.PytestDeprecationWarning",
-  "ignore::DeprecationWarning",
-]
-
