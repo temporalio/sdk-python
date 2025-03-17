@@ -1175,9 +1175,9 @@ async def sleep(
             This can be in single-line Temporal markdown format.
     """
     await _Runtime.current().workflow_sleep(
-        duration=(
-            duration.total_seconds() if isinstance(duration, timedelta) else duration
-        ),
+        duration=duration.total_seconds()
+        if isinstance(duration, timedelta)
+        else duration,
         summary=summary,
     )
 
