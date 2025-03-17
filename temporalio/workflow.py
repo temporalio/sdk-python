@@ -129,7 +129,7 @@ def defn(
             cannot be set if dynamic is set.
         sandboxed: Whether the workflow should run in a sandbox. Default is
             true.
-        dynamic: If true, this activity will be dynamic. Dynamic workflows have
+        dynamic: If true, this workflow will be dynamic. Dynamic workflows have
             to accept a single 'Sequence[RawValue]' parameter. This cannot be
             set to true if name is present.
         failure_exception_types: The types of exceptions that, if a
