@@ -1175,9 +1175,9 @@ async def sleep(
             This can be in single-line Temporal markdown format.
     """
     await _Runtime.current().workflow_sleep(
-        duration=duration.total_seconds()
-        if isinstance(duration, timedelta)
-        else duration,
+        duration=(
+            duration.total_seconds() if isinstance(duration, timedelta) else duration
+        ),
         summary=summary,
     )
 
@@ -1361,7 +1361,7 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.workflow_info_on_extra:
                     extra.setdefault("temporal_workflow", {}).update(update_details)
 
-        kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
+            kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:
             msg = f"{msg} ({msg_extra})"
         return (msg, kwargs)
