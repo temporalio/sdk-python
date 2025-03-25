@@ -97,7 +97,7 @@ informal introduction to the features and their implementation.
         - [Worker Shutdown](#worker-shutdown)
       - [Testing](#testing-1)
     - [Workflow Replay](#workflow-replay)
-    - [OpenTelemetry Support](#opentelemetry-support)
+    - [Observability](#observability)
     - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
     - [Known Compatibility Issues](#known-compatibility-issues)
       - [gevent Patching](#gevent-patching)
@@ -1344,10 +1344,31 @@ async def check_past_histories(my_client: Client):
   )
 ```
 
-### OpenTelemetry Support
+### Observability
 
-OpenTelemetry support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra.
-When using `pip`, running
+See https://github.com/temporalio/samples-python/tree/main/open_telemetry for a sample demonstrating collection of
+metrics and tracing data emitted by the SDK.
+
+#### Metrics
+
+The SDK emits various metrics by default: see https://docs.temporal.io/references/sdk-metrics. By default, these are
+emitted with attributes `namespace`, `task_queue`, `workflow_type` / `activity_type`, and
+`service_name=temporal-core-sdk`. To emit additional attributes with all metrics, pass
+[global_tags](https://python.temporal.io/temporalio.runtime.TelemetryConfig.html#global_tags) when creating the
+[TelemetryConfig](https://python.temporal.io/temporalio.runtime.TelemetryConfig.html).
+
+For emitting custom metrics, the SDK makes a metric meter available:
+- In Workflow code, use https://python.temporal.io/temporalio.workflow.html#metric_meter
+- In Activity code, use https://python.temporal.io/temporalio.activity.html#metric_meter
+- In normal application code, use https://python.temporal.io/temporalio.runtime.Runtime.html#metric_meter
+
+The attributes emitted by these default to `namespace`, `task_queue`, and `workflow_type`/`activity_type`; use
+`with_additional_attributes` to create a meter emitting additional attributes.
+
+#### Tracing
+
+Tracing support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra. When
+using `pip`, running
 
     pip install 'temporalio[opentelemetry]'
 
