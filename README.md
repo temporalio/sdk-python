@@ -98,6 +98,8 @@ informal introduction to the features and their implementation.
       - [Testing](#testing-1)
     - [Workflow Replay](#workflow-replay)
     - [Observability](#observability)
+      - [Metrics](#metrics)
+      - [OpenTelemetry Tracing](#opentelemetry-tracing)
     - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
     - [Known Compatibility Issues](#known-compatibility-issues)
       - [gevent Patching](#gevent-patching)
