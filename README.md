@@ -1351,9 +1351,8 @@ metrics and tracing data emitted by the SDK.
 
 #### Metrics
 
-The SDK emits various metrics by default: see https://docs.temporal.io/references/sdk-metrics. By default, these are
-emitted with attributes `namespace`, `task_queue`, `workflow_type` / `activity_type`, and
-`service_name=temporal-core-sdk`. To emit additional attributes with all metrics, pass
+The SDK emits various metrics by default: see https://docs.temporal.io/references/sdk-metrics. To configure additional
+attributes to be emitted with all metrics, pass
 [global_tags](https://python.temporal.io/temporalio.runtime.TelemetryConfig.html#global_tags) when creating the
 [TelemetryConfig](https://python.temporal.io/temporalio.runtime.TelemetryConfig.html).
 
@@ -1365,7 +1364,7 @@ For emitting custom metrics, the SDK makes a metric meter available:
 The attributes emitted by these default to `namespace`, `task_queue`, and `workflow_type`/`activity_type`; use
 `with_additional_attributes` to create a meter emitting additional attributes.
 
-#### Tracing
+#### OpenTelemetry Tracing
 
 Tracing support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra. When
 using `pip`, running
