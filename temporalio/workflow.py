@@ -427,6 +427,9 @@ class Info:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
+    priority: temporalio.common.Priority
+    """The priority of this workflow execution. If not set, or this server predates priorities,
+    then returns a default instance."""
     raw_memo: Mapping[str, temporalio.api.common.v1.Payload]
     retry_policy: Optional[temporalio.common.RetryPolicy]
     run_id: str

@@ -39,6 +39,7 @@ _default_info = temporalio.activity.Info(
     workflow_namespace="default",
     workflow_run_id="test-run",
     workflow_type="test",
+    priority=temporalio.common.Priority(priority_key=0),
 )
 
 

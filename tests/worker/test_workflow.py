@@ -6993,10 +6993,17 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
     )
 
 
+@activity.defn
+async def check_priority_activity(should_have_priorty: int) -> str:
+    assert activity.info().priority.priority_key == should_have_priorty
+    return "Done!"
+
+
 @workflow.defn
 class WorkflowUsingPriorities:
     @workflow.run
     async def run(self, name: str) -> str:
+        assert workflow.info().priority.priority_key == 1
         await workflow.execute_child_workflow(
             HelloWorkflow.run, name, priority=Priority(priority_key=4)
         )

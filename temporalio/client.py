@@ -2446,6 +2446,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     # Overload for single-param workflow, with_start
@@ -2508,6 +2509,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     # Overload for string-name workflow, with_start
@@ -2540,6 +2542,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     def __init__(
@@ -2570,6 +2573,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        priority: Optional[temporalio.common.Priority] = None,
         stack_level: int = 2,
     ) -> None:
         """Create a WithStartWorkflowOperation.
@@ -2610,6 +2614,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
             ret_type=result_type or result_type_from_run_fn,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
+            priority=priority,
         )
         self._workflow_handle: Future[WorkflowHandle[SelfType, ReturnType]] = Future()
         self._used = False
