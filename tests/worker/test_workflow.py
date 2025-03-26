@@ -6990,3 +6990,24 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
             ever_in_critical_section=3, peak_in_critical_section=3
         ),
     )
+
+
+def check_in_workflow() -> str:
+    return "in workflow" if workflow.in_workflow() else "not in workflow"
+
+
+@workflow.defn
+class InWorkflowUtilWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return check_in_workflow()
+
+
+async def test_in_workflow_util(client: Client):
+    assert check_in_workflow() == "not in workflow"
+    async with new_worker(client, InWorkflowUtilWorkflow) as worker:
+        assert "in workflow" == await client.execute_workflow(
+            InWorkflowUtilWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
