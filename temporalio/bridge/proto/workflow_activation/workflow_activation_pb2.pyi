@@ -433,6 +433,7 @@ class InitializeWorkflow(google.protobuf.message.Message):
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_TIME_FIELD_NUMBER: builtins.int
     ROOT_WORKFLOW_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     workflow_id: builtins.str
@@ -532,6 +533,9 @@ class InitializeWorkflow(google.protobuf.message.Message):
 
         See field in WorkflowExecutionStarted for more detail.
         """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority of this workflow execution"""
     def __init__(
         self,
         *,
@@ -571,6 +575,7 @@ class InitializeWorkflow(google.protobuf.message.Message):
         start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         root_workflow: temporalio.api.common.v1.message_pb2.WorkflowExecution
         | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -585,6 +590,8 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"memo",
             "parent_workflow_info",
             b"parent_workflow_info",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "root_workflow",
@@ -632,6 +639,8 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"memo",
             "parent_workflow_info",
             b"parent_workflow_info",
+            "priority",
+            b"priority",
             "randomness_seed",
             b"randomness_seed",
             "retry_policy",
