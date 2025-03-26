@@ -6073,7 +6073,9 @@ class _ClientImpl(OutboundInterceptor):
                 multiop_failure = (
                     temporalio.api.errordetails.v1.MultiOperationExecutionFailure()
                 )
-                if err.grpc_status.details[0].Unpack(multiop_failure):
+                if err.grpc_status.details and err.grpc_status.details[0].Unpack(
+                    multiop_failure
+                ):
                     status = next(
                         (
                             st
@@ -6108,7 +6110,6 @@ class _ClientImpl(OutboundInterceptor):
                                 RPCStatusCode(status.code),
                                 err.raw_grpc_status,
                             )
-
                 raise err
         finally:
             if err and not seen_start:
