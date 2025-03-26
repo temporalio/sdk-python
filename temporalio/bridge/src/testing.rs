@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use temporal_sdk_core::ephemeral_server;
@@ -17,6 +19,7 @@ pub struct DevServerConfig {
     sdk_version: String,
     download_version: String,
     download_dest_dir: Option<String>,
+    download_ttl_ms: Option<u64>,
     namespace: String,
     ip: String,
     port: Option<u16>,
@@ -34,6 +37,7 @@ pub struct TestServerConfig {
     sdk_version: String,
     download_version: String,
     download_dest_dir: Option<String>,
+    download_ttl_ms: Option<u64>,
     port: Option<u16>,
     extra_args: Vec<String>,
 }
@@ -123,6 +127,7 @@ impl TryFrom<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
                         }
                     },
                     dest_dir: conf.download_dest_dir,
+                    ttl: conf.download_ttl_ms.map(|ttl| Duration::from_millis(ttl)),
                 }
             })
             .namespace(conf.namespace)
@@ -155,6 +160,7 @@ impl TryFrom<TestServerConfig> for ephemeral_server::TestServerConfig {
                         }
                     },
                     dest_dir: conf.download_dest_dir,
+                    ttl: conf.download_ttl_ms.map(|ttl| Duration::from_millis(ttl)),
                 }
             })
             .port(conf.port)
