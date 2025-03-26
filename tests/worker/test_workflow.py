@@ -6034,9 +6034,9 @@ async def _do_first_completion_command_is_honored_test(
             result = await handle.result()
         except WorkflowFailureError as err:
             if main_workflow_returns_before_signal_completions:
-                assert False, (
-                    "Expected no error due to main workflow coroutine returning first"
-                )
+                assert (
+                    False
+                ), "Expected no error due to main workflow coroutine returning first"
             else:
                 assert str(err.cause).startswith("Client should see this error")
         else:

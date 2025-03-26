@@ -155,7 +155,7 @@ class WorkflowEnvironment:
                 Defaults to ``default`` which downloads the version known to
                 work best with this SDK.
             dev_server_extra_args: Extra arguments for the CLI binary.
-            dev_server_download_ttl_ms: TTL for the downloaded CLI binary. If unset, it will be
+            dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
                 cached indefinitely.
 
         Returns:
@@ -301,7 +301,7 @@ class WorkflowEnvironment:
                 download. Defaults to ``default`` which downloads the version
                 known to work best with this SDK.
             test_server_extra_args: Extra arguments for the test server binary.
-                test_server_download_ttl: TTL for the downloaded test server binary. If unset, it
+            test_server_download_ttl: TTL for the downloaded test server binary. If unset, it
                 will be cached indefinitely.
 
         Returns:
