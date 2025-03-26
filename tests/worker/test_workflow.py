@@ -222,7 +222,7 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         assert info["retry_policy"] == json.loads(
             json.dumps(dataclasses.asdict(retry_policy), default=str)
         )
-        assert uuid.UUID(info["run_id"]).version == 4
+        assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
         datetime.fromisoformat(info["start_time"])
         assert info["task_queue"] == worker.task_queue
