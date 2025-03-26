@@ -2654,6 +2654,8 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             command.user_metadata.details.CopyFrom(
                 self._instance._payload_converter.to_payload(self._input.static_details)
             )
+        if self._input.priority:
+            v.priority.CopyFrom(self._input.priority._to_proto())
 
     # If request cancel external, result does _not_ have seq
     def _apply_cancel_command(

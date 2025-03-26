@@ -64,6 +64,7 @@ from temporalio.client import (
     WorkflowUpdateStage,
 )
 from temporalio.common import (
+    Priority,
     RawValue,
     RetryPolicy,
     SearchAttributeKey,
@@ -99,7 +100,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
 )
-from temporalio.service import RPCError, RPCStatusCode, __version__
+from temporalio.service import __version__
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
@@ -6033,9 +6034,9 @@ async def _do_first_completion_command_is_honored_test(
             result = await handle.result()
         except WorkflowFailureError as err:
             if main_workflow_returns_before_signal_completions:
-                assert (
-                    False
-                ), "Expected no error due to main workflow coroutine returning first"
+                assert False, (
+                    "Expected no error due to main workflow coroutine returning first"
+                )
             else:
                 assert str(err.cause).startswith("Client should see this error")
         else:
@@ -6990,3 +6991,52 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
             ever_in_critical_section=3, peak_in_critical_section=3
         ),
     )
+
+
+@workflow.defn
+class WorkflowUsingPriorities:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        await workflow.execute_child_workflow(
+            HelloWorkflow.run, name, priority=Priority(priority_key=4)
+        )
+        await workflow.execute_activity(
+            say_hello,
+            name,
+            priority=Priority(priority_key=5),
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+        return "Done!"
+
+
+async def test_workflow_priorities(client: Client):
+    async with new_worker(
+        client, WorkflowUsingPriorities, HelloWorkflow, activities=[say_hello]
+    ) as worker:
+        handle = await client.start_workflow(
+            WorkflowUsingPriorities.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            priority=Priority(priority_key=1),
+        )
+        await handle.result()
+
+        async for e in handle.fetch_history_events():
+            if e.HasField("workflow_execution_started_event_attributes"):
+                assert (
+                    e.workflow_execution_started_event_attributes.priority.priority_key
+                    == 1
+                )
+            elif e.HasField(
+                "start_child_workflow_execution_initiated_event_attributes"
+            ):
+                assert (
+                    e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                    == 4
+                )
+            elif e.HasField("activity_task_scheduled_event_attributes"):
+                assert (
+                    e.activity_task_scheduled_event_attributes.priority.priority_key
+                    == 5
+                )

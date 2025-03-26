@@ -319,6 +319,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for single-param workflow
@@ -352,6 +353,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for multi-param workflow
@@ -387,6 +389,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for string-name workflow
@@ -422,6 +425,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> WorkflowHandle[Any, Any]: ...
 
     async def start_workflow(
@@ -456,6 +460,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         stack_level: int = 2,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -501,6 +506,7 @@ class Client:
             request_eager_start: Potentially reduce the latency to start this workflow by
                 encouraging the server to start it on a local worker running with
                 this same client.
+            priority: Priority of the workflow execution.
 
         Returns:
             A workflow handle to the started workflow.
@@ -542,6 +548,7 @@ class Client:
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
+                priority=priority,
             )
         )
 
@@ -5108,6 +5115,7 @@ class StartWorkflowInput:
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
     request_eager_start: bool
+    priority: Optional[temporalio.common.Priority]
 
 
 @dataclass
@@ -5280,6 +5288,7 @@ class UpdateWithStartStartWorkflowInput:
     ret_type: Optional[Type]
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
+    priority: Optional[temporalio.common.Priority]
 
 
 @dataclass
@@ -5797,6 +5806,8 @@ class _ClientImpl(OutboundInterceptor):
             req.workflow_start_delay.FromTimedelta(input.start_delay)
         if input.headers is not None:
             temporalio.common._apply_headers(input.headers, req.header.fields)
+        if input.priority is not None:
+            req.priority.CopyFrom(input.priority._to_proto())
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         await self._client.workflow_service.request_cancel_workflow_execution(
