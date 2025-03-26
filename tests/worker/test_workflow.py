@@ -7009,7 +7009,12 @@ class WorkflowUsingPriorities:
         return "Done!"
 
 
-async def test_workflow_priorities(client: Client):
+async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2453"
+        )
+
     async with new_worker(
         client, WorkflowUsingPriorities, HelloWorkflow, activities=[say_hello]
     ) as worker:

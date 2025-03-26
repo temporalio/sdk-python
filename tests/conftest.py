@@ -1,6 +1,4 @@
 import asyncio
-import logging
-import multiprocessing
 import os
 import sys
 from typing import AsyncGenerator
@@ -11,29 +9,29 @@ import pytest_asyncio
 # If there is an integration test environment variable set, we must remove the
 # first path from the sys.path so we can import the wheel instead
 if os.getenv("TEMPORAL_INTEGRATION_TEST"):
-    assert (
-        sys.path[0] == os.getcwd()
-    ), "Expected first sys.path to be the current working dir"
+    assert sys.path[0] == os.getcwd(), (
+        "Expected first sys.path to be the current working dir"
+    )
     sys.path.pop(0)
     # Import temporalio and confirm it is prefixed with virtual env
     import temporalio
 
-    assert temporalio.__file__.startswith(
-        sys.prefix
-    ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
+    assert temporalio.__file__.startswith(sys.prefix), (
+        f"Expected {temporalio.__file__} to be in {sys.prefix}"
+    )
 
 # Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x lib
 import google.protobuf
 
 protobuf_version = google.protobuf.__version__
 if os.getenv("TEMPORAL_TEST_PROTO3"):
-    assert protobuf_version.startswith(
-        "3."
-    ), f"Expected protobuf 3.x, got {protobuf_version}"
+    assert protobuf_version.startswith("3."), (
+        f"Expected protobuf 3.x, got {protobuf_version}"
+    )
 else:
-    assert protobuf_version.startswith("4.") or protobuf_version.startswith(
-        "5."
-    ), f"Expected protobuf 4.x/5.x, got {protobuf_version}"
+    assert protobuf_version.startswith("4.") or protobuf_version.startswith("5."), (
+        f"Expected protobuf 4.x/5.x, got {protobuf_version}"
+    )
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
@@ -109,7 +107,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "system.enableEagerWorkflowStart=true",
                 "--dynamic-config-value",
                 "frontend.enableExecuteMultiOperation=true",
-            ]
+            ],
+            # TODO: Remove after next CLI release
+            dev_server_download_version="v1.3.1-priority.0",
         )
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
