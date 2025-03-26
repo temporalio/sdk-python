@@ -1178,6 +1178,7 @@ class _WorkflowInstanceImpl(
         activity_id: Optional[str],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
         summary: Optional[str] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
         # Get activity definition if it's callable
@@ -1214,6 +1215,7 @@ class _WorkflowInstanceImpl(
                 ret_type=ret_type,
                 versioning_intent=versioning_intent,
                 summary=summary,
+                priority=priority,
             )
         )
 
@@ -1242,6 +1244,7 @@ class _WorkflowInstanceImpl(
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
         name: str
@@ -1281,6 +1284,7 @@ class _WorkflowInstanceImpl(
                 versioning_intent=versioning_intent,
                 static_summary=static_summary,
                 static_details=static_details,
+                priority=priority,
             )
         )
 
@@ -2502,6 +2506,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             if self._input.summary:
                 command.user_metadata.summary.CopyFrom(
                     self._instance._payload_converter.to_payload(self._input.summary)
+                )
+            if self._input.priority:
+                command.schedule_activity.priority.CopyFrom(
+                    self._input.priority._to_proto()
                 )
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:
