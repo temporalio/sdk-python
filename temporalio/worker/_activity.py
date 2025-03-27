@@ -411,7 +411,7 @@ class _ActivityWorker:
                 workflow_namespace=start.workflow_namespace,
                 workflow_run_id=start.workflow_execution.run_id,
                 workflow_type=start.workflow_type,
-                priority=temporalio.common.Priority.from_proto(start.priority),
+                priority=temporalio.common.Priority._from_proto(start.priority),
             )
             running_activity.info = info
             input = ExecuteActivityInput(

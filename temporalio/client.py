@@ -582,6 +582,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> ReturnType: ...
 
     # Overload for single-param workflow
@@ -615,6 +616,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> ReturnType: ...
 
     # Overload for multi-param workflow
@@ -650,6 +652,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> ReturnType: ...
 
     # Overload for string-name workflow
@@ -685,6 +688,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> Any: ...
 
     async def execute_workflow(
@@ -718,6 +722,7 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> Any:
         """Start a workflow and wait for completion.
 
@@ -3791,6 +3796,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     creating."""
     static_summary: Optional[Union[str, temporalio.api.common.v1.Payload]]
     static_details: Optional[Union[str, temporalio.api.common.v1.Payload]]
+    priority: Optional[temporalio.common.Priority]
 
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
 
@@ -3816,6 +3822,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     # Overload for single-param workflow
@@ -3835,6 +3842,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     # Overload for multi-param workflow
@@ -3856,6 +3864,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     # Overload for string-name workflow
@@ -3876,6 +3885,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     # Overload for raw info
@@ -3906,6 +3916,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         static_details: Optional[str] = None,
         headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None,
         raw_info: Optional[temporalio.api.workflow.v1.NewWorkflowExecutionInfo] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None:
         """Create a start-workflow action.
 
@@ -3967,6 +3978,11 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 if raw_info.HasField("user_metadata") and raw_info.user_metadata.details
                 else None
             )
+            self.priority = (
+                temporalio.common.Priority._from_proto(raw_info.priority)
+                if raw_info.HasField("priority") and raw_info.priority
+                else None
+            )
         else:
             if not id:
                 raise ValueError("ID required")
@@ -3994,6 +4010,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             self.headers = headers
             self.static_summary = static_summary
             self.static_details = static_details
+            self.priority = priority
 
     async def _to_proto(
         self, client: Client
@@ -4014,6 +4031,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         if self.retry_policy:
             retry_policy = temporalio.api.common.v1.RetryPolicy()
             self.retry_policy.apply_to_proto(retry_policy)
+        priority: Optional[temporalio.api.common.v1.Priority] = None
+        if self.priority:
+            priority = self.priority._to_proto()
         action = temporalio.api.schedule.v1.ScheduleAction(
             start_workflow=temporalio.api.workflow.v1.NewWorkflowExecutionInfo(
                 workflow_id=self.id,
@@ -4046,6 +4066,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 user_metadata=await _encode_user_metadata(
                     client.data_converter, self.static_summary, self.static_details
                 ),
+                priority=priority,
             ),
         )
         # Add any untyped attributes that are not also in the typed set

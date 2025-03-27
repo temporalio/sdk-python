@@ -973,7 +973,7 @@ class Priority:
     inherit Priority from the workflow that created them, but may override fields when they are
     started or modified. For each field of a Priority on an activity/workflow, not present or equal
     to zero/empty string means to inherit the value from the calling workflow, or if there is no
-    calling workflow, then use the default (documented below).
+    calling workflow, then use the default (documented on the field).
 
     The overall semantics of Priority are:
     1. First, consider "priority_key": lower number goes first.
@@ -993,7 +993,7 @@ class Priority:
     """
 
     @staticmethod
-    def from_proto(proto: temporalio.api.common.v1.Priority) -> Priority:
+    def _from_proto(proto: temporalio.api.common.v1.Priority) -> Priority:
         """Create a Priority instance from the proto object."""
         return Priority(priority_key=proto.priority_key)
 

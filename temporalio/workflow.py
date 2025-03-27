@@ -2273,6 +2273,7 @@ def start_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2291,6 +2292,7 @@ def start_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2310,6 +2312,7 @@ def start_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2329,6 +2332,7 @@ def start_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2348,6 +2352,7 @@ def start_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2367,6 +2372,7 @@ def start_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2385,6 +2391,7 @@ def start_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
 
@@ -2404,6 +2411,7 @@ def start_activity_class(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
@@ -2422,6 +2430,7 @@ async def execute_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2440,6 +2449,7 @@ async def execute_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2459,6 +2469,7 @@ async def execute_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2478,6 +2489,7 @@ async def execute_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2497,6 +2509,7 @@ async def execute_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2516,6 +2529,7 @@ async def execute_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2534,6 +2548,7 @@ async def execute_activity_class(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
 
@@ -2553,6 +2568,7 @@ async def execute_activity_class(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
@@ -2571,6 +2587,7 @@ def start_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2589,6 +2606,7 @@ def start_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2608,6 +2626,7 @@ def start_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2627,6 +2646,7 @@ def start_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2646,6 +2666,7 @@ def start_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2665,6 +2686,7 @@ def start_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -2683,6 +2705,7 @@ def start_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
 
@@ -2702,6 +2725,7 @@ def start_activity_method(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
@@ -2720,6 +2744,7 @@ async def execute_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2738,6 +2763,7 @@ async def execute_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2757,6 +2783,7 @@ async def execute_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2776,6 +2803,7 @@ async def execute_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2795,6 +2823,7 @@ async def execute_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2814,6 +2843,7 @@ async def execute_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> ReturnType: ...
 
 
@@ -2832,6 +2862,7 @@ async def execute_activity_method(
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
 ) -> Any:
     """Start an activity from a method and wait for completion.
 
@@ -2853,6 +2884,7 @@ async def execute_activity_method(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
