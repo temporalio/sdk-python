@@ -7002,14 +7002,20 @@ async def check_priority_activity(should_have_priorty: int) -> str:
 @workflow.defn
 class WorkflowUsingPriorities:
     @workflow.run
-    async def run(self, name: str) -> str:
-        assert workflow.info().priority.priority_key == 1
+    async def run(
+        self, expected_priority: Optional[int], stop_after_check: bool
+    ) -> str:
+        assert workflow.info().priority.priority_key == expected_priority
+        if stop_after_check:
+            return "Done!"
         await workflow.execute_child_workflow(
-            HelloWorkflow.run, name, priority=Priority(priority_key=4)
+            WorkflowUsingPriorities.run,
+            args=[4, True],
+            priority=Priority(priority_key=4),
         )
         await workflow.execute_activity(
             say_hello,
-            name,
+            "hi",
             priority=Priority(priority_key=5),
             start_to_close_timeout=timedelta(seconds=5),
         )
@@ -7027,7 +7033,7 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
     ) as worker:
         handle = await client.start_workflow(
             WorkflowUsingPriorities.run,
-            "Temporal",
+            args=[1, False],
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             priority=Priority(priority_key=1),
@@ -7052,3 +7058,12 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
                     e.activity_task_scheduled_event_attributes.priority.priority_key
                     == 5
                 )
+
+        # Verify a workflow started without priorities sees None for the key
+        handle = await client.start_workflow(
+            WorkflowUsingPriorities.run,
+            args=[None, True],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()

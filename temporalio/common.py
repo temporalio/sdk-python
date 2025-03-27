@@ -980,7 +980,7 @@ class Priority:
     (more will be added here later)
     """
 
-    priority_key: int = 0
+    priority_key: Optional[int]
     """Priority key is a positive integer from 1 to n, where smaller integers correspond to higher
     priorities (tasks run sooner). In general, tasks in a queue should be processed in close to
     priority order, although small deviations are possible.
@@ -995,11 +995,11 @@ class Priority:
     @staticmethod
     def _from_proto(proto: temporalio.api.common.v1.Priority) -> Priority:
         """Create a Priority instance from the proto object."""
-        return Priority(priority_key=proto.priority_key)
+        return Priority(priority_key=proto.priority_key if proto.priority_key else None)
 
     def _to_proto(self) -> temporalio.api.common.v1.Priority:
         return temporalio.api.common.v1.Priority(
-            priority_key=self.priority_key,
+            priority_key=self.priority_key or 0,
         )
 
 
