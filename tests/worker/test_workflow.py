@@ -5,9 +5,11 @@ import dataclasses
 import json
 import logging
 import logging.handlers
+import os
 import queue
 import sys
 import threading
+import time
 import typing
 import uuid
 from abc import ABC, abstractmethod
@@ -111,6 +113,8 @@ from temporalio.worker import (
 from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
+    assert_eventually,
+    assert_task_fail_eventually,
     ensure_search_attributes_present,
     find_free_port,
     new_worker,
@@ -6990,3 +6994,242 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
             ever_in_critical_section=3, peak_in_critical_section=3
         ),
     )
+
+
+deadlock_interruptible_completed = 0
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockInterruptibleWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Infinite loop, which is interruptible via PyThreadState_SetAsyncExc
+        try:
+            while True:
+                pass
+        finally:
+            global deadlock_interruptible_completed
+            deadlock_interruptible_completed += 1
+
+
+async def test_workflow_deadlock_interruptible(client: Client):
+    # TODO(cretz): Improve this test and other deadlock/eviction tests by
+    # checking slot counts with Core. There are a couple of bugs where used slot
+    # counts are off by one and slots are released before eviction (see
+    # https://github.com/temporalio/sdk-core/issues/894).
+
+    # This worker used to not be able to shutdown because we hung evictions on
+    # deadlock
+    async with new_worker(client, DeadlockInterruptibleWorkflow) as worker:
+        # Start the workflow
+        assert deadlock_interruptible_completed == 0
+        handle = await client.start_workflow(
+            DeadlockInterruptibleWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait for task fail
+        await assert_task_fail_eventually(handle, message_contains="deadlock")
+
+        # Confirm workflow was interrupted
+        async def check_completed():
+            assert deadlock_interruptible_completed >= 1
+
+        await assert_eventually(check_completed)
+        completed_sec = time.monotonic()
+    # Confirm worker shutdown didn't hang
+    assert time.monotonic() - completed_sec < 20
+
+
+deadlock_uninterruptible_event = threading.Event()
+deadlock_uninterruptible_completed = 0
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockUninterruptibleWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Wait on event, which is not interruptible via PyThreadState_SetAsyncExc
+        try:
+            deadlock_uninterruptible_event.wait()
+        finally:
+            global deadlock_uninterruptible_completed
+            deadlock_uninterruptible_completed += 1
+
+
+async def test_workflow_deadlock_uninterruptible(client: Client):
+    # This worker used to not be able to shutdown because we hung evictions on
+    # deadlock
+    async with new_worker(client, DeadlockUninterruptibleWorkflow) as worker:
+        # Start the workflow
+        assert deadlock_uninterruptible_completed == 0
+        handle = await client.start_workflow(
+            DeadlockUninterruptibleWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait for task fail
+        await assert_task_fail_eventually(handle, message_contains="deadlock")
+        # Confirm could not be interrupted
+        assert deadlock_uninterruptible_completed == 0
+
+        # Now complete the event and confirm the workflow does complete
+        deadlock_uninterruptible_event.set()
+
+        async def check_completed():
+            assert deadlock_uninterruptible_completed >= 1
+
+        await assert_eventually(check_completed)
+        completed_sec = time.monotonic()
+    # Confirm worker shutdown didn't hang
+    assert time.monotonic() - completed_sec < 20
+
+
+deadlock_fill_up_block_event = threading.Event()
+deadlock_fill_up_block_completed = 0
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockFillUpBlockWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            deadlock_fill_up_block_event.wait()
+        finally:
+            global deadlock_fill_up_block_completed
+            deadlock_fill_up_block_completed += 1
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockFillUpSimpleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "done"
+
+
+async def test_workflow_deadlock_fill_up_slots(client: Client):
+    cpu_count = os.cpu_count()
+    assert cpu_count
+    # This worker used to not be able to shutdown because we hung evictions on
+    # deadlock.
+    async with new_worker(
+        client,
+        DeadlockFillUpBlockWorkflow,
+        DeadlockFillUpSimpleWorkflow,
+        # Start the worker with CPU count + 10 task slots
+        max_concurrent_workflow_tasks=cpu_count + 10,
+    ) as worker:
+        # For this test we're going to start cpu_count + 5 workflows that
+        # deadlock. In previous SDK versions we defaulted to CPU count
+        # number of workflow threads, so deadlocking that many would prevent
+        # other code from executing. Now that we default to more workers, we
+        # can handle more work while some are deadlocked.
+
+        # Start the workflows that deadlock
+        assert deadlock_fill_up_block_completed == 0
+        handles = await asyncio.gather(
+            *[
+                client.start_workflow(
+                    DeadlockFillUpBlockWorkflow.run,
+                    id=f"workflow-deadlock-{i}-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                for i in range(cpu_count + 5)
+            ]
+        )
+
+        # Wait for them all to deadlock
+        await asyncio.gather(
+            *[
+                assert_task_fail_eventually(h, message_contains="deadlock")
+                for h in handles
+            ]
+        )
+
+        # Now try to run a regular non-deadlocked workflow. Before recent
+        # changes, this would also cause a deadlock because it would submit
+        # to the thread pool but the thread pool didn't have enough room.
+        assert "done" == await asyncio.wait_for(
+            client.execute_workflow(
+                DeadlockFillUpSimpleWorkflow.run,
+                id=f"workflow-simple-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            ),
+            10,
+        )
+
+        # Let the deadlocked ones complete too
+        deadlock_fill_up_block_event.set()
+
+        async def check_completed():
+            assert deadlock_fill_up_block_completed >= len(handles)
+
+        await assert_eventually(check_completed)
+        completed_sec = time.monotonic()
+    # Confirm worker shutdown didn't hang
+    assert time.monotonic() - completed_sec < 20
+
+
+eviction_swallow_keep_looping = True
+
+
+@workflow.defn(sandboxed=False)
+class EvictionSwallowWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Start a task in the background that will prevent eviction because
+        # eviction requires all tasks complete
+        async def eviction_swallower():
+            global eviction_swallow_keep_looping
+            while eviction_swallow_keep_looping:
+                try:
+                    await workflow.wait_condition(lambda: False)
+                except BaseException:
+                    # Swallow base exception intentionally which prevents
+                    # eviction
+                    pass
+
+        asyncio.create_task(eviction_swallower())
+        return "done"
+
+
+async def test_workflow_eviction_swallow(client: Client):
+    # Add a queue handler to all logging, and remove later
+    log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
+    log_handler = logging.handlers.QueueHandler(log_queue)
+    logging.getLogger().addHandler(log_handler)
+    try:
+        async with new_worker(client, EvictionSwallowWorkflow) as worker:
+            global eviction_swallow_keep_looping
+            assert eviction_swallow_keep_looping
+
+            # Run workflow that completes but cannot evict
+            handle = await client.start_workflow(
+                EvictionSwallowWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert "done" == await handle.result()
+
+            # Make sure we get the log we expect
+            async def check_logs():
+                try:
+                    while True:
+                        log_record = log_queue.get(block=False)
+                        if log_record.message.startswith(
+                            f"Timed out running eviction job for run ID {handle.result_run_id}"
+                        ):
+                            return
+                except queue.Empty:
+                    pass
+                assert False, "log record not found"
+
+            await assert_eventually(check_logs)
+
+            # Let it finish now
+            eviction_swallow_keep_looping = False
+            completed_sec = time.monotonic()
+        # Confirm worker shutdown didn't hang
+        assert time.monotonic() - completed_sec < 20
+    finally:
+        logging.getLogger().removeHandler(log_handler)
