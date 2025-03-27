@@ -127,7 +127,7 @@ impl TryFrom<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
                         }
                     },
                     dest_dir: conf.download_dest_dir,
-                    ttl: conf.download_ttl_ms.map(|ttl| Duration::from_millis(ttl)),
+                    ttl: conf.download_ttl_ms.map(Duration::from_millis),
                 }
             })
             .namespace(conf.namespace)
@@ -160,7 +160,7 @@ impl TryFrom<TestServerConfig> for ephemeral_server::TestServerConfig {
                         }
                     },
                     dest_dir: conf.download_dest_dir,
-                    ttl: conf.download_ttl_ms.map(|ttl| Duration::from_millis(ttl)),
+                    ttl: conf.download_ttl_ms.map(Duration::from_millis),
                 }
             })
             .port(conf.port)
