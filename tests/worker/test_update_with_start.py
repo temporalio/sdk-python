@@ -5,12 +5,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping, Optional
 from unittest.mock import patch
 
 import pytest
 
 import temporalio.api.common.v1
+import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
     Client,
@@ -26,7 +27,7 @@ from temporalio.common import (
     WorkflowIDConflictPolicy,
 )
 from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
-from temporalio.service import RPCError, RPCStatusCode
+from temporalio.service import RPCError, RPCStatusCode, ServiceCall
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     new_worker,
@@ -809,44 +810,43 @@ async def test_update_with_start_two_param(client: Client):
         )
 
 
-class ErrorClientInterceptor(Interceptor):
-    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
-        return EmptyDetailsErrorInterceptor(super().intercept_client(next))
-
-
-class EmptyDetailsErrorInterceptor(OutboundInterceptor):
-    def __init__(self, next: OutboundInterceptor) -> None:
-        super().__init__(next)
-
-    async def start_update_with_start_workflow(self, *args, **kwargs):
+# Verify correcting issue #791
+async def test_start_update_with_start_empty_details(client: Client):
+    class execute_multi_operation(
+        ServiceCall[
+            temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
+            temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse,
+        ]
+    ):
         empty_details_err = RPCError("empty details", RPCStatusCode.INTERNAL, b"")
         # Set grpc_status with empty details
         empty_details_err._grpc_status = temporalio.api.common.v1.GrpcStatus(details=[])
-        raise empty_details_err
 
+        def __init__(self) -> None:
+            pass
 
-# Verify correcting issue #791
-async def test_start_update_with_start_empty_details_interceptor(client: Client):
-    # Create a client with error interceptor
-    client_with_interceptor = Client(
-        client.service_client,
-        namespace=client.namespace,
-        interceptors=[ErrorClientInterceptor()],
-    )
+        async def __call__(
+            self,
+            req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
+            *,
+            retry: bool = False,
+            metadata: Mapping[str, str] = {},
+            timeout: Optional[timedelta] = None,
+        ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
+            raise self.empty_details_err
 
-    async with new_worker(
-        client,
-        UpdateWithStartInterceptorWorkflow,
-    ) as worker:
+    with patch.object(
+        client.workflow_service, "execute_multi_operation", execute_multi_operation()
+    ):
         with pytest.raises(RPCError) as err:
-            await client_with_interceptor.start_update_with_start_workflow(
+            await client.start_update_with_start_workflow(
                 UpdateWithStartInterceptorWorkflow.my_update,
                 "original-update-arg",
                 start_workflow_operation=WithStartWorkflowOperation(
                     UpdateWithStartInterceptorWorkflow.run,
-                    "original-workflow-arg",
+                    "wf-arg",
                     id=f"wf-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
+                    task_queue="tq",
                     id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
                 ),
                 wait_for_stage=WorkflowUpdateStage.ACCEPTED,
