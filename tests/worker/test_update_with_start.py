@@ -838,19 +838,21 @@ async def test_start_update_with_start_empty_details(client: Client):
     with patch.object(
         client.workflow_service, "execute_multi_operation", execute_multi_operation()
     ):
+        start_workflow_operation = WithStartWorkflowOperation(
+            UpdateWithStartInterceptorWorkflow.run,
+            "wf-arg",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue="tq",
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
         with pytest.raises(RPCError) as err:
             await client.start_update_with_start_workflow(
                 UpdateWithStartInterceptorWorkflow.my_update,
                 "original-update-arg",
-                start_workflow_operation=WithStartWorkflowOperation(
-                    UpdateWithStartInterceptorWorkflow.run,
-                    "wf-arg",
-                    id=f"wf-{uuid.uuid4()}",
-                    task_queue="tq",
-                    id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
-                ),
+                start_workflow_operation=start_workflow_operation,
                 wait_for_stage=WorkflowUpdateStage.ACCEPTED,
             )
+        _ = start_workflow_operation._workflow_handle.exception()
         assert err.value.status == RPCStatusCode.INTERNAL
         assert err.value.message == "empty details"
         assert len(err.value.grpc_status.details) == 0
