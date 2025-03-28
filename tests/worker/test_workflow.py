@@ -7092,7 +7092,11 @@ class WithChildWorkflowInfo:
         )
 
 
-async def test_expose_root_execution(client: Client):
+async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2441"
+        )
     async with new_worker(client, WithChildWorkflowInfo, ChildWorkflowInfo) as worker:
         child_wf_id = "child-wf-id"
         handle = await client.start_workflow(
