@@ -247,7 +247,7 @@ class StartActivityInput:
     disable_eager_execution: bool
     versioning_intent: Optional[VersioningIntent]
     summary: Optional[str]
-    priority: Optional[temporalio.common.Priority]
+    priority: temporalio.common.Priority
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
@@ -279,7 +279,7 @@ class StartChildWorkflowInput:
     versioning_intent: Optional[VersioningIntent]
     static_summary: Optional[str]
     static_details: Optional[str]
-    priority: Optional[temporalio.common.Priority]
+    priority: temporalio.common.Priority
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]

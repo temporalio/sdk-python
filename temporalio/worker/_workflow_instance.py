@@ -1178,7 +1178,7 @@ class _WorkflowInstanceImpl(
         activity_id: Optional[str],
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
         summary: Optional[str] = None,
-        priority: Optional[temporalio.common.Priority] = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
         # Get activity definition if it's callable
@@ -1244,7 +1244,7 @@ class _WorkflowInstanceImpl(
         versioning_intent: Optional[temporalio.workflow.VersioningIntent],
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
-        priority: Optional[temporalio.common.Priority] = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
         name: str

@@ -992,6 +992,9 @@ class Priority:
     3.
     """
 
+    default: ClassVar[Priority]
+    """Singleton default priority instance."""
+
     @staticmethod
     def _from_proto(proto: temporalio.api.common.v1.Priority) -> Priority:
         """Create a Priority instance from the proto object."""
@@ -1002,6 +1005,8 @@ class Priority:
             priority_key=self.priority_key or 0,
         )
 
+
+Priority.default = Priority(priority_key=None)
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument
 # is unset. This is different than None which is a legitimate argument.
