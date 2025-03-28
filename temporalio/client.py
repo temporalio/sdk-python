@@ -756,6 +756,7 @@ class Client:
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
+                priority=priority,
                 stack_level=3,
             )
         ).result()
@@ -2482,6 +2483,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         start_delay: Optional[timedelta] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
+        priority: Optional[temporalio.common.Priority] = None,
     ) -> None: ...
 
     # Overload for multi-param workflow, with_start

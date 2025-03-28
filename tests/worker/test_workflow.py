@@ -7013,6 +7013,12 @@ class WorkflowUsingPriorities:
             args=[4, True],
             priority=Priority(priority_key=4),
         )
+        handle = await workflow.start_child_workflow(
+            WorkflowUsingPriorities.run,
+            args=[2, True],
+            priority=Priority(priority_key=2),
+        )
+        await handle
         await workflow.execute_activity(
             say_hello,
             "hi",
@@ -7040,6 +7046,7 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
         )
         await handle.result()
 
+        first_child = True
         async for e in handle.fetch_history_events():
             if e.HasField("workflow_execution_started_event_attributes"):
                 assert (
@@ -7049,10 +7056,17 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
             elif e.HasField(
                 "start_child_workflow_execution_initiated_event_attributes"
             ):
-                assert (
-                    e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
-                    == 4
-                )
+                if first_child:
+                    assert (
+                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                        == 4
+                    )
+                    first_child = False
+                else:
+                    assert (
+                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                        == 2
+                    )
             elif e.HasField("activity_task_scheduled_event_attributes"):
                 assert (
                     e.activity_task_scheduled_event_attributes.priority.priority_key

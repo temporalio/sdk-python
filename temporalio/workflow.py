@@ -4050,6 +4050,7 @@ async def start_child_workflow(
         versioning_intent=versioning_intent,
         static_summary=static_summary,
         static_details=static_details,
+        priority=priority,
     )
 
 
