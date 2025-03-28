@@ -2777,6 +2777,12 @@ class WorkflowExecution:
     parent_run_id: Optional[str]
     """Run ID for the parent workflow if this was started as a child."""
 
+    root_id: Optional[str]
+    """ID for the root workflow"""
+
+    root_run_id: Optional[str]
+    """Run ID for the root workflow"""
+
     raw_info: temporalio.api.workflow.v1.WorkflowExecutionInfo
     """Underlying protobuf info."""
 
@@ -2827,6 +2833,12 @@ class WorkflowExecution:
             else None,
             parent_run_id=info.parent_execution.run_id
             if info.HasField("parent_execution")
+            else None,
+            root_id=info.root_execution.workflow_id
+            if info.HasField("root_execution")
+            else None,
+            root_run_id=info.root_execution.run_id
+            if info.HasField("root_execution")
             else None,
             raw_info=info,
             run_id=info.execution.run_id,

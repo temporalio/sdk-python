@@ -427,6 +427,7 @@ class Info:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
+    root: Optional[RootInfo]
     priority: temporalio.common.Priority
     """The priority of this workflow execution. If not set, or this server predates priorities,
     then returns a default instance."""
@@ -514,6 +515,14 @@ class ParentInfo:
     """Information about the parent workflow."""
 
     namespace: str
+    run_id: str
+    workflow_id: str
+
+
+@dataclass(frozen=True)
+class RootInfo:
+    """Information about the root workflow."""
+
     run_id: str
     workflow_id: str
 
