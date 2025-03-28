@@ -156,7 +156,7 @@ class Replayer:
             replayed.
         """
         try:
-            last_replay_failure: Optional[Exception]
+            last_replay_failure: Optional[Exception] = None
             last_replay_complete = asyncio.Event()
 
             # Create eviction hook
