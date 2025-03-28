@@ -1005,6 +1005,14 @@ class Priority:
             priority_key=self.priority_key or 0,
         )
 
+    def __post_init__(self):
+        """Validates priority settings."""
+        if self.priority_key is not None:
+            if not isinstance(self.priority_key, int):
+                raise TypeError("priority_key must be an integer")
+            if self.priority_key < 1:
+                raise ValueError("priority_key must be a positive integer")
+
 
 Priority.default = Priority(priority_key=None)
 
