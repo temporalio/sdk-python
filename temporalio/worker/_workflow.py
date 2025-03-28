@@ -7,9 +7,11 @@ import concurrent.futures
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
 from typing import (
+    Awaitable,
     Callable,
     Dict,
     List,
@@ -25,6 +27,7 @@ import temporalio.api.common.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
@@ -59,6 +62,7 @@ class _WorkflowWorker:
         task_queue: str,
         workflows: Sequence[Type],
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor],
+        max_concurrent_workflow_tasks: Optional[int],
         workflow_runner: WorkflowRunner,
         unsandboxed_workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
@@ -80,7 +84,7 @@ class _WorkflowWorker:
         self._workflow_task_executor = (
             workflow_task_executor
             or concurrent.futures.ThreadPoolExecutor(
-                max_workers=max(os.cpu_count() or 4, 4),
+                max_workers=max_concurrent_workflow_tasks or 500,
                 thread_name_prefix="temporal_workflow_",
             )
         )
@@ -102,7 +106,7 @@ class _WorkflowWorker:
             **_WorkflowExternFunctions(__temporal_get_metric_meter=lambda: metric_meter)
         )
         self._workflow_failure_exception_types = workflow_failure_exception_types
-        self._running_workflows: Dict[str, WorkflowInstance] = {}
+        self._running_workflows: Dict[str, _RunningWorkflow] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
@@ -182,7 +186,7 @@ class _WorkflowWorker:
         if self._could_not_evict_count:
             logger.warning(
                 f"Shutting down workflow worker, but {self._could_not_evict_count} "
-                + "workflow(s) could not be evicted previously, so the shutdown will hang"
+                + "workflow(s) could not be evicted previously, so the shutdown may hang"
             )
 
     # Only call this if run() raised an error
@@ -213,6 +217,14 @@ class _WorkflowWorker:
             elif job.HasField("initialize_workflow"):
                 init_job = job.initialize_workflow
 
+        # If this is a cache removal, it is handled separately
+        if cache_remove_job:
+            # Should never happen
+            if len(act.jobs) != 1:
+                logger.warning("Unexpected job alongside cache remove job")
+            await self._handle_cache_eviction(act, cache_remove_job)
+            return
+
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
@@ -220,7 +232,7 @@ class _WorkflowWorker:
         completion.successful.SetInParent()
         try:
             # Decode the activation if there's a codec and not cache remove job
-            if self._data_converter.payload_codec and not cache_remove_job:
+            if self._data_converter.payload_codec:
                 await temporalio.bridge.worker.decode_activation(
                     act, self._data_converter.payload_codec
                 )
@@ -228,19 +240,17 @@ class _WorkflowWorker:
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
 
-            # If the workflow is not running yet and this isn't a cache remove
-            # job, create it. We do not even fetch a workflow if it's a cache
-            # remove job and safe evictions are enabled
-            workflow = None
-            if not cache_remove_job or not self._disable_safe_eviction:
-                workflow = self._running_workflows.get(act.run_id)
-            if not workflow and not cache_remove_job:
+            # If the workflow is not running yet, create it
+            workflow = self._running_workflows.get(act.run_id)
+            if not workflow:
                 # Must have a initialize job to create instance
                 if not init_job:
                     raise RuntimeError(
                         "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
                     )
-                workflow = self._create_workflow_instance(act, init_job)
+                workflow = _RunningWorkflow(
+                    instance=self._create_workflow_instance(act, init_job)
+                )
                 self._running_workflows[act.run_id] = workflow
             elif init_job:
                 # This should never happen
@@ -253,41 +263,44 @@ class _WorkflowWorker:
             if workflow:
                 activate_task = asyncio.get_running_loop().run_in_executor(
                     self._workflow_task_executor,
-                    workflow.activate,
+                    workflow.instance.activate,
                     act,
                 )
 
-                # Wait for deadlock timeout and set commands if successful
+                # Run activation task with deadlock timeout
                 try:
                     completion = await asyncio.wait_for(
                         activate_task, self._deadlock_timeout_seconds
                     )
                 except asyncio.TimeoutError:
-                    raise _DeadlockError.from_deadlocked_workflow(
-                        workflow, self._deadlock_timeout_seconds
-                    ) from None
+                    # Need to create the deadlock exception up here so it
+                    # captures the trace now instead of later after we may have
+                    # interrupted it
+                    deadlock_exc = _DeadlockError.from_deadlocked_workflow(
+                        workflow.instance, self._deadlock_timeout_seconds
+                    )
+                    # When we deadlock, we will raise an exception to fail
+                    # the task. But before we do that, we want to try to
+                    # interrupt the thread and put this activation task on
+                    # the workflow so that the successive eviction can wait
+                    # on it before trying to evict.
+                    deadlocked_thread_id = workflow.instance.get_thread_id()
+                    if deadlocked_thread_id:
+                        temporalio.bridge.runtime.Runtime._raise_in_thread(
+                            deadlocked_thread_id, _InterruptDeadlockError
+                        )
+                    # Set the task and raise
+                    workflow.deadlocked_activation_task = activate_task
+                    raise deadlock_exc from None
 
         except Exception as err:
-            # We cannot fail a cache eviction, we must just log and not complete
-            # the activation (failed or otherwise). This should only happen in
-            # cases of deadlock or tasks not properly completing, and yes this
-            # means that a slot is forever taken.
-            # TODO(cretz): Should we build a complex mechanism to continually
-            # try the eviction until it succeeds?
-            if cache_remove_job:
-                logger.exception(
-                    "Failed running eviction job, not evicting. "
-                    + "Since eviction could not be processed, this worker cannot complete and the slot will remain forever used."
-                )
-                self._could_not_evict_count += 1
-                return
-
             if isinstance(err, _DeadlockError):
                 err.swap_traceback()
 
             logger.exception(
                 "Failed handling activation on workflow with run ID %s", act.run_id
             )
+
             # Set completion failure
             completion.failed.failure.SetInParent()
             try:
@@ -308,20 +321,8 @@ class _WorkflowWorker:
         # Always set the run ID on the completion
         completion.run_id = act.run_id
 
-        # If there is a remove-from-cache job, do so. We don't need to log a
-        # warning if there's not, because create workflow failing for
-        # unregistered workflow still triggers cache remove job
-        if cache_remove_job:
-            if act.run_id in self._running_workflows:
-                logger.debug(
-                    "Evicting workflow with run ID %s, message: %s",
-                    act.run_id,
-                    cache_remove_job.message,
-                )
-                del self._running_workflows[act.run_id]
-
         # Encode the completion if there's a codec and not cache remove job
-        if self._data_converter.payload_codec and not cache_remove_job:
+        if self._data_converter.payload_codec:
             try:
                 await temporalio.bridge.worker.encode_completion(
                     completion, self._data_converter.payload_codec
@@ -344,13 +345,124 @@ class _WorkflowWorker:
                 "Failed completing activation on workflow with run ID %s", act.run_id
             )
 
-        # If there is a remove job and an eviction hook, run it
-        if cache_remove_job and self._on_eviction_hook is not None:
+    async def _handle_cache_eviction(
+        self,
+        act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+        job: temporalio.bridge.proto.workflow_activation.RemoveFromCache,
+    ) -> None:
+        logger.debug(
+            "Evicting workflow with run ID %s, message: %s", act.run_id, job.message
+        )
+
+        # Find the workflow to process safe eviction unless safe eviction
+        # disabled
+        workflow = None
+        if not self._disable_safe_eviction:
+            workflow = self._running_workflows.get(act.run_id)
+
+        # Safe eviction...
+        if workflow:
+            # We have to wait on the deadlocked task if it is set. This is
+            # because eviction may be the result of a deadlocked workflow but
+            # we cannot safely evict until that task is done with its thread. We
+            # don't care what errors may have occurred. We intentionally wait
+            # forever which means a deadlocked task cannot be evicted and give
+            # its slot back.
+            if workflow.deadlocked_activation_task:
+                logger.debug(
+                    "Waiting for deadlocked task to complete on run %s", act.run_id
+                )
+                try:
+                    await workflow.deadlocked_activation_task
+                except:
+                    pass
+
+            # Process the activation to evict. It is very important that
+            # eviction complete successfully because this is the only way we can
+            # confirm the event loop was torn down gracefully and therefore no
+            # GC'ing of the tasks occurs (which can cause them to wake up in
+            # different threads). We will wait deadlock timeout amount (2s if
+            # enabled) before making it clear to users that eviction is being
+            # swallowed. Any error or timeout of eviction causes us to retry
+            # forever because something in users code is preventing eviction.
+            seen_fail = False
+            handle_eviction_task: Optional[asyncio.Future] = None
+            while True:
+                try:
+                    # We only create the eviction task if we haven't already or
+                    # it is done. This is because if it already is running and
+                    # timed out, it's still running (and holding on to a
+                    # thread). But if did complete running but failed with
+                    # another error, we want to re-create the task.
+                    if not handle_eviction_task or handle_eviction_task.done():
+                        handle_eviction_task = (
+                            asyncio.get_running_loop().run_in_executor(
+                                self._workflow_task_executor,
+                                workflow.instance.activate,
+                                act,
+                            )
+                        )
+                    await asyncio.wait_for(
+                        handle_eviction_task, self._deadlock_timeout_seconds
+                    )
+                    # Break if it succeeds
+                    break
+                except BaseException as err:
+                    # Only want to log and mark as could not evict once
+                    if not seen_fail:
+                        seen_fail = True
+                        self._could_not_evict_count += 1
+                        # We give a different message for timeout vs other
+                        # exception
+                        if isinstance(err, asyncio.TimeoutError):
+                            logger.error(
+                                "Timed out running eviction job for run ID %s, continually "
+                                + "retrying eviction. This is usually caused by inadvertently "
+                                + "catching 'BaseException's like asyncio.CancelledError or "
+                                + "_WorkflowBeingEvictedError and still continuing work. "
+                                + "Since eviction could not be processed, this worker "
+                                + "may not complete and the slot may remain forever used "
+                                + "unless it eventually completes.",
+                                act.run_id,
+                            )
+                        else:
+                            logger.exception(
+                                "Failed running eviction job for run ID %s, continually retrying "
+                                + "eviction. "
+                                + "Since eviction could not be processed, this worker "
+                                + "may not complete and the slot may remain forever used "
+                                + "unless it eventually completes.",
+                                act.run_id,
+                            )
+                    # We want to wait a couple of seconds before trying to evict again
+                    await asyncio.sleep(2)
+            # Decrement the could-not-evict-count if it finally succeeded
+            if seen_fail:
+                self._could_not_evict_count -= 1
+
+        # Remove from map and send completion
+        if act.run_id in self._running_workflows:
+            del self._running_workflows[act.run_id]
+        try:
+            await self._bridge_worker().complete_workflow_activation(
+                temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
+                    run_id=act.run_id,
+                    successful=temporalio.bridge.proto.workflow_completion.Success(),
+                )
+            )
+        except Exception:
+            logger.exception(
+                "Failed completing eviction activation on workflow with run ID %s",
+                act.run_id,
+            )
+
+        # Run eviction hook if present
+        if self._on_eviction_hook is not None:
             try:
-                self._on_eviction_hook(act.run_id, cache_remove_job)
+                self._on_eviction_hook(act.run_id, job)
             except Exception as e:
                 self._throw_after_activation = e
-                logger.debug("Shutting down worker on eviction")
+                logger.debug("Shutting down worker on eviction hook exception")
                 self._bridge_worker().initiate_shutdown()
 
     def _create_workflow_instance(
@@ -512,3 +624,13 @@ class _DeadlockError(Exception):
             tb = tb.tb_next
 
         return tb
+
+
+class _InterruptDeadlockError(Exception):
+    pass
+
+
+@dataclass
+class _RunningWorkflow:
+    instance: WorkflowInstance
+    deadlocked_activation_task: Optional[Awaitable] = None

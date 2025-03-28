@@ -51,15 +51,21 @@ class Replayer:
         """Create a replayer to replay workflows from history.
 
         See :py:meth:`temporalio.worker.Worker.__init__` for a description of
-        most of the arguments. The same arguments need to be passed to the
-        replayer that were passed to the worker when the workflow originally
+        most of the arguments. Most of the same arguments need to be passed to
+        the replayer that were passed to the worker when the workflow originally
         ran.
+
+        Note, unlike the worker, for the replayer the workflow_task_executor
+        will default to a new thread pool executor with no max_workers set that
+        will be shared across all replay calls and never explicitly shut down.
+        Users are encouraged to provide their own if needing more control.
         """
         if not workflows:
             raise ValueError("At least one workflow must be specified")
         self._config = ReplayerConfig(
             workflows=list(workflows),
-            workflow_task_executor=workflow_task_executor,
+            workflow_task_executor=workflow_task_executor
+            or concurrent.futures.ThreadPoolExecutor(),
             workflow_runner=workflow_runner,
             unsandboxed_workflow_runner=unsandboxed_workflow_runner,
             namespace=namespace,
@@ -195,6 +201,7 @@ class Replayer:
                 task_queue=task_queue,
                 workflows=self._config["workflows"],
                 workflow_task_executor=self._config["workflow_task_executor"],
+                max_concurrent_workflow_tasks=5,
                 workflow_runner=self._config["workflow_runner"],
                 unsandboxed_workflow_runner=self._config["unsandboxed_workflow_runner"],
                 data_converter=self._config["data_converter"],
