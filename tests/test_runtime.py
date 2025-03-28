@@ -1,3 +1,5 @@
+import re
+
 import logging
 import logging.handlers
 import queue
@@ -181,3 +183,65 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
     assert record.levelno == logging.WARNING
     assert record.name == f"{logger.name}-sdk_core::temporal_sdk_core::worker::workflow"
     assert record.temporal_log.fields["run_id"] == handle.result_run_id  # type: ignore
+
+
+async def test_prometheus_histogram_bucket_overrides(client: Client):
+    # Set up a Prometheus configuration with custom histogram bucket overrides
+    prom_addr = f"127.0.0.1:{find_free_port()}"
+    special_value = float(1234.5678)
+    histogram_overrides = {
+        "temporal_long_request_latency": [special_value / 2, special_value],
+        "custom_histogram": [special_value / 2, special_value],
+        # "temporal_workflow_endtoend_latency": [special_value / 2, special_value],  # This still does not work :(
+    }
+
+    runtime = Runtime(
+        telemetry=TelemetryConfig(
+            metrics=PrometheusConfig(
+                bind_address=prom_addr,
+                counters_total_suffix=False,
+                unit_suffix=False,
+                durations_as_seconds=False,
+                histogram_bucket_overrides=histogram_overrides,
+            ),
+        ),
+    )
+
+    # Create a custom histogram metric
+    custom_histogram = runtime.metric_meter.create_histogram("custom_histogram", "Custom histogram", "ms")
+
+    # Record a value to the custom histogram
+    custom_histogram.record(600)
+
+    # Create client with overrides
+    client_with_overrides = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+
+    async def run_workflow(client: Client):
+        task_queue = f"task-queue-{uuid.uuid4()}"
+        async with Worker(
+            client,
+            task_queue=task_queue,
+            workflows=[HelloWorkflow],
+        ):
+            assert "Hello, World!" == await client.execute_workflow(
+                HelloWorkflow.run,
+                "World",
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+    await run_workflow(client_with_overrides)
+
+    with urlopen(url=f"http://{prom_addr}/metrics") as f:
+        metrics_output = f.read().decode("utf-8")
+
+        for key, buckets in histogram_overrides.items():
+            assert key in metrics_output
+            for bucket in buckets:
+                # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
+                regex = re.compile(f'{key}_bucket.*le="{bucket}"')
+                assert regex.search(metrics_output) is not None, f"Expected {bucket} in '{key}' histogram"

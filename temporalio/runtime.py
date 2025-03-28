@@ -277,6 +277,7 @@ class PrometheusConfig:
     counters_total_suffix: bool = False
     unit_suffix: bool = False
     durations_as_seconds: bool = False
+    histogram_bucket_overrides: Optional[Mapping[str, Sequence[float]]] = None
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.PrometheusConfig:
         return temporalio.bridge.runtime.PrometheusConfig(
@@ -284,6 +285,7 @@ class PrometheusConfig:
             counters_total_suffix=self.counters_total_suffix,
             unit_suffix=self.unit_suffix,
             durations_as_seconds=self.durations_as_seconds,
+            histogram_bucket_overrides=self.histogram_bucket_overrides,
         )
 
 
