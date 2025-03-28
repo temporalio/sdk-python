@@ -367,6 +367,8 @@ async def test_describe(
     assert desc.status == WorkflowExecutionStatus.COMPLETED
     assert desc.task_queue == worker.task_queue
     assert desc.workflow_type == "kitchen_sink"
+    assert desc.root_id == desc.id
+    assert desc.root_run_id == desc.run_id
 
 
 async def test_query(client: Client, worker: ExternalWorker):

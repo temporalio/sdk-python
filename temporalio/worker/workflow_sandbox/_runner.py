@@ -35,6 +35,7 @@ _fake_info = temporalio.workflow.Info(
     headers={},
     namespace="sandbox-validate-namespace",
     parent=None,
+    root=None,
     raw_memo={},
     retry_policy=None,
     run_id="sandbox-validate-run_id",
