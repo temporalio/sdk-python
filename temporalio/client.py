@@ -2778,10 +2778,10 @@ class WorkflowExecution:
     """Run ID for the parent workflow if this was started as a child."""
 
     root_id: Optional[str]
-    """ID for the root workflow"""
+    """ID for the root workflow."""
 
     root_run_id: Optional[str]
-    """Run ID for the root workflow"""
+    """Run ID for the root workflow."""
 
     raw_info: temporalio.api.workflow.v1.WorkflowExecutionInfo
     """Underlying protobuf info."""

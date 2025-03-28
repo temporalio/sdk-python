@@ -4,7 +4,7 @@ import time
 import uuid
 from contextlib import closing
 from datetime import timedelta
-from typing import Awaitable, Callable, Optional, Sequence, Type, TypeVar
+from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar, Union
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import IndexedValueType
@@ -19,7 +19,13 @@ from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
-from temporalio.workflow import UpdateMethodMultiParam
+from temporalio.workflow import (
+    MethodAsyncNoParam,
+    MethodAsyncSingleParam,
+    ReturnType,
+    SelfType,
+    UpdateMethodMultiParam,
+)
 
 
 def new_worker(
@@ -150,3 +156,25 @@ async def admitted_update_task(
         lambda: workflow_update_exists(client, handle.id, id),
     )
     return update_task
+
+
+async def child_started(
+    client: Client,
+    workflow: Any,
+    workflow_id: str,
+) -> bool:
+    try:
+        await client.get_workflow_handle_for(
+            workflow,
+            workflow_id=workflow_id,
+        ).describe()
+        return True
+    except RPCError as err:
+        # Ignore not-found or failed precondition because child may
+        # not have started yet
+        if (
+            err.status == RPCStatusCode.NOT_FOUND
+            or err.status == RPCStatusCode.FAILED_PRECONDITION
+        ):
+            return False
+        raise
