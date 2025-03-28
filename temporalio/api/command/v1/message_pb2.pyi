@@ -62,6 +62,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     REQUEST_EAGER_EXECUTION_FIELD_NUMBER: builtins.int
     USE_WORKFLOW_BUILD_ID_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
@@ -119,6 +120,11 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     """If this is set, the activity would be assigned to the Build ID of the workflow. Otherwise,
     Assignment rules of the activity's Task Queue will be used to determine the Build ID.
     """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority metadata. If this message is not present, or any fields are not
+        present, they inherit the values from the workflow.
+        """
     def __init__(
         self,
         *,
@@ -134,6 +140,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         request_eager_execution: builtins.bool = ...,
         use_workflow_build_id: builtins.bool = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -146,6 +153,8 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "input",
             b"input",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -171,6 +180,8 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "input",
             b"input",
+            "priority",
+            b"priority",
             "request_eager_execution",
             b"request_eager_execution",
             "retry_policy",
@@ -753,6 +764,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     INHERIT_BUILD_ID_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -795,6 +807,11 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     """If this is set, the child workflow inherits the Build ID of the parent. Otherwise, the assignment
     rules of the child's Task Queue will be used to independently assign a Build ID to it.
     """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority metadata. If this message is not present, or any fields are not
+        present, they inherit the values from the workflow.
+        """
     def __init__(
         self,
         *,
@@ -816,6 +833,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         inherit_build_id: builtins.bool = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -826,6 +844,8 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
             b"input",
             "memo",
             b"memo",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "search_attributes",
@@ -861,6 +881,8 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
             b"namespace",
             "parent_close_policy",
             b"parent_close_policy",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "search_attributes",

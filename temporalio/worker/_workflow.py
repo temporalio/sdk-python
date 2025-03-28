@@ -404,6 +404,7 @@ class _WorkflowWorker:
             ),
             workflow_id=init.workflow_id,
             workflow_type=init.workflow_type,
+            priority=temporalio.common.Priority._from_proto(init.priority),
         )
 
         # Create instance from details

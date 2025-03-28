@@ -139,6 +139,8 @@ class _CallbackStateEnumTypeWrapper(
     """Callback has failed."""
     CALLBACK_STATE_SUCCEEDED: _CallbackState.ValueType  # 5
     """Callback has succeeded."""
+    CALLBACK_STATE_BLOCKED: _CallbackState.ValueType  # 6
+    """Callback is blocked (eg: by circuit breaker)."""
 
 class CallbackState(_CallbackState, metaclass=_CallbackStateEnumTypeWrapper):
     """State of a callback."""
@@ -155,6 +157,8 @@ CALLBACK_STATE_FAILED: CallbackState.ValueType  # 4
 """Callback has failed."""
 CALLBACK_STATE_SUCCEEDED: CallbackState.ValueType  # 5
 """Callback has succeeded."""
+CALLBACK_STATE_BLOCKED: CallbackState.ValueType  # 6
+"""Callback is blocked (eg: by circuit breaker)."""
 global___CallbackState = CallbackState
 
 class _PendingNexusOperationState:
@@ -180,6 +184,8 @@ class _PendingNexusOperationStateEnumTypeWrapper(
     """Operation has failed with a retryable error and is backing off before the next attempt."""
     PENDING_NEXUS_OPERATION_STATE_STARTED: _PendingNexusOperationState.ValueType  # 3
     """Operation was started and will complete asynchronously."""
+    PENDING_NEXUS_OPERATION_STATE_BLOCKED: _PendingNexusOperationState.ValueType  # 4
+    """Operation is blocked (eg: by circuit breaker)."""
 
 class PendingNexusOperationState(
     _PendingNexusOperationState, metaclass=_PendingNexusOperationStateEnumTypeWrapper
@@ -194,6 +200,8 @@ PENDING_NEXUS_OPERATION_STATE_BACKING_OFF: PendingNexusOperationState.ValueType 
 """Operation has failed with a retryable error and is backing off before the next attempt."""
 PENDING_NEXUS_OPERATION_STATE_STARTED: PendingNexusOperationState.ValueType  # 3
 """Operation was started and will complete asynchronously."""
+PENDING_NEXUS_OPERATION_STATE_BLOCKED: PendingNexusOperationState.ValueType  # 4
+"""Operation is blocked (eg: by circuit breaker)."""
 global___PendingNexusOperationState = PendingNexusOperationState
 
 class _NexusOperationCancellationState:
@@ -231,6 +239,10 @@ class _NexusOperationCancellationStateEnumTypeWrapper(
         _NexusOperationCancellationState.ValueType
     )  # 5
     """The associated operation timed out - exceeded the user supplied schedule-to-close timeout."""
+    NEXUS_OPERATION_CANCELLATION_STATE_BLOCKED: (
+        _NexusOperationCancellationState.ValueType
+    )  # 6
+    """Cancellation request is blocked (eg: by circuit breaker)."""
 
 class NexusOperationCancellationState(
     _NexusOperationCancellationState,
@@ -262,4 +274,8 @@ NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT: (
     NexusOperationCancellationState.ValueType
 )  # 5
 """The associated operation timed out - exceeded the user supplied schedule-to-close timeout."""
+NEXUS_OPERATION_CANCELLATION_STATE_BLOCKED: (
+    NexusOperationCancellationState.ValueType
+)  # 6
+"""Cancellation request is blocked (eg: by circuit breaker)."""
 global___NexusOperationCancellationState = NexusOperationCancellationState

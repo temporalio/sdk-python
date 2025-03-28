@@ -1,6 +1,4 @@
 import asyncio
-import logging
-import multiprocessing
 import os
 import sys
 from typing import AsyncGenerator
@@ -109,7 +107,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "system.enableEagerWorkflowStart=true",
                 "--dynamic-config-value",
                 "frontend.enableExecuteMultiOperation=true",
-            ]
+            ],
+            # TODO: Remove after next CLI release
+            dev_server_download_version="v1.3.1-priority.0",
         )
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
