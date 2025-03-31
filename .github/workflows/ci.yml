@@ -45,13 +45,19 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install poethepoet
+      - run: uv --preview python install --default ${{ matrix.python }}
       - run: uv sync --all-extras --python ${{ matrix.python }}
       - name: Check python version
         shell: bash
         run: |
+          actual=$(uv run python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
+          if [[ "$actual" != "${{ 3.13 }}" ]]; then
+            echo "Python version in use by uv ($actual) does not match intended version (${{ matrix.python }})"
+            exit 1
+          fi
           actual=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
           if [[ "$actual" != "${{ 3.13 }}" ]]; then
-            echo "Python version in use ($actual) does not match intended version (${{ matrix.python }})"
+            echo "Python version on PATH ($actual) does not match intended version (${{ matrix.python }})"
             exit 1
           fi
       - run: poe bridge-lint
