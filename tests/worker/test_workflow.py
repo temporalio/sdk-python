@@ -112,6 +112,7 @@ from temporalio.worker import (
 from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
+    assert_workflow_exists_eventually,
     ensure_search_attributes_present,
     find_free_port,
     new_worker,
@@ -1126,26 +1127,9 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
             task_queue=worker.task_queue,
         )
 
-        # Wait until child started
-        async def child_started() -> bool:
-            try:
-                return await handle.query(
-                    CancelChildWorkflow.ready
-                ) and await client.get_workflow_handle_for(
-                    LongSleepWorkflow.run,  # type: ignore[arg-type]
-                    workflow_id=f"{handle.id}_child",
-                ).query(LongSleepWorkflow.started)
-            except RPCError as err:
-                # Ignore not-found or failed precondition because child may
-                # not have started yet
-                if (
-                    err.status == RPCStatusCode.NOT_FOUND
-                    or err.status == RPCStatusCode.FAILED_PRECONDITION
-                ):
-                    return False
-                raise
-
-        await assert_eq_eventually(True, child_started)
+        await assert_workflow_exists_eventually(
+            client, LongSleepWorkflow.run, f"{handle.id}_child"
+        )
         # Send cancel signal and wait on the handle
         await handle.signal(CancelChildWorkflow.cancel_child)
         with pytest.raises(WorkflowFailureError) as err:
@@ -7081,3 +7065,65 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
             task_queue=worker.task_queue,
         )
         await handle.result()
+
+
+@workflow.defn
+class ExposeRootChildWorkflow:
+    def __init__(self) -> None:
+        self.blocked = True
+
+    @workflow.signal
+    def unblock(self) -> None:
+        self.blocked = False
+
+    @workflow.run
+    async def run(self) -> Optional[temporalio.workflow.RootInfo]:
+        await workflow.wait_condition(lambda: not self.blocked)
+        return workflow.info().root
+
+
+@workflow.defn
+class ExposeRootWorkflow:
+    @workflow.run
+    async def run(self, child_wf_id) -> Optional[temporalio.workflow.RootInfo]:
+        return await workflow.execute_child_workflow(
+            ExposeRootChildWorkflow.run, id=child_wf_id
+        )
+
+
+async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2441"
+        )
+    async with new_worker(
+        client, ExposeRootWorkflow, ExposeRootChildWorkflow
+    ) as worker:
+        parent_wf_id = f"workflow-{uuid.uuid4()}"
+        child_wf_id = parent_wf_id + "_child"
+        handle = await client.start_workflow(
+            ExposeRootWorkflow.run,
+            child_wf_id,
+            id=parent_wf_id,
+            task_queue=worker.task_queue,
+        )
+
+        await assert_workflow_exists_eventually(
+            client, ExposeRootChildWorkflow, child_wf_id
+        )
+        child_handle: WorkflowHandle = client.get_workflow_handle_for(
+            ExposeRootChildWorkflow.run, child_wf_id
+        )
+        child_desc = await child_handle.describe()
+        parent_desc = await handle.describe()
+        # Assert child root execution is the same as it's parent execution
+        assert child_desc.root_id == parent_desc.id
+        assert child_desc.root_run_id == parent_desc.run_id
+        # Unblock child
+        await child_handle.signal(ExposeRootChildWorkflow.unblock)
+        # Get the result (child info)
+        child_wf_info_root = await handle.result()
+        # Assert root execution in child info is same as it's parent execution
+        assert child_wf_info_root is not None
+        assert child_wf_info_root.workflow_id == parent_desc.id
+        assert child_wf_info_root.run_id == parent_desc.run_id
