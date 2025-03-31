@@ -20,10 +20,6 @@ from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from temporalio.workflow import (
-    MethodAsyncNoParam,
-    MethodAsyncSingleParam,
-    ReturnType,
-    SelfType,
     UpdateMethodMultiParam,
 )
 
@@ -158,23 +154,32 @@ async def admitted_update_task(
     return update_task
 
 
-async def child_started(
+async def assert_workflow_exists_eventually(
     client: Client,
     workflow: Any,
     workflow_id: str,
-) -> bool:
-    try:
-        await client.get_workflow_handle_for(
-            workflow,
-            workflow_id=workflow_id,
-        ).describe()
-        return True
-    except RPCError as err:
-        # Ignore not-found or failed precondition because child may
-        # not have started yet
-        if (
-            err.status == RPCStatusCode.NOT_FOUND
-            or err.status == RPCStatusCode.FAILED_PRECONDITION
-        ):
-            return False
-        raise
+) -> WorkflowHandle:
+    handle = None
+
+    async def check_workflow_exists() -> bool:
+        nonlocal handle
+        try:
+            handle = client.get_workflow_handle_for(
+                workflow,
+                workflow_id=workflow_id,
+            )
+            await handle.describe()
+            return True
+        except RPCError as err:
+            # Ignore not-found or failed precondition because child may
+            # not have started yet
+            if (
+                err.status == RPCStatusCode.NOT_FOUND
+                or err.status == RPCStatusCode.FAILED_PRECONDITION
+            ):
+                return False
+            raise
+
+    await assert_eq_eventually(True, check_workflow_exists)
+    assert handle is not None
+    return handle
