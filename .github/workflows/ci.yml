@@ -97,7 +97,7 @@ jobs:
           TEMPORAL_TEST_PROTO3: 1
         run: |
           uv add --python 3.9 "protobuf<4"
-          uv sync --all-extras
+          uv sync --all-extras --python 3.9
           poe build-develop
           poe gen-protos
           poe format
