@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           actual=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
-          if [[ "$actual" != "${{ matrix.python }}" ]]; then
+          if [[ "$actual" != "${{ 3.13 }}" ]]; then
             echo "Python version in use ($actual) does not match intended version (${{ matrix.python }})"
             exit 1
           fi
