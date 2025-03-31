@@ -48,7 +48,6 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install poethepoet
-      - run: uv --preview python install --default ${{ matrix.python }}
       - run: uv sync --all-extras --python ${{ matrix.python }}
       - name: Check python version
         shell: bash
