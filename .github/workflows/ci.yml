@@ -38,9 +38,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: temporalio/bridge -> target
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
       - uses: arduino/setup-protoc@v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
@@ -48,7 +45,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --python ${{ matrix.python }}
       - name: Check python version
         shell: bash
         run: |
