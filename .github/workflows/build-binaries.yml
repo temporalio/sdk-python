@@ -30,9 +30,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
 
       # Install Rust locally for non-Linux (Linux uses an internal docker
       # command to build with cibuildwheel which uses rustup install defined
@@ -44,7 +41,7 @@ jobs:
         with:
           workspaces: temporalio/bridge -> target
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --python 3.13
 
       # Add the source dist only for Linux x64 for now
       - if: ${{ matrix.package-suffix == 'linux-amd64' }}
