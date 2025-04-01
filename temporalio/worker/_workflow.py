@@ -7,6 +7,7 @@ import concurrent.futures
 import logging
 import os
 import sys
+import threading
 from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
@@ -249,7 +250,7 @@ class _WorkflowWorker:
                         "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
                     )
                 workflow = _RunningWorkflow(
-                    instance=self._create_workflow_instance(act, init_job)
+                    self._create_workflow_instance(act, init_job)
                 )
                 self._running_workflows[act.run_id] = workflow
             elif init_job:
@@ -263,7 +264,7 @@ class _WorkflowWorker:
             if workflow:
                 activate_task = asyncio.get_running_loop().run_in_executor(
                     self._workflow_task_executor,
-                    workflow.instance.activate,
+                    workflow.activate,
                     act,
                 )
 
@@ -284,11 +285,7 @@ class _WorkflowWorker:
                     # interrupt the thread and put this activation task on
                     # the workflow so that the successive eviction can wait
                     # on it before trying to evict.
-                    deadlocked_thread_id = workflow.instance.get_thread_id()
-                    if deadlocked_thread_id:
-                        temporalio.bridge.runtime.Runtime._raise_in_thread(
-                            deadlocked_thread_id, _InterruptDeadlockError
-                        )
+                    workflow.attempt_deadlock_interruption()
                     # Set the task and raise
                     workflow.deadlocked_activation_task = activate_task
                     raise deadlock_exc from None
@@ -398,7 +395,7 @@ class _WorkflowWorker:
                         handle_eviction_task = (
                             asyncio.get_running_loop().run_in_executor(
                                 self._workflow_task_executor,
-                                workflow.instance.activate,
+                                workflow.activate,
                                 act,
                             )
                         )
@@ -428,8 +425,7 @@ class _WorkflowWorker:
                         else:
                             logger.exception(
                                 "Failed running eviction job for run ID %s, continually retrying "
-                                + "eviction. "
-                                + "Since eviction could not be processed, this worker "
+                                + "eviction. Since eviction could not be processed, this worker "
                                 + "may not complete and the slot may remain forever used "
                                 + "unless it eventually completes.",
                                 act.run_id,
@@ -626,11 +622,37 @@ class _DeadlockError(Exception):
         return tb
 
 
-class _InterruptDeadlockError(Exception):
-    pass
-
-
-@dataclass
 class _RunningWorkflow:
-    instance: WorkflowInstance
-    deadlocked_activation_task: Optional[Awaitable] = None
+    def __init__(self, instance: WorkflowInstance):
+        self.instance = instance
+        self.deadlocked_activation_task: Optional[Awaitable] = None
+        self._deadlock_can_be_interrupted_lock = threading.Lock()
+        self._deadlock_can_be_interrupted = False
+
+    def activate(
+        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        # Mark that the deadlock can be interrupted, do work, then unmark
+        with self._deadlock_can_be_interrupted_lock:
+            self._deadlock_can_be_interrupted = True
+        try:
+            return self.instance.activate(act)
+        finally:
+            with self._deadlock_can_be_interrupted_lock:
+                self._deadlock_can_be_interrupted = False
+
+    def attempt_deadlock_interruption(self) -> None:
+        # Need to be under mutex to ensure it can be interrupted
+        with self._deadlock_can_be_interrupted_lock:
+            # Do not interrupt if cannot be interrupted anymore
+            if not self._deadlock_can_be_interrupted:
+                return
+            deadlocked_thread_id = self.instance.get_thread_id()
+            if deadlocked_thread_id:
+                temporalio.bridge.runtime.Runtime._raise_in_thread(
+                    deadlocked_thread_id, _InterruptDeadlockError
+                )
+
+
+class _InterruptDeadlockError(BaseException):
+    pass
