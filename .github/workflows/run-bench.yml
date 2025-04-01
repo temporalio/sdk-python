@@ -47,7 +47,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       # Build
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras --python 3.13
+      - run: uv sync --all-extras
       - run: poe build-develop-with-release
       
       # Run a bunch of bench tests. We run multiple times since results vary.

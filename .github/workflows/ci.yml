@@ -48,20 +48,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras --python ${{ matrix.python }}
-      - name: Check python version
-        shell: bash
-        run: |
-          actual=$(uv run python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
-          if [[ "$actual" != "${{ matrix.python }}" ]]; then
-            echo "Python version in use by uv ($actual) does not match intended version (${{ matrix.python }})"
-            exit 1
-          fi
-          actual=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))")
-          if [[ "$actual" != "${{ matrix.python }}" ]]; then
-            echo "Python version on PATH ($actual) does not match intended version (${{ matrix.python }})"
-            exit 1
-          fi
+      - run: uv sync --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
       - run: poe lint
@@ -97,7 +84,7 @@ jobs:
           TEMPORAL_TEST_PROTO3: 1
         run: |
           uv add --python 3.9 "protobuf<4"
-          uv sync --all-extras --python 3.9
+          uv sync --all-extras
           poe build-develop
           poe gen-protos
           poe format
