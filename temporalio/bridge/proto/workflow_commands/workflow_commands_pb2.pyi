@@ -423,6 +423,7 @@ class ScheduleActivity(google.protobuf.message.Message):
     CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
     DO_NOT_EAGERLY_EXECUTE_FIELD_NUMBER: builtins.int
     VERSIONING_INTENT_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     activity_id: builtins.str
@@ -479,6 +480,9 @@ class ScheduleActivity(google.protobuf.message.Message):
         temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
     )
     """Whether this activity should run on a worker with a compatible build id or not."""
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """The Priority to use for this activity"""
     def __init__(
         self,
         *,
@@ -502,12 +506,15 @@ class ScheduleActivity(google.protobuf.message.Message):
         cancellation_type: global___ActivityCancellationType.ValueType = ...,
         do_not_eagerly_execute: builtins.bool = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "heartbeat_timeout",
             b"heartbeat_timeout",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -535,6 +542,8 @@ class ScheduleActivity(google.protobuf.message.Message):
             b"headers",
             "heartbeat_timeout",
             b"heartbeat_timeout",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -1204,6 +1213,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
     VERSIONING_INTENT_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     namespace: builtins.str
@@ -1263,6 +1273,9 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
     )
     """Whether this child should run on a worker with a compatible build id or not."""
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """The Priority to use for this activity"""
     def __init__(
         self,
         *,
@@ -1294,10 +1307,13 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         | None = ...,
         cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "workflow_execution_timeout",
@@ -1325,6 +1341,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             b"namespace",
             "parent_close_policy",
             b"parent_close_policy",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "search_attributes",
@@ -1358,17 +1376,21 @@ class CancelChildWorkflowExecution(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CHILD_WORKFLOW_SEQ_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
     child_workflow_seq: builtins.int
     """Sequence number as given to the `StartChildWorkflowExecution` command"""
+    reason: builtins.str
+    """A reason for the cancellation"""
     def __init__(
         self,
         *,
         child_workflow_seq: builtins.int = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "child_workflow_seq", b"child_workflow_seq"
+            "child_workflow_seq", b"child_workflow_seq", "reason", b"reason"
         ],
     ) -> None: ...
 
@@ -1383,6 +1405,7 @@ class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
 
     SEQ_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     @property
@@ -1390,12 +1413,15 @@ class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
         self,
     ) -> temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution:
         """The workflow instance being targeted"""
+    reason: builtins.str
+    """A reason for the cancellation"""
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
         workflow_execution: temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution
         | None = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1406,7 +1432,12 @@ class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "seq", b"seq", "workflow_execution", b"workflow_execution"
+            "reason",
+            b"reason",
+            "seq",
+            b"seq",
+            "workflow_execution",
+            b"workflow_execution",
         ],
     ) -> None: ...
 

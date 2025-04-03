@@ -64,6 +64,7 @@ from temporalio.client import (
     WorkflowUpdateStage,
 )
 from temporalio.common import (
+    Priority,
     RawValue,
     RetryPolicy,
     SearchAttributeKey,
@@ -99,7 +100,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
 )
-from temporalio.service import RPCError, RPCStatusCode, __version__
+from temporalio.service import __version__
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
@@ -111,6 +112,7 @@ from temporalio.worker import (
 from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
+    assert_workflow_exists_eventually,
     ensure_search_attributes_present,
     find_free_port,
     new_worker,
@@ -222,7 +224,7 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         assert info["retry_policy"] == json.loads(
             json.dumps(dataclasses.asdict(retry_policy), default=str)
         )
-        assert uuid.UUID(info["run_id"]).version == 4
+        assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
         datetime.fromisoformat(info["start_time"])
         assert info["task_queue"] == worker.task_queue
@@ -1125,26 +1127,9 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
             task_queue=worker.task_queue,
         )
 
-        # Wait until child started
-        async def child_started() -> bool:
-            try:
-                return await handle.query(
-                    CancelChildWorkflow.ready
-                ) and await client.get_workflow_handle_for(
-                    LongSleepWorkflow.run,  # type: ignore[arg-type]
-                    workflow_id=f"{handle.id}_child",
-                ).query(LongSleepWorkflow.started)
-            except RPCError as err:
-                # Ignore not-found or failed precondition because child may
-                # not have started yet
-                if (
-                    err.status == RPCStatusCode.NOT_FOUND
-                    or err.status == RPCStatusCode.FAILED_PRECONDITION
-                ):
-                    return False
-                raise
-
-        await assert_eq_eventually(True, child_started)
+        await assert_workflow_exists_eventually(
+            client, LongSleepWorkflow.run, f"{handle.id}_child"
+        )
         # Send cancel signal and wait on the handle
         await handle.signal(CancelChildWorkflow.cancel_child)
         with pytest.raises(WorkflowFailureError) as err:
@@ -6990,3 +6975,155 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
             ever_in_critical_section=3, peak_in_critical_section=3
         ),
     )
+
+
+@activity.defn
+async def check_priority_activity(should_have_priorty: int) -> str:
+    assert activity.info().priority.priority_key == should_have_priorty
+    return "Done!"
+
+
+@workflow.defn
+class WorkflowUsingPriorities:
+    @workflow.run
+    async def run(
+        self, expected_priority: Optional[int], stop_after_check: bool
+    ) -> str:
+        assert workflow.info().priority.priority_key == expected_priority
+        if stop_after_check:
+            return "Done!"
+        await workflow.execute_child_workflow(
+            WorkflowUsingPriorities.run,
+            args=[4, True],
+            priority=Priority(priority_key=4),
+        )
+        handle = await workflow.start_child_workflow(
+            WorkflowUsingPriorities.run,
+            args=[2, True],
+            priority=Priority(priority_key=2),
+        )
+        await handle
+        await workflow.execute_activity(
+            say_hello,
+            "hi",
+            priority=Priority(priority_key=5),
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+        return "Done!"
+
+
+async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2453"
+        )
+
+    async with new_worker(
+        client, WorkflowUsingPriorities, HelloWorkflow, activities=[say_hello]
+    ) as worker:
+        handle = await client.start_workflow(
+            WorkflowUsingPriorities.run,
+            args=[1, False],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            priority=Priority(priority_key=1),
+        )
+        await handle.result()
+
+        first_child = True
+        async for e in handle.fetch_history_events():
+            if e.HasField("workflow_execution_started_event_attributes"):
+                assert (
+                    e.workflow_execution_started_event_attributes.priority.priority_key
+                    == 1
+                )
+            elif e.HasField(
+                "start_child_workflow_execution_initiated_event_attributes"
+            ):
+                if first_child:
+                    assert (
+                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                        == 4
+                    )
+                    first_child = False
+                else:
+                    assert (
+                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                        == 2
+                    )
+            elif e.HasField("activity_task_scheduled_event_attributes"):
+                assert (
+                    e.activity_task_scheduled_event_attributes.priority.priority_key
+                    == 5
+                )
+
+        # Verify a workflow started without priorities sees None for the key
+        handle = await client.start_workflow(
+            WorkflowUsingPriorities.run,
+            args=[None, True],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+
+
+@workflow.defn
+class ExposeRootChildWorkflow:
+    def __init__(self) -> None:
+        self.blocked = True
+
+    @workflow.signal
+    def unblock(self) -> None:
+        self.blocked = False
+
+    @workflow.run
+    async def run(self) -> Optional[temporalio.workflow.RootInfo]:
+        await workflow.wait_condition(lambda: not self.blocked)
+        return workflow.info().root
+
+
+@workflow.defn
+class ExposeRootWorkflow:
+    @workflow.run
+    async def run(self, child_wf_id) -> Optional[temporalio.workflow.RootInfo]:
+        return await workflow.execute_child_workflow(
+            ExposeRootChildWorkflow.run, id=child_wf_id
+        )
+
+
+async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2441"
+        )
+    async with new_worker(
+        client, ExposeRootWorkflow, ExposeRootChildWorkflow
+    ) as worker:
+        parent_wf_id = f"workflow-{uuid.uuid4()}"
+        child_wf_id = parent_wf_id + "_child"
+        handle = await client.start_workflow(
+            ExposeRootWorkflow.run,
+            child_wf_id,
+            id=parent_wf_id,
+            task_queue=worker.task_queue,
+        )
+
+        await assert_workflow_exists_eventually(
+            client, ExposeRootChildWorkflow, child_wf_id
+        )
+        child_handle: WorkflowHandle = client.get_workflow_handle_for(
+            ExposeRootChildWorkflow.run, child_wf_id
+        )
+        child_desc = await child_handle.describe()
+        parent_desc = await handle.describe()
+        # Assert child root execution is the same as it's parent execution
+        assert child_desc.root_id == parent_desc.id
+        assert child_desc.root_run_id == parent_desc.run_id
+        # Unblock child
+        await child_handle.signal(ExposeRootChildWorkflow.unblock)
+        # Get the result (child info)
+        child_wf_info_root = await handle.result()
+        # Assert root execution in child info is same as it's parent execution
+        assert child_wf_info_root is not None
+        assert child_wf_info_root.workflow_id == parent_desc.id
+        assert child_wf_info_root.run_id == parent_desc.run_id

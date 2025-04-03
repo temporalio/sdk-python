@@ -303,6 +303,71 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityResponse.FromString,
         )
+        self.DescribeDeployment = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeDeployment",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeDeploymentRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeDeploymentResponse.FromString,
+        )
+        self.DescribeWorkerDeploymentVersion = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorkerDeploymentVersion",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentVersionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentVersionResponse.FromString,
+        )
+        self.ListDeployments = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListDeployments",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListDeploymentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListDeploymentsResponse.FromString,
+        )
+        self.GetDeploymentReachability = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/GetDeploymentReachability",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetDeploymentReachabilityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetDeploymentReachabilityResponse.FromString,
+        )
+        self.GetCurrentDeployment = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/GetCurrentDeployment",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetCurrentDeploymentRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetCurrentDeploymentResponse.FromString,
+        )
+        self.SetCurrentDeployment = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/SetCurrentDeployment",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetCurrentDeploymentRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetCurrentDeploymentResponse.FromString,
+        )
+        self.SetWorkerDeploymentCurrentVersion = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/SetWorkerDeploymentCurrentVersion",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentCurrentVersionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentCurrentVersionResponse.FromString,
+        )
+        self.DescribeWorkerDeployment = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorkerDeployment",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentResponse.FromString,
+        )
+        self.DeleteWorkerDeployment = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkerDeployment",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentResponse.FromString,
+        )
+        self.DeleteWorkerDeploymentVersion = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkerDeploymentVersion",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentVersionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentVersionResponse.FromString,
+        )
+        self.SetWorkerDeploymentRampingVersion = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/SetWorkerDeploymentRampingVersion",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentRampingVersionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentRampingVersionResponse.FromString,
+        )
+        self.ListWorkerDeployments = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListWorkerDeployments",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsResponse.FromString,
+        )
+        self.UpdateWorkerDeploymentVersionMetadata = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerDeploymentVersionMetadata",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataResponse.FromString,
+        )
         self.UpdateWorkflowExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.SerializeToString,
@@ -348,25 +413,30 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RespondNexusTaskFailedRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RespondNexusTaskFailedResponse.FromString,
         )
-        self.UpdateActivityOptionsById = channel.unary_unary(
-            "/temporal.api.workflowservice.v1.WorkflowService/UpdateActivityOptionsById",
-            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsByIdRequest.SerializeToString,
-            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsByIdResponse.FromString,
+        self.UpdateActivityOptions = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateActivityOptions",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsResponse.FromString,
         )
-        self.PauseActivityById = channel.unary_unary(
-            "/temporal.api.workflowservice.v1.WorkflowService/PauseActivityById",
-            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityByIdRequest.SerializeToString,
-            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityByIdResponse.FromString,
+        self.UpdateWorkflowExecutionOptions = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecutionOptions",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionOptionsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionOptionsResponse.FromString,
         )
-        self.UnpauseActivityById = channel.unary_unary(
-            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseActivityById",
-            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityByIdRequest.SerializeToString,
-            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityByIdResponse.FromString,
+        self.PauseActivity = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/PauseActivity",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityResponse.FromString,
         )
-        self.ResetActivityById = channel.unary_unary(
-            "/temporal.api.workflowservice.v1.WorkflowService/ResetActivityById",
-            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityByIdRequest.SerializeToString,
-            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityByIdResponse.FromString,
+        self.UnpauseActivity = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseActivity",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityResponse.FromString,
+        )
+        self.ResetActivity = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ResetActivity",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityResponse.FromString,
         )
 
 
@@ -739,6 +809,7 @@ class WorkflowServiceServicer(object):
     def ScanWorkflowExecutions(self, request, context):
         """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
 
+        Deprecated: Replaced with `ListWorkflowExecutions`.
         (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
         """
@@ -988,6 +1059,130 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def DescribeDeployment(self, request, context):
+        """Describes a worker deployment.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeWorkerDeploymentVersion(self, request, context):
+        """Describes a worker deployment version.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListDeployments(self, request, context):
+        """Lists worker deployments in the namespace. Optionally can filter based on deployment series
+        name.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced with `ListWorkerDeployments`.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetDeploymentReachability(self, request, context):
+        """Returns the reachability level of a worker deployment to help users decide when it is time
+        to decommission a deployment. Reachability level is calculated based on the deployment's
+        `status` and existing workflows that depend on the given deployment for their execution.
+        Calculating reachability is relatively expensive. Therefore, server might return a recently
+        cached value. In such a case, the `last_update_time` will inform you about the actual
+        reachability calculation time.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetCurrentDeployment(self, request, context):
+        """Returns the current deployment (and its info) for a given deployment series.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def SetCurrentDeployment(self, request, context):
+        """Sets a deployment as the current deployment for its deployment series. Can optionally update
+        the metadata of the deployment as well.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def SetWorkerDeploymentCurrentVersion(self, request, context):
+        """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
+        Version if it is the Version being set as Current.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeWorkerDeployment(self, request, context):
+        """Describes a Worker Deployment.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteWorkerDeployment(self, request, context):
+        """Deletes records of (an old) Deployment. A deployment can only be deleted if
+        it has no Version in it.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteWorkerDeploymentVersion(self, request, context):
+        """Used for manual deletion of Versions. User can delete a Version only when all the
+        following conditions are met:
+        - It is not the Current or Ramping Version of its Deployment.
+        - It has no active pollers (none of the task queues in the Version have pollers)
+        - It is not draining (see WorkerDeploymentVersionInfo.drainage_info). This condition
+        can be skipped by passing `skip-drainage=true`.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def SetWorkerDeploymentRampingVersion(self, request, context):
+        """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
+        gradual ramp to unversioned workers too.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListWorkerDeployments(self, request, context):
+        """Lists all Worker Deployments that are tracked in the Namespace.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateWorkerDeploymentVersionMetadata(self, request, context):
+        """Updates the user-given metadata attached to a Worker Deployment Version.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def UpdateWorkflowExecution(self, request, context):
         """Invokes the specified Update function on user Workflow code."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1058,18 +1253,23 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
-    def UpdateActivityOptionsById(self, request, context):
-        """UpdateActivityOptionsById is called by the client to update the options of an activity
-        (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+    def UpdateActivityOptions(self, request, context):
+        """UpdateActivityOptions is called by the client to update the options of an activity by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be updated.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
-    def PauseActivityById(self, request, context):
-        """PauseActivityById pauses the execution of an activity specified by its ID.
-        Returns a `NotFound` error if there is no pending activity with the provided ID.
+    def UpdateWorkflowExecutionOptions(self, request, context):
+        """UpdateWorkflowExecutionOptions partially updates the WorkflowExecutionOptions of an existing workflow execution."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def PauseActivity(self, request, context):
+        """PauseActivity pauses the execution of an activity specified by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be paused
 
         Pausing an activity means:
         - If the activity is currently waiting for a retry or is running and subsequently fails,
@@ -1082,45 +1282,50 @@ class WorkflowServiceServicer(object):
         For long-running activities:
         - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
         - The activity should respond to the cancellation accordingly.
-        (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
-    def UnpauseActivityById(self, request, context):
-        """UnpauseActivityById unpauses the execution of an activity specified by its ID.
-        Returns a `NotFound` error if there is no pending activity with the provided ID.
-        There are two 'modes' of unpausing an activity:
-        'resume' - If the activity is paused, it will be resumed and scheduled for execution.
-        * If the activity is currently running Unpause with 'resume' has no effect.
-        * if 'no_wait' flag is set and the activity is waiting, the activity will be scheduled immediately.
-        'reset' - If the activity is paused, it will be reset to its initial state and (depending on parameters) scheduled for execution.
-        * If the activity is currently running, Unpause with 'reset' will reset the number of attempts.
-        * if 'no_wait' flag is set, the activity will be scheduled immediately.
-        * if 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
-        If the activity is in waiting for retry and past it retry timeout, it will be scheduled immediately.
+    def UnpauseActivity(self, request, context):
+        """UnpauseActivity unpauses the execution of an activity specified by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be unpaused.
+
+        If activity is not paused, this call will have no effect.
+        If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
         Once the activity is unpaused, all timeout timers will be regenerated.
-        (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+
+        Flags:
+        'jitter': the activity will be scheduled at a random time within the jitter duration.
+        'reset_attempts': the number of attempts will be reset.
+        'reset_heartbeat': the activity heartbeat timer and heartbeats will be reset.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
-    def ResetActivityById(self, request, context):
-        """ResetActivityById unpauses the execution of an activity specified by its ID.
-        Returns a `NotFound` error if there is no pending activity with the provided ID.
+    def ResetActivity(self, request, context):
+        """ResetActivity resets the execution of an activity specified by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be reset.
+
         Resetting an activity means:
         * number of attempts will be reset to 0.
-        * activity timeouts will be resetted.
-        If the activity currently running:
-        *  if 'no_wait' flag is provided, a new instance of the activity will be scheduled immediately.
-        *  if 'no_wait' flag is not provided, a new instance of the  activity will be scheduled after current instance completes if needed.
-        If 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
-        (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+        * activity timeouts will be reset.
+        * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+        it will be scheduled immediately (* see 'jitter' flag),
+
+        Flags:
+
+        'jitter': the activity will be scheduled at a random time within the jitter duration.
+        If the activity currently paused it will be unpaused, unless 'keep_paused' flag is provided.
+        'reset_heartbeats': the activity heartbeat timer and heartbeats will be reset.
+        'keep_paused': if the activity is paused, it will remain paused.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1404,6 +1609,71 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetWorkerTaskReachabilityResponse.SerializeToString,
         ),
+        "DescribeDeployment": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeDeployment,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeDeploymentRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeDeploymentResponse.SerializeToString,
+        ),
+        "DescribeWorkerDeploymentVersion": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeWorkerDeploymentVersion,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentVersionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentVersionResponse.SerializeToString,
+        ),
+        "ListDeployments": grpc.unary_unary_rpc_method_handler(
+            servicer.ListDeployments,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListDeploymentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListDeploymentsResponse.SerializeToString,
+        ),
+        "GetDeploymentReachability": grpc.unary_unary_rpc_method_handler(
+            servicer.GetDeploymentReachability,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetDeploymentReachabilityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetDeploymentReachabilityResponse.SerializeToString,
+        ),
+        "GetCurrentDeployment": grpc.unary_unary_rpc_method_handler(
+            servicer.GetCurrentDeployment,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetCurrentDeploymentRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetCurrentDeploymentResponse.SerializeToString,
+        ),
+        "SetCurrentDeployment": grpc.unary_unary_rpc_method_handler(
+            servicer.SetCurrentDeployment,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetCurrentDeploymentRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetCurrentDeploymentResponse.SerializeToString,
+        ),
+        "SetWorkerDeploymentCurrentVersion": grpc.unary_unary_rpc_method_handler(
+            servicer.SetWorkerDeploymentCurrentVersion,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentCurrentVersionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentCurrentVersionResponse.SerializeToString,
+        ),
+        "DescribeWorkerDeployment": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeWorkerDeployment,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentResponse.SerializeToString,
+        ),
+        "DeleteWorkerDeployment": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteWorkerDeployment,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentResponse.SerializeToString,
+        ),
+        "DeleteWorkerDeploymentVersion": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteWorkerDeploymentVersion,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentVersionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentVersionResponse.SerializeToString,
+        ),
+        "SetWorkerDeploymentRampingVersion": grpc.unary_unary_rpc_method_handler(
+            servicer.SetWorkerDeploymentRampingVersion,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentRampingVersionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentRampingVersionResponse.SerializeToString,
+        ),
+        "ListWorkerDeployments": grpc.unary_unary_rpc_method_handler(
+            servicer.ListWorkerDeployments,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsResponse.SerializeToString,
+        ),
+        "UpdateWorkerDeploymentVersionMetadata": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkerDeploymentVersionMetadata,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataResponse.SerializeToString,
+        ),
         "UpdateWorkflowExecution": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateWorkflowExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.FromString,
@@ -1449,25 +1719,30 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RespondNexusTaskFailedRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RespondNexusTaskFailedResponse.SerializeToString,
         ),
-        "UpdateActivityOptionsById": grpc.unary_unary_rpc_method_handler(
-            servicer.UpdateActivityOptionsById,
-            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsByIdRequest.FromString,
-            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsByIdResponse.SerializeToString,
+        "UpdateActivityOptions": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateActivityOptions,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsResponse.SerializeToString,
         ),
-        "PauseActivityById": grpc.unary_unary_rpc_method_handler(
-            servicer.PauseActivityById,
-            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityByIdRequest.FromString,
-            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityByIdResponse.SerializeToString,
+        "UpdateWorkflowExecutionOptions": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkflowExecutionOptions,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionOptionsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionOptionsResponse.SerializeToString,
         ),
-        "UnpauseActivityById": grpc.unary_unary_rpc_method_handler(
-            servicer.UnpauseActivityById,
-            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityByIdRequest.FromString,
-            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityByIdResponse.SerializeToString,
+        "PauseActivity": grpc.unary_unary_rpc_method_handler(
+            servicer.PauseActivity,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityResponse.SerializeToString,
         ),
-        "ResetActivityById": grpc.unary_unary_rpc_method_handler(
-            servicer.ResetActivityById,
-            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityByIdRequest.FromString,
-            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityByIdResponse.SerializeToString,
+        "UnpauseActivity": grpc.unary_unary_rpc_method_handler(
+            servicer.UnpauseActivity,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityResponse.SerializeToString,
+        ),
+        "ResetActivity": grpc.unary_unary_rpc_method_handler(
+            servicer.ResetActivity,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3087,6 +3362,383 @@ class WorkflowService(object):
         )
 
     @staticmethod
+    def DescribeDeployment(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeDeployment",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeDeploymentRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeDeploymentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeWorkerDeploymentVersion(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorkerDeploymentVersion",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentVersionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentVersionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListDeployments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListDeployments",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListDeploymentsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListDeploymentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetDeploymentReachability(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/GetDeploymentReachability",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetDeploymentReachabilityRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetDeploymentReachabilityResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetCurrentDeployment(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/GetCurrentDeployment",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetCurrentDeploymentRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.GetCurrentDeploymentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def SetCurrentDeployment(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/SetCurrentDeployment",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetCurrentDeploymentRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetCurrentDeploymentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def SetWorkerDeploymentCurrentVersion(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/SetWorkerDeploymentCurrentVersion",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentCurrentVersionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentCurrentVersionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeWorkerDeployment(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorkerDeployment",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerDeploymentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteWorkerDeployment(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkerDeployment",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteWorkerDeploymentVersion(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkerDeploymentVersion",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentVersionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkerDeploymentVersionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def SetWorkerDeploymentRampingVersion(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/SetWorkerDeploymentRampingVersion",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentRampingVersionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentRampingVersionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListWorkerDeployments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListWorkerDeployments",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateWorkerDeploymentVersionMetadata(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerDeploymentVersionMetadata",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def UpdateWorkflowExecution(
         request,
         target,
@@ -3348,7 +4000,7 @@ class WorkflowService(object):
         )
 
     @staticmethod
-    def UpdateActivityOptionsById(
+    def UpdateActivityOptions(
         request,
         target,
         options=(),
@@ -3363,9 +4015,9 @@ class WorkflowService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/temporal.api.workflowservice.v1.WorkflowService/UpdateActivityOptionsById",
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsByIdRequest.SerializeToString,
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsByIdResponse.FromString,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateActivityOptions",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityOptionsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -3377,7 +4029,7 @@ class WorkflowService(object):
         )
 
     @staticmethod
-    def PauseActivityById(
+    def UpdateWorkflowExecutionOptions(
         request,
         target,
         options=(),
@@ -3392,9 +4044,9 @@ class WorkflowService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/temporal.api.workflowservice.v1.WorkflowService/PauseActivityById",
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityByIdRequest.SerializeToString,
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityByIdResponse.FromString,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecutionOptions",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionOptionsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionOptionsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -3406,7 +4058,7 @@ class WorkflowService(object):
         )
 
     @staticmethod
-    def UnpauseActivityById(
+    def PauseActivity(
         request,
         target,
         options=(),
@@ -3421,9 +4073,9 @@ class WorkflowService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseActivityById",
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityByIdRequest.SerializeToString,
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityByIdResponse.FromString,
+            "/temporal.api.workflowservice.v1.WorkflowService/PauseActivity",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -3435,7 +4087,7 @@ class WorkflowService(object):
         )
 
     @staticmethod
-    def ResetActivityById(
+    def UnpauseActivity(
         request,
         target,
         options=(),
@@ -3450,9 +4102,38 @@ class WorkflowService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            "/temporal.api.workflowservice.v1.WorkflowService/ResetActivityById",
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityByIdRequest.SerializeToString,
-            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityByIdResponse.FromString,
+            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseActivity",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ResetActivity(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ResetActivity",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityResponse.FromString,
             options,
             channel_credentials,
             insecure,
