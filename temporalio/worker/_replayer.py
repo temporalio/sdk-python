@@ -64,8 +64,9 @@ class Replayer:
             raise ValueError("At least one workflow must be specified")
         self._config = ReplayerConfig(
             workflows=list(workflows),
-            workflow_task_executor=workflow_task_executor
-            or concurrent.futures.ThreadPoolExecutor(),
+            workflow_task_executor=(
+                workflow_task_executor or concurrent.futures.ThreadPoolExecutor()
+            ),
             workflow_runner=workflow_runner,
             unsandboxed_workflow_runner=unsandboxed_workflow_runner,
             namespace=namespace,
