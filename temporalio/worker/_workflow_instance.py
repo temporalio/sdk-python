@@ -1433,7 +1433,7 @@ class _WorkflowInstanceImpl(
         input: Any,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> asyncio.Task:
+    ) -> temporalio.workflow.NexusOperationHandle[Any]:
         return await self._outbound.start_nexus_operation(
             StartNexusOperationInput(
                 endpoint=endpoint,
@@ -2860,13 +2860,17 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         await self._instance._cancel_external_workflow(command)
 
 
-class _NexusOperationHandle:
+I = TypeVar("I")
+O = TypeVar("O")
+
+
+class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
     def __init__(
         self,
         instance: _WorkflowInstanceImpl,
         seq: int,
         input: StartNexusOperationInput,
-        fn: Coroutine[Any, Any, Any],
+        fn: Coroutine[Any, Any, O],
     ):
         self._instance = instance
         self._seq = seq
@@ -2875,6 +2879,9 @@ class _NexusOperationHandle:
         self._start_fut: asyncio.Future[None] = instance.create_future()
         self._result_fut: asyncio.Future[Any] = instance.create_future()
         self._operation_id: Optional[str] = None
+
+    async def result(self) -> O:
+        return await self._result_fut
 
     def _resolve_start_success(self, operation_id: str) -> None:
         span = xray.get_current_span()
