@@ -432,6 +432,8 @@ class InitializeWorkflow(google.protobuf.message.Message):
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_TIME_FIELD_NUMBER: builtins.int
+    ROOT_WORKFLOW_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     workflow_id: builtins.str
@@ -518,6 +520,22 @@ class InitializeWorkflow(google.protobuf.message.Message):
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """When the workflow execution started event was first written"""
+    @property
+    def root_workflow(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """Contains information about the root workflow execution. It is possible for the namespace to
+        be different than this workflow if using OSS and cross-namespace children, but this
+        information is not retained. Users should take care to track it by other means in such
+        situations.
+
+        The root workflow execution is defined as follows:
+          1. A workflow without parent workflow is its own root workflow.
+          2. A workflow that has a parent workflow has the same root workflow as its parent workflow.
+
+        See field in WorkflowExecutionStarted for more detail.
+        """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority of this workflow execution"""
     def __init__(
         self,
         *,
@@ -555,6 +573,9 @@ class InitializeWorkflow(google.protobuf.message.Message):
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        root_workflow: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -569,8 +590,12 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"memo",
             "parent_workflow_info",
             b"parent_workflow_info",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
+            "root_workflow",
+            b"root_workflow",
             "search_attributes",
             b"search_attributes",
             "start_time",
@@ -614,10 +639,14 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"memo",
             "parent_workflow_info",
             b"parent_workflow_info",
+            "priority",
+            b"priority",
             "randomness_seed",
             b"randomness_seed",
             "retry_policy",
             b"retry_policy",
+            "root_workflow",
+            b"root_workflow",
             "search_attributes",
             b"search_attributes",
             "start_time",
@@ -978,22 +1007,16 @@ class CancelWorkflow(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    DETAILS_FIELD_NUMBER: builtins.int
-    @property
-    def details(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.common.v1.message_pb2.Payload
-    ]:
-        """Information from the cancellation request"""
+    REASON_FIELD_NUMBER: builtins.int
+    reason: builtins.str
+    """User-specified reason the cancel request was issued"""
     def __init__(
         self,
         *,
-        details: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
-        | None = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
+        self, field_name: typing_extensions.Literal["reason", b"reason"]
     ) -> None: ...
 
 global___CancelWorkflow = CancelWorkflow

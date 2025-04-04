@@ -28,12 +28,15 @@ import builtins
 import sys
 
 import google.protobuf.descriptor
+import google.protobuf.duration_pb2
+import google.protobuf.field_mask_pb2
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.batch_operation_pb2
 import temporalio.api.enums.v1.reset_pb2
+import temporalio.api.workflow.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -262,3 +265,130 @@ class BatchOperationReset(google.protobuf.message.Message):
     ) -> None: ...
 
 global___BatchOperationReset = BatchOperationReset
+
+class BatchOperationUpdateWorkflowExecutionOptions(google.protobuf.message.Message):
+    """BatchOperationUpdateWorkflowExecutionOptions sends UpdateWorkflowExecutionOptions requests to batch workflows.
+    Keep the parameters in sync with temporalio.api.workflowservice.v1.UpdateWorkflowExecutionOptionsRequest.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_OPTIONS_FIELD_NUMBER: builtins.int
+    UPDATE_MASK_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client."""
+    @property
+    def workflow_execution_options(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.WorkflowExecutionOptions:
+        """Workflow Execution options. Partial updates are accepted and controlled by update_mask."""
+    @property
+    def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
+        """Controls which fields from `workflow_execution_options` will be applied.
+        To unset a field, set it to null and use the update mask to indicate that it should be mutated.
+        """
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        workflow_execution_options: temporalio.api.workflow.v1.message_pb2.WorkflowExecutionOptions
+        | None = ...,
+        update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "update_mask",
+            b"update_mask",
+            "workflow_execution_options",
+            b"workflow_execution_options",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "update_mask",
+            b"update_mask",
+            "workflow_execution_options",
+            b"workflow_execution_options",
+        ],
+    ) -> None: ...
+
+global___BatchOperationUpdateWorkflowExecutionOptions = (
+    BatchOperationUpdateWorkflowExecutionOptions
+)
+
+class BatchOperationUnpauseActivities(google.protobuf.message.Message):
+    """BatchOperationUnpauseActivities sends unpause requests to batch workflows."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    MATCH_ALL_FIELD_NUMBER: builtins.int
+    RESET_ATTEMPTS_FIELD_NUMBER: builtins.int
+    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
+    JITTER_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client."""
+    type: builtins.str
+    match_all: builtins.bool
+    reset_attempts: builtins.bool
+    """Providing this flag will also reset the number of attempts."""
+    reset_heartbeat: builtins.bool
+    """Providing this flag will also reset the heartbeat details."""
+    @property
+    def jitter(self) -> google.protobuf.duration_pb2.Duration:
+        """If set, the activity will start at a random time within the specified jitter
+        duration, introducing variability to the start time.
+        """
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        type: builtins.str = ...,
+        match_all: builtins.bool = ...,
+        reset_attempts: builtins.bool = ...,
+        reset_heartbeat: builtins.bool = ...,
+        jitter: google.protobuf.duration_pb2.Duration | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
+            "jitter",
+            b"jitter",
+            "match_all",
+            b"match_all",
+            "type",
+            b"type",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
+            "identity",
+            b"identity",
+            "jitter",
+            b"jitter",
+            "match_all",
+            b"match_all",
+            "reset_attempts",
+            b"reset_attempts",
+            "reset_heartbeat",
+            b"reset_heartbeat",
+            "type",
+            b"type",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["activity", b"activity"]
+    ) -> typing_extensions.Literal["type", "match_all"] | None: ...
+
+global___BatchOperationUnpauseActivities = BatchOperationUnpauseActivities

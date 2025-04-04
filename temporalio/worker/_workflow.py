@@ -477,11 +477,17 @@ class _WorkflowWorker:
 
         # Build info
         parent: Optional[temporalio.workflow.ParentInfo] = None
+        root: Optional[temporalio.workflow.RootInfo] = None
         if init.HasField("parent_workflow_info"):
             parent = temporalio.workflow.ParentInfo(
                 namespace=init.parent_workflow_info.namespace,
                 run_id=init.parent_workflow_info.run_id,
                 workflow_id=init.parent_workflow_info.workflow_id,
+            )
+        if init.HasField("root_workflow"):
+            root = temporalio.workflow.RootInfo(
+                run_id=init.root_workflow.run_id,
+                workflow_id=init.root_workflow.workflow_id,
             )
         info = temporalio.workflow.Info(
             attempt=init.attempt,
@@ -493,6 +499,7 @@ class _WorkflowWorker:
             headers=dict(init.headers),
             namespace=self._namespace,
             parent=parent,
+            root=root,
             raw_memo=dict(init.memo.fields),
             retry_policy=temporalio.common.RetryPolicy.from_proto(init.retry_policy)
             if init.HasField("retry_policy")
@@ -512,6 +519,7 @@ class _WorkflowWorker:
             ),
             workflow_id=init.workflow_id,
             workflow_type=init.workflow_type,
+            priority=temporalio.common.Priority._from_proto(init.priority),
         )
 
         # Create instance from details

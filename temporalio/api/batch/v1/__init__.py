@@ -5,6 +5,8 @@ from .message_pb2 import (
     BatchOperationReset,
     BatchOperationSignal,
     BatchOperationTermination,
+    BatchOperationUnpauseActivities,
+    BatchOperationUpdateWorkflowExecutionOptions,
 )
 
 __all__ = [
@@ -14,4 +16,6 @@ __all__ = [
     "BatchOperationReset",
     "BatchOperationSignal",
     "BatchOperationTermination",
+    "BatchOperationUnpauseActivities",
+    "BatchOperationUpdateWorkflowExecutionOptions",
 ]

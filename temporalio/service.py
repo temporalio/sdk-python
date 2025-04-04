@@ -49,12 +49,12 @@ class TLSConfig:
 
     client_cert: Optional[bytes] = None
     """Client certificate for mTLS.
-    
+
     This must be combined with :py:attr:`client_private_key`."""
 
     client_private_key: Optional[bytes] = None
     """Client private key for mTLS.
-    
+
     This must be combined with :py:attr:`client_cert`."""
 
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientTlsConfig:
@@ -315,6 +315,16 @@ class WorkflowService:
             wsv1.DeleteScheduleRequest,
             wsv1.DeleteScheduleResponse,
         )
+        self.delete_worker_deployment = client._new_call(
+            "delete_worker_deployment",
+            wsv1.DeleteWorkerDeploymentRequest,
+            wsv1.DeleteWorkerDeploymentResponse,
+        )
+        self.delete_worker_deployment_version = client._new_call(
+            "delete_worker_deployment_version",
+            wsv1.DeleteWorkerDeploymentVersionRequest,
+            wsv1.DeleteWorkerDeploymentVersionResponse,
+        )
         self.delete_workflow_execution = client._new_call(
             "delete_workflow_execution",
             wsv1.DeleteWorkflowExecutionRequest,
@@ -324,6 +334,11 @@ class WorkflowService:
             "describe_batch_operation",
             wsv1.DescribeBatchOperationRequest,
             wsv1.DescribeBatchOperationResponse,
+        )
+        self.describe_deployment = client._new_call(
+            "describe_deployment",
+            wsv1.DescribeDeploymentRequest,
+            wsv1.DescribeDeploymentResponse,
         )
         self.deprecate_namespace = client._new_call(
             "deprecate_namespace",
@@ -345,6 +360,16 @@ class WorkflowService:
             wsv1.DescribeTaskQueueRequest,
             wsv1.DescribeTaskQueueResponse,
         )
+        self.describe_worker_deployment = client._new_call(
+            "describe_worker_deployment",
+            wsv1.DescribeWorkerDeploymentRequest,
+            wsv1.DescribeWorkerDeploymentResponse,
+        )
+        self.describe_worker_deployment_version = client._new_call(
+            "describe_worker_deployment_version",
+            wsv1.DescribeWorkerDeploymentVersionRequest,
+            wsv1.DescribeWorkerDeploymentVersionResponse,
+        )
         self.describe_workflow_execution = client._new_call(
             "describe_workflow_execution",
             wsv1.DescribeWorkflowExecutionRequest,
@@ -359,6 +384,16 @@ class WorkflowService:
             "get_cluster_info",
             wsv1.GetClusterInfoRequest,
             wsv1.GetClusterInfoResponse,
+        )
+        self.get_current_deployment = client._new_call(
+            "get_current_deployment",
+            wsv1.GetCurrentDeploymentRequest,
+            wsv1.GetCurrentDeploymentResponse,
+        )
+        self.get_deployment_reachability = client._new_call(
+            "get_deployment_reachability",
+            wsv1.GetDeploymentReachabilityRequest,
+            wsv1.GetDeploymentReachabilityResponse,
         )
         self.get_search_attributes = client._new_call(
             "get_search_attributes",
@@ -410,6 +445,11 @@ class WorkflowService:
             wsv1.ListClosedWorkflowExecutionsRequest,
             wsv1.ListClosedWorkflowExecutionsResponse,
         )
+        self.list_deployments = client._new_call(
+            "list_deployments",
+            wsv1.ListDeploymentsRequest,
+            wsv1.ListDeploymentsResponse,
+        )
         self.list_namespaces = client._new_call(
             "list_namespaces",
             wsv1.ListNamespacesRequest,
@@ -435,6 +475,11 @@ class WorkflowService:
             wsv1.ListTaskQueuePartitionsRequest,
             wsv1.ListTaskQueuePartitionsResponse,
         )
+        self.list_worker_deployments = client._new_call(
+            "list_worker_deployments",
+            wsv1.ListWorkerDeploymentsRequest,
+            wsv1.ListWorkerDeploymentsResponse,
+        )
         self.list_workflow_executions = client._new_call(
             "list_workflow_executions",
             wsv1.ListWorkflowExecutionsRequest,
@@ -444,6 +489,11 @@ class WorkflowService:
             "patch_schedule",
             wsv1.PatchScheduleRequest,
             wsv1.PatchScheduleResponse,
+        )
+        self.pause_activity = client._new_call(
+            "pause_activity",
+            wsv1.PauseActivityRequest,
+            wsv1.PauseActivityResponse,
         )
         self.poll_activity_task_queue = client._new_call(
             "poll_activity_task_queue",
@@ -489,6 +539,11 @@ class WorkflowService:
             "request_cancel_workflow_execution",
             wsv1.RequestCancelWorkflowExecutionRequest,
             wsv1.RequestCancelWorkflowExecutionResponse,
+        )
+        self.reset_activity = client._new_call(
+            "reset_activity",
+            wsv1.ResetActivityRequest,
+            wsv1.ResetActivityResponse,
         )
         self.reset_sticky_task_queue = client._new_call(
             "reset_sticky_task_queue",
@@ -560,6 +615,26 @@ class WorkflowService:
             wsv1.ScanWorkflowExecutionsRequest,
             wsv1.ScanWorkflowExecutionsResponse,
         )
+        self.set_current_deployment = client._new_call(
+            "set_current_deployment",
+            wsv1.SetCurrentDeploymentRequest,
+            wsv1.SetCurrentDeploymentResponse,
+        )
+        self.set_worker_deployment_current_version = client._new_call(
+            "set_worker_deployment_current_version",
+            wsv1.SetWorkerDeploymentCurrentVersionRequest,
+            wsv1.SetWorkerDeploymentCurrentVersionResponse,
+        )
+        self.set_worker_deployment_ramping_version = client._new_call(
+            "set_worker_deployment_ramping_version",
+            wsv1.SetWorkerDeploymentRampingVersionRequest,
+            wsv1.SetWorkerDeploymentRampingVersionResponse,
+        )
+        self.shutdown_worker = client._new_call(
+            "shutdown_worker",
+            wsv1.ShutdownWorkerRequest,
+            wsv1.ShutdownWorkerResponse,
+        )
         self.signal_with_start_workflow_execution = client._new_call(
             "signal_with_start_workflow_execution",
             wsv1.SignalWithStartWorkflowExecutionRequest,
@@ -590,6 +665,16 @@ class WorkflowService:
             wsv1.TerminateWorkflowExecutionRequest,
             wsv1.TerminateWorkflowExecutionResponse,
         )
+        self.unpause_activity = client._new_call(
+            "unpause_activity",
+            wsv1.UnpauseActivityRequest,
+            wsv1.UnpauseActivityResponse,
+        )
+        self.update_activity_options = client._new_call(
+            "update_activity_options",
+            wsv1.UpdateActivityOptionsRequest,
+            wsv1.UpdateActivityOptionsResponse,
+        )
         self.update_namespace = client._new_call(
             "update_namespace",
             wsv1.UpdateNamespaceRequest,
@@ -600,10 +685,10 @@ class WorkflowService:
             wsv1.UpdateScheduleRequest,
             wsv1.UpdateScheduleResponse,
         )
-        self.update_workflow_execution = client._new_call(
-            "update_workflow_execution",
-            wsv1.UpdateWorkflowExecutionRequest,
-            wsv1.UpdateWorkflowExecutionResponse,
+        self.update_worker_deployment_version_metadata = client._new_call(
+            "update_worker_deployment_version_metadata",
+            wsv1.UpdateWorkerDeploymentVersionMetadataRequest,
+            wsv1.UpdateWorkerDeploymentVersionMetadataResponse,
         )
         self.update_worker_build_id_compatibility = client._new_call(
             "update_worker_build_id_compatibility",
@@ -615,30 +700,15 @@ class WorkflowService:
             wsv1.UpdateWorkerVersioningRulesRequest,
             wsv1.UpdateWorkerVersioningRulesResponse,
         )
-        self.pause_activity_by_id = client._new_call(
-            "pause_activity_by_id",
-            wsv1.PauseActivityByIdRequest,
-            wsv1.PauseActivityByIdResponse,
+        self.update_workflow_execution = client._new_call(
+            "update_workflow_execution",
+            wsv1.UpdateWorkflowExecutionRequest,
+            wsv1.UpdateWorkflowExecutionResponse,
         )
-        self.unpause_activity_by_id = client._new_call(
-            "unpause_activity_by_id",
-            wsv1.UnpauseActivityByIdRequest,
-            wsv1.UnpauseActivityByIdResponse,
-        )
-        self.reset_activity_by_id = client._new_call(
-            "reset_activity_by_id",
-            wsv1.ResetActivityByIdRequest,
-            wsv1.ResetActivityByIdResponse,
-        )
-        self.update_activity_options_by_id = client._new_call(
-            "update_activity_options_by_id",
-            wsv1.UpdateActivityOptionsByIdRequest,
-            wsv1.UpdateActivityOptionsByIdResponse,
-        )
-        self.shutdown_worker = client._new_call(
-            "shutdown_worker",
-            wsv1.ShutdownWorkerRequest,
-            wsv1.ShutdownWorkerResponse,
+        self.update_workflow_execution_options = client._new_call(
+            "update_workflow_execution_options",
+            wsv1.UpdateWorkflowExecutionOptionsRequest,
+            wsv1.UpdateWorkflowExecutionOptionsResponse,
         )
 
 

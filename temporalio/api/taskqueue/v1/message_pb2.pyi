@@ -36,6 +36,7 @@ import google.protobuf.timestamp_pb2
 import google.protobuf.wrappers_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.deployment.v1.message_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 
 if sys.version_info >= (3, 8):
@@ -104,6 +105,70 @@ class TaskQueueMetadata(google.protobuf.message.Message):
     ) -> None: ...
 
 global___TaskQueueMetadata = TaskQueueMetadata
+
+class TaskQueueVersioningInfo(google.protobuf.message.Message):
+    """Experimental. Worker Deployments are experimental and might significantly change in the future."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CURRENT_VERSION_FIELD_NUMBER: builtins.int
+    RAMPING_VERSION_FIELD_NUMBER: builtins.int
+    RAMPING_VERSION_PERCENTAGE_FIELD_NUMBER: builtins.int
+    UPDATE_TIME_FIELD_NUMBER: builtins.int
+    current_version: builtins.str
+    """Always present. Specifies which Deployment Version should receive new workflow
+    executions and tasks of existing unversioned or AutoUpgrade workflows.
+    Can be one of the following:
+    - A Deployment Version identifier in the form "<deployment_name>.<build_id>".
+    - Or, the "__unversioned__" special value, to represent all the unversioned workers (those
+      with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.)
+    Note: Current Version is overridden by the Ramping Version for a portion of traffic when a ramp
+    is set (see `ramping_version`.)
+    """
+    ramping_version: builtins.str
+    """When present, it means the traffic is being shifted from the Current Version to the Ramping
+    Version.
+    Must always be different from `current_version`. Can be one of the following:
+    - A Deployment Version identifier in the form "<deployment_name>.<build_id>".
+    - Or, the "__unversioned__" special value, to represent all the unversioned workers (those
+      with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.)
+    Note that it is possible to ramp from one Version to another Version, or from unversioned
+    workers to a particular Version, or from a particular Version to unversioned workers.
+    """
+    ramping_version_percentage: builtins.float
+    """Percentage of tasks that are routed to the Ramping Version instead of the Current Version.
+    Valid range: [0, 100]. A 100% value means the Ramping Version is receiving full traffic but
+    not yet "promoted" to be the Current Version, likely due to pending validations.
+    """
+    @property
+    def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Last time versioning information of this Task Queue changed."""
+    def __init__(
+        self,
+        *,
+        current_version: builtins.str = ...,
+        ramping_version: builtins.str = ...,
+        ramping_version_percentage: builtins.float = ...,
+        update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["update_time", b"update_time"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "current_version",
+            b"current_version",
+            "ramping_version",
+            b"ramping_version",
+            "ramping_version_percentage",
+            b"ramping_version_percentage",
+            "update_time",
+            b"update_time",
+        ],
+    ) -> None: ...
+
+global___TaskQueueVersioningInfo = TaskQueueVersioningInfo
 
 class TaskQueueVersionSelection(google.protobuf.message.Message):
     """Used for specifying versions the caller is interested in."""
@@ -427,6 +492,7 @@ class PollerInfo(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     RATE_PER_SECOND_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     @property
     def last_access_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     identity: builtins.str
@@ -437,7 +503,13 @@ class PollerInfo(google.protobuf.message.Message):
     ) -> temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities:
         """If a worker has opted into the worker versioning feature while polling, its capabilities will
         appear here.
+        Deprecated. Replaced by deployment_options.
         """
+    @property
+    def deployment_options(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
+        """Worker deployment options that SDK sent to server."""
     def __init__(
         self,
         *,
@@ -446,10 +518,14 @@ class PollerInfo(google.protobuf.message.Message):
         rate_per_second: builtins.float = ...,
         worker_version_capabilities: temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities
         | None = ...,
+        deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "deployment_options",
+            b"deployment_options",
             "last_access_time",
             b"last_access_time",
             "worker_version_capabilities",
@@ -459,6 +535,8 @@ class PollerInfo(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "deployment_options",
+            b"deployment_options",
             "identity",
             b"identity",
             "last_access_time",
@@ -816,3 +894,33 @@ class TimestampedCompatibleBuildIdRedirectRule(google.protobuf.message.Message):
 global___TimestampedCompatibleBuildIdRedirectRule = (
     TimestampedCompatibleBuildIdRedirectRule
 )
+
+class PollerScalingDecision(google.protobuf.message.Message):
+    """Attached to task responses to give hints to the SDK about how it may adjust its number of
+    pollers.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    POLL_REQUEST_DELTA_SUGGESTION_FIELD_NUMBER: builtins.int
+    poll_request_delta_suggestion: builtins.int
+    """How many poll requests to suggest should be added or removed, if any. As of now, server only
+    scales up or down by 1. However, SDKs should allow for other values (while staying within
+    defined min/max).
+
+    The SDK is free to ignore this suggestion, EX: making more polls would not make sense because
+    all slots are already occupied.
+    """
+    def __init__(
+        self,
+        *,
+        poll_request_delta_suggestion: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "poll_request_delta_suggestion", b"poll_request_delta_suggestion"
+        ],
+    ) -> None: ...
+
+global___PollerScalingDecision = PollerScalingDecision
