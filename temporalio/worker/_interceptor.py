@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import concurrent.futures
 from dataclasses import dataclass
 from datetime import timedelta
@@ -425,6 +424,6 @@ class WorkflowOutboundInterceptor:
 
     async def start_nexus_operation(
         self, input: StartNexusOperationInput
-    ) -> asyncio.Task:
+    ) -> temporalio.workflow.NexusOperationHandle[Any]:
         """Called for every :py:func:`temporalio.workflow.start_nexus_operation` call."""
         return await self.next.start_nexus_operation(input)

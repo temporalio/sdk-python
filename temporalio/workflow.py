@@ -56,7 +56,6 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
-from temporalio import workflow
 
 from .types import (
     AnyType,
@@ -751,7 +750,7 @@ class _Runtime(ABC):
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
-    def workflow_start_nexus_operation(
+    async def workflow_start_nexus_operation(
         self,
         endpoint: str,
         service: str,
@@ -759,7 +758,7 @@ class _Runtime(ABC):
         input: Any,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> asyncio.Task: ...
+    ) -> NexusOperationHandle[Any]: ...
 
     @abstractmethod
     def workflow_time_ns(self) -> int: ...
@@ -4250,21 +4249,43 @@ I = TypeVar("I")
 O = TypeVar("O")
 
 
+class NexusOperationHandle(Generic[O]):
+    async def result(self) -> O:
+        raise NotImplementedError
+
+
 async def start_nexus_operation(
     endpoint: str,
     service: str,
     operation: str,
     input: Any,
+    *,
     schedule_to_close_timeout: Optional[timedelta] = None,
     headers: Optional[Mapping[str, str]] = None,
-) -> asyncio.Task:
+) -> NexusOperationHandle[Any]:
+    """Start a Nexus operation and return its handle.
+
+    Args:
+        endpoint: The Nexus endpoint.
+        service: The Nexus service.
+        operation: The Nexus operation.
+        input: The Nexus operation input.
+        schedule_to_close_timeout: Timeout for the entire operation attempt.
+        headers: Headers to send with the Nexus HTTP request.
+
+    Returns:
+        A handle to the Nexus operation. The result can be obtained as
+        ```python
+        await handle.result()
+        ```
+    """
     return await _Runtime.current().workflow_start_nexus_operation(
-        endpoint,
-        service,
-        operation,
-        input,
-        schedule_to_close_timeout,
-        headers,
+        endpoint=endpoint,
+        service=service,
+        operation=operation,
+        input=input,
+        schedule_to_close_timeout=schedule_to_close_timeout,
+        headers=headers,
     )
 
 
@@ -5030,7 +5051,7 @@ def create_nexus_client(
             schedule_to_close_timeout: Optional[timedelta] = None,
             headers: Optional[Mapping[str, str]] = None,
         ):
-            return await workflow.start_nexus_operation(
+            return await temporalio.workflow.start_nexus_operation(
                 endpoint=endpoint,
                 service=interface.__name__,
                 operation=name,
@@ -5043,15 +5064,15 @@ def create_nexus_client(
 
         methods[name] = method
 
-    class StartOperation:
+    class _ServiceClient:
         async def start_operation(
             self,
             operation: Callable[[Any, I], Awaitable[O]],
             input: I,
             schedule_to_close_timeout: Optional[timedelta] = None,
             headers: Optional[Mapping[str, str]] = None,
-        ) -> asyncio.Task[O]:
-            return await workflow.start_nexus_operation(
+        ) -> NexusOperationHandle[O]:
+            return await temporalio.workflow.start_nexus_operation(
                 endpoint=endpoint,
                 service=interface.__name__,
                 operation=operation.__name__,
@@ -5062,7 +5083,7 @@ def create_nexus_client(
                 headers=headers or {},
             )
 
-    cls = type(f"{interface.__name__}Client", (StartOperation,), methods)
+    cls = type(f"{interface.__name__}Client", (_ServiceClient,), methods)
     return cls()  # type: ignore
 
 
@@ -5084,8 +5105,8 @@ class NexusClient:
         input: I,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> asyncio.Task[O]:
-        return await workflow.start_nexus_operation(
+    ) -> NexusOperationHandle[O]:
+        return await temporalio.workflow.start_nexus_operation(
             endpoint=self._endpoint,
             service=self._service_name,
             operation=operation.name,
@@ -5106,5 +5127,4 @@ class NexusClient:
         handle = await self.start_operation(
             operation, input, schedule_to_close_timeout, headers
         )
-        # TODO(dan): handle.result()
-        return await handle
+        return await handle.result()
