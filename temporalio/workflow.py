@@ -4995,6 +4995,7 @@ def nexus_service(cls: Type[T]) -> Type[T]:
     return cls
 
 
+# TODO(dan): Eliminate one of these nexus client constructors
 def create_nexus_client(
     interface: Type[T],
     endpoint: str,
@@ -5065,6 +5066,7 @@ def create_nexus_client(
     return cls()  # type: ignore
 
 
+# TODO(dan): Eliminate one of these nexus client constructors
 class NexusClient:
     def __init__(
         self,

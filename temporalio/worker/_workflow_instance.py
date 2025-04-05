@@ -1611,7 +1611,6 @@ class _WorkflowInstanceImpl(
         # Just throw
         raise _ContinueAsNewError(self, input)
 
-    # _outbound_schedule_activity
     def _outbound_schedule_activity(
         self,
         input: Union[StartActivityInput, StartLocalActivityInput],
@@ -1692,7 +1691,6 @@ class _WorkflowInstanceImpl(
             temporalio.common._apply_headers(input.headers, v.headers)
         await self._signal_external_workflow(command)
 
-    # _outbound_start_child_workflow
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> _ChildWorkflowHandle:
@@ -1749,14 +1747,12 @@ class _WorkflowInstanceImpl(
     async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput
     ) -> asyncio.Task:
-        # Function that runs in the handle
+        handle: _NexusOperationHandle
+
         async def run_nexus() -> Any:
-            nonlocal handle
             while True:
-                assert handle
                 try:
-                    # We have to shield because we don't want the future itself
-                    # to be cancelled
+                    # shield to prevent the future itself being cancelled
                     return await asyncio.shield(handle._result_fut)
                 except asyncio.CancelledError:
                     raise NotImplementedError("Nexus operation cancel not implemented")
@@ -1766,11 +1762,10 @@ class _WorkflowInstanceImpl(
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
-        # Wait on start before returning
+
         while True:
             try:
-                # We have to shield because we don't want the future itself
-                # to be cancelled
+                # shield to prevent the future itself being cancelled
                 await asyncio.shield(handle._start_fut)
                 return handle._task
             except asyncio.CancelledError:
