@@ -1744,14 +1744,12 @@ class _WorkflowInstanceImpl(
     async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput
     ) -> asyncio.Task:
-        # Function that runs in the handle
+        handle: _NexusOperationHandle
+
         async def run_nexus() -> Any:
-            nonlocal handle
             while True:
-                assert handle
                 try:
-                    # We have to shield because we don't want the future itself
-                    # to be cancelled
+                    # shield to prevent the future itself being cancelled
                     return await asyncio.shield(handle._result_fut)
                 except asyncio.CancelledError:
                     raise NotImplementedError("Nexus operation cancel not implemented")
@@ -1761,11 +1759,11 @@ class _WorkflowInstanceImpl(
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
+
         # Wait on start before returning
         while True:
             try:
-                # We have to shield because we don't want the future itself
-                # to be cancelled
+                # shield to prevent the future itself being cancelled
                 await asyncio.shield(handle._start_fut)
                 return handle._task
             except asyncio.CancelledError:
