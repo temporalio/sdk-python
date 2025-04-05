@@ -133,7 +133,8 @@ class _NexusWorker:
             type_hints=[arg_types[0]] if arg_types else None,
         )
 
-        start_options = nexusrpc.handler.StartOperationOptions(
+        # TODO(dan): header
+        options = nexusrpc.handler.StartOperationOptions(
             callback_url=request.callback,
             links=[
                 nexusrpc.handler.Link(url=l.url, type=l.type) for l in request.links
@@ -147,12 +148,12 @@ class _NexusWorker:
             )
         )
 
-        result = await handler.start(input, start_options)
+        result = await handler.start(input, options)
         if isinstance(result, nexusrpc.handler.AsyncOperationResult):
             print(
                 f"🟢 Nexus operation {request.operation} started with async response {result}"
             )
-            # See `rg 'complete_nexus_task(NexusTaskCompletion' in sdk-core`
+            # See `rg 'complete_nexus_task(NexusTaskCompletion'` in sdk-core
             op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                 async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
                     operation_id=result.token,

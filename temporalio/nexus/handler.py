@@ -93,7 +93,8 @@ async def fetch_workflow_info(
 async def fetch_workflow_result(
     operation_token: str,
     options: nexusrpc.handler.FetchOperationResultOptions,
-) -> O:
+) -> Any:
+    # TODO(dan): type safety
     # TODO(dan): handle client provided by user?
     _client = client()
     workflow_handle = AsyncWorkflowOperationResult.to_workflow_handle(
