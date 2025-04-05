@@ -1582,12 +1582,10 @@ class _WorkflowInstanceImpl(
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> _ChildWorkflowHandle:
-        handle: Optional[_ChildWorkflowHandle] = None
+        handle: _ChildWorkflowHandle
 
         # Common code for handling cancel for start and run
         def apply_child_cancel_error() -> None:
-            nonlocal handle
-            assert handle
             # Send a cancel request to the child
             cancel_command = self._add_command()
             handle._apply_cancel_command(cancel_command)
@@ -1605,9 +1603,7 @@ class _WorkflowInstanceImpl(
 
         # Function that runs in the handle
         async def run_child() -> Any:
-            nonlocal handle
             while True:
-                assert handle
                 try:
                     # We have to shield because we don't want the future itself
                     # to be cancelled
