@@ -9,6 +9,7 @@ import pytest
 
 from temporalio.api.common.v1 import Payload
 from temporalio.common import (
+    Priority,
     RawValue,
     RetryPolicy,
     SearchAttributeKey,
@@ -96,3 +97,10 @@ def test_typed_search_attribute_duplicates():
         TypedSearchAttributes(
             [SearchAttributePair(key1, "some-val"), SearchAttributePair(key1_dupe, 123)]
         )
+
+
+def test_cant_construct_bad_priority():
+    with pytest.raises(TypeError):
+        Priority(priority_key=1.1)  # type: ignore
+    with pytest.raises(ValueError):
+        Priority(priority_key=-1)

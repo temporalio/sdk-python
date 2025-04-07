@@ -21,6 +21,7 @@ class DevServerConfig:
     sdk_version: str
     download_version: str
     download_dest_dir: Optional[str]
+    download_ttl_ms: Optional[int]
     namespace: str
     ip: str
     port: Optional[int]
@@ -40,6 +41,7 @@ class TestServerConfig:
     sdk_version: str
     download_version: str
     download_dest_dir: Optional[str]
+    download_ttl_ms: Optional[int]
     port: Optional[int]
     extra_args: Sequence[str]
 

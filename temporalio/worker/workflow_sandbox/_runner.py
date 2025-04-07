@@ -35,6 +35,7 @@ _fake_info = temporalio.workflow.Info(
     headers={},
     namespace="sandbox-validate-namespace",
     parent=None,
+    root=None,
     raw_memo={},
     retry_policy=None,
     run_id="sandbox-validate-run_id",
@@ -46,6 +47,7 @@ _fake_info = temporalio.workflow.Info(
     typed_search_attributes=temporalio.common.TypedSearchAttributes.empty,
     workflow_id="sandbox-validate-workflow_id",
     workflow_type="sandbox-validate-workflow_type",
+    priority=temporalio.common.Priority.default,
 )
 
 

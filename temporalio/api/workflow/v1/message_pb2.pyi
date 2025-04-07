@@ -36,6 +36,7 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.deployment.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
@@ -50,6 +51,10 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class WorkflowExecutionInfo(google.protobuf.message.Message):
+    """Hold basic information about a workflow execution.
+    This structure is a part of visibility, and thus contain a limited subset of information.
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     EXECUTION_FIELD_NUMBER: builtins.int
@@ -73,6 +78,9 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     ASSIGNED_BUILD_ID_FIELD_NUMBER: builtins.int
     INHERITED_BUILD_ID_FIELD_NUMBER: builtins.int
     FIRST_RUN_ID_FIELD_NUMBER: builtins.int
+    VERSIONING_INFO_FIELD_NUMBER: builtins.int
+    WORKER_DEPLOYMENT_NAME_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     @property
     def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     @property
@@ -105,7 +113,9 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     def most_recent_worker_version_stamp(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
-        """If set, the most recent worker version stamp that appeared in a workflow task completion"""
+        """If set, the most recent worker version stamp that appeared in a workflow task completion
+        Deprecated. This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
+        """
     @property
     def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
         """Workflow execution duration is defined as difference between close time and execution time.
@@ -138,10 +148,12 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     again, the assigned build ID may change according to the latest versioning rules.
     Assigned build ID can also change in the middle of a execution if Compatible Redirect Rules are applied to
     this execution.
+    Deprecated. This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
     """
     inherited_build_id: builtins.str
     """Build ID inherited from a previous/parent execution. If present, assigned_build_id will be set to this, instead
     of using the assignment rules.
+    Deprecated. This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
     """
     first_run_id: builtins.str
     """The first run ID in the execution chain.
@@ -151,6 +163,19 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
     - Workflow Reset
     - Cron Schedule
     """
+    @property
+    def versioning_info(self) -> global___WorkflowExecutionVersioningInfo:
+        """Absent value means the workflow execution is not versioned. When present, the execution might
+        be versioned or unversioned, depending on `versioning_info.behavior` and `versioning_info.versioning_override`.
+        Experimental. Versioning info is experimental and might change in the future.
+        """
+    worker_deployment_name: builtins.str
+    """The name of Worker Deployment that completed the most recent workflow task.
+    Experimental. Worker Deployments are experimental and might change in the future.
+    """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority metadata"""
     def __init__(
         self,
         *,
@@ -179,6 +204,9 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
         assigned_build_id: builtins.str = ...,
         inherited_build_id: builtins.str = ...,
         first_run_id: builtins.str = ...,
+        versioning_info: global___WorkflowExecutionVersioningInfo | None = ...,
+        worker_deployment_name: builtins.str = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -199,6 +227,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"most_recent_worker_version_stamp",
             "parent_execution",
             b"parent_execution",
+            "priority",
+            b"priority",
             "root_execution",
             b"root_execution",
             "search_attributes",
@@ -207,6 +237,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"start_time",
             "type",
             b"type",
+            "versioning_info",
+            b"versioning_info",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -240,6 +272,8 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"parent_execution",
             "parent_namespace_id",
             b"parent_namespace_id",
+            "priority",
+            b"priority",
             "root_execution",
             b"root_execution",
             "search_attributes",
@@ -254,10 +288,270 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
             b"task_queue",
             "type",
             b"type",
+            "versioning_info",
+            b"versioning_info",
+            "worker_deployment_name",
+            b"worker_deployment_name",
         ],
     ) -> None: ...
 
 global___WorkflowExecutionInfo = WorkflowExecutionInfo
+
+class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
+    """Holds all the extra information about workflow execution that is not part of Visibility."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EXECUTION_EXPIRATION_TIME_FIELD_NUMBER: builtins.int
+    RUN_EXPIRATION_TIME_FIELD_NUMBER: builtins.int
+    CANCEL_REQUESTED_FIELD_NUMBER: builtins.int
+    LAST_RESET_TIME_FIELD_NUMBER: builtins.int
+    ORIGINAL_START_TIME_FIELD_NUMBER: builtins.int
+    @property
+    def execution_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Workflow execution expiration time is defined as workflow start time plus expiration timeout.
+        Workflow start time may change after workflow reset.
+        """
+    @property
+    def run_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Workflow run expiration time is defined as current workflow run start time plus workflow run timeout."""
+    cancel_requested: builtins.bool
+    """indicates if the workflow received a cancel request"""
+    @property
+    def last_reset_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Last workflow reset time. Nil if the workflow was never reset."""
+    @property
+    def original_start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Original workflow start time."""
+    def __init__(
+        self,
+        *,
+        execution_expiration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        run_expiration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        cancel_requested: builtins.bool = ...,
+        last_reset_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        original_start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "execution_expiration_time",
+            b"execution_expiration_time",
+            "last_reset_time",
+            b"last_reset_time",
+            "original_start_time",
+            b"original_start_time",
+            "run_expiration_time",
+            b"run_expiration_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_requested",
+            b"cancel_requested",
+            "execution_expiration_time",
+            b"execution_expiration_time",
+            "last_reset_time",
+            b"last_reset_time",
+            "original_start_time",
+            b"original_start_time",
+            "run_expiration_time",
+            b"run_expiration_time",
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionExtendedInfo = WorkflowExecutionExtendedInfo
+
+class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
+    """Holds all the information about worker versioning for a particular workflow execution.
+    Experimental. Versioning info is experimental and might change in the future.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BEHAVIOR_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_TRANSITION_FIELD_NUMBER: builtins.int
+    VERSION_TRANSITION_FIELD_NUMBER: builtins.int
+    behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType
+    """Versioning behavior determines how the server should treat this execution when workers are
+    upgraded. When present it means this workflow execution is versioned; UNSPECIFIED means
+    unversioned. See the comments in `VersioningBehavior` enum for more info about different
+    behaviors.
+    This field is first set after an execution completes its first workflow task on a versioned
+    worker, and set again on completion of every subsequent workflow task.
+    For child workflows of Pinned parents, this will be set to Pinned (along with `version`) when
+    the the child starts so that child's first workflow task goes to the same Version as the
+    parent. After the first workflow task, it depends on the child workflow itself if it wants
+    to stay pinned or become unpinned (according to Versioning Behavior set in the worker).
+    Note that `behavior` is overridden by `versioning_override` if the latter is present.
+    """
+    @property
+    def deployment(self) -> temporalio.api.deployment.v1.message_pb2.Deployment:
+        """The worker deployment that completed the last workflow task of this workflow execution. Must
+        be present if `behavior` is set. Absent value means no workflow task is completed, or the
+        last workflow task was completed by an unversioned worker. Unversioned workers may still send
+        a deployment value which will be stored here, so the right way to check if an execution is
+        versioned if an execution is versioned or not is via the `behavior` field.
+        Note that `deployment` is overridden by `versioning_override` if the latter is present.
+        Deprecated. Use `version`.
+        """
+    version: builtins.str
+    """The Worker Deployment Version that completed the last workflow task of this workflow
+    execution, in the form "<deployment_name>.<build_id>".
+    Must be present if and only if `behavior` is set. An absent value means no workflow task is
+    completed, or the workflow is unversioned.
+    For child workflows of Pinned parents, this will be set to parent's Pinned Version when the
+    the child starts so that child's first workflow task goes to the same Version as the parent.
+    Note that if `versioning_override.behavior` is PINNED then `versioning_override.pinned_version`
+    will override this value.
+    """
+    @property
+    def versioning_override(self) -> global___VersioningOverride:
+        """Present if user has set an execution-specific versioning override. This override takes
+        precedence over SDK-sent `behavior` (and `version` when override is PINNED). An
+        override can be set when starting a new execution, as well as afterwards by calling the
+        `UpdateWorkflowExecutionOptions` API.
+        Pinned overrides are automatically inherited by child workflows.
+        """
+    @property
+    def deployment_transition(self) -> global___DeploymentTransition:
+        """When present, indicates the workflow is transitioning to a different deployment. Can
+        indicate one of the following transitions: unversioned -> versioned, versioned -> versioned
+        on a different deployment, or versioned -> unversioned.
+        Not applicable to workflows with PINNED behavior.
+        When a workflow with AUTO_UPGRADE behavior creates a new workflow task, it will automatically
+        start a transition to the task queue's current deployment if the task queue's current
+        deployment is different from the workflow's deployment.
+        If the AUTO_UPGRADE workflow is stuck due to backlogged activity or workflow tasks, those
+        tasks will be redirected to the task queue's current deployment. As soon as a poller from
+        that deployment is available to receive the task, the workflow will automatically start a
+        transition to that deployment and continue execution there.
+        A deployment transition can only exist while there is a pending or started workflow task.
+        Once the pending workflow task completes on the transition's target deployment, the
+        transition completes and the workflow's `deployment` and `behavior` fields are updated per
+        the worker's task completion response.
+        Pending activities will not start new attempts during a transition. Once the transition is
+        completed, pending activities will start their next attempt on the new deployment.
+        Deprecated. Use version_transition.
+        """
+    @property
+    def version_transition(self) -> global___DeploymentVersionTransition:
+        """When present, indicates the workflow is transitioning to a different deployment version
+        (which may belong to the same deployment name or another). Can indicate one of the following
+        transitions: unversioned -> versioned, versioned -> versioned
+        on a different deployment version, or versioned -> unversioned.
+        Not applicable to workflows with PINNED behavior.
+        When a workflow with AUTO_UPGRADE behavior creates a new workflow task, it will automatically
+        start a transition to the task queue's current version if the task queue's current version is
+        different from the workflow's current deployment version.
+        If the AUTO_UPGRADE workflow is stuck due to backlogged activity or workflow tasks, those
+        tasks will be redirected to the task queue's current version. As soon as a poller from
+        that deployment version is available to receive the task, the workflow will automatically
+        start a transition to that version and continue execution there.
+        A version transition can only exist while there is a pending or started workflow task.
+        Once the pending workflow task completes on the transition's target version, the
+        transition completes and the workflow's `behavior`, and `version` fields are updated per the
+        worker's task completion response.
+        Pending activities will not start new attempts during a transition. Once the transition is
+        completed, pending activities will start their next attempt on the new version.
+        """
+    def __init__(
+        self,
+        *,
+        behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType = ...,
+        deployment: temporalio.api.deployment.v1.message_pb2.Deployment | None = ...,
+        version: builtins.str = ...,
+        versioning_override: global___VersioningOverride | None = ...,
+        deployment_transition: global___DeploymentTransition | None = ...,
+        version_transition: global___DeploymentVersionTransition | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment",
+            b"deployment",
+            "deployment_transition",
+            b"deployment_transition",
+            "version_transition",
+            b"version_transition",
+            "versioning_override",
+            b"versioning_override",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "behavior",
+            b"behavior",
+            "deployment",
+            b"deployment",
+            "deployment_transition",
+            b"deployment_transition",
+            "version",
+            b"version",
+            "version_transition",
+            b"version_transition",
+            "versioning_override",
+            b"versioning_override",
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionVersioningInfo = WorkflowExecutionVersioningInfo
+
+class DeploymentTransition(google.protobuf.message.Message):
+    """Holds information about ongoing transition of a workflow execution from one deployment to another.
+    Deprecated. Use DeploymentVersionTransition.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DEPLOYMENT_FIELD_NUMBER: builtins.int
+    @property
+    def deployment(self) -> temporalio.api.deployment.v1.message_pb2.Deployment:
+        """The target deployment of the transition. Null means a so-far-versioned workflow is
+        transitioning to unversioned workers.
+        """
+    def __init__(
+        self,
+        *,
+        deployment: temporalio.api.deployment.v1.message_pb2.Deployment | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["deployment", b"deployment"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["deployment", b"deployment"]
+    ) -> None: ...
+
+global___DeploymentTransition = DeploymentTransition
+
+class DeploymentVersionTransition(google.protobuf.message.Message):
+    """Holds information about ongoing transition of a workflow execution from one worker
+    deployment version to another.
+    Experimental. Might change in the future.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VERSION_FIELD_NUMBER: builtins.int
+    version: builtins.str
+    """Required. The target Version of the transition. May be `__unversioned__` which means a
+    so-far-versioned workflow is transitioning to unversioned workers.
+    """
+    def __init__(
+        self,
+        *,
+        version: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["version", b"version"]
+    ) -> None: ...
+
+global___DeploymentVersionTransition = DeploymentVersionTransition
 
 class WorkflowExecutionConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -346,6 +640,9 @@ class PendingActivityInfo(google.protobuf.message.Message):
     LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
     PAUSED_FIELD_NUMBER: builtins.int
+    LAST_DEPLOYMENT_FIELD_NUMBER: builtins.int
+    LAST_WORKER_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
@@ -378,7 +675,9 @@ class PendingActivityInfo(google.protobuf.message.Message):
     def last_worker_version_stamp(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
-        """The version stamp of the worker to whom this activity was most recently dispatched"""
+        """The version stamp of the worker to whom this activity was most recently dispatched
+        Deprecated. This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
+        """
     @property
     def current_retry_interval(self) -> google.protobuf.duration_pb2.Duration:
         """The time activity will wait until the next retry.
@@ -396,6 +695,17 @@ class PendingActivityInfo(google.protobuf.message.Message):
         """
     paused: builtins.bool
     """Indicates if activity is paused."""
+    @property
+    def last_deployment(self) -> temporalio.api.deployment.v1.message_pb2.Deployment:
+        """The deployment this activity was dispatched to most recently. Present only if the activity
+        was dispatched to a versioned worker.
+        Deprecated. Use `last_worker_deployment_version`.
+        """
+    last_worker_deployment_version: builtins.str
+    """The Worker Deployment Version this activity was dispatched to most recently."""
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority metadata"""
     def __init__(
         self,
         *,
@@ -421,6 +731,10 @@ class PendingActivityInfo(google.protobuf.message.Message):
         next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
         | None = ...,
         paused: builtins.bool = ...,
+        last_deployment: temporalio.api.deployment.v1.message_pb2.Deployment
+        | None = ...,
+        last_worker_deployment_version: builtins.str = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -437,6 +751,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"heartbeat_details",
             "last_attempt_complete_time",
             b"last_attempt_complete_time",
+            "last_deployment",
+            b"last_deployment",
             "last_failure",
             b"last_failure",
             "last_heartbeat_time",
@@ -449,6 +765,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"last_worker_version_stamp",
             "next_attempt_schedule_time",
             b"next_attempt_schedule_time",
+            "priority",
+            b"priority",
             "scheduled_time",
             b"scheduled_time",
             "use_workflow_build_id",
@@ -474,6 +792,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"heartbeat_details",
             "last_attempt_complete_time",
             b"last_attempt_complete_time",
+            "last_deployment",
+            b"last_deployment",
             "last_failure",
             b"last_failure",
             "last_heartbeat_time",
@@ -482,6 +802,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"last_independently_assigned_build_id",
             "last_started_time",
             b"last_started_time",
+            "last_worker_deployment_version",
+            b"last_worker_deployment_version",
             "last_worker_identity",
             b"last_worker_identity",
             "last_worker_version_stamp",
@@ -492,6 +814,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"next_attempt_schedule_time",
             "paused",
             b"paused",
+            "priority",
+            b"priority",
             "scheduled_time",
             b"scheduled_time",
             "state",
@@ -730,6 +1054,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
+    VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     workflow_id: builtins.str
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
@@ -770,6 +1096,14 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
         for use by user interfaces to display the fixed as-of-start summary and details of the
         workflow.
         """
+    @property
+    def versioning_override(self) -> global___VersioningOverride:
+        """If set, takes precedence over the Versioning Behavior sent by the SDK on Workflow Task completion.
+        To unset the override after the workflow is running, use UpdateWorkflowExecutionOptions.
+        """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority metadata"""
     def __init__(
         self,
         *,
@@ -789,6 +1123,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
         header: temporalio.api.common.v1.message_pb2.Header | None = ...,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
         | None = ...,
+        versioning_override: global___VersioningOverride | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -799,6 +1135,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
             b"input",
             "memo",
             b"memo",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "search_attributes",
@@ -807,6 +1145,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
             b"task_queue",
             "user_metadata",
             b"user_metadata",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -828,6 +1168,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
             b"input",
             "memo",
             b"memo",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "search_attributes",
@@ -836,6 +1178,8 @@ class NewWorkflowExecutionInfo(google.protobuf.message.Message):
             b"task_queue",
             "user_metadata",
             b"user_metadata",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",
@@ -902,6 +1246,7 @@ class CallbackInfo(google.protobuf.message.Message):
     LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
     LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    BLOCKED_REASON_FIELD_NUMBER: builtins.int
     @property
     def callback(self) -> temporalio.api.common.v1.message_pb2.Callback:
         """Information on how this callback should be invoked (e.g. its URL and type)."""
@@ -925,6 +1270,8 @@ class CallbackInfo(google.protobuf.message.Message):
     @property
     def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The time when the next attempt is scheduled."""
+    blocked_reason: builtins.str
+    """If the state is BLOCKED, blocked reason provides additional information."""
     def __init__(
         self,
         *,
@@ -939,6 +1286,7 @@ class CallbackInfo(google.protobuf.message.Message):
         | None = ...,
         next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
         | None = ...,
+        blocked_reason: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -962,6 +1310,8 @@ class CallbackInfo(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "attempt",
             b"attempt",
+            "blocked_reason",
+            b"blocked_reason",
             "callback",
             b"callback",
             "last_attempt_complete_time",
@@ -999,6 +1349,8 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
     CANCELLATION_INFO_FIELD_NUMBER: builtins.int
     SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
+    BLOCKED_REASON_FIELD_NUMBER: builtins.int
+    OPERATION_TOKEN_FIELD_NUMBER: builtins.int
     endpoint: builtins.str
     """Endpoint name.
     Resolved to a URL via the cluster's endpoint registry.
@@ -1008,7 +1360,10 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     operation: builtins.str
     """Operation name."""
     operation_id: builtins.str
-    """Operation ID. Only set for asynchronous operations after a successful StartOperation call."""
+    """Operation ID. Only set for asynchronous operations after a successful StartOperation call.
+
+    Deprecated: Renamed to operation_token.
+    """
     @property
     def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Schedule-to-close timeout for this operation.
@@ -1039,6 +1394,10 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     """The event ID of the NexusOperationScheduled event. Can be used to correlate an operation in the
     DescribeWorkflowExecution response with workflow history.
     """
+    blocked_reason: builtins.str
+    """If the state is BLOCKED, blocked reason provides additional information."""
+    operation_token: builtins.str
+    """Operation token. Only set for asynchronous operations after a successful StartOperation call."""
     def __init__(
         self,
         *,
@@ -1058,6 +1417,8 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
         | None = ...,
         cancellation_info: global___NexusOperationCancellationInfo | None = ...,
         scheduled_event_id: builtins.int = ...,
+        blocked_reason: builtins.str = ...,
+        operation_token: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1081,6 +1442,8 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "attempt",
             b"attempt",
+            "blocked_reason",
+            b"blocked_reason",
             "cancellation_info",
             b"cancellation_info",
             "endpoint",
@@ -1095,6 +1458,8 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
             b"operation",
             "operation_id",
             b"operation_id",
+            "operation_token",
+            b"operation_token",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
             "scheduled_event_id",
@@ -1121,6 +1486,7 @@ class NexusOperationCancellationInfo(google.protobuf.message.Message):
     LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
     LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    BLOCKED_REASON_FIELD_NUMBER: builtins.int
     @property
     def requested_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The time when cancellation was requested."""
@@ -1138,6 +1504,8 @@ class NexusOperationCancellationInfo(google.protobuf.message.Message):
     @property
     def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The time when the next attempt is scheduled."""
+    blocked_reason: builtins.str
+    """If the state is BLOCKED, blocked reason provides additional information."""
     def __init__(
         self,
         *,
@@ -1150,6 +1518,7 @@ class NexusOperationCancellationInfo(google.protobuf.message.Message):
         | None = ...,
         next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
         | None = ...,
+        blocked_reason: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1169,6 +1538,8 @@ class NexusOperationCancellationInfo(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "attempt",
             b"attempt",
+            "blocked_reason",
+            b"blocked_reason",
             "last_attempt_complete_time",
             b"last_attempt_complete_time",
             "last_attempt_failure",
@@ -1183,3 +1554,119 @@ class NexusOperationCancellationInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___NexusOperationCancellationInfo = NexusOperationCancellationInfo
+
+class WorkflowExecutionOptions(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
+    @property
+    def versioning_override(self) -> global___VersioningOverride:
+        """If set, takes precedence over the Versioning Behavior sent by the SDK on Workflow Task completion."""
+    def __init__(
+        self,
+        *,
+        versioning_override: global___VersioningOverride | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "versioning_override", b"versioning_override"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "versioning_override", b"versioning_override"
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionOptions = WorkflowExecutionOptions
+
+class VersioningOverride(google.protobuf.message.Message):
+    """Used to override the versioning behavior (and pinned deployment version, if applicable) of a
+    specific workflow execution. If set, takes precedence over the worker-sent values. See
+    `WorkflowExecutionInfo.VersioningInfo` for more information. To remove the override, call
+    `UpdateWorkflowExecutionOptions` with a null `VersioningOverride`, and use the `update_mask`
+    to indicate that it should be mutated.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BEHAVIOR_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_FIELD_NUMBER: builtins.int
+    PINNED_VERSION_FIELD_NUMBER: builtins.int
+    behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType
+    """Required."""
+    @property
+    def deployment(self) -> temporalio.api.deployment.v1.message_pb2.Deployment:
+        """Required if behavior is `PINNED`. Must be null if behavior is `AUTO_UPGRADE`.
+        Identifies the worker deployment to pin the workflow to.
+        Deprecated. Use `pinned_version`.
+        """
+    pinned_version: builtins.str
+    """Required if behavior is `PINNED`. Must be absent if behavior is not `PINNED`.
+    Identifies the worker deployment version to pin the workflow to, in the format
+    "<deployment_name>.<build_id>".
+    """
+    def __init__(
+        self,
+        *,
+        behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType = ...,
+        deployment: temporalio.api.deployment.v1.message_pb2.Deployment | None = ...,
+        pinned_version: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["deployment", b"deployment"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "behavior",
+            b"behavior",
+            "deployment",
+            b"deployment",
+            "pinned_version",
+            b"pinned_version",
+        ],
+    ) -> None: ...
+
+global___VersioningOverride = VersioningOverride
+
+class OnConflictOptions(google.protobuf.message.Message):
+    """When StartWorkflowExecution uses the conflict policy WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING and
+    there is already an existing running workflow, OnConflictOptions defines actions to be taken on
+    the existing running workflow. In this case, it will create a WorkflowExecutionOptionsUpdatedEvent
+    history event in the running workflow with the changes requested in this object.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ATTACH_REQUEST_ID_FIELD_NUMBER: builtins.int
+    ATTACH_COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    ATTACH_LINKS_FIELD_NUMBER: builtins.int
+    attach_request_id: builtins.bool
+    """Attaches the request ID to the running workflow."""
+    attach_completion_callbacks: builtins.bool
+    """Attaches the completion callbacks to the running workflow."""
+    attach_links: builtins.bool
+    """Attaches the links to the WorkflowExecutionOptionsUpdatedEvent history event."""
+    def __init__(
+        self,
+        *,
+        attach_request_id: builtins.bool = ...,
+        attach_completion_callbacks: builtins.bool = ...,
+        attach_links: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attach_completion_callbacks",
+            b"attach_completion_callbacks",
+            "attach_links",
+            b"attach_links",
+            "attach_request_id",
+            b"attach_request_id",
+        ],
+    ) -> None: ...
+
+global___OnConflictOptions = OnConflictOptions

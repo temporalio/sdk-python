@@ -8,6 +8,11 @@ from .common_pb2 import (
     PendingNexusOperationState,
     Severity,
 )
+from .deployment_pb2 import (
+    DeploymentReachability,
+    VersionDrainageStatus,
+    WorkerVersioningMode,
+)
 from .event_type_pb2 import EventType
 from .failed_cause_pb2 import (
     CancelExternalWorkflowExecutionFailedCause,
@@ -18,6 +23,7 @@ from .failed_cause_pb2 import (
     WorkflowTaskFailedCause,
 )
 from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
+from .nexus_pb2 import NexusHandlerErrorRetryBehavior
 from .query_pb2 import QueryRejectCondition, QueryResultType
 from .reset_pb2 import ResetReapplyExcludeType, ResetReapplyType, ResetType
 from .schedule_pb2 import ScheduleOverlapPolicy
@@ -37,6 +43,7 @@ from .workflow_pb2 import (
     PendingWorkflowTaskState,
     RetryState,
     TimeoutType,
+    VersioningBehavior,
     WorkflowExecutionStatus,
     WorkflowIdConflictPolicy,
     WorkflowIdReusePolicy,
@@ -51,12 +58,14 @@ __all__ = [
     "CancelExternalWorkflowExecutionFailedCause",
     "CommandType",
     "ContinueAsNewInitiator",
+    "DeploymentReachability",
     "DescribeTaskQueueMode",
     "EncodingType",
     "EventType",
     "HistoryEventFilterType",
     "IndexedValueType",
     "NamespaceState",
+    "NexusHandlerErrorRetryBehavior",
     "NexusOperationCancellationState",
     "ParentClosePolicy",
     "PendingActivityState",
@@ -81,6 +90,9 @@ __all__ = [
     "TimeoutType",
     "UpdateAdmittedEventOrigin",
     "UpdateWorkflowExecutionLifecycleStage",
+    "VersionDrainageStatus",
+    "VersioningBehavior",
+    "WorkerVersioningMode",
     "WorkflowExecutionStatus",
     "WorkflowIdConflictPolicy",
     "WorkflowIdReusePolicy",

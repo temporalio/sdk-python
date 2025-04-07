@@ -116,6 +116,7 @@ class Info:
     workflow_namespace: str
     workflow_run_id: str
     workflow_type: str
+    priority: temporalio.common.Priority
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
     def _logger_details(self) -> Mapping[str, Any]:
