@@ -12,6 +12,7 @@ import google.protobuf.internal.containers
 import google.protobuf.message
 
 import temporalio.api.enums.v1.failed_cause_pb2
+import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.bridge.proto.workflow_commands.workflow_commands_pb2
 
@@ -75,6 +76,7 @@ class Success(google.protobuf.message.Message):
 
     COMMANDS_FIELD_NUMBER: builtins.int
     USED_INTERNAL_FLAGS_FIELD_NUMBER: builtins.int
+    VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
     @property
     def commands(
         self,
@@ -87,6 +89,10 @@ class Success(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """Any internal flags which the lang SDK used in the processing of this activation"""
+    versioning_behavior: (
+        temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType
+    )
+    """The versioning behavior this workflow is currently using"""
     def __init__(
         self,
         *,
@@ -95,11 +101,17 @@ class Success(google.protobuf.message.Message):
         ]
         | None = ...,
         used_internal_flags: collections.abc.Iterable[builtins.int] | None = ...,
+        versioning_behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "commands", b"commands", "used_internal_flags", b"used_internal_flags"
+            "commands",
+            b"commands",
+            "used_internal_flags",
+            b"used_internal_flags",
+            "versioning_behavior",
+            b"versioning_behavior",
         ],
     ) -> None: ...
 
