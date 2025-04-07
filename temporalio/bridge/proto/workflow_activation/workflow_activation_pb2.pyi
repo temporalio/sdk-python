@@ -53,15 +53,15 @@ class WorkflowActivation(google.protobuf.message.Message):
     This is because:
     * Patches are expected to apply to the entire activation
     * Signal and update handlers should be invoked before workflow routines are iterated. That is to
-      say before the users' main workflow function and anything spawned by it is allowed to continue.
+     say before the users' main workflow function and anything spawned by it is allowed to continue.
     * Local activities resolutions go after other normal jobs because while *not* replaying, they
-      will always take longer than anything else that produces an immediate job (which is
-      effectively instant). When *replaying* we need to scan ahead for LA markers so that we can
-      resolve them in the same activation that they completed in when not replaying. However, doing
-      so would, by default, put those resolutions *before* any other immediate jobs that happened
-      in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
-      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
-      normally would have when executing.
+     will always take longer than anything else that produces an immediate job (which is
+     effectively instant). When *replaying* we need to scan ahead for LA markers so that we can
+     resolve them in the same activation that they completed in when not replaying. However, doing
+     so would, by default, put those resolutions *before* any other immediate jobs that happened
+     in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
+     this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
+     normally would have when executing.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 
