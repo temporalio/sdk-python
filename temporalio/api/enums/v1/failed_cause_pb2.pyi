@@ -480,6 +480,8 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
         _ResourceExhaustedCause.ValueType
     )  # 8
     """Circuit breaker is open/half-open."""
+    RESOURCE_EXHAUSTED_CAUSE_OPS_LIMIT: _ResourceExhaustedCause.ValueType  # 9
+    """Namespace exceeds operations rate limit."""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -504,6 +506,8 @@ RESOURCE_EXHAUSTED_CAUSE_PERSISTENCE_STORAGE_LIMIT: (
 """Persistence storage limit exceeded."""
 RESOURCE_EXHAUSTED_CAUSE_CIRCUIT_BREAKER_OPEN: ResourceExhaustedCause.ValueType  # 8
 """Circuit breaker is open/half-open."""
+RESOURCE_EXHAUSTED_CAUSE_OPS_LIMIT: ResourceExhaustedCause.ValueType  # 9
+"""Namespace exceeds operations rate limit."""
 global___ResourceExhaustedCause = ResourceExhaustedCause
 
 class _ResourceExhaustedScope:

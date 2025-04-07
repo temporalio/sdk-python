@@ -14,6 +14,8 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
+from google.protobuf import field_mask_pb2 as google_dot_protobuf_dot_field__mask__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 from temporalio.api.common.v1 import (
@@ -25,9 +27,12 @@ from temporalio.api.enums.v1 import (
 from temporalio.api.enums.v1 import (
     reset_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_reset__pb2,
 )
+from temporalio.api.workflow.v1 import (
+    message_pb2 as temporal_dot_api_dot_workflow_dot_v1_dot_message__pb2,
+)
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n#temporal/api/batch/v1/message.proto\x12\x15temporal.api.batch.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a+temporal/api/enums/v1/batch_operation.proto\x1a!temporal/api/enums/v1/reset.proto"\xbf\x01\n\x12\x42\x61tchOperationInfo\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x39\n\x05state\x18\x02 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"`\n\x19\x42\x61tchOperationTermination\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x02 \x01(\t"\x99\x01\n\x14\x42\x61tchOperationSignal\x12\x0e\n\x06signal\x18\x01 \x01(\t\x12/\n\x05input\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x10\n\x08identity\x18\x04 \x01(\t".\n\x1a\x42\x61tchOperationCancellation\x12\x10\n\x08identity\x18\x01 \x01(\t"*\n\x16\x42\x61tchOperationDeletion\x12\x10\n\x08identity\x18\x01 \x01(\t"\xd9\x01\n\x13\x42\x61tchOperationReset\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x35\n\x07options\x18\x04 \x01(\x0b\x32$.temporal.api.common.v1.ResetOptions\x12\x34\n\nreset_type\x18\x01 \x01(\x0e\x32 .temporal.api.enums.v1.ResetType\x12\x43\n\x12reset_reapply_type\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyTypeB\x84\x01\n\x18io.temporal.api.batch.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/batch/v1;batch\xaa\x02\x17Temporalio.Api.Batch.V1\xea\x02\x1aTemporalio::Api::Batch::V1b\x06proto3'
+    b'\n#temporal/api/batch/v1/message.proto\x12\x15temporal.api.batch.v1\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a+temporal/api/enums/v1/batch_operation.proto\x1a!temporal/api/enums/v1/reset.proto\x1a&temporal/api/workflow/v1/message.proto"\xbf\x01\n\x12\x42\x61tchOperationInfo\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x39\n\x05state\x18\x02 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"`\n\x19\x42\x61tchOperationTermination\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x02 \x01(\t"\x99\x01\n\x14\x42\x61tchOperationSignal\x12\x0e\n\x06signal\x18\x01 \x01(\t\x12/\n\x05input\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x10\n\x08identity\x18\x04 \x01(\t".\n\x1a\x42\x61tchOperationCancellation\x12\x10\n\x08identity\x18\x01 \x01(\t"*\n\x16\x42\x61tchOperationDeletion\x12\x10\n\x08identity\x18\x01 \x01(\t"\xd9\x01\n\x13\x42\x61tchOperationReset\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x35\n\x07options\x18\x04 \x01(\x0b\x32$.temporal.api.common.v1.ResetOptions\x12\x34\n\nreset_type\x18\x01 \x01(\x0e\x32 .temporal.api.enums.v1.ResetType\x12\x43\n\x12reset_reapply_type\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyType"\xc9\x01\n,BatchOperationUpdateWorkflowExecutionOptions\x12\x10\n\x08identity\x18\x01 \x01(\t\x12V\n\x1aworkflow_execution_options\x18\x02 \x01(\x0b\x32\x32.temporal.api.workflow.v1.WorkflowExecutionOptions\x12/\n\x0bupdate_mask\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.FieldMask"\xc0\x01\n\x1f\x42\x61tchOperationUnpauseActivities\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x04type\x18\x02 \x01(\tH\x00\x12\x13\n\tmatch_all\x18\x03 \x01(\x08H\x00\x12\x16\n\x0ereset_attempts\x18\x04 \x01(\x08\x12\x17\n\x0freset_heartbeat\x18\x05 \x01(\x08\x12)\n\x06jitter\x18\x06 \x01(\x0b\x32\x19.google.protobuf.DurationB\n\n\x08\x61\x63tivityB\x84\x01\n\x18io.temporal.api.batch.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/batch/v1;batch\xaa\x02\x17Temporalio.Api.Batch.V1\xea\x02\x1aTemporalio::Api::Batch::V1b\x06proto3'
 )
 
 
@@ -41,6 +46,12 @@ _BATCHOPERATIONCANCELLATION = DESCRIPTOR.message_types_by_name[
 ]
 _BATCHOPERATIONDELETION = DESCRIPTOR.message_types_by_name["BatchOperationDeletion"]
 _BATCHOPERATIONRESET = DESCRIPTOR.message_types_by_name["BatchOperationReset"]
+_BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS = DESCRIPTOR.message_types_by_name[
+    "BatchOperationUpdateWorkflowExecutionOptions"
+]
+_BATCHOPERATIONUNPAUSEACTIVITIES = DESCRIPTOR.message_types_by_name[
+    "BatchOperationUnpauseActivities"
+]
 BatchOperationInfo = _reflection.GeneratedProtocolMessageType(
     "BatchOperationInfo",
     (_message.Message,),
@@ -107,19 +118,45 @@ BatchOperationReset = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(BatchOperationReset)
 
+BatchOperationUpdateWorkflowExecutionOptions = _reflection.GeneratedProtocolMessageType(
+    "BatchOperationUpdateWorkflowExecutionOptions",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS,
+        "__module__": "temporal.api.batch.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationUpdateWorkflowExecutionOptions)
+    },
+)
+_sym_db.RegisterMessage(BatchOperationUpdateWorkflowExecutionOptions)
+
+BatchOperationUnpauseActivities = _reflection.GeneratedProtocolMessageType(
+    "BatchOperationUnpauseActivities",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _BATCHOPERATIONUNPAUSEACTIVITIES,
+        "__module__": "temporal.api.batch.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationUnpauseActivities)
+    },
+)
+_sym_db.RegisterMessage(BatchOperationUnpauseActivities)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.batch.v1B\014MessageProtoP\001Z!go.temporal.io/api/batch/v1;batch\252\002\027Temporalio.Api.Batch.V1\352\002\032Temporalio::Api::Batch::V1"
-    _BATCHOPERATIONINFO._serialized_start = 214
-    _BATCHOPERATIONINFO._serialized_end = 405
-    _BATCHOPERATIONTERMINATION._serialized_start = 407
-    _BATCHOPERATIONTERMINATION._serialized_end = 503
-    _BATCHOPERATIONSIGNAL._serialized_start = 506
-    _BATCHOPERATIONSIGNAL._serialized_end = 659
-    _BATCHOPERATIONCANCELLATION._serialized_start = 661
-    _BATCHOPERATIONCANCELLATION._serialized_end = 707
-    _BATCHOPERATIONDELETION._serialized_start = 709
-    _BATCHOPERATIONDELETION._serialized_end = 751
-    _BATCHOPERATIONRESET._serialized_start = 754
-    _BATCHOPERATIONRESET._serialized_end = 971
+    _BATCHOPERATIONINFO._serialized_start = 320
+    _BATCHOPERATIONINFO._serialized_end = 511
+    _BATCHOPERATIONTERMINATION._serialized_start = 513
+    _BATCHOPERATIONTERMINATION._serialized_end = 609
+    _BATCHOPERATIONSIGNAL._serialized_start = 612
+    _BATCHOPERATIONSIGNAL._serialized_end = 765
+    _BATCHOPERATIONCANCELLATION._serialized_start = 767
+    _BATCHOPERATIONCANCELLATION._serialized_end = 813
+    _BATCHOPERATIONDELETION._serialized_start = 815
+    _BATCHOPERATIONDELETION._serialized_end = 857
+    _BATCHOPERATIONRESET._serialized_start = 860
+    _BATCHOPERATIONRESET._serialized_end = 1077
+    _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS._serialized_start = 1080
+    _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS._serialized_end = 1281
+    _BATCHOPERATIONUNPAUSEACTIVITIES._serialized_start = 1284
+    _BATCHOPERATIONUNPAUSEACTIVITIES._serialized_end = 1476
 # @@protoc_insertion_point(module_scope)

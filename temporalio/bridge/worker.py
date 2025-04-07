@@ -279,9 +279,7 @@ async def decode_activation(
 ) -> None:
     """Decode the given activation with the codec."""
     for job in act.jobs:
-        if job.HasField("cancel_workflow"):
-            await _decode_payloads(job.cancel_workflow.details, codec)
-        elif job.HasField("query_workflow"):
+        if job.HasField("query_workflow"):
             await _decode_payloads(job.query_workflow.arguments, codec)
         elif job.HasField("resolve_activity"):
             if job.resolve_activity.result.HasField("cancelled"):

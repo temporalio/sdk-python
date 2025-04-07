@@ -372,6 +372,7 @@ class WorkflowServiceStub:
     ]
     """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
 
+    Deprecated: Replaced with `ListWorkflowExecutions`.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
     """
@@ -594,6 +595,117 @@ class WorkflowServiceStub:
     Open source users can adjust this limit by setting the server's dynamic config value for
     `limit.reachabilityTaskQueueScan` with the caveat that this call can strain the visibility store.
     """
+    DescribeDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
+    ]
+    """Describes a worker deployment.
+    Experimental. This API might significantly change or be removed in a future release.
+    Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
+    """
+    DescribeWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
+    ]
+    """Describes a worker deployment version.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    ListDeployments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
+    ]
+    """Lists worker deployments in the namespace. Optionally can filter based on deployment series
+    name.
+    Experimental. This API might significantly change or be removed in a future release.
+    Deprecated. Replaced with `ListWorkerDeployments`.
+    """
+    GetDeploymentReachability: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
+    ]
+    """Returns the reachability level of a worker deployment to help users decide when it is time
+    to decommission a deployment. Reachability level is calculated based on the deployment's
+    `status` and existing workflows that depend on the given deployment for their execution.
+    Calculating reachability is relatively expensive. Therefore, server might return a recently
+    cached value. In such a case, the `last_update_time` will inform you about the actual
+    reachability calculation time.
+    Experimental. This API might significantly change or be removed in a future release.
+    Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
+    """
+    GetCurrentDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
+    ]
+    """Returns the current deployment (and its info) for a given deployment series.
+    Experimental. This API might significantly change or be removed in a future release.
+    Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
+    """
+    SetCurrentDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
+    ]
+    """Sets a deployment as the current deployment for its deployment series. Can optionally update
+    the metadata of the deployment as well.
+    Experimental. This API might significantly change or be removed in a future release.
+    Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
+    """
+    SetWorkerDeploymentCurrentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
+    ]
+    """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
+    Version if it is the Version being set as Current.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    DescribeWorkerDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
+    ]
+    """Describes a Worker Deployment.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    DeleteWorkerDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
+    ]
+    """Deletes records of (an old) Deployment. A deployment can only be deleted if
+    it has no Version in it.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    DeleteWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
+    ]
+    """Used for manual deletion of Versions. User can delete a Version only when all the
+    following conditions are met:
+     - It is not the Current or Ramping Version of its Deployment.
+     - It has no active pollers (none of the task queues in the Version have pollers)
+     - It is not draining (see WorkerDeploymentVersionInfo.drainage_info). This condition
+       can be skipped by passing `skip-drainage=true`.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    SetWorkerDeploymentRampingVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
+    ]
+    """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
+    gradual ramp to unversioned workers too.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    ListWorkerDeployments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
+    ]
+    """Lists all Worker Deployments that are tracked in the Namespace.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    UpdateWorkerDeploymentVersionMetadata: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
+    ]
+    """Updates the user-given metadata attached to a Worker Deployment Version.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
     UpdateWorkflowExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
@@ -655,20 +767,24 @@ class WorkflowServiceStub:
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-    UpdateActivityOptionsById: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdResponse,
+    UpdateActivityOptions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
     ]
-    """UpdateActivityOptionsById is called by the client to update the options of an activity
-    (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+    """UpdateActivityOptions is called by the client to update the options of an activity by its ID or type.
+    If there are multiple pending activities of the provided type - all of them will be updated.
     """
-    PauseActivityById: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdResponse,
+    UpdateWorkflowExecutionOptions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
     ]
-    """PauseActivityById pauses the execution of an activity specified by its ID.
-    Returns a `NotFound` error if there is no pending activity with the provided ID.
+    """UpdateWorkflowExecutionOptions partially updates the WorkflowExecutionOptions of an existing workflow execution."""
+    PauseActivity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
+    ]
+    """PauseActivity pauses the execution of an activity specified by its ID or type.
+    If there are multiple pending activities of the provided type - all of them will be paused
 
     Pausing an activity means:
     - If the activity is currently waiting for a retry or is running and subsequently fails,
@@ -681,43 +797,48 @@ class WorkflowServiceStub:
     For long-running activities:
     - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
     - The activity should respond to the cancellation accordingly.
-    (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID or type
     """
-    UnpauseActivityById: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdResponse,
+    UnpauseActivity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
     ]
-    """UnpauseActivityById unpauses the execution of an activity specified by its ID.
-    Returns a `NotFound` error if there is no pending activity with the provided ID.
-    There are two 'modes' of unpausing an activity:
-    'resume' - If the activity is paused, it will be resumed and scheduled for execution.
-       * If the activity is currently running Unpause with 'resume' has no effect.
-       * if 'no_wait' flag is set and the activity is waiting, the activity will be scheduled immediately.
-    'reset' - If the activity is paused, it will be reset to its initial state and (depending on parameters) scheduled for execution.
-       * If the activity is currently running, Unpause with 'reset' will reset the number of attempts.
-       * if 'no_wait' flag is set, the activity will be scheduled immediately.
-       * if 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
-    If the activity is in waiting for retry and past it retry timeout, it will be scheduled immediately.
+    """UnpauseActivity unpauses the execution of an activity specified by its ID or type.
+    If there are multiple pending activities of the provided type - all of them will be unpaused.
+
+    If activity is not paused, this call will have no effect.
+    If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
     Once the activity is unpaused, all timeout timers will be regenerated.
-    (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+
+    Flags:
+    'jitter': the activity will be scheduled at a random time within the jitter duration.
+    'reset_attempts': the number of attempts will be reset.
+    'reset_heartbeat': the activity heartbeat timer and heartbeats will be reset.
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID or type
     """
-    ResetActivityById: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdResponse,
+    ResetActivity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
     ]
-    """ResetActivityById unpauses the execution of an activity specified by its ID.
-    Returns a `NotFound` error if there is no pending activity with the provided ID.
+    """ResetActivity resets the execution of an activity specified by its ID or type.
+    If there are multiple pending activities of the provided type - all of them will be reset.
+
     Resetting an activity means:
     * number of attempts will be reset to 0.
-    * activity timeouts will be resetted.
-    If the activity currently running:
-    *  if 'no_wait' flag is provided, a new instance of the activity will be scheduled immediately.
-    *  if 'no_wait' flag is not provided, a new instance of the  activity will be scheduled after current instance completes if needed.
-    If 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
-    (-- api-linter: core::0136::prepositions=disabled
-        aip.dev/not-precedent: "By" is used to indicate request type. --)
+    * activity timeouts will be reset.
+    * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+       it will be scheduled immediately (* see 'jitter' flag),
+
+    Flags:
+
+    'jitter': the activity will be scheduled at a random time within the jitter duration.
+    If the activity currently paused it will be unpaused, unless 'keep_paused' flag is provided.
+    'reset_heartbeats': the activity heartbeat timer and heartbeats will be reset.
+    'keep_paused': if the activity is paused, it will remain paused.
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID or type.
     """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
@@ -1129,6 +1250,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse:
         """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
 
+        Deprecated: Replaced with `ListWorkflowExecutions`.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
         """
@@ -1402,6 +1524,143 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         `limit.reachabilityTaskQueueScan` with the caveat that this call can strain the visibility store.
         """
     @abc.abstractmethod
+    def DescribeDeployment(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse:
+        """Describes a worker deployment.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
+        """
+    @abc.abstractmethod
+    def DescribeWorkerDeploymentVersion(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse:
+        """Describes a worker deployment version.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def ListDeployments(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse:
+        """Lists worker deployments in the namespace. Optionally can filter based on deployment series
+        name.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced with `ListWorkerDeployments`.
+        """
+    @abc.abstractmethod
+    def GetDeploymentReachability(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse:
+        """Returns the reachability level of a worker deployment to help users decide when it is time
+        to decommission a deployment. Reachability level is calculated based on the deployment's
+        `status` and existing workflows that depend on the given deployment for their execution.
+        Calculating reachability is relatively expensive. Therefore, server might return a recently
+        cached value. In such a case, the `last_update_time` will inform you about the actual
+        reachability calculation time.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
+        """
+    @abc.abstractmethod
+    def GetCurrentDeployment(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse:
+        """Returns the current deployment (and its info) for a given deployment series.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
+        """
+    @abc.abstractmethod
+    def SetCurrentDeployment(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse:
+        """Sets a deployment as the current deployment for its deployment series. Can optionally update
+        the metadata of the deployment as well.
+        Experimental. This API might significantly change or be removed in a future release.
+        Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
+        """
+    @abc.abstractmethod
+    def SetWorkerDeploymentCurrentVersion(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse:
+        """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
+        Version if it is the Version being set as Current.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def DescribeWorkerDeployment(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse:
+        """Describes a Worker Deployment.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def DeleteWorkerDeployment(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse:
+        """Deletes records of (an old) Deployment. A deployment can only be deleted if
+        it has no Version in it.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def DeleteWorkerDeploymentVersion(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse:
+        """Used for manual deletion of Versions. User can delete a Version only when all the
+        following conditions are met:
+         - It is not the Current or Ramping Version of its Deployment.
+         - It has no active pollers (none of the task queues in the Version have pollers)
+         - It is not draining (see WorkerDeploymentVersionInfo.drainage_info). This condition
+           can be skipped by passing `skip-drainage=true`.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def SetWorkerDeploymentRampingVersion(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse:
+        """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
+        gradual ramp to unversioned workers too.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def ListWorkerDeployments(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse:
+        """Lists all Worker Deployments that are tracked in the Namespace.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def UpdateWorkerDeploymentVersionMetadata(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse:
+        """Updates the user-given metadata attached to a Worker Deployment Version.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
     def UpdateWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
@@ -1481,25 +1740,29 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
     @abc.abstractmethod
-    def UpdateActivityOptionsById(
+    def UpdateActivityOptions(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdRequest,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsByIdResponse:
-        """UpdateActivityOptionsById is called by the client to update the options of an activity
-        (-- api-linter: core::0136::prepositions=disabled
-            aip.dev/not-precedent: "By" is used to indicate request type. --)
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse:
+        """UpdateActivityOptions is called by the client to update the options of an activity by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be updated.
         """
     @abc.abstractmethod
-    def PauseActivityById(
+    def UpdateWorkflowExecutionOptions(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdRequest,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityByIdResponse
-    ):
-        """PauseActivityById pauses the execution of an activity specified by its ID.
-        Returns a `NotFound` error if there is no pending activity with the provided ID.
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse:
+        """UpdateWorkflowExecutionOptions partially updates the WorkflowExecutionOptions of an existing workflow execution."""
+    @abc.abstractmethod
+    def PauseActivity(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse:
+        """PauseActivity pauses the execution of an activity specified by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be paused
 
         Pausing an activity means:
         - If the activity is currently waiting for a retry or is running and subsequently fails,
@@ -1512,49 +1775,52 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         For long-running activities:
         - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
         - The activity should respond to the cancellation accordingly.
-        (-- api-linter: core::0136::prepositions=disabled
-            aip.dev/not-precedent: "By" is used to indicate request type. --)
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type
         """
     @abc.abstractmethod
-    def UnpauseActivityById(
+    def UnpauseActivity(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdRequest,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityByIdResponse:
-        """UnpauseActivityById unpauses the execution of an activity specified by its ID.
-        Returns a `NotFound` error if there is no pending activity with the provided ID.
-        There are two 'modes' of unpausing an activity:
-        'resume' - If the activity is paused, it will be resumed and scheduled for execution.
-           * If the activity is currently running Unpause with 'resume' has no effect.
-           * if 'no_wait' flag is set and the activity is waiting, the activity will be scheduled immediately.
-        'reset' - If the activity is paused, it will be reset to its initial state and (depending on parameters) scheduled for execution.
-           * If the activity is currently running, Unpause with 'reset' will reset the number of attempts.
-           * if 'no_wait' flag is set, the activity will be scheduled immediately.
-           * if 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
-        If the activity is in waiting for retry and past it retry timeout, it will be scheduled immediately.
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse:
+        """UnpauseActivity unpauses the execution of an activity specified by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be unpaused.
+
+        If activity is not paused, this call will have no effect.
+        If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
         Once the activity is unpaused, all timeout timers will be regenerated.
-        (-- api-linter: core::0136::prepositions=disabled
-            aip.dev/not-precedent: "By" is used to indicate request type. --)
+
+        Flags:
+        'jitter': the activity will be scheduled at a random time within the jitter duration.
+        'reset_attempts': the number of attempts will be reset.
+        'reset_heartbeat': the activity heartbeat timer and heartbeats will be reset.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type
         """
     @abc.abstractmethod
-    def ResetActivityById(
+    def ResetActivity(
         self,
-        request: temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdRequest,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
         context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityByIdResponse
-    ):
-        """ResetActivityById unpauses the execution of an activity specified by its ID.
-        Returns a `NotFound` error if there is no pending activity with the provided ID.
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse:
+        """ResetActivity resets the execution of an activity specified by its ID or type.
+        If there are multiple pending activities of the provided type - all of them will be reset.
+
         Resetting an activity means:
         * number of attempts will be reset to 0.
-        * activity timeouts will be resetted.
-        If the activity currently running:
-        *  if 'no_wait' flag is provided, a new instance of the activity will be scheduled immediately.
-        *  if 'no_wait' flag is not provided, a new instance of the  activity will be scheduled after current instance completes if needed.
-        If 'reset_heartbeats' flag is set, the activity heartbeat timer and heartbeats will be reset.
-        (-- api-linter: core::0136::prepositions=disabled
-            aip.dev/not-precedent: "By" is used to indicate request type. --)
+        * activity timeouts will be reset.
+        * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+           it will be scheduled immediately (* see 'jitter' flag),
+
+        Flags:
+
+        'jitter': the activity will be scheduled at a random time within the jitter duration.
+        If the activity currently paused it will be unpaused, unless 'keep_paused' flag is provided.
+        'reset_heartbeats': the activity heartbeat timer and heartbeats will be reset.
+        'keep_paused': if the activity is paused, it will remain paused.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type.
         """
 
 def add_WorkflowServiceServicer_to_server(

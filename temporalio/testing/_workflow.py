@@ -98,6 +98,7 @@ class WorkflowEnvironment:
         dev_server_log_level: Optional[str] = "warn",
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
+        dev_server_download_ttl: Optional[timedelta] = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
@@ -154,6 +155,8 @@ class WorkflowEnvironment:
                 Defaults to ``default`` which downloads the version known to
                 work best with this SDK.
             dev_server_extra_args: Extra arguments for the CLI binary.
+            dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
+                cached indefinitely.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -180,6 +183,9 @@ class WorkflowEnvironment:
             dev_server_extra_args = new_args
         # Start CLI dev server
         runtime = runtime or temporalio.runtime.Runtime.default()
+        download_ttl_ms = None
+        if dev_server_download_ttl is not None:
+            download_ttl_ms = int(dev_server_download_ttl.total_seconds() * 1000)
         server = await temporalio.bridge.testing.EphemeralServer.start_dev_server(
             runtime._core_runtime,
             temporalio.bridge.testing.DevServerConfig(
@@ -196,6 +202,7 @@ class WorkflowEnvironment:
                 log_format=dev_server_log_format,
                 log_level=dev_server_log_level,
                 extra_args=dev_server_extra_args,
+                download_ttl_ms=download_ttl_ms,
             ),
         )
         # If we can't connect to the server, we should shut it down
@@ -242,6 +249,7 @@ class WorkflowEnvironment:
         test_server_existing_path: Optional[str] = None,
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
+        test_server_download_ttl: Optional[timedelta] = None,
     ) -> WorkflowEnvironment:
         """Start a time skipping workflow environment.
 
@@ -293,12 +301,17 @@ class WorkflowEnvironment:
                 download. Defaults to ``default`` which downloads the version
                 known to work best with this SDK.
             test_server_extra_args: Extra arguments for the test server binary.
+            test_server_download_ttl: TTL for the downloaded test server binary. If unset, it
+                will be cached indefinitely.
 
         Returns:
             The started workflow environment with time skipping.
         """
         # Start test server
         runtime = runtime or temporalio.runtime.Runtime.default()
+        download_ttl_ms = None
+        if test_server_download_ttl:
+            download_ttl_ms = int(test_server_download_ttl.total_seconds() * 1000)
         server = await temporalio.bridge.testing.EphemeralServer.start_test_server(
             runtime._core_runtime,
             temporalio.bridge.testing.TestServerConfig(
@@ -307,6 +320,7 @@ class WorkflowEnvironment:
                 sdk_version=temporalio.service.__version__,
                 download_version=test_server_download_version,
                 download_dest_dir=download_dest_dir,
+                download_ttl_ms=download_ttl_ms,
                 port=port,
                 extra_args=test_server_extra_args,
             ),

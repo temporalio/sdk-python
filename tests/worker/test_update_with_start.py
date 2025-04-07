@@ -5,11 +5,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping, Optional
 from unittest.mock import patch
 
 import pytest
 
+import temporalio.api.common.v1
+import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
     Client,
@@ -25,6 +27,7 @@ from temporalio.common import (
     WorkflowIDConflictPolicy,
 )
 from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
+from temporalio.service import RPCError, RPCStatusCode, ServiceCall
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     new_worker,
@@ -805,3 +808,51 @@ async def test_update_with_start_two_param(client: Client):
         assert await wf_handle.result() == WorkflowResult(
             result="workflow-arg1-workflow-arg2"
         )
+
+
+# Verify correcting issue #791
+async def test_start_update_with_start_empty_details(client: Client):
+    class execute_multi_operation(
+        ServiceCall[
+            temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
+            temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse,
+        ]
+    ):
+        empty_details_err = RPCError("empty details", RPCStatusCode.INTERNAL, b"")
+        # Set grpc_status with empty details
+        empty_details_err._grpc_status = temporalio.api.common.v1.GrpcStatus(details=[])
+
+        def __init__(self) -> None:
+            pass
+
+        async def __call__(
+            self,
+            req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
+            *,
+            retry: bool = False,
+            metadata: Mapping[str, str] = {},
+            timeout: Optional[timedelta] = None,
+        ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
+            raise self.empty_details_err
+
+    with patch.object(
+        client.workflow_service, "execute_multi_operation", execute_multi_operation()
+    ):
+        start_workflow_operation = WithStartWorkflowOperation(
+            UpdateWithStartInterceptorWorkflow.run,
+            "wf-arg",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue="tq",
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
+        with pytest.raises(RPCError) as err:
+            await client.start_update_with_start_workflow(
+                UpdateWithStartInterceptorWorkflow.my_update,
+                "original-update-arg",
+                start_workflow_operation=start_workflow_operation,
+                wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+            )
+        _ = start_workflow_operation._workflow_handle.exception()
+        assert err.value.status == RPCStatusCode.INTERNAL
+        assert err.value.message == "empty details"
+        assert len(err.value.grpc_status.details) == 0
