@@ -8,7 +8,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import (
     Any,
     Callable,
@@ -1015,6 +1015,74 @@ class Priority:
 
 
 Priority.default = Priority(priority_key=None)
+
+
+class VersioningBehavior(Enum):
+    """Specifies when a workflow might move from a worker of one Build Id to another.
+
+    NOTE: Experimental API.
+    """
+
+    UNSPECIFIED = 1
+    """ An unspecified versioning behavior. By default, workers opting into worker versioning will
+    be required to specify a behavior. See TODO: Add link to worker options."""
+    PINNED = 2
+    """The workflow will be pinned to the current Build ID unless manually moved."""
+    AUTO_UPGRADE = 3
+    """The workflow will automatically move to the latest version (default Build ID of the task
+    queue) when the next task is dispatched."""
+
+    def _to_proto(self) -> temporalio.api.enums.v1.VersioningBehavior.ValueType:
+        if self == VersioningBehavior.UNSPECIFIED:
+            return temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
+        elif self == VersioningBehavior.PINNED:
+            return temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+        elif self == VersioningBehavior.AUTO_UPGRADE:
+            return temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE
+        else:
+            raise ValueError(f"Unknown VersioningBehavior: {self}")
+
+
+class WorkerDeploymentVersion:
+    """Represents the version of a specific worker deployment.
+
+    NOTE: Experimental API.
+    """
+
+    _deployment_name: str
+    _build_id: str
+
+    def __init__(self, deployment_name: str, build_id: str):
+        """Build a WorkerDeploymentVersion from a deployment name and build ID."""
+        self._deployment_name = deployment_name
+        self._build_id = build_id
+
+    @property
+    def deployment_name(self) -> str:
+        """The name of the deployment."""
+        return self._deployment_name
+
+    @property
+    def build_id(self) -> str:
+        """The Build ID of this version."""
+        return self._build_id
+
+    def to_canonical_string(self) -> str:
+        """Returns the canonical string representation of the version."""
+        return f"{self._deployment_name}.{self._build_id}"
+
+    @staticmethod
+    def from_canonical_string(canonical: str) -> WorkerDeploymentVersion:
+        """Parse a version from a canonical string, which must be in the format
+        `<deployment_name>.<build_id>`. Deployment name must not have a `.` in it.
+        """
+        parts = canonical.split(".", maxsplit=1)
+        if len(parts) != 2:
+            raise ValueError(
+                f"Cannot parse version string: {canonical}, must be in format <deployment_name>.<build_id>"
+            )
+        return WorkerDeploymentVersion(parts[0], parts[1])
+
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument
 # is unset. This is different than None which is a legitimate argument.

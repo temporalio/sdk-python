@@ -7,6 +7,7 @@ import concurrent.futures
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from enum import verify
 from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
 
 from typing_extensions import TypedDict
@@ -222,7 +223,6 @@ class Replayer:
                 temporalio.bridge.worker.WorkerConfig(
                     namespace=self._config["namespace"],
                     task_queue=task_queue,
-                    build_id=self._config["build_id"] or load_default_build_id(),
                     identity_override=self._config["identity"],
                     # Need to tell core whether we want to consider all
                     # non-determinism exceptions as workflow fail, and whether we do
@@ -252,7 +252,9 @@ class Replayer:
                     max_activities_per_second=None,
                     max_task_queue_activities_per_second=None,
                     graceful_shutdown_period_millis=0,
-                    use_worker_versioning=False,
+                    versioning_strategy=temporalio.bridge.worker.WorkerVersioningStrategyNone(
+                        build_id=self._config["build_id"] or load_default_build_id(),
+                    ),
                 ),
             )
             # Start worker
@@ -338,7 +340,7 @@ class WorkflowReplayResult:
 
     replay_failure: Optional[Exception]
     """Failure during replay if any.
-    
+
     This does not mean your workflow exited by raising an error, but rather that
     some task failure such as
     :py:class:`temporalio.workflow.NondeterminismError` was encountered during
