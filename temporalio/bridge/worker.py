@@ -44,7 +44,7 @@ class WorkerConfig:
 
     namespace: str
     task_queue: str
-    build_id: str
+    versioning_strategy: WorkerVersioningStrategy
     identity_override: Optional[str]
     max_cached_workflows: int
     tuner: TunerHolder
@@ -58,9 +58,54 @@ class WorkerConfig:
     max_activities_per_second: Optional[float]
     max_task_queue_activities_per_second: Optional[float]
     graceful_shutdown_period_millis: int
-    use_worker_versioning: bool
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
+
+
+@dataclass
+class WorkerDeploymentVersion:
+    """Python representation of the Rust struct for configuring a worker deployment version."""
+
+    deployment_name: str
+    build_id: str
+
+
+@dataclass
+class WorkerDeploymentOptions:
+    """Python representation of the Rust struct for configuring a worker deployment options."""
+
+    version: WorkerDeploymentVersion
+    use_worker_versioning: bool
+    default_versioning_behavior: int
+    """An enums.v1.VersioningBehavior as an int"""
+
+
+@dataclass
+class WorkerVersioningStrategyNone:
+    """Python representation of the Rust struct for configuring a worker versioning strategy None."""
+
+    build_id: str
+
+
+@dataclass
+class WorkerVersioningStrategyDeploymentBased:
+    """Python representation of the Rust struct for configuring a worker versioning strategy deployment-based."""
+
+    options: WorkerDeploymentOptions
+
+
+@dataclass
+class WorkerVersioningStrategyLegacyBuildIdBased:
+    """Python representation of the Rust struct for configuring a worker versioning strategy legacy Build ID-based."""
+
+    build_id: str
+
+
+WorkerVersioningStrategy: TypeAlias = Union[
+    WorkerVersioningStrategyNone,
+    WorkerVersioningStrategyDeploymentBased,
+    WorkerVersioningStrategyLegacyBuildIdBased,
+]
 
 
 @dataclass
