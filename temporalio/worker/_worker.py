@@ -38,7 +38,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
-from temporalio.common import VersioningBehavior
+from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -372,9 +372,7 @@ class Worker:
         versioning_strategy: temporalio.bridge.worker.WorkerVersioningStrategy
         if deployment_options:
             versioning_strategy = (
-                temporalio.bridge.worker.WorkerVersioningStrategyDeploymentBased(
-                    options=deployment_options._to_bridge_worker_deployment_options()
-                )
+                deployment_options._to_bridge_worker_deployment_options()
             )
         elif use_worker_versioning:
             build_id = build_id or load_default_build_id()
@@ -713,20 +711,12 @@ class WorkerConfig(TypedDict, total=False):
 
 
 @dataclass
-class WorkerDeploymentVersion:
-    """Python representation of the Rust struct for configuring a worker deployment version."""
-
-    deployment_name: str
-    build_id: str
-
-
-@dataclass
 class WorkerDeploymentOptions:
-    """Python representation of the Rust struct for configuring a worker deployment options."""
+    """Options for configuring the Worker Versioning feature."""
 
     version: WorkerDeploymentVersion
     use_worker_versioning: bool
-    default_versioning_behavior: VersioningBehavior
+    default_versioning_behavior: VersioningBehavior = VersioningBehavior.UNSPECIFIED
 
     def _to_bridge_worker_deployment_options(
         self,

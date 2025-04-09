@@ -66,9 +66,14 @@ pub struct WorkerConfig {
 /// Recreates [temporal_sdk_core_api::worker::WorkerVersioningStrategy]
 #[derive(FromPyObject)]
 pub enum WorkerVersioningStrategy {
-    None { build_id: String },
-    WorkerDeploymentBased(WorkerDeploymentOptions),
-    LegacyBuildIdBased { build_id: String },
+    None(WorkerVersioningNone),
+    DeploymentBased(WorkerDeploymentOptions),
+    LegacyBuildIdBased(LegacyBuildIdBased),
+}
+
+#[derive(FromPyObject)]
+pub struct WorkerVersioningNone {
+    pub build_id: String,
 }
 
 /// Recreates [temporal_sdk_core_api::worker::WorkerDeploymentOptions]
@@ -78,6 +83,11 @@ pub struct WorkerDeploymentOptions {
     pub use_worker_versioning: bool,
     /// This is a [enums::v1::VersioningBehavior] represented as i32
     pub default_versioning_behavior: i32,
+}
+
+#[derive(FromPyObject)]
+pub struct LegacyBuildIdBased {
+    pub build_id: String,
 }
 
 /// Recreates [temporal_sdk_core_api::worker::WorkerDeploymentVersion]
@@ -734,19 +744,21 @@ fn convert_versioning_strategy(
     strategy: WorkerVersioningStrategy,
 ) -> temporal_sdk_core_api::worker::WorkerVersioningStrategy {
     match strategy {
-        WorkerVersioningStrategy::None { build_id } => {
-            temporal_sdk_core_api::worker::WorkerVersioningStrategy::None { build_id }
+        WorkerVersioningStrategy::None(vn) => {
+            temporal_sdk_core_api::worker::WorkerVersioningStrategy::None {
+                build_id: vn.build_id,
+            }
         }
-        WorkerVersioningStrategy::WorkerDeploymentBased(worker_deployment_options) => {
+        WorkerVersioningStrategy::DeploymentBased(options) => {
             temporal_sdk_core_api::worker::WorkerVersioningStrategy::WorkerDeploymentBased(
                 temporal_sdk_core_api::worker::WorkerDeploymentOptions {
                     version: temporal_sdk_core_api::worker::WorkerDeploymentVersion {
-                        deployment_name: worker_deployment_options.version.deployment_name,
-                        build_id: worker_deployment_options.version.build_id,
+                        deployment_name: options.version.deployment_name,
+                        build_id: options.version.build_id,
                     },
-                    use_worker_versioning: worker_deployment_options.use_worker_versioning,
+                    use_worker_versioning: options.use_worker_versioning,
                     default_versioning_behavior: Some(
-                        worker_deployment_options
+                        options
                             .default_versioning_behavior
                             .try_into()
                             .unwrap_or_default(),
@@ -754,8 +766,10 @@ fn convert_versioning_strategy(
                 },
             )
         }
-        WorkerVersioningStrategy::LegacyBuildIdBased { build_id } => {
-            temporal_sdk_core_api::worker::WorkerVersioningStrategy::LegacyBuildIdBased { build_id }
+        WorkerVersioningStrategy::LegacyBuildIdBased(lb) => {
+            temporal_sdk_core_api::worker::WorkerVersioningStrategy::LegacyBuildIdBased {
+                build_id: lb.build_id,
+            }
         }
     }
 }

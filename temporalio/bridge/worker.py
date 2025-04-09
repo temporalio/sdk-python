@@ -88,13 +88,6 @@ class WorkerVersioningStrategyNone:
 
 
 @dataclass
-class WorkerVersioningStrategyDeploymentBased:
-    """Python representation of the Rust struct for configuring a worker versioning strategy deployment-based."""
-
-    options: WorkerDeploymentOptions
-
-
-@dataclass
 class WorkerVersioningStrategyLegacyBuildIdBased:
     """Python representation of the Rust struct for configuring a worker versioning strategy legacy Build ID-based."""
 
@@ -103,7 +96,7 @@ class WorkerVersioningStrategyLegacyBuildIdBased:
 
 WorkerVersioningStrategy: TypeAlias = Union[
     WorkerVersioningStrategyNone,
-    WorkerVersioningStrategyDeploymentBased,
+    WorkerDeploymentOptions,
     WorkerVersioningStrategyLegacyBuildIdBased,
 ]
 
