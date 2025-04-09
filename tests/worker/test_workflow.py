@@ -181,7 +181,7 @@ async def test_workflow_multi_param(client: Client):
     # This test is mostly just here to confirm MyPy type checks the multi-param
     # overload approach properly
     async with new_worker(
-        client, MultiParamWorkflow, activities=[multi_param_activity]
+            client, MultiParamWorkflow, activities=[multi_param_activity]
     ) as worker:
         result = await client.execute_workflow(
             MultiParamWorkflow.run,
@@ -267,7 +267,7 @@ class HistoryInfoWorkflow:
 
 
 async def test_workflow_history_info(
-    client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
+        client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server does not support should continue as new")
@@ -589,7 +589,7 @@ class SignalAndQueryHandlersOldDynamicStyleWorkflow:
 
 async def test_workflow_signal_qnd_query_handlers_old_dynamic_style(client: Client):
     async with new_worker(
-        client, SignalAndQueryHandlersOldDynamicStyleWorkflow
+            client, SignalAndQueryHandlersOldDynamicStyleWorkflow
     ) as worker:
         handle = await client.start_workflow(
             SignalAndQueryHandlersOldDynamicStyleWorkflow.run,
@@ -654,9 +654,9 @@ async def test_workflow_bad_signal_param(client: Client):
         await handle.signal("some_signal", 123)
         await handle.signal("some_signal", BadSignalParam(some_str="finish"))
         assert [
-            BadSignalParam(some_str="good"),
-            BadSignalParam(some_str="finish"),
-        ] == await handle.result()
+                   BadSignalParam(some_str="good"),
+                   BadSignalParam(some_str="finish"),
+               ] == await handle.result()
 
 
 @workflow.defn
@@ -779,7 +779,7 @@ class SimpleActivityWorkflow:
 
 async def test_workflow_simple_activity(client: Client):
     async with new_worker(
-        client, SimpleActivityWorkflow, activities=[say_hello]
+            client, SimpleActivityWorkflow, activities=[say_hello]
     ) as worker:
         result = await client.execute_workflow(
             SimpleActivityWorkflow.run,
@@ -801,7 +801,7 @@ class SimpleLocalActivityWorkflow:
 
 async def test_workflow_simple_local_activity(client: Client):
     async with new_worker(
-        client, SimpleLocalActivityWorkflow, activities=[say_hello]
+            client, SimpleLocalActivityWorkflow, activities=[say_hello]
     ) as worker:
         result = await client.execute_workflow(
             SimpleLocalActivityWorkflow.run,
@@ -903,7 +903,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
     activity_inst = ActivityWaitCancelNotify()
 
     async with new_worker(
-        client, CancelActivityWorkflow, activities=[activity_inst.wait_cancel]
+            client, CancelActivityWorkflow, activities=[activity_inst.wait_cancel]
     ) as worker:
         # Try cancel - confirm error and activity was sent the cancel
         handle = await client.start_workflow(
@@ -1070,7 +1070,7 @@ class UncaughtCancelWorkflow:
 @pytest.mark.parametrize("activity", [True, False])
 async def test_workflow_uncaught_cancel(client: Client, activity: bool):
     async with new_worker(
-        client, UncaughtCancelWorkflow, activities=[wait_forever]
+            client, UncaughtCancelWorkflow, activities=[wait_forever]
     ) as worker:
         # Start workflow waiting on activity or child workflow, cancel it, and
         # confirm the workflow is shown as cancelled
@@ -1231,7 +1231,7 @@ class SignalExternalWorkflow:
 
 async def test_workflow_signal_external(client: Client):
     async with new_worker(
-        client, SignalExternalWorkflow, ReturnSignalWorkflow
+            client, SignalExternalWorkflow, ReturnSignalWorkflow
     ) as worker:
         # Start return signal, then signal and check that it got signalled
         return_signal_handle = await client.start_workflow(
@@ -1305,7 +1305,7 @@ class MultiCancelWorkflow:
 
 async def test_workflow_cancel_multi(client: Client):
     async with new_worker(
-        client, MultiCancelWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+            client, MultiCancelWorkflow, LongSleepWorkflow, activities=[wait_cancel]
     ) as worker:
         results = await client.execute_workflow(
             MultiCancelWorkflow.run,
@@ -1400,7 +1400,7 @@ class CancelUnsentWorkflow:
 async def test_workflow_cancel_unsent(client: Client):
     workflow_id = f"workflow-{uuid.uuid4()}"
     async with new_worker(
-        client, CancelUnsentWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+            client, CancelUnsentWorkflow, LongSleepWorkflow, activities=[wait_cancel]
     ) as worker:
         await client.execute_workflow(
             CancelUnsentWorkflow.run,
@@ -1419,14 +1419,14 @@ async def test_workflow_cancel_unsent(client: Client):
         # No activities or children scheduled
         assert event.event_type is not EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
         assert (
-            event.event_type
-            is not EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED
+                event.event_type
+                is not EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED
         )
         # Make sure timer is just our 0.01 timer
         if event.event_type is EventType.EVENT_TYPE_TIMER_STARTED:
             assert (
-                event.timer_started_event_attributes.start_to_fire_timeout.ToMilliseconds()
-                == 10
+                    event.timer_started_event_attributes.start_to_fire_timeout.ToMilliseconds()
+                    == 10
             )
             found_timer = True
     assert found_timer
@@ -1445,7 +1445,7 @@ class ActivityTimeoutWorkflow:
 
 async def test_workflow_activity_timeout(client: Client):
     async with new_worker(
-        client, ActivityTimeoutWorkflow, activities=[wait_cancel]
+            client, ActivityTimeoutWorkflow, activities=[wait_cancel]
     ) as worker:
         with pytest.raises(WorkflowFailureError) as err:
             await client.execute_workflow(
@@ -1522,7 +1522,7 @@ class CustomWorkflowRunner(WorkflowRunner):
 
 class CustomWorkflowInstance(WorkflowInstance):
     def __init__(
-        self, runner: CustomWorkflowRunner, unsandboxed: WorkflowInstance
+            self, runner: CustomWorkflowRunner, unsandboxed: WorkflowInstance
     ) -> None:
         super().__init__()
         self._runner = runner
@@ -1546,13 +1546,13 @@ async def test_workflow_with_custom_runner(client: Client):
         assert result == "Hello, Temporal!"
     # Confirm first activation and last non-eviction-reply completion
     assert (
-        runner._pairs[0][0].jobs[0].initialize_workflow.workflow_type == "HelloWorkflow"
+            runner._pairs[0][0].jobs[0].initialize_workflow.workflow_type == "HelloWorkflow"
     )
     assert (
-        runner._pairs[-2][-1]
-        .successful.commands[0]
-        .complete_workflow_execution.result.data
-        == b'"Hello, Temporal!"'
+            runner._pairs[-2][-1]
+            .successful.commands[0]
+            .complete_workflow_execution.result.data
+            == b'"Hello, Temporal!"'
     )
 
 
@@ -1604,7 +1604,7 @@ sa_prefix = "python_test_"
 
 
 def search_attributes_to_serializable(
-    attrs: Union[SearchAttributes, TypedSearchAttributes],
+        attrs: Union[SearchAttributes, TypedSearchAttributes],
 ) -> Mapping[str, Any]:
     if isinstance(attrs, TypedSearchAttributes):
         return {
@@ -1785,7 +1785,7 @@ async def test_workflow_search_attributes(client: Client, env_type: str):
         }
 
     async def describe_attributes_typed(
-        handle: WorkflowHandle,
+            handle: WorkflowHandle,
     ) -> TypedSearchAttributes:
         # Remove any not our prefix
         attrs = (await handle.describe()).typed_search_attributes
@@ -1940,13 +1940,13 @@ class LogCapturer:
 async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
     workflow.logger.full_workflow_info_on_extra = True
     with LogCapturer().logs_captured(
-        workflow.logger.base_logger, activity.logger.base_logger
+            workflow.logger.base_logger, activity.logger.base_logger
     ) as capturer:
         # Log two signals and kill worker before completing. Need to disable
         # workflow cache since we restart the worker and don't want to pay the
         # sticky queue penalty.
         async with new_worker(
-            client, LoggingWorkflow, max_cached_workflows=0
+                client, LoggingWorkflow, max_cached_workflows=0
         ) as worker:
             handle = await client.start_workflow(
                 LoggingWorkflow.run,
@@ -1973,30 +1973,30 @@ async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
         # Also make sure it has some workflow info and correct funcName
         record = capturer.find_log("Signal: signal 1")
         assert (
-            record
-            and record.__dict__["temporal_workflow"]["workflow_type"]
-            == "LoggingWorkflow"
-            and record.funcName == "my_signal"
+                record
+                and record.__dict__["temporal_workflow"]["workflow_type"]
+                == "LoggingWorkflow"
+                and record.funcName == "my_signal"
         )
         # Since we enabled full info, make sure it's there
         assert isinstance(record.__dict__["workflow_info"], workflow.Info)
         # Check the log emitted by the update execution.
         record = capturer.find_log("Update: update 1")
         assert (
-            record
-            and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
-            and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
-            and "'update_id': 'update-1'" in record.message
-            and "'update_name': 'my_update'" in record.message
+                record
+                and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
+                and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
+                and "'update_id': 'update-1'" in record.message
+                and "'update_name': 'my_update'" in record.message
         )
 
         # Clear queue and start a new one with more signals
         capturer.log_queue.queue.clear()
         async with new_worker(
-            client,
-            LoggingWorkflow,
-            task_queue=worker.task_queue,
-            max_cached_workflows=0,
+                client,
+                LoggingWorkflow,
+                task_queue=worker.task_queue,
+                max_cached_workflows=0,
         ) as worker:
             # Send signals and updates
             await handle.signal(LoggingWorkflow.my_signal, "signal 3")
@@ -2043,10 +2043,10 @@ class TaskFailOnceWorkflow:
 
 async def test_workflow_logging_task_fail(client: Client):
     with LogCapturer().logs_captured(
-        activity.logger.base_logger, temporalio.worker._workflow_instance.logger
+            activity.logger.base_logger, temporalio.worker._workflow_instance.logger
     ) as capturer:
         async with new_worker(
-            client, TaskFailOnceWorkflow, activities=[task_fail_once_activity]
+                client, TaskFailOnceWorkflow, activities=[task_fail_once_activity]
         ) as worker:
             await client.execute_workflow(
                 TaskFailOnceWorkflow.run,
@@ -2058,16 +2058,16 @@ async def test_workflow_logging_task_fail(client: Client):
         assert wf_task_record
         assert "Intentional workflow task failure" in wf_task_record.message
         assert (
-            getattr(wf_task_record, "temporal_workflow")["workflow_type"]
-            == "TaskFailOnceWorkflow"
+                getattr(wf_task_record, "temporal_workflow")["workflow_type"]
+                == "TaskFailOnceWorkflow"
         )
 
         act_task_record = capturer.find_log("Completing activity as failed")
         assert act_task_record
         assert "Intentional activity task failure" in act_task_record.message
         assert (
-            getattr(act_task_record, "temporal_activity")["activity_type"]
-            == "task_fail_once_activity"
+                getattr(act_task_record, "temporal_activity")["activity_type"]
+                == "task_fail_once_activity"
         )
 
 
@@ -2102,7 +2102,7 @@ class StackTraceWorkflow:
 
 async def test_workflow_stack_trace(client: Client):
     async with new_worker(
-        client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+            client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
     ) as worker:
         handle = await client.start_workflow(
             StackTraceWorkflow.run,
@@ -2156,7 +2156,7 @@ async def test_workflow_enhanced_stack_trace(client: Client):
     """
 
     async with new_worker(
-        client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+            client, StackTraceWorkflow, LongSleepWorkflow, activities=[wait_cancel]
     ) as worker:
         handle = await client.start_workflow(
             StackTraceWorkflow.run,
@@ -2195,9 +2195,9 @@ async def test_workflow_enhanced_stack_trace(client: Client):
 
 async def test_workflow_external_enhanced_stack_trace(client: Client):
     async with new_worker(
-        client,
-        ExternalStackTraceWorkflow,
-        activities=[external_wait_cancel],
+            client,
+            ExternalStackTraceWorkflow,
+            activities=[external_wait_cancel],
     ) as worker:
         handle = await client.start_workflow(
             ExternalStackTraceWorkflow.run,
@@ -2227,8 +2227,8 @@ async def test_workflow_external_enhanced_stack_trace(client: Client):
 
         assert fn is not None
         assert (
-            'status[0] = "waiting"  # external coroutine test'
-            in trace.sources[fn].content
+                'status[0] = "waiting"  # external coroutine test'
+                in trace.sources[fn].content
         )
         assert trace.sdk.version == __version__
 
@@ -2243,8 +2243,27 @@ class MyDataClass:
         assert self.field1 == "some value"
 
 
+T = typing.TypeVar('T')
+
+
+@dataclass
+class MyGenericDataClass(typing.Generic[T]):
+    field1: T
+
+    def assert_expected(self) -> None:
+        # Part of the assertion is that this is the right type, which is
+        # confirmed just by calling the method. We also check the field.
+        assert str(self.field1) == "some value2"
+
+
 @activity.defn
 async def data_class_typed_activity(param: MyDataClass) -> MyDataClass:
+    param.assert_expected()
+    return param
+
+
+@activity.defn
+async def generic_data_class_typed_activity(param: MyGenericDataClass[str]) -> MyGenericDataClass[str]:
     param.assert_expected()
     return param
 
@@ -2306,6 +2325,19 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
                 start_to_close_timeout=timedelta(seconds=30),
             )
             param.assert_expected()
+            param = await workflow.execute_activity(
+                generic_data_class_typed_activity,
+                param,
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+            param.assert_expected()
+            param = await workflow.execute_local_activity(
+                generic_data_class_typed_activity,
+                param,
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+            param.assert_expected()
+
             child_handle = await workflow.start_child_workflow(
                 DataClassTypedWorkflow.run,
                 param,
@@ -2348,7 +2380,8 @@ async def test_workflow_dataclass_typed(client: Client, env: WorkflowEnvironment
             "Java test server: https://github.com/temporalio/sdk-core/issues/390"
         )
     async with new_worker(
-        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+            client, DataClassTypedWorkflow,
+            activities=[data_class_typed_activity, generic_data_class_typed_activity]
     ) as worker:
         val = MyDataClass(field1="some value")
         handle = await client.start_workflow(
@@ -2373,7 +2406,7 @@ async def test_workflow_separate_protocol(client: Client):
     # This test is to confirm that protocols can be used as "interfaces" for
     # when the workflow impl is absent
     async with new_worker(
-        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+            client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
     ) as worker:
         assert isinstance(DataClassTypedWorkflow(), DataClassTypedWorkflowProto)
         val = MyDataClass(field1="some value")
@@ -2395,7 +2428,7 @@ async def test_workflow_separate_abstract(client: Client):
     # This test is to confirm that abstract classes can be used as "interfaces"
     # for when the workflow impl is absent
     async with new_worker(
-        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+            client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
     ) as worker:
         assert issubclass(DataClassTypedWorkflow, DataClassTypedWorkflowAbstract)
         val = MyDataClass(field1="some value")
@@ -2455,7 +2488,7 @@ async def test_workflow_child_already_started(client: Client, env: WorkflowEnvir
             "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
         )
     async with new_worker(
-        client, ChildAlreadyStartedWorkflow, LongSleepWorkflow
+            client, ChildAlreadyStartedWorkflow, LongSleepWorkflow
     ) as worker:
         with pytest.raises(WorkflowFailureError) as err:
             await client.execute_workflow(
@@ -2503,10 +2536,10 @@ class TypedConfigWorkflow:
 
 async def test_workflow_typed_config(client: Client):
     async with new_worker(
-        client,
-        TypedConfigWorkflow,
-        FailUntilAttemptWorkflow,
-        activities=[fail_until_attempt_activity],
+            client,
+            TypedConfigWorkflow,
+            FailUntilAttemptWorkflow,
+            activities=[fail_until_attempt_activity],
     ) as worker:
         await client.execute_workflow(
             TypedConfigWorkflow.run,
@@ -2549,7 +2582,7 @@ class LocalActivityBackoffWorkflow:
 async def test_workflow_local_activity_backoff(client: Client):
     workflow_id = f"workflow-{uuid.uuid4()}"
     async with new_worker(
-        client, LocalActivityBackoffWorkflow, activities=[fail_until_attempt_activity]
+            client, LocalActivityBackoffWorkflow, activities=[fail_until_attempt_activity]
     ) as worker:
         await client.execute_workflow(
             LocalActivityBackoffWorkflow.run,
@@ -2592,7 +2625,7 @@ class DeadlockedWorkflow:
 async def test_workflow_deadlock(client: Client):
     # Disable safe eviction so the worker can complete
     async with new_worker(
-        client, DeadlockedWorkflow, disable_safe_workflow_eviction=True
+            client, DeadlockedWorkflow, disable_safe_workflow_eviction=True
     ) as worker:
         if worker._workflow_worker:
             worker._workflow_worker._deadlock_timeout_seconds = 1
@@ -2742,7 +2775,7 @@ async def test_workflow_patch(client: Client):
     # Run a simple pre-patch workflow. Need to disable workflow cache since we
     # restart the worker and don't want to pay the sticky queue penalty.
     async with new_worker(
-        client, PrePatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+            client, PrePatchWorkflow, task_queue=task_queue, max_cached_workflows=0
     ):
         pre_patch_handle = await execute()
         assert "pre-patch" == await query_result(pre_patch_handle)
@@ -2750,7 +2783,7 @@ async def test_workflow_patch(client: Client):
     # Confirm patched workflow gives old result for pre-patched but new result
     # for patched
     async with new_worker(
-        client, PatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+            client, PatchWorkflow, task_queue=task_queue, max_cached_workflows=0
     ):
         patch_handle = await execute()
         assert "post-patch" == await query_result(patch_handle)
@@ -2758,7 +2791,7 @@ async def test_workflow_patch(client: Client):
 
     # Confirm what works during deprecated
     async with new_worker(
-        client, DeprecatePatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+            client, DeprecatePatchWorkflow, task_queue=task_queue, max_cached_workflows=0
     ):
         deprecate_patch_handle = await execute()
         assert "post-patch" == await query_result(deprecate_patch_handle)
@@ -2766,7 +2799,7 @@ async def test_workflow_patch(client: Client):
 
     # Confirm what works when deprecation gone
     async with new_worker(
-        client, PostPatchWorkflow, task_queue=task_queue, max_cached_workflows=0
+            client, PostPatchWorkflow, task_queue=task_queue, max_cached_workflows=0
     ):
         post_patch_handle = await execute()
         assert "post-patch" == await query_result(post_patch_handle)
@@ -2819,10 +2852,10 @@ async def test_workflow_patch_memoized(client: Client):
     # to pay the sticky queue penalty.
     task_queue = f"tq-{uuid.uuid4()}"
     async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[PatchMemoizedWorkflowUnpatched],
-        max_cached_workflows=0,
+            client,
+            task_queue=task_queue,
+            workflows=[PatchMemoizedWorkflowUnpatched],
+            max_cached_workflows=0,
     ):
         pre_patch_handle = await client.start_workflow(
             PatchMemoizedWorkflowUnpatched.run,
@@ -2840,10 +2873,10 @@ async def test_workflow_patch_memoized(client: Client):
 
     # Now start the worker again, but this time with a patched workflow
     async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[PatchMemoizedWorkflowPatched],
-        max_cached_workflows=0,
+            client,
+            task_queue=task_queue,
+            workflows=[PatchMemoizedWorkflowPatched],
+            max_cached_workflows=0,
     ):
         # Start a new workflow post patch
         post_patch_handle = await client.start_workflow(
@@ -2859,10 +2892,10 @@ async def test_workflow_patch_memoized(client: Client):
         # Confirm expected values
         assert ["some-value"] == await pre_patch_handle.result()
         assert [
-            "pre-patch",
-            "some-value",
-            "post-patch",
-        ] == await post_patch_handle.result()
+                   "pre-patch",
+                   "some-value",
+                   "post-patch",
+               ] == await post_patch_handle.result()
 
 
 @workflow.defn
@@ -2882,7 +2915,7 @@ class UUIDWorkflow:
 async def test_workflow_uuid(client: Client):
     task_queue = str(uuid.uuid4())
     async with new_worker(
-        client, UUIDWorkflow, task_queue=task_queue, max_cached_workflows=0
+            client, UUIDWorkflow, task_queue=task_queue, max_cached_workflows=0
     ):
         # Get two handle UUID results. Need to disable workflow cache since we
         # restart the worker and don't want to pay the sticky queue penalty.
@@ -2908,7 +2941,7 @@ async def test_workflow_uuid(client: Client):
 
     # Now confirm those results are the same even on a new worker
     async with new_worker(
-        client, UUIDWorkflow, task_queue=task_queue, max_cached_workflows=0
+            client, UUIDWorkflow, task_queue=task_queue, max_cached_workflows=0
     ):
         assert handle1_query_result == await handle1.query(UUIDWorkflow.result)
         assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
@@ -2937,7 +2970,7 @@ class ActivityCallableClassWorkflow:
 async def test_workflow_activity_callable_class(client: Client):
     activity_instance = CallableClassActivity("in worker")
     async with new_worker(
-        client, ActivityCallableClassWorkflow, activities=[activity_instance]
+            client, ActivityCallableClassWorkflow, activities=[activity_instance]
     ) as worker:
         result = await client.execute_workflow(
             ActivityCallableClassWorkflow.run,
@@ -2987,9 +3020,9 @@ class ActivityMethodWorkflow:
 async def test_workflow_activity_method(client: Client):
     activity_instance = MethodActivity("in worker")
     async with new_worker(
-        client,
-        ActivityMethodWorkflow,
-        activities=[activity_instance.add, activity_instance.add_multi],
+            client,
+            ActivityMethodWorkflow,
+            activities=[activity_instance.add, activity_instance.add_multi],
     ) as worker:
         result = await client.execute_workflow(
             ActivityMethodWorkflow.run,
@@ -3030,8 +3063,8 @@ class WaitConditionTimeoutWorkflow:
 
 async def test_workflow_wait_condition_timeout(client: Client):
     async with new_worker(
-        client,
-        WaitConditionTimeoutWorkflow,
+            client,
+            WaitConditionTimeoutWorkflow,
     ) as worker:
         handle = await client.start_workflow(
             WaitConditionTimeoutWorkflow.run,
@@ -3063,8 +3096,8 @@ class HelloWorkflowWithQuery:
 async def test_workflow_query_rpc_timeout(client: Client):
     # Run workflow under worker and confirm query works
     async with new_worker(
-        client,
-        HelloWorkflowWithQuery,
+            client,
+            HelloWorkflowWithQuery,
     ) as worker:
         handle = await client.start_workflow(
             HelloWorkflowWithQuery.run,
@@ -3081,9 +3114,9 @@ async def test_workflow_query_rpc_timeout(client: Client):
             HelloWorkflowWithQuery.some_query, rpc_timeout=timedelta(seconds=1)
         )
     assert (
-        err.value.status == RPCStatusCode.CANCELLED
-        and "timeout" in str(err.value).lower()
-    ) or err.value.status == RPCStatusCode.DEADLINE_EXCEEDED
+                   err.value.status == RPCStatusCode.CANCELLED
+                   and "timeout" in str(err.value).lower()
+           ) or err.value.status == RPCStatusCode.DEADLINE_EXCEEDED
 
 
 @dataclass
@@ -3222,7 +3255,7 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
 
 
 async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     # This test only works when we support time skipping
     if not env.supports_time_skipping:
@@ -3236,7 +3269,7 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
         # Start worker for 30 mins. Need to disable workflow cache since we
         # restart the worker and don't want to pay the sticky queue penalty.
         async with new_worker(
-            client, CancelSignalAndTimerFiredInSameTaskWorkflow, max_cached_workflows=0
+                client, CancelSignalAndTimerFiredInSameTaskWorkflow, max_cached_workflows=0
         ) as worker:
             task_queue = worker.task_queue
             handle = await client.start_workflow(
@@ -3257,10 +3290,10 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
 
         # Start worker again and wait for workflow completion
         async with new_worker(
-            client,
-            CancelSignalAndTimerFiredInSameTaskWorkflow,
-            task_queue=task_queue,
-            max_cached_workflows=0,
+                client,
+                CancelSignalAndTimerFiredInSameTaskWorkflow,
+                task_queue=task_queue,
+                max_cached_workflows=0,
         ):
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire
@@ -3292,7 +3325,7 @@ class CustomErrorWorkflow:
 class CustomFailureConverter(DefaultFailureConverterWithEncodedAttributes):
     # We'll override from failure to convert back to our type
     def from_failure(
-        self, failure: Failure, payload_converter: PayloadConverter
+            self, failure: Failure, payload_converter: PayloadConverter
     ) -> BaseException:
         err = super().from_failure(failure, payload_converter)
         if isinstance(err, ApplicationError) and err.type == "MyCustomError":
@@ -3314,7 +3347,7 @@ async def test_workflow_custom_failure_converter(client: Client):
 
     # Run workflow and confirm error
     async with new_worker(
-        client, CustomErrorWorkflow, activities=[custom_error_activity]
+            client, CustomErrorWorkflow, activities=[custom_error_activity]
     ) as worker:
         handle = await client.start_workflow(
             CustomErrorWorkflow.run,
@@ -3361,11 +3394,11 @@ class OptionalParam:
 class OptionalParamWorkflow:
     @workflow.run
     async def run(
-        self, some_param: Optional[OptionalParam] = OptionalParam(some_string="default")
+            self, some_param: Optional[OptionalParam] = OptionalParam(some_string="default")
     ) -> Optional[OptionalParam]:
         assert some_param is None or (
-            isinstance(some_param, OptionalParam)
-            and some_param.some_string in ["default", "foo"]
+                isinstance(some_param, OptionalParam)
+                and some_param.some_string in ["default", "foo"]
         )
         return some_param
 
@@ -3404,20 +3437,20 @@ class ExceptionRaisingPayloadConverter(DefaultPayloadConverter):
 
     def to_payloads(self, values: Sequence[Any]) -> List[Payload]:
         if any(
-            value == ExceptionRaisingPayloadConverter.bad_outbound_str
-            for value in values
+                value == ExceptionRaisingPayloadConverter.bad_outbound_str
+                for value in values
         ):
             raise ApplicationError("Intentional outbound converter failure")
         return super().to_payloads(values)
 
     def from_payloads(
-        self, payloads: Sequence[Payload], type_hints: Optional[List] = None
+            self, payloads: Sequence[Payload], type_hints: Optional[List] = None
     ) -> List[Any]:
         # Check if any payloads contain the bad data
         for payload in payloads:
             if (
-                ExceptionRaisingPayloadConverter.bad_inbound_str.encode()
-                in payload.data
+                    ExceptionRaisingPayloadConverter.bad_inbound_str.encode()
+                    in payload.data
             ):
                 raise ApplicationError("Intentional inbound converter failure")
         return super().from_payloads(payloads, type_hints)
@@ -3533,7 +3566,7 @@ class ManualResultTypeWorkflow:
 
 async def test_manual_result_type(client: Client):
     async with new_worker(
-        client, ManualResultTypeWorkflow, activities=[manual_result_type_activity]
+            client, ManualResultTypeWorkflow, activities=[manual_result_type_activity]
     ) as worker:
         # Workflow without result type and with
         res1 = await client.execute_workflow(
@@ -3627,11 +3660,11 @@ async def test_cache_eviction_tear_down(client: Client):
     # chooses, but now we expect eviction to properly tear down tasks and
     # therefore we cancel them
     async with new_worker(
-        client,
-        CacheEvictionTearDownWorkflow,
-        WaitForeverWorkflow,
-        activities=[wait_forever_activity],
-        max_cached_workflows=0,
+            client,
+            CacheEvictionTearDownWorkflow,
+            WaitForeverWorkflow,
+            activities=[wait_forever_activity],
+            max_cached_workflows=0,
     ) as worker:
         # Put a hook to catch unraisable exceptions
         old_hook = sys.unraisablehook
@@ -3697,7 +3730,7 @@ async def test_workflow_eviction_exception(client: Client):
 
     # Run workflow with no cache (forces eviction every step)
     async with new_worker(
-        client, EvictionCaptureExceptionWorkflow, max_cached_workflows=0
+            client, EvictionCaptureExceptionWorkflow, max_cached_workflows=0
     ) as worker:
         await client.execute_workflow(
             EvictionCaptureExceptionWorkflow.run,
@@ -3709,8 +3742,8 @@ async def test_workflow_eviction_exception(client: Client):
     assert len(captured_eviction_exceptions) == 1
     assert captured_eviction_exceptions[0].is_replaying
     assert (
-        type(captured_eviction_exceptions[0].exception).__name__
-        == "_WorkflowBeingEvictedError"
+            type(captured_eviction_exceptions[0].exception).__name__
+            == "_WorkflowBeingEvictedError"
     )
 
 
@@ -3809,10 +3842,10 @@ async def test_workflow_queries_doing_bad_things(client: Client):
 
 # typing.Self only in 3.11+
 if sys.version_info >= (3, 11):
-
     @dataclass
     class AnnotatedWithSelfParam:
         some_str: str
+
 
     @workflow.defn
     class WorkflowAnnotatedWithSelf:
@@ -3820,6 +3853,7 @@ if sys.version_info >= (3, 11):
         async def run(self: typing.Self, some_arg: AnnotatedWithSelfParam) -> str:
             assert isinstance(some_arg, AnnotatedWithSelfParam)
             return some_arg.some_str
+
 
     async def test_workflow_annotated_with_self(client: Client):
         async with new_worker(client, WorkflowAnnotatedWithSelf) as worker:
@@ -3861,7 +3895,7 @@ async def test_workflow_custom_metrics(client: Client):
     # Run worker with default runtime which is noop meter just to confirm it
     # doesn't fail
     async with new_worker(
-        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+            client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
     ) as worker:
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
@@ -3890,7 +3924,7 @@ async def test_workflow_custom_metrics(client: Client):
     )
 
     async with new_worker(
-        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+            client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
     ) as worker:
         # Record a gauge at runtime level
         gauge = runtime.metric_meter.with_additional_attributes(
@@ -3912,7 +3946,7 @@ async def test_workflow_custom_metrics(client: Client):
 
         # Intentionally naive metric checker
         def matches_metric_line(
-            line: str, name: str, at_least_labels: Mapping[str, str], value: int
+                line: str, name: str, at_least_labels: Mapping[str, str], value: int
         ) -> bool:
             # Must have metric name
             if not line.startswith(name + "{"):
@@ -3924,7 +3958,7 @@ async def test_workflow_custom_metrics(client: Client):
             return line.endswith(f" {value}")
 
         def assert_metric_exists(
-            name: str, at_least_labels: Mapping[str, str], value: int
+                name: str, at_least_labels: Mapping[str, str], value: int
         ) -> None:
             assert any(
                 matches_metric_line(line, name, at_least_labels, value)
@@ -4045,7 +4079,7 @@ async def test_workflow_buffered_metrics(client: Client):
         runtime=runtime,
     )
     async with new_worker(
-        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+            client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
     ) as worker:
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
@@ -4268,7 +4302,7 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
     async with new_worker(
-        client, UpdateHandlersWorkflow, activities=[say_hello]
+            client, UpdateHandlersWorkflow, activities=[say_hello]
     ) as worker:
         wf_id = f"update-handlers-workflow-{uuid.uuid4()}"
         handle = await client.start_workflow(
@@ -4309,7 +4343,7 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
 
 
 async def test_workflow_update_handlers_unhappy(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -4360,8 +4394,8 @@ async def test_workflow_update_handlers_unhappy(
             await handle.execute_update("last_event", args=[121, "badarg"])
         assert isinstance(err.value.cause, ApplicationError)
         assert (
-            "last_event_validator() takes 2 positional arguments but 3 were given"
-            in err.value.cause.message
+                "last_event_validator() takes 2 positional arguments but 3 were given"
+                in err.value.cause.message
         )
 
         # Un-deserializeable nonsense
@@ -4394,7 +4428,7 @@ async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironme
         )
     # Need to not sandbox so behavior can change based on globals
     async with new_worker(
-        client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
+            client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
     ) as worker:
         handle = await client.start_workflow(
             UpdateHandlersWorkflow.run,
@@ -4432,7 +4466,7 @@ class UpdateRespectsFirstExecutionRunIdWorkflow:
 
 
 async def test_workflow_update_respects_first_execution_run_id(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -4443,7 +4477,6 @@ async def test_workflow_update_respects_first_execution_run_id(
     # r1.
     workflow_id = f"update-respects-first-execution-run-id-{uuid.uuid4()}"
     async with new_worker(client, UpdateRespectsFirstExecutionRunIdWorkflow) as worker:
-
         async def start_workflow(workflow_id: str) -> WorkflowHandle:
             return await client.start_workflow(
                 UpdateRespectsFirstExecutionRunIdWorkflow.run,
@@ -4488,7 +4521,7 @@ class ImmediatelyCompleteUpdateAndWorkflow:
 
 
 async def test_workflow_update_before_worker_start(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -4526,10 +4559,10 @@ async def test_workflow_update_before_worker_start(
 
     # Start no-cache worker on the task queue
     async with new_worker(
-        client,
-        ImmediatelyCompleteUpdateAndWorkflow,
-        task_queue=task_queue,
-        max_cached_workflows=0,
+            client,
+            ImmediatelyCompleteUpdateAndWorkflow,
+            task_queue=task_queue,
+            max_cached_workflows=0,
     ):
         # Confirm workflow completed as expected
         assert "workflow-done" == await handle.result()
@@ -4562,7 +4595,7 @@ class UpdateSeparateHandleWorkflow:
 
 
 async def test_workflow_update_separate_handle(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -4610,7 +4643,7 @@ class UpdateTimeoutOrCancelWorkflow:
 
 
 async def test_workflow_update_timeout_or_cancel(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -4752,7 +4785,7 @@ async def test_workflow_timeout_support(client: Client, approach: str):
     if sys.version_info < (3, 11):
         pytest.skip("Timeout only in >= 3.11")
     async with new_worker(
-        client, TimeoutSupportWorkflow, activities=[wait_cancel]
+            client, TimeoutSupportWorkflow, activities=[wait_cancel]
     ) as worker:
         # Run and confirm activity gets cancelled
         handle = await client.start_workflow(
@@ -4770,8 +4803,8 @@ async def test_workflow_timeout_support(client: Client, approach: str):
         async for e in handle.fetch_history_events():
             if e.HasField("timer_started_event_attributes"):
                 assert (
-                    e.timer_started_event_attributes.start_to_fire_timeout.ToMilliseconds()
-                    == 200
+                        e.timer_started_event_attributes.start_to_fire_timeout.ToMilliseconds()
+                        == 200
                 )
                 found_timer = True
                 break
@@ -4801,18 +4834,18 @@ class BuildIDInfoWorkflow:
 
 
 async def test_workflow_current_build_id_appropriately_set(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server does not support worker versioning")
 
     task_queue = str(uuid.uuid4())
     async with new_worker(
-        client,
-        BuildIDInfoWorkflow,
-        activities=[say_hello],
-        build_id="1.0",
-        task_queue=task_queue,
+            client,
+            BuildIDInfoWorkflow,
+            activities=[say_hello],
+            build_id="1.0",
+            task_queue=task_queue,
     ) as worker:
         handle = await client.start_workflow(
             BuildIDInfoWorkflow.run,
@@ -4831,11 +4864,11 @@ async def test_workflow_current_build_id_appropriately_set(
     )
 
     async with new_worker(
-        client,
-        BuildIDInfoWorkflow,
-        activities=[say_hello],
-        build_id="1.1",
-        task_queue=task_queue,
+            client,
+            BuildIDInfoWorkflow,
+            activities=[say_hello],
+            build_id="1.1",
+            task_queue=task_queue,
     ) as worker:
         bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
         assert bid == "1.0"
@@ -4907,7 +4940,7 @@ class FailureTypesConfiguredInheritedWorkflow(FailureTypesWorkflowBase):
 
 
 async def test_workflow_failure_types_configured(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -4916,14 +4949,14 @@ async def test_workflow_failure_types_configured(
 
     # Asserter for a single scenario
     async def assert_scenario(
-        workflow: Type[FailureTypesWorkflowBase],
-        *,
-        expect_task_fail: bool,
-        fail_message_contains: str,
-        worker_level_failure_exception_type: Optional[Type[Exception]] = None,
-        workflow_scenario: Optional[FailureTypesScenario] = None,
-        signal_scenario: Optional[FailureTypesScenario] = None,
-        update_scenario: Optional[FailureTypesScenario] = None,
+            workflow: Type[FailureTypesWorkflowBase],
+            *,
+            expect_task_fail: bool,
+            fail_message_contains: str,
+            worker_level_failure_exception_type: Optional[Type[Exception]] = None,
+            workflow_scenario: Optional[FailureTypesScenario] = None,
+            signal_scenario: Optional[FailureTypesScenario] = None,
+            update_scenario: Optional[FailureTypesScenario] = None,
     ) -> None:
         logging.debug(
             "Asserting scenario %s",
@@ -4938,12 +4971,12 @@ async def test_workflow_failure_types_configured(
             },
         )
         async with new_worker(
-            client,
-            workflow,
-            max_cached_workflows=0,
-            workflow_failure_exception_types=[worker_level_failure_exception_type]
-            if worker_level_failure_exception_type
-            else [],
+                client,
+                workflow,
+                max_cached_workflows=0,
+                workflow_failure_exception_types=[worker_level_failure_exception_type]
+                if worker_level_failure_exception_type
+                else [],
         ) as worker:
             # Start workflow
             handle = await client.start_workflow(
@@ -4969,9 +5002,9 @@ async def test_workflow_failure_types_configured(
                 async def has_expected_task_fail() -> bool:
                     async for e in handle.fetch_history_events():
                         if (
-                            e.HasField("workflow_task_failed_event_attributes")
-                            and fail_message_contains
-                            in e.workflow_task_failed_event_attributes.failure.message
+                                e.HasField("workflow_task_failed_event_attributes")
+                                and fail_message_contains
+                                in e.workflow_task_failed_event_attributes.failure.message
                         ):
                             return True
                     return False
@@ -4984,9 +5017,9 @@ async def test_workflow_failure_types_configured(
                     # Update does not throw on non-determinism, the workflow
                     # does instead
                     if (
-                        update_handle
-                        and update_scenario
-                        == FailureTypesScenario.THROW_CUSTOM_EXCEPTION
+                            update_handle
+                            and update_scenario
+                            == FailureTypesScenario.THROW_CUSTOM_EXCEPTION
                     ):
                         await update_handle.result()
                     else:
@@ -4996,11 +5029,11 @@ async def test_workflow_failure_types_configured(
 
     # Run a scenario
     async def run_scenario(
-        workflow: Type[FailureTypesWorkflowBase],
-        scenario: FailureTypesScenario,
-        *,
-        expect_task_fail: bool = False,
-        worker_level_failure_exception_type: Optional[Type[Exception]] = None,
+            workflow: Type[FailureTypesWorkflowBase],
+            scenario: FailureTypesScenario,
+            *,
+            expect_task_fail: bool = False,
+            worker_level_failure_exception_type: Optional[Type[Exception]] = None,
     ) -> None:
         # Run for workflow, signal, and update
         fail_message_contains = (
@@ -5141,11 +5174,11 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
 
         # Now start the worker on the first env
         async with Worker(
-            client,
-            task_queue=task_queue,
-            workflows=[TickingWorkflow],
-            max_cached_workflows=0,
-            max_concurrent_workflow_task_polls=1,
+                client,
+                task_queue=task_queue,
+                workflows=[TickingWorkflow],
+                max_cached_workflows=0,
+                max_concurrent_workflow_task_polls=1,
         ) as worker:
             # Confirm the first ticking workflow has completed a task but not
             # the second
@@ -5192,10 +5225,10 @@ class AsCompletedWorkflow:
 async def test_workflow_as_completed_utility(client: Client):
     # Disable cache to force replay
     async with new_worker(
-        client,
-        AsCompletedWorkflow,
-        activities=[return_name_activity],
-        max_cached_workflows=0,
+            client,
+            AsCompletedWorkflow,
+            activities=[return_name_activity],
+            max_cached_workflows=0,
     ) as worker:
         # This would fail if we used asyncio.as_completed in the workflow
         result = await client.execute_workflow(
@@ -5234,7 +5267,7 @@ class WaitWorkflow:
 async def test_workflow_wait_utility(client: Client):
     # Disable cache to force replay
     async with new_worker(
-        client, WaitWorkflow, activities=[return_name_activity], max_cached_workflows=0
+            client, WaitWorkflow, activities=[return_name_activity], max_cached_workflows=0
     ) as worker:
         # This would fail if we used asyncio.wait in the workflow
         result = await client.execute_workflow(
@@ -5456,9 +5489,9 @@ class _UnfinishedHandlersWarningsTest:
         return False
 
     async def _get_workflow_result_and_warning(
-        self,
-        wait_all_handlers_finished: bool,
-        unfinished_policy: Optional[workflow.HandlerUnfinishedPolicy] = None,
+            self,
+            wait_all_handlers_finished: bool,
+            unfinished_policy: Optional[workflow.HandlerUnfinishedPolicy] = None,
     ) -> Tuple[bool, bool]:
         with pytest.WarningsRecorder() as warnings:
             wf_result = await self._get_workflow_result(
@@ -5471,10 +5504,10 @@ class _UnfinishedHandlersWarningsTest:
             return wf_result, unfinished_handler_warning_emitted
 
     async def _get_workflow_result(
-        self,
-        wait_all_handlers_finished: bool,
-        unfinished_policy: Optional[workflow.HandlerUnfinishedPolicy] = None,
-        handle_future: Optional[asyncio.Future[WorkflowHandle]] = None,
+            self,
+            wait_all_handlers_finished: bool,
+            unfinished_policy: Optional[workflow.HandlerUnfinishedPolicy] = None,
+            handle_future: Optional[asyncio.Future[WorkflowHandle]] = None,
     ) -> bool:
         handle = await self.client.start_workflow(
             UnfinishedHandlersWarningsWorkflow.run,
@@ -5516,30 +5549,30 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
 
     @workflow.run
     async def run(
-        self,
-        workflow_termination_type: Literal[
-            "-cancellation-",
-            "-failure-",
-            "-continue-as-new-",
-            "-fail-post-continue-as-new-run-",
-        ],
-        handler_registration: Literal["-late-registered-", "-not-late-registered-"],
-        handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
-        handler_waiting: Literal[
-            "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
-        ],
+            self,
+            workflow_termination_type: Literal[
+                "-cancellation-",
+                "-failure-",
+                "-continue-as-new-",
+                "-fail-post-continue-as-new-run-",
+            ],
+            handler_registration: Literal["-late-registered-", "-not-late-registered-"],
+            handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
+            handler_waiting: Literal[
+                "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
+            ],
     ) -> NoReturn:
         if handler_registration == "-late-registered-":
             if handler_dynamism == "-dynamic-":
 
                 async def my_late_registered_dynamic_update(
-                    name: str, args: Sequence[RawValue]
+                        name: str, args: Sequence[RawValue]
                 ) -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-dynamic-update-result"
 
                 async def my_late_registered_dynamic_signal(
-                    name: str, args: Sequence[RawValue]
+                        name: str, args: Sequence[RawValue]
                 ) -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
@@ -5616,17 +5649,17 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
     "workflow_termination_type", ["-cancellation-", "-failure-", "-continue-as-new-"]
 )
 async def test_unfinished_handler_on_workflow_termination(
-    client: Client,
-    env: WorkflowEnvironment,
-    handler_type: Literal["-signal-", "-update-"],
-    handler_registration: Literal["-late-registered-", "-not-late-registered-"],
-    handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
-    handler_waiting: Literal[
-        "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
-    ],
-    workflow_termination_type: Literal[
-        "-cancellation-", "-failure-", "-continue-as-new-"
-    ],
+        client: Client,
+        env: WorkflowEnvironment,
+        handler_type: Literal["-signal-", "-update-"],
+        handler_registration: Literal["-late-registered-", "-not-late-registered-"],
+        handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
+        handler_waiting: Literal[
+            "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
+        ],
+        workflow_termination_type: Literal[
+            "-cancellation-", "-failure-", "-continue-as-new-"
+        ],
 ):
     skip_unfinished_handler_tests_in_older_python()
     if handler_type == "-update-" and env.supports_time_skipping:
@@ -5657,10 +5690,10 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     ]
 
     async def test_warning_is_issued_on_exit_with_unfinished_handler(
-        self,
+            self,
     ):
         assert await self._run_workflow_and_get_warning() == (
-            self.handler_waiting == "-no-wait-all-handlers-finish-"
+                self.handler_waiting == "-no-wait-all-handlers-finish-"
         )
 
     async def _run_workflow_and_get_warning(self) -> bool:
@@ -5714,9 +5747,9 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             await handle.signal(signal_method)  # type: ignore
 
         async with new_worker(
-            self.client,
-            UnfinishedHandlersOnWorkflowTerminationWorkflow,
-            task_queue=task_queue,
+                self.client,
+                UnfinishedHandlersOnWorkflowTerminationWorkflow,
+                task_queue=task_queue,
         ):
             with pytest.WarningsRecorder() as warnings:
                 if self.handler_type == "-update-":
@@ -5729,7 +5762,7 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                         update_err = err_info.value
                         assert isinstance(update_err.cause, ApplicationError)
                         assert (
-                            update_err.cause.type == "AcceptedUpdateCompletedWorkflow"
+                                update_err.cause.type == "AcceptedUpdateCompletedWorkflow"
                         )
 
                 with pytest.raises(WorkflowFailureError) as err:
@@ -5744,8 +5777,8 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                 )
                 if self.workflow_termination_type == "-continue-as-new-":
                     assert (
-                        str(err.value.cause)
-                        == "Deliberately failing post-ContinueAsNew run"
+                            str(err.value.cause)
+                            == "Deliberately failing post-ContinueAsNew run"
                     )
 
                 unfinished_handler_warning_emitted = any(
@@ -5845,8 +5878,8 @@ class UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow:
 
 
 async def test_update_completion_is_honored_when_after_workflow_return_1(
-    client: Client,
-    env: WorkflowEnvironment,
+        client: Client,
+        env: WorkflowEnvironment,
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -5868,9 +5901,9 @@ async def test_update_completion_is_honored_when_after_workflow_return_1(
     await workflow_update_exists(client, wf_handle.id, update_id)
 
     async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow],
+            client,
+            task_queue=task_queue,
+            workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow],
     ):
         assert await wf_handle.result() == "workflow-result"
         assert await update_result_task == "update-result"
@@ -5901,17 +5934,17 @@ class UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
 
 
 async def test_update_completion_is_honored_when_after_workflow_return_2(
-    client: Client,
-    env: WorkflowEnvironment,
+        client: Client,
+        env: WorkflowEnvironment,
 ):
     if env.supports_time_skipping:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
     async with Worker(
-        client,
-        task_queue="tq",
-        workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2],
+            client,
+            task_queue="tq",
+            workflows=[UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2],
     ) as worker:
         handle = await client.start_workflow(
             UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2.run,
@@ -5988,7 +6021,7 @@ async def test_first_of_two_signal_completion_commands_is_honored(client: Client
 
 
 async def test_workflow_return_is_honored_when_it_precedes_signal_completion_command(
-    client: Client,
+        client: Client,
 ):
     await _do_first_completion_command_is_honored_test(
         client, main_workflow_returns_before_signal_completions=True
@@ -5996,7 +6029,7 @@ async def test_workflow_return_is_honored_when_it_precedes_signal_completion_com
 
 
 async def _do_first_completion_command_is_honored_test(
-    client: Client, main_workflow_returns_before_signal_completions: bool
+        client: Client, main_workflow_returns_before_signal_completions: bool
 ):
     workflow_cls: Union[
         Type[FirstCompletionCommandIsHonoredPingPongWorkflow],
@@ -6007,9 +6040,9 @@ async def _do_first_completion_command_is_honored_test(
         else FirstCompletionCommandIsHonoredWorkflow
     )
     async with Worker(
-        client,
-        task_queue="tq",
-        workflows=[workflow_cls],
+            client,
+            task_queue="tq",
+            workflows=[workflow_cls],
     ) as worker:
         handle = await client.start_workflow(
             workflow_cls.run,
@@ -6029,8 +6062,8 @@ async def _do_first_completion_command_is_honored_test(
                 assert str(err.cause).startswith("Client should see this error")
         else:
             assert (
-                main_workflow_returns_before_signal_completions
-                and result == "workflow-result"
+                    main_workflow_returns_before_signal_completions
+                    and result == "workflow-result"
             )
 
 
@@ -6055,7 +6088,7 @@ class TimerStartedAfterWorkflowCompletionWorkflow:
 
 async def test_timer_started_after_workflow_completion(client: Client):
     async with new_worker(
-        client, TimerStartedAfterWorkflowCompletionWorkflow
+            client, TimerStartedAfterWorkflowCompletionWorkflow
     ) as worker:
         handle = await client.start_workflow(
             TimerStartedAfterWorkflowCompletionWorkflow.run,
@@ -6090,7 +6123,7 @@ class ActivitiesWithRetryDelayWorkflow:
 
 async def test_activity_retry_delay(client: Client):
     async with new_worker(
-        client, ActivitiesWithRetryDelayWorkflow, activities=[activity_with_retry_delay]
+            client, ActivitiesWithRetryDelayWorkflow, activities=[activity_with_retry_delay]
     ) as worker:
         try:
             await client.execute_workflow(
@@ -6102,11 +6135,11 @@ async def test_activity_retry_delay(client: Client):
             assert isinstance(err.cause, ActivityError)
             assert isinstance(err.cause.cause, ApplicationError)
             assert (
-                str(err.cause.cause) == ActivitiesWithRetryDelayWorkflow.error_message
+                    str(err.cause.cause) == ActivitiesWithRetryDelayWorkflow.error_message
             )
             assert (
-                err.cause.cause.next_retry_delay
-                == ActivitiesWithRetryDelayWorkflow.next_retry_delay
+                    err.cause.cause.next_retry_delay
+                    == ActivitiesWithRetryDelayWorkflow.next_retry_delay
             )
 
 
@@ -6169,7 +6202,7 @@ class WorkflowWithNonWorkflowInitInit:
     ],
 )
 async def test_update_in_first_wft_sees_workflow_init(
-    client: Client, client_cls: Type, worker_cls: Type
+        client: Client, client_cls: Type, worker_cls: Type
 ):
     """
     Test how @workflow.init affects what an update in the first WFT sees.
@@ -6270,7 +6303,7 @@ async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
             "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
         )
     async with new_worker(
-        client, UserMetadataWorkflow, activities=[say_hello]
+            client, UserMetadataWorkflow, activities=[say_hello]
     ) as worker:
         handle = await client.start_workflow(
             UserMetadataWorkflow.run,
@@ -6400,7 +6433,7 @@ class ConcurrentSleepsWorkflow:
 
 
 async def test_concurrent_sleeps_use_proper_options(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -6445,10 +6478,10 @@ class BadFailureConverterError(Exception):
 
 class BadFailureConverter(DefaultFailureConverter):
     def to_failure(
-        self,
-        exception: BaseException,
-        payload_converter: PayloadConverter,
-        failure: Failure,
+            self,
+            exception: BaseException,
+            payload_converter: PayloadConverter,
+            failure: Failure,
     ) -> None:
         if isinstance(exception, BadFailureConverterError):
             raise RuntimeError("Intentional failure conversion error")
@@ -6482,7 +6515,7 @@ async def test_bad_failure_converter(client: Client):
     )
     client = Client(**config)
     async with new_worker(
-        client, BadFailureConverterWorkflow, activities=[bad_failure_converter_activity]
+            client, BadFailureConverterWorkflow, activities=[bad_failure_converter_activity]
     ) as worker:
         # Check activity
         with pytest.raises(WorkflowFailureError) as err:
@@ -6495,8 +6528,8 @@ async def test_bad_failure_converter(client: Client):
         assert isinstance(err.value.cause, ActivityError)
         assert isinstance(err.value.cause.cause, ApplicationError)
         assert (
-            err.value.cause.cause.message
-            == "Failed building exception result: Intentional failure conversion error"
+                err.value.cause.cause.message
+                == "Failed building exception result: Intentional failure conversion error"
         )
 
         # Check workflow
@@ -6595,10 +6628,10 @@ async def test_async_loop_ordering(client: Client, env: WorkflowEnvironment):
     await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "before")
 
     async with new_worker(
-        client,
-        SignalsActivitiesTimersUpdatesTracingWorkflow,
-        activities=[say_hello],
-        task_queue=task_queue,
+            client,
+            SignalsActivitiesTimersUpdatesTracingWorkflow,
+            activities=[say_hello],
+            task_queue=task_queue,
     ):
         await asyncio.sleep(0.2)
         await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "1")
@@ -6655,18 +6688,18 @@ async def test_alternate_async_loop_ordering(client: Client, env: WorkflowEnviro
     )
 
     async with new_worker(
-        client,
-        ActivityAndSignalsWhileWorkflowDown,
-        activities=[say_hello],
-        task_queue=task_queue,
+            client,
+            ActivityAndSignalsWhileWorkflowDown,
+            activities=[say_hello],
+            task_queue=task_queue,
     ):
         # This sleep exists to make sure the first WFT is processed
         await asyncio.sleep(0.2)
 
     async with new_worker(
-        client,
-        activities=[say_hello],
-        task_queue=activity_tq,
+            client,
+            activities=[say_hello],
+            task_queue=activity_tq,
     ):
         # Make sure the activity starts being processed before sending signals
         await asyncio.sleep(1)
@@ -6674,10 +6707,10 @@ async def test_alternate_async_loop_ordering(client: Client, env: WorkflowEnviro
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "2")
 
         async with new_worker(
-            client,
-            ActivityAndSignalsWhileWorkflowDown,
-            activities=[say_hello],
-            task_queue=task_queue,
+                client,
+                ActivityAndSignalsWhileWorkflowDown,
+                activities=[say_hello],
+                task_queue=task_queue,
         ):
             await handle.result()
 
@@ -6726,8 +6759,8 @@ class CoroutinesUseLockOrSemaphoreWorkflow:
 
     @workflow.run
     async def run(
-        self,
-        params: Optional[UseLockOrSemaphoreWorkflowParameters],
+            self,
+            params: Optional[UseLockOrSemaphoreWorkflowParameters],
     ) -> LockOrSemaphoreWorkflowConcurrencySummary:
         # TODO: Use workflow init method when it exists.
         assert params
@@ -6784,8 +6817,8 @@ class HandlerCoroutinesUseLockOrSemaphoreWorkflow(CoroutinesUseLockOrSemaphoreWo
 
     @workflow.run
     async def run(
-        self,
-        _: Optional[UseLockOrSemaphoreWorkflowParameters] = None,
+            self,
+            _: Optional[UseLockOrSemaphoreWorkflowParameters] = None,
     ) -> LockOrSemaphoreWorkflowConcurrencySummary:
         await workflow.wait_condition(lambda: self.workflow_may_exit)
         return LockOrSemaphoreWorkflowConcurrencySummary(
@@ -6807,14 +6840,14 @@ class HandlerCoroutinesUseLockOrSemaphoreWorkflow(CoroutinesUseLockOrSemaphoreWo
 
 
 async def _do_workflow_coroutines_lock_or_semaphore_test(
-    client: Client,
-    params: UseLockOrSemaphoreWorkflowParameters,
-    expectation: LockOrSemaphoreWorkflowConcurrencySummary,
+        client: Client,
+        params: UseLockOrSemaphoreWorkflowParameters,
+        expectation: LockOrSemaphoreWorkflowConcurrencySummary,
 ):
     async with new_worker(
-        client,
-        CoroutinesUseLockOrSemaphoreWorkflow,
-        activities=[noop_activity_for_lock_or_semaphore_tests],
+            client,
+            CoroutinesUseLockOrSemaphoreWorkflow,
+            activities=[noop_activity_for_lock_or_semaphore_tests],
     ) as worker:
         summary = await client.execute_workflow(
             CoroutinesUseLockOrSemaphoreWorkflow.run,
@@ -6826,11 +6859,11 @@ async def _do_workflow_coroutines_lock_or_semaphore_test(
 
 
 async def _do_update_handler_lock_or_semaphore_test(
-    client: Client,
-    env: WorkflowEnvironment,
-    params: UseLockOrSemaphoreWorkflowParameters,
-    n_updates: int,
-    expectation: LockOrSemaphoreWorkflowConcurrencySummary,
+        client: Client,
+        env: WorkflowEnvironment,
+        params: UseLockOrSemaphoreWorkflowParameters,
+        n_updates: int,
+        expectation: LockOrSemaphoreWorkflowConcurrencySummary,
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -6855,10 +6888,10 @@ async def _do_update_handler_lock_or_semaphore_test(
         for i in range(n_updates)
     ]
     async with new_worker(
-        client,
-        HandlerCoroutinesUseLockOrSemaphoreWorkflow,
-        activities=[noop_activity_for_lock_or_semaphore_tests],
-        task_queue=task_queue,
+            client,
+            HandlerCoroutinesUseLockOrSemaphoreWorkflow,
+            activities=[noop_activity_for_lock_or_semaphore_tests],
+            task_queue=task_queue,
     ):
         for update_task in admitted_updates:
             await update_task
@@ -6879,7 +6912,7 @@ async def test_workflow_coroutines_can_use_lock(client: Client):
 
 
 async def test_update_handler_can_use_lock_to_serialize_handler_executions(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     await _do_update_handler_lock_or_semaphore_test(
         client,
@@ -6905,7 +6938,7 @@ async def test_workflow_coroutines_lock_acquisition_respects_timeout(client: Cli
 
 
 async def test_update_handler_lock_acquisition_respects_timeout(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     await _do_update_handler_lock_or_semaphore_test(
         client,
@@ -6931,7 +6964,7 @@ async def test_workflow_coroutines_can_use_semaphore(client: Client):
 
 
 async def test_update_handler_can_use_semaphore_to_control_handler_execution_concurrency(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     await _do_update_handler_lock_or_semaphore_test(
         client,
@@ -6946,7 +6979,7 @@ async def test_update_handler_can_use_semaphore_to_control_handler_execution_con
 
 
 async def test_workflow_coroutine_semaphore_acquisition_respects_timeout(
-    client: Client,
+        client: Client,
 ):
     await _do_workflow_coroutines_lock_or_semaphore_test(
         client,
@@ -6962,7 +6995,7 @@ async def test_workflow_coroutine_semaphore_acquisition_respects_timeout(
 
 
 async def test_update_handler_semaphore_acquisition_respects_timeout(
-    client: Client, env: WorkflowEnvironment
+        client: Client, env: WorkflowEnvironment
 ):
     await _do_update_handler_lock_or_semaphore_test(
         client,
@@ -7119,11 +7152,11 @@ async def test_workflow_deadlock_fill_up_slots(client: Client):
     # This worker used to not be able to shutdown because we hung evictions on
     # deadlock.
     async with new_worker(
-        client,
-        DeadlockFillUpBlockWorkflow,
-        DeadlockFillUpSimpleWorkflow,
-        # Start the worker with CPU count + 10 task slots
-        max_concurrent_workflow_tasks=cpu_count + 10,
+            client,
+            DeadlockFillUpBlockWorkflow,
+            DeadlockFillUpSimpleWorkflow,
+            # Start the worker with CPU count + 10 task slots
+            max_concurrent_workflow_tasks=cpu_count + 10,
     ) as worker:
         # For this test we're going to start cpu_count + 5 workflows that
         # deadlock. In previous SDK versions we defaulted to CPU count
@@ -7223,7 +7256,7 @@ async def test_workflow_eviction_swallow(client: Client):
                     while True:
                         log_record = log_queue.get(block=False)
                         if log_record.message.startswith(
-                            f"Timed out running eviction job for run ID {handle.result_run_id}"
+                                f"Timed out running eviction job for run ID {handle.result_run_id}"
                         ):
                             return
                 except queue.Empty:
@@ -7251,7 +7284,7 @@ async def check_priority_activity(should_have_priorty: int) -> str:
 class WorkflowUsingPriorities:
     @workflow.run
     async def run(
-        self, expected_priority: Optional[int], stop_after_check: bool
+            self, expected_priority: Optional[int], stop_after_check: bool
     ) -> str:
         assert workflow.info().priority.priority_key == expected_priority
         if stop_after_check:
@@ -7283,7 +7316,7 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
         )
 
     async with new_worker(
-        client, WorkflowUsingPriorities, HelloWorkflow, activities=[say_hello]
+            client, WorkflowUsingPriorities, HelloWorkflow, activities=[say_hello]
     ) as worker:
         handle = await client.start_workflow(
             WorkflowUsingPriorities.run,
@@ -7298,27 +7331,27 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
         async for e in handle.fetch_history_events():
             if e.HasField("workflow_execution_started_event_attributes"):
                 assert (
-                    e.workflow_execution_started_event_attributes.priority.priority_key
-                    == 1
+                        e.workflow_execution_started_event_attributes.priority.priority_key
+                        == 1
                 )
             elif e.HasField(
-                "start_child_workflow_execution_initiated_event_attributes"
+                    "start_child_workflow_execution_initiated_event_attributes"
             ):
                 if first_child:
                     assert (
-                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
-                        == 4
+                            e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                            == 4
                     )
                     first_child = False
                 else:
                     assert (
-                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
-                        == 2
+                            e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                            == 2
                     )
             elif e.HasField("activity_task_scheduled_event_attributes"):
                 assert (
-                    e.activity_task_scheduled_event_attributes.priority.priority_key
-                    == 5
+                        e.activity_task_scheduled_event_attributes.priority.priority_key
+                        == 5
                 )
 
         # Verify a workflow started without priorities sees None for the key
@@ -7361,7 +7394,7 @@ async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
             "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2441"
         )
     async with new_worker(
-        client, ExposeRootWorkflow, ExposeRootChildWorkflow
+            client, ExposeRootWorkflow, ExposeRootChildWorkflow
     ) as worker:
         parent_wf_id = f"workflow-{uuid.uuid4()}"
         child_wf_id = parent_wf_id + "_child"
