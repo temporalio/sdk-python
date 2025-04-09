@@ -4,10 +4,11 @@ import asyncio
 import concurrent.futures
 import uuid
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional, Sequence
 
 import pytest
 
+import temporalio.api.enums.v1
 import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
@@ -19,7 +20,7 @@ from temporalio.api.workflowservice.v1 import (
     SetWorkerDeploymentRampingVersionResponse,
 )
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
-from temporalio.common import VersioningBehavior
+from temporalio.common import RawValue, VersioningBehavior
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -729,13 +730,13 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
             await set_ramping_version(client, conflict_token, v2, 0)
         ).conflict_token
         for i in range(3):
-            wf = await client.start_workflow(
+            wfa = await client.start_workflow(
                 DeploymentVersioningWorkflowV1AutoUpgrade.run,
                 id=f"versioning-ramp-0-{i}-{uuid.uuid4()}",
                 task_queue=w1.task_queue,
             )
-            await wf.signal(DeploymentVersioningWorkflowV1AutoUpgrade.do_finish)
-            res = await wf.result()
+            await wfa.signal(DeploymentVersioningWorkflowV1AutoUpgrade.do_finish)
+            res = await wfa.result()
             assert res == "version-v1"
 
         # Set ramp to 50 and eventually verify workflows run on both versions
@@ -757,6 +758,92 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
             assert "version-v1" in seen_results and "version-v2" in seen_results
 
         await assert_eventually(check_results)
+
+
+@workflow.defn(dynamic=True)
+class DynamicWorkflowVersioningOnRun:
+    @workflow.run(versioning_behavior=VersioningBehavior.PINNED)
+    async def run(self, args: Sequence[RawValue]) -> str:
+        return "dynamic"
+
+
+@workflow.defn(dynamic=True)
+class DynamicWorkflowVersioningWithGetter:
+    @workflow.run
+    async def run(self, args: Sequence[RawValue]) -> str:
+        return "dynamic"
+
+    @workflow.dynamic_versioning_behavior
+    def huh(self) -> VersioningBehavior:
+        return VersioningBehavior.PINNED
+
+
+async def _test_dynamic_workflow_versioning(
+    client: Client, workflow_class, expected_versioning_behavior
+):
+    deployment_name = f"deployment-dynamic-{uuid.uuid4()}"
+    worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+
+    async with new_worker(
+        client,
+        workflow_class,
+        deployment_options=WorkerDeploymentOptions(
+            version=worker_v1,
+            use_worker_versioning=True,
+        ),
+    ) as w:
+        describe_resp = await wait_until_worker_deployment_visible(
+            client,
+            worker_v1,
+        )
+        await set_current_deployment_version(
+            client, describe_resp.conflict_token, worker_v1
+        )
+
+        wf = await client.start_workflow(
+            "cooldynamicworkflow",
+            id=f"dynamic-workflow-versioning-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        result = await wf.result()
+        assert result == "dynamic"
+
+        history = await wf.fetch_history()
+        assert any(
+            event.HasField("workflow_task_completed_event_attributes")
+            and event.workflow_task_completed_event_attributes.versioning_behavior
+            == expected_versioning_behavior
+            for event in history.events
+        )
+
+
+async def test_worker_deployment_dynamic_workflow_on_run(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    await _test_dynamic_workflow_versioning(
+        client,
+        DynamicWorkflowVersioningOnRun,
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
+    )
+
+
+async def test_worker_deployment_dynamic_workflow_getter(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    await _test_dynamic_workflow_versioning(
+        client,
+        DynamicWorkflowVersioningWithGetter,
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
+    )
+
+
+# TODO: Test for fail at registration time if deployment versioning on, no default, no behavior
 
 
 async def wait_until_worker_deployment_visible(
