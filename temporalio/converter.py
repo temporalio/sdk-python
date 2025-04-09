@@ -1517,7 +1517,9 @@ def value_to_type(
             # We do not check whether field is required here. Rather, we let the
             # attempted instantiation of the dataclass raise if a field is
             # missing
-            if field_value is not dataclasses.MISSING and not field.metadata.get("skip", False) :
+            if field_value is not dataclasses.MISSING and not field.metadata.get(
+                "skip", False
+            ):
                 try:
                     field_values[field.name] = value_to_type(
                         field_hints[field.name], field_value, custom_converters
