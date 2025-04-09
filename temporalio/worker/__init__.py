@@ -42,7 +42,12 @@ from ._tuning import (
     WorkerTuner,
     WorkflowSlotInfo,
 )
-from ._worker import Worker, WorkerConfig
+from ._worker import (
+    Worker,
+    WorkerConfig,
+    WorkerDeploymentOptions,
+    WorkerDeploymentVersion,
+)
 from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
     WorkflowInstance,
@@ -54,6 +59,8 @@ __all__ = [
     # Primary types
     "Worker",
     "WorkerConfig",
+    "WorkerDeploymentOptions",
+    "WorkerDeploymentVersion",
     "Replayer",
     "ReplayerConfig",
     "WorkflowReplayResult",

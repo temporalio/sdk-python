@@ -139,18 +139,40 @@ impl ClientRef {
                 "delete_schedule" => {
                     rpc_call!(retry_client, call, delete_schedule)
                 }
+                "delete_worker_deployment" => {
+                    rpc_call!(retry_client, call, delete_worker_deployment)
+                }
+                "delete_worker_deployment_version" => {
+                    rpc_call!(retry_client, call, delete_worker_deployment_version)
+                }
                 "delete_workflow_execution" => {
                     rpc_call!(retry_client, call, delete_workflow_execution)
+                }
+                "describe_batch_operation" => {
+                    rpc_call!(retry_client, call, describe_batch_operation)
+                }
+                "describe_deployment" => {
+                    rpc_call!(retry_client, call, describe_deployment)
                 }
                 "deprecate_namespace" => rpc_call!(retry_client, call, deprecate_namespace),
                 "describe_namespace" => rpc_call!(retry_client, call, describe_namespace),
                 "describe_schedule" => rpc_call!(retry_client, call, describe_schedule),
                 "describe_task_queue" => rpc_call!(retry_client, call, describe_task_queue),
+                "describe_worker_deployment" => {
+                    rpc_call!(retry_client, call, describe_worker_deployment)
+                }
+                "describe_worker_deployment_version" => {
+                    rpc_call!(retry_client, call, describe_worker_deployment_version)
+                }
                 "describe_workflow_execution" => {
                     rpc_call!(retry_client, call, describe_workflow_execution)
                 }
                 "execute_multi_operation" => rpc_call!(retry_client, call, execute_multi_operation),
                 "get_cluster_info" => rpc_call!(retry_client, call, get_cluster_info),
+                "get_current_deployment" => rpc_call!(retry_client, call, get_current_deployment),
+                "get_deployment_reachability" => {
+                    rpc_call!(retry_client, call, get_deployment_reachability)
+                }
                 "get_search_attributes" => {
                     rpc_call!(retry_client, call, get_search_attributes)
                 }
@@ -176,6 +198,9 @@ impl ClientRef {
                 "list_closed_workflow_executions" => {
                     rpc_call!(retry_client, call, list_closed_workflow_executions)
                 }
+                "list_deployments" => {
+                    rpc_call!(retry_client, call, list_deployments)
+                }
                 "list_namespaces" => rpc_call!(retry_client, call, list_namespaces),
                 "list_open_workflow_executions" => {
                     rpc_call!(retry_client, call, list_open_workflow_executions)
@@ -188,6 +213,9 @@ impl ClientRef {
                 }
                 "list_task_queue_partitions" => {
                     rpc_call!(retry_client, call, list_task_queue_partitions)
+                }
+                "list_worker_deployments" => {
+                    rpc_call!(retry_client, call, list_worker_deployments)
                 }
                 "list_workflow_executions" => {
                     rpc_call!(retry_client, call, list_workflow_executions)
@@ -258,6 +286,18 @@ impl ClientRef {
                 "scan_workflow_executions" => {
                     rpc_call!(retry_client, call, scan_workflow_executions)
                 }
+                "set_current_deployment" => {
+                    rpc_call!(retry_client, call, set_current_deployment)
+                }
+                "set_worker_deployment_current_version" => {
+                    rpc_call!(retry_client, call, set_worker_deployment_current_version)
+                }
+                "set_worker_deployment_ramping_version" => {
+                    rpc_call!(retry_client, call, set_worker_deployment_ramping_version)
+                }
+                "shutdown_worker" => {
+                    rpc_call!(retry_client, call, shutdown_worker)
+                }
                 "signal_with_start_workflow_execution" => {
                     rpc_call!(retry_client, call, signal_with_start_workflow_execution)
                 }
@@ -274,6 +314,13 @@ impl ClientRef {
                     rpc_call_on_trait!(retry_client, call, WorkflowService, update_namespace)
                 }
                 "update_schedule" => rpc_call!(retry_client, call, update_schedule),
+                "update_worker_deployment_version_metadata" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        update_worker_deployment_version_metadata
+                    )
+                }
                 "update_workflow_execution" => {
                     rpc_call!(retry_client, call, update_workflow_execution)
                 }
