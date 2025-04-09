@@ -2248,7 +2248,8 @@ T = typing.TypeVar('T')
 
 @dataclass
 class MyGenericDataClass(typing.Generic[T]):
-    field1: T
+    field1: str
+    field2: T = dataclasses.field(metadata={"skip": True}, default=None)
 
     def assert_expected(self) -> None:
         # Part of the assertion is that this is the right type, which is
@@ -2325,18 +2326,19 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
                 start_to_close_timeout=timedelta(seconds=30),
             )
             param.assert_expected()
-            param = await workflow.execute_activity(
+            generic_param = MyGenericDataClass[str]("some value2")
+            generic_param = await workflow.execute_activity(
                 generic_data_class_typed_activity,
-                param,
+                generic_param,
                 start_to_close_timeout=timedelta(seconds=30),
             )
-            param.assert_expected()
-            param = await workflow.execute_local_activity(
+            generic_param.assert_expected()
+            generic_param = await workflow.execute_local_activity(
                 generic_data_class_typed_activity,
-                param,
+                generic_param,
                 start_to_close_timeout=timedelta(seconds=30),
             )
-            param.assert_expected()
+            generic_param.assert_expected()
 
             child_handle = await workflow.start_child_workflow(
                 DataClassTypedWorkflow.run,

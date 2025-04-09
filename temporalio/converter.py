@@ -1496,35 +1496,40 @@ def value_to_type(
         return ret_dict
 
     # Dataclass
-    if dataclasses.is_dataclass(hint):
+    h = hint if dataclasses.is_dataclass(hint) else None
+    # This allows for generic dataclasses to be passed in.
+    # Note that the field of a generic parameter type is still not deserializable.
+    # Such fields must be marked with dataclasses.field(metadata={"skip": True}, default=...).
+    h = origin if h is None and dataclasses.is_dataclass(origin) else h
+    if h is not None:
         if not isinstance(value, dict):
             raise TypeError(
-                f"Cannot convert to dataclass {hint}, value is {type(value)} not dict"
+                f"Cannot convert to dataclass {h}, value is {type(value)} not dict"
             )
         # Obtain dataclass fields and check that all dict fields are there and
         # that no required fields are missing. Unknown fields are silently
         # ignored.
-        fields = dataclasses.fields(hint)
-        field_hints = get_type_hints(hint)
+        fields = dataclasses.fields(h)
+        field_hints = get_type_hints(h)
         field_values = {}
         for field in fields:
             field_value = value.get(field.name, dataclasses.MISSING)
             # We do not check whether field is required here. Rather, we let the
             # attempted instantiation of the dataclass raise if a field is
             # missing
-            if field_value is not dataclasses.MISSING:
+            if field_value is not dataclasses.MISSING and not field.metadata.get("skip", False) :
                 try:
                     field_values[field.name] = value_to_type(
                         field_hints[field.name], field_value, custom_converters
                     )
                 except Exception as err:
                     raise TypeError(
-                        f"Failed converting field {field.name} on dataclass {hint}"
+                        f"Failed converting field {field.name} on dataclass {h}"
                     ) from err
         # Simply instantiate the dataclass. This will fail as expected when
         # missing required fields.
         # TODO(cretz): Want way to convert snake case to camel case?
-        return hint(**field_values)
+        return h(**field_values)
 
     # Pydantic model instance
     # Pydantic users should use Pydantic v2 with
