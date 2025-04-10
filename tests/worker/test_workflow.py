@@ -6932,8 +6932,9 @@ class TimeoutErrorWorkflow:
         elif scenario == "asyncio.wait_for":
             await asyncio.wait_for(asyncio.sleep(1000), timeout=0.01)
         elif scenario == "asyncio.timeout":
-            async with asyncio.timeout(0.1):
-                await asyncio.sleep(1000)
+            if sys.version_info >= (3, 11):
+                async with asyncio.timeout(0.1):
+                    await asyncio.sleep(1000)
         else:
             raise RuntimeError("Unrecognized scenario")
 
