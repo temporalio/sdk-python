@@ -56,6 +56,8 @@ class _ResetReapplyExcludeTypeEnumTypeWrapper(
     """Exclude updates when reapplying events beyond the reset point."""
     RESET_REAPPLY_EXCLUDE_TYPE_NEXUS: _ResetReapplyExcludeType.ValueType  # 3
     """Exclude nexus events when reapplying events beyond the reset point."""
+    RESET_REAPPLY_EXCLUDE_TYPE_CANCEL_REQUEST: _ResetReapplyExcludeType.ValueType  # 4
+    """Deprecated, unimplemented option."""
 
 class ResetReapplyExcludeType(
     _ResetReapplyExcludeType, metaclass=_ResetReapplyExcludeTypeEnumTypeWrapper
@@ -69,6 +71,8 @@ RESET_REAPPLY_EXCLUDE_TYPE_UPDATE: ResetReapplyExcludeType.ValueType  # 2
 """Exclude updates when reapplying events beyond the reset point."""
 RESET_REAPPLY_EXCLUDE_TYPE_NEXUS: ResetReapplyExcludeType.ValueType  # 3
 """Exclude nexus events when reapplying events beyond the reset point."""
+RESET_REAPPLY_EXCLUDE_TYPE_CANCEL_REQUEST: ResetReapplyExcludeType.ValueType  # 4
+"""Deprecated, unimplemented option."""
 global___ResetReapplyExcludeType = ResetReapplyExcludeType
 
 class _ResetReapplyType:

@@ -73,7 +73,7 @@ class WorkflowIdReusePolicy(
     _WorkflowIdReusePolicy, metaclass=_WorkflowIdReusePolicyEnumTypeWrapper
 ):
     """Defines whether to allow re-using a workflow id from a previously *closed* workflow.
-    If the request is denied, a `WorkflowExecutionAlreadyStartedFailure` is returned.
+    If the request is denied, the server returns a `WorkflowExecutionAlreadyStartedFailure` error.
 
     See `WorkflowIdConflictPolicy` for handling workflow id duplication with a *running* workflow.
     """
@@ -369,3 +369,99 @@ TIMEOUT_TYPE_SCHEDULE_TO_START: TimeoutType.ValueType  # 2
 TIMEOUT_TYPE_SCHEDULE_TO_CLOSE: TimeoutType.ValueType  # 3
 TIMEOUT_TYPE_HEARTBEAT: TimeoutType.ValueType  # 4
 global___TimeoutType = TimeoutType
+
+class _VersioningBehavior:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _VersioningBehaviorEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _VersioningBehavior.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    VERSIONING_BEHAVIOR_UNSPECIFIED: _VersioningBehavior.ValueType  # 0
+    """Workflow execution does not have a Versioning Behavior and is called Unversioned. This is the
+    legacy behavior. An Unversioned workflow's task can go to any Unversioned worker (see
+    `WorkerVersioningMode`.)
+    User needs to use Patching to keep the new code compatible with prior versions when dealing
+    with Unversioned workflows.
+    """
+    VERSIONING_BEHAVIOR_PINNED: _VersioningBehavior.ValueType  # 1
+    """Workflow will start on the Current Deployment Version of its Task Queue, and then
+    will be pinned to that same Deployment Version until completion (the Version that
+    this Workflow is pinned to is specified in `versioning_info.version`).
+    This behavior eliminates most of compatibility concerns users face when changing their code.
+    Patching is not needed when pinned workflows code change.
+    Can be overridden explicitly via `UpdateWorkflowExecutionOptions` API to move the
+    execution to another Deployment Version.
+    Activities of `PINNED` workflows are sent to the same Deployment Version. Exception to this
+    would be when the activity Task Queue workers are not present in the workflow's Deployment
+    Version, in which case the activity will be sent to the Current Deployment Version of its own
+    task queue.
+    """
+    VERSIONING_BEHAVIOR_AUTO_UPGRADE: _VersioningBehavior.ValueType  # 2
+    """Workflow will automatically move to the Current Deployment Version of its Task Queue when the
+    next workflow task is dispatched.
+    AutoUpgrade behavior is suitable for long-running workflows as it allows them to move to the
+    latest Deployment Version, but the user still needs to use Patching to keep the new code
+    compatible with prior versions for changed workflow types.
+    Activities of `AUTO_UPGRADE` workflows are sent to the Deployment Version of the workflow
+    execution (as specified in versioning_info.version based on the last completed
+    workflow task). Exception to this would be when the activity Task Queue workers are not
+    present in the workflow's Deployment Version, in which case, the activity will be sent to a
+    different Deployment Version according to the Current Deployment Version of its own task
+    queue.
+    Workflows stuck on a backlogged activity will still auto-upgrade if the Current Deployment
+    Version of their Task Queue changes, without having to wait for the backlogged activity to
+    complete on the old Version.
+    """
+
+class VersioningBehavior(
+    _VersioningBehavior, metaclass=_VersioningBehaviorEnumTypeWrapper
+):
+    """Versioning Behavior specifies if and how a workflow execution moves between Worker Deployment
+    Versions. The Versioning Behavior of a workflow execution is typically specified by the worker
+    who completes the first task of the execution, but is also overridable manually for new and
+    existing workflows (see VersioningOverride).
+    Experimental. Worker Deployments are experimental and might significantly change in the future.
+    """
+
+VERSIONING_BEHAVIOR_UNSPECIFIED: VersioningBehavior.ValueType  # 0
+"""Workflow execution does not have a Versioning Behavior and is called Unversioned. This is the
+legacy behavior. An Unversioned workflow's task can go to any Unversioned worker (see
+`WorkerVersioningMode`.)
+User needs to use Patching to keep the new code compatible with prior versions when dealing
+with Unversioned workflows.
+"""
+VERSIONING_BEHAVIOR_PINNED: VersioningBehavior.ValueType  # 1
+"""Workflow will start on the Current Deployment Version of its Task Queue, and then
+will be pinned to that same Deployment Version until completion (the Version that
+this Workflow is pinned to is specified in `versioning_info.version`).
+This behavior eliminates most of compatibility concerns users face when changing their code.
+Patching is not needed when pinned workflows code change.
+Can be overridden explicitly via `UpdateWorkflowExecutionOptions` API to move the
+execution to another Deployment Version.
+Activities of `PINNED` workflows are sent to the same Deployment Version. Exception to this
+would be when the activity Task Queue workers are not present in the workflow's Deployment
+Version, in which case the activity will be sent to the Current Deployment Version of its own
+task queue.
+"""
+VERSIONING_BEHAVIOR_AUTO_UPGRADE: VersioningBehavior.ValueType  # 2
+"""Workflow will automatically move to the Current Deployment Version of its Task Queue when the
+next workflow task is dispatched.
+AutoUpgrade behavior is suitable for long-running workflows as it allows them to move to the
+latest Deployment Version, but the user still needs to use Patching to keep the new code
+compatible with prior versions for changed workflow types.
+Activities of `AUTO_UPGRADE` workflows are sent to the Deployment Version of the workflow
+execution (as specified in versioning_info.version based on the last completed
+workflow task). Exception to this would be when the activity Task Queue workers are not
+present in the workflow's Deployment Version, in which case, the activity will be sent to a
+different Deployment Version according to the Current Deployment Version of its own task
+queue.
+Workflows stuck on a backlogged activity will still auto-upgrade if the Current Deployment
+Version of their Task Queue changes, without having to wait for the backlogged activity to
+complete on the old Version.
+"""
+global___VersioningBehavior = VersioningBehavior

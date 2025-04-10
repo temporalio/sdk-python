@@ -149,6 +149,7 @@ class Start(google.protobuf.message.Message):
     START_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
     HEARTBEAT_TIMEOUT_FIELD_NUMBER: builtins.int
     RETRY_POLICY_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     IS_LOCAL_FIELD_NUMBER: builtins.int
     workflow_namespace: builtins.str
     """The namespace the workflow lives in"""
@@ -208,6 +209,9 @@ class Start(google.protobuf.message.Message):
         (or not) during activity scheduling as the service can override the provided one in case its
         values are not specified or exceed configured system limits.
         """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority of this activity. Local activities will always have this field set to the default."""
     is_local: builtins.bool
     """Set to true if this is a local activity. Note that heartbeating does not apply to local
     activities.
@@ -240,6 +244,7 @@ class Start(google.protobuf.message.Message):
         start_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         heartbeat_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         is_local: builtins.bool = ...,
     ) -> None: ...
     def HasField(
@@ -249,6 +254,8 @@ class Start(google.protobuf.message.Message):
             b"current_attempt_scheduled_time",
             "heartbeat_timeout",
             b"heartbeat_timeout",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -284,6 +291,8 @@ class Start(google.protobuf.message.Message):
             b"input",
             "is_local",
             b"is_local",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",

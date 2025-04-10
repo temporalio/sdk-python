@@ -5,9 +5,11 @@ import dataclasses
 import json
 import logging
 import logging.handlers
+import os
 import queue
 import sys
 import threading
+import time
 import typing
 import uuid
 from abc import ABC, abstractmethod
@@ -64,6 +66,7 @@ from temporalio.client import (
     WorkflowUpdateStage,
 )
 from temporalio.common import (
+    Priority,
     RawValue,
     RetryPolicy,
     SearchAttributeKey,
@@ -99,7 +102,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
 )
-from temporalio.service import RPCError, RPCStatusCode, __version__
+from temporalio.service import __version__
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     UnsandboxedWorkflowRunner,
@@ -111,6 +114,9 @@ from temporalio.worker import (
 from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
+    assert_eventually,
+    assert_task_fail_eventually,
+    assert_workflow_exists_eventually,
     ensure_search_attributes_present,
     find_free_port,
     new_worker,
@@ -222,7 +228,7 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         assert info["retry_policy"] == json.loads(
             json.dumps(dataclasses.asdict(retry_policy), default=str)
         )
-        assert uuid.UUID(info["run_id"]).version == 4
+        assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
         datetime.fromisoformat(info["start_time"])
         assert info["task_queue"] == worker.task_queue
@@ -1125,26 +1131,9 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
             task_queue=worker.task_queue,
         )
 
-        # Wait until child started
-        async def child_started() -> bool:
-            try:
-                return await handle.query(
-                    CancelChildWorkflow.ready
-                ) and await client.get_workflow_handle_for(
-                    LongSleepWorkflow.run,  # type: ignore[arg-type]
-                    workflow_id=f"{handle.id}_child",
-                ).query(LongSleepWorkflow.started)
-            except RPCError as err:
-                # Ignore not-found or failed precondition because child may
-                # not have started yet
-                if (
-                    err.status == RPCStatusCode.NOT_FOUND
-                    or err.status == RPCStatusCode.FAILED_PRECONDITION
-                ):
-                    return False
-                raise
-
-        await assert_eq_eventually(True, child_started)
+        await assert_workflow_exists_eventually(
+            client, LongSleepWorkflow.run, f"{handle.id}_child"
+        )
         # Send cancel signal and wait on the handle
         await handle.signal(CancelChildWorkflow.cancel_child)
         with pytest.raises(WorkflowFailureError) as err:
@@ -1497,7 +1486,7 @@ async def test_workflow_with_codec(client: Client, env: WorkflowEnvironment):
     await test_workflow_signal_and_query(client)
     await test_workflow_signal_and_query_errors(client)
     await test_workflow_simple_activity(client)
-    await test_workflow_update_handlers_happy(client, env)
+    await test_workflow_update_handlers_happy(client)
 
 
 class PassThroughCodec(PayloadCodec):
@@ -4273,11 +4262,7 @@ class UpdateHandlersWorkflow:
             raise RuntimeError("intentional failure")
 
 
-async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_handlers_happy(client: Client):
     async with new_worker(
         client, UpdateHandlersWorkflow, activities=[say_hello]
     ) as worker:
@@ -4319,13 +4304,7 @@ async def test_workflow_update_handlers_happy(client: Client, env: WorkflowEnvir
         )
 
 
-async def test_workflow_update_handlers_unhappy(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_handlers_unhappy(client: Client):
     async with new_worker(client, UpdateHandlersWorkflow) as worker:
         handle = await client.start_workflow(
             UpdateHandlersWorkflow.run,
@@ -4398,11 +4377,7 @@ async def test_workflow_update_handlers_unhappy(
         assert "Rejected" == err.value.cause.message
 
 
-async def test_workflow_update_task_fails(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_task_fails(client: Client):
     # Need to not sandbox so behavior can change based on globals
     async with new_worker(
         client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
@@ -4498,13 +4473,7 @@ class ImmediatelyCompleteUpdateAndWorkflow:
         return self._got_update
 
 
-async def test_workflow_update_before_worker_start(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_before_worker_start(client: Client):
     # In order to confirm that all started workflows get updates before the
     # workflow completes, this test will start a workflow and start an update.
     # Only then will it start the worker to process both in the task. The
@@ -4572,13 +4541,7 @@ class UpdateSeparateHandleWorkflow:
         self._complete_update = True
 
 
-async def test_workflow_update_separate_handle(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_update_separate_handle(client: Client):
     async with new_worker(client, UpdateSeparateHandleWorkflow) as worker:
         # Start the workflow
         handle = await client.start_workflow(
@@ -4620,14 +4583,7 @@ class UpdateTimeoutOrCancelWorkflow:
         await asyncio.sleep(sleep)
 
 
-async def test_workflow_update_timeout_or_cancel(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
-
+async def test_workflow_update_timeout_or_cancel(client: Client):
     # Confirm start timeout via short timeout on update w/ no worker running
     handle = await client.start_workflow(
         UpdateTimeoutOrCancelWorkflow.run,
@@ -4917,14 +4873,7 @@ class FailureTypesConfiguredInheritedWorkflow(FailureTypesWorkflowBase):
         await super().run(scenario)
 
 
-async def test_workflow_failure_types_configured(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
-
+async def test_workflow_failure_types_configured(client: Client):
     # Asserter for a single scenario
     async def assert_scenario(
         workflow: Type[FailureTypesWorkflowBase],
@@ -5305,11 +5254,7 @@ class CurrentUpdateWorkflow:
         return info.id
 
 
-async def test_workflow_current_update(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_workflow_current_update(client: Client):
     async with new_worker(client, CurrentUpdateWorkflow) as worker:
         handle = await client.start_workflow(
             CurrentUpdateWorkflow.run,
@@ -5386,12 +5331,7 @@ class UnfinishedHandlersWarningsWorkflow:
         await self._do_update_or_signal()
 
 
-async def test_unfinished_update_handler(client: Client, env: WorkflowEnvironment):
-    skip_unfinished_handler_tests_in_older_python()
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
+async def test_unfinished_update_handler(client: Client):
     async with new_worker(client, UnfinishedHandlersWarningsWorkflow) as worker:
         test = _UnfinishedHandlersWarningsTest(client, worker, "update")
         await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
@@ -5639,11 +5579,11 @@ async def test_unfinished_handler_on_workflow_termination(
         "-cancellation-", "-failure-", "-continue-as-new-"
     ],
 ):
-    skip_unfinished_handler_tests_in_older_python()
-    if handler_type == "-update-" and env.supports_time_skipping:
+    if env.supports_time_skipping:
         pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
+            "Issues with update: https://github.com/temporalio/sdk-python/issues/826"
         )
+    skip_unfinished_handler_tests_in_older_python()
     await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         handler_type,
@@ -5857,12 +5797,7 @@ class UpdateCompletionIsHonoredWhenAfterWorkflowReturn1Workflow:
 
 async def test_update_completion_is_honored_when_after_workflow_return_1(
     client: Client,
-    env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
     update_id = "my-update"
     task_queue = "tq"
     wf_handle = await client.start_workflow(
@@ -5915,10 +5850,6 @@ async def test_update_completion_is_honored_when_after_workflow_return_2(
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
-        )
     async with Worker(
         client,
         task_queue="tq",
@@ -6991,6 +6922,7 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
         ),
     )
 
+
 @workflow.defn
 class TimeoutErrorWorkflow:
     @workflow.run
@@ -7021,3 +6953,415 @@ async def test_workflow_timeout_error(client: Client):
                 )
             assert isinstance(err.value.cause, ApplicationError)
             assert err.value.cause.type == "TimeoutError"
+
+
+def check_in_workflow() -> str:
+    return "in workflow" if workflow.in_workflow() else "not in workflow"
+
+
+@workflow.defn
+class InWorkflowUtilWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return check_in_workflow()
+
+
+async def test_in_workflow_util(client: Client):
+    assert check_in_workflow() == "not in workflow"
+    async with new_worker(client, InWorkflowUtilWorkflow) as worker:
+        assert "in workflow" == await client.execute_workflow(
+            InWorkflowUtilWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
+deadlock_interruptible_completed = 0
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockInterruptibleWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Infinite loop, which is interruptible via PyThreadState_SetAsyncExc
+        try:
+            while True:
+                pass
+        finally:
+            global deadlock_interruptible_completed
+            deadlock_interruptible_completed += 1
+
+
+async def test_workflow_deadlock_interruptible(client: Client):
+    # TODO(cretz): Improve this test and other deadlock/eviction tests by
+    # checking slot counts with Core. There are a couple of bugs where used slot
+    # counts are off by one and slots are released before eviction (see
+    # https://github.com/temporalio/sdk-core/issues/894).
+
+    # This worker used to not be able to shutdown because we hung evictions on
+    # deadlock
+    async with new_worker(client, DeadlockInterruptibleWorkflow) as worker:
+        # Start the workflow
+        assert deadlock_interruptible_completed == 0
+        handle = await client.start_workflow(
+            DeadlockInterruptibleWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait for task fail
+        await assert_task_fail_eventually(handle, message_contains="deadlock")
+
+        # Confirm workflow was interrupted
+        async def check_completed():
+            assert deadlock_interruptible_completed >= 1
+
+        await assert_eventually(check_completed)
+        completed_sec = time.monotonic()
+    # Confirm worker shutdown didn't hang
+    assert time.monotonic() - completed_sec < 20
+
+
+deadlock_uninterruptible_event = threading.Event()
+deadlock_uninterruptible_completed = 0
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockUninterruptibleWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Wait on event, which is not interruptible via PyThreadState_SetAsyncExc
+        try:
+            deadlock_uninterruptible_event.wait()
+        finally:
+            global deadlock_uninterruptible_completed
+            deadlock_uninterruptible_completed += 1
+
+
+async def test_workflow_deadlock_uninterruptible(client: Client):
+    # This worker used to not be able to shutdown because we hung evictions on
+    # deadlock
+    async with new_worker(client, DeadlockUninterruptibleWorkflow) as worker:
+        # Start the workflow
+        assert deadlock_uninterruptible_completed == 0
+        handle = await client.start_workflow(
+            DeadlockUninterruptibleWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait for task fail
+        await assert_task_fail_eventually(handle, message_contains="deadlock")
+        # Confirm could not be interrupted
+        assert deadlock_uninterruptible_completed == 0
+
+        # Now complete the event and confirm the workflow does complete
+        deadlock_uninterruptible_event.set()
+
+        async def check_completed():
+            assert deadlock_uninterruptible_completed >= 1
+
+        await assert_eventually(check_completed)
+        completed_sec = time.monotonic()
+    # Confirm worker shutdown didn't hang
+    assert time.monotonic() - completed_sec < 20
+
+
+deadlock_fill_up_block_event = threading.Event()
+deadlock_fill_up_block_completed = 0
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockFillUpBlockWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            deadlock_fill_up_block_event.wait()
+        finally:
+            global deadlock_fill_up_block_completed
+            deadlock_fill_up_block_completed += 1
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockFillUpSimpleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "done"
+
+
+async def test_workflow_deadlock_fill_up_slots(client: Client):
+    cpu_count = os.cpu_count()
+    assert cpu_count
+    # This worker used to not be able to shutdown because we hung evictions on
+    # deadlock.
+    async with new_worker(
+        client,
+        DeadlockFillUpBlockWorkflow,
+        DeadlockFillUpSimpleWorkflow,
+        # Start the worker with CPU count + 10 task slots
+        max_concurrent_workflow_tasks=cpu_count + 10,
+    ) as worker:
+        # For this test we're going to start cpu_count + 5 workflows that
+        # deadlock. In previous SDK versions we defaulted to CPU count
+        # number of workflow threads, so deadlocking that many would prevent
+        # other code from executing. Now that we default to more workers, we
+        # can handle more work while some are deadlocked.
+
+        # Start the workflows that deadlock
+        assert deadlock_fill_up_block_completed == 0
+        handles = await asyncio.gather(
+            *[
+                client.start_workflow(
+                    DeadlockFillUpBlockWorkflow.run,
+                    id=f"workflow-deadlock-{i}-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                for i in range(cpu_count + 5)
+            ]
+        )
+
+        # Wait for them all to deadlock
+        await asyncio.gather(
+            *[
+                assert_task_fail_eventually(h, message_contains="deadlock")
+                for h in handles
+            ]
+        )
+
+        # Now try to run a regular non-deadlocked workflow. Before recent
+        # changes, this would also cause a deadlock because it would submit
+        # to the thread pool but the thread pool didn't have enough room.
+        assert "done" == await asyncio.wait_for(
+            client.execute_workflow(
+                DeadlockFillUpSimpleWorkflow.run,
+                id=f"workflow-simple-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            ),
+            10,
+        )
+
+        # Let the deadlocked ones complete too
+        deadlock_fill_up_block_event.set()
+
+        async def check_completed():
+            assert deadlock_fill_up_block_completed >= len(handles)
+
+        await assert_eventually(check_completed)
+        completed_sec = time.monotonic()
+    # Confirm worker shutdown didn't hang
+    assert time.monotonic() - completed_sec < 20
+
+
+eviction_swallow_keep_looping = True
+
+
+@workflow.defn(sandboxed=False)
+class EvictionSwallowWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Start a task in the background that will prevent eviction because
+        # eviction requires all tasks complete
+        async def eviction_swallower():
+            global eviction_swallow_keep_looping
+            while eviction_swallow_keep_looping:
+                try:
+                    await workflow.wait_condition(lambda: False)
+                except BaseException:
+                    # Swallow base exception intentionally which prevents
+                    # eviction
+                    pass
+
+        asyncio.create_task(eviction_swallower())
+        return "done"
+
+
+async def test_workflow_eviction_swallow(client: Client):
+    # Add a queue handler to all logging, and remove later
+    log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
+    log_handler = logging.handlers.QueueHandler(log_queue)
+    logging.getLogger().addHandler(log_handler)
+    try:
+        async with new_worker(client, EvictionSwallowWorkflow) as worker:
+            global eviction_swallow_keep_looping
+            assert eviction_swallow_keep_looping
+
+            # Run workflow that completes but cannot evict
+            handle = await client.start_workflow(
+                EvictionSwallowWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert "done" == await handle.result()
+
+            # Make sure we get the log we expect
+            async def check_logs():
+                try:
+                    while True:
+                        log_record = log_queue.get(block=False)
+                        if log_record.message.startswith(
+                            f"Timed out running eviction job for run ID {handle.result_run_id}"
+                        ):
+                            return
+                except queue.Empty:
+                    pass
+                assert False, "log record not found"
+
+            await assert_eventually(check_logs)
+
+            # Let it finish now
+            eviction_swallow_keep_looping = False
+            completed_sec = time.monotonic()
+        # Confirm worker shutdown didn't hang
+        assert time.monotonic() - completed_sec < 20
+    finally:
+        logging.getLogger().removeHandler(log_handler)
+
+
+@activity.defn
+async def check_priority_activity(should_have_priorty: int) -> str:
+    assert activity.info().priority.priority_key == should_have_priorty
+    return "Done!"
+
+
+@workflow.defn
+class WorkflowUsingPriorities:
+    @workflow.run
+    async def run(
+        self, expected_priority: Optional[int], stop_after_check: bool
+    ) -> str:
+        assert workflow.info().priority.priority_key == expected_priority
+        if stop_after_check:
+            return "Done!"
+        await workflow.execute_child_workflow(
+            WorkflowUsingPriorities.run,
+            args=[4, True],
+            priority=Priority(priority_key=4),
+        )
+        handle = await workflow.start_child_workflow(
+            WorkflowUsingPriorities.run,
+            args=[2, True],
+            priority=Priority(priority_key=2),
+        )
+        await handle
+        await workflow.execute_activity(
+            say_hello,
+            "hi",
+            priority=Priority(priority_key=5),
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+        return "Done!"
+
+
+async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2453"
+        )
+
+    async with new_worker(
+        client, WorkflowUsingPriorities, HelloWorkflow, activities=[say_hello]
+    ) as worker:
+        handle = await client.start_workflow(
+            WorkflowUsingPriorities.run,
+            args=[1, False],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            priority=Priority(priority_key=1),
+        )
+        await handle.result()
+
+        first_child = True
+        async for e in handle.fetch_history_events():
+            if e.HasField("workflow_execution_started_event_attributes"):
+                assert (
+                    e.workflow_execution_started_event_attributes.priority.priority_key
+                    == 1
+                )
+            elif e.HasField(
+                "start_child_workflow_execution_initiated_event_attributes"
+            ):
+                if first_child:
+                    assert (
+                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                        == 4
+                    )
+                    first_child = False
+                else:
+                    assert (
+                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
+                        == 2
+                    )
+            elif e.HasField("activity_task_scheduled_event_attributes"):
+                assert (
+                    e.activity_task_scheduled_event_attributes.priority.priority_key
+                    == 5
+                )
+
+        # Verify a workflow started without priorities sees None for the key
+        handle = await client.start_workflow(
+            WorkflowUsingPriorities.run,
+            args=[None, True],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+
+
+@workflow.defn
+class ExposeRootChildWorkflow:
+    def __init__(self) -> None:
+        self.blocked = True
+
+    @workflow.signal
+    def unblock(self) -> None:
+        self.blocked = False
+
+    @workflow.run
+    async def run(self) -> Optional[temporalio.workflow.RootInfo]:
+        await workflow.wait_condition(lambda: not self.blocked)
+        return workflow.info().root
+
+
+@workflow.defn
+class ExposeRootWorkflow:
+    @workflow.run
+    async def run(self, child_wf_id) -> Optional[temporalio.workflow.RootInfo]:
+        return await workflow.execute_child_workflow(
+            ExposeRootChildWorkflow.run, id=child_wf_id
+        )
+
+
+async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2441"
+        )
+    async with new_worker(
+        client, ExposeRootWorkflow, ExposeRootChildWorkflow
+    ) as worker:
+        parent_wf_id = f"workflow-{uuid.uuid4()}"
+        child_wf_id = parent_wf_id + "_child"
+        handle = await client.start_workflow(
+            ExposeRootWorkflow.run,
+            child_wf_id,
+            id=parent_wf_id,
+            task_queue=worker.task_queue,
+        )
+
+        await assert_workflow_exists_eventually(
+            client, ExposeRootChildWorkflow, child_wf_id
+        )
+        child_handle: WorkflowHandle = client.get_workflow_handle_for(
+            ExposeRootChildWorkflow.run, child_wf_id
+        )
+        child_desc = await child_handle.describe()
+        parent_desc = await handle.describe()
+        # Assert child root execution is the same as it's parent execution
+        assert child_desc.root_id == parent_desc.id
+        assert child_desc.root_run_id == parent_desc.run_id
+        # Unblock child
+        await child_handle.signal(ExposeRootChildWorkflow.unblock)
+        # Get the result (child info)
+        child_wf_info_root = await handle.result()
+        # Assert root execution in child info is same as it's parent execution
+        assert child_wf_info_root is not None
+        assert child_wf_info_root.workflow_id == parent_desc.id
+        assert child_wf_info_root.run_id == parent_desc.run_id

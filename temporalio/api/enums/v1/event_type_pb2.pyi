@@ -225,6 +225,8 @@ class _EventTypeEnumTypeWrapper(
     """A Nexus operation timed out."""
     EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED: _EventType.ValueType  # 54
     """A Nexus operation was requested to be canceled using a RequestCancelNexusOperation command."""
+    EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED: _EventType.ValueType  # 55
+    """Workflow execution options updated by user."""
 
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
@@ -405,4 +407,6 @@ EVENT_TYPE_NEXUS_OPERATION_TIMED_OUT: EventType.ValueType  # 53
 """A Nexus operation timed out."""
 EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED: EventType.ValueType  # 54
 """A Nexus operation was requested to be canceled using a RequestCancelNexusOperation command."""
+EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED: EventType.ValueType  # 55
+"""Workflow execution options updated by user."""
 global___EventType = EventType

@@ -611,7 +611,12 @@ async def test_activity_type_hints(client: Client, worker: ExternalWorker):
     assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
 
 
-async def test_activity_heartbeat_details(client: Client, worker: ExternalWorker):
+async def test_activity_heartbeat_details(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     @activity.defn
     async def some_activity() -> str:
         info = activity.info()
@@ -698,8 +703,11 @@ def picklable_heartbeat_details_activity() -> str:
 
 
 async def test_sync_activity_thread_heartbeat_details(
-    client: Client, worker: ExternalWorker
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=default_max_concurrent_activities
     ) as executor:
@@ -714,8 +722,11 @@ async def test_sync_activity_thread_heartbeat_details(
 
 
 async def test_sync_activity_process_heartbeat_details(
-    client: Client, worker: ExternalWorker
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
@@ -1066,8 +1077,14 @@ async def test_activity_async_success(
 
 @pytest.mark.parametrize("use_task_token", [True, False])
 async def test_activity_async_heartbeat_and_fail(
-    client: Client, worker: ExternalWorker, use_task_token: bool
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    use_task_token: bool,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     wrapper = AsyncActivityWrapper()
     # Start task w/ max attempts 2, wait for info, send heartbeat, fail
     task = asyncio.create_task(

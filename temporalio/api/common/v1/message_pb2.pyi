@@ -445,7 +445,9 @@ class MeteringMetadata(google.protobuf.message.Message):
 global___MeteringMetadata = MeteringMetadata
 
 class WorkerVersionStamp(google.protobuf.message.Message):
-    """Identifies the version(s) of a worker that processed a task"""
+    """Deprecated. This message is replaced with `Deployment` and `VersioningBehavior`.
+    Identifies the version(s) of a worker that processed a task
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -475,31 +477,41 @@ class WorkerVersionStamp(google.protobuf.message.Message):
 global___WorkerVersionStamp = WorkerVersionStamp
 
 class WorkerVersionCapabilities(google.protobuf.message.Message):
-    """Identifies the version(s) that a worker is compatible with when polling or identifying itself,
+    """Identifies the version that a worker is compatible with when polling or identifying itself,
     and whether or not this worker is opting into the build-id based versioning feature. This is
     used by matching to determine which workers ought to receive what tasks.
+    Deprecated. Use WorkerDeploymentOptions instead.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     BUILD_ID_FIELD_NUMBER: builtins.int
     USE_VERSIONING_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_SERIES_NAME_FIELD_NUMBER: builtins.int
     build_id: builtins.str
     """An opaque whole-worker identifier"""
     use_versioning: builtins.bool
     """If set, the worker is opting in to worker versioning, and wishes to only receive appropriate
     tasks.
     """
+    deployment_series_name: builtins.str
+    """Must be sent if user has set a deployment series name (versioning-3)."""
     def __init__(
         self,
         *,
         build_id: builtins.str = ...,
         use_versioning: builtins.bool = ...,
+        deployment_series_name: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "build_id", b"build_id", "use_versioning", b"use_versioning"
+            "build_id",
+            b"build_id",
+            "deployment_series_name",
+            b"deployment_series_name",
+            "use_versioning",
+            b"use_versioning",
         ],
     ) -> None: ...
 
@@ -842,3 +854,51 @@ class Link(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["workflow_event", "batch_job"] | None: ...
 
 global___Link = Link
+
+class Priority(google.protobuf.message.Message):
+    """Priority contains metadata that controls relative ordering of task processing
+    when tasks are backlogged in a queue. Initially, Priority will be used in
+    activity and workflow task queues, which are typically where backlogs exist.
+    Other queues in the server (such as transfer and timer queues) and rate
+    limiting decisions do not use Priority, but may in the future.
+
+    Priority is attached to workflows and activities. Activities and child
+    workflows inherit Priority from the workflow that created them, but may
+    override fields when they are started or modified. For each field of a
+    Priority on an activity/workflow, not present or equal to zero/empty string
+    means to inherit the value from the calling workflow, or if there is no
+    calling workflow, then use the default (documented below).
+
+    Despite being named "Priority", this message will also contains fields that
+    control "fairness" mechanisms.
+
+    The overall semantics of Priority are:
+    1. First, consider "priority_key": lower number goes first.
+    (more will be added here later)
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PRIORITY_KEY_FIELD_NUMBER: builtins.int
+    priority_key: builtins.int
+    """Priority key is a positive integer from 1 to n, where smaller integers
+    correspond to higher priorities (tasks run sooner). In general, tasks in
+    a queue should be processed in close to priority order, although small
+    deviations are possible.
+
+    The maximum priority value (minimum priority) is determined by server
+    configuration, and defaults to 5.
+
+    The default priority is (min+max)/2. With the default max of 5 and min of
+    1, that comes out to 3.
+    """
+    def __init__(
+        self,
+        *,
+        priority_key: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["priority_key", b"priority_key"]
+    ) -> None: ...
+
+global___Priority = Priority

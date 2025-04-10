@@ -109,9 +109,10 @@ class Worker:
             workflow_task_executor: Thread pool executor for workflow tasks. If
                 this is not present, a new
                 :py:class:`concurrent.futures.ThreadPoolExecutor` will be
-                created with ``max_workers`` set to ``max(os.cpu_count(), 4)``.
-                The default one will be properly shutdown, but if one is
-                provided, the caller is responsible for shutting it down after
+                created with ``max_workers`` set to
+                ``max_concurrent_workflow_tasks`` if it is present, or 500
+                otherwise. The default one will be properly shutdown, but if one
+                is provided, the caller is responsible for shutting it down after
                 the worker is shut down.
             workflow_runner: Runner for workflows.
             unsandboxed_workflow_runner: Runner for workflows that opt-out of
@@ -312,6 +313,7 @@ class Worker:
                 task_queue=task_queue,
                 workflows=workflows,
                 workflow_task_executor=workflow_task_executor,
+                max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
                 workflow_runner=workflow_runner,
                 unsandboxed_workflow_runner=unsandboxed_workflow_runner,
                 data_converter=client_config["data_converter"],
