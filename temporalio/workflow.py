@@ -750,7 +750,7 @@ class _Runtime(ABC):
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
-    async def workflow_start_nexus_operation(
+    def workflow_start_nexus_operation(
         self,
         endpoint: str,
         service: str,
@@ -4262,7 +4262,7 @@ class NexusOperationHandle(Generic[O]):
         raise NotImplementedError
 
 
-async def start_nexus_operation(
+def start_nexus_operation(
     endpoint: str,
     service: str,
     operation: str,
@@ -4287,7 +4287,7 @@ async def start_nexus_operation(
         await handle.result()
         ```
     """
-    return await _Runtime.current().workflow_start_nexus_operation(
+    return _Runtime.current().workflow_start_nexus_operation(
         endpoint=endpoint,
         service=service,
         operation=operation,
@@ -5059,7 +5059,7 @@ def create_nexus_client(
             schedule_to_close_timeout: Optional[timedelta] = None,
             headers: Optional[Mapping[str, str]] = None,
         ):
-            return await temporalio.workflow.start_nexus_operation(
+            return temporalio.workflow.start_nexus_operation(
                 endpoint=endpoint,
                 service=interface.__name__,
                 operation=name,
@@ -5073,14 +5073,14 @@ def create_nexus_client(
         methods[name] = method
 
     class _ServiceClient:
-        async def start_operation(
+        def start_operation(
             self,
             operation: Callable[[Any, I], Awaitable[O]],
             input: I,
             schedule_to_close_timeout: Optional[timedelta] = None,
             headers: Optional[Mapping[str, str]] = None,
         ) -> NexusOperationHandle[O]:
-            return await temporalio.workflow.start_nexus_operation(
+            return temporalio.workflow.start_nexus_operation(
                 endpoint=endpoint,
                 service=interface.__name__,
                 operation=operation.__name__,
@@ -5107,14 +5107,14 @@ class NexusClient:
         self._endpoint = endpoint
         self._schedule_to_close_timeout = schedule_to_close_timeout
 
-    async def start_operation(
+    def start_operation(
         self,
         operation: nexusrpc.interface.NexusOperation[I, O],
         input: I,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[O]:
-        return await temporalio.workflow.start_nexus_operation(
+        return temporalio.workflow.start_nexus_operation(
             endpoint=self._endpoint,
             service=self._service_name,
             operation=operation.name,
@@ -5132,7 +5132,7 @@ class NexusClient:
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> O:
-        handle = await self.start_operation(
+        handle = self.start_operation(
             operation, input, schedule_to_close_timeout, headers
         )
         return await handle.result()
