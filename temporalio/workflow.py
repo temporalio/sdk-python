@@ -90,12 +90,16 @@ def defn(
     name: Optional[str] = None,
     sandboxed: bool = True,
     failure_exception_types: Sequence[Type[BaseException]] = [],
+    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
 ) -> Callable[[ClassType], ClassType]: ...
 
 
 @overload
 def defn(
-    *, sandboxed: bool = True, dynamic: bool = False
+    *,
+    sandboxed: bool = True,
+    dynamic: bool = False,
+    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
 ) -> Callable[[ClassType], ClassType]: ...
 
 
@@ -106,6 +110,7 @@ def defn(
     sandboxed: bool = True,
     dynamic: bool = False,
     failure_exception_types: Sequence[Type[BaseException]] = [],
+    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
 ):
     """Decorator for workflow classes.
 
@@ -127,6 +132,8 @@ def defn(
             applied in addition to ones set on the worker constructor. If
             ``Exception`` is set, it effectively will fail a workflow/update in
             all user exception cases. WARNING: This setting is experimental.
+        versioning_behavior: Specifies the versioning behavior to use for this workflow.
+            WARNING: This setting is experimental.
     """
 
     def decorator(cls: ClassType) -> ClassType:
@@ -136,6 +143,7 @@ def defn(
             workflow_name=name or cls.__name__ if not dynamic else None,
             sandboxed=sandboxed,
             failure_exception_types=failure_exception_types,
+            versioning_behavior=versioning_behavior,
         )
         return cls
 
@@ -164,29 +172,7 @@ def init(
     return init_fn
 
 
-@dataclass(frozen=True)
-class _RunAttributes:
-    versioning_behavior: temporalio.common.VersioningBehavior
-
-
-@overload
-def run(
-    fn: CallableAsyncType,
-) -> CallableAsyncType: ...
-
-
-@overload
-def run(
-    *,
-    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
-) -> Callable[[CallableAsyncType], CallableAsyncType]: ...
-
-
-def run(
-    fn: Optional[CallableAsyncType] = None,
-    *,
-    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
-):
+def run(fn: CallableAsyncType) -> CallableAsyncType:
     """Decorator for the workflow run method.
 
     This must be used on one and only one async method defined on the same class
@@ -199,36 +185,18 @@ def run(
 
     Args:
         fn: The function to decorate.
-        versioning_behavior: Specifies the versioning behavior to use for this workflow.
-            WARNING: This setting is experimental.
     """
-
-    def decorator(
-        versioning_behavior: temporalio.common.VersioningBehavior, fn: CallableAsyncType
-    ) -> CallableAsyncType:
-        if not inspect.iscoroutinefunction(fn):
-            raise ValueError("Workflow run method must be an async function")
-        # Disallow local classes because we need to have the class globally
-        # referenceable by name
-        if "<locals>" in fn.__qualname__:
-            raise ValueError(
-                "Local classes unsupported, @workflow.run cannot be on a local class"
-            )
-        setattr(
-            fn,
-            "__temporal_workflow_run",
-            _RunAttributes(versioning_behavior=versioning_behavior),
+    if not inspect.iscoroutinefunction(fn):
+        raise ValueError("Workflow run method must be an async function")
+    # Disallow local classes because we need to have the class globally
+    # referenceable by name
+    if "<locals>" in fn.__qualname__:
+        raise ValueError(
+            "Local classes unsupported, @workflow.run cannot be on a local class"
         )
-        # TODO(cretz): Why is MyPy unhappy with this return?
-        return fn  # type: ignore[return-value]
-
-    if fn is None:
-        return partial(
-            decorator,
-            versioning_behavior,
-        )
-    else:
-        return decorator(versioning_behavior, fn)
+    setattr(fn, "__temporal_workflow_run", True)
+    # TODO(cretz): Why is MyPy unhappy with this return?
+    return fn  # type: ignore[return-value]
 
 
 class HandlerUnfinishedPolicy(Enum):
@@ -1534,6 +1502,7 @@ class _Definition:
         workflow_name: Optional[str],
         sandboxed: bool,
         failure_exception_types: Sequence[Type[BaseException]],
+        versioning_behavior: temporalio.common.VersioningBehavior,
     ) -> None:
         # Check it's not being doubly applied
         if _Definition.from_class(cls):
@@ -1543,14 +1512,14 @@ class _Definition:
         # Collect run fn and all signal/query/update fns
         init_fn: Optional[Callable[..., None]] = None
         run_fn: Optional[Callable[..., Awaitable[Any]]] = None
-        seen_run_attr: Optional[_RunAttributes] = None
+        seen_run_attr = False
         signals: Dict[Optional[str], _SignalDefinition] = {}
         queries: Dict[Optional[str], _QueryDefinition] = {}
         updates: Dict[Optional[str], _UpdateDefinition] = {}
         dynamic_versioning_behavior: Optional[CallableSyncNoParam] = None
         for name, member in inspect.getmembers(cls):
             if hasattr(member, "__temporal_workflow_run"):
-                seen_run_attr = getattr(member, "__temporal_workflow_run")
+                seen_run_attr = True
                 if not _is_unbound_method_on_cls(member, cls):
                     issues.append(
                         f"@workflow.run method {name} must be defined on {cls.__qualname__}"
@@ -1627,8 +1596,7 @@ class _Definition:
                 ):
                     continue
                 if hasattr(base_member, "__temporal_workflow_run"):
-                    # TODO: Not sure this needs to exist?
-                    # seen_run_attr = True
+                    seen_run_attr = True
                     if not run_fn or base_member.__name__ != run_fn.__name__:
                         issues.append(
                             f"@workflow.run defined on {base_member.__qualname__} but not on the override"
@@ -1683,7 +1651,7 @@ class _Definition:
             updates=updates,
             sandboxed=sandboxed,
             failure_exception_types=failure_exception_types,
-            versioning_behavior=seen_run_attr.versioning_behavior,
+            versioning_behavior=versioning_behavior,
             dynamic_versioning_behavior=dynamic_versioning_behavior,
         )
         setattr(cls, "__temporal_workflow_definition", defn)

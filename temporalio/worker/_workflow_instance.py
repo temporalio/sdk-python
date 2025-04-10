@@ -346,7 +346,7 @@ class _WorkflowInstanceImpl(
         )
         self._current_completion.successful.SetInParent()
         self._current_completion.successful.versioning_behavior = (
-            self._defn.versioning_behavior._to_proto()
+            self._defn.versioning_behavior.value
             if self._defn.versioning_behavior
             else temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
         )
@@ -425,7 +425,7 @@ class _WorkflowInstanceImpl(
                         != temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
                     ):
                         self._current_completion.successful.versioning_behavior = (
-                            vb._to_proto()
+                            vb.value
                         )
 
         # If we're deleting, there better be no more tasks. It is important for

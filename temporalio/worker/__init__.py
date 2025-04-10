@@ -45,7 +45,7 @@ from ._tuning import (
 from ._worker import (
     Worker,
     WorkerConfig,
-    WorkerDeploymentOptions,
+    WorkerDeploymentConfig,
     WorkerDeploymentVersion,
 )
 from ._workflow_instance import (
@@ -59,7 +59,7 @@ __all__ = [
     # Primary types
     "Worker",
     "WorkerConfig",
-    "WorkerDeploymentOptions",
+    "WorkerDeploymentConfig",
     "WorkerDeploymentVersion",
     "Replayer",
     "ReplayerConfig",

@@ -134,9 +134,9 @@ def test_workflow_defn_good():
     )
 
 
-@workflow.defn
+@workflow.defn(versioning_behavior=VersioningBehavior.PINNED)
 class VersioningBehaviorDefn:
-    @workflow.run(versioning_behavior=VersioningBehavior.PINNED)
+    @workflow.run
     async def run(self, name: str) -> str:
         raise NotImplementedError
 
