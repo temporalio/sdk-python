@@ -6937,6 +6937,7 @@ class TimeoutErrorWorkflow:
         else:
             raise RuntimeError("Unrecognized scenario")
 
+
 async def test_workflow_timeout_error(client: Client):
     async with new_worker(client, TimeoutErrorWorkflow) as worker:
         scenarios = ["workflow.wait_condition", "asyncio.wait_for"]
