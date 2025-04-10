@@ -1752,10 +1752,10 @@ class _WorkflowInstanceImpl(
         async def run_nexus() -> Any:
             while True:
                 try:
-                    # TODO(dan): start_child_workflow shields. Why?
-                    return await handle._result_fut
+                    return await asyncio.shield(handle._result_fut)
                 except asyncio.CancelledError:
-                    raise NotImplementedError("Nexus operation cancel not implemented")
+                    cancel_command = self._add_command()
+                    handle._apply_cancel_command(cancel_command)
 
         handle = _NexusOperationHandle(
             self, self._next_seq("nexus_operation"), input, run_nexus()
@@ -1765,8 +1765,7 @@ class _WorkflowInstanceImpl(
 
         while True:
             try:
-                # TODO(dan): start_child_workflow shields. Why?
-                await handle._start_fut
+                await asyncio.shield(handle._start_fut)
                 return handle
             except asyncio.CancelledError:
                 raise NotImplementedError("Nexus operation cancel not implemented")
@@ -2886,6 +2885,9 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
     async def result(self) -> O:
         return await self._task
 
+    def cancel(self) -> bool:
+        return self._task.cancel()
+
     def _resolve_start_success(self, operation_id: str) -> None:
         span = xray.get_current_span()
         span.add_event("_resolve_start_success", {"operation_id": operation_id})
@@ -2945,6 +2947,12 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         if self._input.headers:
             for key, val in self._input.headers.items():
                 v.nexus_header[key] = val
+
+    def _apply_cancel_command(
+        self,
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
+        command.request_cancel_nexus_operation.seq = self._seq
 
 
 class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):

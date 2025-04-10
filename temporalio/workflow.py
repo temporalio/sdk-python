@@ -4258,6 +4258,9 @@ class NexusOperationHandle(Generic[O]):
     async def result(self) -> O:
         raise NotImplementedError
 
+    def cancel(self) -> bool:
+        raise NotImplementedError
+
 
 async def start_nexus_operation(
     endpoint: str,
