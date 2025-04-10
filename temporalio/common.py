@@ -1017,59 +1017,39 @@ class Priority:
 Priority.default = Priority(priority_key=None)
 
 
-class VersioningBehavior(Enum):
+class VersioningBehavior(IntEnum):
     """Specifies when a workflow might move from a worker of one Build Id to another.
 
     WARNING: Experimental API.
     """
 
-    UNSPECIFIED = 1
+    UNSPECIFIED = (
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
+    )
     """ An unspecified versioning behavior. By default, workers opting into worker versioning will
     be required to specify a behavior. See :py:class:`temporalio.worker.WorkerDeploymentOptions`."""
-    PINNED = 2
+    PINNED = temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
     """The workflow will be pinned to the current Build ID unless manually moved."""
-    AUTO_UPGRADE = 3
+    AUTO_UPGRADE = (
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    )
     """The workflow will automatically move to the latest version (default Build ID of the task
     queue) when the next task is dispatched."""
 
-    def _to_proto(self) -> temporalio.api.enums.v1.VersioningBehavior.ValueType:
-        if self == VersioningBehavior.UNSPECIFIED:
-            return temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
-        elif self == VersioningBehavior.PINNED:
-            return temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
-        elif self == VersioningBehavior.AUTO_UPGRADE:
-            return temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE
-        else:
-            raise ValueError(f"Unknown VersioningBehavior: {self}")
 
-
+@dataclass(frozen=True)
 class WorkerDeploymentVersion:
     """Represents the version of a specific worker deployment.
 
     WARNING: Experimental API.
     """
 
-    _deployment_name: str
-    _build_id: str
-
-    def __init__(self, deployment_name: str, build_id: str):
-        """Build a WorkerDeploymentVersion from a deployment name and build ID."""
-        self._deployment_name = deployment_name
-        self._build_id = build_id
-
-    @property
-    def deployment_name(self) -> str:
-        """The name of the deployment."""
-        return self._deployment_name
-
-    @property
-    def build_id(self) -> str:
-        """The Build ID of this version."""
-        return self._build_id
+    deployment_name: str
+    build_id: str
 
     def to_canonical_string(self) -> str:
         """Returns the canonical string representation of the version."""
-        return f"{self._deployment_name}.{self._build_id}"
+        return f"{self.deployment_name}.{self.build_id}"
 
     @staticmethod
     def from_canonical_string(canonical: str) -> WorkerDeploymentVersion:

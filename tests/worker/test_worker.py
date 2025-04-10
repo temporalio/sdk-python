@@ -36,7 +36,7 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
-    WorkerDeploymentOptions,
+    WorkerDeploymentConfig,
     WorkerDeploymentVersion,
     WorkerTuner,
     WorkflowSlotInfo,
@@ -531,11 +531,14 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
         await asyncio.sleep(1)
 
 
-@workflow.defn(name="DeploymentVersioningWorkflow")
+@workflow.defn(
+    name="DeploymentVersioningWorkflow",
+    versioning_behavior=VersioningBehavior.AUTO_UPGRADE,
+)
 class DeploymentVersioningWorkflowV1AutoUpgrade:
     finish = False
 
-    @workflow.run(versioning_behavior=VersioningBehavior.AUTO_UPGRADE)
+    @workflow.run
     async def run(self):
         await workflow.wait_condition(lambda: self.finish)
         return "version-v1"
@@ -549,11 +552,13 @@ class DeploymentVersioningWorkflowV1AutoUpgrade:
         return "v1"
 
 
-@workflow.defn(name="DeploymentVersioningWorkflow")
+@workflow.defn(
+    name="DeploymentVersioningWorkflow", versioning_behavior=VersioningBehavior.PINNED
+)
 class DeploymentVersioningWorkflowV2Pinned:
     finish = False
 
-    @workflow.run(versioning_behavior=VersioningBehavior.PINNED)
+    @workflow.run
     async def run(self):
         await workflow.wait_condition(lambda: self.finish)
         return "version-v2"
@@ -567,11 +572,14 @@ class DeploymentVersioningWorkflowV2Pinned:
         return "v2"
 
 
-@workflow.defn(name="DeploymentVersioningWorkflow")
+@workflow.defn(
+    name="DeploymentVersioningWorkflow",
+    versioning_behavior=VersioningBehavior.AUTO_UPGRADE,
+)
 class DeploymentVersioningWorkflowV3AutoUpgrade:
     finish = False
 
-    @workflow.run(versioning_behavior=VersioningBehavior.AUTO_UPGRADE)
+    @workflow.run
     async def run(self):
         await workflow.wait_condition(lambda: self.finish)
         return "version-v3"
@@ -585,7 +593,7 @@ class DeploymentVersioningWorkflowV3AutoUpgrade:
         return "v3"
 
 
-async def test_worker_with_worker_deployment_options(
+async def test_worker_with_worker_deployment_config(
     client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
@@ -599,7 +607,7 @@ async def test_worker_with_worker_deployment_options(
         new_worker(
             client,
             DeploymentVersioningWorkflowV1AutoUpgrade,
-            deployment_options=WorkerDeploymentOptions(
+            deployment_config=WorkerDeploymentConfig(
                 version=worker_v1,
                 use_worker_versioning=True,
             ),
@@ -607,7 +615,7 @@ async def test_worker_with_worker_deployment_options(
         new_worker(
             client,
             DeploymentVersioningWorkflowV2Pinned,
-            deployment_options=WorkerDeploymentOptions(
+            deployment_config=WorkerDeploymentConfig(
                 version=worker_v2,
                 use_worker_versioning=True,
             ),
@@ -616,7 +624,7 @@ async def test_worker_with_worker_deployment_options(
         new_worker(
             client,
             DeploymentVersioningWorkflowV3AutoUpgrade,
-            deployment_options=WorkerDeploymentOptions(
+            deployment_config=WorkerDeploymentConfig(
                 version=worker_v3,
                 use_worker_versioning=True,
             ),
@@ -688,14 +696,14 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
         new_worker(
             client,
             DeploymentVersioningWorkflowV1AutoUpgrade,
-            deployment_options=WorkerDeploymentOptions(
+            deployment_config=WorkerDeploymentConfig(
                 version=v1, use_worker_versioning=True
             ),
         ) as w1,
         new_worker(
             client,
             DeploymentVersioningWorkflowV2Pinned,
-            deployment_options=WorkerDeploymentOptions(
+            deployment_config=WorkerDeploymentConfig(
                 version=v2, use_worker_versioning=True
             ),
             task_queue=w1.task_queue,
@@ -760,9 +768,9 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
         await assert_eventually(check_results)
 
 
-@workflow.defn(dynamic=True)
-class DynamicWorkflowVersioningOnRun:
-    @workflow.run(versioning_behavior=VersioningBehavior.PINNED)
+@workflow.defn(dynamic=True, versioning_behavior=VersioningBehavior.PINNED)
+class DynamicWorkflowVersioningOnDefn:
+    @workflow.run
     async def run(self, args: Sequence[RawValue]) -> str:
         return "dynamic"
 
@@ -787,7 +795,7 @@ async def _test_dynamic_workflow_versioning(
     async with new_worker(
         client,
         workflow_class,
-        deployment_options=WorkerDeploymentOptions(
+        deployment_config=WorkerDeploymentConfig(
             version=worker_v1,
             use_worker_versioning=True,
         ),
@@ -825,7 +833,7 @@ async def test_worker_deployment_dynamic_workflow_on_run(
 
     await _test_dynamic_workflow_versioning(
         client,
-        DynamicWorkflowVersioningOnRun,
+        DynamicWorkflowVersioningOnDefn,
         temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
     )
 
@@ -865,7 +873,7 @@ async def test_workflows_must_have_versioning_behavior_when_feature_turned_on(
             client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             workflows=[NoVersioningAnnotationWorkflow],
-            deployment_options=WorkerDeploymentOptions(
+            deployment_config=WorkerDeploymentConfig(
                 version=WorkerDeploymentVersion(
                     deployment_name="whatever", build_id="1.0"
                 ),
@@ -880,7 +888,7 @@ async def test_workflows_must_have_versioning_behavior_when_feature_turned_on(
             client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             workflows=[NoVersioningAnnotationDynamicWorkflow],
-            deployment_options=WorkerDeploymentOptions(
+            deployment_config=WorkerDeploymentConfig(
                 version=WorkerDeploymentVersion(
                     deployment_name="whatever", build_id="1.0"
                 ),
@@ -903,7 +911,7 @@ async def test_workflows_can_use_default_versioning_behavior(
     async with new_worker(
         client,
         NoVersioningAnnotationWorkflow,
-        deployment_options=WorkerDeploymentOptions(
+        deployment_config=WorkerDeploymentConfig(
             version=worker_v1,
             use_worker_versioning=True,
             default_versioning_behavior=VersioningBehavior.PINNED,

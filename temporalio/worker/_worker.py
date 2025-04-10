@@ -93,7 +93,7 @@ class Worker:
         on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,
         use_worker_versioning: bool = False,
         disable_safe_workflow_eviction: bool = False,
-        deployment_options: Optional[WorkerDeploymentOptions] = None,
+        deployment_config: Optional[WorkerDeploymentConfig] = None,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -136,8 +136,8 @@ class Worker:
             build_id: Unique identifier for the current runtime. This is best
                 set as a hash of all code and should change only when code does.
                 If unset, a best-effort identifier is generated.
-                Exclusive with `deployment_options`.
-                WARNING: Deprecated. Use `deployment_options` instead.
+                Exclusive with `deployment_config`.
+                WARNING: Deprecated. Use `deployment_config` instead.
             identity: Identity for this worker client. If unset, the client
                 identity is used.
             max_cached_workflows: If nonzero, workflows will be cached and
@@ -219,8 +219,8 @@ class Worker:
                 workflows which it claims to be compatible with. For more
                 information, see
                 https://docs.temporal.io/workers#worker-versioning.
-                Exclusive with `deployment_options`.
-                WARNING: Deprecated. Use `deployment_options` instead.
+                Exclusive with `deployment_config`.
+                WARNING: Deprecated. Use `deployment_config` instead.
             disable_safe_workflow_eviction: If true, instead of letting the
                 workflow collect its tasks properly, the worker will simply let
                 the Python garbage collector collect the tasks. WARNING: Users
@@ -228,8 +228,9 @@ class Worker:
                 throw ``GeneratorExit`` in coroutines causing them to wake up
                 in different threads and run ``finally`` and other code in the
                 wrong workflow environment.
-            deployment_options: Deployment options for the worker. Exclusive with `build_id` and
+            deployment_config: Deployment config for the worker. Exclusive with `build_id` and
                 `use_worker_versioning`.
+                WARNING: This is an experimental feature and may change in the future.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
@@ -237,9 +238,9 @@ class Worker:
             raise ValueError(
                 "build_id must be specified when use_worker_versioning is True"
             )
-        if deployment_options and (build_id or use_worker_versioning):
+        if deployment_config and (build_id or use_worker_versioning):
             raise ValueError(
-                "deployment_options cannot be used with build_id or use_worker_versioning"
+                "deployment_config cannot be used with build_id or use_worker_versioning"
             )
 
         # Prepend applicable client interceptors to the given ones
@@ -330,9 +331,9 @@ class Worker:
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
             should_enforce_versioning_behavior = (
-                deployment_options is not None
-                and deployment_options.use_worker_versioning
-                and deployment_options.default_versioning_behavior
+                deployment_config is not None
+                and deployment_config.use_worker_versioning
+                and deployment_config.default_versioning_behavior
                 == temporalio.common.VersioningBehavior.UNSPECIFIED
             )
             self._workflow_worker = _WorkflowWorker(
@@ -375,9 +376,9 @@ class Worker:
         bridge_tuner = tuner._to_bridge_tuner()
 
         versioning_strategy: temporalio.bridge.worker.WorkerVersioningStrategy
-        if deployment_options:
+        if deployment_config:
             versioning_strategy = (
-                deployment_options._to_bridge_worker_deployment_options()
+                deployment_config._to_bridge_worker_deployment_options()
             )
         elif use_worker_versioning:
             build_id = build_id or load_default_build_id()
@@ -712,12 +713,15 @@ class WorkerConfig(TypedDict, total=False):
     on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]]
     use_worker_versioning: bool
     disable_safe_workflow_eviction: bool
-    deployment_options: Optional[WorkerDeploymentOptions]
+    deployment_config: Optional[WorkerDeploymentConfig]
 
 
 @dataclass
-class WorkerDeploymentOptions:
-    """Options for configuring the Worker Versioning feature."""
+class WorkerDeploymentConfig:
+    """Options for configuring the Worker Versioning feature.
+
+    WARNING: This is an experimental feature and may change in the future.
+    """
 
     version: WorkerDeploymentVersion
     use_worker_versioning: bool
@@ -732,7 +736,7 @@ class WorkerDeploymentOptions:
                 build_id=self.version.build_id,
             ),
             use_worker_versioning=self.use_worker_versioning,
-            default_versioning_behavior=self.default_versioning_behavior._to_proto(),
+            default_versioning_behavior=self.default_versioning_behavior.value,
         )
 
 

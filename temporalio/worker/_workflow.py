@@ -144,14 +144,14 @@ class _WorkflowWorker:
                     if not_in_annotation:
                         raise ValueError(
                             f"Workflow {defn.name} must specify a versioning behavior using "
-                            "the `versioning_behavior` argument to `@workflow.run`."
+                            "the `versioning_behavior` argument to `@workflow.defn`."
                         )
                 else:
-                    if defn.dynamic_versioning_behavior is None:
+                    if not_in_annotation and defn.dynamic_versioning_behavior is None:
                         raise ValueError(
-                            f"Dynamic Workflow {defn.name} must specify a versioning behavior "
-                            "using `@workflow.dynamic_versioning_behavior` or the "
-                            "`versioning_behavior` argument to `@workflow.run`."
+                            f"Dynamic Workflow {defn.cls.__qualname__} must specify a versioning "
+                            "behavior using `@workflow.dynamic_versioning_behavior` or the "
+                            "`versioning_behavior` argument to `@workflow.defn`."
                         )
 
             # Prepare the workflow with the runner (this will error in the
