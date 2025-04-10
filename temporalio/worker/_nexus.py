@@ -9,6 +9,7 @@ from typing import (
     Any,
     Callable,
     Sequence,
+    Union,
 )
 
 import nexusrpc.handler
@@ -103,30 +104,21 @@ class _NexusWorker:
                         "Nexus cancel_operation not yet implemented"
                     )
             else:
-                raise NotImplementedError("Nexus cancel_task not yet implemented")
+                raise NotImplementedError(f"Invalid Nexus task: {task}")
 
     # TODO(dan): is it correct to import from temporalio.api.nexus?
     # Why are these things not exposed in temporalio.bridge?
     async def _handle_start_operation(
         self, request: temporalio.api.nexus.v1.StartOperationRequest, task_token: bytes
     ) -> None:
-        try:
-            service = self._nexus_services[request.service]
-        except KeyError:
-            raise RuntimeError(
-                f"Nexus service '{request.service}' has not been registered with this worker."
-            )
-        try:
-            handler = service[request.operation]
-        except KeyError:
-            raise RuntimeError(
-                f"Nexus service '{request.service}' has no operation '{request.operation}'."
-            )
+        operation = self._get_operation(request)
 
-        print(f"Starting operation {request.operation} with payload {request.payload}")
+        print(
+            f"🟠 Starting operation {request.operation} with payload {request.payload}"
+        )
 
         # TODO(dan): HACK. See activity_def.arg_types in _activity.py
-        arg_types, _ = temporalio.common._type_hints_from_func(handler.start)
+        arg_types, _ = temporalio.common._type_hints_from_func(operation.start)
 
         [input] = await self._data_converter.decode(
             [request.payload],
@@ -148,7 +140,7 @@ class _NexusWorker:
             )
         )
 
-        result = await handler.start(input, options)
+        result = await operation.start(input, options)
         if isinstance(result, nexusrpc.handler.AsyncOperationResult):
             print(
                 f"🟢 Nexus operation {request.operation} started with async response {result}"
@@ -174,3 +166,22 @@ class _NexusWorker:
             completed=temporalio.api.nexus.v1.Response(start_operation=op_resp),
         )
         await self._bridge_worker().complete_nexus_task(completion)
+
+    def _get_operation(
+        self,
+        request: Union[
+            temporalio.api.nexus.v1.StartOperationRequest,
+            temporalio.api.nexus.v1.CancelOperationRequest,
+        ],
+    ) -> nexusrpc.handler.Operation:
+        service = self._nexus_services.get(request.service)
+        if service is None:
+            raise RuntimeError(
+                f"Nexus service '{request.service}' has not been registered with this worker."
+            )
+        operation = service.get(request.operation)
+        if operation is None:
+            raise RuntimeError(
+                f"Nexus service '{request.service}' has no operation '{request.operation}'."
+            )
+        return operation
