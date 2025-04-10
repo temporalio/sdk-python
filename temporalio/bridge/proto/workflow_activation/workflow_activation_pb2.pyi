@@ -91,7 +91,7 @@ class WorkflowActivation(google.protobuf.message.Message):
     AVAILABLE_INTERNAL_FLAGS_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     CONTINUE_AS_NEW_SUGGESTED_FIELD_NUMBER: builtins.int
-    BUILD_ID_FOR_CURRENT_TASK_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_VERSION_FOR_CURRENT_TASK_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The id of the currently active run of the workflow. Also used as a cache key. There may
     only ever be one active workflow task (and hence activation) of a run at one time.
@@ -124,11 +124,18 @@ class WorkflowActivation(google.protobuf.message.Message):
     """The history size in bytes as of the last WFT started event"""
     continue_as_new_suggested: builtins.bool
     """Set true if the most recent WFT started event had this suggestion"""
-    build_id_for_current_task: builtins.str
-    """Set to the Build ID of the worker that processed this task, which may be empty. During replay
-    this id may not equal the id of the replaying worker. If not replaying and this worker has
-    a defined Build ID, it will equal that ID. It will also be empty for evict-only activations.
-    """
+    @property
+    def deployment_version_for_current_task(
+        self,
+    ) -> temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion:
+        """Set to the deployment version of the worker that processed this task,
+        which may be empty. During replay this version may not equal the version
+        of the replaying worker. If not replaying and this worker has a defined
+        Deployment Version, it will equal that. It will also be empty for
+        evict-only activations. The deployment name may be empty, but not the
+        build id, if this worker was using the deprecated Build ID-only
+        feature(s).
+        """
     def __init__(
         self,
         *,
@@ -140,20 +147,27 @@ class WorkflowActivation(google.protobuf.message.Message):
         available_internal_flags: collections.abc.Iterable[builtins.int] | None = ...,
         history_size_bytes: builtins.int = ...,
         continue_as_new_suggested: builtins.bool = ...,
-        build_id_for_current_task: builtins.str = ...,
+        deployment_version_for_current_task: temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion
+        | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment_version_for_current_task",
+            b"deployment_version_for_current_task",
+            "timestamp",
+            b"timestamp",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "available_internal_flags",
             b"available_internal_flags",
-            "build_id_for_current_task",
-            b"build_id_for_current_task",
             "continue_as_new_suggested",
             b"continue_as_new_suggested",
+            "deployment_version_for_current_task",
+            b"deployment_version_for_current_task",
             "history_length",
             b"history_length",
             "history_size_bytes",
