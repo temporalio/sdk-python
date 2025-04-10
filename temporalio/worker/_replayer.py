@@ -7,7 +7,6 @@ import concurrent.futures
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from enum import verify
 from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
 
 from typing_extensions import TypedDict
