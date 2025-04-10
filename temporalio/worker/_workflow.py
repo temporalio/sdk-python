@@ -8,7 +8,6 @@ import logging
 import os
 import sys
 import threading
-from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
 from typing import (
@@ -78,6 +77,7 @@ class _WorkflowWorker:
             ]
         ],
         disable_safe_eviction: bool,
+        should_enforce_versioning_behavior: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -135,6 +135,25 @@ class _WorkflowWorker:
             # Confirm name unique
             if defn.name in self._workflows:
                 raise ValueError(f"More than one workflow named {defn.name}")
+            if should_enforce_versioning_behavior:
+                not_in_annotation = defn.versioning_behavior in [
+                    None,
+                    temporalio.common.VersioningBehavior.UNSPECIFIED,
+                ]
+                if defn.name:
+                    if not_in_annotation:
+                        raise ValueError(
+                            f"Workflow {defn.name} must specify a versioning behavior using "
+                            "the `versioning_behavior` argument to `@workflow.run`."
+                        )
+                else:
+                    if defn.dynamic_versioning_behavior is None:
+                        raise ValueError(
+                            f"Dynamic Workflow {defn.name} must specify a versioning behavior "
+                            "using `@workflow.dynamic_versioning_behavior` or the "
+                            "`versioning_behavior` argument to `@workflow.run`."
+                        )
+
             # Prepare the workflow with the runner (this will error in the
             # sandbox if an import fails somehow)
             try:

@@ -216,6 +216,7 @@ class Replayer:
                 on_eviction_hook=on_eviction_hook,
                 disable_eager_activity_execution=False,
                 disable_safe_eviction=self._config["disable_safe_workflow_eviction"],
+                should_enforce_versioning_behavior=False,
             )
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(

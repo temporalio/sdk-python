@@ -843,7 +843,94 @@ async def test_worker_deployment_dynamic_workflow_getter(
     )
 
 
-# TODO: Test for fail at registration time if deployment versioning on, no default, no behavior
+@workflow.defn
+class NoVersioningAnnotationWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "whee"
+
+
+@workflow.defn(dynamic=True)
+class NoVersioningAnnotationDynamicWorkflow:
+    @workflow.run
+    async def run(self, args: Sequence[RawValue]) -> str:
+        return "whee"
+
+
+async def test_workflows_must_have_versioning_behavior_when_feature_turned_on(
+    client: Client, env: WorkflowEnvironment
+):
+    with pytest.raises(ValueError) as exc_info:
+        Worker(
+            client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            workflows=[NoVersioningAnnotationWorkflow],
+            deployment_options=WorkerDeploymentOptions(
+                version=WorkerDeploymentVersion(
+                    deployment_name="whatever", build_id="1.0"
+                ),
+                use_worker_versioning=True,
+            ),
+        )
+
+    assert "must specify a versioning behavior" in str(exc_info.value)
+
+    with pytest.raises(ValueError) as exc_info:
+        Worker(
+            client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            workflows=[NoVersioningAnnotationDynamicWorkflow],
+            deployment_options=WorkerDeploymentOptions(
+                version=WorkerDeploymentVersion(
+                    deployment_name="whatever", build_id="1.0"
+                ),
+                use_worker_versioning=True,
+            ),
+        )
+
+    assert "must specify a versioning behavior" in str(exc_info.value)
+
+
+async def test_workflows_can_use_default_versioning_behavior(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker versioning")
+
+    deployment_name = f"deployment-default-versioning-{uuid.uuid4()}"
+    worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+
+    async with new_worker(
+        client,
+        NoVersioningAnnotationWorkflow,
+        deployment_options=WorkerDeploymentOptions(
+            version=worker_v1,
+            use_worker_versioning=True,
+            default_versioning_behavior=VersioningBehavior.PINNED,
+        ),
+    ) as w:
+        describe_resp = await wait_until_worker_deployment_visible(
+            client,
+            worker_v1,
+        )
+        await set_current_deployment_version(
+            client, describe_resp.conflict_token, worker_v1
+        )
+
+        wf = await client.start_workflow(
+            NoVersioningAnnotationWorkflow.run,
+            id=f"default-versioning-behavior-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf.result()
+
+        history = await wf.fetch_history()
+        assert any(
+            event.HasField("workflow_task_completed_event_attributes")
+            and event.workflow_task_completed_event_attributes.versioning_behavior
+            == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+            for event in history.events
+        )
 
 
 async def wait_until_worker_deployment_visible(
