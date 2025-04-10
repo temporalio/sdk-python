@@ -99,9 +99,6 @@ def defn(
 ) -> Callable[[ClassType], ClassType]: ...
 
 
-# TODO: Pass versioning behavior here or do it via a method in dynamic workflow impl like Java?
-
-
 def defn(
     cls: Optional[ClassType] = None,
     *,
