@@ -414,20 +414,6 @@ class _WorkflowInstanceImpl(
                     )
                 activation_err = None
 
-        # If this workflow is dynamic, try calling the dynamic versioning behavior
-        if self._defn.name is None:
-            dvb = self.workflow_get_dynamic_versioning_behavior()
-            if dvb:
-                with self._as_read_only():
-                    vb = dvb()
-                    if (
-                        vb
-                        != temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
-                    ):
-                        self._current_completion.successful.versioning_behavior = (
-                            vb.value
-                        )
-
         # If we're deleting, there better be no more tasks. It is important for
         # the integrity of the system that we check this. If there are tasks
         # remaining, they and any associated coroutines will get garbage
@@ -1039,14 +1025,6 @@ class _WorkflowInstanceImpl(
             return None
         # Bind if a method
         return defn.bind_validator(self._object) if defn.is_method else defn.validator
-
-    def workflow_get_dynamic_versioning_behavior(
-        self,
-    ) -> Optional[Callable[[], temporalio.common.VersioningBehavior]]:
-        defn = self._defn.dynamic_versioning_behavior
-        if not defn:
-            return None
-        return temporalio.workflow._bind_method(self._object, defn)
 
     def workflow_info(self) -> temporalio.workflow.Info:
         return self._outbound.info()

@@ -225,16 +225,12 @@ class BadDefn(BadDefnBase):
     def base_update(self):
         pass
 
-    @workflow.dynamic_versioning_behavior
-    def i_shouldnt_exist(self) -> VersioningBehavior:
-        return VersioningBehavior.PINNED
-
 
 def test_workflow_defn_bad():
     with pytest.raises(ValueError) as err:
         workflow.defn(BadDefn)
 
-    assert "Invalid workflow class for 10 reasons" in str(err.value)
+    assert "Invalid workflow class for 9 reasons" in str(err.value)
     assert "Missing @workflow.run method" in str(err.value)
     assert (
         "Multiple signal methods found for signal1 (at least on signal2 and signal1)"
@@ -267,10 +263,6 @@ def test_workflow_defn_bad():
     assert (
         "@workflow.update defined on BadDefnBase.base_update but not on the override"
         in str(err.value)
-    )
-    assert (
-        "Non-dynamic workflows should not specify @workflow.dynamic_versioning_behavior, which "
-        "was found on BadDefn.i_shouldnt_exist" in str(err.value)
     )
 
 

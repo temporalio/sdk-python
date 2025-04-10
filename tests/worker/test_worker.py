@@ -775,26 +775,18 @@ class DynamicWorkflowVersioningOnDefn:
         return "dynamic"
 
 
-@workflow.defn(dynamic=True)
-class DynamicWorkflowVersioningWithGetter:
-    @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> str:
-        return "dynamic"
-
-    @workflow.dynamic_versioning_behavior
-    def huh(self) -> VersioningBehavior:
-        return VersioningBehavior.PINNED
-
-
-async def _test_dynamic_workflow_versioning(
-    client: Client, workflow_class, expected_versioning_behavior
+async def test_worker_deployment_dynamic_workflow_on_run(
+    client: Client, env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
     deployment_name = f"deployment-dynamic-{uuid.uuid4()}"
     worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
 
     async with new_worker(
         client,
-        workflow_class,
+        DynamicWorkflowVersioningOnDefn,
         deployment_config=WorkerDeploymentConfig(
             version=worker_v1,
             use_worker_versioning=True,
@@ -820,35 +812,9 @@ async def _test_dynamic_workflow_versioning(
         assert any(
             event.HasField("workflow_task_completed_event_attributes")
             and event.workflow_task_completed_event_attributes.versioning_behavior
-            == expected_versioning_behavior
+            == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
             for event in history.events
         )
-
-
-async def test_worker_deployment_dynamic_workflow_on_run(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip("Test Server doesn't support worker deployments")
-
-    await _test_dynamic_workflow_versioning(
-        client,
-        DynamicWorkflowVersioningOnDefn,
-        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
-    )
-
-
-async def test_worker_deployment_dynamic_workflow_getter(
-    client: Client, env: WorkflowEnvironment
-):
-    if env.supports_time_skipping:
-        pytest.skip("Test Server doesn't support worker deployments")
-
-    await _test_dynamic_workflow_versioning(
-        client,
-        DynamicWorkflowVersioningWithGetter,
-        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
-    )
 
 
 @workflow.defn
