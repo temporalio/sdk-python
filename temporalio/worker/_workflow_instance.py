@@ -1610,9 +1610,7 @@ class _WorkflowInstanceImpl(
             while True:
                 assert handle
                 try:
-                    # We have to shield because we don't want the future itself
-                    # to be cancelled
-                    return await asyncio.shield(handle._result_fut)
+                    return await handle._result_fut
                 except asyncio.CancelledError:
                     apply_child_cancel_error()
 
@@ -1626,9 +1624,7 @@ class _WorkflowInstanceImpl(
         # Wait on start before returning
         while True:
             try:
-                # We have to shield because we don't want the future itself
-                # to be cancelled
-                await asyncio.shield(handle._start_fut)
+                await handle._start_fut
                 return handle
             except asyncio.CancelledError:
                 apply_child_cancel_error()
