@@ -18,8 +18,6 @@ from typing import (
     Optional,
     Sequence,
     Type,
-    TypeAlias,
-    Union,
     cast,
 )
 
@@ -331,6 +329,12 @@ class Worker:
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
+            should_enforce_versioning_behavior = (
+                deployment_options is not None
+                and deployment_options.use_worker_versioning
+                and deployment_options.default_versioning_behavior
+                == temporalio.common.VersioningBehavior.UNSPECIFIED
+            )
             self._workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 namespace=client.namespace,
@@ -348,6 +352,7 @@ class Worker:
                 metric_meter=self._runtime.metric_meter,
                 on_eviction_hook=None,
                 disable_safe_eviction=disable_safe_workflow_eviction,
+                should_enforce_versioning_behavior=should_enforce_versioning_behavior,
             )
 
         if tuner is not None:
