@@ -136,23 +136,14 @@ class _WorkflowWorker:
             if defn.name in self._workflows:
                 raise ValueError(f"More than one workflow named {defn.name}")
             if should_enforce_versioning_behavior:
-                not_in_annotation = defn.versioning_behavior in [
+                if defn.versioning_behavior in [
                     None,
                     temporalio.common.VersioningBehavior.UNSPECIFIED,
-                ]
-                if defn.name:
-                    if not_in_annotation:
-                        raise ValueError(
-                            f"Workflow {defn.name} must specify a versioning behavior using "
-                            "the `versioning_behavior` argument to `@workflow.defn`."
-                        )
-                else:
-                    if not_in_annotation and defn.dynamic_versioning_behavior is None:
-                        raise ValueError(
-                            f"Dynamic Workflow {defn.cls.__qualname__} must specify a versioning "
-                            "behavior using `@workflow.dynamic_versioning_behavior` or the "
-                            "`versioning_behavior` argument to `@workflow.defn`."
-                        )
+                ]:
+                    raise ValueError(
+                        f"Workflow {defn.name} must specify a versioning behavior using "
+                        "the `versioning_behavior` argument to `@workflow.defn`."
+                    )
 
             # Prepare the workflow with the runner (this will error in the
             # sandbox if an import fails somehow)

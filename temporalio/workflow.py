@@ -223,25 +223,6 @@ class UnfinishedSignalHandlersWarning(RuntimeWarning):
     """The workflow exited before all signal handlers had finished executing."""
 
 
-def dynamic_versioning_behavior(
-    fn: MethodSyncNoParam[SelfType, temporalio.common.VersioningBehavior],
-) -> MethodSyncNoParam[SelfType, temporalio.common.VersioningBehavior]:
-    """Decorator for specifying versioning behavior in dynamic workflows.
-
-    This function must be read-only and not mutate workflow state. Any mutation could lead to
-    nondeterministic behavior. If the workflow function specifies a `versioning_behavior` on
-    both ``@workflow.run`` and with a getter, the getter's value will be used whenever it is not
-    ``VersioningBehavior.UNSPECIFIED``.
-
-    WARNING: This setting is experimental.
-
-    Args:
-        fn: The method to decorate
-    """
-    setattr(fn, "__temporal_dynamic_versioning_behavior", True)
-    return fn
-
-
 @overload
 def signal(
     fn: CallableSyncOrAsyncReturnNoneType,
@@ -1447,7 +1428,6 @@ class _Definition:
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
     versioning_behavior: Optional[temporalio.common.VersioningBehavior] = None
-    dynamic_versioning_behavior: Optional[CallableSyncNoParam] = None
 
     @staticmethod
     def from_class(cls: Type) -> Optional[_Definition]:
@@ -1516,7 +1496,6 @@ class _Definition:
         signals: Dict[Optional[str], _SignalDefinition] = {}
         queries: Dict[Optional[str], _QueryDefinition] = {}
         updates: Dict[Optional[str], _UpdateDefinition] = {}
-        dynamic_versioning_behavior: Optional[CallableSyncNoParam] = None
         for name, member in inspect.getmembers(cls):
             if hasattr(member, "__temporal_workflow_run"):
                 seen_run_attr = True
@@ -1560,15 +1539,6 @@ class _Definition:
                     queries[query_defn.name] = query_defn
             elif name == "__init__" and hasattr(member, "__temporal_workflow_init"):
                 init_fn = member
-            elif hasattr(member, "__temporal_dynamic_versioning_behavior"):
-                if workflow_name:
-                    issues.append(
-                        "Non-dynamic workflows should not specify "
-                        "@workflow.dynamic_versioning_behavior, which was found on "
-                        f"{cls.__qualname__}.{name}. Use the versioning_behavior "
-                        "argument to @workflow.run instead."
-                    )
-                dynamic_versioning_behavior = member
             elif isinstance(member, UpdateMethodMultiParam):
                 update_defn = member._defn
                 if update_defn.name in updates:
@@ -1652,7 +1622,6 @@ class _Definition:
             sandboxed=sandboxed,
             failure_exception_types=failure_exception_types,
             versioning_behavior=versioning_behavior,
-            dynamic_versioning_behavior=dynamic_versioning_behavior,
         )
         setattr(cls, "__temporal_workflow_definition", defn)
         setattr(run_fn, "__temporal_workflow_definition", defn)
