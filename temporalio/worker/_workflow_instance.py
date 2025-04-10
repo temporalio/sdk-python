@@ -1594,6 +1594,7 @@ class _WorkflowInstanceImpl(
             # If the cancel command is for external workflow, we
             # have to add a seq and mark it pending
             if cancel_command.HasField("request_cancel_external_workflow_execution"):
+                assert False, "request_cancel_external_workflow_execution"
                 cancel_seq = self._next_seq("external_cancel")
                 cancel_command.request_cancel_external_workflow_execution.seq = (
                     cancel_seq
