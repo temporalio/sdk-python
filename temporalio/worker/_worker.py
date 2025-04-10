@@ -8,8 +8,18 @@ import hashlib
 import logging
 import sys
 import warnings
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, List, Optional, Sequence, Type, cast
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    cast,
+)
 
 from typing_extensions import TypedDict
 
@@ -26,10 +36,11 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
+from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
-from ._tuning import WorkerTuner, _to_bridge_slot_supplier
+from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -82,6 +93,7 @@ class Worker:
         on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,
         use_worker_versioning: bool = False,
         disable_safe_workflow_eviction: bool = False,
+        deployment_config: Optional[WorkerDeploymentConfig] = None,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -124,6 +136,8 @@ class Worker:
             build_id: Unique identifier for the current runtime. This is best
                 set as a hash of all code and should change only when code does.
                 If unset, a best-effort identifier is generated.
+                Exclusive with `deployment_config`.
+                WARNING: Deprecated. Use `deployment_config` instead.
             identity: Identity for this worker client. If unset, the client
                 identity is used.
             max_cached_workflows: If nonzero, workflows will be cached and
@@ -205,6 +219,8 @@ class Worker:
                 workflows which it claims to be compatible with. For more
                 information, see
                 https://docs.temporal.io/workers#worker-versioning.
+                Exclusive with `deployment_config`.
+                WARNING: Deprecated. Use `deployment_config` instead.
             disable_safe_workflow_eviction: If true, instead of letting the
                 workflow collect its tasks properly, the worker will simply let
                 the Python garbage collector collect the tasks. WARNING: Users
@@ -212,12 +228,19 @@ class Worker:
                 throw ``GeneratorExit`` in coroutines causing them to wake up
                 in different threads and run ``finally`` and other code in the
                 wrong workflow environment.
+            deployment_config: Deployment config for the worker. Exclusive with `build_id` and
+                `use_worker_versioning`.
+                WARNING: This is an experimental feature and may change in the future.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
         if use_worker_versioning and not build_id:
             raise ValueError(
                 "build_id must be specified when use_worker_versioning is True"
+            )
+        if deployment_config and (build_id or use_worker_versioning):
+            raise ValueError(
+                "deployment_config cannot be used with build_id or use_worker_versioning"
             )
 
         # Prepend applicable client interceptors to the given ones
@@ -307,6 +330,12 @@ class Worker:
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
+            should_enforce_versioning_behavior = (
+                deployment_config is not None
+                and deployment_config.use_worker_versioning
+                and deployment_config.default_versioning_behavior
+                == temporalio.common.VersioningBehavior.UNSPECIFIED
+            )
             self._workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 namespace=client.namespace,
@@ -324,6 +353,7 @@ class Worker:
                 metric_meter=self._runtime.metric_meter,
                 on_eviction_hook=None,
                 disable_safe_eviction=disable_safe_workflow_eviction,
+                should_enforce_versioning_behavior=should_enforce_versioning_behavior,
             )
 
         if tuner is not None:
@@ -345,6 +375,24 @@ class Worker:
 
         bridge_tuner = tuner._to_bridge_tuner()
 
+        versioning_strategy: temporalio.bridge.worker.WorkerVersioningStrategy
+        if deployment_config:
+            versioning_strategy = (
+                deployment_config._to_bridge_worker_deployment_options()
+            )
+        elif use_worker_versioning:
+            build_id = build_id or load_default_build_id()
+            versioning_strategy = (
+                temporalio.bridge.worker.WorkerVersioningStrategyLegacyBuildIdBased(
+                    build_id=build_id
+                )
+            )
+        else:
+            build_id = build_id or load_default_build_id()
+            versioning_strategy = temporalio.bridge.worker.WorkerVersioningStrategyNone(
+                build_id=build_id
+            )
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -357,7 +405,6 @@ class Worker:
             temporalio.bridge.worker.WorkerConfig(
                 namespace=client.namespace,
                 task_queue=task_queue,
-                build_id=build_id or load_default_build_id(),
                 identity_override=identity,
                 max_cached_workflows=max_cached_workflows,
                 tuner=bridge_tuner,
@@ -382,7 +429,6 @@ class Worker:
                 graceful_shutdown_period_millis=int(
                     1000 * graceful_shutdown_timeout.total_seconds()
                 ),
-                use_worker_versioning=use_worker_versioning,
                 # Need to tell core whether we want to consider all
                 # non-determinism exceptions as workflow fail, and whether we do
                 # per workflow type
@@ -393,6 +439,7 @@ class Worker:
                     if self._workflow_worker
                     else set()
                 ),
+                versioning_strategy=versioning_strategy,
             ),
         )
 
@@ -666,6 +713,31 @@ class WorkerConfig(TypedDict, total=False):
     on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]]
     use_worker_versioning: bool
     disable_safe_workflow_eviction: bool
+    deployment_config: Optional[WorkerDeploymentConfig]
+
+
+@dataclass
+class WorkerDeploymentConfig:
+    """Options for configuring the Worker Versioning feature.
+
+    WARNING: This is an experimental feature and may change in the future.
+    """
+
+    version: WorkerDeploymentVersion
+    use_worker_versioning: bool
+    default_versioning_behavior: VersioningBehavior = VersioningBehavior.UNSPECIFIED
+
+    def _to_bridge_worker_deployment_options(
+        self,
+    ) -> temporalio.bridge.worker.WorkerDeploymentOptions:
+        return temporalio.bridge.worker.WorkerDeploymentOptions(
+            version=temporalio.bridge.worker.WorkerDeploymentVersion(
+                deployment_name=self.version.deployment_name,
+                build_id=self.version.build_id,
+            ),
+            use_worker_versioning=self.use_worker_versioning,
+            default_versioning_behavior=self.default_versioning_behavior.value,
+        )
 
 
 _default_build_id: Optional[str] = None

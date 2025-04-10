@@ -90,12 +90,16 @@ def defn(
     name: Optional[str] = None,
     sandboxed: bool = True,
     failure_exception_types: Sequence[Type[BaseException]] = [],
+    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
 ) -> Callable[[ClassType], ClassType]: ...
 
 
 @overload
 def defn(
-    *, sandboxed: bool = True, dynamic: bool = False
+    *,
+    sandboxed: bool = True,
+    dynamic: bool = False,
+    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
 ) -> Callable[[ClassType], ClassType]: ...
 
 
@@ -106,6 +110,7 @@ def defn(
     sandboxed: bool = True,
     dynamic: bool = False,
     failure_exception_types: Sequence[Type[BaseException]] = [],
+    versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
 ):
     """Decorator for workflow classes.
 
@@ -127,6 +132,8 @@ def defn(
             applied in addition to ones set on the worker constructor. If
             ``Exception`` is set, it effectively will fail a workflow/update in
             all user exception cases. WARNING: This setting is experimental.
+        versioning_behavior: Specifies the versioning behavior to use for this workflow.
+            WARNING: This setting is experimental.
     """
 
     def decorator(cls: ClassType) -> ClassType:
@@ -136,6 +143,7 @@ def defn(
             workflow_name=name or cls.__name__ if not dynamic else None,
             sandboxed=sandboxed,
             failure_exception_types=failure_exception_types,
+            versioning_behavior=versioning_behavior,
         )
         return cls
 
@@ -1419,6 +1427,7 @@ class _Definition:
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
+    versioning_behavior: Optional[temporalio.common.VersioningBehavior] = None
 
     @staticmethod
     def from_class(cls: Type) -> Optional[_Definition]:
@@ -1473,6 +1482,7 @@ class _Definition:
         workflow_name: Optional[str],
         sandboxed: bool,
         failure_exception_types: Sequence[Type[BaseException]],
+        versioning_behavior: temporalio.common.VersioningBehavior,
     ) -> None:
         # Check it's not being doubly applied
         if _Definition.from_class(cls):
@@ -1601,6 +1611,7 @@ class _Definition:
             )
 
         assert run_fn
+        assert seen_run_attr
         defn = _Definition(
             name=workflow_name,
             cls=cls,
@@ -1610,6 +1621,7 @@ class _Definition:
             updates=updates,
             sandboxed=sandboxed,
             failure_exception_types=failure_exception_types,
+            versioning_behavior=versioning_behavior,
         )
         setattr(cls, "__temporal_workflow_definition", defn)
         setattr(run_fn, "__temporal_workflow_definition", defn)

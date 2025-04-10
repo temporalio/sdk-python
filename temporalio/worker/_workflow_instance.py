@@ -345,6 +345,11 @@ class _WorkflowInstanceImpl(
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         self._current_completion.successful.SetInParent()
+        self._current_completion.successful.versioning_behavior = (
+            self._defn.versioning_behavior.value
+            if self._defn.versioning_behavior
+            else temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
+        )
         self._current_activation_error: Optional[Exception] = None
         self._current_build_id = act.build_id_for_current_task
         self._current_history_length = act.history_length
@@ -429,6 +434,7 @@ class _WorkflowInstanceImpl(
             )
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()
+            # TODO: Review - odd that we don't un-set success here?
             try:
                 self._failure_converter.to_failure(
                     activation_err,
