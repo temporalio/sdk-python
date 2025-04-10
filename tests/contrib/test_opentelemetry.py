@@ -332,6 +332,56 @@ def dump_spans(
     return ret
 
 
+@workflow.defn
+class SimpleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "done"
+
+
+async def test_opentelemetry_always_create_workflow_spans(client: Client):
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    # Create a worker with an interceptor without always create
+    async with Worker(
+        client,
+        task_queue=f"task_queue_{uuid.uuid4()}",
+        workflows=[SimpleWorkflow],
+        interceptors=[TracingInterceptor(tracer)],
+    ) as worker:
+        assert "done" == await client.execute_workflow(
+            SimpleWorkflow.run,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    # Confirm the spans are not there
+    spans = exporter.get_finished_spans()
+    logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
+    assert len(spans) == 0
+
+    # Now create a worker with an interceptor with always create
+    async with Worker(
+        client,
+        task_queue=f"task_queue_{uuid.uuid4()}",
+        workflows=[SimpleWorkflow],
+        interceptors=[TracingInterceptor(tracer, always_create_workflow_spans=True)],
+    ) as worker:
+        assert "done" == await client.execute_workflow(
+            SimpleWorkflow.run,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    # Confirm the spans are not there
+    spans = exporter.get_finished_spans()
+    logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
+    assert len(spans) > 0
+    assert spans[0].name == "RunWorkflow:SimpleWorkflow"
+
+
 # TODO(cretz): Additional tests to write
 # * query without interceptor (no headers)
 # * workflow without interceptor (no headers) but query with interceptor (headers)
