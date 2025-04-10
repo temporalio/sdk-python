@@ -6923,6 +6923,40 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
     )
 
 
+@workflow.defn
+class TimeoutErrorWorkflow:
+    @workflow.run
+    async def run(self, scenario) -> None:
+        if scenario == "workflow.wait_condition":
+            await workflow.wait_condition(lambda: False, timeout=0.01)
+        elif scenario == "asyncio.wait_for":
+            await asyncio.wait_for(asyncio.sleep(1000), timeout=0.01)
+        elif scenario == "asyncio.timeout":
+            if sys.version_info >= (3, 11):
+                async with asyncio.timeout(0.1):
+                    await asyncio.sleep(1000)
+        else:
+            raise RuntimeError("Unrecognized scenario")
+
+
+async def test_workflow_timeout_error(client: Client):
+    async with new_worker(client, TimeoutErrorWorkflow) as worker:
+        scenarios = ["workflow.wait_condition", "asyncio.wait_for"]
+        if sys.version_info >= (3, 11):
+            scenarios.append("asyncio.timeout")
+
+        for scenario in scenarios:
+            with pytest.raises(WorkflowFailureError) as err:
+                await client.execute_workflow(
+                    TimeoutErrorWorkflow.run,
+                    scenario,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+            assert isinstance(err.value.cause, ApplicationError)
+            assert err.value.cause.type == "TimeoutError"
+
+
 def check_in_workflow() -> str:
     return "in workflow" if workflow.in_workflow() else "not in workflow"
 
