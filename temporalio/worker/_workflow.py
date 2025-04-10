@@ -336,7 +336,6 @@ class _WorkflowWorker:
 
         # Always set the run ID on the completion
         completion.run_id = act.run_id
-        # TODO: Could set versioning behavior here?
 
         # Encode the completion if there's a codec and not cache remove job
         if self._data_converter.payload_codec:

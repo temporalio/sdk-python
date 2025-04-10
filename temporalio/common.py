@@ -1020,12 +1020,12 @@ Priority.default = Priority(priority_key=None)
 class VersioningBehavior(Enum):
     """Specifies when a workflow might move from a worker of one Build Id to another.
 
-    NOTE: Experimental API.
+    WARNING: Experimental API.
     """
 
     UNSPECIFIED = 1
     """ An unspecified versioning behavior. By default, workers opting into worker versioning will
-    be required to specify a behavior. See TODO: Add link to worker options."""
+    be required to specify a behavior. See :py:class:`temporalio.worker.WorkerDeploymentOptions`."""
     PINNED = 2
     """The workflow will be pinned to the current Build ID unless manually moved."""
     AUTO_UPGRADE = 3
@@ -1046,7 +1046,7 @@ class VersioningBehavior(Enum):
 class WorkerDeploymentVersion:
     """Represents the version of a specific worker deployment.
 
-    NOTE: Experimental API.
+    WARNING: Experimental API.
     """
 
     _deployment_name: str
