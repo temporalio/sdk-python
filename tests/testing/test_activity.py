@@ -2,8 +2,12 @@ import asyncio
 import threading
 import time
 from contextvars import copy_context
+from unittest.mock import Mock
+
+import pytest
 
 from temporalio import activity
+from temporalio.client import Client
 from temporalio.exceptions import CancelledError
 from temporalio.testing import ActivityEnvironment
 
@@ -110,3 +114,30 @@ async def test_activity_env_assert():
 
     assert type(expected_err) == type(actual_err)
     assert str(expected_err) == str(actual_err)
+
+
+async def test_activity_env_without_client():
+    saw_error: bool = False
+
+    def my_activity() -> None:
+        with pytest.raises(RuntimeError):
+            activity.client()
+        nonlocal saw_error
+        saw_error = True
+
+    env = ActivityEnvironment()
+    env.run(my_activity)
+    assert saw_error
+
+
+async def test_activity_env_with_client():
+    got_client: bool = False
+
+    def my_activity() -> None:
+        nonlocal got_client
+        if activity.client():
+            got_client = True
+
+    env = ActivityEnvironment(client=Mock(spec=Client))
+    env.run(my_activity)
+    assert got_client
