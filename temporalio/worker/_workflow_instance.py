@@ -1752,8 +1752,8 @@ class _WorkflowInstanceImpl(
         async def run_nexus() -> Any:
             while True:
                 try:
-                    # shield to prevent the future itself being cancelled
-                    return await asyncio.shield(handle._result_fut)
+                    # TODO(dan): start_child_workflow shields. Why?
+                    return await handle._result_fut
                 except asyncio.CancelledError:
                     raise NotImplementedError("Nexus operation cancel not implemented")
 
@@ -1765,8 +1765,8 @@ class _WorkflowInstanceImpl(
 
         while True:
             try:
-                # shield to prevent the future itself being cancelled
-                await asyncio.shield(handle._start_fut)
+                # TODO(dan): start_child_workflow shields. Why?
+                await handle._start_fut
                 return handle
             except asyncio.CancelledError:
                 raise NotImplementedError("Nexus operation cancel not implemented")
