@@ -97,11 +97,15 @@ class _NexusWorker:
             if task.HasField("task"):
                 if task.task.request.HasField("start_operation"):
                     await self._handle_start_operation(
-                        task.task.request.start_operation, task.task.task_token
+                        task.task.request.start_operation
                     )
                 elif task.task.request.HasField("cancel_operation"):
+                    await self._handle_cancel_operation(
+                        task.task.request.cancel_operation, task.task.task_token
+                    )
+                else:
                     raise NotImplementedError(
-                        "Nexus cancel_operation not yet implemented"
+                        f"Invalid Nexus task request: {task.task.request}"
                     )
             else:
                 raise NotImplementedError(f"Invalid Nexus task: {task}")
@@ -109,7 +113,7 @@ class _NexusWorker:
     # TODO(dan): is it correct to import from temporalio.api.nexus?
     # Why are these things not exposed in temporalio.bridge?
     async def _handle_start_operation(
-        self, request: temporalio.api.nexus.v1.StartOperationRequest, task_token: bytes
+        self, request: temporalio.api.nexus.v1.StartOperationRequest
     ) -> None:
         operation = self._get_operation(request)
 
@@ -148,6 +152,7 @@ class _NexusWorker:
             # See `rg 'complete_nexus_task(NexusTaskCompletion' in sdk-core`
             op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                 async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
+                    # TODO(dan): operation_token?
                     operation_id=result.token,
                     # TODO(dan): links
                     links=[],
@@ -162,10 +167,21 @@ class _NexusWorker:
                 )
             )
         completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-            task_token=task_token,
+            # TODO(dan): why is the token in two places: here and in op_resp
+            task_token=(result.token or "").encode(),
             completed=temporalio.api.nexus.v1.Response(start_operation=op_resp),
         )
         await self._bridge_worker().complete_nexus_task(completion)
+
+    async def _handle_cancel_operation(
+        self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
+    ) -> None:
+        operation = self._get_operation(request)
+        # TODO(dan): header
+        await operation.cancel(
+            token=task_token.decode(),
+            options=nexusrpc.handler.CancelOperationOptions(),
+        )
 
     def _get_operation(
         self,
