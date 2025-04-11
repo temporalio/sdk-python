@@ -5,7 +5,7 @@ use log::error;
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyTuple};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -91,10 +91,29 @@ pub struct LegacyBuildIdBased {
 }
 
 /// Recreates [temporal_sdk_core_api::worker::WorkerDeploymentVersion]
-#[derive(FromPyObject)]
+#[derive(FromPyObject, Clone)]
 pub struct WorkerDeploymentVersion {
     pub deployment_name: String,
     pub build_id: String,
+}
+
+impl IntoPy<Py<PyAny>> for WorkerDeploymentVersion {
+    fn into_py(self, py: Python) -> Py<PyAny> {
+        let dict = PyDict::new(py);
+        dict.set_item("deployment_name", self.deployment_name)
+            .unwrap();
+        dict.set_item("build_id", self.build_id).unwrap();
+        dict.into()
+    }
+}
+
+impl From<temporal_sdk_core_api::worker::WorkerDeploymentVersion> for WorkerDeploymentVersion {
+    fn from(version: temporal_sdk_core_api::worker::WorkerDeploymentVersion) -> Self {
+        WorkerDeploymentVersion {
+            deployment_name: version.deployment_name,
+            build_id: version.build_id,
+        }
+    }
 }
 
 #[derive(FromPyObject)]
@@ -136,6 +155,8 @@ pub struct SlotReserveCtx {
     #[pyo3(get)]
     pub worker_build_id: String,
     #[pyo3(get)]
+    pub worker_deployment_version: Option<WorkerDeploymentVersion>,
+    #[pyo3(get)]
     pub is_sticky: bool,
 }
 
@@ -150,7 +171,12 @@ impl SlotReserveCtx {
             },
             task_queue: ctx.task_queue().to_string(),
             worker_identity: ctx.worker_identity().to_string(),
-            worker_build_id: ctx.worker_build_id().to_string(),
+            worker_build_id: ctx
+                .worker_deployment_version()
+                .clone()
+                .map(|v| v.build_id)
+                .unwrap_or_default(),
+            worker_deployment_version: ctx.worker_deployment_version().clone().map(Into::into),
             is_sticky: ctx.is_sticky(),
         }
     }

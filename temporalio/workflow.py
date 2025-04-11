@@ -480,11 +480,27 @@ class Info:
     def get_current_build_id(self) -> str:
         """Get the Build ID of the worker which executed the current Workflow Task.
 
-        May be undefined if the task was completed by a worker without a Build ID. If this worker is the one executing
-        this task for the first time and has a Build ID set, then its ID will be used. This value may change over the
-        lifetime of the workflow run, but is deterministic and safe to use for branching.
+        May be undefined if the task was completed by a worker without a Build ID. If this worker is
+        the one executing this task for the first time and has a Build ID set, then its ID will be
+        used. This value may change over the lifetime of the workflow run, but is deterministic and
+        safe to use for branching.
+
+        .. deprecated::
+            Use get_current_deployment_version instead.
         """
         return _Runtime.current().workflow_get_current_build_id()
+
+    def get_current_deployment_version(
+        self,
+    ) -> Optional[temporalio.common.WorkerDeploymentVersion]:
+        """Get the deployment version of the worker which executed the current Workflow Task.
+
+        May be None if the task was completed by a worker without a deployment version or build
+        id. If this worker is the one executing this task for the first time and has a deployment
+        version set, then its ID will be used. This value may change over the lifetime of the
+        workflow run, but is deterministic and safe to use for branching.
+        """
+        return _Runtime.current().workflow_get_current_deployment_version()
 
     def get_current_history_length(self) -> int:
         """Get the current number of events in history.
@@ -612,6 +628,11 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_get_current_build_id(self) -> str: ...
+
+    @abstractmethod
+    def workflow_get_current_deployment_version(
+        self,
+    ) -> Optional[temporalio.common.WorkerDeploymentVersion]: ...
 
     @abstractmethod
     def workflow_get_current_history_length(self) -> int: ...

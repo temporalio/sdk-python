@@ -561,6 +561,11 @@ class DeploymentVersioningWorkflowV2Pinned:
     @workflow.run
     async def run(self):
         await workflow.wait_condition(lambda: self.finish)
+        depver = workflow.info().get_current_deployment_version()
+        assert depver
+        assert depver.build_id == "2.0"
+        # Just ensuring the rust object was converted properly and this method still works
+        workflow.logger.debug(f"Dep string: {depver.to_canonical_string()}")
         return "version-v2"
 
     @workflow.signal

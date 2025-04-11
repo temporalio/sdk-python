@@ -50,6 +50,7 @@ import temporalio.api.enums.v1
 import temporalio.api.sdk.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
+import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
@@ -211,7 +212,9 @@ class _WorkflowInstanceImpl(
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time_ns = 0
         self._cancel_requested = False
-        self._current_build_id = ""
+        self._deployment_version_for_current_task: Optional[
+            temporalio.bridge.proto.common.WorkerDeploymentVersion
+        ] = None
         self._current_history_length = 0
         self._current_history_size = 0
         self._continue_as_new_suggested = False
@@ -351,7 +354,9 @@ class _WorkflowInstanceImpl(
             else temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
         )
         self._current_activation_error: Optional[Exception] = None
-        self._current_build_id = act.build_id_for_current_task
+        self._deployment_version_for_current_task = (
+            act.deployment_version_for_current_task
+        )
         self._current_history_length = act.history_length
         self._current_history_size = act.history_size_bytes
         self._continue_as_new_suggested = act.continue_as_new_suggested
@@ -985,7 +990,19 @@ class _WorkflowInstanceImpl(
         return self._extern_functions
 
     def workflow_get_current_build_id(self) -> str:
-        return self._current_build_id
+        if not self._deployment_version_for_current_task:
+            return ""
+        return self._deployment_version_for_current_task.build_id
+
+    def workflow_get_current_deployment_version(
+        self,
+    ) -> Optional[temporalio.common.WorkerDeploymentVersion]:
+        if not self._deployment_version_for_current_task:
+            return None
+        return temporalio.common.WorkerDeploymentVersion(
+            build_id=self._deployment_version_for_current_task.build_id,
+            deployment_name=self._deployment_version_for_current_task.deployment_name,
+        )
 
     def workflow_get_current_history_length(self) -> int:
         return self._current_history_length
