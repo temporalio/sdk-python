@@ -92,8 +92,9 @@ class _NexusWorker:
 
             task = await poll_task
 
-            print("🟢 _NexusWorker received poll response")
+            print(f"🟢 _NexusWorker received poll response: {task}")
 
+            # TODO: Correct way to examine and classify task proto
             if task.HasField("task"):
                 if task.task.request.HasField("start_operation"):
                     await self._handle_start_operation(
@@ -148,6 +149,7 @@ class _NexusWorker:
             # See `rg 'complete_nexus_task(NexusTaskCompletion'` in sdk-core
             op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                 async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
+                    # TODO(dan): operation_token
                     operation_id=result.token,
                     # TODO(dan): links
                     links=[],
