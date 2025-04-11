@@ -2243,8 +2243,30 @@ class MyDataClass:
         assert self.field1 == "some value"
 
 
+T = typing.TypeVar("T")
+
+
+@dataclass
+class MyGenericDataClass(typing.Generic[T]):
+    field1: str
+    field2: T = dataclasses.field(metadata={"skip": True}, default=None)
+
+    def assert_expected(self) -> None:
+        # Part of the assertion is that this is the right type, which is
+        # confirmed just by calling the method. We also check the field.
+        assert str(self.field1) == "some value2"
+
+
 @activity.defn
 async def data_class_typed_activity(param: MyDataClass) -> MyDataClass:
+    param.assert_expected()
+    return param
+
+
+@activity.defn
+async def generic_data_class_typed_activity(
+    param: MyGenericDataClass[str],
+) -> MyGenericDataClass[str]:
     param.assert_expected()
     return param
 
@@ -2306,6 +2328,20 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
                 start_to_close_timeout=timedelta(seconds=30),
             )
             param.assert_expected()
+            generic_param = MyGenericDataClass[str]("some value2")
+            generic_param = await workflow.execute_activity(
+                generic_data_class_typed_activity,
+                generic_param,
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+            generic_param.assert_expected()
+            generic_param = await workflow.execute_local_activity(
+                generic_data_class_typed_activity,
+                generic_param,
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+            generic_param.assert_expected()
+
             child_handle = await workflow.start_child_workflow(
                 DataClassTypedWorkflow.run,
                 param,
@@ -2348,7 +2384,9 @@ async def test_workflow_dataclass_typed(client: Client, env: WorkflowEnvironment
             "Java test server: https://github.com/temporalio/sdk-core/issues/390"
         )
     async with new_worker(
-        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+        client,
+        DataClassTypedWorkflow,
+        activities=[data_class_typed_activity, generic_data_class_typed_activity],
     ) as worker:
         val = MyDataClass(field1="some value")
         handle = await client.start_workflow(
