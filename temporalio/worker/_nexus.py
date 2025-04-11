@@ -101,10 +101,16 @@ class _NexusWorker:
                         task.task.request.start_operation, task.task.task_token
                     )
                 elif task.task.request.HasField("cancel_operation"):
+                    await self._handle_cancel_operation(
+                        task.task.request.cancel_operation,
+                        task.task.request.cancel_operation.operation_token,
+                    )
+                else:
                     raise NotImplementedError(
-                        "Nexus cancel_operation not yet implemented"
+                        f"Invalid Nexus task request: {task.task.request}"
                     )
             else:
+                # TODO(dan): handle cancel_task
                 raise NotImplementedError(f"Invalid Nexus task: {task}")
 
     # TODO(dan): is it correct to import from temporalio.api.nexus?
@@ -168,6 +174,18 @@ class _NexusWorker:
             completed=temporalio.api.nexus.v1.Response(start_operation=op_resp),
         )
         await self._bridge_worker().complete_nexus_task(completion)
+
+    async def _handle_cancel_operation(
+        self,
+        request: temporalio.api.nexus.v1.CancelOperationRequest,
+        operation_token: str,
+    ) -> None:
+        operation = self._get_operation(request)
+        # TODO(dan): header
+        await operation.cancel(
+            token=operation_token,
+            options=nexusrpc.handler.CancelOperationOptions(),
+        )
 
     def _get_operation(
         self,
