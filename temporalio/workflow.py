@@ -7,6 +7,7 @@ import contextvars
 import inspect
 import logging
 import threading
+import typing
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -39,6 +40,7 @@ from typing import (
     overload,
 )
 
+import nexusrpc.interface
 from typing_extensions import (
     Concatenate,
     Literal,
@@ -746,6 +748,17 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
     ) -> ActivityHandle[Any]: ...
+
+    @abstractmethod
+    async def workflow_start_nexus_operation(
+        self,
+        endpoint: str,
+        service: str,
+        operation: str,
+        input: Any,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[Any]: ...
 
     @abstractmethod
     def workflow_time_ns(self) -> int: ...
@@ -4237,6 +4250,53 @@ async def execute_child_workflow(
     return await handle
 
 
+I = TypeVar("I")
+O = TypeVar("O")
+
+
+class NexusOperationHandle(Generic[O]):
+    async def result(self) -> O:
+        raise NotImplementedError
+
+    def cancel(self) -> bool:
+        raise NotImplementedError
+
+
+async def start_nexus_operation(
+    endpoint: str,
+    service: str,
+    operation: str,
+    input: Any,
+    *,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    headers: Optional[Mapping[str, str]] = None,
+) -> NexusOperationHandle[Any]:
+    """Start a Nexus operation and return its handle.
+
+    Args:
+        endpoint: The Nexus endpoint.
+        service: The Nexus service.
+        operation: The Nexus operation.
+        input: The Nexus operation input.
+        schedule_to_close_timeout: Timeout for the entire operation attempt.
+        headers: Headers to send with the Nexus HTTP request.
+
+    Returns:
+        A handle to the Nexus operation. The result can be obtained as
+        ```python
+        await handle.result()
+        ```
+    """
+    return await _Runtime.current().workflow_start_nexus_operation(
+        endpoint=endpoint,
+        service=service,
+        operation=operation,
+        input=input,
+        schedule_to_close_timeout=schedule_to_close_timeout,
+        headers=headers,
+    )
+
+
 class ExternalWorkflowHandle(Generic[SelfType]):
     """Handle for interacting with an external workflow.
 
@@ -4939,3 +4999,140 @@ class VersioningIntent(Enum):
         elif self == VersioningIntent.DEFAULT:
             return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
+
+
+# Nexus
+
+if TYPE_CHECKING:
+
+    class ProtocolBound(typing.Protocol):
+        pass
+
+    T = TypeVar("T", bound=ProtocolBound)
+
+
+def nexus_service(cls: Type[T]) -> Type[T]:
+    """
+    Class decorator that enforces the following on the protocol definition:
+    - all methods are async
+    - no method body implementations
+    - Maximum of two parameters
+    - first param name 'self' with no type annotation
+    - second param if present has type annotation
+    - return type annotation present
+    """
+    return cls
+
+
+# TODO(dan): Eliminate one of these nexus client constructors
+def create_nexus_client(
+    interface: Type[T],
+    endpoint: str,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+) -> T:
+    """
+    Creates a Nexus client implementing the given Nexus service interface.
+
+    Args:
+        interface: A typing.Protocol class defining the Nexus service interface to implement
+        endpoint: The Nexus endpoint to connect to
+        schedule_to_close_timeout: Optional schedule to close timeout for the Nexus operations
+
+    Returns:
+        A Nexus client interface for use in workflow code
+    """
+    client_schedule_to_close_timeout = schedule_to_close_timeout
+
+    methods = {}
+    for name, obj in interface.__dict__.items():
+        if not inspect.iscoroutinefunction(obj):
+            continue
+
+        # TODO: create methods with run-time signature objects matching interface?
+        # See e.g. `create_autospec` https://github.com/python/cpython/blob/main/Lib/unittest/mock.py#L2736
+        # hints = get_type_hints(method_impl)
+        # return_type = hints.pop("return", type(None))
+
+        async def method(
+            self,
+            arg: Any,
+            schedule_to_close_timeout: Optional[timedelta] = None,
+            headers: Optional[Mapping[str, str]] = None,
+        ):
+            return await temporalio.workflow.start_nexus_operation(
+                endpoint=endpoint,
+                service=interface.__name__,
+                operation=name,
+                input=arg,
+                schedule_to_close_timeout=(
+                    schedule_to_close_timeout or client_schedule_to_close_timeout
+                ),
+                headers=headers or {},
+            )
+
+        methods[name] = method
+
+    class _ServiceClient:
+        async def start_operation(
+            self,
+            operation: Callable[[Any, I], Awaitable[O]],
+            input: I,
+            schedule_to_close_timeout: Optional[timedelta] = None,
+            headers: Optional[Mapping[str, str]] = None,
+        ) -> NexusOperationHandle[O]:
+            return await temporalio.workflow.start_nexus_operation(
+                endpoint=endpoint,
+                service=interface.__name__,
+                operation=operation.__name__,
+                input=input,
+                schedule_to_close_timeout=(
+                    schedule_to_close_timeout or client_schedule_to_close_timeout
+                ),
+                headers=headers or {},
+            )
+
+    cls = type(f"{interface.__name__}Client", (_ServiceClient,), methods)
+    return cls()  # type: ignore
+
+
+# TODO(dan): Eliminate one of these nexus client constructors
+class NexusClient:
+    def __init__(
+        self,
+        service: Union[str, Type[T]],
+        endpoint: str,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+    ) -> None:
+        self._service_name = service if isinstance(service, str) else service.__name__
+        self._endpoint = endpoint
+        self._schedule_to_close_timeout = schedule_to_close_timeout
+
+    async def start_operation(
+        self,
+        operation: nexusrpc.interface.NexusOperation[I, O],
+        input: I,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[O]:
+        return await temporalio.workflow.start_nexus_operation(
+            endpoint=self._endpoint,
+            service=self._service_name,
+            operation=operation.name,
+            input=input,
+            schedule_to_close_timeout=(
+                schedule_to_close_timeout or self._schedule_to_close_timeout
+            ),
+            headers=headers or {},
+        )
+
+    async def execute_operation(
+        self,
+        operation: nexusrpc.interface.NexusOperation[I, O],
+        input: I,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> O:
+        handle = await self.start_operation(
+            operation, input, schedule_to_close_timeout, headers
+        )
+        return await handle.result()
