@@ -1425,7 +1425,7 @@ class _WorkflowInstanceImpl(
             )
         )
 
-    def workflow_start_nexus_operation(
+    async def workflow_start_nexus_operation(
         self,
         endpoint: str,
         service: str,
@@ -1434,7 +1434,7 @@ class _WorkflowInstanceImpl(
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> temporalio.workflow.NexusOperationHandle[Any]:
-        return self._outbound.start_nexus_operation(
+        return await self._outbound.start_nexus_operation(
             StartNexusOperationInput(
                 endpoint=endpoint,
                 service=service,
@@ -1744,12 +1744,9 @@ class _WorkflowInstanceImpl(
             except asyncio.CancelledError:
                 apply_child_cancel_error()
 
-    def _outbound_start_nexus_operation(
+    async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput
     ) -> _NexusOperationHandle[Any]:
-        # A ScheduleNexusOperation command always results in an NexusOperationScheduled
-        # event, so this function returns the handle immediately. This is similar to
-        # activity but differs from child workflow.
         handle: _NexusOperationHandle
 
         async def run_nexus() -> Any:
@@ -1765,7 +1762,13 @@ class _WorkflowInstanceImpl(
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
-        return handle
+
+        while True:
+            try:
+                await asyncio.shield(handle._start_fut)
+                return handle
+            except asyncio.CancelledError:
+                raise NotImplementedError("Nexus operation cancel not implemented")
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
@@ -2467,10 +2470,10 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         return await self._instance._outbound_start_child_workflow(input)
 
-    def start_nexus_operation(
+    async def start_nexus_operation(
         self, input: StartNexusOperationInput
     ) -> temporalio.workflow.NexusOperationHandle[Any]:
-        return self._instance._outbound_start_nexus_operation(input)
+        return await self._instance._outbound_start_nexus_operation(input)
 
     def start_local_activity(
         self, input: StartLocalActivityInput
