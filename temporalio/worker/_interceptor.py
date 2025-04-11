@@ -422,8 +422,8 @@ class WorkflowOutboundInterceptor:
         """
         return self.next.start_local_activity(input)
 
-    def start_nexus_operation(
+    async def start_nexus_operation(
         self, input: StartNexusOperationInput
     ) -> temporalio.workflow.NexusOperationHandle[Any]:
         """Called for every :py:func:`temporalio.workflow.start_nexus_operation` call."""
-        return self.next.start_nexus_operation(input)
+        return await self.next.start_nexus_operation(input)
