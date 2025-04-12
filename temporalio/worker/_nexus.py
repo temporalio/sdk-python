@@ -12,7 +12,7 @@ from typing import (
     Union,
 )
 
-import nexusrpc.handler
+import nexus.handler
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -68,11 +68,11 @@ class _NexusWorker:
 
     def _validate_nexus_services(
         self, nexus_services: Sequence[Any]
-    ) -> dict[str, dict[str, nexusrpc.handler.Operation]]:
+    ) -> dict[str, dict[str, nexus.handler.Operation]]:
         # TODO(dan): Fail if multiple services implement the same service interface.
-        nexus_services_by_name: dict[str, dict[str, nexusrpc.handler.Operation]] = {}
+        nexus_services_by_name: dict[str, dict[str, nexus.handler.Operation]] = {}
         for service in nexus_services:
-            defn = nexusrpc.handler._NexusServiceDefinition.from_implementation(service)
+            defn = nexus.handler._NexusServiceDefinition.from_implementation(service)
             nexus_services_by_name[defn.name] = {
                 op_name: op_factory(service)
                 for op_name, op_factory in defn.operation_factories.items()
@@ -133,11 +133,9 @@ class _NexusWorker:
         )
 
         # TODO(dan): header
-        options = nexusrpc.handler.StartOperationOptions(
+        options = nexus.handler.StartOperationOptions(
             callback_url=request.callback,
-            links=[
-                nexusrpc.handler.Link(url=l.url, type=l.type) for l in request.links
-            ],
+            links=[nexus.handler.Link(url=l.url, type=l.type) for l in request.links],
             callback_header=dict(request.callback_header),
         )
         temporalio.nexus.handler._current_context.set(
@@ -148,7 +146,7 @@ class _NexusWorker:
         )
 
         result = await operation.start(input, options)
-        if isinstance(result, nexusrpc.handler.AsyncOperationResult):
+        if isinstance(result, nexus.handler.AsyncOperationResult):
             print(
                 f"🟢 Nexus operation {request.operation} started with async response {result}"
             )
@@ -190,7 +188,7 @@ class _NexusWorker:
         # TODO(dan): header
         await operation.cancel(
             token=operation_token,
-            options=nexusrpc.handler.CancelOperationOptions(),
+            options=nexus.handler.CancelOperationOptions(),
         )
 
     def _get_operation(
@@ -199,7 +197,7 @@ class _NexusWorker:
             temporalio.api.nexus.v1.StartOperationRequest,
             temporalio.api.nexus.v1.CancelOperationRequest,
         ],
-    ) -> nexusrpc.handler.Operation:
+    ) -> nexus.handler.Operation:
         service = self._nexus_services.get(request.service)
         if service is None:
             raise RuntimeError(
