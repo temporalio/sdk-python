@@ -34,7 +34,7 @@ class AsyncWorkflowOperationResult(nexusrpc.handler.AsyncOperationResult, Generi
     @staticmethod
     def _encode_token(workflow_handle: WorkflowHandle[Any, O]) -> str:
         return base64.b64encode(
-            json.dumps([workflow_handle.id, workflow_handle.run_id]).encode()
+            json.dumps([workflow_handle.id, workflow_handle.run_id or ""]).encode()
         ).decode()
 
     @staticmethod
