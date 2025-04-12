@@ -7,17 +7,17 @@ import typing
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Awaitable, Callable, Generic, Optional, TypeVar
+from typing import Any, Awaitable, Callable, Generic, Optional, TypeVar, overload
 
 import nexus.handler
 from nexus.handler import _ServiceImpl
 
+import temporalio.common
 from temporalio.client import (
     Client,
     WorkflowHandle,
 )
-from temporalio.common import CompletionCallback
-from temporalio.types import MethodAsyncSingleParam
+from temporalio.types import MethodAsyncNoParam, MethodAsyncSingleParam
 
 O = TypeVar("O")
 I = TypeVar("I")
@@ -51,23 +51,52 @@ class AsyncWorkflowOperationResult(nexus.handler.AsyncOperationResult, Generic[O
         return client.get_workflow_handle(workflow_id, run_id=run_id)
 
 
+# TODO(dan): overloads?
+
+
+# Without-input overload
+@overload
+async def start_workflow(
+    workflow_run_method: MethodAsyncNoParam[Any, O],
+    *,
+    id: str,
+    options: nexus.handler.StartOperationOptions,
+) -> AsyncWorkflowOperationResult[O]: ...
+
+
+# With-input overload
+@overload
 async def start_workflow(
     workflow_run_method: MethodAsyncSingleParam[Any, I, O],
     arg: I,
+    *,
     id: str,
-    options: nexusrpc.handler.StartOperationOptions,
-) -> AsyncWorkflowOperationResult[O]:
+    options: nexus.handler.StartOperationOptions,
+) -> AsyncWorkflowOperationResult[O]: ...
+
+
+async def start_workflow(
+    workflow_run_method: Callable[..., Awaitable[Any]],
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    id: str,
+    options: nexus.handler.StartOperationOptions,
+) -> AsyncWorkflowOperationResult[Any]:
     # TODO(dan): handle client and task queue provided by user?
-    _client = client()
+    _client = get_client()
     _task_queue = task_queue()
     completion_callbacks = (
-        [CompletionCallback(url=options.callback_url, header=options.callback_header)]
+        [
+            temporalio.common.CompletionCallback(
+                url=options.callback_url, header=options.callback_header
+            )
+        ]
         if options.callback_url
         else []
     )
     workflow_handle = await _client.start_workflow(
         workflow_run_method,
-        arg,
+        args=temporalio.common._arg_or_args(arg, []),
         id=id,
         task_queue=_task_queue,
         completion_callbacks=completion_callbacks,
@@ -93,10 +122,11 @@ async def fetch_workflow_info(
 async def fetch_workflow_result(
     operation_token: str,
     options: nexus.handler.FetchOperationResultOptions,
+    client: Optional[Client] = None,
 ) -> Any:
     # TODO(dan): type safety
-    # TODO(dan): handle client provided by user?
-    _client = client()
+    _client = client or get_client()
+    _client = get_client()
     workflow_handle = AsyncWorkflowOperationResult.to_workflow_handle(
         operation_token, _client
     )
@@ -106,9 +136,9 @@ async def fetch_workflow_result(
 async def cancel_workflow(
     operation_token: str,
     options: nexus.handler.CancelOperationOptions,
+    client: Optional[Client] = None,
 ) -> None:
-    # TODO(dan): handle client provided by user?
-    _client = client()
+    _client = client or get_client()
     workflow_handle = AsyncWorkflowOperationResult.to_workflow_handle(
         operation_token, _client
     )
@@ -124,7 +154,7 @@ class _Context:
     task_queue: Optional[str]
 
 
-def client() -> Client:
+def get_client() -> Client:
     context = _current_context.get(None)
     if context is None:
         raise RuntimeError("Not in Nexus handler context")
