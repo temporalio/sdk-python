@@ -152,7 +152,12 @@ class _NexusWorker:
             print(
                 f"🟢 Nexus operation {request.operation} started with async response {result}"
             )
+            # TODO(dan): is it not valid to instantiate proto objects with an argument?
+            # "When called, it accepts no arguments and returns a new featureless instance
+            # that has no instance attributes and cannot be given any.""
+
             # See `rg 'complete_nexus_task(NexusTaskCompletion'` in sdk-core
+            # TODO(dan): python proto instantiation
             op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                 async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
                     # TODO(dan): operation_token
@@ -171,6 +176,7 @@ class _NexusWorker:
             )
         completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
             task_token=task_token,
+            # TODO(dan): python proto instantiation
             completed=temporalio.api.nexus.v1.Response(start_operation=op_resp),
         )
         await self._bridge_worker().complete_nexus_task(completion)
