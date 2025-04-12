@@ -40,7 +40,7 @@ from typing import (
     overload,
 )
 
-import nexusrpc.interface
+import nexus
 from typing_extensions import (
     Concatenate,
     Literal,
@@ -5107,9 +5107,10 @@ class NexusClient:
         self._endpoint = endpoint
         self._schedule_to_close_timeout = schedule_to_close_timeout
 
+    # TODO(dan): no-input overload
     async def start_operation(
         self,
-        operation: nexusrpc.interface.NexusOperation[I, O],
+        operation: nexus.Operation[I, O],
         input: I,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
@@ -5125,9 +5126,10 @@ class NexusClient:
             headers=headers or {},
         )
 
+    # TODO(dan): no-input overload
     async def execute_operation(
         self,
-        operation: nexusrpc.interface.NexusOperation[I, O],
+        operation: nexus.Operation[I, O],
         input: I,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,

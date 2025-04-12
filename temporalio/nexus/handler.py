@@ -61,6 +61,8 @@ async def start_workflow(
     *,
     id: str,
     options: nexus.handler.StartOperationOptions,
+    client: Optional[Client] = None,
+    task_queue: Optional[str] = None,
 ) -> AsyncWorkflowOperationResult[O]: ...
 
 
@@ -72,6 +74,8 @@ async def start_workflow(
     *,
     id: str,
     options: nexus.handler.StartOperationOptions,
+    client: Optional[Client] = None,
+    task_queue: Optional[str] = None,
 ) -> AsyncWorkflowOperationResult[O]: ...
 
 
@@ -81,10 +85,14 @@ async def start_workflow(
     *,
     id: str,
     options: nexus.handler.StartOperationOptions,
+    client: Optional[Client] = None,
+    task_queue: Optional[str] = None,
 ) -> AsyncWorkflowOperationResult[Any]:
-    # TODO(dan): handle client and task queue provided by user?
-    _client = get_client()
-    _task_queue = task_queue()
+    if client is None:
+        client = get_client()
+    if task_queue is None:
+        # TODO(dan): are we handling empty string well elsewhere?
+        task_queue = get_task_queue()
     completion_callbacks = (
         [
             temporalio.common.CompletionCallback(
@@ -94,11 +102,11 @@ async def start_workflow(
         if options.callback_url
         else []
     )
-    workflow_handle = await _client.start_workflow(
+    workflow_handle = await client.start_workflow(
         workflow_run_method,
         args=temporalio.common._arg_or_args(arg, []),
         id=id,
-        task_queue=_task_queue,
+        task_queue=task_queue,
         completion_callbacks=completion_callbacks,
     )
     return AsyncWorkflowOperationResult.from_workflow_handle(workflow_handle)
@@ -163,7 +171,7 @@ def get_client() -> Client:
     return context.client
 
 
-def task_queue() -> str:
+def get_task_queue() -> str:
     context = _current_context.get(None)
     if context is None:
         raise RuntimeError("Not in Nexus handler context")
