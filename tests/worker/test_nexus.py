@@ -1,7 +1,8 @@
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Union
+from typing import Union, cast
 
 import nexus
 import nexus.handler
@@ -16,7 +17,7 @@ import temporalio.api.operatorservice.v1
 import temporalio.nexus
 import temporalio.nexus.handler
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
@@ -36,7 +37,9 @@ class AsyncResponse:
     operation_workflow_id: str
 
 
-ResponseType = Union[SyncResponse, AsyncResponse]
+# TODO(dan): Using Unions with the data converter is probably inadvisable.
+# They must be in this since the data converter matches eagerly, ignoring unknown fields.
+ResponseType = Union[AsyncResponse, SyncResponse]
 
 
 @dataclass
@@ -114,21 +117,40 @@ class MyCallerWorkflow:
             endpoint=NEXUS_ENDPOINT_NAME,
             schedule_to_close_timeout=timedelta(seconds=10),
         )
+        self._waiting_to_proceed = False
+        self._proceed = False
 
     @workflow.run
     async def run(self, response_type: ResponseType, should_cancel: bool) -> str:
-        handle = await self.nexus_service.start_operation(
+        op_handle = await self.nexus_service.start_operation(
             MyService.my_operation, MyInput(response_type)
         )
+        task = cast(asyncio.Task, getattr(op_handle, "_task"))
         if isinstance(response_type, SyncResponse):
-            assert handle.operation_token is None
-            assert handle
+            assert op_handle.operation_token is None
+            # TODO(dan): I expected task to be done at this point
+            # assert task.done()
+            # assert not task.exception()
+        else:
+            assert op_handle.operation_token
+            assert not task.done()
+            self._waiting_to_proceed = True
+            await workflow.wait_condition(lambda: self._proceed)
+
         if should_cancel:
-            assert handle.cancel()
+            assert op_handle.cancel()
             return ""
         else:
-            result = await handle
+            result = await op_handle
             return result.val
+
+    @workflow.update
+    async def wait_nexus_operation_started(self) -> None:
+        await workflow.wait_condition(lambda: self._waiting_to_proceed)
+
+    @workflow.signal
+    def proceed(self) -> None:
+        self._proceed = True
 
 
 # TODO(dan): cross-namespace tests
@@ -143,12 +165,14 @@ async def test_sync_response(client: Client):
         workflow_runner=UnsandboxedWorkflowRunner(),
     ):
         await create_nexus_endpoint(client, task_queue)
-        result = await client.execute_workflow(
+        wf_handle = await client.start_workflow(
             MyCallerWorkflow.run,
             args=[SyncResponse(), False],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
+
+        result = await wf_handle.result()
         assert result == "sync response"
 
 
@@ -162,14 +186,33 @@ async def test_async_response(client: Client):
         workflow_runner=UnsandboxedWorkflowRunner(),
     ):
         operation_workflow_id = str(uuid.uuid4())
+        operation_workflow_handle = client.get_workflow_handle(operation_workflow_id)
         await create_nexus_endpoint(client, task_queue)
-        result = await client.execute_workflow(
+
+        # Start the caller workflow
+        wf_handle = await client.start_workflow(
             MyCallerWorkflow.run,
             args=[AsyncResponse(operation_workflow_id), False],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
-        assert result == "sync response"
+
+        # Wait for the Nexus operation to start and check that the operation-backing workflow now exists.
+        await wf_handle.execute_update(MyCallerWorkflow.wait_nexus_operation_started)
+        wf_details = await operation_workflow_handle.describe()
+        assert wf_details.status in [
+            WorkflowExecutionStatus.RUNNING,
+            WorkflowExecutionStatus.COMPLETED,
+        ]
+
+        # Wait for the Nexus operation to complete and check that the operation-backing
+        # workflow has completed.
+        await wf_handle.signal(MyCallerWorkflow.proceed)
+
+        wf_details = await operation_workflow_handle.describe()
+        assert wf_details.status == WorkflowExecutionStatus.COMPLETED
+        result = await wf_handle.result()
+        assert result == "workflow result"
 
 
 async def create_nexus_endpoint(client: Client, task_queue: str) -> None:
