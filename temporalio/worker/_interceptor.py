@@ -9,6 +9,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Generic,
     List,
     Mapping,
     MutableMapping,
@@ -16,8 +17,11 @@ from typing import (
     Optional,
     Sequence,
     Type,
+    TypeVar,
     Union,
 )
+
+import nexus
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -285,16 +289,44 @@ class StartChildWorkflowInput:
     ret_type: Optional[Type]
 
 
+I = TypeVar("I")
+O = TypeVar("O")
+
+
 @dataclass
-class StartNexusOperationInput:
+class StartNexusOperationInput(Generic[I, O]):
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_nexus_operation`."""
 
     endpoint: str
     service: str
-    operation: str
-    input: Any
+    operation: Union[nexus.Operation[I, O], str]
+    input: I
     schedule_to_close_timeout: Optional[timedelta]
     headers: Optional[Mapping[str, str]]
+
+    @property
+    def operation_name(self) -> str:
+        return (
+            self.operation.name
+            if isinstance(self.operation, nexus.Operation)
+            else self.operation
+        )
+
+    @property
+    def input_type(self) -> Optional[Type[I]]:
+        return (
+            self.operation.input_type
+            if isinstance(self.operation, nexus.Operation)
+            else None
+        )
+
+    @property
+    def output_type(self) -> Optional[Type[O]]:
+        return (
+            self.operation.output_type
+            if isinstance(self.operation, nexus.Operation)
+            else None
+        )
 
 
 @dataclass

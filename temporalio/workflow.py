@@ -754,7 +754,7 @@ class _Runtime(ABC):
         self,
         endpoint: str,
         service: str,
-        operation: str,
+        operation: Union[nexus.Operation[I, O], str],
         input: Any,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
@@ -4265,7 +4265,7 @@ class NexusOperationHandle(Generic[O]):
 async def start_nexus_operation(
     endpoint: str,
     service: str,
-    operation: str,
+    operation: Union[nexus.Operation[I, O], str],
     input: Any,
     *,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -5110,7 +5110,7 @@ class NexusClient:
     # TODO(dan): no-input overload
     async def start_operation(
         self,
-        operation: nexus.Operation[I, O],
+        operation: Union[nexus.Operation[I, O], str],
         input: I,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
@@ -5118,7 +5118,7 @@ class NexusClient:
         return await temporalio.workflow.start_nexus_operation(
             endpoint=self._endpoint,
             service=self._service_name,
-            operation=operation.name,
+            operation=operation,
             input=input,
             schedule_to_close_timeout=(
                 schedule_to_close_timeout or self._schedule_to_close_timeout

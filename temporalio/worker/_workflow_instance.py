@@ -42,6 +42,7 @@ from typing import (
     cast,
 )
 
+import nexus
 from typing_extensions import Self, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -857,20 +858,18 @@ class _WorkflowInstanceImpl(
 
         # TODO(dan): data conversion
         if job.result.HasField("completed"):
-            ret: Optional[Any] = None
-            ret_types = None
             # TODO(dan): why is the payload `job.result.completed.result` for
             # ChildWorkflowExecution yet `job.result.completed` here? And same question for
             # result.failed.failure and result.cancelled.failure.
-            [ret] = self._convert_payloads(
+            [output] = self._convert_payloads(
                 [job.result.completed],
-                ret_types,
+                [handle._input.output_type] if handle._input.output_type else None,
             )
             span.add_event(
                 "resolve_nexus_operation_success",
                 {"ret_types": str(ret_types), "result": str(ret)},
             )
-            handle._resolve_success(ret)
+            handle._resolve_success(output)
         elif job.result.HasField("failed"):
             handle._resolve_failure(
                 self._failure_converter.from_failure(
@@ -1310,6 +1309,7 @@ class _WorkflowInstanceImpl(
             )
         )
 
+    # workflow_start_child_workflow ret_type
     async def workflow_start_child_workflow(
         self,
         workflow: Any,
@@ -1429,7 +1429,7 @@ class _WorkflowInstanceImpl(
         self,
         endpoint: str,
         service: str,
-        operation: str,
+        operation: Union[nexus.Operation[I, O], str],
         input: Any,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
@@ -2938,7 +2938,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         v.seq = self._seq
         v.endpoint = self._input.endpoint
         v.service = self._input.service
-        v.operation = self._input.operation
+        v.operation = self._input.operation_name
         v.input.CopyFrom(
             self._instance._payload_converter.to_payload(self._input.input)
         )
