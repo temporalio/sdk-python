@@ -93,6 +93,7 @@ async def start_workflow(
     if task_queue is None:
         # TODO(dan): are we handling empty string well elsewhere?
         task_queue = get_task_queue()
+    print(f"🌈 starting workflow {workflow_run_method} {id} in task queue {task_queue}")
     completion_callbacks = (
         [
             temporalio.common.CompletionCallback(

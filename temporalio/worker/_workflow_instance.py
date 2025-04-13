@@ -848,13 +848,6 @@ class _WorkflowInstanceImpl(
                 f"Failed finding nexus operation handle for sequence {job.seq}"
             )
         span = xray.get_current_span()
-        if span:
-            span.add_event(
-                "apply job: resolve_nexus_operation",
-                {
-                    "job": MessageToJson(job),
-                },
-            )
 
         # TODO(dan): data conversion
         if job.result.HasField("completed"):
@@ -867,22 +860,45 @@ class _WorkflowInstanceImpl(
             )
             span.add_event(
                 "resolve_nexus_operation_success",
-                {"ret_types": str(ret_types), "result": str(ret)},
+                {
+                    "ret_types": str(handle._input.output_type or "<none>"),
+                    "result": str(output),
+                },
             )
             handle._resolve_success(output)
         elif job.result.HasField("failed"):
+            span.add_event(
+                "apply job: resolve_nexus_operation [failed]",
+                {
+                    "job": MessageToJson(job),
+                },
+            )
+            # TODO(dan): test failure converter
             handle._resolve_failure(
                 self._failure_converter.from_failure(
                     job.result.failed, self._payload_converter
                 )
             )
         elif job.result.HasField("cancelled"):
+            span.add_event(
+                "apply job: resolve_nexus_operation [cancelled]",
+                {
+                    "job": MessageToJson(job),
+                },
+            )
             handle._resolve_failure(
                 self._failure_converter.from_failure(
                     job.result.cancelled, self._payload_converter
                 )
             )
         else:
+            span.add_event(
+                "ERROR: apply job: resolve_nexus_operation [???]",
+                {
+                    "job": MessageToJson(job),
+                    "error": str(RuntimeError("Nexus operation did not have a result")),
+                },
+            )
             raise RuntimeError("Nexus operation did not have a result")
 
     def _apply_resolve_nexus_operation_start(
