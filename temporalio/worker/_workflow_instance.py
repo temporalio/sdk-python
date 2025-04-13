@@ -2901,6 +2901,9 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
     async def result(self) -> O:
         return await self._task
 
+    def __await__(self) -> Generator[Any, Any, O]:
+        return self._task.__await__()
+
     def cancel(self) -> bool:
         # TODO(dan): what do we do when the start result has been delivered and we know
         # this cannot be canceled (e.g. because it was a sync result, or because it failed.)

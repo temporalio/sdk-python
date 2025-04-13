@@ -23,6 +23,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    Generator,
     Generic,
     Iterable,
     Iterator,
@@ -4261,6 +4262,9 @@ class NexusOperationHandle(Generic[O]):
     def cancel(self) -> bool:
         raise NotImplementedError
 
+    def __await__(self) -> Generator[Any, Any, O]:
+        raise NotImplementedError
+
 
 async def start_nexus_operation(
     endpoint: str,
@@ -5137,4 +5141,4 @@ class NexusClient:
         handle = await self.start_operation(
             operation, input, schedule_to_close_timeout, headers
         )
-        return await handle.result()
+        return await handle

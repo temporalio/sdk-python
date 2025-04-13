@@ -124,7 +124,7 @@ class MyCallerWorkflow:
             assert handle.cancel()
             return ""
         else:
-            result = await handle.result()
+            result = await handle
             return result.val
 
 
