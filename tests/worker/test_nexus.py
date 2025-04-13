@@ -120,6 +120,9 @@ class MyCallerWorkflow:
         handle = await self.nexus_service.start_operation(
             MyService.my_operation, MyInput(response_type)
         )
+        if isinstance(response_type, SyncResponse):
+            assert handle.operation_token is None
+            assert handle
         if should_cancel:
             assert handle.cancel()
             return ""
@@ -143,6 +146,26 @@ async def test_sync_response(client: Client):
         result = await client.execute_workflow(
             MyCallerWorkflow.run,
             args=[SyncResponse(), False],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert result == "sync response"
+
+
+async def test_async_response(client: Client):
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_services=[MyServiceImpl()],
+        workflows=[MyCallerWorkflow, MyHandlerWorkflow],
+        task_queue=task_queue,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        operation_workflow_id = str(uuid.uuid4())
+        await create_nexus_endpoint(client, task_queue)
+        result = await client.execute_workflow(
+            MyCallerWorkflow.run,
+            args=[AsyncResponse(operation_workflow_id), False],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
