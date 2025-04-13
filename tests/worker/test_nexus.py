@@ -6,6 +6,7 @@ from typing import Union, cast
 
 import nexus
 import nexus.handler
+import pytest
 
 import temporalio.api
 import temporalio.api.common
@@ -111,6 +112,11 @@ class MyServiceImpl:
 #
 @workflow.defn
 class MyCallerWorkflow:
+    """
+    A workflow that executes a Nexus operation, specifying whether it should return
+    synchrinously or asynchronously.
+    """
+
     def __init__(self) -> None:
         self.nexus_service = workflow.NexusClient(
             service=MyService,
@@ -131,18 +137,40 @@ class MyCallerWorkflow:
             # TODO(dan): I expected task to be done at this point
             # assert task.done()
             # assert not task.exception()
-        else:
+            if should_cancel:
+                with pytest.raises(
+                    RuntimeError,
+                    match="A Nexus operation that has returned synchronously can't be canceled.",
+                ) as ei:
+                    await op_handle
+                return (
+                    "As expected, it is an error to attempt to cancel a "
+                    "Nexus operation that has responded synchronously."
+                )
+            else:
+                result = await op_handle
+                return result.val
+
+        elif isinstance(response_type, AsyncResponse):
             assert op_handle.operation_token
             assert not task.done()
             self._waiting_to_proceed = True
             await workflow.wait_condition(lambda: self._proceed)
 
-        if should_cancel:
-            assert op_handle.cancel()
-            return ""
-        else:
-            result = await op_handle
-            return result.val
+            if should_cancel:
+                assert op_handle.cancel()
+                with pytest.raises(
+                    BaseException,
+                ) as ei:
+                    await op_handle
+                e = ei.value
+                return (
+                    f"Cancellation of Nexus operation returning asynchronously resulted in "
+                    f"caller workflow receiving error: {e.__class__.__name__}({e})"
+                )
+            else:
+                result = await op_handle
+                return result.val
 
     @workflow.update
     async def wait_nexus_operation_started(self) -> None:
@@ -151,6 +179,11 @@ class MyCallerWorkflow:
     @workflow.signal
     def proceed(self) -> None:
         self._proceed = True
+
+
+# -----------------------------------------------------------------------------
+# Tests
+#
 
 
 # TODO(dan): cross-namespace tests
