@@ -5039,11 +5039,12 @@ class NexusClient:
         self._endpoint = endpoint
         self._schedule_to_close_timeout = schedule_to_close_timeout
 
-    # TODO(dan): no-input overload
+    # TODO(dan): overloads: no-input, operation name, ret type
     async def start_operation(
         self,
         operation: Union[nexus.Operation[I, O], str],
         input: I,
+        *,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[O]:
@@ -5058,15 +5059,19 @@ class NexusClient:
             headers=headers or {},
         )
 
-    # TODO(dan): no-input overload
+    # TODO(dan): overloads: no-input, operation name, ret type
     async def execute_operation(
         self,
         operation: nexus.Operation[I, O],
         input: I,
+        *,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> O:
         handle = await self.start_operation(
-            operation, input, schedule_to_close_timeout, headers
+            operation,
+            input,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            headers=headers,
         )
         return await handle

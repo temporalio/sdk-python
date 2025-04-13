@@ -918,7 +918,7 @@ class _WorkflowInstanceImpl(
             raise RuntimeError(
                 f"Failed finding nexus operation handle for sequence {job.seq}"
             )
-        handle._resolve_start_success(job.operation_id)
+        handle._resolve_start_success(job.operation_id or None)
 
     def _apply_resolve_request_cancel_external_workflow(
         self,
@@ -1765,7 +1765,7 @@ class _WorkflowInstanceImpl(
     ) -> _NexusOperationHandle[Any]:
         handle: _NexusOperationHandle
 
-        async def run_nexus() -> Any:
+        async def operation_handle_fn() -> Any:
             while True:
                 try:
                     return await asyncio.shield(handle._result_fut)
@@ -1774,7 +1774,7 @@ class _WorkflowInstanceImpl(
                     handle._apply_cancel_command(cancel_command)
 
         handle = _NexusOperationHandle(
-            self, self._next_seq("nexus_operation"), input, run_nexus()
+            self, self._next_seq("nexus_operation"), input, operation_handle_fn()
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
@@ -2882,6 +2882,9 @@ I = TypeVar("I")
 O = TypeVar("O")
 
 
+# TODO(dan): are we sure we don't want to inherit from asyuncio.Task as ActivityHandle and
+# ChildWorkflowHandle do? I worry that we should provide .done(), .result(), .exception()
+# etc for consistency.
 class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
     def __init__(
         self,
@@ -2909,7 +2912,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         # this cannot be canceled (e.g. because it was a sync result, or because it failed.)
         return self._task.cancel()
 
-    def _resolve_start_success(self, operation_token: str) -> None:
+    def _resolve_start_success(self, operation_token: Optional[str]) -> None:
         span = xray.get_current_span()
         span.add_event("_resolve_start_success", {"operation_id": operation_token})
         self.operation_token = operation_token
