@@ -4255,9 +4255,9 @@ I = TypeVar("I")
 O = TypeVar("O")
 
 
+# TODO(dan): ABC?
 class NexusOperationHandle(Generic[O]):
-    async def result(self) -> O:
-        raise NotImplementedError
+    operation_token: Optional[str]
 
     def cancel(self) -> bool:
         raise NotImplementedError

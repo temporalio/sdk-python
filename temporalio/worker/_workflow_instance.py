@@ -2896,7 +2896,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         self._task = asyncio.Task(fn)
         self._start_fut: asyncio.Future[None] = instance.create_future()
         self._result_fut: asyncio.Future[Any] = instance.create_future()
-        self._operation_id: Optional[str] = None
+        self.operation_token: Optional[str] = None
 
     async def result(self) -> O:
         return await self._task
@@ -2909,12 +2909,12 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         # this cannot be canceled (e.g. because it was a sync result, or because it failed.)
         return self._task.cancel()
 
-    def _resolve_start_success(self, operation_id: str) -> None:
+    def _resolve_start_success(self, operation_token: str) -> None:
         span = xray.get_current_span()
-        span.add_event("_resolve_start_success", {"operation_id": operation_id})
-        self._operation_id = operation_id
+        span.add_event("_resolve_start_success", {"operation_id": operation_token})
+        self.operation_token = operation_token
         # We intentionally let this error if already done
-        print(f"🟢 _resolve_start_success: operation_id: {operation_id}")
+        print(f"🟢 _resolve_start_success: operation_id: {operation_token}")
         self._start_fut.set_result(None)
 
     def _resolve_success(self, result: Any) -> None:
@@ -2922,13 +2922,13 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         span.add_event(
             "_resolve_success",
             {
-                "operation_id": self._operation_id or "",
+                "operation_id": self.operation_token or "",
                 "result": str(result),
             },
         )
         # We intentionally let this error if already done
         print(
-            f"🟢 _resolve_success: operation_id: {self._operation_id} result: {result}"
+            f"🟢 _resolve_success: operation_id: {self.operation_token} result: {result}"
         )
         self._result_fut.set_result(result)
 
@@ -2937,11 +2937,11 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         span.add_event(
             "_resolve_failure",
             {
-                "operation_id": self._operation_id or "",
+                "operation_id": self.operation_token or "",
                 "error": str(err),
             },
         )
-        print(f"🔴 _resolve_failure: operation_id: {self._operation_id} err: {err}")
+        print(f"🔴 _resolve_failure: operation_id: {self.operation_token} err: {err}")
         if self._start_fut.done():
             # We intentionally let this error if already done
             self._result_fut.set_exception(err)
