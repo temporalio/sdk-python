@@ -70,7 +70,7 @@ async def main():
             nonlocal max_mem
             while True:
                 try:
-                    await asyncio.sleep(0.8)
+                    await asyncio.sleep(0.1)
                 finally:
                     # TODO(cretz): "vms" appears more accurate on Windows, but
                     # rss is more accurate on Linux
