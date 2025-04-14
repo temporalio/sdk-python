@@ -4260,6 +4260,16 @@ class NexusOperationHandle(Generic[O]):
     operation_token: Optional[str]
 
     def cancel(self) -> bool:
+        # TODO(dan): docstring
+        """
+        Call task.cancel() on the asyncio task that is backing this handle.
+
+        From asyncio docs:
+
+        Cancel the future and schedule callbacks.
+
+        If the future is already done or cancelled, return False. Otherwise, change the future's state to cancelled, schedule the callbacks and return True.
+        """
         raise NotImplementedError
 
     def __await__(self) -> Generator[Any, Any, O]:

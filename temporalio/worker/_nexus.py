@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import pprint
 from typing import (
@@ -12,6 +13,7 @@ from typing import (
     Union,
 )
 
+import google.protobuf.json_format
 import nexus.handler
 
 import temporalio.activity
@@ -92,7 +94,18 @@ class _NexusWorker:
 
             task = await poll_task
 
-            print(f"🟢 _NexusWorker received poll response: {task}")
+            request = json.loads(google.protobuf.json_format.MessageToJson(task))[
+                "task"
+            ]["request"]
+            op = (
+                "start"
+                if "startOperation" in request
+                else "cancel"
+                if "cancelOperation" in request
+                else None
+            )
+            assert op
+            print(f"🟢 _NexusWorker received '{op}' operation")
 
             # TODO: Correct way to examine and classify task proto
             if task.HasField("task"):

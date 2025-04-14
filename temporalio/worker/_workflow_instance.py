@@ -848,13 +848,11 @@ class _WorkflowInstanceImpl(
                 f"Failed finding nexus operation handle for sequence {job.seq}"
             )
 
-        # TODO(dan): data conversion
-        if job.result.HasField("completed"):
-            # TODO(dan): why is the payload `job.result.completed.result` for
-            # ChildWorkflowExecution yet `job.result.completed` here? And same question for
-            # result.failed.failure and result.cancelled.failure.
+        result = job.result
+        # Handle the four oneof variants of NexusOperationResult
+        if result.HasField("completed"):
             [output] = self._convert_payloads(
-                [job.result.completed],
+                [result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
             )
             xray.add_span_event(
@@ -863,7 +861,7 @@ class _WorkflowInstanceImpl(
                 result=output,
             )
             handle._resolve_success(output)
-        elif job.result.HasField("failed"):
+        elif result.HasField("failed"):
             xray.add_span_event(
                 "apply job: resolve_nexus_operation [failed]",
                 job=job,
@@ -871,27 +869,27 @@ class _WorkflowInstanceImpl(
             # TODO(dan): test failure converter
             handle._resolve_failure(
                 self._failure_converter.from_failure(
-                    job.result.failed, self._payload_converter
+                    result.failed, self._payload_converter
                 )
             )
-        elif job.result.HasField("cancelled"):
+        elif result.HasField("cancelled"):
             xray.add_span_event(
                 "apply job: resolve_nexus_operation [cancelled]",
                 job=job,
             )
             handle._resolve_failure(
                 self._failure_converter.from_failure(
-                    job.result.cancelled, self._payload_converter
+                    result.cancelled, self._payload_converter
                 )
             )
-        elif job.result.HasField("timed_out"):
+        elif result.HasField("timed_out"):
             xray.add_span_event(
                 "apply job: resolve_nexus_operation [timed_out]",
                 job=job,
             )
             handle._resolve_failure(
                 self._failure_converter.from_failure(
-                    job.result.timed_out, self._payload_converter
+                    result.timed_out, self._payload_converter
                 )
             )
         else:
@@ -1630,8 +1628,8 @@ class _WorkflowInstanceImpl(
         input: Union[StartActivityInput, StartLocalActivityInput],
     ) -> _ActivityHandle:
         # A ScheduleActivityTask command always results in an ActivityTaskScheduled event,
-        # so this function returns the handle immediately. This is similar to nexus
-        # operation but differs from child workflow.
+        # so this function is not async and returns the handle immediately. This differs
+        # from child workflow and nexus operation.
 
         # Validate
         if not input.start_to_close_timeout and not input.schedule_to_close_timeout:
@@ -1710,9 +1708,9 @@ class _WorkflowInstanceImpl(
     ) -> _ChildWorkflowHandle:
         # A StartChildWorkflowExecution command results in a
         # StartChildWorkflowExecutionInitiated event, but the start may fail (e.g. due to
-        # workflow ID collision). Therefore this function does not return the handle until
-        # a future activation contains an event indicating start success / failure. This
-        # differs from activity and nexus operation.
+        # workflow ID collision). Therefore this function is async and does not return the
+        # handle until a future activation contains an event indicating start success /
+        # failure. This is similar to nexus operation but differs from activity.
 
         handle: _ChildWorkflowHandle
 
@@ -2916,8 +2914,8 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
             operation_id=operation_token,
         )
         self.operation_token = operation_token
-        # We intentionally let this error if already done
         print(f"🟢 _resolve_start_success: operation_id: {operation_token}")
+        # We intentionally let this error if already done
         self._start_fut.set_result(None)
 
     def _resolve_success(self, result: Any) -> None:
@@ -2926,10 +2924,10 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
             operation_id=self.operation_token,
             result=result,
         )
-        # We intentionally let this error if already done
         print(
             f"🟢 _resolve_success: operation_id: {self.operation_token} result: {result}"
         )
+        # We intentionally let this error if already done
         self._result_fut.set_result(result)
 
     def _resolve_failure(self, err: BaseException) -> None:

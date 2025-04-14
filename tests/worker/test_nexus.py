@@ -138,6 +138,7 @@ class MyCallerWorkflow:
             # assert task.done()
             # assert not task.exception()
             if should_cancel:
+                assert op_handle.cancel()
                 with pytest.raises(
                     RuntimeError,
                     match="A Nexus operation that has returned synchronously can't be canceled.",
@@ -188,7 +189,7 @@ class MyCallerWorkflow:
 
 # TODO(dan): cross-namespace tests
 # TODO(dan): nexus endpoint pytest fixture?
-@pytest.mark.parametrize("should_cancel", [True, False])
+@pytest.mark.parametrize("should_cancel", [False, True])
 async def test_sync_response(client: Client, should_cancel: bool):
     task_queue = str(uuid.uuid4())
     async with Worker(
@@ -205,8 +206,10 @@ async def test_sync_response(client: Client, should_cancel: bool):
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
+        print(f"🌈 wf_handle: {wf_handle}")
 
         result = await wf_handle.result()
+        print(f"🌈 result: {result}")
         assert result == "sync response"
 
 
@@ -307,6 +310,6 @@ async def create_nexus_endpoint(name: str, task_queue: str, client: Client) -> N
         )
     except RPCError as e:
         if e.status == RPCStatusCode.ALREADY_EXISTS:
-            print(f"Nexus endpoint {name} already exists")
+            print(f"🟠 Nexus endpoint {name} already exists")
         else:
             raise
