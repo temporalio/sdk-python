@@ -31,6 +31,15 @@ async def bench_activity(name: str) -> str:
     return f"Hello, {name}!"
 
 
+@workflow.defn
+class DeadlockInterruptibleWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Infinite loop, which is interruptible via PyThreadState_SetAsyncExc
+        while True:
+            pass
+
+
 async def main():
     logging.basicConfig(
         format="%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s",
@@ -87,6 +96,13 @@ async def main():
             pre_start_seconds = time.monotonic()
             handles = [
                 await env.client.start_workflow(
+                    DeadlockInterruptibleWorkflow.run,
+                    id=f"deadlock-interruptible-workflow-{i}-{uuid.uuid4()}",
+                    task_queue=task_queue,
+                )
+                for i in range(args.workflow_count)
+            ] + [
+                await env.client.start_workflow(
                     BenchWorkflow.run,
                     f"user-{i}",
                     id=f"workflow-{i}-{uuid.uuid4()}",
@@ -101,7 +117,7 @@ async def main():
             async with Worker(
                 env.client,
                 task_queue=task_queue,
-                workflows=[BenchWorkflow],
+                workflows=[BenchWorkflow, DeadlockInterruptibleWorkflow],
                 activities=[bench_activity],
                 workflow_runner=SandboxedWorkflowRunner()
                 if args.sandbox
