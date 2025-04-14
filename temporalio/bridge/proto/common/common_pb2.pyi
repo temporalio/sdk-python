@@ -99,3 +99,25 @@ class NamespacedWorkflowExecution(google.protobuf.message.Message):
     ) -> None: ...
 
 global___NamespacedWorkflowExecution = NamespacedWorkflowExecution
+
+class WorkerDeploymentVersion(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DEPLOYMENT_NAME_FIELD_NUMBER: builtins.int
+    BUILD_ID_FIELD_NUMBER: builtins.int
+    deployment_name: builtins.str
+    build_id: builtins.str
+    def __init__(
+        self,
+        *,
+        deployment_name: builtins.str = ...,
+        build_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "build_id", b"build_id", "deployment_name", b"deployment_name"
+        ],
+    ) -> None: ...
+
+global___WorkerDeploymentVersion = WorkerDeploymentVersion

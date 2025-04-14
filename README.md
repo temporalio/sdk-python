@@ -510,7 +510,7 @@ class GreetingWorkflow:
                 start_to_close_timeout=timedelta(seconds=5),
             )
             workflow.logger.debug("Greeting set to %s", self._current_greeting)
-            
+
             # Wait for salutation update or complete signal (this can be
             # cancelled)
             await asyncio.wait(
@@ -536,7 +536,7 @@ class GreetingWorkflow:
     @workflow.query
     def current_greeting(self) -> str:
         return self._current_greeting
-    
+
     @workflow.update
     def set_and_get_greeting(self, greeting: str) -> str:
       old = self._current_greeting
@@ -622,7 +622,7 @@ Here are the decorators that can be applied:
   * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
   * Also accepts the `name` and `dynamic` parameters like signal, with the same semantics.
   * Update handlers may optionally define a validator method by decorating it with `@update_handler_method.validator`.
-    To reject an update before any events are written to history, throw an exception in a validator. Validators cannot 
+    To reject an update before any events are written to history, throw an exception in a validator. Validators cannot
     be `async`, cannot mutate workflow state, and return nothing.
   * See [Signal and update handlers](#signal-and-update-handlers) below
 * `@workflow.query` - Defines a method as a query
@@ -994,7 +994,7 @@ To run an entire workflow outside of a sandbox, set `sandboxed=False` on the `@w
 it. This will run the entire workflow outside of the workflow which means it can share global state and other bad
 things.
 
-To disable the sandbox entirely for a worker, set the `Worker` init's `workflow_runner` keyword argument to 
+To disable the sandbox entirely for a worker, set the `Worker` init's `workflow_runner` keyword argument to
 `temporalio.worker.UnsandboxedWorkflowRunner()`. This value is defaulted to
 `temporalio.worker.workflow_sandbox.SandboxedWorkflowRunner()` so by changing it to the unsandboxed runner, the sandbox
 will not be used at all.

@@ -5,7 +5,7 @@ use log::error;
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyTuple};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -15,8 +15,9 @@ use temporal_sdk_core::api::errors::PollError;
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::worker::{
-    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
-    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
+    PollerBehavior, SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext,
+    SlotReleaseContext, SlotReservationContext, SlotSupplier as SlotSupplierTrait,
+    SlotSupplierPermit,
 };
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
@@ -44,7 +45,7 @@ pub struct WorkerRef {
 pub struct WorkerConfig {
     namespace: String,
     task_queue: String,
-    build_id: String,
+    versioning_strategy: WorkerVersioningStrategy,
     identity_override: Option<String>,
     max_cached_workflows: usize,
     tuner: TunerHolder,
@@ -58,9 +59,61 @@ pub struct WorkerConfig {
     max_activities_per_second: Option<f64>,
     max_task_queue_activities_per_second: Option<f64>,
     graceful_shutdown_period_millis: u64,
-    use_worker_versioning: bool,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
+}
+
+/// Recreates [temporal_sdk_core_api::worker::WorkerVersioningStrategy]
+#[derive(FromPyObject)]
+pub enum WorkerVersioningStrategy {
+    None(WorkerVersioningNone),
+    DeploymentBased(WorkerDeploymentOptions),
+    LegacyBuildIdBased(LegacyBuildIdBased),
+}
+
+#[derive(FromPyObject)]
+pub struct WorkerVersioningNone {
+    pub build_id: String,
+}
+
+/// Recreates [temporal_sdk_core_api::worker::WorkerDeploymentOptions]
+#[derive(FromPyObject)]
+pub struct WorkerDeploymentOptions {
+    pub version: WorkerDeploymentVersion,
+    pub use_worker_versioning: bool,
+    /// This is a [enums::v1::VersioningBehavior] represented as i32
+    pub default_versioning_behavior: i32,
+}
+
+#[derive(FromPyObject)]
+pub struct LegacyBuildIdBased {
+    pub build_id: String,
+}
+
+/// Recreates [temporal_sdk_core_api::worker::WorkerDeploymentVersion]
+#[derive(FromPyObject, Clone)]
+pub struct WorkerDeploymentVersion {
+    pub deployment_name: String,
+    pub build_id: String,
+}
+
+impl IntoPy<Py<PyAny>> for WorkerDeploymentVersion {
+    fn into_py(self, py: Python) -> Py<PyAny> {
+        let dict = PyDict::new(py);
+        dict.set_item("deployment_name", self.deployment_name)
+            .unwrap();
+        dict.set_item("build_id", self.build_id).unwrap();
+        dict.into()
+    }
+}
+
+impl From<temporal_sdk_core_api::worker::WorkerDeploymentVersion> for WorkerDeploymentVersion {
+    fn from(version: temporal_sdk_core_api::worker::WorkerDeploymentVersion) -> Self {
+        WorkerDeploymentVersion {
+            deployment_name: version.deployment_name,
+            build_id: version.build_id,
+        }
+    }
 }
 
 #[derive(FromPyObject)]
@@ -102,6 +155,8 @@ pub struct SlotReserveCtx {
     #[pyo3(get)]
     pub worker_build_id: String,
     #[pyo3(get)]
+    pub worker_deployment_version: Option<WorkerDeploymentVersion>,
+    #[pyo3(get)]
     pub is_sticky: bool,
 }
 
@@ -116,7 +171,12 @@ impl SlotReserveCtx {
             },
             task_queue: ctx.task_queue().to_string(),
             worker_identity: ctx.worker_identity().to_string(),
-            worker_build_id: ctx.worker_build_id().to_string(),
+            worker_build_id: ctx
+                .worker_deployment_version()
+                .clone()
+                .map(|v| v.build_id)
+                .unwrap_or_default(),
+            worker_deployment_version: ctx.worker_deployment_version().clone().map(Into::into),
             is_sticky: ctx.is_sticky(),
         }
     }
@@ -559,16 +619,21 @@ fn convert_worker_config(
     task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
 ) -> PyResult<temporal_sdk_core::WorkerConfig> {
     let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
+    let converted_versioning_strategy = convert_versioning_strategy(conf.versioning_strategy);
     temporal_sdk_core::WorkerConfigBuilder::default()
         .namespace(conf.namespace)
         .task_queue(conf.task_queue)
-        .worker_build_id(conf.build_id)
+        .versioning_strategy(converted_versioning_strategy)
         .client_identity_override(conf.identity_override)
         .max_cached_workflows(conf.max_cached_workflows)
-        .max_concurrent_wft_polls(conf.max_concurrent_workflow_task_polls)
+        .workflow_task_poller_behavior(PollerBehavior::SimpleMaximum(
+            conf.max_concurrent_workflow_task_polls,
+        ))
         .tuner(Arc::new(converted_tuner))
         .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-        .max_concurrent_at_polls(conf.max_concurrent_activity_task_polls)
+        .activity_task_poller_behavior(PollerBehavior::SimpleMaximum(
+            conf.max_concurrent_activity_task_polls,
+        ))
         .no_remote_activities(conf.no_remote_activities)
         .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
             conf.sticky_queue_schedule_to_start_timeout_millis,
@@ -585,7 +650,6 @@ fn convert_worker_config(
         // auto-cancel-activity behavior of shutdown will not occur, so we
         // always set it even if 0.
         .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
-        .use_worker_versioning(conf.use_worker_versioning)
         .workflow_failure_errors(if conf.nondeterminism_as_workflow_fail {
             HashSet::from([WorkflowErrorType::Nondeterminism])
         } else {
@@ -700,6 +764,40 @@ fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
             },
         )),
     })
+}
+
+fn convert_versioning_strategy(
+    strategy: WorkerVersioningStrategy,
+) -> temporal_sdk_core_api::worker::WorkerVersioningStrategy {
+    match strategy {
+        WorkerVersioningStrategy::None(vn) => {
+            temporal_sdk_core_api::worker::WorkerVersioningStrategy::None {
+                build_id: vn.build_id,
+            }
+        }
+        WorkerVersioningStrategy::DeploymentBased(options) => {
+            temporal_sdk_core_api::worker::WorkerVersioningStrategy::WorkerDeploymentBased(
+                temporal_sdk_core_api::worker::WorkerDeploymentOptions {
+                    version: temporal_sdk_core_api::worker::WorkerDeploymentVersion {
+                        deployment_name: options.version.deployment_name,
+                        build_id: options.version.build_id,
+                    },
+                    use_worker_versioning: options.use_worker_versioning,
+                    default_versioning_behavior: Some(
+                        options
+                            .default_versioning_behavior
+                            .try_into()
+                            .unwrap_or_default(),
+                    ),
+                },
+            )
+        }
+        WorkerVersioningStrategy::LegacyBuildIdBased(lb) => {
+            temporal_sdk_core_api::worker::WorkerVersioningStrategy::LegacyBuildIdBased {
+                build_id: lb.build_id,
+            }
+        }
+    }
 }
 
 /// For feeding histories into core during replay

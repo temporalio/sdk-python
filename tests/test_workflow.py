@@ -5,7 +5,7 @@ from typing import Sequence
 import pytest
 
 from temporalio import workflow
-from temporalio.common import RawValue
+from temporalio.common import RawValue, VersioningBehavior
 
 
 class GoodDefnBase:
@@ -130,6 +130,29 @@ def test_workflow_defn_good():
         },
         sandboxed=True,
         failure_exception_types=[],
+        versioning_behavior=VersioningBehavior.UNSPECIFIED,
+    )
+
+
+@workflow.defn(versioning_behavior=VersioningBehavior.PINNED)
+class VersioningBehaviorDefn:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        raise NotImplementedError
+
+
+def test_workflow_definition_with_versioning_behavior():
+    defn = workflow._Definition.from_class(VersioningBehaviorDefn)
+    assert defn == workflow._Definition(
+        name="VersioningBehaviorDefn",
+        cls=VersioningBehaviorDefn,
+        run_fn=VersioningBehaviorDefn.run,
+        signals={},
+        queries={},
+        updates={},
+        sandboxed=True,
+        failure_exception_types=[],
+        versioning_behavior=VersioningBehavior.PINNED,
     )
 
 
