@@ -1420,6 +1420,7 @@ source = { editable = "../xray/sdks/python" }
 dependencies = [
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-sdk" },
+    { name = "protobuf" },
     { name = "temporalio" },
 ]
 
@@ -1427,6 +1428,7 @@ dependencies = [
 requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.30.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.11.1,<2" },
+    { name = "protobuf", specifier = ">=3.20" },
     { name = "temporalio", specifier = ">=1.10.0" },
 ]
 

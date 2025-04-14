@@ -847,7 +847,6 @@ class _WorkflowInstanceImpl(
             raise RuntimeError(
                 f"Failed finding nexus operation handle for sequence {job.seq}"
             )
-        span = xray.get_current_span()
 
         # TODO(dan): data conversion
         if job.result.HasField("completed"):
@@ -858,20 +857,16 @@ class _WorkflowInstanceImpl(
                 [job.result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
             )
-            span.add_event(
+            xray.add_span_event(
                 "resolve_nexus_operation_success",
-                {
-                    "ret_types": str(handle._input.output_type or "<none>"),
-                    "result": str(output),
-                },
+                ret_types=handle._input.output_type or "<none>",
+                result=output,
             )
             handle._resolve_success(output)
         elif job.result.HasField("failed"):
-            span.add_event(
+            xray.add_span_event(
                 "apply job: resolve_nexus_operation [failed]",
-                {
-                    "job": MessageToJson(job),
-                },
+                job=job,
             )
             # TODO(dan): test failure converter
             handle._resolve_failure(
@@ -880,11 +875,9 @@ class _WorkflowInstanceImpl(
                 )
             )
         elif job.result.HasField("cancelled"):
-            span.add_event(
+            xray.add_span_event(
                 "apply job: resolve_nexus_operation [cancelled]",
-                {
-                    "job": MessageToJson(job),
-                },
+                job=job,
             )
             handle._resolve_failure(
                 self._failure_converter.from_failure(
@@ -892,12 +885,10 @@ class _WorkflowInstanceImpl(
                 )
             )
         else:
-            span.add_event(
+            xray.add_span_event(
                 "ERROR: apply job: resolve_nexus_operation [???]",
-                {
-                    "job": MessageToJson(job),
-                    "error": str(RuntimeError("Nexus operation did not have a result")),
-                },
+                job=job,
+                error=RuntimeError("Nexus operation did not have a result"),
             )
             raise RuntimeError("Nexus operation did not have a result")
 
@@ -905,12 +896,9 @@ class _WorkflowInstanceImpl(
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperationStart,
     ) -> None:
-        span = xray.get_current_span()
-        span.add_event(
+        xray.add_span_event(
             "apply job: resolve_nexus_operation_start",
-            {
-                "job": MessageToJson(job),
-            },
+            job=job,
         )
         # TODO(dan): compare with resolve_child_workflow_execution_start
         handle = self._pending_nexus_operations.get(job.seq)
@@ -2913,21 +2901,20 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         return self._task.cancel()
 
     def _resolve_start_success(self, operation_token: Optional[str]) -> None:
-        span = xray.get_current_span()
-        span.add_event("_resolve_start_success", {"operation_id": operation_token})
+        xray.add_span_event(
+            "_resolve_start_success",
+            operation_id=operation_token,
+        )
         self.operation_token = operation_token
         # We intentionally let this error if already done
         print(f"🟢 _resolve_start_success: operation_id: {operation_token}")
         self._start_fut.set_result(None)
 
     def _resolve_success(self, result: Any) -> None:
-        span = xray.get_current_span()
-        span.add_event(
+        xray.add_span_event(
             "_resolve_success",
-            {
-                "operation_id": self.operation_token or "",
-                "result": str(result),
-            },
+            operation_id=self.operation_token,
+            result=result,
         )
         # We intentionally let this error if already done
         print(
@@ -2936,13 +2923,10 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         self._result_fut.set_result(result)
 
     def _resolve_failure(self, err: BaseException) -> None:
-        span = xray.get_current_span()
-        span.add_event(
+        xray.add_span_event(
             "_resolve_failure",
-            {
-                "operation_id": self.operation_token or "",
-                "error": str(err),
-            },
+            operation_id=self.operation_token,
+            error=err,
         )
         print(f"🔴 _resolve_failure: operation_id: {self.operation_token} err: {err}")
         if self._start_fut.done():
