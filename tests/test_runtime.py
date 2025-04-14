@@ -1,8 +1,7 @@
-import re
-
 import logging
 import logging.handlers
 import queue
+import re
 import uuid
 from typing import List, cast
 from urllib.request import urlopen
@@ -35,14 +34,18 @@ async def test_different_runtimes(client: Client):
     client1 = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
-        runtime=Runtime(telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr1))),
+        runtime=Runtime(
+            telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr1))
+        ),
     )
 
     prom_addr2 = f"127.0.0.1:{find_free_port()}"
     client2 = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
-        runtime=Runtime(telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr2))),
+        runtime=Runtime(
+            telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr2))
+        ),
     )
 
     async def run_workflow(client: Client):
@@ -95,12 +98,19 @@ async def test_runtime_log_forwarding():
     # Check the expected records
     await assert_eq_eventually(2, log_queue_len)
     assert log_queue_list[0].levelno == logging.INFO
-    assert log_queue_list[0].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info1")
-    assert log_queue_list[0].name == f"{logger.name}-sdk_core::temporal_sdk_bridge::runtime"
+    assert log_queue_list[0].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info1"
+    )
+    assert (
+        log_queue_list[0].name
+        == f"{logger.name}-sdk_core::temporal_sdk_bridge::runtime"
+    )
     assert log_queue_list[0].created == log_queue_list[0].temporal_log.time  # type: ignore
     assert log_queue_list[0].temporal_log.fields == {"extra_data": "extra1"}  # type: ignore
     assert log_queue_list[1].levelno == logging.INFO
-    assert log_queue_list[1].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info3")
+    assert log_queue_list[1].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info3"
+    )
 
     # Clear logs and enable debug and try again
     log_queue_list.clear()
@@ -110,11 +120,17 @@ async def test_runtime_log_forwarding():
     runtime._core_runtime.write_test_info_log("info6", "extra6")
     await assert_eq_eventually(3, log_queue_len)
     assert log_queue_list[0].levelno == logging.INFO
-    assert log_queue_list[0].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info4")
+    assert log_queue_list[0].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info4"
+    )
     assert log_queue_list[1].levelno == logging.DEBUG
-    assert log_queue_list[1].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] debug5")
+    assert log_queue_list[1].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] debug5"
+    )
     assert log_queue_list[2].levelno == logging.INFO
-    assert log_queue_list[2].message.startswith("[sdk_core::temporal_sdk_bridge::runtime] info6")
+    assert log_queue_list[2].message.startswith(
+        "[sdk_core::temporal_sdk_bridge::runtime] info6"
+    )
 
 
 @workflow.defn
@@ -155,7 +171,9 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
 
         # Wait for log to appear
         async def has_log() -> bool:
-            return any(l for l in log_queue_list if "Failing workflow task" in l.message)
+            return any(
+                l for l in log_queue_list if "Failing workflow task" in l.message
+            )
 
         await assert_eq_eventually(True, has_log)
 
@@ -173,7 +191,10 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     histogram_overrides = {
         "temporal_long_request_latency": [special_value / 2, special_value],
         "custom_histogram": [special_value / 2, special_value],
-        "temporal_workflow_endtoend_latency": [special_value / 2, special_value],  # This still does not work :(
+        "temporal_workflow_endtoend_latency": [
+            special_value / 2,
+            special_value,
+        ],  # This still does not work :(
     }
 
     runtime = Runtime(
@@ -189,7 +210,9 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     )
 
     # Create a custom histogram metric
-    custom_histogram = runtime.metric_meter.create_histogram("custom_histogram", "Custom histogram", "ms")
+    custom_histogram = runtime.metric_meter.create_histogram(
+        "custom_histogram", "Custom histogram", "ms"
+    )
 
     # Record a value to the custom histogram
     custom_histogram.record(600)
@@ -225,4 +248,6 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
             for bucket in buckets:
                 # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
                 regex = re.compile(f'{key}_bucket.*le="{bucket}"')
-                assert regex.search(metrics_output) is not None, f"Expected {bucket} in '{key}' histogram"
+                assert (
+                    regex.search(metrics_output) is not None
+                ), f"Expected {bucket} in '{key}' histogram"
