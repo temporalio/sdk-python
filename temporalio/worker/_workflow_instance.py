@@ -1712,10 +1712,11 @@ class _WorkflowInstanceImpl(
 
     def _is_workflow_failure_exception(self, err: BaseException) -> bool:
         # An exception is a failure instead of a task fail if it's already a
-        # failure error or if it is an instance of any of the failure types in
-        # the worker or workflow-level setting
+        # failure error or if it is a timeout error or if it is an instance of
+        # any of the failure types in the worker or workflow-level setting
         return (
             isinstance(err, temporalio.exceptions.FailureError)
+            or isinstance(err, asyncio.TimeoutError)
             or any(isinstance(err, typ) for typ in self._defn.failure_exception_types)
             or any(
                 isinstance(err, typ)

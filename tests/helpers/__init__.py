@@ -46,6 +46,23 @@ def new_worker(
     )
 
 
+async def assert_eventually(
+    fn: Callable[[], Awaitable],
+    *,
+    timeout: timedelta = timedelta(seconds=10),
+    interval: timedelta = timedelta(milliseconds=200),
+) -> None:
+    start_sec = time.monotonic()
+    while True:
+        try:
+            await fn()
+            return
+        except AssertionError:
+            if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
+                raise
+        await asyncio.sleep(interval.total_seconds())
+
+
 T = TypeVar("T")
 
 
@@ -56,16 +73,26 @@ async def assert_eq_eventually(
     timeout: timedelta = timedelta(seconds=10),
     interval: timedelta = timedelta(milliseconds=200),
 ) -> None:
-    start_sec = time.monotonic()
-    last_value = None
-    while timedelta(seconds=time.monotonic() - start_sec) < timeout:
-        last_value = await fn()
-        if expected == last_value:
-            return
-        await asyncio.sleep(interval.total_seconds())
-    assert (
-        expected == last_value
-    ), f"timed out waiting for equal, asserted against last value of {last_value}"
+    async def check() -> None:
+        assert expected == await fn()
+
+    await assert_eventually(check, timeout=timeout, interval=interval)
+
+
+async def assert_task_fail_eventually(
+    handle: WorkflowHandle, *, message_contains: Optional[str] = None
+) -> None:
+    async def check() -> None:
+        async for evt in handle.fetch_history_events():
+            if evt.HasField("workflow_task_failed_event_attributes") and (
+                not message_contains
+                or message_contains
+                in evt.workflow_task_failed_event_attributes.failure.message
+            ):
+                return
+        assert False, "Task failure not present"
+
+    await assert_eventually(check)
 
 
 async def worker_versioning_enabled(client: Client) -> bool:
