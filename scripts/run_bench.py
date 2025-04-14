@@ -100,7 +100,7 @@ async def main():
                     id=f"deadlock-interruptible-workflow-{i}-{uuid.uuid4()}",
                     task_queue=task_queue,
                 )
-                for i in range(args.workflow_count)
+                for i in range(1)
             ] + [
                 await env.client.start_workflow(
                     BenchWorkflow.run,
