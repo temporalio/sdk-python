@@ -188,7 +188,8 @@ class MyCallerWorkflow:
 
 # TODO(dan): cross-namespace tests
 # TODO(dan): nexus endpoint pytest fixture?
-async def test_sync_response(client: Client):
+@pytest.mark.parametrize("should_cancel", [True, False])
+async def test_sync_response(client: Client, should_cancel: bool):
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -197,10 +198,10 @@ async def test_sync_response(client: Client):
         task_queue=task_queue,
         workflow_runner=UnsandboxedWorkflowRunner(),
     ):
-        await create_nexus_endpoint(client, task_queue)
+        await create_nexus_endpoint(NEXUS_ENDPOINT_NAME, task_queue, client)
         wf_handle = await client.start_workflow(
             MyCallerWorkflow.run,
-            args=[SyncResponse(), False],
+            args=[SyncResponse(), should_cancel],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
@@ -220,7 +221,7 @@ async def test_async_response(client: Client):
     ):
         operation_workflow_id = str(uuid.uuid4())
         operation_workflow_handle = client.get_workflow_handle(operation_workflow_id)
-        await create_nexus_endpoint(client, task_queue)
+        await create_nexus_endpoint(NEXUS_ENDPOINT_NAME, task_queue, client)
 
         # Start the caller workflow
         wf_handle = await client.start_workflow(
@@ -248,12 +249,53 @@ async def test_async_response(client: Client):
         assert result == "workflow result"
 
 
-async def create_nexus_endpoint(client: Client, task_queue: str) -> None:
+async def test_cancellation_of_async_response(client: Client):
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_services=[MyServiceImpl()],
+        workflows=[MyCallerWorkflow, MyHandlerWorkflow],
+        task_queue=task_queue,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        operation_workflow_id = str(uuid.uuid4())
+        operation_workflow_handle = client.get_workflow_handle(operation_workflow_id)
+        await create_nexus_endpoint(NEXUS_ENDPOINT_NAME, task_queue, client)
+
+        # Start the caller workflow
+        wf_handle = await client.start_workflow(
+            MyCallerWorkflow.run,
+            args=[AsyncResponse(operation_workflow_id), True],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+
+        # Wait for the Nexus operation to start and check that the operation-backing workflow now exists.
+        await wf_handle.execute_update(MyCallerWorkflow.wait_nexus_operation_started)
+        wf_details = await operation_workflow_handle.describe()
+        assert wf_details.status in [
+            WorkflowExecutionStatus.RUNNING,
+            WorkflowExecutionStatus.COMPLETED,
+        ]
+
+        # Wait for the Nexus operation to complete and check that the operation-backing
+        # workflow has been cancelled.
+        await wf_handle.signal(MyCallerWorkflow.proceed)
+
+        wf_details = await operation_workflow_handle.describe()
+        assert wf_details.status == WorkflowExecutionStatus.CANCELED
+        with pytest.raises(BaseException) as ei:
+            await wf_handle.result()
+        e = ei.value
+        print(f"🌈 workflow failed: {e.__class__.__name__}({e})")
+
+
+async def create_nexus_endpoint(name: str, task_queue: str, client: Client) -> None:
     try:
         await client.operator_service.create_nexus_endpoint(
             temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
                 spec=temporalio.api.nexus.v1.EndpointSpec(
-                    name=NEXUS_ENDPOINT_NAME,
+                    name=name,
                     target=temporalio.api.nexus.v1.EndpointTarget(
                         worker=temporalio.api.nexus.v1.EndpointTarget.Worker(
                             namespace=client.namespace,
@@ -265,6 +307,6 @@ async def create_nexus_endpoint(client: Client, task_queue: str) -> None:
         )
     except RPCError as e:
         if e.status == RPCStatusCode.ALREADY_EXISTS:
-            print(f"Nexus endpoint {NEXUS_ENDPOINT_NAME} already exists")
+            print(f"Nexus endpoint {name} already exists")
         else:
             raise
