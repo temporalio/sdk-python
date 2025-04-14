@@ -194,7 +194,7 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
         "temporal_workflow_endtoend_latency": [
             special_value / 2,
             special_value,
-        ],  # This still does not work :(
+        ],
     }
 
     runtime = Runtime(
