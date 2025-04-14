@@ -884,6 +884,16 @@ class _WorkflowInstanceImpl(
                     job.result.cancelled, self._payload_converter
                 )
             )
+        elif job.result.HasField("timed_out"):
+            xray.add_span_event(
+                "apply job: resolve_nexus_operation [timed_out]",
+                job=job,
+            )
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    job.result.timed_out, self._payload_converter
+                )
+            )
         else:
             xray.add_span_event(
                 "ERROR: apply job: resolve_nexus_operation [???]",
