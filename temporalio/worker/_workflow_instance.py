@@ -838,6 +838,62 @@ class _WorkflowInstanceImpl(
         else:
             raise RuntimeError("Child workflow start did not have a known status")
 
+    def _apply_resolve_nexus_operation_start(
+        self,
+        job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperationStart,
+    ) -> None:
+        # message ResolveNexusOperationStart {
+        #   // Sequence number as provided by lang in the corresponding ScheduleNexusOperation command
+        #   uint32 seq = 1;
+        #   oneof status {
+        #       // The operation started asynchronously. Contains an ID that can be used to perform
+        #       // operations on the started operation by, ex, clients. A `ResolveNexusOperation` job will
+        #       // follow at some point.
+        #       string operation_id = 2;
+        #       // If true the operation "started" but only because it's also already resolved. A
+        #       // `ResolveNexusOperation` job will be in the same activation.
+        #       bool started_sync = 3;
+        #       // The operation was cancelled before it was ever sent to server (same WFT).
+        #       // Note that core will still send a `ResolveNexusOperation` job in the same activation, so
+        #       // there does not need to be an exceptional case for this in lang.
+        #       temporal.api.failure.v1.Failure cancelled_before_start = 4;
+        #   }
+        # }
+        handle = self._pending_nexus_operations.get(job.seq)
+        if not handle:
+            raise RuntimeError(
+                f"Failed to find nexus operation handle for job sequence number {job.seq}"
+            )
+        if job.HasField("operation_id"):
+            # The Nexus operation started asynchronously. A `ResolveNexusOperation` job
+            # will follow in a future activation.
+            xray.add_span_event(
+                "_apply_resolve_nexus_operation_start [operation_id]",
+                job=job,
+            )
+            handle._resolve_start_success(job.operation_id)
+        elif job.HasField("started_sync"):
+            # The Nexus operation 'started' in the sense that it's already resolved. A
+            # `ResolveNexusOperation` job will be in the same activation.
+            xray.add_span_event(
+                "_apply_resolve_nexus_operation_start [start_sync]",
+                job=job,
+            )
+            handle._resolve_start_success(None)
+        elif job.HasField("cancelled_before_start"):
+            # The operation was cancelled before it was ever sent to server (same WFT).
+            # Note that core will still send a `ResolveNexusOperation` job in the same
+            # activation, so there does not need to be an exceptional case for this in
+            # lang.
+            xray.add_span_event(
+                "_apply_resolve_nexus_operation_start [cancelled_before_start]",
+                job=job,
+            )
+            # TODO(dan): confirm appropriate to take no action here
+            pass
+        else:
+            raise ValueError(f"Unknown Nexus operation start status: {job}")
+
     def _apply_resolve_nexus_operation(
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperation,
@@ -845,11 +901,26 @@ class _WorkflowInstanceImpl(
         handle = self._pending_nexus_operations.get(job.seq)
         if not handle:
             raise RuntimeError(
-                f"Failed finding nexus operation handle for sequence {job.seq}"
+                f"Failed to find nexus operation handle for job sequence number {job.seq}"
             )
 
         result = job.result
         # Handle the four oneof variants of NexusOperationResult
+
+        # message ResolveNexusOperation {
+        #   // Sequence number as provided by lang in the corresponding ScheduleNexusOperation command
+        #   uint32 seq = 1;
+        #   nexus.NexusOperationResult result = 2;
+        # }
+        # message NexusOperationResult {
+        #   oneof status {
+        #       temporal.api.common.v1.Payload completed = 1;
+        #       temporal.api.failure.v1.Failure failed = 2;
+        #       temporal.api.failure.v1.Failure cancelled = 3;
+        #       temporal.api.failure.v1.Failure timed_out = 4;
+        #   }
+        # }
+
         if result.HasField("completed"):
             [output] = self._convert_payloads(
                 [result.completed],
@@ -899,22 +970,6 @@ class _WorkflowInstanceImpl(
                 error=RuntimeError("Nexus operation did not have a result"),
             )
             raise RuntimeError("Nexus operation did not have a result")
-
-    def _apply_resolve_nexus_operation_start(
-        self,
-        job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperationStart,
-    ) -> None:
-        xray.add_span_event(
-            "apply job: resolve_nexus_operation_start",
-            job=job,
-        )
-        # TODO(dan): compare with resolve_child_workflow_execution_start
-        handle = self._pending_nexus_operations.get(job.seq)
-        if not handle:
-            raise RuntimeError(
-                f"Failed finding nexus operation handle for sequence {job.seq}"
-            )
-        handle._resolve_start_success(job.operation_id or None)
 
     def _apply_resolve_request_cancel_external_workflow(
         self,
