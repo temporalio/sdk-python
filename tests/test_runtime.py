@@ -3,6 +3,7 @@ import logging.handlers
 import queue
 import re
 import uuid
+from datetime import timedelta
 from typing import List, cast
 from urllib.request import urlopen
 
@@ -240,14 +241,29 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
     await run_workflow(client_with_overrides)
 
-    with urlopen(url=f"http://{prom_addr}/metrics") as f:
-        metrics_output = f.read().decode("utf-8")
+    async def check_metrics() -> bool:
+        try:
+            with urlopen(url=f"http://{prom_addr}/metrics") as f:
+                metrics_output = f.read().decode("utf-8")
 
-        for key, buckets in histogram_overrides.items():
-            assert key in metrics_output
-            for bucket in buckets:
-                # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
-                regex = re.compile(f'{key}_bucket.*le="{bucket}"')
-                assert (
-                    regex.search(metrics_output) is not None
-                ), f"Expected {bucket} in '{key}' histogram"
+                for key, buckets in histogram_overrides.items():
+                    if key not in metrics_output:
+                        return False
+                    for bucket in buckets:
+                        # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
+                        regex = re.compile(f'{key}_bucket.*le="{bucket}"')
+                        if regex.search(metrics_output) is None:
+                            return False
+                return True
+        except Exception as e:
+            # Log the error for debugging if needed, but return False so assert_eventually retries
+            print(f"Error fetching/checking metrics: {e}")
+            return False
+
+    # Wait for metrics to appear and match the expected buckets
+    await assert_eq_eventually(
+        True,
+        check_metrics,
+        timeout=timedelta(seconds=30),
+        interval=timedelta(seconds=2),
+    )
