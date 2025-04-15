@@ -133,12 +133,7 @@ class MyCallerWorkflow:
         )
         task = cast(asyncio.Task, getattr(op_handle, "_task"))
         if isinstance(response_type, SyncResponse):
-            # TODO(dan): core seems to be sending empty operation_id when it should be
-            # sending started_sync
-            # https://temporaltechnologies.slack.com/archives/C01FG4BRQVB/p1744750759998299
-            # assert op_handle.operation_token is None
-            assert not op_handle.operation_token
-
+            assert op_handle.operation_token is None
             # TODO(dan): I expected task to be done at this point
             # assert task.done()
             # assert not task.exception()
