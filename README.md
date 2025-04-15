@@ -1327,9 +1327,9 @@ A Nexus Service interface definition is a set of named operations, where each op
 `(input_type,output_type)` pair:
 
 ```python
-@nexus_service
+@nexusrpc.service
 class MyNexusService:
-    my_operation: NexusOperation[MyOpInput, MyOpOutput]
+    my_operation: nexusrpc.Operation[MyOpInput, MyOpOutput]
 ```
 
 ### Operation implementation

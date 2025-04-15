@@ -21,7 +21,7 @@ from typing import (
     Union,
 )
 
-import nexus
+import nexusrpc
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -299,7 +299,7 @@ class StartNexusOperationInput(Generic[I, O]):
 
     endpoint: str
     service: str
-    operation: Union[nexus.Operation[I, O], str]
+    operation: Union[nexusrpc.Operation[I, O], str]
     input: I
     schedule_to_close_timeout: Optional[timedelta]
     headers: Optional[Mapping[str, str]]
@@ -308,7 +308,7 @@ class StartNexusOperationInput(Generic[I, O]):
     def operation_name(self) -> str:
         return (
             self.operation.name
-            if isinstance(self.operation, nexus.Operation)
+            if isinstance(self.operation, nexusrpc.Operation)
             else self.operation
         )
 
@@ -316,7 +316,7 @@ class StartNexusOperationInput(Generic[I, O]):
     def input_type(self) -> Optional[Type[I]]:
         return (
             self.operation.input_type
-            if isinstance(self.operation, nexus.Operation)
+            if isinstance(self.operation, nexusrpc.Operation)
             else None
         )
 
@@ -324,7 +324,7 @@ class StartNexusOperationInput(Generic[I, O]):
     def output_type(self) -> Optional[Type[O]]:
         return (
             self.operation.output_type
-            if isinstance(self.operation, nexus.Operation)
+            if isinstance(self.operation, nexusrpc.Operation)
             else None
         )
 

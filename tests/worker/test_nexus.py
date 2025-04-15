@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Union, cast
 
-import nexus
-import nexus.handler
+import nexusrpc
+import nexusrpc.handler
 import pytest
 
 import temporalio.api
@@ -53,9 +53,9 @@ class MyOutput:
     val: str
 
 
-@nexus.service
+@nexusrpc.service
 class MyService:
-    my_operation: nexus.Operation[MyInput, MyOutput]
+    my_operation: nexusrpc.Operation[MyInput, MyOutput]
 
 
 # -----------------------------------------------------------------------------
@@ -72,7 +72,7 @@ class MyHandlerWorkflow:
 
 class MyOperation:
     async def start(
-        self, input: MyInput, options: nexus.handler.StartOperationOptions
+        self, input: MyInput, options: nexusrpc.handler.StartOperationOptions
     ) -> Union[
         MyOutput,
         temporalio.nexus.handler.AsyncWorkflowOperationResult[MyOutput],
@@ -89,7 +89,7 @@ class MyOperation:
             raise TypeError
 
     async def cancel(
-        self, token: str, options: nexus.handler.CancelOperationOptions
+        self, token: str, options: nexusrpc.handler.CancelOperationOptions
     ) -> None:
         return await temporalio.nexus.handler.cancel_workflow(token, options)
 
@@ -100,10 +100,10 @@ class MyOperation:
         raise NotImplementedError
 
 
-@nexus.handler.service(interface=MyService)
+@nexusrpc.handler.service(interface=MyService)
 class MyServiceImpl:
-    @nexus.handler.operation
-    def my_operation(self) -> nexus.handler.Operation[MyInput, MyOutput]:
+    @nexusrpc.handler.operation
+    def my_operation(self) -> nexusrpc.handler.Operation[MyInput, MyOutput]:
         return MyOperation()
 
 

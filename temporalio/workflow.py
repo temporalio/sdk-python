@@ -41,7 +41,7 @@ from typing import (
     overload,
 )
 
-import nexus
+import nexusrpc
 from typing_extensions import (
     Concatenate,
     Literal,
@@ -755,7 +755,7 @@ class _Runtime(ABC):
         self,
         endpoint: str,
         service: str,
-        operation: Union[nexus.Operation[I, O], str],
+        operation: Union[nexusrpc.Operation[I, O], str],
         input: Any,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
@@ -4282,7 +4282,7 @@ class NexusOperationHandle(Generic[O]):
 async def start_nexus_operation(
     endpoint: str,
     service: str,
-    operation: Union[nexus.Operation[I, O], str],
+    operation: Union[nexusrpc.Operation[I, O], str],
     input: Any,
     *,
     schedule_to_close_timeout: Optional[timedelta] = None,
@@ -5055,7 +5055,7 @@ class NexusClient:
     # TODO(dan): overloads: no-input, operation name, ret type
     async def start_operation(
         self,
-        operation: Union[nexus.Operation[I, O], str],
+        operation: Union[nexusrpc.Operation[I, O], str],
         input: I,
         *,
         schedule_to_close_timeout: Optional[timedelta] = None,
@@ -5075,7 +5075,7 @@ class NexusClient:
     # TODO(dan): overloads: no-input, operation name, ret type
     async def execute_operation(
         self,
-        operation: nexus.Operation[I, O],
+        operation: nexusrpc.Operation[I, O],
         input: I,
         *,
         schedule_to_close_timeout: Optional[timedelta] = None,

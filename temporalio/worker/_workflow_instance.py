@@ -42,7 +42,7 @@ from typing import (
     cast,
 )
 
-import nexus
+import nexusrpc
 from typing_extensions import Self, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -1496,7 +1496,7 @@ class _WorkflowInstanceImpl(
         self,
         endpoint: str,
         service: str,
-        operation: Union[nexus.Operation[I, O], str],
+        operation: Union[nexusrpc.Operation[I, O], str],
         input: Any,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,

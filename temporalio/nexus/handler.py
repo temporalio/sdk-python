@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Awaitable, Callable, Generic, Optional, TypeVar, overload
 
-import nexus.handler
-from nexus.handler import _ServiceImpl
+import nexusrpc.handler
+from nexusrpc.handler import _ServiceImpl
 
 import temporalio.common
 from temporalio.client import (
@@ -24,7 +24,7 @@ I = TypeVar("I")
 S = TypeVar("S", bound=_ServiceImpl)
 
 
-class AsyncWorkflowOperationResult(nexus.handler.AsyncOperationResult, Generic[O]):
+class AsyncWorkflowOperationResult(nexusrpc.handler.AsyncOperationResult, Generic[O]):
     @classmethod
     def from_workflow_handle(
         cls, workflow_handle: WorkflowHandle[Any, O]
@@ -60,7 +60,7 @@ async def start_workflow(
     workflow_run_method: MethodAsyncNoParam[Any, O],
     *,
     id: str,
-    options: nexus.handler.StartOperationOptions,
+    options: nexusrpc.handler.StartOperationOptions,
     client: Optional[Client] = None,
     task_queue: Optional[str] = None,
 ) -> AsyncWorkflowOperationResult[O]: ...
@@ -73,7 +73,7 @@ async def start_workflow(
     arg: I,
     *,
     id: str,
-    options: nexus.handler.StartOperationOptions,
+    options: nexusrpc.handler.StartOperationOptions,
     client: Optional[Client] = None,
     task_queue: Optional[str] = None,
 ) -> AsyncWorkflowOperationResult[O]: ...
@@ -84,7 +84,7 @@ async def start_workflow(
     arg: Any = temporalio.common._arg_unset,
     *,
     id: str,
-    options: nexus.handler.StartOperationOptions,
+    options: nexusrpc.handler.StartOperationOptions,
     client: Optional[Client] = None,
     task_queue: Optional[str] = None,
 ) -> AsyncWorkflowOperationResult[Any]:
@@ -117,12 +117,12 @@ async def start_workflow(
 # order to check that the design extends well to this.
 async def fetch_workflow_info(
     operation_token: str,
-    options: nexus.handler.FetchOperationInfoOptions,
-) -> nexus.handler.OperationInfo:
+    options: nexusrpc.handler.FetchOperationInfoOptions,
+) -> nexusrpc.handler.OperationInfo:
     # TODO(dan)
-    return nexus.handler.OperationInfo(
+    return nexusrpc.handler.OperationInfo(
         token=operation_token,
-        status=nexus.handler.OperationState.RUNNING,
+        status=nexusrpc.handler.OperationState.RUNNING,
     )
 
 
@@ -130,7 +130,7 @@ async def fetch_workflow_info(
 # order to check that the design extends well to this.
 async def fetch_workflow_result(
     operation_token: str,
-    options: nexus.handler.FetchOperationResultOptions,
+    options: nexusrpc.handler.FetchOperationResultOptions,
     client: Optional[Client] = None,
 ) -> Any:
     # TODO(dan): type safety
@@ -144,7 +144,7 @@ async def fetch_workflow_result(
 
 async def cancel_workflow(
     operation_token: str,
-    options: nexus.handler.CancelOperationOptions,
+    options: nexusrpc.handler.CancelOperationOptions,
     client: Optional[Client] = None,
 ) -> None:
     _client = client or get_client()
@@ -181,12 +181,12 @@ def get_task_queue() -> str:
     return context.task_queue
 
 
-class WorkflowOperation(nexus.handler.Operation[I, O]):
+class WorkflowOperation(nexusrpc.handler.Operation[I, O]):
     def __init__(
         self,
         service: _ServiceImpl,
         start_method: Callable[
-            [_ServiceImpl, I, nexus.handler.StartOperationOptions],
+            [_ServiceImpl, I, nexusrpc.handler.StartOperationOptions],
             Awaitable[AsyncWorkflowOperationResult[O]],
         ],
     ):
@@ -195,13 +195,13 @@ class WorkflowOperation(nexus.handler.Operation[I, O]):
         # TODO: get rid of first parameter?
         @wraps(start_method)
         async def start(
-            self, input: I, options: nexus.handler.StartOperationOptions
+            self, input: I, options: nexusrpc.handler.StartOperationOptions
         ) -> AsyncWorkflowOperationResult[O]:
             return await start_method(service, input, options)
 
         # TODO: get rid of first parameter?
         async def fetch_result(
-            self, token: str, options: nexus.handler.FetchOperationResultOptions
+            self, token: str, options: nexusrpc.handler.FetchOperationResultOptions
         ) -> O:
             return await fetch_workflow_result(token, options)
 
@@ -213,27 +213,27 @@ class WorkflowOperation(nexus.handler.Operation[I, O]):
         self.fetch_result = types.MethodType(fetch_result, self)
 
     async def cancel(
-        self, token: str, options: nexus.handler.CancelOperationOptions
+        self, token: str, options: nexusrpc.handler.CancelOperationOptions
     ) -> None:
         await cancel_workflow(token, options)
 
     async def fetch_info(
-        self, token: str, options: nexus.handler.FetchOperationInfoOptions
-    ) -> nexus.handler.OperationInfo:
+        self, token: str, options: nexusrpc.handler.FetchOperationInfoOptions
+    ) -> nexusrpc.handler.OperationInfo:
         return await fetch_workflow_info(token, options)
 
 
 # TODO(dan): support overriding op name
 def workflow_operation(
     start_method: Callable[
-        [S, I, nexus.handler.StartOperationOptions],
+        [S, I, nexusrpc.handler.StartOperationOptions],
         Awaitable[AsyncWorkflowOperationResult[O]],
     ],
 ) -> Callable[[S], WorkflowOperation[I, O]]:
     def factory(service: S) -> WorkflowOperation[I, O]:
         return WorkflowOperation(service, start_method)
 
-    factory.__nexus_operation__ = nexus.handler._NexusOperationDefinition(
+    factory.__nexus_operation__ = nexusrpc.handler._NexusOperationDefinition(
         name=start_method.__name__
     )
     return factory
