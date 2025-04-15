@@ -1780,7 +1780,8 @@ class _WorkflowInstanceImpl(
                 await asyncio.shield(handle._start_fut)
                 return handle
             except asyncio.CancelledError:
-                raise NotImplementedError("Nexus operation cancel not implemented")
+                cancel_command = self._add_command()
+                handle._apply_cancel_command(cancel_command)
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
