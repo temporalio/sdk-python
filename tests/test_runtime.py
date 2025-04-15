@@ -264,6 +264,4 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     await assert_eq_eventually(
         True,
         check_metrics,
-        timeout=timedelta(seconds=30),
-        interval=timedelta(seconds=2),
     )
