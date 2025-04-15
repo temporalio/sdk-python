@@ -2894,9 +2894,20 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         self._seq = seq
         self._input = input
         self._task = asyncio.Task(fn)
-        self._start_fut: asyncio.Future[None] = instance.create_future()
-        self._result_fut: asyncio.Future[Any] = instance.create_future()
-        self.operation_token: Optional[str] = None
+        self._start_fut: asyncio.Future[Optional[str]] = instance.create_future()
+        self._result_fut: asyncio.Future[Optional[O]] = instance.create_future()
+
+    @property
+    def operation_token(self) -> Optional[str]:
+        # TODO(dan): How should this behave?
+        # Java has a separate class that only exists if the operation token exists:
+        # https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/sync/NexusOperationExecutionImpl.java#L26
+        # And Go similar:
+        # https://github.com/temporalio/sdk-go/blob/master/internal/workflow.go#L2770-L2771
+        try:
+            return self._start_fut.result()
+        except BaseException:
+            return None
 
     async def result(self) -> O:
         return await self._task
@@ -2912,17 +2923,15 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
     def _resolve_start_success(self, operation_token: Optional[str]) -> None:
         xray.add_span_event(
             "_resolve_start_success",
-            operation_id=operation_token,
+            operation_token=operation_token,
         )
-        self.operation_token = operation_token
         print(f"🟢 _resolve_start_success: operation_id: {operation_token}")
         # We intentionally let this error if already done
-        self._start_fut.set_result(None)
+        self._start_fut.set_result(operation_token)
 
     def _resolve_success(self, result: Any) -> None:
         xray.add_span_event(
             "_resolve_success",
-            operation_id=self.operation_token,
             result=result,
         )
         print(
@@ -2934,7 +2943,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
     def _resolve_failure(self, err: BaseException) -> None:
         xray.add_span_event(
             "_resolve_failure",
-            operation_id=self.operation_token,
+            operation_token=self.operation_token,
             error=err,
         )
         print(f"🔴 _resolve_failure: operation_id: {self.operation_token} err: {err}")

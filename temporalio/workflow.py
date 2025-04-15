@@ -4257,8 +4257,6 @@ O = TypeVar("O")
 
 # TODO(dan): ABC?
 class NexusOperationHandle(Generic[O]):
-    operation_token: Optional[str]
-
     def cancel(self) -> bool:
         # TODO(dan): docstring
         """
@@ -4273,6 +4271,11 @@ class NexusOperationHandle(Generic[O]):
         raise NotImplementedError
 
     def __await__(self) -> Generator[Any, Any, O]:
+        raise NotImplementedError
+
+    # TODO(dan): check SDK-wide philosophy on @property vs nullary accessor methods.
+    @property
+    def operation_token(self) -> Optional[str]:
         raise NotImplementedError
 
 
