@@ -8,6 +8,7 @@ from typing import Any, Callable, Literal, Optional, Protocol, Union, runtime_ch
 from typing_extensions import TypeAlias
 
 import temporalio.bridge.worker
+from temporalio.common import WorkerDeploymentVersion
 
 _DEFAULT_RESOURCE_ACTIVITY_MAX = 500
 
@@ -55,7 +56,7 @@ class ResourceBasedSlotConfig:
     ramp_throttle: Optional[timedelta] = None
     """Minimum time we will wait (after passing the minimum slots number) between handing out new slots in milliseconds.
     Defaults to 0 for workflows and 50ms for activities.
-    
+
     This value matters because how many resources a task will use cannot be determined ahead of time, and thus the
     system should wait to see how much resources are used before issuing more slots."""
 
@@ -101,7 +102,13 @@ class SlotReserveContext(Protocol):
     worker_identity: str
     """The identity of the worker that is requesting the reservation."""
     worker_build_id: str
-    """The build id of the worker that is requesting the reservation."""
+    """The build id of the worker that is requesting the reservation.
+
+    .. warning::
+        Deprecated, use :py:attr:`worker_deployment_version` instead.
+    """
+    worker_deployment_version: Optional[WorkerDeploymentVersion]
+    """The deployment version of the worker that is requesting the reservation, if any."""
     is_sticky: bool
     """True iff this is a reservation for a sticky poll for a workflow task."""
 

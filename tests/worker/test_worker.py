@@ -2,15 +2,27 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import sys
 import uuid
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional, Sequence
 
 import pytest
 
+import temporalio.api.enums.v1
 import temporalio.worker._worker
 from temporalio import activity, workflow
+from temporalio.api.workflowservice.v1 import (
+    DescribeWorkerDeploymentRequest,
+    DescribeWorkerDeploymentResponse,
+    SetWorkerDeploymentCurrentVersionRequest,
+    SetWorkerDeploymentCurrentVersionResponse,
+    SetWorkerDeploymentRampingVersionRequest,
+    SetWorkerDeploymentRampingVersionResponse,
+)
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
+from temporalio.common import RawValue, VersioningBehavior
+from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ActivitySlotInfo,
@@ -25,11 +37,13 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
+    WorkerDeploymentConfig,
+    WorkerDeploymentVersion,
     WorkerTuner,
     WorkflowSlotInfo,
 )
 from temporalio.workflow import VersioningIntent
-from tests.helpers import new_worker, worker_versioning_enabled
+from tests.helpers import assert_eventually, new_worker, worker_versioning_enabled
 
 
 def test_load_default_worker_binary_id():
@@ -516,6 +530,444 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
         tuner=tuner,
     ) as _w:
         await asyncio.sleep(1)
+
+
+@workflow.defn(
+    name="DeploymentVersioningWorkflow",
+    versioning_behavior=VersioningBehavior.AUTO_UPGRADE,
+)
+class DeploymentVersioningWorkflowV1AutoUpgrade:
+    def __init__(self) -> None:
+        self.finish = False
+
+    @workflow.run
+    async def run(self):
+        await workflow.wait_condition(lambda: self.finish)
+        return "version-v1"
+
+    @workflow.signal
+    def do_finish(self):
+        self.finish = True
+
+    @workflow.query
+    def state(self):
+        return "v1"
+
+
+@workflow.defn(
+    name="DeploymentVersioningWorkflow", versioning_behavior=VersioningBehavior.PINNED
+)
+class DeploymentVersioningWorkflowV2Pinned:
+    def __init__(self) -> None:
+        self.finish = False
+
+    @workflow.run
+    async def run(self):
+        await workflow.wait_condition(lambda: self.finish)
+        depver = workflow.info().get_current_deployment_version()
+        assert depver
+        assert depver.build_id == "2.0"
+        # Just ensuring the rust object was converted properly and this method still works
+        workflow.logger.debug(f"Dep string: {depver.to_canonical_string()}")
+        return "version-v2"
+
+    @workflow.signal
+    def do_finish(self):
+        self.finish = True
+
+    @workflow.query
+    def state(self):
+        return "v2"
+
+
+@workflow.defn(
+    name="DeploymentVersioningWorkflow",
+    versioning_behavior=VersioningBehavior.AUTO_UPGRADE,
+)
+class DeploymentVersioningWorkflowV3AutoUpgrade:
+    def __init__(self) -> None:
+        self.finish = False
+
+    @workflow.run
+    async def run(self):
+        await workflow.wait_condition(lambda: self.finish)
+        return "version-v3"
+
+    @workflow.signal
+    def do_finish(self):
+        self.finish = True
+
+    @workflow.query
+    def state(self):
+        return "v3"
+
+
+async def test_worker_with_worker_deployment_config(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"deployment-{uuid.uuid4()}"
+    worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+    worker_v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
+    worker_v3 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="3.0")
+    async with (
+        new_worker(
+            client,
+            DeploymentVersioningWorkflowV1AutoUpgrade,
+            deployment_config=WorkerDeploymentConfig(
+                version=worker_v1,
+                use_worker_versioning=True,
+            ),
+        ) as w1,
+        new_worker(
+            client,
+            DeploymentVersioningWorkflowV2Pinned,
+            deployment_config=WorkerDeploymentConfig(
+                version=worker_v2,
+                use_worker_versioning=True,
+            ),
+            task_queue=w1.task_queue,
+        ),
+        new_worker(
+            client,
+            DeploymentVersioningWorkflowV3AutoUpgrade,
+            deployment_config=WorkerDeploymentConfig(
+                version=worker_v3,
+                use_worker_versioning=True,
+            ),
+            task_queue=w1.task_queue,
+        ),
+    ):
+        describe_resp = await wait_until_worker_deployment_visible(
+            client,
+            worker_v1,
+        )
+        await set_current_deployment_version(
+            client, describe_resp.conflict_token, worker_v1
+        )
+
+        # Start workflow 1 which will use the 1.0 worker on auto-upgrade
+        wf1 = await client.start_workflow(
+            DeploymentVersioningWorkflowV1AutoUpgrade.run,
+            id="basic-versioning-v1",
+            task_queue=w1.task_queue,
+        )
+        assert "v1" == await wf1.query("state")
+
+        describe_resp2 = await wait_until_worker_deployment_visible(client, worker_v2)
+        await set_current_deployment_version(
+            client, describe_resp2.conflict_token, worker_v2
+        )
+
+        wf2 = await client.start_workflow(
+            DeploymentVersioningWorkflowV2Pinned.run,
+            id="basic-versioning-v2",
+            task_queue=w1.task_queue,
+        )
+        assert "v2" == await wf2.query("state")
+
+        describe_resp3 = await wait_until_worker_deployment_visible(client, worker_v3)
+        await set_current_deployment_version(
+            client, describe_resp3.conflict_token, worker_v3
+        )
+
+        wf3 = await client.start_workflow(
+            DeploymentVersioningWorkflowV3AutoUpgrade.run,
+            id="basic-versioning-v3",
+            task_queue=w1.task_queue,
+        )
+        assert "v3" == await wf3.query("state")
+
+        # Signal all workflows to finish
+        await wf1.signal(DeploymentVersioningWorkflowV1AutoUpgrade.do_finish)
+        await wf2.signal(DeploymentVersioningWorkflowV2Pinned.do_finish)
+        await wf3.signal(DeploymentVersioningWorkflowV3AutoUpgrade.do_finish)
+
+        res1 = await wf1.result()
+        res2 = await wf2.result()
+        res3 = await wf3.result()
+
+        assert res1 == "version-v3"
+        assert res2 == "version-v2"
+        assert res3 == "version-v3"
+
+
+async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"deployment-ramping-{uuid.uuid4()}"
+    v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+    v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
+    async with (
+        new_worker(
+            client,
+            DeploymentVersioningWorkflowV1AutoUpgrade,
+            deployment_config=WorkerDeploymentConfig(
+                version=v1, use_worker_versioning=True
+            ),
+        ) as w1,
+        new_worker(
+            client,
+            DeploymentVersioningWorkflowV2Pinned,
+            deployment_config=WorkerDeploymentConfig(
+                version=v2, use_worker_versioning=True
+            ),
+            task_queue=w1.task_queue,
+        ),
+    ):
+        await wait_until_worker_deployment_visible(client, v1)
+        describe_resp = await wait_until_worker_deployment_visible(client, v2)
+
+        # Set current version to v1 and ramp v2 to 100%
+        conflict_token = (
+            await set_current_deployment_version(
+                client, describe_resp.conflict_token, v1
+            )
+        ).conflict_token
+        conflict_token = (
+            await set_ramping_version(client, conflict_token, v2, 100)
+        ).conflict_token
+
+        # Run workflows and verify they run on v2
+        for i in range(3):
+            wf = await client.start_workflow(
+                DeploymentVersioningWorkflowV2Pinned.run,
+                id=f"versioning-ramp-100-{i}-{uuid.uuid4()}",
+                task_queue=w1.task_queue,
+            )
+            await wf.signal(DeploymentVersioningWorkflowV2Pinned.do_finish)
+            res = await wf.result()
+            assert res == "version-v2"
+
+        # Set ramp to 0, expecting workflows to run on v1
+        conflict_token = (
+            await set_ramping_version(client, conflict_token, v2, 0)
+        ).conflict_token
+        for i in range(3):
+            wfa = await client.start_workflow(
+                DeploymentVersioningWorkflowV1AutoUpgrade.run,
+                id=f"versioning-ramp-0-{i}-{uuid.uuid4()}",
+                task_queue=w1.task_queue,
+            )
+            await wfa.signal(DeploymentVersioningWorkflowV1AutoUpgrade.do_finish)
+            res = await wfa.result()
+            assert res == "version-v1"
+
+        # Set ramp to 50 and eventually verify workflows run on both versions
+        await set_ramping_version(client, conflict_token, v2, 50)
+        seen_results = set()
+
+        async def run_and_record():
+            wf = await client.start_workflow(
+                DeploymentVersioningWorkflowV1AutoUpgrade.run,
+                id=f"versioning-ramp-50-{uuid.uuid4()}",
+                task_queue=w1.task_queue,
+            )
+            await wf.signal(DeploymentVersioningWorkflowV1AutoUpgrade.do_finish)
+            return await wf.result()
+
+        async def check_results():
+            res = await run_and_record()
+            seen_results.add(res)
+            assert "version-v1" in seen_results and "version-v2" in seen_results
+
+        await assert_eventually(check_results)
+
+
+@workflow.defn(dynamic=True, versioning_behavior=VersioningBehavior.PINNED)
+class DynamicWorkflowVersioningOnDefn:
+    @workflow.run
+    async def run(self, args: Sequence[RawValue]) -> str:
+        return "dynamic"
+
+
+async def test_worker_deployment_dynamic_workflow_on_run(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"deployment-dynamic-{uuid.uuid4()}"
+    worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+
+    async with new_worker(
+        client,
+        DynamicWorkflowVersioningOnDefn,
+        deployment_config=WorkerDeploymentConfig(
+            version=worker_v1,
+            use_worker_versioning=True,
+        ),
+    ) as w:
+        describe_resp = await wait_until_worker_deployment_visible(
+            client,
+            worker_v1,
+        )
+        await set_current_deployment_version(
+            client, describe_resp.conflict_token, worker_v1
+        )
+
+        wf = await client.start_workflow(
+            "cooldynamicworkflow",
+            id=f"dynamic-workflow-versioning-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        result = await wf.result()
+        assert result == "dynamic"
+
+        history = await wf.fetch_history()
+        assert any(
+            event.HasField("workflow_task_completed_event_attributes")
+            and event.workflow_task_completed_event_attributes.versioning_behavior
+            == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+            for event in history.events
+        )
+
+
+@workflow.defn
+class NoVersioningAnnotationWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "whee"
+
+
+@workflow.defn(dynamic=True)
+class NoVersioningAnnotationDynamicWorkflow:
+    @workflow.run
+    async def run(self, args: Sequence[RawValue]) -> str:
+        return "whee"
+
+
+async def test_workflows_must_have_versioning_behavior_when_feature_turned_on(
+    client: Client, env: WorkflowEnvironment
+):
+    with pytest.raises(ValueError) as exc_info:
+        Worker(
+            client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            workflows=[NoVersioningAnnotationWorkflow],
+            deployment_config=WorkerDeploymentConfig(
+                version=WorkerDeploymentVersion(
+                    deployment_name="whatever", build_id="1.0"
+                ),
+                use_worker_versioning=True,
+            ),
+        )
+
+    assert "must specify a versioning behavior" in str(exc_info.value)
+
+    with pytest.raises(ValueError) as exc_info:
+        Worker(
+            client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            workflows=[NoVersioningAnnotationDynamicWorkflow],
+            deployment_config=WorkerDeploymentConfig(
+                version=WorkerDeploymentVersion(
+                    deployment_name="whatever", build_id="1.0"
+                ),
+                use_worker_versioning=True,
+            ),
+        )
+
+    assert "must specify a versioning behavior" in str(exc_info.value)
+
+
+async def test_workflows_can_use_default_versioning_behavior(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker versioning")
+
+    deployment_name = f"deployment-default-versioning-{uuid.uuid4()}"
+    worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+
+    async with new_worker(
+        client,
+        NoVersioningAnnotationWorkflow,
+        deployment_config=WorkerDeploymentConfig(
+            version=worker_v1,
+            use_worker_versioning=True,
+            default_versioning_behavior=VersioningBehavior.PINNED,
+        ),
+    ) as w:
+        describe_resp = await wait_until_worker_deployment_visible(
+            client,
+            worker_v1,
+        )
+        await set_current_deployment_version(
+            client, describe_resp.conflict_token, worker_v1
+        )
+
+        wf = await client.start_workflow(
+            NoVersioningAnnotationWorkflow.run,
+            id=f"default-versioning-behavior-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf.result()
+
+        history = await wf.fetch_history()
+        assert any(
+            event.HasField("workflow_task_completed_event_attributes")
+            and event.workflow_task_completed_event_attributes.versioning_behavior
+            == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+            for event in history.events
+        )
+
+
+async def wait_until_worker_deployment_visible(
+    client: Client, version: WorkerDeploymentVersion
+) -> DescribeWorkerDeploymentResponse:
+    async def mk_call() -> DescribeWorkerDeploymentResponse:
+        try:
+            res = await client.workflow_service.describe_worker_deployment(
+                DescribeWorkerDeploymentRequest(
+                    namespace=client.namespace,
+                    deployment_name=version.deployment_name,
+                )
+            )
+        except RPCError:
+            # Expected
+            assert False
+        assert any(
+            vs.version == version.to_canonical_string()
+            for vs in res.worker_deployment_info.version_summaries
+        )
+        return res
+
+    return await assert_eventually(mk_call)
+
+
+async def set_current_deployment_version(
+    client: Client, conflict_token: bytes, version: WorkerDeploymentVersion
+) -> SetWorkerDeploymentCurrentVersionResponse:
+    return await client.workflow_service.set_worker_deployment_current_version(
+        SetWorkerDeploymentCurrentVersionRequest(
+            namespace=client.namespace,
+            deployment_name=version.deployment_name,
+            version=version.to_canonical_string(),
+            conflict_token=conflict_token,
+        )
+    )
+
+
+async def set_ramping_version(
+    client: Client,
+    conflict_token: bytes,
+    version: WorkerDeploymentVersion,
+    percentage: float,
+) -> SetWorkerDeploymentRampingVersionResponse:
+    response = await client.workflow_service.set_worker_deployment_ramping_version(
+        SetWorkerDeploymentRampingVersionRequest(
+            namespace=client.namespace,
+            deployment_name=version.deployment_name,
+            version=version.to_canonical_string(),
+            conflict_token=conflict_token,
+            percentage=percentage,
+        )
+    )
+    return response
 
 
 def create_worker(

@@ -8,7 +8,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import (
     Any,
     Callable,
@@ -1015,6 +1015,54 @@ class Priority:
 
 
 Priority.default = Priority(priority_key=None)
+
+
+class VersioningBehavior(IntEnum):
+    """Specifies when a workflow might move from a worker of one Build Id to another.
+
+    WARNING: Experimental API.
+    """
+
+    UNSPECIFIED = (
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
+    )
+    """ An unspecified versioning behavior. By default, workers opting into worker versioning will
+    be required to specify a behavior. See :py:class:`temporalio.worker.WorkerDeploymentOptions`."""
+    PINNED = temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+    """The workflow will be pinned to the current Build ID unless manually moved."""
+    AUTO_UPGRADE = (
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    )
+    """The workflow will automatically move to the latest version (default Build ID of the task
+    queue) when the next task is dispatched."""
+
+
+@dataclass(frozen=True)
+class WorkerDeploymentVersion:
+    """Represents the version of a specific worker deployment.
+
+    WARNING: Experimental API.
+    """
+
+    deployment_name: str
+    build_id: str
+
+    def to_canonical_string(self) -> str:
+        """Returns the canonical string representation of the version."""
+        return f"{self.deployment_name}.{self.build_id}"
+
+    @staticmethod
+    def from_canonical_string(canonical: str) -> WorkerDeploymentVersion:
+        """Parse a version from a canonical string, which must be in the format
+        `<deployment_name>.<build_id>`. Deployment name must not have a `.` in it.
+        """
+        parts = canonical.split(".", maxsplit=1)
+        if len(parts) != 2:
+            raise ValueError(
+                f"Cannot parse version string: {canonical}, must be in format <deployment_name>.<build_id>"
+            )
+        return WorkerDeploymentVersion(parts[0], parts[1])
+
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument
 # is unset. This is different than None which is a legitimate argument.
