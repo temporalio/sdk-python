@@ -49,6 +49,7 @@ ResponseType = Union[AsyncResponse, SyncResponse]
 @dataclass
 class MyInput:
     response_type: ResponseType
+    block_forever_waiting_for_cancellation: bool
 
 
 @dataclass
@@ -69,7 +70,9 @@ class MyService:
 @workflow.defn
 class MyHandlerWorkflow:
     @workflow.run
-    async def run(self) -> MyOutput:
+    async def run(self, block_forever_waiting_for_cancellation: bool) -> MyOutput:
+        if block_forever_waiting_for_cancellation:
+            await workflow.wait_condition(lambda: False)
         return MyOutput("workflow result")
 
 
@@ -85,6 +88,7 @@ class MyOperation:
         elif isinstance(input.response_type, AsyncResponse):
             return await temporalio.nexus.handler.start_workflow(
                 MyHandlerWorkflow.run,
+                input.block_forever_waiting_for_cancellation,
                 id=input.response_type.operation_workflow_id,
                 options=options,
             )
@@ -132,7 +136,11 @@ class MyCallerWorkflow:
     @workflow.run
     async def run(self, response_type: ResponseType, should_cancel: bool) -> str:
         op_handle = await self.nexus_service.start_operation(
-            MyService.my_operation, MyInput(response_type)
+            MyService.my_operation,
+            MyInput(
+                response_type,
+                block_forever_waiting_for_cancellation=should_cancel,
+            ),
         )
         self._nexus_operation_started = True
         task = cast(asyncio.Task, getattr(op_handle, "_task"))
