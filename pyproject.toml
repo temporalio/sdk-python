@@ -11,8 +11,11 @@ keywords = [
     "workflow",
 ]
 dependencies = [
+    "nexus-rpc",
     "protobuf>=3.20",
+    "pyright==1.1.394",
     "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
+    "temporalio-xray",
     "types-protobuf>=3.20",
     "typing-extensions>=4.2.0,<5",
 ]
@@ -40,7 +43,7 @@ dev = [
     "psutil>=5.9.3,<6",
     "pydocstyle>=6.3.0,<7",
     "pydoctor>=24.11.1,<25",
-    "pyright==1.1.377",
+    "pyright==1.1.394",
     "pytest~=7.4",
     "pytest-asyncio>=0.21,<0.22",
     "pytest-timeout~=2.2",
@@ -83,8 +86,6 @@ testpaths = ["tests"]
 timeout = 600
 timeout_func_only = true
 filterwarnings = [
-  "error::temporalio.workflow.UnfinishedUpdateHandlersWarning",
-  "error::temporalio.workflow.UnfinishedSignalHandlersWarning",
   "ignore::pytest.PytestDeprecationWarning",
   "ignore::DeprecationWarning",
 ]
@@ -185,6 +186,7 @@ exclude = [
 
 [tool.ruff]
 target-version = "py39"
+extend-ignore = ["E741"]  # Allow single-letter variable names like I, O
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
@@ -202,3 +204,7 @@ exclude = [
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
+
+[tool.uv.sources]
+nexus-rpc = { path = "../nexus-sdk-python", editable = true }
+temporalio-xray = { path = "../xray/sdks/python", editable = true }

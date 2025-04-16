@@ -9,6 +9,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Generic,
     List,
     Mapping,
     MutableMapping,
@@ -16,8 +17,11 @@ from typing import (
     Optional,
     Sequence,
     Type,
+    TypeVar,
     Union,
 )
+
+import nexusrpc
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -285,6 +289,46 @@ class StartChildWorkflowInput:
     ret_type: Optional[Type]
 
 
+I = TypeVar("I")
+O = TypeVar("O")
+
+
+@dataclass
+class StartNexusOperationInput(Generic[I, O]):
+    """Input for :py:meth:`WorkflowOutboundInterceptor.start_nexus_operation`."""
+
+    endpoint: str
+    service: str
+    operation: Union[nexusrpc.Operation[I, O], str]
+    input: I
+    schedule_to_close_timeout: Optional[timedelta]
+    headers: Optional[Mapping[str, str]]
+
+    @property
+    def operation_name(self) -> str:
+        return (
+            self.operation.name
+            if isinstance(self.operation, nexusrpc.Operation)
+            else self.operation
+        )
+
+    @property
+    def input_type(self) -> Optional[Type[I]]:
+        return (
+            self.operation.input_type
+            if isinstance(self.operation, nexusrpc.Operation)
+            else None
+        )
+
+    @property
+    def output_type(self) -> Optional[Type[O]]:
+        return (
+            self.operation.output_type
+            if isinstance(self.operation, nexusrpc.Operation)
+            else None
+        )
+
+
 @dataclass
 class StartLocalActivityInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_local_activity`."""
@@ -388,7 +432,7 @@ class WorkflowOutboundInterceptor:
 
     def start_activity(
         self, input: StartActivityInput
-    ) -> temporalio.workflow.ActivityHandle:
+    ) -> temporalio.workflow.ActivityHandle[Any]:
         """Called for every :py:func:`temporalio.workflow.start_activity` and
         :py:func:`temporalio.workflow.execute_activity` call.
         """
@@ -396,7 +440,7 @@ class WorkflowOutboundInterceptor:
 
     async def start_child_workflow(
         self, input: StartChildWorkflowInput
-    ) -> temporalio.workflow.ChildWorkflowHandle:
+    ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         """Called for every :py:func:`temporalio.workflow.start_child_workflow`
         and :py:func:`temporalio.workflow.execute_child_workflow` call.
         """
@@ -404,8 +448,14 @@ class WorkflowOutboundInterceptor:
 
     def start_local_activity(
         self, input: StartLocalActivityInput
-    ) -> temporalio.workflow.ActivityHandle:
+    ) -> temporalio.workflow.ActivityHandle[Any]:
         """Called for every :py:func:`temporalio.workflow.start_local_activity`
         and :py:func:`temporalio.workflow.execute_local_activity` call.
         """
         return self.next.start_local_activity(input)
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> temporalio.workflow.NexusOperationHandle[Any]:
+        """Called for every :py:func:`temporalio.workflow.start_nexus_operation` call."""
+        return await self.next.start_nexus_operation(input)
