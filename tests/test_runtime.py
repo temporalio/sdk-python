@@ -18,7 +18,7 @@ from temporalio.runtime import (
     TelemetryFilter,
 )
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, find_free_port
+from tests.helpers import assert_eq_eventually, assert_eventually, find_free_port
 
 
 @workflow.defn
@@ -241,27 +241,20 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
     await run_workflow(client_with_overrides)
 
-    async def check_metrics() -> bool:
-        try:
-            with urlopen(url=f"http://{prom_addr}/metrics") as f:
-                metrics_output = f.read().decode("utf-8")
+    async def check_metrics() -> None:
+        with urlopen(url=f"http://{prom_addr}/metrics") as f:
+            metrics_output = f.read().decode("utf-8")
 
-                for key, buckets in histogram_overrides.items():
-                    if key not in metrics_output:
-                        return False
-                    for bucket in buckets:
-                        # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
-                        regex = re.compile(f'{key}_bucket.*le="{bucket}"')
-                        if regex.search(metrics_output) is None:
-                            return False
-                return True
-        except Exception as e:
-            # Log the error for debugging if needed, but return False so assert_eventually retries
-            print(f"Error fetching/checking metrics: {e}")
-            return False
+            for key, buckets in histogram_overrides.items():
+                assert (
+                    key in metrics_output
+                ), f"Missing {key} in full output: {metrics_output}"
+                for bucket in buckets:
+                    # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
+                    regex = re.compile(f'{key}_bucket.*le="{bucket}"')
+                    assert regex.search(
+                        metrics_output
+                    ), f"Missing bucket for {key} in full output: {metrics_output}"
 
     # Wait for metrics to appear and match the expected buckets
-    await assert_eq_eventually(
-        True,
-        check_metrics,
-    )
+    await assert_eventually(check_metrics)
