@@ -353,7 +353,14 @@ class _WorkflowInstanceImpl(
             name="handle_activation",
             request_payload=MessageToJson(act),
         ) as span:
+            print(
+                "\n\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\nWFT\n\n\n"
+            )
+
             completion = self._activate(act)
+            print(
+                "\n\n\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\nWFT\n\n\n"
+            )
             span.set_attribute("sdk.response.payload", MessageToJson(completion))
         return completion
 

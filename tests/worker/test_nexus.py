@@ -121,7 +121,7 @@ class MyServiceImpl:
 class MyCallerWorkflow:
     """
     A workflow that executes a Nexus operation, specifying whether it should return
-    synchrinously or asynchronously.
+    synchronously or asynchronously.
     """
 
     def __init__(self) -> None:
@@ -150,48 +150,22 @@ class MyCallerWorkflow:
             # assert task.done()
             # assert not task.exception()
             if should_cancel:
+                # TODO(dan): why does this assert pass (same Q as above re task.done())
                 assert op_handle.cancel()
-                with pytest.raises(
-                    RuntimeError,
-                    match="A Nexus operation that has returned synchronously can't be canceled.",
-                ) as ei:
-                    await op_handle
-                return (
-                    "As expected, it is an error to attempt to cancel a "
-                    "Nexus operation that has responded synchronously."
-                )
-            else:
-                result = await op_handle
-                return result.val
-
         elif isinstance(response_type, AsyncResponse):
             assert op_handle.operation_token
             assert not task.done()
+            # Allow the test to control when we proceed so that it can make initial
+            # assertions.
             await workflow.wait_condition(lambda: self._proceed)
 
             if should_cancel:
-                print(f"🌈 🟠 cancelling op_handle: {op_handle}")
-                # We cannot assert that canel returns True because it's possible that a
+                # We cannot assert that cancel() returns True because it's possible that a
                 # resolve_nexus_operation job has already come in.
                 op_handle.cancel()
-                print(f"🌈 🟠 awaiting op_handle under pytest.raises: {op_handle}")
-                with pytest.raises(
-                    BaseException,
-                ) as ei:
-                    print(
-                        f"🌈 🟠 awaiting op_handle._task: {op_handle._task}, {op_handle._task._state}"
-                    )
-                    await op_handle
-                e = ei.value
-                msg = (
-                    f"Cancellation of Nexus operation returning asynchronously resulted in "
-                    f"caller workflow receiving error: {e.__class__.__name__}({e})"
-                )
-                print(f"🌈 {msg}")
-                return msg
-            else:
-                result = await op_handle
-                return result.val
+
+        result = await op_handle
+        return result.val
 
     @workflow.update
     async def wait_nexus_operation_started(self) -> None:
@@ -209,8 +183,8 @@ class MyCallerWorkflow:
 
 # TODO(dan): cross-namespace tests
 # TODO(dan): nexus endpoint pytest fixture?
-@pytest.mark.parametrize("should_cancel", [False, True])
-async def test_sync_response(client: Client, should_cancel: bool):
+@pytest.mark.parametrize("should_attempt_cancel", [False, True])
+async def test_sync_response(client: Client, should_attempt_cancel: bool):
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -222,14 +196,13 @@ async def test_sync_response(client: Client, should_cancel: bool):
         await create_nexus_endpoint(NEXUS_ENDPOINT_NAME, task_queue, client)
         wf_handle = await client.start_workflow(
             MyCallerWorkflow.run,
-            args=[SyncResponse(), should_cancel],
+            args=[SyncResponse(), should_attempt_cancel],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
-        print(f"🌈 wf_handle: {wf_handle}")
-
+        # The response is synchronous, so the workflow's attempt to cancel the
+        # NexusOperationHandle do not result in cancellation.
         result = await wf_handle.result()
-        print(f"🌈 result: {result}")
         assert result == "sync response"
 
 
@@ -304,6 +277,7 @@ async def test_cancellation_of_async_response(client: Client):
         await wf_handle.signal(MyCallerWorkflow.proceed)
         # The caller workflow will now cancel the op_handle, and await it.
 
+        # TODO(dan): assert what type of exception is raised here
         with pytest.raises(BaseException) as ei:
             await wf_handle.result()
         e = ei.value
