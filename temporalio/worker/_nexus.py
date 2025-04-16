@@ -94,17 +94,36 @@ class _NexusWorker:
 
             task = await poll_task
 
-            request = json.loads(google.protobuf.json_format.MessageToJson(task))[
-                "task"
-            ]["request"]
+            # message NexusTask {
+            #     oneof variant {
+            #         // A nexus task from server
+            #         temporal.api.workflowservice.v1.PollNexusTaskQueueResponse task = 1;
+            #         // A request by Core to notify an in-progress operation handler that it should cancel. This
+            #         // is distinct from a `CancelOperationRequest` from the server, which results from the user
+            #         // requesting the cancellation of an operation. Handling this variant should result in
+            #         // something like cancelling a cancellation token given to the user's operation handler.
+            #         //
+            #         // These do not count as a separate task for the purposes of completing all issued tasks,
+            #         // but rather count as a sort of modification to the already-issued task which is being
+            #         // cancelled.
+            #         //
+            #         // EX: Core knows the nexus operation has timed out, and it does not make sense for the
+            #         // user's operation handler to continue doing work.
+            #         CancelNexusTask cancel_task = 2;
+            #     }
+            # }
+
+            task_python = json.loads(google.protobuf.json_format.MessageToJson(task))
             op = (
-                "start"
-                if "startOperation" in request
+                "cancel_task"
+                if "cancelTask" in task_python
+                else "start"
+                if "startOperation" in task_python.get("task", {}).get("request", {})
                 else "cancel"
-                if "cancelOperation" in request
+                if "cancelOperation" in task_python.get("task", {}).get("request", {})
                 else None
             )
-            assert op
+            assert op, f"Failed to classify Nexus task: {task_python}"
             print(f"🟢 _NexusWorker received '{op}' operation")
 
             # TODO: Correct way to examine and classify task proto
@@ -115,15 +134,19 @@ class _NexusWorker:
                     )
                 elif task.task.request.HasField("cancel_operation"):
                     await self._handle_cancel_operation(
-                        task.task.request.cancel_operation,
-                        task.task.request.cancel_operation.operation_token,
+                        task.task.request.cancel_operation, task.task.task_token
                     )
                 else:
                     raise NotImplementedError(
                         f"Invalid Nexus task request: {task.task.request}"
                     )
-            else:
+            elif task.HasField("cancel_task"):
+                print(
+                    f"🟠 _NexusWorker received cancel_task, reason: {task.cancel_task.reason}. "
+                    "TODO: handling not implemented; ignoring."
+                )
                 # TODO(dan): handle cancel_task
+            else:
                 raise NotImplementedError(f"Invalid Nexus task: {task}")
 
     # Only call this if run() raised an error
@@ -174,6 +197,15 @@ class _NexusWorker:
             )
         )
 
+        # message NexusTaskCompletion {
+        #     bytes task_token = 1;
+        #     oneof status {
+        #         temporal.api.nexus.v1.Response completed = 2;
+        #         temporal.api.nexus.v1.HandlerError error = 3;
+        #         bool ack_cancel = 4;
+        #     }
+        # }
+
         result = await operation.start(input, options)
         if isinstance(result, nexusrpc.handler.AsyncOperationResult):
             print(
@@ -183,11 +215,10 @@ class _NexusWorker:
             # "When called, it accepts no arguments and returns a new featureless instance
             # that has no instance attributes and cannot be given any.""
 
-            # See `rg 'complete_nexus_task(NexusTaskCompletion'` in sdk-core
             # TODO(dan): python proto instantiation
             op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                 async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
-                    # TODO(dan): operation_token
+                    # TODO(dan): change core protos to use operation_token instead of operation_id
                     operation_id=result.token,
                     # TODO(dan): links
                     links=[],
@@ -209,16 +240,30 @@ class _NexusWorker:
         await self._bridge_worker().complete_nexus_task(completion)
 
     async def _handle_cancel_operation(
-        self,
-        request: temporalio.api.nexus.v1.CancelOperationRequest,
-        operation_token: str,
+        self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
     ) -> None:
         operation = self._get_operation(request)
         # TODO(dan): header
         await operation.cancel(
-            token=operation_token,
+            token=request.operation_token,
             options=nexusrpc.handler.CancelOperationOptions(),
         )
+        # message NexusTaskCompletion {
+        #     bytes task_token = 1;
+        #     oneof status {
+        #         temporal.api.nexus.v1.Response completed = 2;
+        #         temporal.api.nexus.v1.HandlerError error = 3;
+        #         bool ack_cancel = 4;
+        #     }
+        # }
+        completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+            task_token=task_token,
+            # TODO(dan): python proto instantiation
+            completed=temporalio.api.nexus.v1.Response(
+                cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
+            ),
+        )
+        await self._bridge_worker().complete_nexus_task(completion)
 
     def _get_operation(
         self,
