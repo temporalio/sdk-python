@@ -1821,6 +1821,20 @@ class _WorkflowInstanceImpl(
     async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput
     ) -> _NexusOperationHandle[Any]:
+        # A Nexus operation handle contains two futures: self._start_fut is resolved wheas
+        # a result of the Nexus operation starting (activation job:
+        # resolve_nexus_operation_start), and self._result_fut is resolved as a result of
+        # the Nexus operation completing (activation job: resolve_nexus_operation). The
+        # handle itself corresponds to an asyncio.Task which waits on self.result_fut,
+        # handling CancelledError by emitting a RequestCancelNexusOperation command. We do
+        # not return the handle until we receive resolve_nexus_operation_start, like
+        # ChildWorkflowHandle and unlike ActivityHandle. Note that a Nexus operation may
+        # complete synchronously (in which case both jobs will be sent in the same
+        # activation, and start will be resolved without an operation token), or
+        # asynchronously (in which case start they may be sent in separate activations,
+        # and start will be resolved with an operation token). See comments in
+        # tests/worker/test_nexus.py for worked examples of the evolution of the resulting
+        # handle state machine in the sync and async Nexus response cases.
         handle: _NexusOperationHandle
 
         async def operation_handle_fn() -> Any:
@@ -2977,9 +2991,17 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
     def __await__(self) -> Generator[Any, Any, O]:
         return self._task.__await__()
 
+    def __repr__(self) -> str:
+        return (
+            f"{self._start_fut} "
+            f"{self._result_fut} "
+            f"Task[{self._task._state}] fut_waiter = {self._task._fut_waiter}) ({self._task._must_cancel})"
+        )
+
     def cancel(self) -> bool:
         # TODO(dan): what do we do when the start result has been delivered and we know
-        # this cannot be canceled (e.g. because it was a sync result, or because it failed.)
+        # this cannot be canceled (e.g. because it was a sync result, or because it
+        # failed.)
         return self._task.cancel()
 
     def _resolve_start_success(self, operation_token: Optional[str]) -> None:
