@@ -126,7 +126,7 @@ class MyCallerWorkflow:
             endpoint=NEXUS_ENDPOINT_NAME,
             schedule_to_close_timeout=timedelta(seconds=10),
         )
-        self._waiting_to_proceed = False
+        self._nexus_operation_started = False
         self._proceed = False
 
     @workflow.run
@@ -134,6 +134,7 @@ class MyCallerWorkflow:
         op_handle = await self.nexus_service.start_operation(
             MyService.my_operation, MyInput(response_type)
         )
+        self._nexus_operation_started = True
         task = cast(asyncio.Task, getattr(op_handle, "_task"))
         if isinstance(response_type, SyncResponse):
             assert op_handle.operation_token is None
@@ -158,27 +159,35 @@ class MyCallerWorkflow:
         elif isinstance(response_type, AsyncResponse):
             assert op_handle.operation_token
             assert not task.done()
-            self._waiting_to_proceed = True
             await workflow.wait_condition(lambda: self._proceed)
 
             if should_cancel:
-                assert op_handle.cancel()
+                print(f"🌈 🟠 cancelling op_handle: {op_handle}")
+                # We cannot assert that canel returns True because it's possible that a
+                # resolve_nexus_operation job has already come in.
+                op_handle.cancel()
+                print(f"🌈 🟠 awaiting op_handle under pytest.raises: {op_handle}")
                 with pytest.raises(
                     BaseException,
                 ) as ei:
+                    print(
+                        f"🌈 🟠 awaiting op_handle._task: {op_handle._task}, {op_handle._task._state}"
+                    )
                     await op_handle
                 e = ei.value
-                return (
+                msg = (
                     f"Cancellation of Nexus operation returning asynchronously resulted in "
                     f"caller workflow receiving error: {e.__class__.__name__}({e})"
                 )
+                print(f"🌈 {msg}")
+                return msg
             else:
                 result = await op_handle
                 return result.val
 
     @workflow.update
     async def wait_nexus_operation_started(self) -> None:
-        await workflow.wait_condition(lambda: self._waiting_to_proceed)
+        await workflow.wait_condition(lambda: self._nexus_operation_started)
 
     @workflow.signal
     def proceed(self) -> None:
@@ -284,16 +293,15 @@ async def test_cancellation_of_async_response(client: Client):
             WorkflowExecutionStatus.COMPLETED,
         ]
 
-        # Wait for the Nexus operation to complete and check that the operation-backing
-        # workflow has been cancelled.
         await wf_handle.signal(MyCallerWorkflow.proceed)
+        # The caller workflow will now cancel the op_handle, and await it.
 
-        wf_details = await operation_workflow_handle.describe()
-        assert wf_details.status == WorkflowExecutionStatus.CANCELED
         with pytest.raises(BaseException) as ei:
             await wf_handle.result()
         e = ei.value
         print(f"🌈 workflow failed: {e.__class__.__name__}({e})")
+        wf_details = await operation_workflow_handle.describe()
+        assert wf_details.status == WorkflowExecutionStatus.CANCELED
 
 
 async def create_nexus_endpoint(name: str, task_queue: str, client: Client) -> None:
