@@ -126,6 +126,20 @@ class _NexusWorker:
                 # TODO(dan): handle cancel_task
                 raise NotImplementedError(f"Invalid Nexus task: {task}")
 
+    # Only call this if run() raised an error
+    async def drain_poll_queue(self) -> None:
+        while True:
+            try:
+                # Take all tasks and say we can't handle them
+                task = await self._bridge_worker().poll_nexus_task()
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task.task.task_token
+                )
+                completion.error.failure.message = "Worker shutting down"
+                await self._bridge_worker().complete_nexus_task(completion)
+            except temporalio.bridge.worker.PollShutdownError:
+                return
+
     # TODO(dan): is it correct to import from temporalio.api.nexus?
     # Why are these things not exposed in temporalio.bridge?
     async def _handle_start_operation(
