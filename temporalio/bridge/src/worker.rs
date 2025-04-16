@@ -64,7 +64,7 @@ pub struct WorkerConfig {
 
 #[derive(FromPyObject)]
 pub struct PollerBehaviorSimpleMaximum {
-    pub maximum: usize,
+    pub simple_maximum: usize,
 }
 
 #[derive(FromPyObject)]
@@ -85,7 +85,7 @@ impl From<PollerBehavior> for temporal_sdk_core_api::worker::PollerBehavior {
     fn from(value: PollerBehavior) -> Self {
         match value {
             PollerBehavior::SimpleMaximum(simple) => {
-                temporal_sdk_core_api::worker::PollerBehavior::SimpleMaximum(simple.maximum)
+                temporal_sdk_core_api::worker::PollerBehavior::SimpleMaximum(simple.simple_maximum)
             }
             PollerBehavior::Autoscaling(auto) => {
                 temporal_sdk_core_api::worker::PollerBehavior::Autoscaling {

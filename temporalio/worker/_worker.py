@@ -49,7 +49,7 @@ from .workflow_sandbox import SandboxedWorkflowRunner
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class PollerBehaviorSimpleMaximum:
     """A poller behavior that will attempt to poll as long as a slot is available, up to the
     provided maximum. Cannot be less than two for workflow tasks, or one for other tasks.
@@ -59,11 +59,11 @@ class PollerBehaviorSimpleMaximum:
 
     def _to_bridge(self) -> temporalio.bridge.worker.PollerBehavior:
         return temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
-            maximum=self.maximum
+            simple_maximum=self.maximum
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class PollerBehaviorAutoscaling:
     """A poller behavior that will automatically scale the number of pollers based on feedback
     from the server. A slot must be available before beginning polling.
@@ -201,10 +201,15 @@ class Worker:
                 ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``, and
                 ``max_concurrent_local_activities`` arguments.
 
+                Defaults to fixed-size 100 slots for each slot kind if unset and none of the
+                max_* arguments are provided.
+
                 WARNING: This argument is experimental
             max_concurrent_workflow_task_polls: Maximum number of concurrent
                 poll workflow task requests we will perform at a time on this
                 worker's task queue.
+
+                If set, will override any value passed to ``workflow_task_poller_behavior``.
 
                 WARNING: Deprecated, use ``workflow_task_poller_behavior`` instead
             nonsticky_to_sticky_poll_ratio: max_concurrent_workflow_task_polls *
@@ -217,6 +222,8 @@ class Worker:
             max_concurrent_activity_task_polls: Maximum number of concurrent
                 poll activity task requests we will perform at a time on this
                 worker's task queue.
+
+                If set, will override any value passed to ``activity_task_poller_behavior``.
 
                 WARNING: Deprecated, use ``activity_task_poller_behavior`` instead
             no_remote_activities: If true, this worker will only handle workflow
@@ -284,8 +291,10 @@ class Worker:
             deployment_config: Deployment config for the worker. Exclusive with `build_id` and
                 `use_worker_versioning`.
                 WARNING: This is an experimental feature and may change in the future.
-            workflow_task_poller_behavior: Specify the behavior of workflow task polling
-            activity_task_poller_behavior: Specify the behavior of activity task polling
+            workflow_task_poller_behavior: Specify the behavior of workflow task polling.
+                Defaults to a 5-poller maximum.
+            activity_task_poller_behavior: Specify the behavior of activity task polling.
+                Defaults to a 5-poller maximum.
         """
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
@@ -446,6 +455,15 @@ class Worker:
             build_id = build_id or load_default_build_id()
             versioning_strategy = temporalio.bridge.worker.WorkerVersioningStrategyNone(
                 build_id=build_id
+            )
+
+        if max_concurrent_workflow_task_polls:
+            workflow_task_poller_behavior = PollerBehaviorSimpleMaximum(
+                maximum=max_concurrent_workflow_task_polls
+            )
+        if max_concurrent_activity_task_polls:
+            activity_task_poller_behavior = PollerBehaviorSimpleMaximum(
+                maximum=max_concurrent_activity_task_polls
             )
 
         # Create bridge worker last. We have empirically observed that if it is

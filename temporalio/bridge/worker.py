@@ -66,7 +66,7 @@ class WorkerConfig:
 class PollerBehaviorSimpleMaximum:
     """Python representation of the Rust struct for simple poller behavior."""
 
-    maximum: int
+    simple_maximum: int
 
 
 @dataclass
