@@ -1,8 +1,7 @@
-import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Union, cast
+from typing import Union
 
 import nexusrpc
 import nexusrpc.handler
@@ -152,26 +151,15 @@ class MyCallerWorkflow:
             ),
         )
         self._nexus_operation_started = True
-        task = cast(asyncio.Task, getattr(op_handle, "_task"))
         if isinstance(response_type, SyncResponse):
             assert op_handle.operation_token is None
-            # TODO(dan): I expected task to be done at this point
-            # assert task.done()
-            # assert not task.exception()
-            if should_cancel:
-                # TODO(dan): why does this assert pass (same Q as above re task.done())
-                assert op_handle.cancel()
-        elif isinstance(response_type, AsyncResponse):
+        else:
             assert op_handle.operation_token
-            assert not task.done()
-            # Allow the test to control when we proceed so that it can make initial
-            # assertions.
+            # Allow the test to make assertions before signalling us to proceed.
             await workflow.wait_condition(lambda: self._proceed)
 
-            if should_cancel:
-                # We cannot assert that cancel() returns True because it's possible that a
-                # resolve_nexus_operation job has already come in.
-                op_handle.cancel()
+        if should_cancel:
+            op_handle.cancel()
 
         result = await op_handle
         return result.val
@@ -210,7 +198,7 @@ async def test_sync_response(client: Client, should_attempt_cancel: bool):
             task_queue=task_queue,
         )
         # The response is synchronous, so the workflow's attempt to cancel the
-        # NexusOperationHandle do not result in cancellation.
+        # NexusOperationHandle does not result in cancellation.
         result = await wf_handle.result()
         assert result == "sync response"
 
