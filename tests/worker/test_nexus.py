@@ -22,8 +22,6 @@ from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
-NEXUS_ENDPOINT_NAME = "my-nexus-endpoint"
-
 
 # -----------------------------------------------------------------------------
 # Service interface
@@ -124,17 +122,28 @@ class MyCallerWorkflow:
     synchronously or asynchronously.
     """
 
-    def __init__(self) -> None:
+    @workflow.init
+    def __init__(
+        self,
+        response_type: ResponseType,
+        should_cancel: bool,
+        task_queue: str,
+    ) -> None:
         self.nexus_service = workflow.NexusClient(
             service=MyService,
-            endpoint=NEXUS_ENDPOINT_NAME,
+            endpoint=make_nexus_endpoint_name(task_queue),
             schedule_to_close_timeout=timedelta(seconds=10),
         )
         self._nexus_operation_started = False
         self._proceed = False
 
     @workflow.run
-    async def run(self, response_type: ResponseType, should_cancel: bool) -> str:
+    async def run(
+        self,
+        response_type: ResponseType,
+        should_cancel: bool,
+        task_queue: str,
+    ) -> str:
         op_handle = await self.nexus_service.start_operation(
             MyService.my_operation,
             MyInput(
@@ -193,10 +202,10 @@ async def test_sync_response(client: Client, should_attempt_cancel: bool):
         task_queue=task_queue,
         workflow_runner=UnsandboxedWorkflowRunner(),
     ):
-        await create_nexus_endpoint(NEXUS_ENDPOINT_NAME, task_queue, client)
+        await create_nexus_endpoint(task_queue, client)
         wf_handle = await client.start_workflow(
             MyCallerWorkflow.run,
-            args=[SyncResponse(), should_attempt_cancel],
+            args=[SyncResponse(), should_attempt_cancel, task_queue],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
@@ -217,12 +226,12 @@ async def test_async_response(client: Client):
     ):
         operation_workflow_id = str(uuid.uuid4())
         operation_workflow_handle = client.get_workflow_handle(operation_workflow_id)
-        await create_nexus_endpoint(NEXUS_ENDPOINT_NAME, task_queue, client)
+        await create_nexus_endpoint(task_queue, client)
 
         # Start the caller workflow
         wf_handle = await client.start_workflow(
             MyCallerWorkflow.run,
-            args=[AsyncResponse(operation_workflow_id), False],
+            args=[AsyncResponse(operation_workflow_id), False, task_queue],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
@@ -256,12 +265,12 @@ async def test_cancellation_of_async_response(client: Client):
     ):
         operation_workflow_id = str(uuid.uuid4())
         operation_workflow_handle = client.get_workflow_handle(operation_workflow_id)
-        await create_nexus_endpoint(NEXUS_ENDPOINT_NAME, task_queue, client)
+        await create_nexus_endpoint(task_queue, client)
 
         # Start the caller workflow
         wf_handle = await client.start_workflow(
             MyCallerWorkflow.run,
-            args=[AsyncResponse(operation_workflow_id), True],
+            args=[AsyncResponse(operation_workflow_id), True, task_queue],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
@@ -286,7 +295,14 @@ async def test_cancellation_of_async_response(client: Client):
         assert wf_details.status == WorkflowExecutionStatus.CANCELED
 
 
-async def create_nexus_endpoint(name: str, task_queue: str, client: Client) -> None:
+def make_nexus_endpoint_name(task_queue: str) -> str:
+    return f"nexus-endpoint-{task_queue}"
+
+
+async def create_nexus_endpoint(task_queue: str, client: Client) -> None:
+    # In order to be able to create endpoints for different task queues without risk of
+    # name collision.
+    name = make_nexus_endpoint_name(task_queue)
     try:
         await client.operator_service.create_nexus_endpoint(
             temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
