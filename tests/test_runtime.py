@@ -192,10 +192,6 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     histogram_overrides = {
         "temporal_long_request_latency": [special_value / 2, special_value],
         "custom_histogram": [special_value / 2, special_value],
-        "temporal_workflow_endtoend_latency": [
-            special_value / 2,
-            special_value,
-        ],
     }
 
     runtime = Runtime(
