@@ -43,6 +43,9 @@ from ._tuning import (
     WorkflowSlotInfo,
 )
 from ._worker import (
+    PollerBehavior,
+    PollerBehaviorAutoscaling,
+    PollerBehaviorSimpleMaximum,
     Worker,
     WorkerConfig,
     WorkerDeploymentConfig,
@@ -65,6 +68,9 @@ __all__ = [
     "ReplayerConfig",
     "WorkflowReplayResult",
     "WorkflowReplayResults",
+    "PollerBehavior",
+    "PollerBehaviorSimpleMaximum",
+    "PollerBehaviorAutoscaling",
     # Interceptor base classes
     "Interceptor",
     "ActivityInboundInterceptor",

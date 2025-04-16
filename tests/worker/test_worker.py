@@ -27,6 +27,7 @@ from temporalio.worker import (
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
     LocalActivitySlotInfo,
+    PollerBehaviorAutoscaling,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
@@ -917,6 +918,29 @@ async def test_workflows_can_use_default_versioning_behavior(
             == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
             for event in history.events
         )
+
+
+async def test_can_run_autoscaling_polling_worker(
+    client: Client, env: WorkflowEnvironment
+):
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        workflow_task_poller_behavior=PollerBehaviorAutoscaling(),
+        activity_task_poller_behavior=PollerBehaviorAutoscaling(),
+    ) as w:
+
+        async def do_workflow():
+            wf = await client.start_workflow(
+                WaitOnSignalWorkflow.run,
+                id=f"resource-based-{uuid.uuid4()}",
+                task_queue=w.task_queue,
+            )
+            await wf.signal(WaitOnSignalWorkflow.my_signal, "finish")
+            await wf.result()
+
+        await asyncio.gather(*[do_workflow() for _ in range(20)])
 
 
 async def wait_until_worker_deployment_visible(

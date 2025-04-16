@@ -48,9 +48,9 @@ class WorkerConfig:
     identity_override: Optional[str]
     max_cached_workflows: int
     tuner: TunerHolder
-    max_concurrent_workflow_task_polls: int
+    workflow_task_poller_behavior: PollerBehavior
     nonsticky_to_sticky_poll_ratio: float
-    max_concurrent_activity_task_polls: int
+    activity_task_poller_behavior: PollerBehavior
     no_remote_activities: bool
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int
@@ -60,6 +60,28 @@ class WorkerConfig:
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
+
+
+@dataclass
+class PollerBehaviorSimpleMaximum:
+    """Python representation of the Rust struct for simple poller behavior."""
+
+    maximum: int
+
+
+@dataclass
+class PollerBehaviorAutoscaling:
+    """Python representation of the Rust struct for autoscaling poller behavior."""
+
+    minimum: int
+    maximum: int
+    initial: int
+
+
+PollerBehavior: TypeAlias = Union[
+    PollerBehaviorSimpleMaximum,
+    PollerBehaviorAutoscaling,
+]
 
 
 @dataclass
