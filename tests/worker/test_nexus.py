@@ -38,8 +38,11 @@ class AsyncResponse:
     operation_workflow_id: str
 
 
+# The ordering in this union is critical since the data converter matches eagerly,
+# ignoring unknown fields, and so would identify an AsyncResponse as a SyncResponse if
+# SyncResponse came first in the union.
+
 # TODO(dan): Using Unions with the data converter is probably inadvisable.
-# They must be in this since the data converter matches eagerly, ignoring unknown fields.
 ResponseType = Union[AsyncResponse, SyncResponse]
 
 
@@ -313,3 +316,6 @@ async def create_nexus_endpoint(name: str, task_queue: str, client: Client) -> N
             print(f"🟠 Nexus endpoint {name} already exists")
         else:
             raise
+
+
+# TODO(dan): test exceptions in Nexus worker are raised
