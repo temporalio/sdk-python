@@ -1,5 +1,6 @@
 import asyncio
 import platform
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from time import monotonic
@@ -223,7 +224,9 @@ async def test_workflow_env_assert(client: Client):
         # In unsandboxed workflows, this message has extra diff info appended
         # due to pytest's custom loader that does special assert tricks. But in
         # sandboxed workflows, this just has the first line.
-        assert err.message.startswith("assert 'foo' == 'bar'")
+        # The plain asserter is used for 3.9 & below due to import issues
+        if sys.version_info[:2] > (3, 9):
+            assert err.message.startswith("assert 'foo' == 'bar'")
 
     async with WorkflowEnvironment.from_client(client) as env:
         async with new_worker(env.client, AssertFailWorkflow) as worker:
