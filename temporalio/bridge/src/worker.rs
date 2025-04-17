@@ -601,6 +601,7 @@ impl WorkerRef {
     }
 
     fn record_activity_heartbeat(&self, proto: &PyBytes) -> PyResult<()> {
+        println!("IN BRIDGE - RUST");
         enter_sync!(self.runtime);
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;

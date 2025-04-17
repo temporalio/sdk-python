@@ -220,6 +220,9 @@ impl ClientRef {
                 "list_workflow_executions" => {
                     rpc_call!(retry_client, call, list_workflow_executions)
                 }
+                "pause_activity" => {
+                    rpc_call!(retry_client, call, pause_activity)
+                }
                 "patch_schedule" => {
                     rpc_call!(retry_client, call, patch_schedule)
                 }
