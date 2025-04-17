@@ -80,6 +80,7 @@ class PrometheusConfig:
     counters_total_suffix: bool
     unit_suffix: bool
     durations_as_seconds: bool
+    histogram_bucket_overrides: Optional[Mapping[str, Sequence[float]]] = None
 
 
 @dataclass(frozen=True)
