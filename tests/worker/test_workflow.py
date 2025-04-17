@@ -2251,11 +2251,9 @@ class MyGenericClass(typing.Generic[T]):
     Demonstrates custom conversion and that it works even with generic classes.
     """
 
-    field1: str
-    field2: str = None
-
     def __init__(self, field1: str):
         self.field1 = field1
+        self.field2 = "foo"
 
     @classmethod
     def from_json(cls, json_obj: Any) -> MyGenericClass:
