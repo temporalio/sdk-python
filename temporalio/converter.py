@@ -490,6 +490,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
     This encoder supports dataclasses and all iterables as lists.
 
     A class can implement to_json and from_json methods to support custom conversion logic.
+    Custom conversion of generic classes is supported.
     These methods should have the following signatures:
 
     .. code-block:: python
