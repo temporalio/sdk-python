@@ -9,6 +9,7 @@ on:
 jobs:
   # Build and test the project
   build-lint-test:
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -16,7 +17,8 @@ jobs:
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
         include:
           # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
-          # to a bug in CPython, so we avoid using the assert rewriter.
+          # to a bug in CPython (https://github.com/python/cpython/issues/91351), so we avoid using
+          # the assert rewriter.
           - python: "3.9"
             pytestExtraArgs: "--assert=plain"
           - os: ubuntu-latest
@@ -31,6 +33,12 @@ jobs:
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
             runsOn: macos-13
+          # On 3.13.3 there is some issue with macOS intel where it hangs after pytest with some
+          # test that may have a worker that cannot properly shutdown, but it does not occur on
+          # other versions, platforms, etc. See https://github.com/temporalio/sdk-python/issues/834.
+          - os: macos-intel
+            python: "3.13"
+            pythonOverride: "3.13.2"
           - os: macos-arm
             runsOn: macos-latest
     runs-on: ${{ matrix.runsOn || matrix.os }}
@@ -44,7 +52,7 @@ jobs:
           workspaces: temporalio/bridge -> target
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ matrix.pythonOverride || matrix.python }}
       - uses: arduino/setup-protoc@v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
@@ -59,12 +67,15 @@ jobs:
       - run: poe build-develop
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 10
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+        timeout-minutes: 10
       # Check cloud if proper target and not on fork
       - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
         run: poe test ${{matrix.pytestExtraArgs}} -s -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--cloud.xml
+        timeout-minutes: 10
         env:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
@@ -94,6 +105,7 @@ jobs:
           poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
           poe test -s
+        timeout-minutes: 10
 
       # Do docs stuff (only on one host)
       - name: Build API docs

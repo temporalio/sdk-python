@@ -6,6 +6,8 @@ from typing import AsyncGenerator
 import pytest
 import pytest_asyncio
 
+from . import DEV_SERVER_DOWNLOAD_VERSION
+
 # If there is an integration test environment variable set, we must remove the
 # first path from the sys.path so we can import the wheel instead
 if os.getenv("TEMPORAL_INTEGRATION_TEST"):
@@ -114,8 +116,7 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "--dynamic-config-value",
                 "system.enableDeploymentVersions=true",
             ],
-            # TODO: Remove after next CLI release
-            dev_server_download_version="v1.3.1-priority.0",
+            dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
@@ -139,11 +140,11 @@ async def worker(
     await worker.close()
 
 
-# There is an issue on Windows 3.9 tests in GitHub actions where even though all
-# tests pass, an unclear outer area is killing the process with a bad exit code.
-# This windows-only hook forcefully kills the process as success when the exit
-# code from pytest is a success.
-if sys.version_info < (3, 10) and sys.platform == "win32":
+# There is an issue on 3.9 tests in GitHub actions where even though all tests
+# pass, an unclear outer area is killing the process with a bad exit code. This
+# hook forcefully kills the process as success when the exit code from pytest
+# is a success.
+if sys.version_info < (3, 10):
 
     @pytest.hookimpl(hookwrapper=True, trylast=True)
     def pytest_cmdline_main(config):
