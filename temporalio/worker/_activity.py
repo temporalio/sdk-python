@@ -241,6 +241,7 @@ class _ActivityWorker:
         activity: _RunningActivity,
         task_token: bytes,
     ) -> None:
+        print("HEARTBEAT ASYNC FN")
         # Drain the queue, only taking the last value to actually heartbeat
         details: Optional[Sequence[Any]] = None
         while not activity.pending_heartbeats.empty():

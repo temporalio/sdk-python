@@ -48,6 +48,7 @@ from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
     ResetStickyTaskQueueRequest,
+    PauseActivityRequest
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
@@ -92,6 +93,7 @@ from temporalio.exceptions import (
     TemporalError,
     TimeoutError,
     WorkflowAlreadyStartedError,
+    ActivityPausedError
 )
 from temporalio.runtime import (
     BUFFERED_METRIC_KIND_COUNTER,
@@ -119,6 +121,7 @@ from tests.helpers import (
     assert_task_fail_eventually,
     assert_workflow_exists_eventually,
     ensure_search_attributes_present,
+    assert_pending_activity_exists_eventually,
     find_free_port,
     new_worker,
     workflow_update_exists,
@@ -132,7 +135,6 @@ from tests.helpers.external_stack_trace import (
 # https://github.com/python/cpython/issues/91351
 with workflow.unsafe.imports_passed_through():
     import pytest
-
 
 @workflow.defn
 class HelloWorkflow:
@@ -7481,7 +7483,6 @@ async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
         assert child_wf_info_root.workflow_id == parent_desc.id
         assert child_wf_info_root.run_id == parent_desc.run_id
 
-
 @workflow.defn(dynamic=True)
 class WorkflowDynamicConfigFnFailure:
     @workflow.dynamic_config
@@ -7622,3 +7623,86 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
             handle,
             message_contains="Activity function say_hello is not registered on this worker, no available activities",
         )
+@activity.defn
+async def heartbeat_activity() -> str:
+    while True:
+        try:
+            activity.heartbeat()
+            await asyncio.sleep(1)
+        except ActivityPausedError as e:
+            return "Paused"
+
+@workflow.defn
+class ActivityHeartbeatWorkflow:
+    @workflow.run
+    async def run(self, activity_id: str) -> str:
+        await workflow.execute_activity(
+            heartbeat_activity,
+            activity_id=activity_id,
+            start_to_close_timeout=timedelta(seconds=10),
+            heartbeat_timeout=timedelta(seconds=2),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+        result = await workflow.execute_activity(
+            heartbeat_activity,
+            activity_id=f"{activity_id}-2",
+            start_to_close_timeout=timedelta(seconds=10),
+            heartbeat_timeout=timedelta(seconds=2),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+        return result
+
+async def test_activity_pause(client: Client, env: WorkflowEnvironment):
+    async def pause_and_assert(
+        client: Client, handle: WorkflowHandle, activity_id: str
+    ):
+        """Pause the given activity and assert it becomes paused."""
+        desc = await handle.describe()
+        req = PauseActivityRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(
+                workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
+                run_id=desc.raw_description.workflow_execution_info.execution.run_id,
+            ),
+            id=activity_id,
+        )
+        await client.workflow_service.pause_activity(req)
+
+        # Assert eventually paused
+        async def check_paused() -> bool:
+            info = await assert_pending_activity_exists_eventually(handle, activity_id)
+            return info.paused
+
+        await assert_eventually(check_paused)
+
+    async with new_worker(
+        client, ActivityHeartbeatWorkflow, activities=[heartbeat_activity]
+    ) as worker:
+        test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
+
+        handle: WorkflowHandle[str] = await client.start_workflow(
+            ActivityHeartbeatWorkflow.run,
+            test_activity_id,
+            id=f"test-activity-pause-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Wait for first activity
+        activity_info_1 = await assert_pending_activity_exists_eventually(handle, test_activity_id)
+        # Assert not paused
+        assert not activity_info_1.paused
+        # Pause activity then assert it is paused
+        await pause_and_assert(client, handle, activity_info_1.activity_id)
+
+        # Wait for second activity
+        activity_info_2 = await assert_pending_activity_exists_eventually(
+            handle, f"{test_activity_id}-2"
+        )
+        # # Assert not paused
+        # assert not activity_info_2.paused
+        # # Pause activity then assert it is paused
+        # await pause_and_assert(client, handle, activity_info_2.activity_id)
+
+        # # Assert workflow returned "Paused"
+        # assert await handle.result() == "Paused"

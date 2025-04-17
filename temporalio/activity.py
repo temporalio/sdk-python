@@ -266,6 +266,7 @@ def heartbeat(*details: Any) -> None:
     Raises:
         RuntimeError: When not in an activity.
     """
+    print("PUBLIC HEARTBEAT FN")
     heartbeat_fn = _Context.current().heartbeat
     if not heartbeat_fn:
         raise RuntimeError("Can only execute heartbeat after interceptor init")
