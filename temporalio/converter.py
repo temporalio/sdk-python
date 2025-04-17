@@ -489,6 +489,41 @@ class AdvancedJSONEncoder(json.JSONEncoder):
 
     This encoder supports dataclasses and all iterables as lists.
 
+    A class can implement to_json and from_json methods to support custom conversion logic.
+    These methods should have the following signatures:
+
+    .. code-block:: python
+
+        class MyClass:
+            ...
+
+            @classmethod
+            def from_json(cls, json: Any) -> MyClass:
+                ...
+
+            def to_json(self) -> Any:
+                ...
+
+    The to_json should return the same Python JSON types produced by JSONEncoder:
+
+    +-------------------+---------------+
+    | Python            | JSON          |
+    +===================+===============+
+    | dict              | object        |
+    +-------------------+---------------+
+    | list, tuple       | array         |
+    +-------------------+---------------+
+    | str               | string        |
+    +-------------------+---------------+
+    | int, float        | number        |
+    +-------------------+---------------+
+    | True              | true          |
+    +-------------------+---------------+
+    | False             | false         |
+    +-------------------+---------------+
+    | None              | null          |
+    +-------------------+---------------+
+
     It also uses Pydantic v1's "dict" methods if available on the object,
     but this is deprecated. Pydantic users should upgrade to v2 and use
     temporalio.contrib.pydantic.pydantic_data_converter.
@@ -499,8 +534,9 @@ class AdvancedJSONEncoder(json.JSONEncoder):
 
         See :py:meth:`json.JSONEncoder.default`.
         """
-        # Custom encoding and decoding through temporal_to_json and temporal_from_json
-        to_json = "temporal_to_json"
+        # Custom encoding and decoding through to_json and from_json
+        # to_json should be an instance method with only self argument
+        to_json = "to_json"
         if hasattr(o, to_json):
             attr = getattr(o, to_json)
             if not callable(attr):
@@ -1439,12 +1475,12 @@ def value_to_type(
             raise TypeError(f"Value {value} not in literal values {type_args}")
         return value
 
-    # Has temporal_from_json method
-    from_json = "temporal_from_json"
+    # Has from_json class method (must have to_json as well)
+    from_json = "from_json"
     if hasattr(hint, from_json):
         attr = getattr(hint, from_json)
-        attrCls = getattr(attr, "__self__")
-        if not callable(attr) or not attrCls == origin:
+        attr_cls = getattr(attr, "__self__")
+        if not callable(attr) or not attr_cls == origin:
             raise TypeError(f"Type {hint}: temporal_from_json must be a class method")
         return attr(value)
 
@@ -1515,42 +1551,35 @@ def value_to_type(
         return ret_dict
 
     # Dataclass
-    h = hint if dataclasses.is_dataclass(hint) else None
-    # This allows for generic dataclasses to be passed in.
-    # Note that the field of a generic parameter type is still not deserializable.
-    # Such fields must be marked with dataclasses.field(metadata={"skip": True}, default=...).
-    h = origin if h is None and dataclasses.is_dataclass(origin) else h
-    if h is not None:
+    if dataclasses.is_dataclass(hint):
         if not isinstance(value, dict):
             raise TypeError(
-                f"Cannot convert to dataclass {h}, value is {type(value)} not dict"
+                f"Cannot convert to dataclass {hint}, value is {type(value)} not dict"
             )
         # Obtain dataclass fields and check that all dict fields are there and
         # that no required fields are missing. Unknown fields are silently
         # ignored.
-        fields = dataclasses.fields(h)
-        field_hints = get_type_hints(h)
+        fields = dataclasses.fields(hint)
+        field_hints = get_type_hints(hint)
         field_values = {}
         for field in fields:
             field_value = value.get(field.name, dataclasses.MISSING)
             # We do not check whether field is required here. Rather, we let the
             # attempted instantiation of the dataclass raise if a field is
             # missing
-            if field_value is not dataclasses.MISSING and not field.metadata.get(
-                "skip", False
-            ):
+            if field_value is not dataclasses.MISSING:
                 try:
                     field_values[field.name] = value_to_type(
                         field_hints[field.name], field_value, custom_converters
                     )
                 except Exception as err:
                     raise TypeError(
-                        f"Failed converting field {field.name} on dataclass {h}"
+                        f"Failed converting field {field.name} on dataclass {hint}"
                     ) from err
         # Simply instantiate the dataclass. This will fail as expected when
         # missing required fields.
         # TODO(cretz): Want way to convert snake case to camel case?
-        return h(**field_values)
+        return hint(**field_values)
 
     # Pydantic model instance
     # Pydantic users should use Pydantic v2 with
