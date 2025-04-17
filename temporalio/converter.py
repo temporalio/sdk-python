@@ -543,7 +543,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
             attr = getattr(o, to_json)
             if not callable(attr):
                 raise TypeError(
-                    f"Type {o.__class__}: temporal_to_json must be a method"
+                    f"Type {o.__class__}: to_json must be a method"
                 )
             return attr()
 
