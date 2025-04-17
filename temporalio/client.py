@@ -5130,6 +5130,12 @@ class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
         """Create async activity cancelled error."""
         super().__init__("Activity cancelled")
 
+class AsyncActivityPausedError(temporalio.exceptions.TemporalError):
+    """Error that occurs when async activity attempted heartbeat but was paused."""
+
+    def __init__(self) -> None:
+        """Create async activity paused error."""
+        super().__init__("Activity paused")
 
 class ScheduleAlreadyRunningError(temporalio.exceptions.TemporalError):
     """Error when a schedule is already running."""
@@ -6266,6 +6272,9 @@ class _ClientImpl(OutboundInterceptor):
             )
             if resp_by_id.cancel_requested:
                 raise AsyncActivityCancelledError()
+            if resp_by_id.activity_paused:
+                raise AsyncActivityPausedError()
+
         else:
             resp = await self._client.workflow_service.record_activity_task_heartbeat(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest(
@@ -6280,6 +6289,8 @@ class _ClientImpl(OutboundInterceptor):
             )
             if resp.cancel_requested:
                 raise AsyncActivityCancelledError()
+            if resp.activity_paused:
+                raise AsyncActivityPausedError()
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
         result = (

@@ -231,9 +231,11 @@ impl ClientRef {
                 }
                 "list_workflow_rules" => {
                     rpc_call!(retry_client, call, list_workflow_rules)
-                }
                 "patch_schedule" => {
                     rpc_call!(retry_client, call, patch_schedule)
+                }
+                "pause_activity" => {
+                    rpc_call!(retry_client, call, pause_activity)
                 }
                 "poll_activity_task_queue" => {
                     rpc_call!(retry_client, call, poll_activity_task_queue)
