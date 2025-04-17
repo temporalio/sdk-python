@@ -2251,10 +2251,21 @@ class MyGenericDataClass(typing.Generic[T]):
     field1: str
     field2: T = dataclasses.field(metadata={"skip": True}, default=None)
 
-    def assert_expected(self) -> None:
+    def __init__(self, field1: str):
+        self.field1 = field1
+
+    @classmethod
+    def temporal_from_json(cls, json_obj: Dict[str, Any]) -> MyGenericDataClass:
+        json_obj["field1"] = json_obj["field1"] + "_from_json"
+        return cls(**json_obj)
+
+    def temporal_to_json(self) -> Dict[str, Any]:
+        return {"field1": self.field1 + "_to_json"}
+
+    def assert_expected(self, value: str) -> None:
         # Part of the assertion is that this is the right type, which is
         # confirmed just by calling the method. We also check the field.
-        assert str(self.field1) == "some value2"
+        assert str(self.field1) == value
 
 
 @activity.defn
@@ -2267,7 +2278,6 @@ async def data_class_typed_activity(param: MyDataClass) -> MyDataClass:
 async def generic_data_class_typed_activity(
     param: MyGenericDataClass[str],
 ) -> MyGenericDataClass[str]:
-    param.assert_expected()
     return param
 
 
@@ -2328,20 +2338,24 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
                 start_to_close_timeout=timedelta(seconds=30),
             )
             param.assert_expected()
-            generic_param = MyGenericDataClass[str]("some value2")
+            generic_param = MyGenericDataClass[str]("some_value2")
             generic_param = await workflow.execute_activity(
                 generic_data_class_typed_activity,
                 generic_param,
                 start_to_close_timeout=timedelta(seconds=30),
             )
-            generic_param.assert_expected()
+            generic_param.assert_expected(
+                "some_value2_to_json_from_json_to_json_from_json"
+            )
+            generic_param = MyGenericDataClass[str]("some_value2")
             generic_param = await workflow.execute_local_activity(
                 generic_data_class_typed_activity,
                 generic_param,
                 start_to_close_timeout=timedelta(seconds=30),
             )
-            generic_param.assert_expected()
-
+            generic_param.assert_expected(
+                "some_value2_to_json_from_json_to_json_from_json"
+            )
             child_handle = await workflow.start_child_workflow(
                 DataClassTypedWorkflow.run,
                 param,
@@ -2411,7 +2425,9 @@ async def test_workflow_separate_protocol(client: Client):
     # This test is to confirm that protocols can be used as "interfaces" for
     # when the workflow impl is absent
     async with new_worker(
-        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+        client,
+        DataClassTypedWorkflow,
+        activities=[data_class_typed_activity, generic_data_class_typed_activity],
     ) as worker:
         assert isinstance(DataClassTypedWorkflow(), DataClassTypedWorkflowProto)
         val = MyDataClass(field1="some value")
@@ -2433,7 +2449,9 @@ async def test_workflow_separate_abstract(client: Client):
     # This test is to confirm that abstract classes can be used as "interfaces"
     # for when the workflow impl is absent
     async with new_worker(
-        client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
+        client,
+        DataClassTypedWorkflow,
+        activities=[data_class_typed_activity, generic_data_class_typed_activity],
     ) as worker:
         assert issubclass(DataClassTypedWorkflow, DataClassTypedWorkflowAbstract)
         val = MyDataClass(field1="some value")
