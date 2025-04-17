@@ -107,6 +107,12 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "system.enableEagerWorkflowStart=true",
                 "--dynamic-config-value",
                 "frontend.enableExecuteMultiOperation=true",
+                "--dynamic-config-value",
+                "frontend.enableVersioningWorkflowAPIs=true",
+                "--dynamic-config-value",
+                "frontend.enableVersioningDataAPIs=true",
+                "--dynamic-config-value",
+                "system.enableDeploymentVersions=true",
             ],
             # TODO: Remove after next CLI release
             dev_server_download_version="v1.3.1-priority.0",

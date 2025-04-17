@@ -50,6 +50,7 @@ import temporalio.api.enums.v1
 import temporalio.api.sdk.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
+import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
@@ -211,7 +212,9 @@ class _WorkflowInstanceImpl(
         self._primary_task: Optional[asyncio.Task[None]] = None
         self._time_ns = 0
         self._cancel_requested = False
-        self._current_build_id = ""
+        self._deployment_version_for_current_task: Optional[
+            temporalio.bridge.proto.common.WorkerDeploymentVersion
+        ] = None
         self._current_history_length = 0
         self._current_history_size = 0
         self._continue_as_new_suggested = False
@@ -345,8 +348,15 @@ class _WorkflowInstanceImpl(
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         self._current_completion.successful.SetInParent()
+        self._current_completion.successful.versioning_behavior = (
+            self._defn.versioning_behavior.value
+            if self._defn.versioning_behavior
+            else temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
+        )
         self._current_activation_error: Optional[Exception] = None
-        self._current_build_id = act.build_id_for_current_task
+        self._deployment_version_for_current_task = (
+            act.deployment_version_for_current_task
+        )
         self._current_history_length = act.history_length
         self._current_history_size = act.history_size_bytes
         self._continue_as_new_suggested = act.continue_as_new_suggested
@@ -429,6 +439,7 @@ class _WorkflowInstanceImpl(
             )
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()
+            # TODO: Review - odd that we don't un-set success here?
             try:
                 self._failure_converter.to_failure(
                     activation_err,
@@ -979,7 +990,19 @@ class _WorkflowInstanceImpl(
         return self._extern_functions
 
     def workflow_get_current_build_id(self) -> str:
-        return self._current_build_id
+        if not self._deployment_version_for_current_task:
+            return ""
+        return self._deployment_version_for_current_task.build_id
+
+    def workflow_get_current_deployment_version(
+        self,
+    ) -> Optional[temporalio.common.WorkerDeploymentVersion]:
+        if not self._deployment_version_for_current_task:
+            return None
+        return temporalio.common.WorkerDeploymentVersion(
+            build_id=self._deployment_version_for_current_task.build_id,
+            deployment_name=self._deployment_version_for_current_task.deployment_name,
+        )
 
     def workflow_get_current_history_length(self) -> int:
         return self._current_history_length
@@ -1712,10 +1735,11 @@ class _WorkflowInstanceImpl(
 
     def _is_workflow_failure_exception(self, err: BaseException) -> bool:
         # An exception is a failure instead of a task fail if it's already a
-        # failure error or if it is an instance of any of the failure types in
-        # the worker or workflow-level setting
+        # failure error or if it is a timeout error or if it is an instance of
+        # any of the failure types in the worker or workflow-level setting
         return (
             isinstance(err, temporalio.exceptions.FailureError)
+            or isinstance(err, asyncio.TimeoutError)
             or any(isinstance(err, typ) for typ in self._defn.failure_exception_types)
             or any(
                 isinstance(err, typ)
