@@ -525,6 +525,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
     | None              | null          |
     +-------------------+---------------+
 
+
     It also uses Pydantic v1's "dict" methods if available on the object,
     but this is deprecated. Pydantic users should upgrade to v2 and use
     temporalio.contrib.pydantic.pydantic_data_converter.
