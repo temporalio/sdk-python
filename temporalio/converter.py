@@ -542,9 +542,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         if hasattr(o, to_json):
             attr = getattr(o, to_json)
             if not callable(attr):
-                raise TypeError(
-                    f"Type {o.__class__}: to_json must be a method"
-                )
+                raise TypeError(f"Type {o.__class__}: to_json must be a method")
             return attr()
 
         # Dataclass support
