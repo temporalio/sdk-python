@@ -8,8 +8,6 @@ from enum import Enum
 from typing import Any, Iterator, Mapping, Optional
 from unittest.mock import patch
 
-import pytest
-
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
@@ -32,6 +30,11 @@ from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     new_worker,
 )
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 @activity.defn

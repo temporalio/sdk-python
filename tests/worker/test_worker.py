@@ -7,8 +7,6 @@ import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
 
-import pytest
-
 import temporalio.api.enums.v1
 import temporalio.worker._worker
 from temporalio import activity, workflow
@@ -44,6 +42,11 @@ from temporalio.worker import (
 )
 from temporalio.workflow import VersioningIntent
 from tests.helpers import assert_eventually, new_worker, worker_versioning_enabled
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 def test_load_default_worker_binary_id():

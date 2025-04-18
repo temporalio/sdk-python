@@ -35,7 +35,6 @@ from typing import (
 )
 from urllib.request import urlopen
 
-import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
@@ -111,6 +110,7 @@ from temporalio.worker import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
+from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
@@ -126,6 +126,11 @@ from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
     external_wait_cancel,
 )
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 @workflow.defn
@@ -5083,7 +5088,9 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
     # we will terminate both. We have to use a ticking workflow with only one
     # poller to force a quick re-poll to recognize our client change quickly (as
     # opposed to just waiting the minute for poll timeout).
-    async with await WorkflowEnvironment.start_local() as other_env:
+    async with await WorkflowEnvironment.start_local(
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION
+    ) as other_env:
         # Start both workflows on different servers
         task_queue = f"tq-{uuid.uuid4()}"
         handle1 = await client.start_workflow(
@@ -5964,9 +5971,9 @@ async def _do_first_completion_command_is_honored_test(
             result = await handle.result()
         except WorkflowFailureError as err:
             if main_workflow_returns_before_signal_completions:
-                assert (
-                    False
-                ), "Expected no error due to main workflow coroutine returning first"
+                raise RuntimeError(
+                    "Expected no error due to main workflow coroutine returning first"
+                )
             else:
                 assert str(err.cause).startswith("Client should see this error")
         else:

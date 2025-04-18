@@ -15,8 +15,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
-import pytest
-
 from temporalio import activity, workflow
 from temporalio.client import (
     AsyncActivityHandle,
@@ -47,6 +45,12 @@ from tests.helpers.worker import (
     KSExecuteActivityAction,
     KSWorkflowParams,
 )
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
+
 
 _default_shared_state_manager = SharedStateManager.create_from_multiprocessing(
     multiprocessing.Manager()
