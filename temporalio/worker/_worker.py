@@ -391,6 +391,7 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
+                client=client,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
