@@ -1471,22 +1471,39 @@ def value_to_type(
         )
         # Convert each key/value
         for key, value in value.items():
-            if key_type:
-                try:
-                    key = value_to_type(key_type, key, custom_converters)
-                except Exception as err:
-                    raise TypeError(f"Failed converting key {key} on {hint}") from err
-            # If there are per-key types, use it instead of single type
             this_value_type = value_type
             if per_key_types:
                 # TODO(cretz): Strict mode would fail an unknown key
                 this_value_type = per_key_types.get(key)
+
+            if key_type:
+                # This function is used only by JSONPlainPayloadConverter. When
+                # serializing to JSON, Python supports key types str, int, float, bool,
+                # and None, serializing all to string representations. We now attempt to
+                # use the provided type annotation to recover the original value with its
+                # original type.
+                try:
+                    if isinstance(key, str):
+                        if key_type is int or key_type is float:
+                            key = key_type(key)
+                        elif key_type is bool:
+                            key = {"true": True, "false": False}[key]
+                        elif key_type is type(None):
+                            key = {"null": None}[key]
+
+                    if not isinstance(key, key_type):
+                        key = value_to_type(key_type, key, custom_converters)
+                except Exception as err:
+                    raise TypeError(
+                        f"Failed converting key {repr(key)} to type {key_type} in mapping {hint}"
+                    ) from err
+
             if this_value_type:
                 try:
                     value = value_to_type(this_value_type, value, custom_converters)
                 except Exception as err:
                     raise TypeError(
-                        f"Failed converting value for key {key} on {hint}"
+                        f"Failed converting value for key {repr(key)} in mapping {hint}"
                     ) from err
             ret_dict[key] = value
         # If there are per-key types, it's a typed dict and we want to attempt
