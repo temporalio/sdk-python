@@ -15,9 +15,8 @@ use temporal_sdk_core::api::errors::PollError;
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::worker::{
-    PollerBehavior, SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext,
-    SlotReleaseContext, SlotReservationContext, SlotSupplier as SlotSupplierTrait,
-    SlotSupplierPermit,
+    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
+    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
 };
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
@@ -49,9 +48,9 @@ pub struct WorkerConfig {
     identity_override: Option<String>,
     max_cached_workflows: usize,
     tuner: TunerHolder,
-    max_concurrent_workflow_task_polls: usize,
+    workflow_task_poller_behavior: PollerBehavior,
     nonsticky_to_sticky_poll_ratio: f32,
-    max_concurrent_activity_task_polls: usize,
+    activity_task_poller_behavior: PollerBehavior,
     no_remote_activities: bool,
     sticky_queue_schedule_to_start_timeout_millis: u64,
     max_heartbeat_throttle_interval_millis: u64,
@@ -61,6 +60,42 @@ pub struct WorkerConfig {
     graceful_shutdown_period_millis: u64,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
+}
+
+#[derive(FromPyObject)]
+pub struct PollerBehaviorSimpleMaximum {
+    pub simple_maximum: usize,
+}
+
+#[derive(FromPyObject)]
+pub struct PollerBehaviorAutoscaling {
+    pub minimum: usize,
+    pub maximum: usize,
+    pub initial: usize,
+}
+
+/// Recreates [temporal_sdk_core_api::worker::PollerBehavior]
+#[derive(FromPyObject)]
+pub enum PollerBehavior {
+    SimpleMaximum(PollerBehaviorSimpleMaximum),
+    Autoscaling(PollerBehaviorAutoscaling),
+}
+
+impl From<PollerBehavior> for temporal_sdk_core_api::worker::PollerBehavior {
+    fn from(value: PollerBehavior) -> Self {
+        match value {
+            PollerBehavior::SimpleMaximum(simple) => {
+                temporal_sdk_core_api::worker::PollerBehavior::SimpleMaximum(simple.simple_maximum)
+            }
+            PollerBehavior::Autoscaling(auto) => {
+                temporal_sdk_core_api::worker::PollerBehavior::Autoscaling {
+                    minimum: auto.minimum,
+                    maximum: auto.maximum,
+                    initial: auto.initial,
+                }
+            }
+        }
+    }
 }
 
 /// Recreates [temporal_sdk_core_api::worker::WorkerVersioningStrategy]
@@ -626,14 +661,10 @@ fn convert_worker_config(
         .versioning_strategy(converted_versioning_strategy)
         .client_identity_override(conf.identity_override)
         .max_cached_workflows(conf.max_cached_workflows)
-        .workflow_task_poller_behavior(PollerBehavior::SimpleMaximum(
-            conf.max_concurrent_workflow_task_polls,
-        ))
+        .workflow_task_poller_behavior(conf.workflow_task_poller_behavior)
         .tuner(Arc::new(converted_tuner))
         .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-        .activity_task_poller_behavior(PollerBehavior::SimpleMaximum(
-            conf.max_concurrent_activity_task_polls,
-        ))
+        .activity_task_poller_behavior(conf.activity_task_poller_behavior)
         .no_remote_activities(conf.no_remote_activities)
         .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
             conf.sticky_queue_schedule_to_start_timeout_millis,
