@@ -464,9 +464,16 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-        stack_level: int = 2,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        # The following options are deliberately not exposed in overloads
+        stack_level: int = 2,
+        nexus_completion_callbacks: Sequence[
+            temporalio.common.NexusCompletionCallback
+        ] = [],
+        workflow_event_links: Sequence[
+            temporalio.api.common.v1.Link.WorkflowEvent
+        ] = [],
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -557,6 +564,8 @@ class Client:
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
                 priority=priority,
+                nexus_completion_callbacks=nexus_completion_callbacks,
+                workflow_event_links=workflow_event_links,
             )
         )
 
@@ -5193,6 +5202,8 @@ class StartWorkflowInput:
     rpc_timeout: Optional[timedelta]
     request_eager_start: bool
     priority: temporalio.common.Priority
+    nexus_completion_callbacks: Sequence[temporalio.common.NexusCompletionCallback]
+    workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
     versioning_override: Optional[temporalio.common.VersioningOverride] = None
 
 
@@ -5809,6 +5820,16 @@ class _ClientImpl(OutboundInterceptor):
         req = temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest()
         req.request_eager_execution = input.request_eager_start
         await self._populate_start_workflow_execution_request(req, input)
+        for callback in input.nexus_completion_callbacks:
+            c = temporalio.api.common.v1.Callback()
+            c.nexus.url = callback.url
+            c.nexus.header.update(callback.header)
+            req.completion_callbacks.append(c)
+
+        req.links.extend(
+            temporalio.api.common.v1.Link(workflow_event=link)
+            for link in input.workflow_event_links
+        )
         return req
 
     async def _build_signal_with_start_workflow_execution_request(
