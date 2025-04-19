@@ -20,7 +20,7 @@ use temporal_sdk_core_api::worker::{
 };
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
-use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
+use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion, nexus::NexusTaskCompletion};
 use temporal_sdk_core_protos::temporal::api::history::v1::History;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
@@ -565,6 +565,19 @@ impl WorkerRef {
         })
     }
 
+    fn poll_nexus_task<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let worker = self.worker.as_ref().unwrap().clone();
+        self.runtime.future_into_py(py, async move {
+            let bytes = match worker.poll_nexus_task().await {
+                Ok(task) => task.encode_to_vec(),
+                Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
+                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
+            };
+            let bytes: &[u8] = &bytes;
+            Ok(Python::with_gil(|py| bytes.into_py(py)))
+        })
+    }
+
     fn complete_workflow_activation<'p>(
         &self,
         py: Python<'p>,
@@ -593,6 +606,19 @@ impl WorkerRef {
         self.runtime.future_into_py(py, async move {
             worker
                 .complete_activity_task(completion)
+                .await
+                .context("Completion failure")
+                .map_err(Into::into)
+        })
+    }
+
+    fn complete_nexus_task<'p>(&self, py: Python<'p>, proto: &PyBytes) -> PyResult<&'p PyAny> {
+        let worker = self.worker.as_ref().unwrap().clone();
+        let completion = NexusTaskCompletion::decode(proto.as_bytes())
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+        self.runtime.future_into_py(py, async move {
+            worker
+                .complete_nexus_task(completion)
                 .await
                 .context("Completion failure")
                 .map_err(Into::into)

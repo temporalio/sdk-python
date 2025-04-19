@@ -911,6 +911,12 @@ class DefaultFailureConverter(FailureConverter):
             failure.child_workflow_execution_failure_info.retry_state = (
                 temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
             )
+        # TODO(nexus-prerelease): test coverage for this
+        elif isinstance(error, temporalio.exceptions.NexusOperationError):
+            failure.nexus_operation_execution_failure_info.SetInParent()
+            failure.nexus_operation_execution_failure_info.operation_token = (
+                error.operation_token
+            )
 
     def from_failure(
         self,
@@ -1005,6 +1011,26 @@ class DefaultFailureConverter(FailureConverter):
                 )
                 if child_info.retry_state
                 else None,
+            )
+        elif failure.HasField("nexus_handler_failure_info"):
+            nexus_handler_failure_info = failure.nexus_handler_failure_info
+            err = temporalio.exceptions.NexusHandlerError(
+                failure.message or "Nexus handler error",
+                type=nexus_handler_failure_info.type,
+                retryable={
+                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE: True,
+                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE: False,
+                }.get(nexus_handler_failure_info.retry_behavior),
+            )
+        elif failure.HasField("nexus_operation_execution_failure_info"):
+            nexus_op_failure_info = failure.nexus_operation_execution_failure_info
+            err = temporalio.exceptions.NexusOperationError(
+                failure.message or "Nexus operation error",
+                scheduled_event_id=nexus_op_failure_info.scheduled_event_id,
+                endpoint=nexus_op_failure_info.endpoint,
+                service=nexus_op_failure_info.service,
+                operation=nexus_op_failure_info.operation,
+                operation_token=nexus_op_failure_info.operation_token,
             )
         else:
             err = temporalio.exceptions.FailureError(failure.message or "Failure error")
