@@ -104,7 +104,7 @@ class _WorkflowWorker:
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
         self._extern_functions.update(
-            **_WorkflowExternFunctions(__temporal_get_metric_meter=lambda: metric_meter)
+            **_WorkflowExternFunctions(__temporal_get_metric_meter=lambda: metric_meter)  # pyright: ignore
         )
         self._workflow_failure_exception_types = workflow_failure_exception_types
         self._running_workflows: Dict[str, _RunningWorkflow] = {}

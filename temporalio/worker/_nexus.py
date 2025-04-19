@@ -1,0 +1,478 @@
+"""Nexus worker"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import pprint
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Sequence,
+    Union,
+)
+
+import google.protobuf.json_format
+import nexusrpc.handler
+from nexusrpc.handler import HandlerError, HandlerErrorType
+
+import temporalio.activity
+import temporalio.api.common.v1
+import temporalio.api.enums.v1
+import temporalio.api.failure.v1
+import temporalio.api.nexus.v1
+import temporalio.bridge.client
+import temporalio.bridge.proto
+import temporalio.bridge.proto.activity_result
+import temporalio.bridge.proto.activity_task
+import temporalio.bridge.proto.common
+import temporalio.bridge.proto.nexus
+import temporalio.bridge.runtime
+import temporalio.bridge.worker
+import temporalio.client
+import temporalio.common
+import temporalio.converter
+import temporalio.nexus
+import temporalio.nexus.handler
+from temporalio.exceptions import ApplicationError
+from temporalio.service import RPCError, RPCStatusCode
+
+from ._interceptor import Interceptor
+
+logger = logging.getLogger(__name__)
+
+
+class _NexusWorker:
+    def __init__(
+        self,
+        *,
+        bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
+        client: temporalio.client.Client,
+        task_queue: str,
+        nexus_services: Sequence[Any],
+        data_converter: temporalio.converter.DataConverter,
+        interceptors: Sequence[Interceptor],
+        metric_meter: temporalio.common.MetricMeter,
+    ) -> None:
+        # TODO(dan): make it possible to query task queue of bridge worker
+        # instead of passing unused task_queue into _NexusWorker,
+        # _ActivityWorker, etc?
+        self._bridge_worker = bridge_worker
+        self._client = client
+        self._task_queue = task_queue
+
+        self._nexus_services = self._validate_nexus_services(nexus_services)
+        print(
+            f"🟠 Nexus worker registered Nexus services: {pprint.pformat(self._nexus_services)}"
+        )
+        self._data_converter = data_converter
+        # TODO(dan): interceptors
+        self._interceptors = interceptors
+        # TODO(dan): metric_meter
+        self._metric_meter = metric_meter
+        self._running_operations: dict[bytes, asyncio.Task] = {}
+
+    def _validate_nexus_services(
+        self, nexus_services: Sequence[Any]
+    ) -> dict[str, dict[str, nexusrpc.handler.Operation]]:
+        # TODO(dan): Fail if multiple services have the same name.
+        nexus_services_by_name: dict[str, dict[str, nexusrpc.handler.Operation]] = {}
+        for service in nexus_services:
+            defn = nexusrpc.handler.NexusServiceDefinition.from_implementation(service)
+            nexus_services_by_name[defn.name] = {
+                op_name: op_factory(service)
+                for op_name, op_factory in defn.operation_factories.items()
+            }
+        return nexus_services_by_name
+
+    async def run(self) -> None:
+        while True:
+            print("_NexusWorker running")
+
+            try:
+                poll_task = asyncio.create_task(self._bridge_worker().poll_nexus_task())
+            except Exception as err:
+                raise RuntimeError("Nexus worker failed") from err
+
+            print("🟠 _NexusWorker sent poll request")
+
+            task = await poll_task
+
+            # message NexusTask {
+            #     oneof variant {
+            #         // A nexus task from server
+            #         temporal.api.workflowservice.v1.PollNexusTaskQueueResponse task = 1;
+            #         // A request by Core to notify an in-progress operation handler that it should cancel. This
+            #         // is distinct from a `CancelOperationRequest` from the server, which results from the user
+            #         // requesting the cancellation of an operation. Handling this variant should result in
+            #         // something like cancelling a cancellation token given to the user's operation handler.
+            #         //
+            #         // These do not count as a separate task for the purposes of completing all issued tasks,
+            #         // but rather count as a sort of modification to the already-issued task which is being
+            #         // cancelled.
+            #         //
+            #         // EX: Core knows the nexus operation has timed out, and it does not make sense for the
+            #         // user's operation handler to continue doing work.
+            #         CancelNexusTask cancel_task = 2;
+            #     }
+            # }
+
+            task_python = json.loads(google.protobuf.json_format.MessageToJson(task))
+            op = (
+                "cancel_task"
+                if "cancelTask" in task_python
+                else "start"
+                if "startOperation" in task_python.get("task", {}).get("request", {})
+                else "cancel"
+                if "cancelOperation" in task_python.get("task", {}).get("request", {})
+                else None
+            )
+            assert op, f"Failed to classify Nexus task: {task_python}"
+            print(f"🟢 _NexusWorker received '{op}' operation")
+
+            # TODO(dan): Correct way to examine and classify task proto
+            if task.HasField("task"):
+                if task.task.request.HasField("start_operation"):
+                    await self._handle_start_operation(
+                        task.task.request.start_operation, task.task.task_token
+                    )
+                elif task.task.request.HasField("cancel_operation"):
+                    await self._handle_cancel_operation(
+                        task.task.request.cancel_operation, task.task.task_token
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"Invalid Nexus task request: {task.task.request}"
+                    )
+            elif task.HasField("cancel_task"):
+                print(
+                    f"🟠 _NexusWorker received cancel_task, reason: {task.cancel_task.reason}. "
+                    "TODO: handling not implemented; ignoring."
+                )
+                # TODO(dan): handle cancel_task
+            else:
+                raise NotImplementedError(f"Invalid Nexus task: {task}")
+
+    # Only call this if run() raised an error
+    async def drain_poll_queue(self) -> None:
+        while True:
+            try:
+                # Take all tasks and say we can't handle them
+                task = await self._bridge_worker().poll_nexus_task()
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task.task.task_token
+                )
+                completion.error.failure.message = "Worker shutting down"
+                await self._bridge_worker().complete_nexus_task(completion)
+            except temporalio.bridge.worker.PollShutdownError:
+                return
+
+    async def wait_all_completed(self) -> None:
+        await asyncio.gather(
+            *self._running_operations.values(), return_exceptions=False
+        )
+
+    # TODO(dan): is it correct to import from temporalio.api.nexus?
+    # Why are these things not exposed in temporalio.bridge?
+    async def _handle_start_operation(
+        self, request: temporalio.api.nexus.v1.StartOperationRequest, task_token: bytes
+    ) -> None:
+        operation = self._get_operation(request)
+
+        print(
+            f"🟠 Starting operation {request.operation} with payload {request.payload}"
+        )
+
+        # TODO(dan): HACK. See activity_def.arg_types in _activity.py
+        arg_types, _ = temporalio.common._type_hints_from_func(operation.start)
+
+        [input] = await self._data_converter.decode(
+            [request.payload],
+            type_hints=[arg_types[0]] if arg_types else None,
+        )
+
+        # TODO(dan): header
+        options = nexusrpc.handler.StartOperationOptions(
+            callback_url=request.callback,
+            links=[
+                nexusrpc.handler.Link(url=l.url, type=l.type) for l in request.links
+            ],
+            callback_header=dict(request.callback_header),
+        )
+        for l in request.links:
+            print(
+                f"🌈@@ worker received task with link: {google.protobuf.json_format.MessageToJson(l)}"
+            )
+
+        # TODO(dan): shouldn't this be set in the _run_nexus_operation context? (that doesn't work currently)
+        temporalio.nexus.handler._current_context.set(
+            temporalio.nexus.handler._Context(
+                client=self._client,
+                task_queue=self._task_queue,
+            )
+        )
+        self._running_operations[task_token] = asyncio.create_task(
+            self._run_nexus_operation(task_token, operation.start, input, options)
+        )
+
+    # TODO(dan): start type
+    async def _run_nexus_operation(
+        self,
+        task_token: bytes,
+        start: Callable[..., Awaitable[Any]],
+        input: Any,
+        options: nexusrpc.handler.StartOperationOptions,
+    ) -> None:
+        # message NexusTaskCompletion {
+        #     bytes task_token = 1;
+        #     oneof status {
+        #         temporal.api.nexus.v1.Response completed = 2;
+        #         temporal.api.nexus.v1.HandlerError error = 3;
+        #         bool ack_cancel = 4;
+        #     }
+        # }
+
+        # message Response {
+        #     oneof variant {
+        #         StartOperationResponse start_operation = 1;
+        #         CancelOperationResponse cancel_operation = 2;
+        #     }
+        # }
+
+        # message StartOperationResponse {
+        #     oneof variant {
+        #         Sync sync_success = 1;
+        #         Async async_success = 2;
+        #         UnsuccessfulOperationError operation_error = 3;
+        #     }
+        # }
+
+        # message HandlerError {
+        #     string error_type = 1;
+        #     Failure failure = 2;
+        #     temporal.api.enums.v1.NexusHandlerErrorRetryBehavior retry_behavior = 3;
+        # }
+
+        # message Failure {
+        #     string message = 1;
+        #     map<string, string> metadata = 2;
+        #     // UTF-8 encoded JSON serializable details.
+        #     bytes details = 3;
+        # }
+
+        async def run() -> temporalio.bridge.proto.nexus.NexusTaskCompletion:
+            try:
+                result = await start(input, options)
+            except nexusrpc.handler.OperationError as err:
+                return temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    completed=temporalio.api.nexus.v1.Response(
+                        start_operation=temporalio.api.nexus.v1.StartOperationResponse(
+                            operation_error=temporalio.api.nexus.v1.UnsuccessfulOperationError(
+                                operation_state=err.state.value,
+                                failure=await self._exception_to_failure_proto(err),
+                            ),
+                        ),
+                    ),
+                )
+            except BaseException as err:
+                # TODO(dan): should encode_failure be called here?? (It accepts the
+                # api.Failure proto struct, not the Nexus one.)
+                # await self._data_converter.encode_failure(err, completion.error.failure)
+                err = _exception_to_handler_error(err)
+
+                return temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    error=temporalio.api.nexus.v1.HandlerError(
+                        error_type=err.type.value,
+                        failure=await self._exception_to_failure_proto(err),
+                    ),
+                )
+            else:
+                # TODO: TS is wrapping the sync start method result, but Python is not
+                if isinstance(result, nexusrpc.handler.StartOperationAsyncResult):
+                    print(f"🟢 Nexus operation started with async response {result}")
+                    op_resp = temporalio.api.nexus.v1.StartOperationResponse(
+                        async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
+                            operation_token=result.token,
+                            links=[
+                                temporalio.api.nexus.v1.Link(url=l.url, type=l.type)
+                                for l in result.links
+                            ],
+                        )
+                    )
+                else:
+                    # TODO(dan): are we going to use StartOperationSyncResult from nexusrpc?
+                    # (contains links and headers in addition to result) IIRC Go does something
+                    # like that.
+                    [payload] = await self._data_converter.encode([result])
+                    op_resp = temporalio.api.nexus.v1.StartOperationResponse(
+                        sync_success=temporalio.api.nexus.v1.StartOperationResponse.Sync(
+                            payload=payload
+                        )
+                    )
+                return temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    completed=temporalio.api.nexus.v1.Response(start_operation=op_resp),
+                )
+
+        try:
+            completion = await run()
+            await self._bridge_worker().complete_nexus_task(completion)
+        except Exception:
+            temporalio.nexus.logger.exception("Failed completing Nexus operation")
+        finally:
+            try:
+                del self._running_operations[task_token]
+            except KeyError:
+                temporalio.activity.logger.exception(
+                    "Failed to remove completed Nexus operation"
+                )
+
+    async def _handle_cancel_operation(
+        self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
+    ) -> None:
+        operation = self._get_operation(request)
+        # TODO(dan): header
+        await operation.cancel(
+            token=request.operation_token,
+            options=nexusrpc.handler.CancelOperationOptions(),
+        )
+        # message NexusTaskCompletion {
+        #     bytes task_token = 1;
+        #     oneof status {
+        #         temporal.api.nexus.v1.Response completed = 2;
+        #         temporal.api.nexus.v1.HandlerError error = 3;
+        #         bool ack_cancel = 4;
+        #     }
+        # }
+        # TODO(dan): when do we use ack_cancel?
+        # TODO(dan): HandlerError
+        completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+            task_token=task_token,
+            completed=temporalio.api.nexus.v1.Response(
+                cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
+            ),
+        )
+        await self._bridge_worker().complete_nexus_task(completion)
+
+    def _get_operation(
+        self,
+        request: Union[
+            temporalio.api.nexus.v1.StartOperationRequest,
+            temporalio.api.nexus.v1.CancelOperationRequest,
+        ],
+    ) -> nexusrpc.handler.Operation:
+        service = self._nexus_services.get(request.service)
+        if service is None:
+            raise RuntimeError(
+                f"Nexus service '{request.service}' has not been registered with this worker."
+            )
+        operation = service.get(request.operation)
+        if operation is None:
+            raise RuntimeError(
+                f"Nexus service '{request.service}' has no operation '{request.operation}'."
+            )
+        return operation
+
+    async def _exception_to_failure_proto(
+        self,
+        err: Exception,
+    ) -> temporalio.api.nexus.v1.Failure:
+        api_failure = temporalio.api.failure.v1.Failure()
+        await self._data_converter.encode_failure(err, api_failure)
+        api_failure = google.protobuf.json_format.MessageToDict(api_failure)
+        # TODO(dan): is metadata correct and playing intended role here?
+        return temporalio.api.nexus.v1.Failure(
+            message=api_failure.pop("message", ""),
+            metadata={"type": "temporal.api.failure.v1.Failure"},
+            details=json.dumps(api_failure).encode("utf-8"),
+        )
+
+    async def _handler_error_to_proto(
+        self, err: HandlerError
+    ) -> temporalio.api.nexus.v1.HandlerError:
+        # message HandlerError {
+        #     string error_type = 1;
+        #     Failure failure = 2;
+        #     temporal.api.enums.v1.NexusHandlerErrorRetryBehavior retry_behavior = 3;
+        # }
+        return temporalio.api.nexus.v1.HandlerError(
+            error_type=err.type.value,
+            failure=await self._exception_to_failure_proto(err),
+            # TODO(dan): is there a reason to support retryable=None?
+            retry_behavior=(
+                temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+                if err.retryable
+                else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+            ),
+        )
+
+
+def _exception_to_handler_error(err: BaseException) -> HandlerError:
+    # Based on sdk-typescript's convertKnownErrors:
+    # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/worker/src/nexus.ts
+    if isinstance(err, HandlerError):
+        return err
+    elif isinstance(err, ApplicationError):
+        return HandlerError(
+            # TODO(dan): what should message be?
+            err.message,
+            type=HandlerErrorType.INTERNAL,
+            cause=err,
+            # TODO(dan): is there a reason to support retryable=None?
+            retryable=not err.non_retryable,
+        )
+    elif isinstance(err, RPCError):
+        if err.status == RPCStatusCode.INVALID_ARGUMENT:
+            return HandlerError(
+                err.message, type=HandlerErrorType.BAD_REQUEST, cause=err
+            )
+        elif err.status in [
+            RPCStatusCode.ALREADY_EXISTS,
+            RPCStatusCode.FAILED_PRECONDITION,
+            RPCStatusCode.OUT_OF_RANGE,
+        ]:
+            return HandlerError(
+                err.message, type=HandlerErrorType.INTERNAL, cause=err, retryable=False
+            )
+        elif err.status in [RPCStatusCode.ABORTED, RPCStatusCode.UNAVAILABLE]:
+            return HandlerError(
+                err.message, type=HandlerErrorType.UNAVAILABLE, cause=err
+            )
+        elif err.status in [
+            RPCStatusCode.CANCELLED,
+            RPCStatusCode.DATA_LOSS,
+            RPCStatusCode.INTERNAL,
+            RPCStatusCode.UNKNOWN,
+            RPCStatusCode.UNAUTHENTICATED,
+            RPCStatusCode.PERMISSION_DENIED,
+        ]:
+            # Note that UNAUTHENTICATED and PERMISSION_DENIED have Nexus error types but
+            # we convert to internal because this is not a client auth error and happens
+            # when the handler fails to auth with Temporal and should be considered
+            # retryable.
+            return HandlerError(err.message, type=HandlerErrorType.INTERNAL, cause=err)
+        elif err.status == RPCStatusCode.NOT_FOUND:
+            return HandlerError(err.message, type=HandlerErrorType.NOT_FOUND, cause=err)
+        elif err.status == RPCStatusCode.RESOURCE_EXHAUSTED:
+            return HandlerError(
+                err.message, type=HandlerErrorType.RESOURCE_EXHAUSTED, cause=err
+            )
+        elif err.status == RPCStatusCode.UNIMPLEMENTED:
+            return HandlerError(
+                err.message, type=HandlerErrorType.NOT_IMPLEMENTED, cause=err
+            )
+        elif err.status == RPCStatusCode.DEADLINE_EXCEEDED:
+            return HandlerError(
+                err.message, type=HandlerErrorType.UPSTREAM_TIMEOUT, cause=err
+            )
+        else:
+            return HandlerError(
+                f"Unhandled RPC error status: {err.status}",
+                type=HandlerErrorType.INTERNAL,
+                cause=err,
+            )
+    return HandlerError(str(err), type=HandlerErrorType.INTERNAL, cause=err)
