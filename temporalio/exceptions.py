@@ -128,6 +128,14 @@ class ApplicationError(FailureError):
         return self._non_retryable
 
     @property
+    def retryable(self) -> bool:
+        """Whether the error is retryable.
+
+        This is the inverse of :py:attr:`non_retryable`.
+        """
+        return not self._non_retryable
+
+    @property
     def next_retry_delay(self) -> Optional[timedelta]:
         """Delay before the next activity retry attempt.
 
@@ -304,6 +312,15 @@ class ActivityError(FailureError):
 class ChildWorkflowError(FailureError):
     """Error raised on child workflow failure."""
 
+    # message ChildWorkflowExecutionFailureInfo {
+    #     string namespace = 1;
+    #     temporal.api.common.v1.WorkflowExecution workflow_execution = 2;
+    #     temporal.api.common.v1.WorkflowType workflow_type = 3;
+    #     int64 initiated_event_id = 4;
+    #     int64 started_event_id = 5;
+    #     temporal.api.enums.v1.RetryState retry_state = 6;
+    # }
+
     def __init__(
         self,
         message: str,
@@ -360,6 +377,94 @@ class ChildWorkflowError(FailureError):
     def retry_state(self) -> Optional[RetryState]:
         """Retry state for this error."""
         return self._retry_state
+
+
+class NexusHandlerError(FailureError):
+    """Error raised on Nexus handler failure."""
+
+    # message NexusHandlerFailureInfo {
+    #     // The Nexus error type as defined in the spec:
+    #     // https://github.com/nexus-rpc/api/blob/main/SPEC.md#predefined-handler-errors.
+    #     string type = 1;
+    #     // Retry behavior, defaults to the retry behavior of the error type as defined in the spec.
+    #     temporal.api.enums.v1.NexusHandlerErrorRetryBehavior retry_behavior = 2;
+    # }
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        type: str,
+        retryable: Optional[bool] = None,
+    ):
+        """Initialize a Nexus handler error."""
+        super().__init__(message)
+        self._type = type
+        self._retryable = retryable
+
+
+class NexusOperationError(FailureError):
+    """Error raised on Nexus operation failure."""
+
+    # message NexusOperationFailureInfo {
+    #     // The NexusOperationScheduled event ID.
+    #     int64 scheduled_event_id = 1;
+    #     // Endpoint name.
+    #     string endpoint = 2;
+    #     // Service name.
+    #     string service = 3;
+    #     // Operation name.
+    #     string operation = 4;
+    #     // Operation ID - may be empty if the operation completed synchronously.
+    #     //
+    #     // Deprecated: Renamed to operation_token.
+    #     string operation_id = 5;
+    #     // Operation token - may be empty if the operation completed synchronously.
+    #     string operation_token = 6;
+    # }
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        scheduled_event_id: int,
+        endpoint: str,
+        service: str,
+        operation: str,
+        operation_token: str,
+    ):
+        """Initialize a Nexus operation error."""
+        super().__init__(message)
+        self._scheduled_event_id = scheduled_event_id
+        self._endpoint = endpoint
+        self._service = service
+        self._operation = operation
+        self._operation_token = operation_token
+
+    @property
+    def scheduled_event_id(self) -> int:
+        """The NexusOperationScheduled event ID for the failed operation."""
+        return self._scheduled_event_id
+
+    @property
+    def endpoint(self) -> str:
+        """The endpoint name for the failed operation."""
+        return self._endpoint
+
+    @property
+    def service(self) -> str:
+        """The service name for the failed operation."""
+        return self._service
+
+    @property
+    def operation(self) -> str:
+        """The name of the failed operation."""
+        return self._operation
+
+    @property
+    def operation_token(self) -> str:
+        """The operation token returned by the failed operation."""
+        return self._operation_token
 
 
 def is_cancelled_exception(exception: BaseException) -> bool:

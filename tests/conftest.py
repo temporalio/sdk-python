@@ -99,6 +99,7 @@ def env_type(request: pytest.FixtureRequest) -> str:
 @pytest_asyncio.fixture(scope="session")
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
+        http_port = 7243
         env = await WorkflowEnvironment.start_local(
             dev_server_extra_args=[
                 "--dynamic-config-value",
@@ -115,6 +116,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "frontend.workerVersioningDataAPIs=true",
                 "--dynamic-config-value",
                 "system.enableDeploymentVersions=true",
+                "--http-port",
+                str(http_port),
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
@@ -122,6 +125,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
         env = await WorkflowEnvironment.start_time_skipping()
     else:
         env = WorkflowEnvironment.from_client(await Client.connect(env_type))
+
+    # TODO(dan): expose this in a principled way
+    env._http_port = http_port  # type: ignore
     yield env
     await env.shutdown()
 

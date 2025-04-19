@@ -41,6 +41,7 @@ from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
+from ._nexus import _NexusWorker
 from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
@@ -106,9 +107,11 @@ class Worker:
         *,
         task_queue: str,
         activities: Sequence[Callable] = [],
+        nexus_services: Sequence[Any] = [],
         workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         interceptors: Sequence[Interceptor] = [],
@@ -153,10 +156,12 @@ class Worker:
                 client's underlying service client. This client cannot be
                 "lazy".
             task_queue: Required task queue for this worker.
-            activities: Set of activity callables decorated with
+            activities: Activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
-            workflows: Set of workflow classes decorated with
+            nexus_services: Nexus service instances decorated with
+                :py:func:`@nexusrpc.handler.service_handler<nexusrpc.service>`.
+            workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async.
@@ -191,12 +196,12 @@ class Worker:
                 identity is used.
             max_cached_workflows: If nonzero, workflows will be cached and
                 sticky task queues will be used.
-            max_concurrent_workflow_tasks: Maximum allowed number of workflow
-                tasks that will ever be given to this worker at one time. Mutually exclusive with ``tuner``.
             max_concurrent_activities: Maximum number of activity tasks that
-                will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
+                will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
-                tasks that will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
+                tasks that will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
+            max_concurrent_workflow_tasks: Maximum allowed number of
+                tasks that will ever be given to the workflow worker at one time. Mutually exclusive with ``tuner``.
             tuner:  Provide a custom :py:class:`WorkerTuner`. Mutually exclusive with the
                 ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``, and
                 ``max_concurrent_local_activities`` arguments.
@@ -296,8 +301,22 @@ class Worker:
             activity_task_poller_behavior: Specify the behavior of activity task polling.
                 Defaults to a 5-poller maximum.
         """
-        if not activities and not workflows:
-            raise ValueError("At least one activity or workflow must be specified")
+        # TODO(dan): non-async (executor-based) Nexus worker; honor
+        # max_concurrent_nexus_operations and nexus_operation_executor.
+        # nexus_operation_executor: Concurrent executor to use for non-async
+        #     Nexus operations. This is required if any operation start methods
+        #     are non-async. :py:class:`concurrent.futures.ThreadPoolExecutor`
+        #     is recommended. If this is a
+        #     :py:class:`concurrent.futures.ProcessPoolExecutor`, all non-async
+        #     start methods must be picklable. ``max_workers`` on the executor
+        #     should at least be ``max_concurrent_nexus_operations`` or a warning
+        #     is issued.
+        # max_concurrent_nexus_operations: Maximum number of Nexus operations that
+        #     will ever be given to the Nexus worker concurrently. Mutually exclusive with ``tuner``.
+        if not (activities or nexus_services or workflows):
+            raise ValueError(
+                "At least one activity, Nexus service, or workflow must be specified"
+            )
         if use_worker_versioning and not build_id:
             raise ValueError(
                 "build_id must be specified when use_worker_versioning is True"
@@ -326,6 +345,7 @@ class Worker:
             workflows=workflows,
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
+            nexus_task_executor=nexus_task_executor,
             workflow_runner=workflow_runner,
             unsandboxed_workflow_runner=unsandboxed_workflow_runner,
             interceptors=interceptors,
@@ -360,7 +380,6 @@ class Worker:
         self._async_context_run_task: Optional[asyncio.Task] = None
         self._async_context_run_exception: Optional[BaseException] = None
 
-        # Create activity and workflow worker
         self._activity_worker: Optional[_ActivityWorker] = None
         self._runtime = (
             bridge_client.config.runtime or temporalio.runtime.Runtime.default()
@@ -391,6 +410,20 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
+            )
+        self._nexus_worker: Optional[_NexusWorker] = None
+        if nexus_services:
+            # TODO(dan): consider not allowing / warning on max_workers <
+            # max_concurrent_nexus_operations? See warning above for activity worker.
+            self._nexus_worker = _NexusWorker(
+                bridge_worker=lambda: self._bridge_worker,
+                client=client,
+                task_queue=task_queue,
+                nexus_services=nexus_services,
+                data_converter=client_config["data_converter"],
+                interceptors=interceptors,
+                metric_meter=self._runtime.metric_meter,
+                executor=nexus_task_executor,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
@@ -431,6 +464,7 @@ class Worker:
             )
 
         if tuner is not None:
+            # TODO(dan): Nexus tuner support
             if (
                 max_concurrent_workflow_tasks
                 or max_concurrent_activities
@@ -616,21 +650,30 @@ class Worker:
             except asyncio.CancelledError:
                 pass
 
-        tasks: List[asyncio.Task] = [asyncio.create_task(raise_on_shutdown())]
+        tasks: dict[
+            Union[None, _ActivityWorker, _WorkflowWorker, _NexusWorker], asyncio.Task
+        ] = {None: asyncio.create_task(raise_on_shutdown())}
         # Create tasks for workers
         if self._activity_worker:
-            tasks.append(asyncio.create_task(self._activity_worker.run()))
+            tasks[self._activity_worker] = asyncio.create_task(
+                self._activity_worker.run()
+            )
         if self._workflow_worker:
-            tasks.append(asyncio.create_task(self._workflow_worker.run()))
+            tasks[self._workflow_worker] = asyncio.create_task(
+                self._workflow_worker.run()
+            )
+        if self._nexus_worker:
+            tasks[self._nexus_worker] = asyncio.create_task(self._nexus_worker.run())
 
         # Wait for either worker or shutdown requested
-        wait_task = asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+        wait_task = asyncio.wait(tasks.values(), return_when=asyncio.FIRST_EXCEPTION)
         try:
             await asyncio.shield(wait_task)
 
-            # If any of the last two tasks failed, we want to re-raise that as
-            # the exception
-            exception = next((t.exception() for t in tasks[1:] if t.done()), None)
+            # If any of the worker tasks failed, re-raise that as the exception
+            exception = next(
+                (t.exception() for w, t in tasks.items() if w and t.done()), None
+            )
             if exception:
                 logger.error("Worker failed, shutting down", exc_info=exception)
                 if self._config["on_fatal_error"]:
@@ -645,7 +688,7 @@ class Worker:
             exception = user_cancel_err
 
         # Cancel the shutdown task (safe if already done)
-        tasks[0].cancel()
+        tasks[None].cancel()
         graceful_timeout = self._config["graceful_shutdown_timeout"]
         logger.info(
             f"Beginning worker shutdown, will wait {graceful_timeout} before cancelling activities"
@@ -654,18 +697,10 @@ class Worker:
         # Initiate core worker shutdown
         self._bridge_worker.initiate_shutdown()
 
-        # If any worker task had an exception, replace that task with a queue
-        # drain (task at index 1 can be activity or workflow worker, task at
-        # index 2 must be workflow worker if present)
-        if tasks[1].done() and tasks[1].exception():
-            if self._activity_worker:
-                tasks[1] = asyncio.create_task(self._activity_worker.drain_poll_queue())
-            else:
-                assert self._workflow_worker
-                tasks[1] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
-        if len(tasks) > 2 and tasks[2].done() and tasks[2].exception():
-            assert self._workflow_worker
-            tasks[2] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
+        # If any worker task had an exception, replace that task with a queue drain
+        for worker, task in tasks.items():
+            if worker and task.done() and task.exception():
+                tasks[worker] = asyncio.create_task(worker.drain_poll_queue())
 
         # Notify shutdown occurring
         if self._activity_worker:
@@ -674,20 +709,23 @@ class Worker:
             self._workflow_worker.notify_shutdown()
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
-        await asyncio.wait(tasks)
+        await asyncio.wait(tasks.values())
         # Sometimes both workers throw an exception and since we only take the
         # first, Python may complain with "Task exception was never retrieved"
         # if we don't get the others. Therefore we call cancel on each task
         # which suppresses this.
-        for task in tasks:
+        for task in tasks.values():
             task.cancel()
 
-        # If there's an activity worker, we have to let all activity completions
-        # finish. We cannot guarantee that because poll shutdown completed
-        # (which means activities completed) that they got flushed to the
-        # server.
+        # Let all activity / nexus operations completions finish. We cannot guarantee that
+        # because poll shutdown completed (which means activities/operations completed)
+        # that they got flushed to the server.
         if self._activity_worker:
             await self._activity_worker.wait_all_completed()
+        if self._nexus_worker:
+            await self._nexus_worker.wait_all_completed()
+
+        # TODO(dan): check that we do all appropriate things for nexus worker that we do for activity worker
 
         # Do final shutdown
         try:
@@ -769,6 +807,7 @@ class WorkerConfig(TypedDict, total=False):
     workflows: Sequence[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     interceptors: Sequence[Interceptor]

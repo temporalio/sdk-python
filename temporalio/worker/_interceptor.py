@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import concurrent.futures
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, MutableMapping
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import (
     Any,
     Awaitable,
-    Callable,
+    Generic,
     List,
-    Mapping,
-    MutableMapping,
     NoReturn,
     Optional,
     Sequence,
     Type,
+    TypeVar,
     Union,
 )
+
+import nexusrpc.handler
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -285,6 +287,60 @@ class StartChildWorkflowInput:
     ret_type: Optional[Type]
 
 
+# TODO(dan): Put these in a better location. Type variance?
+I = TypeVar("I")
+O = TypeVar("O")
+
+
+@dataclass
+class StartNexusOperationInput(Generic[I, O]):
+    """Input for :py:meth:`WorkflowOutboundInterceptor.start_nexus_operation`."""
+
+    endpoint: str
+    service: str
+    operation: Union[
+        nexusrpc.Operation[I, O],
+        Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
+        str,
+    ]
+    input: I
+    schedule_to_close_timeout: Optional[timedelta]
+    headers: Optional[Mapping[str, str]]
+    output_type: Optional[Type[O]] = None
+
+    _operation_name: str = field(init=False, repr=False)
+    _input_type: Optional[Type[I]] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.operation, str):
+            self._operation_name = self.operation
+            self._input_type = None
+        elif isinstance(self.operation, nexusrpc.Operation):
+            self._operation_name = self.operation.name
+            self._input_type = self.operation.input_type
+            self.output_type = self.operation.output_type
+        elif isinstance(self.operation, Callable):
+            op = getattr(self.operation, "__nexus_operation__", None)
+            if isinstance(op, nexusrpc.Operation):
+                self._operation_name = op.name
+                self._input_type = op.input_type
+                self.output_type = op.output_type
+            else:
+                raise ValueError(
+                    f"Operation callable is not a Nexus operation: {self.operation}"
+                )
+        else:
+            raise ValueError(f"Operation is not a Nexus operation: {self.operation}")
+
+    @property
+    def operation_name(self) -> str:
+        return self._operation_name
+
+    @property
+    def input_type(self) -> Optional[Type[I]]:
+        return self._input_type
+
+
 @dataclass
 class StartLocalActivityInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_local_activity`."""
@@ -409,3 +465,9 @@ class WorkflowOutboundInterceptor:
         and :py:func:`temporalio.workflow.execute_local_activity` call.
         """
         return self.next.start_local_activity(input)
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> temporalio.workflow.NexusOperationHandle[Any]:
+        """Called for every :py:func:`temporalio.workflow.start_nexus_operation` call."""
+        return await self.next.start_nexus_operation(input)
