@@ -489,43 +489,6 @@ class AdvancedJSONEncoder(json.JSONEncoder):
 
     This encoder supports dataclasses and all iterables as lists.
 
-    A class can implement to_json and from_json methods to support custom conversion logic.
-    Custom conversion of generic classes is supported.
-    These methods should have the following signatures:
-
-    .. code-block:: python
-
-        class MyClass:
-            ...
-
-            @classmethod
-            def from_json(cls, json: Any) -> MyClass:
-                ...
-
-            def to_json(self) -> Any:
-                ...
-
-    The to_json should return the same Python JSON types produced by JSONEncoder:
-
-    +-------------------+---------------+
-    | Python            | JSON          |
-    +===================+===============+
-    | dict              | object        |
-    +-------------------+---------------+
-    | list, tuple       | array         |
-    +-------------------+---------------+
-    | str               | string        |
-    +-------------------+---------------+
-    | int, float        | number        |
-    +-------------------+---------------+
-    | True              | true          |
-    +-------------------+---------------+
-    | False             | false         |
-    +-------------------+---------------+
-    | None              | null          |
-    +-------------------+---------------+
-
-
     It also uses Pydantic v1's "dict" methods if available on the object,
     but this is deprecated. Pydantic users should upgrade to v2 and use
     temporalio.contrib.pydantic.pydantic_data_converter.
@@ -538,11 +501,11 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         """
         # Custom encoding and decoding through to_json and from_json
         # to_json should be an instance method with only self argument
-        to_json = "to_json"
+        to_json = "to_temporal_json"
         if hasattr(o, to_json):
             attr = getattr(o, to_json)
             if not callable(attr):
-                raise TypeError(f"Type {o.__class__}: to_json must be a method")
+                raise TypeError(f"Type {o.__class__}: {to_json} must be a method")
             return attr()
 
         # Dataclass support
@@ -570,6 +533,44 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
     For decoding, this uses type hints to attempt to rebuild the type from the
     type hint.
+
+    A class can implement to_json and from_temporal_json methods to support custom conversion logic.
+    Custom conversion of generic classes is supported.
+    These methods should have the following signatures:
+
+    .. code-block:: python
+
+        class MyClass:
+            ...
+
+            @classmethod
+            def from_temporal_json(cls, json: Any) -> MyClass:
+                ...
+
+            def to_temporal_json(self) -> Any:
+                ...
+
+    The to_json should return the same Python JSON types produced by JSONEncoder:
+
+    +-------------------+---------------+
+    | Python            | JSON          |
+    +===================+===============+
+    | dict              | object        |
+    +-------------------+---------------+
+    | list, tuple       | array         |
+    +-------------------+---------------+
+    | str               | string        |
+    +-------------------+---------------+
+    | int, float        | number        |
+    +-------------------+---------------+
+    | True              | true          |
+    +-------------------+---------------+
+    | False             | false         |
+    +-------------------+---------------+
+    | None              | null          |
+    +-------------------+---------------+
+
+
     """
 
     _encoder: Optional[Type[json.JSONEncoder]]
@@ -1476,12 +1477,14 @@ def value_to_type(
         return value
 
     # Has from_json class method (must have to_json as well)
-    from_json = "from_json"
+    from_json = "from_temporal_json"
     if hasattr(hint, from_json):
         attr = getattr(hint, from_json)
-        attr_cls = getattr(attr, "__self__")
-        if not callable(attr) or not attr_cls == origin:
-            raise TypeError(f"Type {hint}: temporal_from_json must be a class method")
+        attr_cls = getattr(attr, "__self__", None)
+        if not callable(attr) or (attr_cls is not None and attr_cls is not origin):
+            raise TypeError(
+                f"Type {hint}: {from_json} must be a staticmethod or classmethod"
+            )
         return attr(value)
 
     is_union = origin is Union

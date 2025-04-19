@@ -2256,10 +2256,32 @@ class MyGenericClass(typing.Generic[T]):
         self.field2 = "foo"
 
     @classmethod
-    def from_json(cls, json_obj: Any) -> MyGenericClass:
+    def from_temporal_json(cls, json_obj: Any) -> MyGenericClass:
         return MyGenericClass(str(json_obj) + "_from_json")
 
-    def to_json(self) -> Any:
+    def to_temporal_json(self) -> Any:
+        return self.field1 + "_to_json"
+
+    def assert_expected(self, value: str) -> None:
+        # Part of the assertion is that this is the right type, which is
+        # confirmed just by calling the method. We also check the field.
+        assert str(self.field1) == value
+
+
+class MyGenericClassWithStatic(typing.Generic[T]):
+    """
+    Demonstrates custom conversion and that it works even with generic classes.
+    """
+
+    def __init__(self, field1: str):
+        self.field1 = field1
+        self.field2 = "foo"
+
+    @staticmethod
+    def from_temporal_json(json_obj: Any) -> MyGenericClass:
+        return MyGenericClass(str(json_obj) + "_from_json")
+
+    def to_temporal_json(self) -> Any:
         return self.field1 + "_to_json"
 
     def assert_expected(self, value: str) -> None:
@@ -2278,6 +2300,13 @@ async def data_class_typed_activity(param: MyDataClass) -> MyDataClass:
 async def generic_class_typed_activity(
     param: MyGenericClass[str],
 ) -> MyGenericClass[str]:
+    return param
+
+
+@activity.defn
+async def generic_class_typed_activity_with_static(
+    param: MyGenericClassWithStatic[str],
+) -> MyGenericClassWithStatic[str]:
     return param
 
 
@@ -2347,13 +2376,13 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
             generic_param.assert_expected(
                 "some_value2_to_json_from_json_to_json_from_json"
             )
-            generic_param = MyGenericClass[str]("some_value2")
-            generic_param = await workflow.execute_local_activity(
-                generic_class_typed_activity,
-                generic_param,
+            generic_param_s = MyGenericClassWithStatic[str]("some_value2")
+            generic_param_s = await workflow.execute_local_activity(
+                generic_class_typed_activity_with_static,
+                generic_param_s,
                 start_to_close_timeout=timedelta(seconds=30),
             )
-            generic_param.assert_expected(
+            generic_param_s.assert_expected(
                 "some_value2_to_json_from_json_to_json_from_json"
             )
             child_handle = await workflow.start_child_workflow(
@@ -2400,7 +2429,11 @@ async def test_workflow_dataclass_typed(client: Client, env: WorkflowEnvironment
     async with new_worker(
         client,
         DataClassTypedWorkflow,
-        activities=[data_class_typed_activity, generic_class_typed_activity],
+        activities=[
+            data_class_typed_activity,
+            generic_class_typed_activity,
+            generic_class_typed_activity_with_static,
+        ],
     ) as worker:
         val = MyDataClass(field1="some value")
         handle = await client.start_workflow(
@@ -2427,7 +2460,11 @@ async def test_workflow_separate_protocol(client: Client):
     async with new_worker(
         client,
         DataClassTypedWorkflow,
-        activities=[data_class_typed_activity, generic_class_typed_activity],
+        activities=[
+            data_class_typed_activity,
+            generic_class_typed_activity,
+            generic_class_typed_activity_with_static,
+        ],
     ) as worker:
         assert isinstance(DataClassTypedWorkflow(), DataClassTypedWorkflowProto)
         val = MyDataClass(field1="some value")
@@ -2451,7 +2488,11 @@ async def test_workflow_separate_abstract(client: Client):
     async with new_worker(
         client,
         DataClassTypedWorkflow,
-        activities=[data_class_typed_activity, generic_class_typed_activity],
+        activities=[
+            data_class_typed_activity,
+            generic_class_typed_activity,
+            generic_class_typed_activity_with_static,
+        ],
     ) as worker:
         assert issubclass(DataClassTypedWorkflow, DataClassTypedWorkflowAbstract)
         val = MyDataClass(field1="some value")
