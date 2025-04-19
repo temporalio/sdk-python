@@ -908,6 +908,12 @@ class DefaultFailureConverter(FailureConverter):
             failure.child_workflow_execution_failure_info.retry_state = (
                 temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
             )
+        # TODO(dan): test coverage for this
+        elif isinstance(error, temporalio.exceptions.NexusOperationError):
+            failure.nexus_operation_execution_failure_info.SetInParent()
+            failure.nexus_operation_execution_failure_info.operation_token = (
+                error.operation_token
+            )
 
     def from_failure(
         self,
@@ -915,6 +921,44 @@ class DefaultFailureConverter(FailureConverter):
         payload_converter: PayloadConverter,
     ) -> BaseException:
         """See base class."""
+
+        # message Failure {
+        #     string message = 1;
+        #     // The source this Failure originated in, e.g. TypeScriptSDK / JavaSDK
+        #     // In some SDKs this is used to rehydrate the stack trace into an exception object.
+        #     string source = 2;
+        #     string stack_trace = 3;
+        #     // Alternative way to supply `message` and `stack_trace` and possibly other attributes, used for encryption of
+        #     // errors originating in user code which might contain sensitive information.
+        #     // The `encoded_attributes` Payload could represent any serializable object, e.g. JSON object or a `Failure` proto
+        #     // message.
+        #     //
+        #     // SDK authors:
+        #     // - The SDK should provide a default `encodeFailureAttributes` and `decodeFailureAttributes` implementation that:
+        #     //   - Uses a JSON object to represent `{ message, stack_trace }`.
+        #     //   - Overwrites the original message with "Encoded failure" to indicate that more information could be extracted.
+        #     //   - Overwrites the original stack_trace with an empty string.
+        #     //   - The resulting JSON object is converted to Payload using the default PayloadConverter and should be processed
+        #     //     by the user-provided PayloadCodec
+        #     //
+        #     // - If there's demand, we could allow overriding the default SDK implementation to encode other opaque Failure attributes.
+        #     // (-- api-linter: core::0203::optional=disabled --)
+        #     temporal.api.common.v1.Payload encoded_attributes = 20;
+        #     Failure cause = 4;
+        #     oneof failure_info {
+        #         ApplicationFailureInfo application_failure_info = 5;
+        #         TimeoutFailureInfo timeout_failure_info = 6;
+        #         CanceledFailureInfo canceled_failure_info = 7;
+        #         TerminatedFailureInfo terminated_failure_info = 8;
+        #         ServerFailureInfo server_failure_info = 9;
+        #         ResetWorkflowFailureInfo reset_workflow_failure_info = 10;
+        #         ActivityFailureInfo activity_failure_info = 11;
+        #         ChildWorkflowExecutionFailureInfo child_workflow_execution_failure_info = 12;
+        #         NexusOperationFailureInfo nexus_operation_execution_failure_info = 13;
+        #         NexusHandlerFailureInfo nexus_handler_failure_info = 14;
+        #     }
+        # }
+
         # If encoded attributes are present and have the fields we expect,
         # extract them
         if failure.HasField("encoded_attributes"):
@@ -988,6 +1032,15 @@ class DefaultFailureConverter(FailureConverter):
                 else None,
             )
         elif failure.HasField("child_workflow_execution_failure_info"):
+            # message ChildWorkflowExecutionFailureInfo {
+            #     string namespace = 1;
+            #     temporal.api.common.v1.WorkflowExecution workflow_execution = 2;
+            #     temporal.api.common.v1.WorkflowType workflow_type = 3;
+            #     int64 initiated_event_id = 4;
+            #     int64 started_event_id = 5;
+            #     temporal.api.enums.v1.RetryState retry_state = 6;
+            # }
+
             child_info = failure.child_workflow_execution_failure_info
             err = temporalio.exceptions.ChildWorkflowError(
                 failure.message or "Child workflow error",
@@ -1002,6 +1055,54 @@ class DefaultFailureConverter(FailureConverter):
                 )
                 if child_info.retry_state
                 else None,
+            )
+        elif failure.HasField("nexus_handler_failure_info"):
+            # message NexusHandlerFailureInfo {
+            #     // The Nexus error type as defined in the spec:
+            #     // https://github.com/nexus-rpc/api/blob/main/SPEC.md#predefined-handler-errors.
+            #     string type = 1;
+            #     // Retry behavior, defaults to the retry behavior of the error type as defined in the spec.
+            #     temporal.api.enums.v1.NexusHandlerErrorRetryBehavior retry_behavior = 2;
+            # }
+            # TODO(dan): check that handler-side phenomena are correctly turning into this vs nexus_operation_execution_failure_info
+            # TODO(dan): What exception should be raised for this vs nexus_operation_execution_failure_info?
+            nexus_handler_failure_info = failure.nexus_handler_failure_info
+            err = temporalio.exceptions.NexusHandlerError(
+                failure.message or "Nexus handler error",
+                type=nexus_handler_failure_info.type,
+                retryable={
+                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE: True,
+                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE: False,
+                }.get(nexus_handler_failure_info.retry_behavior),
+            )
+            print(f"got err {err.__class__} with retryable", err._retryable)
+        elif failure.HasField("nexus_operation_execution_failure_info"):
+            # message NexusOperationFailureInfo {
+            #     // The NexusOperationScheduled event ID.
+            #     int64 scheduled_event_id = 1;
+            #     // Endpoint name.
+            #     string endpoint = 2;
+            #     // Service name.
+            #     string service = 3;
+            #     // Operation name.
+            #     string operation = 4;
+            #     // Operation ID - may be empty if the operation completed synchronously.
+            #     //
+            #     // Deprecated: Renamed to operation_token.
+            #     string operation_id = 5;
+            #     // Operation token - may be empty if the operation completed synchronously.
+            #     string operation_token = 6;
+            # }
+            # TODO(dan)
+            # This is covered by cancellation tests
+            nexus_op_failure_info = failure.nexus_operation_execution_failure_info
+            err = temporalio.exceptions.NexusOperationError(
+                failure.message or "Nexus operation error",
+                scheduled_event_id=nexus_op_failure_info.scheduled_event_id,
+                endpoint=nexus_op_failure_info.endpoint,
+                service=nexus_op_failure_info.service,
+                operation=nexus_op_failure_info.operation,
+                operation_token=nexus_op_failure_info.operation_token,
             )
         else:
             err = temporalio.exceptions.FailureError(failure.message or "Failure error")
