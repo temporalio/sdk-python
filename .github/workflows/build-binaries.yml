@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+      - fix-compile-binaries
 
 jobs:
   # Compile the binaries and upload artifacts
