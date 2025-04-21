@@ -65,7 +65,7 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             bindir=Scripts
           fi
-          ./.venv/$bindir/pip install 'protobuf>=3.20' 'types-protobuf>=3.20' 'typing-extensions<5,>=4.2.0' pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil
+          ./.venv/$bindir/pip install 'protobuf>=3.20,<6' 'types-protobuf>=3.20,<6' 'typing-extensions>=4.2.0,<5' pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil
           ./.venv/$bindir/pip install --no-index --find-links=../dist temporalio
           ./.venv/$bindir/python -m pytest -s -k test_workflow_hello
 
