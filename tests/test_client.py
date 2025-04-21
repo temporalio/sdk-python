@@ -8,7 +8,6 @@ from unittest import mock
 
 import google.protobuf.any_pb2
 import google.protobuf.message
-import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
@@ -105,6 +104,11 @@ from tests.helpers.worker import (
     KSSleepAction,
     KSWorkflowParams,
 )
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 async def test_start_id_reuse(

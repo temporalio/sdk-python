@@ -242,9 +242,7 @@ class Replayer:
                             1
                         ),
                     ),
-                    max_concurrent_workflow_task_polls=1,
                     nonsticky_to_sticky_poll_ratio=1,
-                    max_concurrent_activity_task_polls=1,
                     no_remote_activities=True,
                     sticky_queue_schedule_to_start_timeout_millis=1000,
                     max_heartbeat_throttle_interval_millis=1000,
@@ -254,6 +252,12 @@ class Replayer:
                     graceful_shutdown_period_millis=0,
                     versioning_strategy=temporalio.bridge.worker.WorkerVersioningStrategyNone(
                         build_id=self._config["build_id"] or load_default_build_id(),
+                    ),
+                    workflow_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
+                        1
+                    ),
+                    activity_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
+                        1
                     ),
                 ),
             )

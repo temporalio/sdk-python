@@ -6,8 +6,7 @@ import sys
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
-
-import pytest
+from urllib.request import urlopen
 
 import temporalio.api.enums.v1
 import temporalio.worker._worker
@@ -22,6 +21,7 @@ from temporalio.api.workflowservice.v1 import (
 )
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
 from temporalio.common import RawValue, VersioningBehavior
+from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -29,6 +29,7 @@ from temporalio.worker import (
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
     LocalActivitySlotInfo,
+    PollerBehaviorAutoscaling,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
@@ -43,7 +44,17 @@ from temporalio.worker import (
     WorkflowSlotInfo,
 )
 from temporalio.workflow import VersioningIntent
-from tests.helpers import assert_eventually, new_worker, worker_versioning_enabled
+from tests.helpers import (
+    assert_eventually,
+    find_free_port,
+    new_worker,
+    worker_versioning_enabled,
+)
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 def test_load_default_worker_binary_id():
@@ -914,6 +925,58 @@ async def test_workflows_can_use_default_versioning_behavior(
             == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
             for event in history.events
         )
+
+
+async def test_can_run_autoscaling_polling_worker(
+    client: Client, env: WorkflowEnvironment
+):
+    # Create new runtime with Prom server
+    prom_addr = f"127.0.0.1:{find_free_port()}"
+    runtime = Runtime(
+        telemetry=TelemetryConfig(
+            metrics=PrometheusConfig(bind_address=prom_addr),
+        )
+    )
+    client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        workflow_task_poller_behavior=PollerBehaviorAutoscaling(initial=2),
+        activity_task_poller_behavior=PollerBehaviorAutoscaling(initial=2),
+    ) as w:
+        # Give pollers a beat to start
+        await asyncio.sleep(0.3)
+
+        with urlopen(url=f"http://{prom_addr}/metrics") as f:
+            prom_str: str = f.read().decode("utf-8")
+        prom_lines = prom_str.splitlines()
+        matches = [line for line in prom_lines if "temporal_num_pollers" in line]
+        activity_pollers = [l for l in matches if "activity_task" in l]
+        assert len(activity_pollers) == 1
+        assert activity_pollers[0].endswith("2")
+        workflow_pollers = [l for l in matches if "workflow_task" in l]
+        assert len(workflow_pollers) == 2
+        # There's sticky & non-sticky pollers, and they may have a count of 1 or 2 depending on
+        # initialization timing.
+        assert workflow_pollers[0].endswith("2") or workflow_pollers[0].endswith("1")
+        assert workflow_pollers[1].endswith("2") or workflow_pollers[1].endswith("1")
+
+        async def do_workflow():
+            wf = await client.start_workflow(
+                WaitOnSignalWorkflow.run,
+                id=f"resource-based-{uuid.uuid4()}",
+                task_queue=w.task_queue,
+            )
+            await wf.signal(WaitOnSignalWorkflow.my_signal, "finish")
+            await wf.result()
+
+        await asyncio.gather(*[do_workflow() for _ in range(20)])
 
 
 async def wait_until_worker_deployment_visible(

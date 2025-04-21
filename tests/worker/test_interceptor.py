@@ -3,8 +3,6 @@ import uuid
 from datetime import timedelta
 from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
 
-import pytest
-
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.exceptions import ApplicationError
@@ -29,6 +27,11 @@ from temporalio.worker import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 interceptor_traces: List[Tuple[str, Any]] = []
 

@@ -373,8 +373,12 @@ def test_json_type_hints():
     # just accepting any dict.
     ok(MyTypedDictNotTotal, {"foo": "bar"})
     ok(MyTypedDict, {"foo": "bar", "blah": "meh"})
-    # Note, dicts can't have int key in JSON
-    fail(Dict[int, str], {1: "2"})
+
+    # Non-string dict keys are supported
+    ok(Dict[int, str], {1: "1"})
+    ok(Dict[float, str], {1.0: "1"})
+    ok(Dict[bool, str], {True: "1"})
+    ok(Dict[None, str], {None: "1"})
 
     # Alias
     ok(MyDataClassAlias, MyDataClass("foo", 5, SerializableEnum.FOO))

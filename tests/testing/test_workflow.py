@@ -6,8 +6,6 @@ from datetime import datetime, timedelta, timezone
 from time import monotonic
 from typing import Any, List, Optional, Union
 
-import pytest
-
 from temporalio import activity, workflow
 from temporalio.client import (
     Client,
@@ -31,7 +29,13 @@ from temporalio.exceptions import (
     TimeoutType,
 )
 from temporalio.testing import WorkflowEnvironment
+from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
+
+# Passing through because Python 3.9 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 @workflow.defn
@@ -306,7 +310,8 @@ async def test_search_attributes_on_dev_server(
             float_attr,
             bool_attr,
             datetime_attr,
-        ]
+        ],
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
     ) as env:
         handle = await env.client.start_workflow(
             "some-workflow",
