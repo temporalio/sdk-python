@@ -116,7 +116,7 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --name python --scope temporal --prod --yes
+        run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --prod --yes
 
       # Confirm README ToC is generated properly
       - uses: actions/setup-node@v4
