@@ -420,18 +420,23 @@ def query(
 class DynamicWorkflowConfig:
     """Returned by functions using the :py:func:`dynamic_config` decorator, see it for more."""
 
-    failure_exception_types: Sequence[Type[BaseException]] = dataclasses.field(
-        default_factory=list
-    )
+    failure_exception_types: Optional[Sequence[Type[BaseException]]] = None
     """The types of exceptions that, if a workflow-thrown exception extends, will cause the
     workflow/update to fail instead of suspending the workflow via task failure. These are applied
     in addition to ones set on the worker constructor. If ``Exception`` is set, it effectively will
-    fail a workflow/update in all user exception cases. WARNING: This setting is experimental.
+    fail a workflow/update in all user exception cases.
+
+    Always overrides the equivalent parameter on :py:func:`defn` if set not-None.
+
+        WARNING: This setting is experimental.
     """
     versioning_behavior: temporalio.common.VersioningBehavior = (
         temporalio.common.VersioningBehavior.UNSPECIFIED
     )
     """Specifies the versioning behavior to use for this workflow.
+
+    Always overrides the equivalent parameter on :py:func:`defn`.
+
         WARNING: This setting is experimental.
     """
 
@@ -1618,6 +1623,10 @@ class _Definition:
                     issues.append(
                         "@workflow.dynamic_config can only be used in dynamic workflows, but "
                         f"workflow class {workflow_name} ({cls.__name__}) is not dynamic"
+                    )
+                if dynamic_config_fn:
+                    issues.append(
+                        "@workflow.dynamic_config can only be defined once per workflow"
                     )
                 dynamic_config_fn = member
             elif isinstance(member, UpdateMethodMultiParam):

@@ -1762,7 +1762,7 @@ class _WorkflowInstanceImpl(
                 raise self._current_activation_error
 
             if dynamic_config:
-                if dynamic_config.failure_exception_types:
+                if dynamic_config.failure_exception_types is not None:
                     self._dynamic_failure_exception_types = (
                         dynamic_config.failure_exception_types
                     )
