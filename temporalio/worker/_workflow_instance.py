@@ -332,6 +332,15 @@ class _WorkflowInstanceImpl(
         # metadata query
         self._current_details = ""
 
+        # The versioning behavior of this workflow, as established by annotation or by the dynamic
+        # config function. Is only set once upon initialization.
+        self._versioning_behavior: Optional[temporalio.common.VersioningBehavior] = None
+
+        # Dynamic failure exception types as overridden by the dynamic config function
+        self._dynamic_failure_exception_types: Optional[
+            Sequence[type[BaseException]]
+        ] = None
+
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
 
@@ -348,11 +357,7 @@ class _WorkflowInstanceImpl(
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         self._current_completion.successful.SetInParent()
-        self._current_completion.successful.versioning_behavior = (
-            self._defn.versioning_behavior.value
-            if self._defn.versioning_behavior
-            else temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
-        )
+
         self._current_activation_error: Optional[Exception] = None
         self._deployment_version_for_current_task = (
             act.deployment_version_for_current_task
@@ -419,6 +424,12 @@ class _WorkflowInstanceImpl(
                     )
                 activation_err = None
 
+        # Apply versioning behavior if one was established
+        if self._versioning_behavior:
+            self._current_completion.successful.versioning_behavior = (
+                self._versioning_behavior.value
+            )
+
         # If we're deleting, there better be no more tasks. It is important for
         # the integrity of the system that we check this. If there are tasks
         # remaining, they and any associated coroutines will get garbage
@@ -439,7 +450,6 @@ class _WorkflowInstanceImpl(
             )
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()
-            # TODO: Review - odd that we don't un-set success here?
             try:
                 self._failure_converter.to_failure(
                     activation_err,
@@ -1728,19 +1738,53 @@ class _WorkflowInstanceImpl(
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
             raise RuntimeError("Expected workflow input. This is a Python SDK bug.")
+
         if hasattr(self._defn.cls.__init__, "__temporal_workflow_init"):
-            return self._defn.cls(*self._workflow_input.args)
+            workflow_instance = self._defn.cls(*self._workflow_input.args)
         else:
-            return self._defn.cls()
+            workflow_instance = self._defn.cls()
+
+        if self._defn.versioning_behavior:
+            self._versioning_behavior = self._defn.versioning_behavior
+        # If there's a dynamic config function, call it now after we've instantiated the object
+        # but before we start executing the workflow
+        if self._defn.name is None and self._defn.dynamic_config_fn is not None:
+            dynamic_config = None
+            try:
+                with self._as_read_only():
+                    dynamic_config = self._defn.dynamic_config_fn(workflow_instance)
+            except Exception as err:
+                logger.exception(
+                    f"Failed to run dynamic config function in workflow {self._info.workflow_type}"
+                )
+                # Treat as a task failure
+                self._current_activation_error = err
+                raise self._current_activation_error
+
+            if dynamic_config:
+                if dynamic_config.failure_exception_types is not None:
+                    self._dynamic_failure_exception_types = (
+                        dynamic_config.failure_exception_types
+                    )
+                if (
+                    dynamic_config.versioning_behavior
+                    != temporalio.common.VersioningBehavior.UNSPECIFIED
+                ):
+                    self._versioning_behavior = dynamic_config.versioning_behavior
+
+        return workflow_instance
 
     def _is_workflow_failure_exception(self, err: BaseException) -> bool:
         # An exception is a failure instead of a task fail if it's already a
         # failure error or if it is a timeout error or if it is an instance of
         # any of the failure types in the worker or workflow-level setting
+        wf_failure_exception_types = self._defn.failure_exception_types
+        if self._dynamic_failure_exception_types is not None:
+            wf_failure_exception_types = self._dynamic_failure_exception_types
         return (
             isinstance(err, temporalio.exceptions.FailureError)
             or isinstance(err, asyncio.TimeoutError)
-            or any(isinstance(err, typ) for typ in self._defn.failure_exception_types)
+            or any(isinstance(err, typ) for typ in wf_failure_exception_types)
             or any(
                 isinstance(err, typ)
                 for typ in self._worker_level_failure_exception_types

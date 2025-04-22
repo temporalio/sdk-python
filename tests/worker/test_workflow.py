@@ -4878,6 +4878,18 @@ class FailureTypesConfiguredInheritedWorkflow(FailureTypesWorkflowBase):
         await super().run(scenario)
 
 
+class FailureTypesConfiguredDynamicConfig(FailureTypesWorkflowBase):
+    @workflow.dynamic_config
+    def dynamic_config(self) -> temporalio.workflow.DynamicWorkflowConfig:
+        return temporalio.workflow.DynamicWorkflowConfig(
+            failure_exception_types=[Exception]
+        )
+
+    @workflow.run
+    async def run(self, scenario: FailureTypesScenario) -> None:
+        await super().run(scenario)
+
+
 async def test_workflow_failure_types_configured(client: Client):
     # Asserter for a single scenario
     async def assert_scenario(
@@ -5045,6 +5057,15 @@ async def test_workflow_failure_types_configured(client: Client):
         )
         await run_scenario(
             FailureTypesConfiguredInheritedWorkflow,
+            FailureTypesScenario.CAUSE_NON_DETERMINISM,
+        )
+        # When configured at the workflow level dynamically
+        await run_scenario(
+            FailureTypesConfiguredDynamicConfig,
+            FailureTypesScenario.THROW_CUSTOM_EXCEPTION,
+        )
+        await run_scenario(
+            FailureTypesConfiguredDynamicConfig,
             FailureTypesScenario.CAUSE_NON_DETERMINISM,
         )
 
@@ -7374,3 +7395,29 @@ async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
         assert child_wf_info_root is not None
         assert child_wf_info_root.workflow_id == parent_desc.id
         assert child_wf_info_root.run_id == parent_desc.run_id
+
+
+@workflow.defn(dynamic=True)
+class WorkflowDynamicConfigFnFailure:
+    @workflow.dynamic_config
+    def dynamic_config(self) -> temporalio.workflow.DynamicWorkflowConfig:
+        raise Exception("Dynamic config failure")
+
+    @workflow.run
+    async def run(self, args: Sequence[RawValue]) -> None:
+        raise RuntimeError("Should never actually run")
+
+
+async def test_workflow_dynamic_config_failure(client: Client):
+    async with new_worker(client, WorkflowDynamicConfigFnFailure) as worker:
+        handle = await client.start_workflow(
+            "verycooldynamicworkflow",
+            id=f"dynamic-config-failure-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=5),
+        )
+
+        # Assert workflow task fails with our expected error message
+        await assert_task_fail_eventually(
+            handle, message_contains="Dynamic config failure"
+        )
