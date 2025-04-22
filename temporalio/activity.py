@@ -459,13 +459,11 @@ class LoggerAdapter(logging.LoggerAdapter):
                     msg = f"{msg} ({context.logger_details})"
                 if self.activity_info_on_extra:
                     # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
-                    extra["temporal_activity"] = context.logger_details
+                    extra = {**kwargs.get("extra", {}), **context.logger_details()}
                     kwargs["extra"] = extra
                 if self.full_activity_info_on_extra:
                     # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
-                    extra["activity_info"] = context.info()
+                    extra = {**kwargs.get("extra", {}), **context.info()}
                     kwargs["extra"] = extra
         return (msg, kwargs)
 
