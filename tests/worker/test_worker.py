@@ -43,7 +43,7 @@ from temporalio.worker import (
     WorkerTuner,
     WorkflowSlotInfo,
 )
-from temporalio.workflow import VersioningIntent
+from temporalio.workflow import DynamicWorkflowConfig, VersioningIntent
 from tests.helpers import (
     assert_eventually,
     find_free_port,
@@ -795,8 +795,24 @@ class DynamicWorkflowVersioningOnDefn:
         return "dynamic"
 
 
-async def test_worker_deployment_dynamic_workflow_on_run(
-    client: Client, env: WorkflowEnvironment
+@workflow.defn(dynamic=True, versioning_behavior=VersioningBehavior.PINNED)
+class DynamicWorkflowVersioningOnConfigMethod:
+    @workflow.dynamic_config
+    def dynamic_config(self) -> DynamicWorkflowConfig:
+        return DynamicWorkflowConfig(
+            versioning_behavior=VersioningBehavior.AUTO_UPGRADE
+        )
+
+    @workflow.run
+    async def run(self, args: Sequence[RawValue]) -> str:
+        return "dynamic"
+
+
+async def _test_worker_deployment_dynamic_workflow(
+    client: Client,
+    env: WorkflowEnvironment,
+    workflow_class,
+    expected_versioning_behavior: temporalio.api.enums.v1.VersioningBehavior.ValueType,
 ):
     if env.supports_time_skipping:
         pytest.skip("Test Server doesn't support worker deployments")
@@ -806,7 +822,7 @@ async def test_worker_deployment_dynamic_workflow_on_run(
 
     async with new_worker(
         client,
-        DynamicWorkflowVersioningOnDefn,
+        workflow_class,
         deployment_config=WorkerDeploymentConfig(
             version=worker_v1,
             use_worker_versioning=True,
@@ -832,9 +848,31 @@ async def test_worker_deployment_dynamic_workflow_on_run(
         assert any(
             event.HasField("workflow_task_completed_event_attributes")
             and event.workflow_task_completed_event_attributes.versioning_behavior
-            == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+            == expected_versioning_behavior
             for event in history.events
         )
+
+
+async def test_worker_deployment_dynamic_workflow_with_pinned_versioning(
+    client: Client, env: WorkflowEnvironment
+):
+    await _test_worker_deployment_dynamic_workflow(
+        client,
+        env,
+        DynamicWorkflowVersioningOnDefn,
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
+    )
+
+
+async def test_worker_deployment_dynamic_workflow_with_auto_upgrade_versioning(
+    client: Client, env: WorkflowEnvironment
+):
+    await _test_worker_deployment_dynamic_workflow(
+        client,
+        env,
+        DynamicWorkflowVersioningOnConfigMethod,
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE,
+    )
 
 
 @workflow.defn
