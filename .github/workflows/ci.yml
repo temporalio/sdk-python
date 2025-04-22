@@ -112,7 +112,7 @@ jobs:
         if: ${{ matrix.docsTarget }}
         run: poe gen-docs
       - name: Deploy prod API docs
-        if: ${{ github.ref == 'refs/heads/main' && matrix.docsTarget }}
+        if: ${{ matrix.docsTarget }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
