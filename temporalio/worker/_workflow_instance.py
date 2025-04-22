@@ -1779,7 +1779,7 @@ class _WorkflowInstanceImpl(
         # failure error or if it is a timeout error or if it is an instance of
         # any of the failure types in the worker or workflow-level setting
         wf_failure_exception_types = self._defn.failure_exception_types
-        if self._dynamic_failure_exception_types:
+        if self._dynamic_failure_exception_types is not None:
             wf_failure_exception_types = self._dynamic_failure_exception_types
         return (
             isinstance(err, temporalio.exceptions.FailureError)
