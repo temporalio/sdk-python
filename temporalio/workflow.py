@@ -1398,16 +1398,16 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.workflow_info_on_message:
                     msg_extra.update(workflow_details)
                 if self.workflow_info_on_extra:
-                    extra["temporal_workflow"] = workflow_details
+                    extra.update(workflow_details)
                 if self.full_workflow_info_on_extra:
-                    extra["workflow_info"] = runtime.workflow_info()
+                    extra.update(runtime.workflow_info())
             update_info = current_update_info()
             if update_info:
                 update_details = update_info._logger_details
                 if self.workflow_info_on_message:
                     msg_extra.update(update_details)
                 if self.workflow_info_on_extra:
-                    extra.setdefault("temporal_workflow", {}).update(update_details)
+                    extra = update_details
 
         kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:
