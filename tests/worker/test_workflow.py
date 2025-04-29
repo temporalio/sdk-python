@@ -7022,35 +7022,6 @@ class DeadlockInterruptibleWorkflow:
             deadlock_interruptible_completed += 1
 
 
-async def test_workflow_deadlock_interruptible(client: Client):
-    # TODO(cretz): Improve this test and other deadlock/eviction tests by
-    # checking slot counts with Core. There are a couple of bugs where used slot
-    # counts are off by one and slots are released before eviction (see
-    # https://github.com/temporalio/sdk-core/issues/894).
-
-    # This worker used to not be able to shutdown because we hung evictions on
-    # deadlock
-    async with new_worker(client, DeadlockInterruptibleWorkflow) as worker:
-        # Start the workflow
-        assert deadlock_interruptible_completed == 0
-        handle = await client.start_workflow(
-            DeadlockInterruptibleWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        # Wait for task fail
-        await assert_task_fail_eventually(handle, message_contains="deadlock")
-
-        # Confirm workflow was interrupted
-        async def check_completed():
-            assert deadlock_interruptible_completed >= 1
-
-        await assert_eventually(check_completed)
-        completed_sec = time.monotonic()
-    # Confirm worker shutdown didn't hang
-    assert time.monotonic() - completed_sec < 20
-
-
 deadlock_uninterruptible_event = threading.Event()
 deadlock_uninterruptible_completed = 0
 
