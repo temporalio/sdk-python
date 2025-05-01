@@ -710,6 +710,31 @@ class WorkflowService:
             wsv1.UpdateWorkflowExecutionOptionsRequest,
             wsv1.UpdateWorkflowExecutionOptionsResponse,
         )
+        self.create_workflow_rule = client._new_call(
+            "create_workflow_rule",
+            wsv1.CreateWorkflowRuleRequest,
+            wsv1.CreateWorkflowRuleRequest,
+        )
+        self.delete_workflow_rule = client._new_call(
+            "delete_workflow_rule",
+            wsv1.DeleteWorkflowRuleRequest,
+            wsv1.DeleteWorkflowRuleResponse,
+        )
+        self.describe_workflow_rule = client._new_call(
+            "describe_workflow_rule",
+            wsv1.DescribeWorkflowRuleRequest,
+            wsv1.DescribeWorkflowRuleResponse,
+        )
+        self.list_workflow_rules = client._new_call(
+            "list_workflow_rules",
+            wsv1.ListWorkflowRulesRequest,
+            wsv1.ListWorkflowRulesResponse,
+        )
+        self.trigger_workflow_rule = client._new_call(
+            "trigger_workflow_rule",
+            wsv1.TriggerWorkflowRuleRequest,
+            wsv1.TriggerWorkflowRuleResponse,
+        )
 
 
 class OperatorService:
