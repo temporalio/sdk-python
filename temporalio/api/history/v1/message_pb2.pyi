@@ -203,21 +203,30 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
         """Contains information about the root workflow execution.
         The root workflow execution is defined as follows:
-        1. A workflow without parent workflow is its own root workflow.
-        2. A workflow that has a parent workflow has the same root workflow as its parent workflow.
+          1. A workflow without parent workflow is its own root workflow.
+          2. A workflow that has a parent workflow has the same root workflow as its parent workflow.
+        When the workflow is its own root workflow, then root_workflow_execution is nil.
         Note: workflows continued as new or reseted may or may not have parents, check examples below.
 
         Examples:
           Scenario 1: Workflow W1 starts child workflow W2, and W2 starts child workflow W3.
             - The root workflow of all three workflows is W1.
+            - W1 has root_workflow_execution set to nil.
+            - W2 and W3 have root_workflow_execution set to W1.
           Scenario 2: Workflow W1 starts child workflow W2, and W2 continued as new W3.
             - The root workflow of all three workflows is W1.
+            - W1 has root_workflow_execution set to nil.
+            - W2 and W3 have root_workflow_execution set to W1.
           Scenario 3: Workflow W1 continued as new W2.
             - The root workflow of W1 is W1 and the root workflow of W2 is W2.
+            - W1 and W2 have root_workflow_execution set to nil.
           Scenario 4: Workflow W1 starts child workflow W2, and W2 is reseted, creating W3
             - The root workflow of all three workflows is W1.
+            - W1 has root_workflow_execution set to nil.
+            - W2 and W3 have root_workflow_execution set to W1.
           Scenario 5: Workflow W1 is reseted, creating W2.
             - The root workflow of W1 is W1 and the root workflow of W2 is W2.
+            - W1 and W2 have root_workflow_execution set to nil.
         """
     inherited_build_id: builtins.str
     """When present, this execution is assigned to the build ID of its parent or previous execution.
@@ -3768,6 +3777,92 @@ global___NexusOperationCancelRequestedEventAttributes = (
     NexusOperationCancelRequestedEventAttributes
 )
 
+class NexusOperationCancelRequestCompletedEventAttributes(
+    google.protobuf.message.Message
+):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REQUESTED_EVENT_ID_FIELD_NUMBER: builtins.int
+    WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
+    SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
+    requested_event_id: builtins.int
+    """The ID of the `NEXUS_OPERATION_CANCEL_REQUESTED` event."""
+    workflow_task_completed_event_id: builtins.int
+    """The `WORKFLOW_TASK_COMPLETED` event that the corresponding RequestCancelNexusOperation command was reported
+    with.
+    """
+    scheduled_event_id: builtins.int
+    """The id of the `NEXUS_OPERATION_SCHEDULED` event this cancel request corresponds to."""
+    def __init__(
+        self,
+        *,
+        requested_event_id: builtins.int = ...,
+        workflow_task_completed_event_id: builtins.int = ...,
+        scheduled_event_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "requested_event_id",
+            b"requested_event_id",
+            "scheduled_event_id",
+            b"scheduled_event_id",
+            "workflow_task_completed_event_id",
+            b"workflow_task_completed_event_id",
+        ],
+    ) -> None: ...
+
+global___NexusOperationCancelRequestCompletedEventAttributes = (
+    NexusOperationCancelRequestCompletedEventAttributes
+)
+
+class NexusOperationCancelRequestFailedEventAttributes(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REQUESTED_EVENT_ID_FIELD_NUMBER: builtins.int
+    WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
+    SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
+    requested_event_id: builtins.int
+    """The ID of the `NEXUS_OPERATION_CANCEL_REQUESTED` event."""
+    workflow_task_completed_event_id: builtins.int
+    """The `WORKFLOW_TASK_COMPLETED` event that the corresponding RequestCancelNexusOperation command was reported
+    with.
+    """
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """Failure details. A NexusOperationFailureInfo wrapping a CanceledFailureInfo."""
+    scheduled_event_id: builtins.int
+    """The id of the `NEXUS_OPERATION_SCHEDULED` event this cancel request corresponds to."""
+    def __init__(
+        self,
+        *,
+        requested_event_id: builtins.int = ...,
+        workflow_task_completed_event_id: builtins.int = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        scheduled_event_id: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failure",
+            b"failure",
+            "requested_event_id",
+            b"requested_event_id",
+            "scheduled_event_id",
+            b"scheduled_event_id",
+            "workflow_task_completed_event_id",
+            b"workflow_task_completed_event_id",
+        ],
+    ) -> None: ...
+
+global___NexusOperationCancelRequestFailedEventAttributes = (
+    NexusOperationCancelRequestFailedEventAttributes
+)
+
 class HistoryEvent(google.protobuf.message.Message):
     """History events are the method by which Temporal SDKs advance (or recreate) workflow state.
     See the `EventType` enum for more info about what each event is for.
@@ -3846,6 +3941,8 @@ class HistoryEvent(google.protobuf.message.Message):
     NEXUS_OPERATION_TIMED_OUT_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     NEXUS_OPERATION_CANCEL_REQUESTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_OPTIONS_UPDATED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    NEXUS_OPERATION_CANCEL_REQUEST_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
     @property
@@ -4097,6 +4194,14 @@ class HistoryEvent(google.protobuf.message.Message):
     def workflow_execution_options_updated_event_attributes(
         self,
     ) -> global___WorkflowExecutionOptionsUpdatedEventAttributes: ...
+    @property
+    def nexus_operation_cancel_request_completed_event_attributes(
+        self,
+    ) -> global___NexusOperationCancelRequestCompletedEventAttributes: ...
+    @property
+    def nexus_operation_cancel_request_failed_event_attributes(
+        self,
+    ) -> global___NexusOperationCancelRequestFailedEventAttributes: ...
     def __init__(
         self,
         *,
@@ -4219,6 +4324,10 @@ class HistoryEvent(google.protobuf.message.Message):
         | None = ...,
         workflow_execution_options_updated_event_attributes: global___WorkflowExecutionOptionsUpdatedEventAttributes
         | None = ...,
+        nexus_operation_cancel_request_completed_event_attributes: global___NexusOperationCancelRequestCompletedEventAttributes
+        | None = ...,
+        nexus_operation_cancel_request_failed_event_attributes: global___NexusOperationCancelRequestFailedEventAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4261,6 +4370,10 @@ class HistoryEvent(google.protobuf.message.Message):
             b"external_workflow_execution_signaled_event_attributes",
             "marker_recorded_event_attributes",
             b"marker_recorded_event_attributes",
+            "nexus_operation_cancel_request_completed_event_attributes",
+            b"nexus_operation_cancel_request_completed_event_attributes",
+            "nexus_operation_cancel_request_failed_event_attributes",
+            b"nexus_operation_cancel_request_failed_event_attributes",
             "nexus_operation_cancel_requested_event_attributes",
             b"nexus_operation_cancel_requested_event_attributes",
             "nexus_operation_canceled_event_attributes",
@@ -4388,6 +4501,10 @@ class HistoryEvent(google.protobuf.message.Message):
             b"links",
             "marker_recorded_event_attributes",
             b"marker_recorded_event_attributes",
+            "nexus_operation_cancel_request_completed_event_attributes",
+            b"nexus_operation_cancel_request_completed_event_attributes",
+            "nexus_operation_cancel_request_failed_event_attributes",
+            b"nexus_operation_cancel_request_failed_event_attributes",
             "nexus_operation_cancel_requested_event_attributes",
             b"nexus_operation_cancel_requested_event_attributes",
             "nexus_operation_canceled_event_attributes",
@@ -4533,6 +4650,8 @@ class HistoryEvent(google.protobuf.message.Message):
             "nexus_operation_timed_out_event_attributes",
             "nexus_operation_cancel_requested_event_attributes",
             "workflow_execution_options_updated_event_attributes",
+            "nexus_operation_cancel_request_completed_event_attributes",
+            "nexus_operation_cancel_request_failed_event_attributes",
         ]
         | None
     ): ...

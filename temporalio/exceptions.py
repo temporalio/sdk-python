@@ -135,6 +135,7 @@ class CancelledError(FailureError):
         """User-defined details on the error."""
         return self._details
 
+
 class ActivityPausedError(FailureError):
     """Error raised on activity pause."""
 
@@ -147,6 +148,7 @@ class ActivityPausedError(FailureError):
     def details(self) -> Sequence[Any]:
         """User-defined details on the error."""
         return self._details
+
 
 class TerminatedError(FailureError):
     """Error raised on workflow cancellation."""

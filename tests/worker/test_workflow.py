@@ -47,8 +47,8 @@ from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
+    PauseActivityRequest,
     ResetStickyTaskQueueRequest,
-    PauseActivityRequest
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
@@ -86,13 +86,13 @@ from temporalio.converter import (
 )
 from temporalio.exceptions import (
     ActivityError,
+    ActivityPausedError,
     ApplicationError,
     CancelledError,
     ChildWorkflowError,
     TemporalError,
     TimeoutError,
     WorkflowAlreadyStartedError,
-    ActivityPausedError
 )
 from temporalio.runtime import (
     BUFFERED_METRIC_KIND_COUNTER,
@@ -117,10 +117,10 @@ from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
+    assert_pending_activity_exists_eventually,
     assert_task_fail_eventually,
     assert_workflow_exists_eventually,
     ensure_search_attributes_present,
-    assert_pending_activity_exists_eventually,
     find_free_port,
     new_worker,
     workflow_update_exists,
@@ -7432,6 +7432,7 @@ async def heartbeat_activity() -> str:
         except ActivityPausedError as e:
             return "Paused"
 
+
 @workflow.defn
 class ActivityHeartbeatWorkflow:
     @workflow.run
@@ -7452,6 +7453,7 @@ class ActivityHeartbeatWorkflow:
             retry_policy=RetryPolicy(maximum_attempts=1),
         )
         return result
+
 
 async def test_activity_pause(client: Client, env: WorkflowEnvironment):
     async def pause_and_assert(
@@ -7489,7 +7491,9 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
         )
 
         # Wait for first activity
-        activity_info_1 = await assert_pending_activity_exists_eventually(handle, test_activity_id)
+        activity_info_1 = await assert_pending_activity_exists_eventually(
+            handle, test_activity_id
+        )
         # Assert not paused
         assert not activity_info_1.paused
         # Pause activity then assert it is paused

@@ -5114,12 +5114,14 @@ class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
         """Create async activity cancelled error."""
         super().__init__("Activity cancelled")
 
+
 class AsyncActivityPausedError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was paused."""
 
     def __init__(self) -> None:
         """Create async activity paused error."""
         super().__init__("Activity paused")
+
 
 class ScheduleAlreadyRunningError(temporalio.exceptions.TemporalError):
     """Error when a schedule is already running."""

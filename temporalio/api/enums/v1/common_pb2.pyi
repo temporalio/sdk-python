@@ -279,3 +279,57 @@ NEXUS_OPERATION_CANCELLATION_STATE_BLOCKED: (
 )  # 6
 """Cancellation request is blocked (eg: by circuit breaker)."""
 global___NexusOperationCancellationState = NexusOperationCancellationState
+
+class _WorkflowRuleActionScope:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _WorkflowRuleActionScopeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _WorkflowRuleActionScope.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    WORKFLOW_RULE_ACTION_SCOPE_UNSPECIFIED: _WorkflowRuleActionScope.ValueType  # 0
+    """Default value, unspecified scope."""
+    WORKFLOW_RULE_ACTION_SCOPE_WORKFLOW: _WorkflowRuleActionScope.ValueType  # 1
+    """The action will be applied to the entire workflow."""
+    WORKFLOW_RULE_ACTION_SCOPE_ACTIVITY: _WorkflowRuleActionScope.ValueType  # 2
+    """The action will be applied to a specific activity."""
+
+class WorkflowRuleActionScope(
+    _WorkflowRuleActionScope, metaclass=_WorkflowRuleActionScopeEnumTypeWrapper
+): ...
+
+WORKFLOW_RULE_ACTION_SCOPE_UNSPECIFIED: WorkflowRuleActionScope.ValueType  # 0
+"""Default value, unspecified scope."""
+WORKFLOW_RULE_ACTION_SCOPE_WORKFLOW: WorkflowRuleActionScope.ValueType  # 1
+"""The action will be applied to the entire workflow."""
+WORKFLOW_RULE_ACTION_SCOPE_ACTIVITY: WorkflowRuleActionScope.ValueType  # 2
+"""The action will be applied to a specific activity."""
+global___WorkflowRuleActionScope = WorkflowRuleActionScope
+
+class _ApplicationErrorCategory:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ApplicationErrorCategoryEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _ApplicationErrorCategory.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    APPLICATION_ERROR_CATEGORY_UNSPECIFIED: _ApplicationErrorCategory.ValueType  # 0
+    APPLICATION_ERROR_CATEGORY_BENIGN: _ApplicationErrorCategory.ValueType  # 1
+    """Expected application error with little/no severity."""
+
+class ApplicationErrorCategory(
+    _ApplicationErrorCategory, metaclass=_ApplicationErrorCategoryEnumTypeWrapper
+): ...
+
+APPLICATION_ERROR_CATEGORY_UNSPECIFIED: ApplicationErrorCategory.ValueType  # 0
+APPLICATION_ERROR_CATEGORY_BENIGN: ApplicationErrorCategory.ValueType  # 1
+"""Expected application error with little/no severity."""
+global___ApplicationErrorCategory = ApplicationErrorCategory

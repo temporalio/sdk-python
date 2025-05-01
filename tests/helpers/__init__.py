@@ -13,8 +13,8 @@ from temporalio.api.operatorservice.v1 import (
     ListSearchAttributesRequest,
 )
 from temporalio.api.update.v1 import UpdateRef
-from temporalio.api.workflowservice.v1 import PollWorkflowExecutionUpdateRequest
 from temporalio.api.workflow.v1 import PendingActivityInfo
+from temporalio.api.workflowservice.v1 import PollWorkflowExecutionUpdateRequest
 from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
 from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
@@ -219,12 +219,15 @@ async def assert_pending_activity_exists_eventually(
     timeout: timedelta = timedelta(seconds=5),
 ) -> PendingActivityInfo:
     """Wait until a pending activity with the given ID exists and return it."""
+
     async def check() -> Optional[PendingActivityInfo]:
         desc = await handle.describe()
         for act in desc.raw_description.pending_activities:
             if act.activity_id == activity_id:
                 return act
-        raise AssertionError(f"Activity with ID {activity_id} not found in pending activities")
+        raise AssertionError(
+            f"Activity with ID {activity_id} not found in pending activities"
+        )
 
     activity_info = await assert_eventually(check, timeout=timeout)
     return activity_info
