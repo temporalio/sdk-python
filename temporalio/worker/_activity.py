@@ -490,6 +490,17 @@ class _ActivityWorker:
                         temporalio.exceptions.CancelledError("Cancelled"),
                         completion.result.cancelled.failure,
                     )
+                elif (
+                    isinstance(
+                        err,
+                        temporalio.exceptions.ApplicationError,
+                    )
+                    and err.category == temporalio.exceptions.ApplicationErrorCategory.BENIGN
+                ):
+                    # Do not log for ApplicationError with BENIGN category.
+                    await self._data_converter.encode_failure(
+                        err, completion.result.failed.failure
+                    )
                 else:
                     temporalio.activity.logger.warning(
                         "Completing activity as failed", exc_info=True
