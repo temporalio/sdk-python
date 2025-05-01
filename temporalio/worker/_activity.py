@@ -495,7 +495,8 @@ class _ActivityWorker:
                         err,
                         temporalio.exceptions.ApplicationError,
                     )
-                    and err.category == temporalio.exceptions.ApplicationErrorCategory.BENIGN
+                    and err.category
+                    == temporalio.exceptions.ApplicationErrorCategory.BENIGN
                 ):
                     # Do not log for ApplicationError with BENIGN category.
                     await self._data_converter.encode_failure(

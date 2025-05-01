@@ -69,6 +69,7 @@ class WorkflowAlreadyStartedError(FailureError):
         self.workflow_type = workflow_type
         self.run_id = run_id
 
+
 class ApplicationErrorCategory(IntEnum):
     """Severity category for your application error. Maps to corresponding client-side logging/metrics behaviors"""
 
@@ -76,8 +77,9 @@ class ApplicationErrorCategory(IntEnum):
         temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_UNSPECIFIED
     )
     BENIGN = int(
-            temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_BENIGN
+        temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_BENIGN
     )
+
 
 class ApplicationError(FailureError):
     """Error raised during workflow/activity execution."""
@@ -89,7 +91,7 @@ class ApplicationError(FailureError):
         type: Optional[str] = None,
         non_retryable: bool = False,
         next_retry_delay: Optional[timedelta] = None,
-        category: ApplicationErrorCategory = ApplicationErrorCategory.UNSPECIFIED 
+        category: ApplicationErrorCategory = ApplicationErrorCategory.UNSPECIFIED,
     ) -> None:
         """Initialize an application error."""
         super().__init__(

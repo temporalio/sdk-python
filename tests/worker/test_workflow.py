@@ -7423,17 +7423,16 @@ async def test_workflow_dynamic_config_failure(client: Client):
             handle, message_contains="Dynamic config failure"
         )
 
+
 @activity.defn
 async def raise_application_error(use_benign: bool):
     if use_benign:
         raise ApplicationError(
-            "This is a benign error",
-            category=ApplicationErrorCategory.BENIGN
+            "This is a benign error", category=ApplicationErrorCategory.BENIGN
         )
     else:
         raise ApplicationError(
-            "This is a regular error",
-            category=ApplicationErrorCategory.UNSPECIFIED
+            "This is a regular error", category=ApplicationErrorCategory.UNSPECIFIED
         )
 
 
@@ -7446,14 +7445,12 @@ class RaiseErrorWorkflow:
             raise_application_error,
             args=[use_benign],
             start_to_close_timeout=timedelta(seconds=5),
-            retry_policy=RetryPolicy(maximum_attempts=1)
+            retry_policy=RetryPolicy(maximum_attempts=1),
         )
 
 
 async def test_activity_benign_error_not_logged(client: Client):
-    with LogCapturer().logs_captured(
-        activity.logger.base_logger
-    ) as capturer:
+    with LogCapturer().logs_captured(activity.logger.base_logger) as capturer:
         async with new_worker(
             client, RaiseErrorWorkflow, activities=[raise_application_error]
         ) as worker:
@@ -7465,9 +7462,9 @@ async def test_activity_benign_error_not_logged(client: Client):
                     id=str(uuid.uuid4()),
                     task_queue=worker.task_queue,
                 )
-            
+
             assert capturer.find_log("Completing activity as failed") == None
-    
+
             # Run with non-benign error
             with pytest.raises(WorkflowFailureError):
                 await client.execute_workflow(
@@ -7476,5 +7473,5 @@ async def test_activity_benign_error_not_logged(client: Client):
                     id=str(uuid.uuid4()),
                     task_queue=worker.task_queue,
                 )
-            
+
             assert capturer.find_log("Completing activity as failed") != None
