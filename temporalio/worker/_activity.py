@@ -216,7 +216,12 @@ class _ActivityWorker:
             warnings.warn(f"Cannot find activity to cancel for token {task_token!r}")
             return
         logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
-        activity.cancel(cancelled_by_request=True)
+        activity.cancel(
+            cancelled_by_request=cancel.reason
+            == temporalio.bridge.proto.activity_task.ActivityCancelReason.CANCELLED,
+            cancelled_by_pause=cancel.reason
+            == temporalio.bridge.proto.activity_task.ActivityCancelReason.PAUSED,
+        )
 
     def _heartbeat(self, task_token: bytes, *details: Any) -> None:
         # We intentionally make heartbeating non-async, but since the data
@@ -241,7 +246,6 @@ class _ActivityWorker:
         activity: _RunningActivity,
         task_token: bytes,
     ) -> None:
-        print("HEARTBEAT ASYNC FN")
         # Drain the queue, only taking the last value to actually heartbeat
         details: Optional[Sequence[Any]] = None
         while not activity.pending_heartbeats.empty():
@@ -315,6 +319,21 @@ class _ActivityWorker:
                     await self._data_converter.encode_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
+                        completion.result.cancelled.failure,
+                    )
+                elif (
+                    isinstance(
+                        err,
+                        (
+                            asyncio.CancelledError,
+                            temporalio.exceptions.ActivityPausedError,
+                        ),
+                    )
+                    and running_activity.cancelled_by_pause
+                ):
+                    temporalio.activity.logger.debug("Completing as paused")
+                    await self._data_converter.encode_failure(
+                        temporalio.exceptions.ActivityPausedError("Activity paused"),
                         completion.result.cancelled.failure,
                     )
                 else:
@@ -571,23 +590,31 @@ class _RunningActivity:
     done: bool = False
     cancelled_by_request: bool = False
     cancelled_due_to_heartbeat_error: Optional[Exception] = None
+    cancelled_by_pause: bool = False
 
     def cancel(
         self,
         *,
         cancelled_by_request: bool = False,
         cancelled_due_to_heartbeat_error: Optional[Exception] = None,
+        cancelled_by_pause: bool = False,
     ) -> None:
         self.cancelled_by_request = cancelled_by_request
         self.cancelled_due_to_heartbeat_error = cancelled_due_to_heartbeat_error
+        self.cancelled_by_pause = cancelled_by_pause
         if self.cancelled_event:
             self.cancelled_event.set()
         if not self.done:
             # If there's a thread raiser, use it
             if self.cancel_thread_raiser:
-                self.cancel_thread_raiser.raise_in_thread(
-                    temporalio.exceptions.CancelledError
-                )
+                if self.cancelled_by_pause:
+                    self.cancel_thread_raiser.raise_in_thread(
+                        temporalio.exceptions.ActivityPausedError
+                    )
+                else:
+                    self.cancel_thread_raiser.raise_in_thread(
+                        temporalio.exceptions.CancelledError
+                    )
             # If not sync and there's a task, cancel it
             if not self.sync and self.task:
                 # TODO(cretz): Check that Python >= 3.9 and set msg?

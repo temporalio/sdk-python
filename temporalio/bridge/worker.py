@@ -231,10 +231,9 @@ class Worker:
 
     def record_activity_heartbeat(
         self, comp: temporalio.bridge.proto.ActivityHeartbeat
-    ) -> temporalio.bridge.proto.RecordActivityHeartbeatResponse:
+    ) -> None:
         """Record an activity heartbeat."""
-        print("IN BRIDGE - PYTHON")
-        return self._ref.record_activity_heartbeat(comp.SerializeToString())
+        self._ref.record_activity_heartbeat(comp.SerializeToString())
 
     def request_workflow_eviction(self, run_id: str) -> None:
         """Request a workflow be evicted."""

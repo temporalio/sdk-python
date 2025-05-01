@@ -227,4 +227,4 @@ async def assert_pending_activity_exists_eventually(
         raise AssertionError(f"Activity with ID {activity_id} not found in pending activities")
 
     activity_info = await assert_eventually(check, timeout=timeout)
-    return activity_info
+    return cast(PendingActivityInfo, activity_info)

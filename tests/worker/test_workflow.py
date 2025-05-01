@@ -7629,7 +7629,7 @@ async def heartbeat_activity() -> str:
         try:
             activity.heartbeat()
             await asyncio.sleep(1)
-        except ActivityPausedError as e:
+        except (ActivityPausedError, asyncio.CancelledError):
             return "Paused"
 
 @workflow.defn
@@ -7681,7 +7681,7 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
     ) as worker:
         test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
 
-        handle: WorkflowHandle[str] = await client.start_workflow(
+        handle = await client.start_workflow(
             ActivityHeartbeatWorkflow.run,
             test_activity_id,
             id=f"test-activity-pause-{uuid.uuid4()}",
@@ -7699,10 +7699,10 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
         activity_info_2 = await assert_pending_activity_exists_eventually(
             handle, f"{test_activity_id}-2"
         )
-        # # Assert not paused
-        # assert not activity_info_2.paused
-        # # Pause activity then assert it is paused
-        # await pause_and_assert(client, handle, activity_info_2.activity_id)
+        # Assert not paused
+        assert not activity_info_2.paused
+        # Pause activity then assert it is paused
+        await pause_and_assert(client, handle, activity_info_2.activity_id)
 
-        # # Assert workflow returned "Paused"
-        # assert await handle.result() == "Paused"
+        # Assert workflow returned "Paused"
+        assert await handle.result() == "Paused"
