@@ -227,6 +227,10 @@ class _EventTypeEnumTypeWrapper(
     """A Nexus operation was requested to be canceled using a RequestCancelNexusOperation command."""
     EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED: _EventType.ValueType  # 55
     """Workflow execution options updated by user."""
+    EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED: _EventType.ValueType  # 56
+    """A cancellation request for a Nexus operation was successfully delivered to the Nexus handler."""
+    EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED: _EventType.ValueType  # 57
+    """A cancellation request for a Nexus operation resulted in an error."""
 
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
@@ -409,4 +413,8 @@ EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED: EventType.ValueType  # 54
 """A Nexus operation was requested to be canceled using a RequestCancelNexusOperation command."""
 EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED: EventType.ValueType  # 55
 """Workflow execution options updated by user."""
+EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED: EventType.ValueType  # 56
+"""A cancellation request for a Nexus operation was successfully delivered to the Nexus handler."""
+EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED: EventType.ValueType  # 57
+"""A cancellation request for a Nexus operation resulted in an error."""
 global___EventType = EventType
