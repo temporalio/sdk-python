@@ -4,7 +4,7 @@ import time
 import uuid
 from contextlib import closing
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar, Union
+from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar, cast
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import IndexedValueType
@@ -230,4 +230,4 @@ async def assert_pending_activity_exists_eventually(
         )
 
     activity_info = await assert_eventually(check, timeout=timeout)
-    return activity_info
+    return cast(PendingActivityInfo, activity_info)
