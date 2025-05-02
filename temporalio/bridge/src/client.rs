@@ -324,11 +324,29 @@ impl ClientRef {
                 "update_workflow_execution" => {
                     rpc_call!(retry_client, call, update_workflow_execution)
                 }
+                "update_workflow_execution_options" => {
+                    rpc_call!(retry_client, call, update_workflow_execution_options)
+                }
                 "update_worker_build_id_compatibility" => {
                     rpc_call!(retry_client, call, update_worker_build_id_compatibility)
                 }
                 "update_worker_versioning_rules" => {
                     rpc_call!(retry_client, call, update_worker_versioning_rules)
+                }
+                "create_workflow_rule" => {
+                    rpc_call!(retry_client, call, create_workflow_rule)
+                }
+                "delete_workflow_rule" => {
+                    rpc_call!(retry_client, call, delete_workflow_rule)
+                }
+                "describe_workflow_rule" => {
+                    rpc_call!(retry_client, call, describe_workflow_rule)
+                }
+                "list_workflow_rules" => {
+                    rpc_call!(retry_client, call, list_workflow_rules)
+                }
+                "trigger_workflow_rule" => {
+                    rpc_call!(retry_client, call, trigger_workflow_rule)
                 }
                 _ => {
                     return Err(PyValueError::new_err(format!(

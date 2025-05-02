@@ -76,6 +76,8 @@ class ApplicationErrorCategory(IntEnum):
     UNSPECIFIED = int(
         temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_UNSPECIFIED
     )
+
+    """BENIGN category errors emit DEBUG level logs and do not record metrics"""
     BENIGN = int(
         temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_BENIGN
     )

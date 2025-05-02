@@ -7425,7 +7425,7 @@ async def test_workflow_dynamic_config_failure(client: Client):
 
 
 @activity.defn
-async def raise_application_error(use_benign: bool):
+async def raise_application_error(use_benign: bool) -> typing.NoReturn:
     if use_benign:
         raise ApplicationError(
             "This is a benign error", category=ApplicationErrorCategory.BENIGN
@@ -7439,11 +7439,11 @@ async def raise_application_error(use_benign: bool):
 @workflow.defn
 class RaiseErrorWorkflow:
     @workflow.run
-    async def run(self, use_benign: bool):
+    async def run(self, use_benign: bool) -> None:
         # Execute activity that will raise an error
         await workflow.execute_activity(
             raise_application_error,
-            args=[use_benign],
+            use_benign,
             start_to_close_timeout=timedelta(seconds=5),
             retry_policy=RetryPolicy(maximum_attempts=1),
         )
@@ -7458,7 +7458,7 @@ async def test_activity_benign_error_not_logged(client: Client):
             with pytest.raises(WorkflowFailureError):
                 await client.execute_workflow(
                     RaiseErrorWorkflow.run,
-                    args=[True],
+                    True,
                     id=str(uuid.uuid4()),
                     task_queue=worker.task_queue,
                 )
@@ -7469,7 +7469,7 @@ async def test_activity_benign_error_not_logged(client: Client):
             with pytest.raises(WorkflowFailureError):
                 await client.execute_workflow(
                     RaiseErrorWorkflow.run,
-                    args=[False],
+                    False,
                     id=str(uuid.uuid4()),
                     task_queue=worker.task_queue,
                 )
