@@ -7455,18 +7455,22 @@ async def test_activity_benign_error_not_logged(client: Client):
             client, RaiseErrorWorkflow, activities=[raise_application_error]
         ) as worker:
             # Run with benign error
-            with pytest.raises(WorkflowFailureError):
+            with pytest.raises(WorkflowFailureError) as err:
                 await client.execute_workflow(
                     RaiseErrorWorkflow.run,
                     True,
                     id=str(uuid.uuid4()),
                     task_queue=worker.task_queue,
                 )
-
+            # Check that the cause is an ApplicationError
+            assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, ApplicationError)
+            # Assert the expected category
+            assert err.value.cause.cause.category == ApplicationErrorCategory.BENIGN
             assert capturer.find_log("Completing activity as failed") == None
 
             # Run with non-benign error
-            with pytest.raises(WorkflowFailureError):
+            with pytest.raises(WorkflowFailureError) as err:
                 await client.execute_workflow(
                     RaiseErrorWorkflow.run,
                     False,
@@ -7474,4 +7478,9 @@ async def test_activity_benign_error_not_logged(client: Client):
                     task_queue=worker.task_queue,
                 )
 
+            # Check that the cause is an ApplicationError
+            assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, ApplicationError)
+            # Assert the expected category
+            assert err.value.cause.cause.category == ApplicationErrorCategory.UNSPECIFIED
             assert capturer.find_log("Completing activity as failed") != None

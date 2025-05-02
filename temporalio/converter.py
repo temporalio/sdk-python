@@ -852,6 +852,10 @@ class DefaultFailureConverter(FailureConverter):
                 failure.application_failure_info.next_retry_delay.FromTimedelta(
                     error.next_retry_delay
                 )
+            if error.category:
+                failure.application_failure_info.category = (
+                    temporalio.api.enums.v1.ApplicationErrorCategory.ValueType(error.category or 0)
+                )
         elif isinstance(error, temporalio.exceptions.TimeoutError):
             failure.timeout_failure_info.SetInParent()
             failure.timeout_failure_info.timeout_type = (
@@ -938,6 +942,7 @@ class DefaultFailureConverter(FailureConverter):
                 type=app_info.type or None,
                 non_retryable=app_info.non_retryable,
                 next_retry_delay=app_info.next_retry_delay.ToTimedelta(),
+                category=temporalio.exceptions.ApplicationErrorCategory(int(app_info.category))
             )
         elif failure.HasField("timeout_failure_info"):
             timeout_info = failure.timeout_failure_info
