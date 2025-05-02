@@ -7482,5 +7482,7 @@ async def test_activity_benign_error_not_logged(client: Client):
             assert isinstance(err.value.cause, ActivityError)
             assert isinstance(err.value.cause.cause, ApplicationError)
             # Assert the expected category
-            assert err.value.cause.cause.category == ApplicationErrorCategory.UNSPECIFIED
+            assert (
+                err.value.cause.cause.category == ApplicationErrorCategory.UNSPECIFIED
+            )
             assert capturer.find_log("Completing activity as failed") != None

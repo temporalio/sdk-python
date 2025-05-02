@@ -496,7 +496,8 @@ class _ActivityWorker:
                             err,
                             temporalio.exceptions.ApplicationError,
                         )
-                        and err.category == temporalio.exceptions.ApplicationErrorCategory.BENIGN
+                        and err.category
+                        == temporalio.exceptions.ApplicationErrorCategory.BENIGN
                     ):
                         # Downgrade log level to DEBUG for BENIGN application errors.
                         temporalio.activity.logger.debug(
