@@ -136,6 +136,7 @@ from tests.helpers.external_stack_trace import (
 with workflow.unsafe.imports_passed_through():
     import pytest
 
+
 @workflow.defn
 class HelloWorkflow:
     @workflow.run
@@ -7399,6 +7400,7 @@ async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
         assert child_wf_info_root.workflow_id == parent_desc.id
         assert child_wf_info_root.run_id == parent_desc.run_id
 
+
 @workflow.defn(dynamic=True)
 class WorkflowDynamicConfigFnFailure:
     @workflow.dynamic_config
@@ -7423,6 +7425,7 @@ async def test_workflow_dynamic_config_failure(client: Client):
         await assert_task_fail_eventually(
             handle, message_contains="Dynamic config failure"
         )
+
 
 @activity.defn
 async def heartbeat_activity() -> (
