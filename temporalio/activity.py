@@ -34,6 +34,9 @@ from typing import (
     overload,
 )
 
+import temporalio.bridge
+import temporalio.bridge.proto
+import temporalio.bridge.proto.activity_task
 import temporalio.common
 import temporalio.converter
 
@@ -136,6 +139,27 @@ _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("act
 
 
 @dataclass
+class ActivityCancellationDetails:
+    not_found: bool = False
+    cancelled: bool = False
+    paused: bool = False
+    timed_out: bool = False
+    worker_shutdown: bool = False
+
+    @staticmethod
+    def fromProto(
+        proto: temporalio.bridge.proto.activity_task.ActivityCancellationDetails,
+    ) -> ActivityCancellationDetails:
+        return ActivityCancellationDetails(
+            not_found=proto.is_not_found,
+            cancelled=proto.is_cancelled,
+            paused=proto.is_paused,
+            timed_out=proto.is_timed_out,
+            worker_shutdown=proto.is_worker_shutdown,
+        )
+
+
+@dataclass
 class _Context:
     info: Callable[[], Info]
     # This is optional because during interceptor init it is not present
@@ -148,6 +172,7 @@ class _Context:
         temporalio.converter.PayloadConverter,
     ]
     runtime_metric_meter: Optional[temporalio.common.MetricMeter]
+    cancellation_details: Callable[[], Optional[ActivityCancellationDetails]]
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
     _metric_meter: Optional[temporalio.common.MetricMeter] = None
@@ -258,6 +283,11 @@ def info() -> Info:
         RuntimeError: When not in an activity.
     """
     return _Context.current().info()
+
+
+def cancellation_details() -> Optional[ActivityCancellationDetails]:
+    """Cancellation details of the currenct activity, if any"""
+    return _Context.current().cancellation_details()
 
 
 def heartbeat(*details: Any) -> None:
