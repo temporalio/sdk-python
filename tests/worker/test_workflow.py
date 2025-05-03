@@ -38,6 +38,7 @@ from urllib.request import urlopen
 from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
+import temporalio.activity
 import temporalio.worker
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -7624,32 +7625,51 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
             message_contains="Activity function say_hello is not registered on this worker, no available activities",
         )
 @activity.defn
-async def heartbeat_activity() -> str:
+async def heartbeat_activity() -> (
+    Optional[temporalio.activity.ActivityCancellationDetails]
+):
     while True:
         try:
             activity.heartbeat()
             await asyncio.sleep(1)
-        except (ActivityPausedError, asyncio.CancelledError):
-            return "Paused"
+        except (CancelledError, asyncio.CancelledError):
+            return activity.cancellation_details()
+
+@activity.defn
+async def sync_heartbeat_activity() -> (
+    Optional[temporalio.activity.ActivityCancellationDetails]
+):
+    while True:
+        try:
+            activity.heartbeat()
+            await asyncio.sleep(1)
+        except (CancelledError, asyncio.CancelledError):
+            return activity.cancellation_details()
 
 @workflow.defn
 class ActivityHeartbeatWorkflow:
     @workflow.run
-    async def run(self, activity_id: str) -> str:
-        await workflow.execute_activity(
-            heartbeat_activity,
-            activity_id=activity_id,
-            start_to_close_timeout=timedelta(seconds=10),
-            heartbeat_timeout=timedelta(seconds=2),
-            retry_policy=RetryPolicy(maximum_attempts=1),
+    async def run(
+        self, activity_id: str
+    ) -> list[Optional[temporalio.activity.ActivityCancellationDetails]]:
+        result = []
+        result.append(
+            await workflow.execute_activity(
+                sync_heartbeat_activity,
+                activity_id=activity_id,
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=2),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
         )
-
-        result = await workflow.execute_activity(
-            heartbeat_activity,
-            activity_id=f"{activity_id}-2",
-            start_to_close_timeout=timedelta(seconds=10),
-            heartbeat_timeout=timedelta(seconds=2),
-            retry_policy=RetryPolicy(maximum_attempts=1),
+        result.append(
+            await workflow.execute_activity(
+                heartbeat_activity,
+                activity_id=f"{activity_id}-2",
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=2),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
         )
         return result
 
@@ -7677,7 +7697,7 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
         await assert_eventually(check_paused)
 
     async with new_worker(
-        client, ActivityHeartbeatWorkflow, activities=[heartbeat_activity]
+        client, ActivityHeartbeatWorkflow, activities=[heartbeat_activity, sync_heartbeat_activity]
     ) as worker:
         test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
 
@@ -7705,4 +7725,6 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
         await pause_and_assert(client, handle, activity_info_2.activity_id)
 
         # Assert workflow returned "Paused"
-        assert await handle.result() == "Paused"
+        result = await handle.result()
+        assert result[0] == temporalio.activity.ActivityCancellationDetails(paused=True)
+        assert result[1] == temporalio.activity.ActivityCancellationDetails(paused=True)

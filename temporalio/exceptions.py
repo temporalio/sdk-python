@@ -155,18 +155,6 @@ class CancelledError(FailureError):
         """User-defined details on the error."""
         return self._details
 
-class ActivityPausedError(FailureError):
-    """Error raised on activity pause."""
-
-    def __init__(self, message: str = "Activity paused.", *details: Any) -> None:
-        """Initialize an activity paused error."""
-        super().__init__(message)
-        self._details = details
-
-    @property
-    def details(self) -> Sequence[Any]:
-        """User-defined details on the error."""
-        return self._details
 
 class TerminatedError(FailureError):
     """Error raised on workflow cancellation."""
