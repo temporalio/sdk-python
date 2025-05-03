@@ -174,7 +174,7 @@ class _Context:
         temporalio.converter.PayloadConverter,
     ]
     runtime_metric_meter: Optional[temporalio.common.MetricMeter]
-    cancellation_details: Callable[[], Optional[ActivityCancellationDetails]]
+    cancellation_details: Optional[ActivityCancellationDetails] = None
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
     _metric_meter: Optional[temporalio.common.MetricMeter] = None
@@ -289,7 +289,7 @@ def info() -> Info:
 
 def cancellation_details() -> Optional[ActivityCancellationDetails]:
     """Cancellation details of the currenct activity, if any"""
-    return _Context.current().cancellation_details()
+    return _Context.current().cancellation_details
 
 
 def heartbeat(*details: Any) -> None:
