@@ -855,7 +855,7 @@ class DefaultFailureConverter(FailureConverter):
             if error.category:
                 failure.application_failure_info.category = (
                     temporalio.api.enums.v1.ApplicationErrorCategory.ValueType(
-                        error.category or 0
+                        error.category
                     )
                 )
         elif isinstance(error, temporalio.exceptions.TimeoutError):
