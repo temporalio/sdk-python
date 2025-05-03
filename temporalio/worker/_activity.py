@@ -15,7 +15,7 @@ import threading
 import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
@@ -214,9 +214,8 @@ class _ActivityWorker:
             warnings.warn(f"Cannot find activity to cancel for token {task_token!r}")
             return
         logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
-        activity.cancellation_details = (
-            temporalio.activity.ActivityCancellationDetails._fromProto(cancel.details)
-        )
+        activity.cancellation_details.cancelled = cancel.details.is_cancelled
+        activity.cancellation_details.paused = cancel.details.is_paused
         activity.cancel(cancelled_by_request=True)
 
     def _heartbeat(self, task_token: bytes, *details: Any) -> None:
@@ -424,8 +423,6 @@ class _ActivityWorker:
                 headers=start.header_fields,
             )
 
-            running_activity.cancellation_details = None
-
             # Set the context early so the logging adapter works and
             # interceptors have it
             temporalio.activity._Context.set(
@@ -441,8 +438,7 @@ class _ActivityWorker:
                     runtime_metric_meter=None
                     if sync_non_threaded
                     else self._metric_meter,
-                    # Function reference to the running activity's cancellation details
-                    cancellation_details=lambda: running_activity.cancellation_details,
+                    cancellation_details=running_activity.cancellation_details,
                 )
             )
             temporalio.activity.logger.debug("Starting activity")
@@ -553,8 +549,8 @@ class _RunningActivity:
     done: bool = False
     cancelled_by_request: bool = False
     cancelled_due_to_heartbeat_error: Optional[Exception] = None
-    cancellation_details: Optional[temporalio.activity.ActivityCancellationDetails] = (
-        None
+    cancellation_details: temporalio.activity.ActivityCancellationDetails = field(
+        default_factory=temporalio.activity.ActivityCancellationDetails
     )
 
     def cancel(
@@ -751,9 +747,7 @@ def _execute_sync_activity(
         temporalio.converter.PayloadConverter,
     ],
     runtime_metric_meter: Optional[temporalio.common.MetricMeter],
-    cancellation_details: Callable[
-        [], Optional[temporalio.activity.ActivityCancellationDetails]
-    ],
+    cancellation_details: Optional[temporalio.activity.ActivityCancellationDetails],
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
