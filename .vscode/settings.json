@@ -1,7 +1,0 @@
-{
-    "rust-analyzer.linkedProjects": [
-        // Add the path to the Cargo.toml file of your Rust project
-        // relative to the workspace root
-        "temporalio/bridge/sdk-core/Cargo.toml"
-    ]
-}
