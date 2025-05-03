@@ -6264,7 +6264,6 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            # TODO(thomas): modify activity context (if applicable to async activities)
             if resp_by_id.cancel_requested or resp_by_id.activity_paused:
                 raise AsyncActivityCancelledError()
 
@@ -6280,7 +6279,6 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            # TODO(thomas): modify activity context (if applicable to async activities)
             if resp.cancel_requested or resp.activity_paused:
                 raise AsyncActivityCancelledError()
 

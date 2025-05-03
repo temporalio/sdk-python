@@ -140,6 +140,8 @@ _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("act
 
 @dataclass
 class ActivityCancellationDetails:
+    """Provides the reasons for the activity's cancellation"""
+
     not_found: bool = False
     cancelled: bool = False
     paused: bool = False
@@ -147,7 +149,7 @@ class ActivityCancellationDetails:
     worker_shutdown: bool = False
 
     @staticmethod
-    def fromProto(
+    def _fromProto(
         proto: temporalio.bridge.proto.activity_task.ActivityCancellationDetails,
     ) -> ActivityCancellationDetails:
         return ActivityCancellationDetails(
