@@ -74,16 +74,29 @@ class ActivityEnvironment:
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
-        self.cancellation_details = None
+        self.cancellation_details: Optional[
+            temporalio.activity.ActivityCancellationDetails
+        ] = None
 
-    def cancel(self) -> None:
+    def cancel(
+        self,
+        cancellation_details: Optional[
+            temporalio.activity.ActivityCancellationDetails
+        ] = None,
+    ) -> None:
         """Cancel the activity.
+
+        Args:
+            cancellation_details: Optional details about the cancellation. When provided, these
+                will be accessible through temporalio.activity.cancellation_details()
+                in the activity after cancellation.
 
         This only has an effect on the first call.
         """
         if self._cancelled:
             return
         self._cancelled = True
+        self.cancellation_details = cancellation_details
         for act in self._activities:
             act.cancel()
 
