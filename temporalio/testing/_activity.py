@@ -74,6 +74,7 @@ class ActivityEnvironment:
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
+        self.cancellation_details = None
 
     def cancel(self) -> None:
         """Cancel the activity.
@@ -154,6 +155,7 @@ class _Activity:
             else self.cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=env.payload_converter,
             runtime_metric_meter=env.metric_meter,
+            cancellation_details=lambda: env.cancellation_details,
         )
         self.task: Optional[asyncio.Task] = None
 

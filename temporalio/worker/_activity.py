@@ -217,7 +217,7 @@ class _ActivityWorker:
             return
         logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
         activity.cancellation_details = (
-            temporalio.activity.ActivityCancellationDetails.fromProto(cancel.details)
+            temporalio.activity.ActivityCancellationDetails._fromProto(cancel.details)
         )
         activity.cancel(cancelled_by_request=True)
 
@@ -773,7 +773,9 @@ def _execute_sync_activity(
         temporalio.converter.PayloadConverter,
     ],
     runtime_metric_meter: Optional[temporalio.common.MetricMeter],
-    cancellation_details: Callable[[], Optional[temporalio.activity.ActivityCancellationDetails]],
+    cancellation_details: Callable[
+        [], Optional[temporalio.activity.ActivityCancellationDetails]
+    ],
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -805,7 +807,7 @@ def _execute_sync_activity(
             else cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
-            cancellation_details=cancellation_details
+            cancellation_details=cancellation_details,
         )
     )
     return fn(*args)

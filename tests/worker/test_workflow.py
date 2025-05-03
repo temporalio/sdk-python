@@ -7636,6 +7636,7 @@ async def heartbeat_activity() -> (
         except (CancelledError, asyncio.CancelledError):
             return activity.cancellation_details()
 
+
 @activity.defn
 def sync_heartbeat_activity() -> (
     Optional[temporalio.activity.ActivityCancellationDetails]
@@ -7646,6 +7647,7 @@ def sync_heartbeat_activity() -> (
             time.sleep(1)
         except (CancelledError, asyncio.CancelledError):
             return activity.cancellation_details()
+
 
 @workflow.defn
 class ActivityHeartbeatWorkflow:
@@ -7703,7 +7705,7 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
             task_queue=str(uuid.uuid4()),
             workflows=[ActivityHeartbeatWorkflow],
             activities=[heartbeat_activity, sync_heartbeat_activity],
-            activity_executor=executor
+            activity_executor=executor,
         ) as worker:
             test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
 
@@ -7734,5 +7736,9 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
 
             # Assert workflow returned "Paused"
             result = await handle.result()
-            assert result[0] == temporalio.activity.ActivityCancellationDetails(paused=True)
-            assert result[1] == temporalio.activity.ActivityCancellationDetails(paused=True)
+            assert result[0] == temporalio.activity.ActivityCancellationDetails(
+                paused=True
+            )
+            assert result[1] == temporalio.activity.ActivityCancellationDetails(
+                paused=True
+            )
