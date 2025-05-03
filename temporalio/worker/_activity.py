@@ -805,7 +805,7 @@ def _execute_sync_activity(
             else cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
-            # cancellation_details=None
+            cancellation_details=cancellation_details
         )
     )
     return fn(*args)
