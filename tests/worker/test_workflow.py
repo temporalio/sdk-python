@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import dataclasses
 import json
 import logging
@@ -7636,13 +7637,13 @@ async def heartbeat_activity() -> (
             return activity.cancellation_details()
 
 @activity.defn
-async def sync_heartbeat_activity() -> (
+def sync_heartbeat_activity() -> (
     Optional[temporalio.activity.ActivityCancellationDetails]
 ):
     while True:
         try:
             activity.heartbeat()
-            await asyncio.sleep(1)
+            time.sleep(1)
         except (CancelledError, asyncio.CancelledError):
             return activity.cancellation_details()
 
@@ -7696,35 +7697,42 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
 
         await assert_eventually(check_paused)
 
-    async with new_worker(
-        client, ActivityHeartbeatWorkflow, activities=[heartbeat_activity, sync_heartbeat_activity]
-    ) as worker:
-        test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        async with Worker(
+            client,
+            task_queue=str(uuid.uuid4()),
+            workflows=[ActivityHeartbeatWorkflow],
+            activities=[heartbeat_activity, sync_heartbeat_activity],
+            activity_executor=executor
+        ) as worker:
+            test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
 
-        handle = await client.start_workflow(
-            ActivityHeartbeatWorkflow.run,
-            test_activity_id,
-            id=f"test-activity-pause-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
+            handle = await client.start_workflow(
+                ActivityHeartbeatWorkflow.run,
+                test_activity_id,
+                id=f"test-activity-pause-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
 
-        # Wait for first activity
-        activity_info_1 = await assert_pending_activity_exists_eventually(handle, test_activity_id)
-        # Assert not paused
-        assert not activity_info_1.paused
-        # Pause activity then assert it is paused
-        await pause_and_assert(client, handle, activity_info_1.activity_id)
+            # Wait for first activity
+            activity_info_1 = await assert_pending_activity_exists_eventually(
+                handle, test_activity_id
+            )
+            # Assert not paused
+            assert not activity_info_1.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_1.activity_id)
 
-        # Wait for second activity
-        activity_info_2 = await assert_pending_activity_exists_eventually(
-            handle, f"{test_activity_id}-2"
-        )
-        # Assert not paused
-        assert not activity_info_2.paused
-        # Pause activity then assert it is paused
-        await pause_and_assert(client, handle, activity_info_2.activity_id)
+            # Wait for second activity
+            activity_info_2 = await assert_pending_activity_exists_eventually(
+                handle, f"{test_activity_id}-2"
+            )
+            # Assert not paused
+            assert not activity_info_2.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_2.activity_id)
 
-        # Assert workflow returned "Paused"
-        result = await handle.result()
-        assert result[0] == temporalio.activity.ActivityCancellationDetails(paused=True)
-        assert result[1] == temporalio.activity.ActivityCancellationDetails(paused=True)
+            # Assert workflow returned "Paused"
+            result = await handle.result()
+            assert result[0] == temporalio.activity.ActivityCancellationDetails(paused=True)
+            assert result[1] == temporalio.activity.ActivityCancellationDetails(paused=True)
