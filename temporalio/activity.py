@@ -152,7 +152,7 @@ class _ActivityCancellationDetailsHolder:
 
 @dataclass(frozen=True)
 class ActivityCancellationDetails:
-    """Provides the reasons for the activity's cancellation"""
+    """Provides the reasons for the activity's cancellation. Cancellation details are set once and do not change once set."""
 
     not_found: bool = False
     cancelled_requested: bool = False
@@ -300,7 +300,7 @@ def info() -> Info:
 
 
 def cancellation_details() -> Optional[ActivityCancellationDetails]:
-    """Cancellation details of the current activity, if any"""
+    """Cancellation details of the current activity, if any. Once set, cancellation details do not change."""
     return _Context.current().cancellation_details.details
 
 
