@@ -143,7 +143,7 @@ class ActivityCancellationDetails:
     """Provides the reasons for the activity's cancellation"""
 
     not_found: bool = False
-    cancelled: bool = False
+    cancelled_requested: bool = False
     paused: bool = False
     timed_out: bool = False
     worker_shutdown: bool = False
@@ -154,7 +154,7 @@ class ActivityCancellationDetails:
     ) -> ActivityCancellationDetails:
         return ActivityCancellationDetails(
             not_found=proto.is_not_found,
-            cancelled=proto.is_cancelled,
+            cancelled_requested=proto.is_cancelled,
             paused=proto.is_paused,
             timed_out=proto.is_timed_out,
             worker_shutdown=proto.is_worker_shutdown,
@@ -288,7 +288,7 @@ def info() -> Info:
 
 
 def cancellation_details() -> Optional[ActivityCancellationDetails]:
-    """Cancellation details of the currenct activity, if any"""
+    """Cancellation details of the current activity, if any"""
     return _Context.current().cancellation_details
 
 
