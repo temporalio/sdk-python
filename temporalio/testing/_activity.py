@@ -74,9 +74,9 @@ class ActivityEnvironment:
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
-        self.cancellation_details: Optional[
-            temporalio.activity.ActivityCancellationDetails
-        ] = None
+        self.cancellation_details: (
+            temporalio.activity._ActivityCancellationDetailsHolder
+        )
 
     def cancel(
         self,
@@ -96,7 +96,8 @@ class ActivityEnvironment:
         if self._cancelled:
             return
         self._cancelled = True
-        self.cancellation_details = cancellation_details
+        if cancellation_details:
+            self.cancellation_details.set_details(cancellation_details)
         for act in self._activities:
             act.cancel()
 
