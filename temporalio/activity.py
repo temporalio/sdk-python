@@ -139,6 +139,18 @@ _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("act
 
 
 @dataclass
+class _ActivityCancellationDetailsHolder:
+    _details: Optional[ActivityCancellationDetails] = None
+
+    def set_details(self, details: ActivityCancellationDetails) -> None:
+        self._details = details
+
+    @property
+    def details(self) -> Optional[ActivityCancellationDetails]:
+        return self._details
+
+
+@dataclass(frozen=True)
 class ActivityCancellationDetails:
     """Provides the reasons for the activity's cancellation"""
 
@@ -149,7 +161,7 @@ class ActivityCancellationDetails:
     worker_shutdown: bool = False
 
     @staticmethod
-    def _fromProto(
+    def _from_proto(
         proto: temporalio.bridge.proto.activity_task.ActivityCancellationDetails,
     ) -> ActivityCancellationDetails:
         return ActivityCancellationDetails(
@@ -174,7 +186,7 @@ class _Context:
         temporalio.converter.PayloadConverter,
     ]
     runtime_metric_meter: Optional[temporalio.common.MetricMeter]
-    cancellation_details: Optional[ActivityCancellationDetails] = None
+    cancellation_details: _ActivityCancellationDetailsHolder
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
     _metric_meter: Optional[temporalio.common.MetricMeter] = None
@@ -289,7 +301,7 @@ def info() -> Info:
 
 def cancellation_details() -> Optional[ActivityCancellationDetails]:
     """Cancellation details of the current activity, if any"""
-    return _Context.current().cancellation_details
+    return _Context.current().cancellation_details.details
 
 
 def heartbeat(*details: Any) -> None:
