@@ -126,6 +126,8 @@ from tests.helpers import (
     assert_pending_activity_exists_eventually,
     find_free_port,
     new_worker,
+    pause_and_assert,
+    unpause_and_assert,
     workflow_update_exists,
 )
 from tests.helpers.external_stack_trace import (
@@ -7627,27 +7629,42 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
             handle,
             message_contains="Activity function say_hello is not registered on this worker, no available activities",
         )
+
+
 @activity.defn
 async def heartbeat_activity() -> (
     Optional[temporalio.activity.ActivityCancellationDetails]
 ):
+async def heartbeat_activity(
+    catch_err: bool = True,
+) -> Optional[temporalio.activity.ActivityCancellationDetails]:
     while True:
         try:
             activity.heartbeat()
+            # If we are on the second attempt, we have retried due to pause/unpause.
+            if activity.info().attempt > 1:
+                return activity.cancellation_details()
             await asyncio.sleep(1)
-        except (CancelledError, asyncio.CancelledError):
+        except (CancelledError, asyncio.CancelledError) as err:
+            if not catch_err:
+                raise err
             return activity.cancellation_details()
 
 
 @activity.defn
-def sync_heartbeat_activity() -> (
-    Optional[temporalio.activity.ActivityCancellationDetails]
-):
+def sync_heartbeat_activity(
+    catch_err: bool = True,
+) -> Optional[temporalio.activity.ActivityCancellationDetails]:
     while True:
         try:
             activity.heartbeat()
+            # If we are on the second attempt, we have retried due to pause/unpause.
+            if activity.info().attempt > 1:
+                return activity.cancellation_details()
             time.sleep(1)
-        except (CancelledError, asyncio.CancelledError):
+        except (CancelledError, asyncio.CancelledError) as err:
+            if not catch_err:
+                raise err
             return activity.cancellation_details()
 
 
@@ -7678,29 +7695,8 @@ class ActivityHeartbeatWorkflow:
         )
         return result
 
-async def test_activity_pause(client: Client, env: WorkflowEnvironment):
-    async def pause_and_assert(
-        client: Client, handle: WorkflowHandle, activity_id: str
-    ):
-        """Pause the given activity and assert it becomes paused."""
-        desc = await handle.describe()
-        req = PauseActivityRequest(
-            namespace=client.namespace,
-            execution=WorkflowExecution(
-                workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
-                run_id=desc.raw_description.workflow_execution_info.execution.run_id,
-            ),
-            id=activity_id,
-        )
-        await client.workflow_service.pause_activity(req)
 
-        # Assert eventually paused
-        async def check_paused() -> bool:
-            info = await assert_pending_activity_exists_eventually(handle, activity_id)
-            return info.paused
-
-        await assert_eventually(check_paused)
-
+async def test_activity_pause_cancellation_details(client: Client):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         async with Worker(
             client,
@@ -7718,7 +7714,7 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
                 task_queue=worker.task_queue,
             )
 
-            # Wait for first activity
+            # Wait for sync activity
             activity_info_1 = await assert_pending_activity_exists_eventually(
                 handle, test_activity_id
             )
@@ -7727,7 +7723,7 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
             # Pause activity then assert it is paused
             await pause_and_assert(client, handle, activity_info_1.activity_id)
 
-            # Wait for second activity
+            # Wait for async activity
             activity_info_2 = await assert_pending_activity_exists_eventually(
                 handle, f"{test_activity_id}-2"
             )
@@ -7736,7 +7732,8 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
             # Pause activity then assert it is paused
             await pause_and_assert(client, handle, activity_info_2.activity_id)
 
-            # Assert workflow returned "Paused"
+            # Assert workflow return value for paused activities that caught the
+            # cancel error
             result = await handle.result()
             assert result[0] == temporalio.activity.ActivityCancellationDetails(
                 paused=True
@@ -7744,3 +7741,85 @@ async def test_activity_pause(client: Client, env: WorkflowEnvironment):
             assert result[1] == temporalio.activity.ActivityCancellationDetails(
                 paused=True
             )
+
+
+@workflow.defn
+class ActivityHeartbeatPauseUnpauseWorkflow:
+    @workflow.run
+    async def run(
+        self, activity_id: str
+    ) -> list[Optional[temporalio.activity.ActivityCancellationDetails]]:
+        results = []
+        results.append(
+            await workflow.execute_activity(
+                sync_heartbeat_activity,
+                False,
+                activity_id=activity_id,
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=2),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        )
+        results.append(
+            await workflow.execute_activity(
+                heartbeat_activity,
+                False,
+                activity_id=f"{activity_id}-2",
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=2),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        )
+        return results
+
+
+async def test_activity_pause_unpause(client: Client):
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        async with Worker(
+            client,
+            task_queue=str(uuid.uuid4()),
+            workflows=[ActivityHeartbeatPauseUnpauseWorkflow],
+            activities=[heartbeat_activity, sync_heartbeat_activity],
+            activity_executor=executor,
+        ) as worker:
+            test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
+
+            handle = await client.start_workflow(
+                ActivityHeartbeatPauseUnpauseWorkflow.run,
+                test_activity_id,
+                id=f"test-activity-pause-unpause-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            # Wait for sync activity
+            activity_info_1 = await assert_pending_activity_exists_eventually(
+                handle, test_activity_id
+            )
+            # Assert not paused
+            assert not activity_info_1.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_1.activity_id)
+
+            # Wait for next heartbeat to propagate the cancellation. Unpausing before the heartbeat
+            # will show activity as unpaused to core. Consequently, it will *not* issue an activity cancel.
+            time.sleep(2)
+
+            # Unpause activity
+            await unpause_and_assert(client, handle, activity_info_1.activity_id)
+            # Expect second activity to have started now
+            activity_info_2 = await assert_pending_activity_exists_eventually(
+                handle, f"{test_activity_id}-2"
+            )
+            # Assert not paused
+            assert not activity_info_2.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_2.activity_id)
+            # Wait for next heartbeat to propagate the cancellation.
+            time.sleep(2)
+            # Unpause activity
+            await unpause_and_assert(client, handle, activity_info_2.activity_id)
+
+            # Check workflow complete
+            result = await handle.result()
+            assert result[0] == None
+            assert result[1] == None

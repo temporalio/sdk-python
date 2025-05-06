@@ -13,8 +13,12 @@ from temporalio.api.operatorservice.v1 import (
     ListSearchAttributesRequest,
 )
 from temporalio.api.update.v1 import UpdateRef
-from temporalio.api.workflowservice.v1 import PollWorkflowExecutionUpdateRequest
 from temporalio.api.workflow.v1 import PendingActivityInfo
+from temporalio.api.workflowservice.v1 import (
+    PauseActivityRequest,
+    PollWorkflowExecutionUpdateRequest,
+    UnpauseActivityRequest,
+)
 from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
 from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
@@ -228,3 +232,45 @@ async def assert_pending_activity_exists_eventually(
 
     activity_info = await assert_eventually(check, timeout=timeout)
     return cast(PendingActivityInfo, activity_info)
+
+
+async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
+    """Pause the given activity and assert it becomes paused."""
+    desc = await handle.describe()
+    req = PauseActivityRequest(
+        namespace=client.namespace,
+        execution=WorkflowExecution(
+            workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
+            run_id=desc.raw_description.workflow_execution_info.execution.run_id,
+        ),
+        id=activity_id,
+    )
+    await client.workflow_service.pause_activity(req)
+
+    # Assert eventually paused
+    async def check_paused() -> bool:
+        info = await assert_pending_activity_exists_eventually(handle, activity_id)
+        return info.paused
+
+    await assert_eventually(check_paused)
+
+
+async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
+    """Unpause the given activity and assert it is not paused."""
+    desc = await handle.describe()
+    req = UnpauseActivityRequest(
+        namespace=client.namespace,
+        execution=WorkflowExecution(
+            workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
+            run_id=desc.raw_description.workflow_execution_info.execution.run_id,
+        ),
+        id=activity_id,
+    )
+    await client.workflow_service.unpause_activity(req)
+
+    # Assert eventually not paused
+    async def check_unpaused() -> bool:
+        info = await assert_pending_activity_exists_eventually(handle, activity_id)
+        return not info.paused
+
+    await assert_eventually(check_unpaused)
