@@ -7644,7 +7644,7 @@ async def heartbeat_activity(
             # If we are on the second attempt, we have retried due to pause/unpause.
             if activity.info().attempt > 1:
                 return activity.cancellation_details()
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
         except (CancelledError, asyncio.CancelledError) as err:
             if not catch_err:
                 raise err
@@ -7661,7 +7661,7 @@ def sync_heartbeat_activity(
             # If we are on the second attempt, we have retried due to pause/unpause.
             if activity.info().attempt > 1:
                 return activity.cancellation_details()
-            time.sleep(1)
+            time.sleep(0.1)
         except (CancelledError, asyncio.CancelledError) as err:
             if not catch_err:
                 raise err
@@ -7756,7 +7756,7 @@ class ActivityHeartbeatPauseUnpauseWorkflow:
                 False,
                 activity_id=activity_id,
                 start_to_close_timeout=timedelta(seconds=10),
-                heartbeat_timeout=timedelta(seconds=2),
+                heartbeat_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=2),
             )
         )
@@ -7766,7 +7766,7 @@ class ActivityHeartbeatPauseUnpauseWorkflow:
                 False,
                 activity_id=f"{activity_id}-2",
                 start_to_close_timeout=timedelta(seconds=10),
-                heartbeat_timeout=timedelta(seconds=2),
+                heartbeat_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=2),
             )
         )
@@ -7781,6 +7781,8 @@ async def test_activity_pause_unpause(client: Client):
             workflows=[ActivityHeartbeatPauseUnpauseWorkflow],
             activities=[heartbeat_activity, sync_heartbeat_activity],
             activity_executor=executor,
+            max_heartbeat_throttle_interval=timedelta(milliseconds=300),
+            default_heartbeat_throttle_interval=timedelta(milliseconds=300),
         ) as worker:
             test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
 
@@ -7802,8 +7804,7 @@ async def test_activity_pause_unpause(client: Client):
 
             # Wait for next heartbeat to propagate the cancellation. Unpausing before the heartbeat
             # will show activity as unpaused to core. Consequently, it will *not* issue an activity cancel.
-            time.sleep(2)
-
+            time.sleep(0.3)
             # Unpause activity
             await unpause_and_assert(client, handle, activity_info_1.activity_id)
             # Expect second activity to have started now
@@ -7815,7 +7816,7 @@ async def test_activity_pause_unpause(client: Client):
             # Pause activity then assert it is paused
             await pause_and_assert(client, handle, activity_info_2.activity_id)
             # Wait for next heartbeat to propagate the cancellation.
-            time.sleep(2)
+            time.sleep(0.3)
             # Unpause activity
             await unpause_and_assert(client, handle, activity_info_2.activity_id)
 
