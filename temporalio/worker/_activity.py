@@ -216,10 +216,10 @@ class _ActivityWorker:
             warnings.warn(f"Cannot find activity to cancel for token {task_token!r}")
             return
         logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
-        activity.cancellation_details.set_details(
+        activity.cancellation_details.details = (
             temporalio.activity.ActivityCancellationDetails._from_proto(cancel.details)
         )
-        activity.cancel(cancelled_by_request=True)
+        activity.cancel(cancelled_by_request=cancel.details.is_cancelled)
 
     def _heartbeat(self, task_token: bytes, *details: Any) -> None:
         # We intentionally make heartbeating non-async, but since the data
@@ -311,6 +311,23 @@ class _ActivityWorker:
                         err,
                         (asyncio.CancelledError, temporalio.exceptions.CancelledError),
                     )
+                    and running_activity.cancellation_details.details
+                    and running_activity.cancellation_details.details.paused
+                ):
+                    temporalio.activity.logger.warning(
+                        f"Completing as failure due to unhandled cancel error produced by activity pause",
+                    )
+                    await self._data_converter.encode_failure(
+                        temporalio.exceptions.ApplicationError(
+                            "Unhandled activity cancel error produced by activity pause"
+                        ),
+                        completion.result.failed.failure,
+                    )
+                elif (
+                    isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    )
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
@@ -339,7 +356,6 @@ class _ActivityWorker:
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
-
                     # For broken executors, we have to fail the entire worker
                     if isinstance(err, concurrent.futures.BrokenExecutor):
                         self._fail_worker_exception_queue.put_nowait(err)

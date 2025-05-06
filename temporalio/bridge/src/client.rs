@@ -324,8 +324,13 @@ impl ClientRef {
                 "terminate_workflow_execution" => {
                     rpc_call!(retry_client, call, terminate_workflow_execution)
                 }
+<<<<<<< HEAD
                 "trigger_workflow_rule" => {
                     rpc_call!(retry_client, call, trigger_workflow_rule)
+=======
+                "unpause_activity" => {
+                    rpc_call!(retry_client, call, unpause_activity)
+>>>>>>> 7e4b2d9 (add test for pause/unpause)
                 }
                 "update_namespace" => {
                     rpc_call_on_trait!(retry_client, call, WorkflowService, update_namespace)

@@ -140,14 +140,7 @@ _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("act
 
 @dataclass
 class _ActivityCancellationDetailsHolder:
-    _details: Optional[ActivityCancellationDetails] = None
-
-    def set_details(self, details: ActivityCancellationDetails) -> None:
-        self._details = details
-
-    @property
-    def details(self) -> Optional[ActivityCancellationDetails]:
-        return self._details
+    details: Optional[ActivityCancellationDetails] = None
 
 
 @dataclass(frozen=True)
@@ -155,7 +148,7 @@ class ActivityCancellationDetails:
     """Provides the reasons for the activity's cancellation. Cancellation details are set once and do not change once set."""
 
     not_found: bool = False
-    cancelled_requested: bool = False
+    cancel_requested: bool = False
     paused: bool = False
     timed_out: bool = False
     worker_shutdown: bool = False
@@ -166,7 +159,7 @@ class ActivityCancellationDetails:
     ) -> ActivityCancellationDetails:
         return ActivityCancellationDetails(
             not_found=proto.is_not_found,
-            cancelled_requested=proto.is_cancelled,
+            cancel_requested=proto.is_cancelled,
             paused=proto.is_paused,
             timed_out=proto.is_timed_out,
             worker_shutdown=proto.is_worker_shutdown,

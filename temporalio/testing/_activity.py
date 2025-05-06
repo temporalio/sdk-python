@@ -74,8 +74,8 @@ class ActivityEnvironment:
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
-        self.cancellation_details: (
-            temporalio.activity._ActivityCancellationDetailsHolder
+        self._cancellation_details = (
+            temporalio.activity._ActivityCancellationDetailsHolder()
         )
 
     def cancel(
@@ -97,7 +97,7 @@ class ActivityEnvironment:
             return
         self._cancelled = True
         if cancellation_details:
-            self.cancellation_details.set_details(cancellation_details)
+            self._cancellation_details.details = cancellation_details
         for act in self._activities:
             act.cancel()
 
@@ -169,7 +169,7 @@ class _Activity:
             else self.cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=env.payload_converter,
             runtime_metric_meter=env.metric_meter,
-            cancellation_details=env.cancellation_details,
+            cancellation_details=env._cancellation_details,
         )
         self.task: Optional[asyncio.Task] = None
 
