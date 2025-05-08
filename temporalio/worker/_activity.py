@@ -278,63 +278,12 @@ class _ActivityWorker:
         # We choose to surround interceptor creation and activity invocation in
         # a try block so we can mark the workflow as failed on any error instead
         # of having error handling in the interceptor
-
-        # message ActivityTaskCompletion {
-        #     bytes task_token = 1;
-        #     activity_result.ActivityExecutionResult result = 2;
-        # }
-        # message ActivityExecutionResult {
-        #     oneof status {
-        #         Success completed = 1;
-        #         Failure failed = 2;
-        #         Cancellation cancelled = 3;
-        #         WillCompleteAsync will_complete_async = 4;
-        #     }
-        # }
-
         completion = temporalio.bridge.proto.ActivityTaskCompletion(
             task_token=task_token
         )
         try:
             await self._execute_activity(start, running_activity, completion)
         except BaseException as err:
-            # temporal/api/failure/v1/
-            # message Failure {
-            #     string message = 1;
-            #     // The source this Failure originated in, e.g. TypeScriptSDK / JavaSDK
-            #     // In some SDKs this is used to rehydrate the stack trace into an exception object.
-            #     string source = 2;
-            #     string stack_trace = 3;
-            #     // Alternative way to supply `message` and `stack_trace` and possibly other attributes, used for encryption of
-            #     // errors originating in user code which might contain sensitive information.
-            #     // The `encoded_attributes` Payload could represent any serializable object, e.g. JSON object or a `Failure` proto
-            #     // message.
-            #     //
-            #     // SDK authors:
-            #     // - The SDK should provide a default `encodeFailureAttributes` and `decodeFailureAttributes` implementation that:
-            #     //   - Uses a JSON object to represent `{ message, stack_trace }`.
-            #     //   - Overwrites the original message with "Encoded failure" to indicate that more information could be extracted.
-            #     //   - Overwrites the original stack_trace with an empty string.
-            #     //   - The resulting JSON object is converted to Payload using the default PayloadConverter and should be processed
-            #     //     by the user-provided PayloadCodec
-            #     //
-            #     // - If there's demand, we could allow overriding the default SDK implementation to encode other opaque Failure attributes.
-            #     // (-- api-linter: core::0203::optional=disabled --)
-            #     temporal.api.common.v1.Payload encoded_attributes = 20;
-            #     Failure cause = 4;
-            #     oneof failure_info {
-            #         ApplicationFailureInfo application_failure_info = 5;
-            #         TimeoutFailureInfo timeout_failure_info = 6;
-            #         CanceledFailureInfo canceled_failure_info = 7;
-            #         TerminatedFailureInfo terminated_failure_info = 8;
-            #         ServerFailureInfo server_failure_info = 9;
-            #         ResetWorkflowFailureInfo reset_workflow_failure_info = 10;
-            #         ActivityFailureInfo activity_failure_info = 11;
-            #         ChildWorkflowExecutionFailureInfo child_workflow_execution_failure_info = 12;
-            #         NexusOperationFailureInfo nexus_operation_execution_failure_info = 13;
-            #         NexusHandlerFailureInfo nexus_handler_failure_info = 14;
-            #     }
-            # }
             try:
                 if isinstance(err, temporalio.activity._CompleteAsyncError):
                     temporalio.activity.logger.debug("Completing asynchronously")
