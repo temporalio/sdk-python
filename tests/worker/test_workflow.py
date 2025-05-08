@@ -7422,6 +7422,7 @@ async def test_workflow_dynamic_config_failure(client: Client):
             handle, message_contains="Dynamic config failure"
         )
 
+
 async def test_workflow_missing_local_activity(client: Client):
     async with new_worker(
         client, SimpleLocalActivityWorkflow, activities=[custom_error_activity]
@@ -7434,12 +7435,16 @@ async def test_workflow_missing_local_activity(client: Client):
         )
 
         await assert_task_fail_eventually(
-            handle, message_contains="Activity function say_hello is not registered on this worker, available activities: custom_error_activity"
+            handle,
+            message_contains="Activity function say_hello is not registered on this worker, available activities: custom_error_activity",
         )
+
 
 async def test_workflow_missing_local_activity_but_dynamic(client: Client):
     async with new_worker(
-        client, SimpleLocalActivityWorkflow, activities=[custom_error_activity, return_name_activity]
+        client,
+        SimpleLocalActivityWorkflow,
+        activities=[custom_error_activity, return_name_activity],
     ) as worker:
         res = await client.execute_workflow(
             SimpleLocalActivityWorkflow.run,
