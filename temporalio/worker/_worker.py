@@ -427,7 +427,7 @@ class Worker:
                 on_eviction_hook=None,
                 disable_safe_eviction=disable_safe_workflow_eviction,
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
-                assert_activity_valid=check_activity,
+                assert_local_activity_valid=check_activity,
             )
 
         if tuner is not None:

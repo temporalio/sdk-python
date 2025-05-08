@@ -138,7 +138,6 @@ class WorkflowInstanceDetails:
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
-    assert_activity_valid: Callable[[str], None]
 
 
 class WorkflowInstance(ABC):
@@ -341,8 +340,6 @@ class _WorkflowInstanceImpl(
         self._dynamic_failure_exception_types: Optional[
             Sequence[type[BaseException]]
         ] = None
-
-        self._assert_activity_valid = det.assert_activity_valid
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
@@ -1353,7 +1350,9 @@ class _WorkflowInstanceImpl(
         else:
             raise TypeError("Activity must be a string or callable")
 
-        self._assert_activity_valid(name)
+        cast(_WorkflowExternFunctions, self._extern_functions)[
+            "__temporal_assert_local_activity_valid"
+        ](name)
 
         return self._outbound.start_local_activity(
             StartLocalActivityInput(
@@ -2864,6 +2863,7 @@ def _encode_search_attributes(
 
 class _WorkflowExternFunctions(TypedDict):
     __temporal_get_metric_meter: Callable[[], temporalio.common.MetricMeter]
+    __temporal_assert_local_activity_valid: Callable[[str], None]
 
 
 class _ReplaySafeMetricMeter(temporalio.common.MetricMeter):
