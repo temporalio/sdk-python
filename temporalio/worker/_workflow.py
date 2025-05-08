@@ -78,6 +78,7 @@ class _WorkflowWorker:
         ],
         disable_safe_eviction: bool,
         should_enforce_versioning_behavior: bool,
+        assert_activity_valid: Callable[[str], None]
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -112,6 +113,7 @@ class _WorkflowWorker:
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
         self._throw_after_activation: Optional[Exception] = None
+        self._assert_activity_valid = assert_activity_valid
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
         # deadlock detection, otherwise set to 2 seconds
@@ -548,6 +550,7 @@ class _WorkflowWorker:
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
+            assert_activity_valid=self._assert_activity_valid
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)
