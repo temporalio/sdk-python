@@ -532,6 +532,19 @@ class _ActivityWorker:
         except Exception:
             temporalio.activity.logger.exception("Failed completing activity task")
 
+    def assert_activity_valid(self, activity) -> Optional[str]:
+        activity_def = self._activities.get(activity)
+        if self._dynamic_activity:
+            return None
+        if not activity_def:
+            activity_names = ", ".join(sorted(self._activities.keys()))
+            raise ValueError(
+                f"Activity function {activity} "
+                f"is not registered on this worker, available activities: {activity_names}",
+            )
+
+        return None
+
 
 @dataclass
 class _RunningActivity:

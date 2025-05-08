@@ -138,6 +138,7 @@ class WorkflowInstanceDetails:
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
+    assert_activity_valid: Callable[[str], None]
 
 
 class WorkflowInstance(ABC):
@@ -340,6 +341,8 @@ class _WorkflowInstanceImpl(
         self._dynamic_failure_exception_types: Optional[
             Sequence[type[BaseException]]
         ] = None
+
+        self._assert_activity_valid = det.assert_activity_valid
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
@@ -1349,6 +1352,8 @@ class _WorkflowInstanceImpl(
             ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
+
+        self._assert_activity_valid(name)
 
         return self._outbound.start_local_activity(
             StartLocalActivityInput(
