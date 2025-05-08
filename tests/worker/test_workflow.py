@@ -7454,3 +7454,22 @@ async def test_workflow_missing_local_activity_but_dynamic(client: Client):
         )
 
         assert res == "say_hello"
+
+
+async def test_workflow_missing_local_activity_no_activities(client: Client):
+    async with new_worker(
+        client,
+        SimpleLocalActivityWorkflow,
+        activities=[],
+    ) as worker:
+        handle = await client.start_workflow(
+            SimpleLocalActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        await assert_task_fail_eventually(
+            handle,
+            message_contains="Activity function say_hello is not registered on this worker, no available activities",
+        )
