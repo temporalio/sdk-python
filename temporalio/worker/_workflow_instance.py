@@ -218,8 +218,11 @@ class _WorkflowInstanceImpl(
         self._current_history_length = 0
         self._current_history_size = 0
         self._continue_as_new_suggested = False
+        self._raw_memo: Optional[
+            MutableMapping[str, temporalio.api.common.v1.Payload]
+        ] = dict(self._info.raw_memo.items())
         # Lazily loaded
-        self._memo: Optional[Mapping[str, Any]] = None
+        self._untyped_converted_memo: Optional[Mapping[str, Any]] = None
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
@@ -1066,24 +1069,50 @@ class _WorkflowInstanceImpl(
         return self._is_replaying
 
     def workflow_memo(self) -> Mapping[str, Any]:
-        if self._memo is None:
-            self._memo = {
-                k: self._payload_converter.from_payloads([v])[0]
-                for k, v in self._info.raw_memo.items()
+        if self._untyped_converted_memo is None:
+            self._untyped_converted_memo = {
+                k: self._payload_converter.from_payload(v)
+                for k, v in self._raw_memo.items()
             }
-        return self._memo
+        return self._untyped_converted_memo
 
     def workflow_memo_value(
         self, key: str, default: Any, *, type_hint: Optional[Type]
     ) -> Any:
-        payload = self._info.raw_memo.get(key)
+        payload = self._raw_memo.get(key)
         if not payload:
             if default is temporalio.common._arg_unset:
                 raise KeyError(f"Memo does not have a value for key {key}")
             return default
-        return self._payload_converter.from_payloads(
-            [payload], [type_hint] if type_hint else None
-        )[0]
+        return self._payload_converter.from_payload(payload, type_hint)
+
+    def workflow_upsert_memo(self, updates: Mapping[str, Any]) -> None:
+        # Converting before creating a command so that we don't leave a partial command in case of conversion failure.
+        update_payloads = {}
+        removals = []
+        for k, v in updates.items():
+            if v is None:
+                # Intentionally not checking if memo exists, so that no-op removals show up in history too.
+                removals.append(k)
+            else:
+                update_payloads[k] = self._payload_converter.to_payload(v)
+
+        if not update_payloads and not removals:
+            return
+
+        command = self._add_command()
+        fields = command.modify_workflow_properties.upserted_memo.fields
+
+        for k, v in update_payloads.items():
+            fields[k].CopyFrom(v)
+            self._raw_memo[k] = v
+
+        for k in removals:
+            fields.get_or_create(k)
+            self._raw_memo.pop(k, None)
+
+        # Clearing cached value, will be regenerated on next workflow_memo() call.
+        self._untyped_converted_memo = None
 
     def workflow_metric_meter(self) -> temporalio.common.MetricMeter:
         # Create if not present, which means using an extern function
