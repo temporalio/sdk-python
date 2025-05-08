@@ -448,13 +448,13 @@ class Worker:
             build_id = build_id or load_default_build_id()
             versioning_strategy = (
                 temporalio.bridge.worker.WorkerVersioningStrategyLegacyBuildIdBased(
-                    build_id=build_id
+                    build_id_with_versioning=build_id
                 )
             )
         else:
             build_id = build_id or load_default_build_id()
             versioning_strategy = temporalio.bridge.worker.WorkerVersioningStrategyNone(
-                build_id=build_id
+                build_id_no_versioning=build_id
             )
 
         if max_concurrent_workflow_task_polls:
