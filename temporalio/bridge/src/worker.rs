@@ -108,7 +108,7 @@ pub enum WorkerVersioningStrategy {
 
 #[derive(FromPyObject)]
 pub struct WorkerVersioningNone {
-    pub build_id: String,
+    pub build_id_no_versioning: String,
 }
 
 /// Recreates [temporal_sdk_core_api::worker::WorkerDeploymentOptions]
@@ -122,7 +122,7 @@ pub struct WorkerDeploymentOptions {
 
 #[derive(FromPyObject)]
 pub struct LegacyBuildIdBased {
-    pub build_id: String,
+    pub build_id_with_versioning: String,
 }
 
 /// Recreates [temporal_sdk_core_api::worker::WorkerDeploymentVersion]
@@ -803,7 +803,7 @@ fn convert_versioning_strategy(
     match strategy {
         WorkerVersioningStrategy::None(vn) => {
             temporal_sdk_core_api::worker::WorkerVersioningStrategy::None {
-                build_id: vn.build_id,
+                build_id: vn.build_id_no_versioning,
             }
         }
         WorkerVersioningStrategy::DeploymentBased(options) => {
@@ -825,7 +825,7 @@ fn convert_versioning_strategy(
         }
         WorkerVersioningStrategy::LegacyBuildIdBased(lb) => {
             temporal_sdk_core_api::worker::WorkerVersioningStrategy::LegacyBuildIdBased {
-                build_id: lb.build_id,
+                build_id: lb.build_id_with_versioning,
             }
         }
     }
