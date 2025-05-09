@@ -26,7 +26,11 @@ async def test_activity_env_async():
             await asyncio.Future()
             raise RuntimeError("Unreachable")
         except asyncio.CancelledError:
-            activity.heartbeat("cancelled")
+            cancellation_details = activity.cancellation_details()
+            if cancellation_details:
+                activity.heartbeat(
+                    f"cancelled={cancellation_details.cancel_requested}",
+                )
         return "done"
 
     env = ActivityEnvironment()
@@ -37,9 +41,11 @@ async def test_activity_env_async():
     task = asyncio.create_task(env.run(do_stuff, "param1"))
     await waiting.wait()
     # Cancel and confirm done
-    env.cancel()
+    env.cancel(
+        cancellation_details=activity.ActivityCancellationDetails(cancel_requested=True)
+    )
     assert "done" == await task
-    assert heartbeats == ["param: param1", "task, type: unknown", "cancelled"]
+    assert heartbeats == ["param: param1", "task, type: unknown", "cancelled=True"]
 
 
 def test_activity_env_sync():
@@ -72,7 +78,11 @@ def test_activity_env_sync():
                     raise RuntimeError("Unexpected")
         except CancelledError:
             nonlocal properly_cancelled
-            properly_cancelled = True
+            cancellation_details = activity.cancellation_details()
+            if cancellation_details:
+                properly_cancelled = cancellation_details.cancel_requested
+            else:
+                properly_cancelled = False
 
     env = ActivityEnvironment()
     # Set heartbeat handler to add to list
@@ -84,7 +94,9 @@ def test_activity_env_sync():
     waiting.wait()
     # Cancel and confirm done
     time.sleep(1)
-    env.cancel()
+    env.cancel(
+        cancellation_details=activity.ActivityCancellationDetails(cancel_requested=True)
+    )
     thread.join()
     assert heartbeats == ["param: param1", "task, type: unknown"]
     assert properly_cancelled

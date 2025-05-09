@@ -20,6 +20,9 @@ from temporalio.api.common.v1 import (
     message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
 )
 from temporalio.api.enums.v1 import (
+    common_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_common__pb2,
+)
+from temporalio.api.enums.v1 import (
     nexus_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_nexus__pb2,
 )
 from temporalio.api.enums.v1 import (
@@ -27,7 +30,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n%temporal/api/failure/v1/message.proto\x12\x17temporal.api.failure.v1\x1a$temporal/api/common/v1/message.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a!temporal/api/enums/v1/nexus.proto\x1a\x1egoogle/protobuf/duration.proto"\xa5\x01\n\x16\x41pplicationFailureInfo\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x15\n\rnon_retryable\x18\x02 \x01(\x08\x12\x31\n\x07\x64\x65tails\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x33\n\x10next_retry_delay\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration"\x90\x01\n\x12TimeoutFailureInfo\x12\x38\n\x0ctimeout_type\x18\x01 \x01(\x0e\x32".temporal.api.enums.v1.TimeoutType\x12@\n\x16last_heartbeat_details\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"H\n\x13\x43\x61nceledFailureInfo\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\x17\n\x15TerminatedFailureInfo"*\n\x11ServerFailureInfo\x12\x15\n\rnon_retryable\x18\x01 \x01(\x08"\\\n\x18ResetWorkflowFailureInfo\x12@\n\x16last_heartbeat_details\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\xe7\x01\n\x13\x41\x63tivityFailureInfo\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03\x12\x18\n\x10started_event_id\x18\x02 \x01(\x03\x12\x10\n\x08identity\x18\x03 \x01(\t\x12;\n\ractivity_type\x18\x04 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x13\n\x0b\x61\x63tivity_id\x18\x05 \x01(\t\x12\x36\n\x0bretry_state\x18\x06 \x01(\x0e\x32!.temporal.api.enums.v1.RetryState"\xa8\x02\n!ChildWorkflowExecutionFailureInfo\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x1a\n\x12initiated_event_id\x18\x04 \x01(\x03\x12\x18\n\x10started_event_id\x18\x05 \x01(\x03\x12\x36\n\x0bretry_state\x18\x06 \x01(\x0e\x32!.temporal.api.enums.v1.RetryState"\x9c\x01\n\x19NexusOperationFailureInfo\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03\x12\x10\n\x08\x65ndpoint\x18\x02 \x01(\t\x12\x0f\n\x07service\x18\x03 \x01(\t\x12\x11\n\toperation\x18\x04 \x01(\t\x12\x14\n\x0coperation_id\x18\x05 \x01(\t\x12\x17\n\x0foperation_token\x18\x06 \x01(\t"v\n\x17NexusHandlerFailureInfo\x12\x0c\n\x04type\x18\x01 \x01(\t\x12M\n\x0eretry_behavior\x18\x02 \x01(\x0e\x32\x35.temporal.api.enums.v1.NexusHandlerErrorRetryBehavior"\xa0\x08\n\x07\x46\x61ilure\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x0e\n\x06source\x18\x02 \x01(\t\x12\x13\n\x0bstack_trace\x18\x03 \x01(\t\x12;\n\x12\x65ncoded_attributes\x18\x14 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12/\n\x05\x63\x61use\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12S\n\x18\x61pplication_failure_info\x18\x05 \x01(\x0b\x32/.temporal.api.failure.v1.ApplicationFailureInfoH\x00\x12K\n\x14timeout_failure_info\x18\x06 \x01(\x0b\x32+.temporal.api.failure.v1.TimeoutFailureInfoH\x00\x12M\n\x15\x63\x61nceled_failure_info\x18\x07 \x01(\x0b\x32,.temporal.api.failure.v1.CanceledFailureInfoH\x00\x12Q\n\x17terminated_failure_info\x18\x08 \x01(\x0b\x32..temporal.api.failure.v1.TerminatedFailureInfoH\x00\x12I\n\x13server_failure_info\x18\t \x01(\x0b\x32*.temporal.api.failure.v1.ServerFailureInfoH\x00\x12X\n\x1breset_workflow_failure_info\x18\n \x01(\x0b\x32\x31.temporal.api.failure.v1.ResetWorkflowFailureInfoH\x00\x12M\n\x15\x61\x63tivity_failure_info\x18\x0b \x01(\x0b\x32,.temporal.api.failure.v1.ActivityFailureInfoH\x00\x12k\n%child_workflow_execution_failure_info\x18\x0c \x01(\x0b\x32:.temporal.api.failure.v1.ChildWorkflowExecutionFailureInfoH\x00\x12\x64\n&nexus_operation_execution_failure_info\x18\r \x01(\x0b\x32\x32.temporal.api.failure.v1.NexusOperationFailureInfoH\x00\x12V\n\x1anexus_handler_failure_info\x18\x0e \x01(\x0b\x32\x30.temporal.api.failure.v1.NexusHandlerFailureInfoH\x00\x42\x0e\n\x0c\x66\x61ilure_info" \n\x1eMultiOperationExecutionAbortedB\x8e\x01\n\x1aio.temporal.api.failure.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/failure/v1;failure\xaa\x02\x19Temporalio.Api.Failure.V1\xea\x02\x1cTemporalio::Api::Failure::V1b\x06proto3'
+    b'\n%temporal/api/failure/v1/message.proto\x12\x17temporal.api.failure.v1\x1a$temporal/api/common/v1/message.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a!temporal/api/enums/v1/nexus.proto\x1a"temporal/api/enums/v1/common.proto\x1a\x1egoogle/protobuf/duration.proto"\xe8\x01\n\x16\x41pplicationFailureInfo\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x15\n\rnon_retryable\x18\x02 \x01(\x08\x12\x31\n\x07\x64\x65tails\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x33\n\x10next_retry_delay\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x41\n\x08\x63\x61tegory\x18\x05 \x01(\x0e\x32/.temporal.api.enums.v1.ApplicationErrorCategory"\x90\x01\n\x12TimeoutFailureInfo\x12\x38\n\x0ctimeout_type\x18\x01 \x01(\x0e\x32".temporal.api.enums.v1.TimeoutType\x12@\n\x16last_heartbeat_details\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"H\n\x13\x43\x61nceledFailureInfo\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\x17\n\x15TerminatedFailureInfo"*\n\x11ServerFailureInfo\x12\x15\n\rnon_retryable\x18\x01 \x01(\x08"\\\n\x18ResetWorkflowFailureInfo\x12@\n\x16last_heartbeat_details\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\xe7\x01\n\x13\x41\x63tivityFailureInfo\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03\x12\x18\n\x10started_event_id\x18\x02 \x01(\x03\x12\x10\n\x08identity\x18\x03 \x01(\t\x12;\n\ractivity_type\x18\x04 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x13\n\x0b\x61\x63tivity_id\x18\x05 \x01(\t\x12\x36\n\x0bretry_state\x18\x06 \x01(\x0e\x32!.temporal.api.enums.v1.RetryState"\xa8\x02\n!ChildWorkflowExecutionFailureInfo\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x1a\n\x12initiated_event_id\x18\x04 \x01(\x03\x12\x18\n\x10started_event_id\x18\x05 \x01(\x03\x12\x36\n\x0bretry_state\x18\x06 \x01(\x0e\x32!.temporal.api.enums.v1.RetryState"\x9c\x01\n\x19NexusOperationFailureInfo\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03\x12\x10\n\x08\x65ndpoint\x18\x02 \x01(\t\x12\x0f\n\x07service\x18\x03 \x01(\t\x12\x11\n\toperation\x18\x04 \x01(\t\x12\x14\n\x0coperation_id\x18\x05 \x01(\t\x12\x17\n\x0foperation_token\x18\x06 \x01(\t"v\n\x17NexusHandlerFailureInfo\x12\x0c\n\x04type\x18\x01 \x01(\t\x12M\n\x0eretry_behavior\x18\x02 \x01(\x0e\x32\x35.temporal.api.enums.v1.NexusHandlerErrorRetryBehavior"\xa0\x08\n\x07\x46\x61ilure\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x0e\n\x06source\x18\x02 \x01(\t\x12\x13\n\x0bstack_trace\x18\x03 \x01(\t\x12;\n\x12\x65ncoded_attributes\x18\x14 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12/\n\x05\x63\x61use\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12S\n\x18\x61pplication_failure_info\x18\x05 \x01(\x0b\x32/.temporal.api.failure.v1.ApplicationFailureInfoH\x00\x12K\n\x14timeout_failure_info\x18\x06 \x01(\x0b\x32+.temporal.api.failure.v1.TimeoutFailureInfoH\x00\x12M\n\x15\x63\x61nceled_failure_info\x18\x07 \x01(\x0b\x32,.temporal.api.failure.v1.CanceledFailureInfoH\x00\x12Q\n\x17terminated_failure_info\x18\x08 \x01(\x0b\x32..temporal.api.failure.v1.TerminatedFailureInfoH\x00\x12I\n\x13server_failure_info\x18\t \x01(\x0b\x32*.temporal.api.failure.v1.ServerFailureInfoH\x00\x12X\n\x1breset_workflow_failure_info\x18\n \x01(\x0b\x32\x31.temporal.api.failure.v1.ResetWorkflowFailureInfoH\x00\x12M\n\x15\x61\x63tivity_failure_info\x18\x0b \x01(\x0b\x32,.temporal.api.failure.v1.ActivityFailureInfoH\x00\x12k\n%child_workflow_execution_failure_info\x18\x0c \x01(\x0b\x32:.temporal.api.failure.v1.ChildWorkflowExecutionFailureInfoH\x00\x12\x64\n&nexus_operation_execution_failure_info\x18\r \x01(\x0b\x32\x32.temporal.api.failure.v1.NexusOperationFailureInfoH\x00\x12V\n\x1anexus_handler_failure_info\x18\x0e \x01(\x0b\x32\x30.temporal.api.failure.v1.NexusHandlerFailureInfoH\x00\x42\x0e\n\x0c\x66\x61ilure_info" \n\x1eMultiOperationExecutionAbortedB\x8e\x01\n\x1aio.temporal.api.failure.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/failure/v1;failure\xaa\x02\x19Temporalio.Api.Failure.V1\xea\x02\x1cTemporalio::Api::Failure::V1b\x06proto3'
 )
 
 
@@ -184,28 +187,28 @@ _sym_db.RegisterMessage(MultiOperationExecutionAborted)
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.failure.v1B\014MessageProtoP\001Z%go.temporal.io/api/failure/v1;failure\252\002\031Temporalio.Api.Failure.V1\352\002\034Temporalio::Api::Failure::V1"
-    _APPLICATIONFAILUREINFO._serialized_start = 210
-    _APPLICATIONFAILUREINFO._serialized_end = 375
-    _TIMEOUTFAILUREINFO._serialized_start = 378
-    _TIMEOUTFAILUREINFO._serialized_end = 522
-    _CANCELEDFAILUREINFO._serialized_start = 524
-    _CANCELEDFAILUREINFO._serialized_end = 596
-    _TERMINATEDFAILUREINFO._serialized_start = 598
-    _TERMINATEDFAILUREINFO._serialized_end = 621
-    _SERVERFAILUREINFO._serialized_start = 623
-    _SERVERFAILUREINFO._serialized_end = 665
-    _RESETWORKFLOWFAILUREINFO._serialized_start = 667
-    _RESETWORKFLOWFAILUREINFO._serialized_end = 759
-    _ACTIVITYFAILUREINFO._serialized_start = 762
-    _ACTIVITYFAILUREINFO._serialized_end = 993
-    _CHILDWORKFLOWEXECUTIONFAILUREINFO._serialized_start = 996
-    _CHILDWORKFLOWEXECUTIONFAILUREINFO._serialized_end = 1292
-    _NEXUSOPERATIONFAILUREINFO._serialized_start = 1295
-    _NEXUSOPERATIONFAILUREINFO._serialized_end = 1451
-    _NEXUSHANDLERFAILUREINFO._serialized_start = 1453
-    _NEXUSHANDLERFAILUREINFO._serialized_end = 1571
-    _FAILURE._serialized_start = 1574
-    _FAILURE._serialized_end = 2630
-    _MULTIOPERATIONEXECUTIONABORTED._serialized_start = 2632
-    _MULTIOPERATIONEXECUTIONABORTED._serialized_end = 2664
+    _APPLICATIONFAILUREINFO._serialized_start = 246
+    _APPLICATIONFAILUREINFO._serialized_end = 478
+    _TIMEOUTFAILUREINFO._serialized_start = 481
+    _TIMEOUTFAILUREINFO._serialized_end = 625
+    _CANCELEDFAILUREINFO._serialized_start = 627
+    _CANCELEDFAILUREINFO._serialized_end = 699
+    _TERMINATEDFAILUREINFO._serialized_start = 701
+    _TERMINATEDFAILUREINFO._serialized_end = 724
+    _SERVERFAILUREINFO._serialized_start = 726
+    _SERVERFAILUREINFO._serialized_end = 768
+    _RESETWORKFLOWFAILUREINFO._serialized_start = 770
+    _RESETWORKFLOWFAILUREINFO._serialized_end = 862
+    _ACTIVITYFAILUREINFO._serialized_start = 865
+    _ACTIVITYFAILUREINFO._serialized_end = 1096
+    _CHILDWORKFLOWEXECUTIONFAILUREINFO._serialized_start = 1099
+    _CHILDWORKFLOWEXECUTIONFAILUREINFO._serialized_end = 1395
+    _NEXUSOPERATIONFAILUREINFO._serialized_start = 1398
+    _NEXUSOPERATIONFAILUREINFO._serialized_end = 1554
+    _NEXUSHANDLERFAILUREINFO._serialized_start = 1556
+    _NEXUSHANDLERFAILUREINFO._serialized_end = 1674
+    _FAILURE._serialized_start = 1677
+    _FAILURE._serialized_end = 2733
+    _MULTIOPERATIONEXECUTIONABORTED._serialized_start = 2735
+    _MULTIOPERATIONEXECUTIONABORTED._serialized_end = 2767
 # @@protoc_insertion_point(module_scope)

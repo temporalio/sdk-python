@@ -223,6 +223,9 @@ impl ClientRef {
                 "patch_schedule" => {
                     rpc_call!(retry_client, call, patch_schedule)
                 }
+                "pause_activity" => {
+                    rpc_call!(retry_client, call, pause_activity)
+                }
                 "poll_activity_task_queue" => {
                     rpc_call!(retry_client, call, poll_activity_task_queue)
                 }
@@ -309,6 +312,9 @@ impl ClientRef {
                 }
                 "terminate_workflow_execution" => {
                     rpc_call!(retry_client, call, terminate_workflow_execution)
+                }
+                "unpause_activity" => {
+                    rpc_call!(retry_client, call, unpause_activity)
                 }
                 "update_namespace" => {
                     rpc_call_on_trait!(retry_client, call, WorkflowService, update_namespace)
