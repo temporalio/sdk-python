@@ -7,6 +7,9 @@ import inspect
 import os
 import time
 import uuid
+
+# This used to fail because our __init__ couldn't handle metaclass init
+import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
@@ -36,9 +39,6 @@ global_state = ["global orig"]
 # We just access os.name in here to show we _can_. It's access-restricted at
 # runtime only
 _ = os.name
-
-# This used to fail because our __init__ couldn't handle metaclass init
-import zipfile
 
 
 class MyZipFile(zipfile.ZipFile):

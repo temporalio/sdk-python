@@ -626,7 +626,7 @@ class Worker:
                 if self._config["on_fatal_error"]:
                     try:
                         await self._config["on_fatal_error"](exception)
-                    except:
+                    except BaseException:
                         logger.warning("Fatal error handler failed")
 
         except asyncio.CancelledError as user_cancel_err:
@@ -682,7 +682,7 @@ class Worker:
         # Do final shutdown
         try:
             await self._bridge_worker.finalize_shutdown()
-        except:
+        except BaseException:
             # Ignore errors here that can arise in some tests where the bridge
             # worker still has a reference
             pass
