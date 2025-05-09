@@ -1,12 +1,14 @@
 from .batch_operation_pb2 import BatchOperationState, BatchOperationType
 from .command_type_pb2 import CommandType
 from .common_pb2 import (
+    ApplicationErrorCategory,
     CallbackState,
     EncodingType,
     IndexedValueType,
     NexusOperationCancellationState,
     PendingNexusOperationState,
     Severity,
+    WorkflowRuleActionScope,
 )
 from .deployment_pb2 import (
     DeploymentReachability,
@@ -50,6 +52,7 @@ from .workflow_pb2 import (
 )
 
 __all__ = [
+    "ApplicationErrorCategory",
     "ArchivalState",
     "BatchOperationState",
     "BatchOperationType",
@@ -96,5 +99,6 @@ __all__ = [
     "WorkflowExecutionStatus",
     "WorkflowIdConflictPolicy",
     "WorkflowIdReusePolicy",
+    "WorkflowRuleActionScope",
     "WorkflowTaskFailedCause",
 ]

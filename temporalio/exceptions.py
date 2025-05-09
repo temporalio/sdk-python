@@ -70,6 +70,19 @@ class WorkflowAlreadyStartedError(FailureError):
         self.run_id = run_id
 
 
+class ApplicationErrorCategory(IntEnum):
+    """Severity category for your application error. Maps to corresponding client-side logging/metrics behaviors"""
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_UNSPECIFIED
+    )
+
+    BENIGN = int(
+        temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_BENIGN
+    )
+    """BENIGN category errors emit DEBUG level logs and do not record metrics"""
+
+
 class ApplicationError(FailureError):
     """Error raised during workflow/activity execution."""
 
@@ -80,6 +93,7 @@ class ApplicationError(FailureError):
         type: Optional[str] = None,
         non_retryable: bool = False,
         next_retry_delay: Optional[timedelta] = None,
+        category: ApplicationErrorCategory = ApplicationErrorCategory.UNSPECIFIED,
     ) -> None:
         """Initialize an application error."""
         super().__init__(
@@ -91,6 +105,7 @@ class ApplicationError(FailureError):
         self._type = type
         self._non_retryable = non_retryable
         self._next_retry_delay = next_retry_delay
+        self._category = category
 
     @property
     def details(self) -> Sequence[Any]:
@@ -120,6 +135,11 @@ class ApplicationError(FailureError):
         a delay before the next activity retry.
         """
         return self._next_retry_delay
+
+    @property
+    def category(self) -> ApplicationErrorCategory:
+        """Severity category of the application error"""
+        return self._category
 
 
 class CancelledError(FailureError):

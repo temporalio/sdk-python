@@ -310,6 +310,11 @@ class WorkflowService:
             wsv1.CreateScheduleRequest,
             wsv1.CreateScheduleResponse,
         )
+        self.create_workflow_rule = client._new_call(
+            "create_workflow_rule",
+            wsv1.CreateWorkflowRuleRequest,
+            wsv1.CreateWorkflowRuleRequest,
+        )
         self.delete_schedule = client._new_call(
             "delete_schedule",
             wsv1.DeleteScheduleRequest,
@@ -329,6 +334,11 @@ class WorkflowService:
             "delete_workflow_execution",
             wsv1.DeleteWorkflowExecutionRequest,
             wsv1.DeleteWorkflowExecutionResponse,
+        )
+        self.delete_workflow_rule = client._new_call(
+            "delete_workflow_rule",
+            wsv1.DeleteWorkflowRuleRequest,
+            wsv1.DeleteWorkflowRuleResponse,
         )
         self.describe_batch_operation = client._new_call(
             "describe_batch_operation",
@@ -374,6 +384,11 @@ class WorkflowService:
             "describe_workflow_execution",
             wsv1.DescribeWorkflowExecutionRequest,
             wsv1.DescribeWorkflowExecutionResponse,
+        )
+        self.describe_workflow_rule = client._new_call(
+            "describe_workflow_rule",
+            wsv1.DescribeWorkflowRuleRequest,
+            wsv1.DescribeWorkflowRuleResponse,
         )
         self.execute_multi_operation = client._new_call(
             "execute_multi_operation",
@@ -484,6 +499,11 @@ class WorkflowService:
             "list_workflow_executions",
             wsv1.ListWorkflowExecutionsRequest,
             wsv1.ListWorkflowExecutionsResponse,
+        )
+        self.list_workflow_rules = client._new_call(
+            "list_workflow_rules",
+            wsv1.ListWorkflowRulesRequest,
+            wsv1.ListWorkflowRulesResponse,
         )
         self.patch_schedule = client._new_call(
             "patch_schedule",
@@ -664,6 +684,11 @@ class WorkflowService:
             "terminate_workflow_execution",
             wsv1.TerminateWorkflowExecutionRequest,
             wsv1.TerminateWorkflowExecutionResponse,
+        )
+        self.trigger_workflow_rule = client._new_call(
+            "trigger_workflow_rule",
+            wsv1.TriggerWorkflowRuleRequest,
+            wsv1.TriggerWorkflowRuleResponse,
         )
         self.unpause_activity = client._new_call(
             "unpause_activity",

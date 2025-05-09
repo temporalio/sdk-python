@@ -58,6 +58,7 @@ import temporalio.api.nexus.v1.message_pb2
 import temporalio.api.protocol.v1.message_pb2
 import temporalio.api.query.v1.message_pb2
 import temporalio.api.replication.v1.message_pb2
+import temporalio.api.rules.v1.message_pb2
 import temporalio.api.schedule.v1.message_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
@@ -7349,6 +7350,7 @@ class PauseActivityRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity."""
     @property
@@ -7360,6 +7362,8 @@ class PauseActivityRequest(google.protobuf.message.Message):
     """Only the activity with this ID will be paused."""
     type: builtins.str
     """Pause all running activities of this type."""
+    reason: builtins.str
+    """Reason to pause the activity."""
     def __init__(
         self,
         *,
@@ -7368,6 +7372,7 @@ class PauseActivityRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         id: builtins.str = ...,
         type: builtins.str = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -7395,6 +7400,8 @@ class PauseActivityRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "reason",
+            b"reason",
             "type",
             b"type",
         ],
@@ -8715,3 +8722,275 @@ class GetDeploymentReachabilityResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___GetDeploymentReachabilityResponse = GetDeploymentReachabilityResponse
+
+class CreateWorkflowRuleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    FORCE_SCAN_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    @property
+    def spec(self) -> temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec:
+        """The rule specification ."""
+    force_scan: builtins.bool
+    """If true, the rule will be applied to the currently running workflows via batch job.
+    If not set , the rule will only be applied when triggering condition is satisfied.
+    visibility_query in the rule will be used to select the workflows to apply the rule to.
+    """
+    request_id: builtins.str
+    """Used to de-dupe requests. Typically should be UUID."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        spec: temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec | None = ...,
+        force_scan: builtins.bool = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "force_scan",
+            b"force_scan",
+            "namespace",
+            b"namespace",
+            "request_id",
+            b"request_id",
+            "spec",
+            b"spec",
+        ],
+    ) -> None: ...
+
+global___CreateWorkflowRuleRequest = CreateWorkflowRuleRequest
+
+class CreateWorkflowRuleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RULE_FIELD_NUMBER: builtins.int
+    JOB_ID_FIELD_NUMBER: builtins.int
+    @property
+    def rule(self) -> temporalio.api.rules.v1.message_pb2.WorkflowRule:
+        """Created rule."""
+    job_id: builtins.str
+    """Batch Job ID if force-scan flag was provided. Otherwise empty."""
+    def __init__(
+        self,
+        *,
+        rule: temporalio.api.rules.v1.message_pb2.WorkflowRule | None = ...,
+        job_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["rule", b"rule"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["job_id", b"job_id", "rule", b"rule"],
+    ) -> None: ...
+
+global___CreateWorkflowRuleResponse = CreateWorkflowRuleResponse
+
+class DescribeWorkflowRuleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    RULE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    rule_id: builtins.str
+    """User-specified ID of the rule to read. Unique within the namespace."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        rule_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace", b"namespace", "rule_id", b"rule_id"
+        ],
+    ) -> None: ...
+
+global___DescribeWorkflowRuleRequest = DescribeWorkflowRuleRequest
+
+class DescribeWorkflowRuleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RULE_FIELD_NUMBER: builtins.int
+    @property
+    def rule(self) -> temporalio.api.rules.v1.message_pb2.WorkflowRule:
+        """The rule that was read."""
+    def __init__(
+        self,
+        *,
+        rule: temporalio.api.rules.v1.message_pb2.WorkflowRule | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["rule", b"rule"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["rule", b"rule"]
+    ) -> None: ...
+
+global___DescribeWorkflowRuleResponse = DescribeWorkflowRuleResponse
+
+class DeleteWorkflowRuleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    RULE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    rule_id: builtins.str
+    """ID of the rule to delete. Unique within the namespace."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        rule_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace", b"namespace", "rule_id", b"rule_id"
+        ],
+    ) -> None: ...
+
+global___DeleteWorkflowRuleRequest = DeleteWorkflowRuleRequest
+
+class DeleteWorkflowRuleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteWorkflowRuleResponse = DeleteWorkflowRuleResponse
+
+class ListWorkflowRulesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    next_page_token: builtins.bytes
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        next_page_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace", b"namespace", "next_page_token", b"next_page_token"
+        ],
+    ) -> None: ...
+
+global___ListWorkflowRulesRequest = ListWorkflowRulesRequest
+
+class ListWorkflowRulesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RULES_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def rules(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.rules.v1.message_pb2.WorkflowRule
+    ]: ...
+    next_page_token: builtins.bytes
+    def __init__(
+        self,
+        *,
+        rules: collections.abc.Iterable[
+            temporalio.api.rules.v1.message_pb2.WorkflowRule
+        ]
+        | None = ...,
+        next_page_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "next_page_token", b"next_page_token", "rules", b"rules"
+        ],
+    ) -> None: ...
+
+global___ListWorkflowRulesResponse = ListWorkflowRulesResponse
+
+class TriggerWorkflowRuleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    EXECUTION_FIELD_NUMBER: builtins.int
+    ID_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    @property
+    def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """Execution info of the workflow which scheduled this activity"""
+    id: builtins.str
+    @property
+    def spec(self) -> temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec:
+        """Note: Rule ID and expiration date are not used in the trigger request."""
+    identity: builtins.str
+    """The identity of the client who initiated this request"""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        execution: temporalio.api.common.v1.message_pb2.WorkflowExecution | None = ...,
+        id: builtins.str = ...,
+        spec: temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec | None = ...,
+        identity: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "execution", b"execution", "id", b"id", "rule", b"rule", "spec", b"spec"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "execution",
+            b"execution",
+            "id",
+            b"id",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "rule",
+            b"rule",
+            "spec",
+            b"spec",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["rule", b"rule"]
+    ) -> typing_extensions.Literal["id", "spec"] | None: ...
+
+global___TriggerWorkflowRuleRequest = TriggerWorkflowRuleRequest
+
+class TriggerWorkflowRuleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    APPLIED_FIELD_NUMBER: builtins.int
+    applied: builtins.bool
+    """True is the rule was applied, based on the rule conditions (predicate/visibility_query)."""
+    def __init__(
+        self,
+        *,
+        applied: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["applied", b"applied"]
+    ) -> None: ...
+
+global___TriggerWorkflowRuleResponse = TriggerWorkflowRuleResponse

@@ -36,6 +36,7 @@ import google.protobuf.timestamp_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.batch_operation_pb2
 import temporalio.api.enums.v1.reset_pb2
+import temporalio.api.rules.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -392,3 +393,43 @@ class BatchOperationUnpauseActivities(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["type", "match_all"] | None: ...
 
 global___BatchOperationUnpauseActivities = BatchOperationUnpauseActivities
+
+class BatchOperationTriggerWorkflowRule(google.protobuf.message.Message):
+    """BatchOperationTriggerWorkflowRule sends TriggerWorkflowRule requests to batch workflows."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    ID_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client."""
+    id: builtins.str
+    """ID of existing rule."""
+    @property
+    def spec(self) -> temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec:
+        """Rule specification to be applied to the workflow without creating a new rule."""
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        id: builtins.str = ...,
+        spec: temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "id", b"id", "rule", b"rule", "spec", b"spec"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "id", b"id", "identity", b"identity", "rule", b"rule", "spec", b"spec"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["rule", b"rule"]
+    ) -> typing_extensions.Literal["id", "spec"] | None: ...
+
+global___BatchOperationTriggerWorkflowRule = BatchOperationTriggerWorkflowRule
