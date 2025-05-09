@@ -400,6 +400,15 @@ class Worker:
                 and deployment_config.default_versioning_behavior
                 == temporalio.common.VersioningBehavior.UNSPECIFIED
             )
+
+            def check_activity(activity):
+                if self._activity_worker is None:
+                    raise ValueError(
+                        f"Activity function {activity} "
+                        f"is not registered on this worker, no available activities.",
+                    )
+                self._activity_worker.assert_activity_valid(activity)
+
             self._workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 namespace=client.namespace,
@@ -418,6 +427,7 @@ class Worker:
                 on_eviction_hook=None,
                 disable_safe_eviction=disable_safe_workflow_eviction,
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
+                assert_local_activity_valid=check_activity,
             )
 
         if tuner is not None:
