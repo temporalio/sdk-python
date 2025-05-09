@@ -32,8 +32,7 @@ class MyServiceHandler:
     async def echo(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
-        # Custom header assertion removed temporarily due to headers not being populated in options.headers
-        # assert options.headers.get("test") == "true", "Custom header 'Test' not received or incorrect."
+        assert options.headers["test-header-key"] == "test-header-value"
         return Output(value=f"from handler: {input.value}")
 
 
@@ -57,7 +56,7 @@ async def test_sync_operation_direct_http_invocation(http_test_env: Tuple[Client
                 json={"value": "hello"},
                 headers={
                     "Content-Type": "application/json",
-                    "Test": "true",
+                    "Test-Header-Key": "test-header-value",
                     "Nexus-Link": '<http://test/>; type="test"',
                 },
             )
