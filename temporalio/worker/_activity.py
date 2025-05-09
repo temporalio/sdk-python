@@ -412,6 +412,9 @@ class _ActivityWorker:
                 workflow_run_id=start.workflow_execution.run_id,
                 workflow_type=start.workflow_type,
                 priority=temporalio.common.Priority._from_proto(start.priority),
+                retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
+                if start.HasField("retry_policy")
+                else None,
             )
             running_activity.info = info
             input = ExecuteActivityInput(
