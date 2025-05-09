@@ -31,6 +31,7 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 # TODO(dan): test availability of Temporal client etc in async context set by worker
 # TODO(dan): test worker shutdown, wait_all_completed, drain etc
@@ -947,28 +948,6 @@ async def test_service_interface_and_implementation_names(client: Client):
 # TODO(dan): test service impls and interfaces with and without names, conflicting names, etc.
 # TODO(dan): test impl used without interface
 # TODO(dan): test empty service impl/interface names
-
-
-def make_nexus_endpoint_name(task_queue: str) -> str:
-    # Create endpoints for different task queues without name collisions.
-    return f"nexus-endpoint-{task_queue}"
-
-
-async def create_nexus_endpoint(task_queue: str, client: Client) -> None:
-    name = make_nexus_endpoint_name(task_queue)
-    await client.operator_service.create_nexus_endpoint(
-        temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
-            spec=temporalio.api.nexus.v1.EndpointSpec(
-                name=name,
-                target=temporalio.api.nexus.v1.EndpointTarget(
-                    worker=temporalio.api.nexus.v1.EndpointTarget.Worker(
-                        namespace=client.namespace,
-                        task_queue=task_queue,
-                    )
-                ),
-            )
-        )
-    )
 
 
 async def assert_caller_workflow_has_link_to_handler_workflow(
