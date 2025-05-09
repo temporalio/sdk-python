@@ -136,7 +136,7 @@ class _NexusWorker:
             if task.HasField("task"):
                 if task.task.request.HasField("start_operation"):
                     await self._handle_start_operation(
-                        task.task.request.start_operation, task.task.task_token
+                        task.task.request, task.task.task_token
                     )
                 elif task.task.request.HasField("cancel_operation"):
                     await self._handle_cancel_operation(
@@ -177,31 +177,35 @@ class _NexusWorker:
     # TODO(dan): is it correct to import from temporalio.api.nexus?
     # Why are these things not exposed in temporalio.bridge?
     async def _handle_start_operation(
-        self, request: temporalio.api.nexus.v1.StartOperationRequest, task_token: bytes
+        self,
+        request: temporalio.api.nexus.v1.Request,
+        task_token: bytes,
     ) -> None:
-        operation = self._get_operation(request)
+        start_request = request.start_operation
+        operation = self._get_operation(start_request)
 
         print(
-            f"🟠 Starting operation {request.operation} with payload {request.payload}"
+            f"🟠 Starting operation {start_request.operation} with payload {start_request.payload}"
         )
 
         # TODO(dan): HACK. See activity_def.arg_types in _activity.py
         arg_types, _ = temporalio.common._type_hints_from_func(operation.start)
 
         [input] = await self._data_converter.decode(
-            [request.payload],
+            [start_request.payload],
             type_hints=[arg_types[0]] if arg_types else None,
         )
 
-        # TODO(dan): header
         options = nexusrpc.handler.StartOperationOptions(
-            callback_url=request.callback,
+            headers=dict(request.header),
+            callback_url=start_request.callback,
             links=[
-                nexusrpc.handler.Link(url=l.url, type=l.type) for l in request.links
+                nexusrpc.handler.Link(url=l.url, type=l.type)
+                for l in start_request.links
             ],
-            callback_header=dict(request.callback_header),
+            callback_header=dict(start_request.callback_header),
         )
-        for l in request.links:
+        for l in start_request.links:
             print(
                 f"🌈@@ worker received task with link: {google.protobuf.json_format.MessageToJson(l)}"
             )
