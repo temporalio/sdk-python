@@ -16,9 +16,11 @@ def make_nexus_endpoint_name(task_queue: str) -> str:
     return f"nexus-endpoint-{task_queue}"
 
 
-async def create_nexus_endpoint(task_queue: str, client: Client) -> str:
+async def create_nexus_endpoint(
+    task_queue: str, client: Client
+) -> temporalio.api.operatorservice.v1.CreateNexusEndpointResponse:
     name = make_nexus_endpoint_name(task_queue)
-    await client.operator_service.create_nexus_endpoint(
+    return await client.operator_service.create_nexus_endpoint(
         temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
             spec=temporalio.api.nexus.v1.EndpointSpec(
                 name=name,
@@ -31,4 +33,3 @@ async def create_nexus_endpoint(task_queue: str, client: Client) -> str:
             )
         )
     )
-    return name
