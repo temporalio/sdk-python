@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from dataclasses import dataclass
 from typing import Tuple
@@ -24,6 +25,7 @@ class Output:
 @nexusrpc.interface.service
 class MyService:
     echo: nexusrpc.interface.Operation[Input, Output]
+    hang: nexusrpc.interface.Operation[None, None]
 
 
 @nexusrpc.handler.service(interface=MyService)
@@ -34,6 +36,12 @@ class MyServiceHandler:
     ) -> Output:
         assert options.headers["test-header-key"] == "test-header-value"
         return Output(value=f"from handler: {input.value}")
+
+    @nexusrpc.handler.sync_operation
+    async def hang(
+        self, input: None, options: nexusrpc.handler.StartOperationOptions
+    ) -> None:
+        await asyncio.Future()
 
 
 async def test_sync_operation_direct_http_invocation(http_test_env: Tuple[Client, int]):
@@ -71,3 +79,29 @@ async def test_sync_operation_direct_http_invocation(http_test_env: Tuple[Client
             #     "Nexus-Link header not echoed correctly."
             output_json = response.json()
             assert output_json == {"value": "from handler: hello"}
+
+
+async def test_request_timeout_header(http_test_env: Tuple[Client, int]):
+    client, http_port = http_test_env
+
+    task_queue = str(uuid.uuid4())
+    service = MyService.__name__
+    operation = "hang"
+    resp = await create_nexus_endpoint(task_queue, client)
+    endpoint = resp.endpoint.id
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_services=[MyServiceHandler()],
+    ):
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
+                f"http://127.0.0.1:{http_port}/nexus/endpoints/{endpoint}/services/{service}/{operation}",
+                json={"value": "hello"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Request-Timeout": "10ms",
+                },
+            )
+            assert response.status_code == 520
