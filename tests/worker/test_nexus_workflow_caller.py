@@ -263,7 +263,7 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_service = workflow.NexusClient(
+        self.nexus_service = workflow.NexusService(
             service={
                 CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
                 CallerReference.INTERFACE: ServiceInterface,
@@ -404,7 +404,7 @@ class UntypedCallerWorkflow:
     ) -> None:
         # TODO(dan): untyped caller cannot reference name of implementation. I think this is as it should be.
         service_name = "ServiceInterface"
-        self.nexus_service = workflow.NexusClient(
+        self.nexus_service = workflow.NexusService(
             service=service_name,
             endpoint=make_nexus_endpoint_name(task_queue),
         )
@@ -856,7 +856,7 @@ class ServiceInterfaceAndImplCallerWorkflow:
                 f"Invalid combination of caller_reference ({caller_reference}) and name_override ({name_override})"
             )
 
-        nexus_client = workflow.NexusClient(
+        nexus_client = workflow.NexusService(
             service=service_cls,
             endpoint=make_nexus_endpoint_name(task_queue),
         )

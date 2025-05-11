@@ -5136,7 +5136,7 @@ class VersioningIntent(Enum):
 # Nexus
 
 
-class NexusClient(Generic[S]):
+class NexusService(Generic[S]):
     def __init__(
         self,
         service: Union[
@@ -5146,6 +5146,7 @@ class NexusClient(Generic[S]):
             Type[S],
             str,
         ],
+        *,
         endpoint: str,
         schedule_to_close_timeout: Optional[timedelta] = None,
     ) -> None:
