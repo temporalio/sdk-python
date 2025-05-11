@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Never, Tuple
 
 import httpx
 import nexusrpc
@@ -40,7 +40,7 @@ class MyServiceHandler:
     @nexusrpc.handler.sync_operation
     async def hang(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
-    ) -> Output:
+    ) -> Never:
         await asyncio.Future()
 
 
