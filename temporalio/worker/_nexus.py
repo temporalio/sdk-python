@@ -8,7 +8,6 @@ import logging
 import pprint
 from typing import (
     Any,
-    Awaitable,
     Callable,
     Sequence,
     Union,
@@ -136,7 +135,20 @@ class _NexusWorker:
             if task.HasField("task"):
                 task = task.task
                 if task.request.HasField("start_operation"):
-                    await self._handle_start_operation(task.request, task.task_token)
+                    # TODO(dan): shouldn't this be set in the _run_nexus_operation context? (that doesn't work currently)
+                    temporalio.nexus.handler._current_context.set(
+                        temporalio.nexus.handler._Context(
+                            client=self._client,
+                            task_queue=self._task_queue,
+                        )
+                    )
+                    self._running_operations[task.task_token] = asyncio.create_task(
+                        self._run_nexus_operation(
+                            task.task_token,
+                            task.request.start_operation,
+                            dict(task.request.header),
+                        )
+                    )
                 elif task.request.HasField("cancel_operation"):
                     await self._handle_cancel_operation(
                         task.request.cancel_operation, task.task_token
@@ -177,60 +189,12 @@ class _NexusWorker:
             *self._running_operations.values(), return_exceptions=False
         )
 
-    # TODO(dan): is it correct to import from temporalio.api.nexus?
-    # Why are these things not exposed in temporalio.bridge?
-    async def _handle_start_operation(
-        self,
-        request: temporalio.api.nexus.v1.Request,
-        task_token: bytes,
-    ) -> None:
-        start_request = request.start_operation
-        operation = self._get_operation(start_request)
-
-        print(
-            f"🟠 Starting operation {start_request.operation} with payload {start_request.payload}"
-        )
-
-        # TODO(dan): HACK. See activity_def.arg_types in _activity.py
-        arg_types, _ = temporalio.common._type_hints_from_func(operation.start)
-
-        [input] = await self._data_converter.decode(
-            [start_request.payload],
-            type_hints=[arg_types[0]] if arg_types else None,
-        )
-
-        options = nexusrpc.handler.StartOperationOptions(
-            headers=dict(request.header),
-            callback_url=start_request.callback,
-            links=[
-                nexusrpc.handler.Link(url=l.url, type=l.type)
-                for l in start_request.links
-            ],
-            callback_header=dict(start_request.callback_header),
-        )
-        for l in start_request.links:
-            print(
-                f"🌈@@ worker received task with link: {google.protobuf.json_format.MessageToJson(l)}"
-            )
-
-        # TODO(dan): shouldn't this be set in the _run_nexus_operation context? (that doesn't work currently)
-        temporalio.nexus.handler._current_context.set(
-            temporalio.nexus.handler._Context(
-                client=self._client,
-                task_queue=self._task_queue,
-            )
-        )
-        self._running_operations[task_token] = asyncio.create_task(
-            self._run_nexus_operation(task_token, operation.start, input, options)
-        )
-
     # TODO(dan): start type
     async def _run_nexus_operation(
         self,
         task_token: bytes,
-        start: Callable[..., Awaitable[Any]],
-        input: Any,
-        options: nexusrpc.handler.StartOperationOptions,
+        start_request: temporalio.api.nexus.v1.StartOperationRequest,
+        header: dict[str, str],
     ) -> None:
         # message NexusTaskCompletion {
         #     bytes task_token = 1;
@@ -271,7 +235,35 @@ class _NexusWorker:
 
         async def run() -> temporalio.bridge.proto.nexus.NexusTaskCompletion:
             try:
-                result = await start(input, options)
+                operation = self._get_operation(start_request)
+
+                print(
+                    f"🟠 Starting operation {start_request.operation} with payload {start_request.payload}"
+                )
+
+                # TODO(dan): HACK. See activity_def.arg_types in _activity.py
+                arg_types, _ = temporalio.common._type_hints_from_func(operation.start)
+
+                try:
+                    [input] = await self._data_converter.decode(
+                        [start_request.payload],
+                        type_hints=[arg_types[0]] if arg_types else None,
+                    )
+                except Exception as err:
+                    raise HandlerError(
+                        str(err), type=HandlerErrorType.BAD_REQUEST, cause=err
+                    )
+
+                options = nexusrpc.handler.StartOperationOptions(
+                    headers=header,
+                    callback_url=start_request.callback,
+                    links=[
+                        nexusrpc.handler.Link(url=l.url, type=l.type)
+                        for l in start_request.links
+                    ],
+                    callback_header=dict(start_request.callback_header),
+                )
+                result = await operation.start(input, options)
             except nexusrpc.handler.OperationError as err:
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
@@ -288,7 +280,10 @@ class _NexusWorker:
                 # TODO(dan): should encode_failure be called here?? (It accepts the
                 # api.Failure proto struct, not the Nexus one.)
                 # await self._data_converter.encode_failure(err, completion.error.failure)
+
                 err = _exception_to_handler_error(err)
+
+                print(f"🔴 completing NexusTask with error: {err}")
 
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
