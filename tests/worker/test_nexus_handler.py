@@ -44,7 +44,7 @@ class MyServiceHandler:
         await asyncio.Future()
 
 
-async def test_sync_operation_direct_http_invocation(http_test_env: Tuple[Client, int]):
+async def test_success(http_test_env: Tuple[Client, int]):
     client, http_port = http_test_env
 
     task_queue = str(uuid.uuid4())
@@ -68,9 +68,7 @@ async def test_sync_operation_direct_http_invocation(http_test_env: Tuple[Client
                     "Nexus-Link": '<http://test/>; type="test"',
                 },
             )
-            # Print response content for debugging in case of error
-            if not response.is_success:
-                print(f"Error response from server: {response.text}")
+            assert response.is_success
             response.raise_for_status()
             # Check if the Nexus-Link header is echoed in the response
             # TODO(dan): Support manually adding links in operation handler
@@ -82,7 +80,7 @@ async def test_sync_operation_direct_http_invocation(http_test_env: Tuple[Client
 
 
 # TODO(dan): Why are we seeing 2025-05-11T22:41:51.853243Z  WARN temporal_sdk_core::worker::nexus: Failed to parse nexus timeout header value '5.617792ms'
-async def test_request_timeout_header(http_test_env: Tuple[Client, int]):
+async def test_upstream_timeout(http_test_env: Tuple[Client, int]):
     client, http_port = http_test_env
 
     task_queue = str(uuid.uuid4())
