@@ -171,6 +171,7 @@ class _ActivityWorker:
                     )
                     self._running_activities[task.task_token] = activity
                 elif task.HasField("cancel"):
+                    # TODO(dan): does the task get removed from running_activities?
                     self._cancel(task.task_token, task.cancel)
                 else:
                     raise RuntimeError(f"Unrecognized activity task: {task}")

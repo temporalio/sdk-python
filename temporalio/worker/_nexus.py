@@ -146,11 +146,15 @@ class _NexusWorker:
                         f"Invalid Nexus task request: {task.request}"
                     )
             elif task.HasField("cancel_task"):
-                print(
-                    f"🟠 _NexusWorker received cancel_task, reason: {task.cancel_task.reason}. "
-                    "TODO: handling not implemented; ignoring."
-                )
-                # TODO(dan): handle cancel_task
+                task = task.cancel_task
+                if _task := self._running_operations.get(task.task_token):
+                    # TODO(dan): when do we remove the entry from _running_operations?
+                    _task.cancel()
+                else:
+                    temporalio.nexus.logger.warning(
+                        f"Received cancel_task but no running operation exists for "
+                        f"task token: {task.task_token}"
+                    )
             else:
                 raise NotImplementedError(f"Invalid Nexus task: {task}")
 
