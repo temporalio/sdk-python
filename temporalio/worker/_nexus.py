@@ -134,17 +134,16 @@ class _NexusWorker:
 
             # TODO(dan): Correct way to examine and classify task proto
             if task.HasField("task"):
-                if task.task.request.HasField("start_operation"):
-                    await self._handle_start_operation(
-                        task.task.request, task.task.task_token
-                    )
-                elif task.task.request.HasField("cancel_operation"):
+                task = task.task
+                if task.request.HasField("start_operation"):
+                    await self._handle_start_operation(task.request, task.task_token)
+                elif task.request.HasField("cancel_operation"):
                     await self._handle_cancel_operation(
-                        task.task.request.cancel_operation, task.task.task_token
+                        task.request.cancel_operation, task.task_token
                     )
                 else:
                     raise NotImplementedError(
-                        f"Invalid Nexus task request: {task.task.request}"
+                        f"Invalid Nexus task request: {task.request}"
                     )
             elif task.HasField("cancel_task"):
                 print(
