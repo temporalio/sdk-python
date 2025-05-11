@@ -25,7 +25,7 @@ class Output:
 @nexusrpc.interface.service
 class MyService:
     echo: nexusrpc.interface.Operation[Input, Output]
-    hang: nexusrpc.interface.Operation[None, None]
+    hang: nexusrpc.interface.Operation[Input, Output]
 
 
 @nexusrpc.handler.service(interface=MyService)
@@ -39,8 +39,8 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation
     async def hang(
-        self, input: None, options: nexusrpc.handler.StartOperationOptions
-    ) -> None:
+        self, input: Input, options: nexusrpc.handler.StartOperationOptions
+    ) -> Output:
         await asyncio.Future()
 
 
@@ -81,6 +81,7 @@ async def test_sync_operation_direct_http_invocation(http_test_env: Tuple[Client
             assert output_json == {"value": "from handler: hello"}
 
 
+# TODO(dan): Why are we seeing 2025-05-11T22:41:51.853243Z  WARN temporal_sdk_core::worker::nexus: Failed to parse nexus timeout header value '5.617792ms'
 async def test_request_timeout_header(http_test_env: Tuple[Client, int]):
     client, http_port = http_test_env
 
