@@ -1350,6 +1350,10 @@ class _WorkflowInstanceImpl(
         else:
             raise TypeError("Activity must be a string or callable")
 
+        cast(_WorkflowExternFunctions, self._extern_functions)[
+            "__temporal_assert_local_activity_valid"
+        ](name)
+
         return self._outbound.start_local_activity(
             StartLocalActivityInput(
                 activity=name,
@@ -2859,6 +2863,7 @@ def _encode_search_attributes(
 
 class _WorkflowExternFunctions(TypedDict):
     __temporal_get_metric_meter: Callable[[], temporalio.common.MetricMeter]
+    __temporal_assert_local_activity_valid: Callable[[str], None]
 
 
 class _ReplaySafeMetricMeter(temporalio.common.MetricMeter):

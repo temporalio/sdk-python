@@ -991,7 +991,7 @@ To remove restrictions around a particular block of code, use `with temporalio.w
 The workflow will still be running in the sandbox, but no restrictions for invalid library calls will be applied.
 
 To run an entire workflow outside of a sandbox, set `sandboxed=False` on the `@workflow.defn` decorator when defining
-it. This will run the entire workflow outside of the workflow which means it can share global state and other bad
+it. This will run the entire workflow outside of the sandbox which means it can share global state and other bad
 things.
 
 To disable the sandbox entirely for a worker, set the `Worker` init's `workflow_runner` keyword argument to
