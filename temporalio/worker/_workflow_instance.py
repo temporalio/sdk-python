@@ -219,7 +219,7 @@ class _WorkflowInstanceImpl(
         self._current_history_size = 0
         self._continue_as_new_suggested = False
         # Lazily loaded
-        self._untyped_converted_memo: Optional[Mapping[str, Any]] = None
+        self._untyped_converted_memo: Optional[MutableMapping[str, Any]] = None
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
@@ -1119,8 +1119,14 @@ class _WorkflowInstanceImpl(
                 fields[k].CopyFrom(null_payload)
                 mut_raw_memo.pop(k, None)
 
-        # Clearing cached value, will be regenerated on next workflow_memo() call.
-        self._untyped_converted_memo = None
+        # Keeping deserialized memo dict in sync, if exists
+        if self._untyped_converted_memo is not None:
+            for k, v in update_payloads.items():
+                self._untyped_converted_memo[k] = self._payload_converter.from_payload(
+                    v
+                )
+            for k in removals:
+                self._untyped_converted_memo.pop(k, None)
 
     def workflow_metric_meter(self) -> temporalio.common.MetricMeter:
         # Create if not present, which means using an extern function
