@@ -508,6 +508,11 @@ class Info:
     """
 
     start_time: datetime
+    """The start time of the first task executed by the workflow."""
+
+    workflow_start_time: datetime
+    """The start time of the workflow based on the workflow initialization."""
+
     task_queue: str
     task_timeout: timedelta
 

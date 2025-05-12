@@ -42,6 +42,7 @@ _fake_info = temporalio.workflow.Info(
     run_timeout=None,
     search_attributes={},
     start_time=datetime.fromtimestamp(0, timezone.utc),
+    workflow_start_time=datetime.fromtimestamp(0, timezone.utc),
     task_queue="sandbox-validate-task_queue",
     task_timeout=timedelta(),
     typed_search_attributes=temporalio.common.TypedSearchAttributes.empty,

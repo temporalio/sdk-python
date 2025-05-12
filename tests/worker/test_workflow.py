@@ -220,12 +220,13 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
             maximum_interval=timedelta(seconds=5),
             maximum_attempts=6,
         )
-        info = await client.execute_workflow(
+        handle = await client.start_workflow(
             InfoWorkflow.run,
             id=workflow_id,
             task_queue=worker.task_queue,
             retry_policy=retry_policy,
         )
+        info = await handle.result()
         assert info["attempt"] == 1
         assert info["cron_schedule"] is None
         assert info["execution_timeout"] is None
@@ -235,11 +236,26 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         )
         assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
-        datetime.fromisoformat(info["start_time"])
         assert info["task_queue"] == worker.task_queue
         assert info["task_timeout"] == "0:00:10"
         assert info["workflow_id"] == workflow_id
         assert info["workflow_type"] == "InfoWorkflow"
+
+        async for e in handle.fetch_history_events():
+            if e.HasField("workflow_execution_started_event_attributes"):
+                assert info["workflow_start_time"] == json.loads(
+                    json.dumps(
+                        e.event_time.ToDatetime().replace(tzinfo=timezone.utc),
+                        default=str,
+                    )
+                )
+            elif e.HasField("workflow_task_started_event_attributes"):
+                assert info["start_time"] == json.loads(
+                    json.dumps(
+                        e.event_time.ToDatetime().replace(tzinfo=timezone.utc),
+                        default=str,
+                    )
+                )
 
 
 @dataclass
