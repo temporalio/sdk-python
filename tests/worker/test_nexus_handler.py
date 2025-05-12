@@ -79,6 +79,31 @@ async def test_success(http_test_env: Tuple[Client, int]):
             assert output_json == {"value": "from handler: hello"}
 
 
+async def test_bad_request(http_test_env: Tuple[Client, int]):
+    client, http_port = http_test_env
+
+    task_queue = str(uuid.uuid4())
+    service = MyService.__name__
+    operation = "echo"
+    resp = await create_nexus_endpoint(task_queue, client)
+    endpoint = resp.endpoint.id
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_services=[MyServiceHandler()],
+    ):
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
+                f"http://127.0.0.1:{http_port}/nexus/endpoints/{endpoint}/services/{service}/{operation}",
+                json={"value": 7},
+                headers={
+                    "Content-Type": "application/json",
+                },
+            )
+            assert response.status_code == 400
+
+
 # TODO(dan): Why are we seeing 2025-05-11T22:41:51.853243Z  WARN temporal_sdk_core::worker::nexus: Failed to parse nexus timeout header value '5.617792ms'
 async def test_upstream_timeout(http_test_env: Tuple[Client, int]):
     client, http_port = http_test_env
