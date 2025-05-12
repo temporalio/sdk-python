@@ -1113,9 +1113,11 @@ class _WorkflowInstanceImpl(
             fields[k].CopyFrom(v)
             mut_raw_memo[k] = v
 
-        for k in removals:
-            fields.get_or_create(k)
-            mut_raw_memo.pop(k, None)
+        if removals:
+            null_payload = self._payload_converter.to_payload(None)
+            for k in removals:
+                fields[k].CopyFrom(null_payload)
+                mut_raw_memo.pop(k, None)
 
         # Clearing cached value, will be regenerated on next workflow_memo() call.
         self._untyped_converted_memo = None
