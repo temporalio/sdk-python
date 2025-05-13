@@ -51,15 +51,7 @@ class MyServiceHandler:
     async def log(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
-        logger.info(
-            "Logging from handler",
-            extra={
-                "input_value": input.value,
-                "service": MyService.__name__,
-                "operation": "log",
-                "nexus_options_headers": options.headers,
-            },
-        )
+        logger.info("Logging from handler", extra={"input_value": input.value})
         return Output(value=f"logged: {input.value}")
 
 
