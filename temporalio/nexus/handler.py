@@ -91,6 +91,12 @@ class StartWorkflowOperationResult(
                 workflow_handle.id, workflow_handle.first_execution_run_id
             ),
             links=[
+                # TODO(dan): Before, WorkflowRunOperation was generating an EventReference
+                # link to send back to the caller. Now, it checks if the server returned
+                # the link in the StartWorkflowExecutionResponse, and if so, send the link
+                # from the response to the caller. Fallback to generating the link for
+                # backwards compatibility. PR reference in Go SDK:
+                # https://github.com/temporalio/sdk-go/pull/1934
                 _workflow_event_to_nexus_link(
                     _workflow_handle_to_workflow_execution_started_event_link(
                         workflow_handle
@@ -209,6 +215,11 @@ async def start_workflow(
         task_queue = get_task_queue()
     completion_callbacks = (
         [
+            # TODO(dan): For WorkflowRunOperation, when it handles the Nexus request, it
+            # needs to copy the links to the callback in
+            # StartWorkflowRequest.CompletionCallbacks and to StartWorkflowRequest.Links
+            # (for backwards compatibility). PR reference in Go SDK:
+            # https://github.com/temporalio/sdk-go/pull/1945
             temporalio.common.NexusCompletionCallback(
                 url=options.callback_url, header=options.callback_header
             )
