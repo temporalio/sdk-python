@@ -287,6 +287,8 @@ _current_context: ContextVar[_Context] = ContextVar("nexus-handler")
 class _Context:
     client: Optional[Client]
     task_queue: Optional[str]
+    service: Optional[str] = None
+    operation: Optional[str] = None
 
 
 def get_client() -> Client:

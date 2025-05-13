@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Any, Never, Tuple
@@ -9,6 +10,7 @@ import nexusrpc.handler
 import pytest
 
 from temporalio.client import Client
+from temporalio.nexus import logger
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
 
@@ -27,6 +29,7 @@ class Output:
 class MyService:
     echo: nexusrpc.interface.Operation[Input, Output]
     hang: nexusrpc.interface.Operation[Input, Output]
+    log_something: nexusrpc.interface.Operation[Input, Output]
 
 
 @nexusrpc.handler.service(interface=MyService)
@@ -43,6 +46,21 @@ class MyServiceHandler:
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Never:
         await asyncio.Future()
+
+    @nexusrpc.handler.sync_operation
+    async def log(
+        self, input: Input, options: nexusrpc.handler.StartOperationOptions
+    ) -> Output:
+        logger.info(
+            "Logging from handler",
+            extra={
+                "input_value": input.value,
+                "service": MyService.__name__,
+                "operation": "log",
+                "nexus_options_headers": options.headers,
+            },
+        )
+        return Output(value=f"logged: {input.value}")
 
 
 async def test_success(http_test_env: Tuple[Client, int]):
@@ -129,3 +147,50 @@ async def test_nexus_handler_failure(
                 headers=test_case.headers,
             )
             assert response.status_code == test_case.expected_status_code
+
+
+async def test_logger_available_in_handler_context(
+    http_test_env: Tuple[Client, int], caplog: Any
+):
+    client, http_port = http_test_env
+    task_queue = str(uuid.uuid4())
+    service_name = MyService.__name__
+    operation_name = "log"
+    resp = await create_nexus_endpoint(task_queue, client)
+    endpoint = resp.endpoint.id
+
+    caplog.set_level(logging.INFO)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_services=[MyServiceHandler()],
+    ):
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
+                f"http://127.0.0.1:{http_port}/nexus/endpoints/{endpoint}/services/{service_name}/{operation_name}",
+                json={"value": "test_log"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Test-Log-Header": "test-log-header-value",
+                },
+            )
+            assert response.is_success
+            response.raise_for_status()
+            output_json = response.json()
+            assert output_json == {"value": "logged: test_log"}
+
+    record = next(
+        (
+            record
+            for record in caplog.records
+            if record.name == "temporalio.nexus"
+            and record.getMessage() == "Logging from handler"
+        ),
+        None,
+    )
+    assert record is not None, "Expected log message not found"
+    assert record.levelname == "INFO"
+    assert getattr(record, "input_value", None) == "test_log"
+    assert getattr(record, "service", None) == service_name
+    assert getattr(record, "operation", None) == operation_name
