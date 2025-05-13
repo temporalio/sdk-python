@@ -508,6 +508,8 @@ class Info:
     """
 
     start_time: datetime
+    """The start time of the first task executed by the workflow."""
+
     task_queue: str
     task_timeout: timedelta
 
@@ -520,6 +522,10 @@ class Info:
     """
 
     workflow_id: str
+
+    workflow_start_time: datetime
+    """The start time of the workflow based on the workflow initialization."""
+
     workflow_type: str
 
     def _logger_details(self) -> Mapping[str, Any]:

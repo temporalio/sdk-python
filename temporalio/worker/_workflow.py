@@ -532,6 +532,9 @@ class _WorkflowWorker:
                 init.search_attributes
             ),
             start_time=act.timestamp.ToDatetime().replace(tzinfo=timezone.utc),
+            workflow_start_time=init.start_time.ToDatetime().replace(
+                tzinfo=timezone.utc
+            ),
             task_queue=self._task_queue,
             task_timeout=init.workflow_task_timeout.ToTimedelta(),
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
