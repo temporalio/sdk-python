@@ -222,6 +222,14 @@ class _NexusWorker:
         async def run() -> temporalio.bridge.proto.nexus.NexusTaskCompletion:
             try:
                 operation = self._get_operation(start_request)
+                temporalio.nexus.handler._current_context.set(
+                    temporalio.nexus.handler._Context(
+                        client=self._client,
+                        task_queue=self._task_queue,
+                        service=start_request.service,
+                        operation=start_request.operation,
+                    )
+                )
 
                 print(
                     f"🟠 Starting operation {start_request.operation} with payload {start_request.payload}"
