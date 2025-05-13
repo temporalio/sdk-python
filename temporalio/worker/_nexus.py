@@ -106,13 +106,6 @@ class _NexusWorker:
         #     }
         # }
 
-        # TODO(dan): is this the correct async context to set the client in?
-        temporalio.nexus.handler._current_context.set(
-            temporalio.nexus.handler._Context(
-                client=self._client,
-                task_queue=self._task_queue,
-            )
-        )
         while True:
             try:
                 poll_task = asyncio.create_task(self._bridge_worker().poll_nexus_task())
@@ -221,7 +214,6 @@ class _NexusWorker:
 
         async def run() -> temporalio.bridge.proto.nexus.NexusTaskCompletion:
             try:
-                operation = self._get_operation(start_request)
                 temporalio.nexus.handler._current_context.set(
                     temporalio.nexus.handler._Context(
                         client=self._client,
@@ -230,6 +222,8 @@ class _NexusWorker:
                         operation=start_request.operation,
                     )
                 )
+
+                operation = self._get_operation(start_request)
 
                 print(
                     f"🟠 Starting operation {start_request.operation} with payload {start_request.payload}"
@@ -330,6 +324,15 @@ class _NexusWorker:
     async def _handle_cancel_operation(
         self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
     ) -> None:
+        # TODO(dan): cancel must be done in its own asyncio.Task
+        temporalio.nexus.handler._current_context.set(
+            temporalio.nexus.handler._Context(
+                client=self._client,
+                task_queue=self._task_queue,
+                service=request.service,
+                operation=request.operation,
+            )
+        )
         operation = self._get_operation(request)
         # TODO(dan): header
         try:
