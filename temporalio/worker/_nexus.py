@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import pprint
 from typing import (
     Any,
     Callable,
@@ -63,9 +62,6 @@ class _NexusWorker:
         self._task_queue = task_queue
 
         self._nexus_services = self._validate_nexus_services(nexus_services)
-        print(
-            f"🟠 Nexus worker registered Nexus services: {pprint.pformat(self._nexus_services)}"
-        )
         self._data_converter = data_converter
         # TODO(dan): interceptors
         self._interceptors = interceptors
@@ -222,12 +218,7 @@ class _NexusWorker:
                         operation=start_request.operation,
                     )
                 )
-
                 operation = self._get_operation(start_request)
-
-                print(
-                    f"🟠 Starting operation {start_request.operation} with payload {start_request.payload}"
-                )
 
                 # TODO(dan): HACK. See activity_def.arg_types in _activity.py
                 arg_types, _ = temporalio.common._type_hints_from_func(operation.start)
@@ -268,11 +259,7 @@ class _NexusWorker:
                 # TODO(dan): should encode_failure be called here?? (It accepts the
                 # api.Failure proto struct, not the Nexus one.)
                 # await self._data_converter.encode_failure(err, completion.error.failure)
-
                 err = _exception_to_handler_error(err)
-
-                print(f"🔴 completing NexusTask with error: {err}")
-
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
                     error=temporalio.api.nexus.v1.HandlerError(
@@ -281,9 +268,8 @@ class _NexusWorker:
                     ),
                 )
             else:
-                # TODO: TS is wrapping the sync start method result, but Python is not
+                # TODO(dan): TS is wrapping the sync start method result, but Python is not
                 if isinstance(result, nexusrpc.handler.StartOperationAsyncResult):
-                    print(f"🟢 Nexus operation started with async response {result}")
                     op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                         async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
                             operation_token=result.token,
@@ -297,6 +283,7 @@ class _NexusWorker:
                     # TODO(dan): are we going to use StartOperationSyncResult from nexusrpc?
                     # (contains links and headers in addition to result) IIRC Go does something
                     # like that.
+                    # TODO(dan): error handling here; what error type should it be?
                     [payload] = await self._data_converter.encode([result])
                     op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                         sync_success=temporalio.api.nexus.v1.StartOperationResponse.Sync(
@@ -324,7 +311,6 @@ class _NexusWorker:
     async def _handle_cancel_operation(
         self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
     ) -> None:
-        # TODO(dan): cancel must be done in its own asyncio.Task
         temporalio.nexus.handler._current_context.set(
             temporalio.nexus.handler._Context(
                 client=self._client,

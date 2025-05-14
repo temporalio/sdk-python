@@ -29,7 +29,7 @@ class Output:
 class MyService:
     echo: nexusrpc.interface.Operation[Input, Output]
     hang: nexusrpc.interface.Operation[Input, Output]
-    log_something: nexusrpc.interface.Operation[Input, Output]
+    log: nexusrpc.interface.Operation[Input, Output]
 
 
 @nexusrpc.handler.service(interface=MyService)
@@ -141,7 +141,7 @@ async def test_nexus_handler_failure(
             assert response.status_code == test_case.expected_status_code
 
 
-async def test_logger_available_in_handler_context(
+async def test_logging_in_operation_handler(
     http_test_env: Tuple[Client, int], caplog: Any
 ):
     client, http_port = http_test_env
