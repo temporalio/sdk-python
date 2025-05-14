@@ -2926,21 +2926,23 @@ class WorkflowExecutionDescription(WorkflowExecution):
 
     raw_description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse
     """Underlying protobuf description."""
-    
+
     _static_summary: Optional[str] = None
     _static_details: Optional[str] = None
     _metadata_decoded: bool = False
 
     async def static_summary(self) -> Optional[str]:
         """Gets the single-line fixed summary for this workflow execution that may appear in
-        UI/CLI. This can be in single-line Temporal markdown format."""
+        UI/CLI. This can be in single-line Temporal markdown format.
+        """
         if not self._metadata_decoded:
             await self._decode_metadata()
         return self._static_summary
 
     async def static_details(self) -> Optional[str]:
         """Gets the general fixed details for this workflow execution that may appear in UI/CLI.
-        This can be in Temporal markdown format and can span multiple lines."""
+        This can be in Temporal markdown format and can span multiple lines.
+        """
         if not self._metadata_decoded:
             await self._decode_metadata()
         return self._static_details
@@ -2948,8 +2950,7 @@ class WorkflowExecutionDescription(WorkflowExecution):
     async def _decode_metadata(self) -> None:
         """Internal method to decode metadata lazily."""
         self._static_summary, self._static_details = await _decode_user_metadata(
-            self.data_converter,
-            self.raw_description.execution_config.user_metadata
+            self.data_converter, self.raw_description.execution_config.user_metadata
         )
         self._metadata_decoded = True
 
