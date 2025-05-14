@@ -35,12 +35,12 @@ from typing import (
     get_type_hints,
     overload,
 )
-import typing_extensions
 
 import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
+import typing_extensions
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
