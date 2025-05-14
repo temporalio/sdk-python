@@ -229,8 +229,12 @@ class _NexusWorker:
                         type_hints=[arg_types[0]] if arg_types else None,
                     )
                 except Exception as err:
+                    print("🌈 returning non-retryable HandlerError")
                     raise HandlerError(
-                        str(err), type=HandlerErrorType.BAD_REQUEST, cause=err
+                        str(err),
+                        type=HandlerErrorType.BAD_REQUEST,
+                        cause=err,
+                        retryable=False,
                     )
 
                 options = nexusrpc.handler.StartOperationOptions(
@@ -265,6 +269,11 @@ class _NexusWorker:
                     error=temporalio.api.nexus.v1.HandlerError(
                         error_type=err.type.value,
                         failure=await self._exception_to_failure_proto(err),
+                        retry_behavior=(
+                            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+                            if err.retryable
+                            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+                        ),
                     ),
                 )
             else:
@@ -297,6 +306,9 @@ class _NexusWorker:
 
         try:
             completion = await run()
+            print(
+                f"returning completion with retry behavior = {completion.error.retry_behavior}"
+            )
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
             temporalio.nexus.logger.exception("Failed completing Nexus operation")
@@ -410,6 +422,7 @@ def _exception_to_handler_error(err: BaseException) -> HandlerError:
     # Based on sdk-typescript's convertKnownErrors:
     # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/worker/src/nexus.ts
     if isinstance(err, HandlerError):
+        print(f"🌈 retryable = {err.retryable}")
         return err
     elif isinstance(err, ApplicationError):
         return HandlerError(

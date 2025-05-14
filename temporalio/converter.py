@@ -1075,6 +1075,7 @@ class DefaultFailureConverter(FailureConverter):
                     temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE: False,
                 }.get(nexus_handler_failure_info.retry_behavior),
             )
+            print(f"got err {err.__class__} with retryable", err._retryable)
         elif failure.HasField("nexus_operation_execution_failure_info"):
             # message NexusOperationFailureInfo {
             #     // The NexusOperationScheduled event ID.
