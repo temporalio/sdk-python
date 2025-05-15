@@ -14,10 +14,13 @@ from google.protobuf import json_format
 from hyperlinked import print
 
 import temporalio.api.failure.v1
+import temporalio.nexus
+from temporalio import workflow
 from temporalio.client import Client
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import logger
+from temporalio.nexus.handler import StartWorkflowOperationResult, start_workflow
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
 
@@ -39,6 +42,14 @@ class MyService:
     hang: nexusrpc.interface.Operation[Input, Output]
     log: nexusrpc.interface.Operation[Input, Output]
     error: nexusrpc.interface.Operation[Input, Output]
+    start_workflow: nexusrpc.interface.Operation[Input, Output]
+
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, input: Input) -> Output:
+        return Output(value=f"from workflow: {input.value}")
 
 
 @nexusrpc.handler.service(interface=MyService)
@@ -106,6 +117,17 @@ class MyServiceHandler:
         logger.info("Logging from handler", extra={"input_value": input.value})
         return Output(value=f"logged: {input.value}")
 
+    @temporalio.nexus.handler.workflow_run_operation
+    async def start_workflow(
+        self, input: Input, options: nexusrpc.handler.StartOperationOptions
+    ) -> StartWorkflowOperationResult[Output]:
+        return await start_workflow(
+            MyWorkflow.run,
+            input,
+            id=str(uuid.uuid4()),
+            options=options,
+        )
+
 
 @dataclass
 class Failure:
@@ -170,6 +192,21 @@ class SyncHandlerHappyPath(_TestCase):
         # assert headers.get("nexus-link") == "<http://test/>; type=\"test\"", \
         #     "Nexus-Link header not echoed correctly."
         pass
+
+
+class StartWorkflow(_TestCase):
+    operation = "start_workflow"
+    input = "hello"
+    expected_status_code = 201
+    headers = {
+        "Content-Type": "application/json",
+    }
+
+    @staticmethod
+    def check_response_headers(headers: dict[str, str]) -> None:
+        import pdb
+
+        pdb.set_trace()
 
 
 # TODO(dan): Before fixing the upstream-timeout test by implementing the handler for the
@@ -287,6 +324,7 @@ class OperationError(_FailureTestCase):
         RetryableApplicationError,
         HandlerErrorInternal,
         # TODO(dan): OperationError
+        StartWorkflow,
     ],
 )
 async def test_nexus_handler(
