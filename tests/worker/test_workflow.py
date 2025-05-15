@@ -7507,6 +7507,7 @@ async def test_workflow_dynamic_config_failure(client: Client):
             handle, message_contains="Dynamic config failure"
         )
 
+
 @activity.defn
 async def raise_application_error(use_benign: bool) -> typing.NoReturn:
     if use_benign:
@@ -7570,6 +7571,7 @@ async def test_activity_benign_error_not_logged(client: Client):
             )
             assert capturer.find_log("Completing activity as failed") != None
 
+
 async def test_workflow_missing_local_activity(client: Client):
     async with new_worker(
         client, SimpleLocalActivityWorkflow, activities=[custom_error_activity]
@@ -7620,4 +7622,3 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
             handle,
             message_contains="Activity function say_hello is not registered on this worker, no available activities",
         )
-
