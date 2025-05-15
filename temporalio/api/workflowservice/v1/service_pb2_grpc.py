@@ -438,6 +438,31 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityResponse.FromString,
         )
+        self.CreateWorkflowRule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateWorkflowRule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkflowRuleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkflowRuleResponse.FromString,
+        )
+        self.DescribeWorkflowRule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorkflowRule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkflowRuleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkflowRuleResponse.FromString,
+        )
+        self.DeleteWorkflowRule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkflowRule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowRuleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowRuleResponse.FromString,
+        )
+        self.ListWorkflowRules = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListWorkflowRules",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkflowRulesRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkflowRulesResponse.FromString,
+        )
+        self.TriggerWorkflowRule = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/TriggerWorkflowRule",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleResponse.FromString,
+        )
 
 
 class WorkflowServiceServicer(object):
@@ -1331,6 +1356,47 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def CreateWorkflowRule(self, request, context):
+        """Create a new workflow rule. The rules are used to control the workflow execution.
+        The rule will be applied to all running and new workflows in the namespace.
+        If the rule with such ID already exist this call will fail
+        Note: the rules are part of namespace configuration and will be stored in the namespace config.
+        Namespace config is eventually consistent.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeWorkflowRule(self, request, context):
+        """DescribeWorkflowRule return the rule specification for existing rule id.
+        If there is no rule with such id - NOT FOUND error will be returned.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteWorkflowRule(self, request, context):
+        """Delete rule by rule id"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListWorkflowRules(self, request, context):
+        """Return all namespace workflow rules"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def TriggerWorkflowRule(self, request, context):
+        """TriggerWorkflowRule allows to:
+        * trigger existing rule for a specific workflow execution;
+        * trigger rule for a specific workflow execution without creating a rule;
+        This is useful for one-off operations.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_WorkflowServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1743,6 +1809,31 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.ResetActivity,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityResponse.SerializeToString,
+        ),
+        "CreateWorkflowRule": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateWorkflowRule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkflowRuleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkflowRuleResponse.SerializeToString,
+        ),
+        "DescribeWorkflowRule": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeWorkflowRule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkflowRuleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkflowRuleResponse.SerializeToString,
+        ),
+        "DeleteWorkflowRule": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteWorkflowRule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowRuleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowRuleResponse.SerializeToString,
+        ),
+        "ListWorkflowRules": grpc.unary_unary_rpc_method_handler(
+            servicer.ListWorkflowRules,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkflowRulesRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkflowRulesResponse.SerializeToString,
+        ),
+        "TriggerWorkflowRule": grpc.unary_unary_rpc_method_handler(
+            servicer.TriggerWorkflowRule,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -4134,6 +4225,151 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/ResetActivity",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CreateWorkflowRule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateWorkflowRule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkflowRuleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkflowRuleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeWorkflowRule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorkflowRule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkflowRuleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkflowRuleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteWorkflowRule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteWorkflowRule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowRuleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteWorkflowRuleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListWorkflowRules(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListWorkflowRules",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkflowRulesRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkflowRulesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def TriggerWorkflowRule(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/TriggerWorkflowRule",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleResponse.FromString,
             options,
             channel_credentials,
             insecure,

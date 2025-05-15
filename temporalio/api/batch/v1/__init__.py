@@ -5,6 +5,7 @@ from .message_pb2 import (
     BatchOperationReset,
     BatchOperationSignal,
     BatchOperationTermination,
+    BatchOperationTriggerWorkflowRule,
     BatchOperationUnpauseActivities,
     BatchOperationUpdateWorkflowExecutionOptions,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "BatchOperationReset",
     "BatchOperationSignal",
     "BatchOperationTermination",
+    "BatchOperationTriggerWorkflowRule",
     "BatchOperationUnpauseActivities",
     "BatchOperationUpdateWorkflowExecutionOptions",
 ]

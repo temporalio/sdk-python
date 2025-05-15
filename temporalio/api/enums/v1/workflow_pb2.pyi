@@ -257,6 +257,10 @@ class _PendingActivityStateEnumTypeWrapper(
     PENDING_ACTIVITY_STATE_SCHEDULED: _PendingActivityState.ValueType  # 1
     PENDING_ACTIVITY_STATE_STARTED: _PendingActivityState.ValueType  # 2
     PENDING_ACTIVITY_STATE_CANCEL_REQUESTED: _PendingActivityState.ValueType  # 3
+    PENDING_ACTIVITY_STATE_PAUSED: _PendingActivityState.ValueType  # 4
+    """PAUSED means activity is paused on the server, and is not running in the worker"""
+    PENDING_ACTIVITY_STATE_PAUSE_REQUESTED: _PendingActivityState.ValueType  # 5
+    """PAUSE_REQUESTED means activity is currently running on the worker, but paused on the server"""
 
 class PendingActivityState(
     _PendingActivityState, metaclass=_PendingActivityStateEnumTypeWrapper
@@ -266,6 +270,10 @@ PENDING_ACTIVITY_STATE_UNSPECIFIED: PendingActivityState.ValueType  # 0
 PENDING_ACTIVITY_STATE_SCHEDULED: PendingActivityState.ValueType  # 1
 PENDING_ACTIVITY_STATE_STARTED: PendingActivityState.ValueType  # 2
 PENDING_ACTIVITY_STATE_CANCEL_REQUESTED: PendingActivityState.ValueType  # 3
+PENDING_ACTIVITY_STATE_PAUSED: PendingActivityState.ValueType  # 4
+"""PAUSED means activity is paused on the server, and is not running in the worker"""
+PENDING_ACTIVITY_STATE_PAUSE_REQUESTED: PendingActivityState.ValueType  # 5
+"""PAUSE_REQUESTED means activity is currently running on the worker, but paused on the server"""
 global___PendingActivityState = PendingActivityState
 
 class _PendingWorkflowTaskState:

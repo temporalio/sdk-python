@@ -86,6 +86,7 @@ from temporalio.converter import (
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
+    ApplicationErrorCategory,
     CancelledError,
     ChildWorkflowError,
     TemporalError,
@@ -7505,6 +7506,70 @@ async def test_workflow_dynamic_config_failure(client: Client):
         await assert_task_fail_eventually(
             handle, message_contains="Dynamic config failure"
         )
+
+
+@activity.defn
+async def raise_application_error(use_benign: bool) -> typing.NoReturn:
+    if use_benign:
+        raise ApplicationError(
+            "This is a benign error", category=ApplicationErrorCategory.BENIGN
+        )
+    else:
+        raise ApplicationError(
+            "This is a regular error", category=ApplicationErrorCategory.UNSPECIFIED
+        )
+
+
+@workflow.defn
+class RaiseErrorWorkflow:
+    @workflow.run
+    async def run(self, use_benign: bool) -> None:
+        # Execute activity that will raise an error
+        await workflow.execute_activity(
+            raise_application_error,
+            use_benign,
+            start_to_close_timeout=timedelta(seconds=5),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+
+async def test_activity_benign_error_not_logged(client: Client):
+    with LogCapturer().logs_captured(activity.logger.base_logger) as capturer:
+        async with new_worker(
+            client, RaiseErrorWorkflow, activities=[raise_application_error]
+        ) as worker:
+            # Run with benign error
+            with pytest.raises(WorkflowFailureError) as err:
+                await client.execute_workflow(
+                    RaiseErrorWorkflow.run,
+                    True,
+                    id=str(uuid.uuid4()),
+                    task_queue=worker.task_queue,
+                )
+            # Check that the cause is an ApplicationError
+            assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, ApplicationError)
+            # Assert the expected category
+            assert err.value.cause.cause.category == ApplicationErrorCategory.BENIGN
+            assert capturer.find_log("Completing activity as failed") == None
+
+            # Run with non-benign error
+            with pytest.raises(WorkflowFailureError) as err:
+                await client.execute_workflow(
+                    RaiseErrorWorkflow.run,
+                    False,
+                    id=str(uuid.uuid4()),
+                    task_queue=worker.task_queue,
+                )
+
+            # Check that the cause is an ApplicationError
+            assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, ApplicationError)
+            # Assert the expected category
+            assert (
+                err.value.cause.cause.category == ApplicationErrorCategory.UNSPECIFIED
+            )
+            assert capturer.find_log("Completing activity as failed") != None
 
 
 async def test_workflow_missing_local_activity(client: Client):
