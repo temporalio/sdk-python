@@ -219,7 +219,7 @@ class _WorkflowInstanceImpl(
         self._current_history_size = 0
         self._continue_as_new_suggested = False
         # Lazily loaded
-        self._memo: Optional[Mapping[str, Any]] = None
+        self._untyped_converted_memo: Optional[MutableMapping[str, Any]] = None
         # Handles which are ready to run on the next event loop iteration
         self._ready: Deque[asyncio.Handle] = collections.deque()
         self._conditions: List[Tuple[Callable[[], bool], asyncio.Future]] = []
@@ -1066,12 +1066,12 @@ class _WorkflowInstanceImpl(
         return self._is_replaying
 
     def workflow_memo(self) -> Mapping[str, Any]:
-        if self._memo is None:
-            self._memo = {
-                k: self._payload_converter.from_payloads([v])[0]
+        if self._untyped_converted_memo is None:
+            self._untyped_converted_memo = {
+                k: self._payload_converter.from_payload(v)
                 for k, v in self._info.raw_memo.items()
             }
-        return self._memo
+        return self._untyped_converted_memo
 
     def workflow_memo_value(
         self, key: str, default: Any, *, type_hint: Optional[Type]
@@ -1081,9 +1081,52 @@ class _WorkflowInstanceImpl(
             if default is temporalio.common._arg_unset:
                 raise KeyError(f"Memo does not have a value for key {key}")
             return default
-        return self._payload_converter.from_payloads(
-            [payload], [type_hint] if type_hint else None
-        )[0]
+        return self._payload_converter.from_payload(
+            payload,
+            type_hint,  # type: ignore[arg-type]
+        )
+
+    def workflow_upsert_memo(self, updates: Mapping[str, Any]) -> None:
+        # Converting before creating a command so that we don't leave a partial command in case of conversion failure.
+        update_payloads = {}
+        removals = []
+        for k, v in updates.items():
+            if v is None:
+                # Intentionally not checking if memo exists, so that no-op removals show up in history too.
+                removals.append(k)
+            else:
+                update_payloads[k] = self._payload_converter.to_payload(v)
+
+        if not update_payloads and not removals:
+            return
+
+        command = self._add_command()
+        fields = command.modify_workflow_properties.upserted_memo.fields
+
+        # Updating memo inside info by downcasting to mutable mapping.
+        mut_raw_memo = cast(
+            MutableMapping[str, temporalio.api.common.v1.Payload],
+            self._info.raw_memo,
+        )
+
+        for k, v in update_payloads.items():
+            fields[k].CopyFrom(v)
+            mut_raw_memo[k] = v
+
+        if removals:
+            null_payload = self._payload_converter.to_payload(None)
+            for k in removals:
+                fields[k].CopyFrom(null_payload)
+                mut_raw_memo.pop(k, None)
+
+        # Keeping deserialized memo dict in sync, if exists
+        if self._untyped_converted_memo is not None:
+            for k, v in update_payloads.items():
+                self._untyped_converted_memo[k] = self._payload_converter.from_payload(
+                    v
+                )
+            for k in removals:
+                self._untyped_converted_memo.pop(k, None)
 
     def workflow_metric_meter(self) -> temporalio.common.MetricMeter:
         # Create if not present, which means using an extern function
@@ -1349,6 +1392,10 @@ class _WorkflowInstanceImpl(
             ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
+
+        cast(_WorkflowExternFunctions, self._extern_functions)[
+            "__temporal_assert_local_activity_valid"
+        ](name)
 
         return self._outbound.start_local_activity(
             StartLocalActivityInput(
@@ -2859,6 +2906,7 @@ def _encode_search_attributes(
 
 class _WorkflowExternFunctions(TypedDict):
     __temporal_get_metric_meter: Callable[[], temporalio.common.MetricMeter]
+    __temporal_assert_local_activity_valid: Callable[[str], None]
 
 
 class _ReplaySafeMetricMeter(temporalio.common.MetricMeter):

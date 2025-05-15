@@ -23,6 +23,7 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    Literal,
     Mapping,
     NewType,
     Optional,
@@ -39,7 +40,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
-from typing_extensions import Literal
+import typing_extensions
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -1433,7 +1434,7 @@ def value_to_type(
     type_args: Tuple = getattr(hint, "__args__", ())
 
     # Literal
-    if origin is Literal:
+    if origin is Literal or origin is typing_extensions.Literal:
         if value not in type_args:
             raise TypeError(f"Value {value} not in literal values {type_args}")
         return value

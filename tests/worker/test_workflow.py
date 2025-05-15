@@ -221,12 +221,13 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
             maximum_interval=timedelta(seconds=5),
             maximum_attempts=6,
         )
-        info = await client.execute_workflow(
+        handle = await client.start_workflow(
             InfoWorkflow.run,
             id=workflow_id,
             task_queue=worker.task_queue,
             retry_policy=retry_policy,
         )
+        info = await handle.result()
         assert info["attempt"] == 1
         assert info["cron_schedule"] is None
         assert info["execution_timeout"] is None
@@ -236,11 +237,26 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         )
         assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
-        datetime.fromisoformat(info["start_time"])
         assert info["task_queue"] == worker.task_queue
         assert info["task_timeout"] == "0:00:10"
         assert info["workflow_id"] == workflow_id
         assert info["workflow_type"] == "InfoWorkflow"
+
+        async for e in handle.fetch_history_events():
+            if e.HasField("workflow_execution_started_event_attributes"):
+                assert info["workflow_start_time"] == json.loads(
+                    json.dumps(
+                        e.event_time.ToDatetime().replace(tzinfo=timezone.utc),
+                        default=str,
+                    )
+                )
+            elif e.HasField("workflow_task_started_event_attributes"):
+                assert info["start_time"] == json.loads(
+                    json.dumps(
+                        e.event_time.ToDatetime().replace(tzinfo=timezone.utc),
+                        default=str,
+                    )
+                )
 
 
 @dataclass
@@ -3128,24 +3144,83 @@ class MemoValue:
 class MemoWorkflow:
     @workflow.run
     async def run(self, run_child: bool) -> None:
-        # Check untyped memo
-        assert workflow.memo()["my_memo"] == {"field1": "foo"}
-        # Check typed memo
-        assert workflow.memo_value("my_memo", type_hint=MemoValue) == MemoValue(
-            field1="foo"
+        expected_memo = {
+            "dict_memo": {"field1": "dict"},
+            "dataclass_memo": {"field1": "data"},
+            "changed_memo": {"field1": "old value"},
+            "removed_memo": {"field1": "removed"},
+        }
+
+        # Test getting all memos (child)
+        # Alternating order of operations between parent and child workflow for more coverage
+        if run_child:
+            assert workflow.memo() == expected_memo
+
+        # Test getting single memo with and without type hint
+        assert workflow.memo_value("dict_memo", type_hint=MemoValue) == MemoValue(
+            field1="dict"
         )
-        # Check default
-        assert workflow.memo_value("absent_memo", "blah") == "blah"
-        # Check key error
-        try:
+        assert workflow.memo_value("dict_memo") == {"field1": "dict"}
+        assert workflow.memo_value("dataclass_memo", type_hint=MemoValue) == MemoValue(
+            field1="data"
+        )
+        assert workflow.memo_value("dataclass_memo") == {"field1": "data"}
+
+        # Test getting all memos (parent)
+        if not run_child:
+            assert workflow.memo() == expected_memo
+
+        # Test missing value handling
+        with pytest.raises(KeyError):
+            workflow.memo_value("absent_memo", type_hint=MemoValue)
+        with pytest.raises(KeyError):
             workflow.memo_value("absent_memo")
-            assert False
-        except KeyError:
-            pass
-        # Run child if requested
+
+        # Test default value handling
+        assert (
+            workflow.memo_value("absent_memo", "default value", type_hint=MemoValue)
+            == "default value"
+        )
+        assert workflow.memo_value("absent_memo", "default value") == "default value"
+        assert workflow.memo_value(
+            "dict_memo", "default value", type_hint=MemoValue
+        ) == MemoValue(field1="dict")
+        assert workflow.memo_value("dict_memo", "default value") == {"field1": "dict"}
+
+        # Saving original memo to pass to child workflow
+        old_memo = dict(workflow.memo())
+
+        # Test upsert
+        assert workflow.memo_value("changed_memo", type_hint=MemoValue) == MemoValue(
+            field1="old value"
+        )
+        assert workflow.memo_value("removed_memo", type_hint=MemoValue) == MemoValue(
+            field1="removed"
+        )
+        with pytest.raises(KeyError):
+            workflow.memo_value("added_memo", type_hint=MemoValue)
+
+        workflow.upsert_memo(
+            {
+                "changed_memo": MemoValue(field1="new value"),
+                "added_memo": MemoValue(field1="added"),
+                "removed_memo": None,
+            }
+        )
+
+        assert workflow.memo_value("changed_memo", type_hint=MemoValue) == MemoValue(
+            field1="new value"
+        )
+        assert workflow.memo_value("added_memo", type_hint=MemoValue) == MemoValue(
+            field1="added"
+        )
+        with pytest.raises(KeyError):
+            workflow.memo_value("removed_memo", type_hint=MemoValue)
+
+        # Run second time as child workflow
         if run_child:
             await workflow.execute_child_workflow(
-                MemoWorkflow.run, False, memo=workflow.memo()
+                MemoWorkflow.run, False, memo=old_memo
             )
 
 
@@ -3157,24 +3232,33 @@ async def test_workflow_memo(client: Client):
             True,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            memo={"my_memo": MemoValue(field1="foo")},
+            memo={
+                "dict_memo": {"field1": "dict"},
+                "dataclass_memo": MemoValue(field1="data"),
+                "changed_memo": MemoValue(field1="old value"),
+                "removed_memo": MemoValue(field1="removed"),
+            },
         )
         await handle.result()
         desc = await handle.describe()
         # Check untyped memo
-        assert (await desc.memo())["my_memo"] == {"field1": "foo"}
+        assert (await desc.memo()) == {
+            "dict_memo": {"field1": "dict"},
+            "dataclass_memo": {"field1": "data"},
+            "changed_memo": {"field1": "new value"},
+            "added_memo": {"field1": "added"},
+        }
         # Check typed memo
-        assert (await desc.memo_value("my_memo", type_hint=MemoValue)) == MemoValue(
-            field1="foo"
-        )
+        assert (
+            await desc.memo_value("dataclass_memo", type_hint=MemoValue)
+        ) == MemoValue(field1="data")
         # Check default
-        assert (await desc.memo_value("absent_memo", "blah")) == "blah"
+        assert (
+            await desc.memo_value("absent_memo", "default value")
+        ) == "default value"
         # Check key error
-        try:
+        with pytest.raises(KeyError):
             await desc.memo_value("absent_memo")
-            assert False
-        except KeyError:
-            pass
 
 
 @workflow.defn
@@ -7423,7 +7507,6 @@ async def test_workflow_dynamic_config_failure(client: Client):
             handle, message_contains="Dynamic config failure"
         )
 
-
 @activity.defn
 async def raise_application_error(use_benign: bool) -> typing.NoReturn:
     if use_benign:
@@ -7486,3 +7569,55 @@ async def test_activity_benign_error_not_logged(client: Client):
                 err.value.cause.cause.category == ApplicationErrorCategory.UNSPECIFIED
             )
             assert capturer.find_log("Completing activity as failed") != None
+
+async def test_workflow_missing_local_activity(client: Client):
+    async with new_worker(
+        client, SimpleLocalActivityWorkflow, activities=[custom_error_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            SimpleLocalActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        await assert_task_fail_eventually(
+            handle,
+            message_contains="Activity function say_hello is not registered on this worker, available activities: custom_error_activity",
+        )
+
+
+async def test_workflow_missing_local_activity_but_dynamic(client: Client):
+    async with new_worker(
+        client,
+        SimpleLocalActivityWorkflow,
+        activities=[custom_error_activity, return_name_activity],
+    ) as worker:
+        res = await client.execute_workflow(
+            SimpleLocalActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        assert res == "say_hello"
+
+
+async def test_workflow_missing_local_activity_no_activities(client: Client):
+    async with new_worker(
+        client,
+        SimpleLocalActivityWorkflow,
+        activities=[],
+    ) as worker:
+        handle = await client.start_workflow(
+            SimpleLocalActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        await assert_task_fail_eventually(
+            handle,
+            message_contains="Activity function say_hello is not registered on this worker, no available activities",
+        )
+

@@ -508,6 +508,8 @@ class Info:
     """
 
     start_time: datetime
+    """The start time of the first task executed by the workflow."""
+
     task_queue: str
     task_timeout: timedelta
 
@@ -520,6 +522,10 @@ class Info:
     """
 
     workflow_id: str
+
+    workflow_start_time: datetime
+    """The start time of the workflow based on the workflow initialization."""
+
     workflow_type: str
 
     def _logger_details(self) -> Mapping[str, Any]:
@@ -738,6 +744,9 @@ class _Runtime(ABC):
     def workflow_memo_value(
         self, key: str, default: Any, *, type_hint: Optional[Type]
     ) -> Any: ...
+
+    @abstractmethod
+    def workflow_upsert_memo(self, updates: Mapping[str, Any]) -> None: ...
 
     @abstractmethod
     def workflow_metric_meter(self) -> temporalio.common.MetricMeter: ...
@@ -984,6 +993,17 @@ def memo_value(
         KeyError: Key not present and default not set.
     """
     return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
+
+
+def upsert_memo(updates: Mapping[str, Any]) -> None:
+    """Adds, modifies, and/or removes memos, with upsert semantics.
+
+    Every memo that has a matching key has its value replaced with the one specified in ``updates``.
+    If the value is set to ``None``, the memo is removed instead.
+    For every key with no existing memo, a new memo is added with specified value (unless the value is ``None``).
+    Memos with keys not included in ``updates`` remain unchanged.
+    """
+    return _Runtime.current().workflow_upsert_memo(updates)
 
 
 def get_current_details() -> str:
