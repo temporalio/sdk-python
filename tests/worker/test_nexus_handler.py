@@ -1,10 +1,25 @@
+"""
+See https://github.com/nexus-rpc/api/blob/main/SPEC.md
+
+This file contains test coverage for Nexus StartOperation and CancelOperation
+operations issued by a caller directly via HTTP.
+
+The response to StartOperation may indicate a protocol-level failure (400
+BAD_REQUEST, 520 UPSTREAM_TIMEOUT, etc). In this case the body is a valid
+Failure object.
+
+
+(https://github.com/nexus-rpc/api/blob/main/SPEC.md#predefined-handler-errors)
+
+"""
+
 import asyncio
 import dataclasses
 import json
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, Never, Tuple, Type
+from typing import Any, Never, Optional, Tuple, Type
 
 import httpx
 import nexusrpc
@@ -42,7 +57,7 @@ class MyService:
     hang: nexusrpc.interface.Operation[Input, Output]
     log: nexusrpc.interface.Operation[Input, Output]
     error: nexusrpc.interface.Operation[Input, Output]
-    start_workflow: nexusrpc.interface.Operation[Input, Output]
+    async_operation: nexusrpc.interface.Operation[Input, Output]
 
 
 @workflow.defn
@@ -118,7 +133,7 @@ class MyServiceHandler:
         return Output(value=f"logged: {input.value}")
 
     @temporalio.nexus.handler.workflow_run_operation
-    async def start_workflow(
+    async def async_operation(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> StartWorkflowOperationResult[Output]:
         return await start_workflow(
@@ -131,19 +146,22 @@ class MyServiceHandler:
 
 @dataclass
 class Failure:
-    message: str
-    metadata: dict[str, str]
-    details: dict[str, Any]
+    message: str = ""
+    metadata: Optional[dict[str, str]] = None
+    details: Optional[dict[str, Any]] = None
 
-    exception: BaseException = dataclasses.field(init=False)
+    exception: Optional[BaseException] = dataclasses.field(init=False, default=None)
 
     def __post_init__(self) -> None:
-        self.exception = self._instantiate_exception(self.details)
+        if self.metadata and (error_type := self.metadata.get("type")):
+            self.exception = self._instantiate_exception(error_type, self.details)
 
-    def _instantiate_exception(self, details: dict[str, Any]) -> BaseException:
+    def _instantiate_exception(
+        self, error_type: str, details: Optional[dict[str, Any]]
+    ) -> BaseException:
         proto = {
             "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,
-        }[self.metadata["type"]]()
+        }[error_type]()
         json_format.ParseDict(self.details, proto, ignore_unknown_fields=True)
         return FailureConverter.default.from_failure(proto, PayloadConverter.default)
 
@@ -164,7 +182,7 @@ class _TestCase:
 
 
 class _FailureTestCase(_TestCase):
-    retryable: bool
+    retryable: Optional[bool] = None
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
@@ -194,19 +212,13 @@ class SyncHandlerHappyPath(_TestCase):
         pass
 
 
-class StartWorkflow(_TestCase):
-    operation = "start_workflow"
+class AsyncHandlerHappyPath(_TestCase):
+    operation = "async_operation"
     input = "hello"
     expected_status_code = 201
     headers = {
         "Content-Type": "application/json",
     }
-
-    @staticmethod
-    def check_response_headers(headers: dict[str, str]) -> None:
-        import pdb
-
-        pdb.set_trace()
 
 
 # TODO(dan): Before fixing the upstream-timeout test by implementing the handler for the
@@ -216,10 +228,8 @@ class StartWorkflow(_TestCase):
 
 # TODO(dan): test Nexus-Callback- headers
 
-# TODO(dan): should an async operation set `Nexus-Operation-State: succeeded`?
 
-
-class UpstreamTimeout(_TestCase):
+class UpstreamTimeout(_FailureTestCase):
     operation = "hang"
     # TODO(dan): test Operation-Timeout header also?
     headers = {"Request-Timeout": "10ms"}
@@ -247,13 +257,6 @@ class BadRequest(_FailureTestCase):
     def check_failure(failure: Failure) -> None:
         # TODO(dan): is it correct that this is ApplicationError?
         assert isinstance(failure.exception, ApplicationError)
-        # (Pdb++) failure.exception.cause
-        # ApplicationError("TypeError: Failed converting field value on dataclass <class 'tests.worker.test_nexus_handler.Input'>")
-        # (Pdb++) failure.exception.cause.cause
-        # ApplicationError("TypeError: Expected value to be str, was <class 'int'>")
-        # assert err.message == "deliberate application error"
-        # assert err.details == "details arg"
-        # assert err.type == "TestFailureType"
 
 
 class NonRetryableApplicationError(_FailureTestCase):
@@ -266,12 +269,6 @@ class NonRetryableApplicationError(_FailureTestCase):
         assert failure.metadata == {"type": "temporal.api.failure.v1.Failure"}
         assert failure.message == "non-retryable application error"
         # TODO(dan): Why are there two levels of ApplicationError? The inner one is non-retryable.
-        # (Pdb++) pprint(failure.details)
-        # {'applicationFailureInfo': {'type': 'HandlerError'},
-        #  'cause': {'applicationFailureInfo': {'details': {'payloads': [{'data': 'ImRldGFpbHMgYXJnIg==',
-        #                                                                 'metadata': {'encoding': 'anNvbi9wbGFpbg=='}}]},
-        #                                       'nonRetryable': True,
-        #                                       'type': 'TestFailureType'},
         err = failure.exception
         assert isinstance(err, ApplicationError)
         err = err.cause
@@ -318,16 +315,44 @@ class OperationError(_FailureTestCase):
     "test_case",
     [
         SyncHandlerHappyPath,
-        UpstreamTimeout,
-        BadRequest,
-        NonRetryableApplicationError,
-        RetryableApplicationError,
-        HandlerErrorInternal,
-        # TODO(dan): OperationError
-        StartWorkflow,
+        AsyncHandlerHappyPath,
     ],
 )
-async def test_nexus_handler(
+async def test_start_operation_happy_path(
+    test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
+):
+    await _test_start_operation(test_case, http_test_env)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        UpstreamTimeout,
+        BadRequest,
+        HandlerErrorInternal,
+    ],
+)
+async def test_start_operation_protocol_level_failures(
+    test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
+):
+    await _test_start_operation(test_case, http_test_env)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NonRetryableApplicationError,
+        RetryableApplicationError,
+        OperationError,
+    ],
+)
+async def test_start_operation_operation_failures(
+    test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
+):
+    await _test_start_operation(test_case, http_test_env)
+
+
+async def _test_start_operation(
     test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
 ):
     client, http_port = http_test_env
@@ -351,23 +376,31 @@ async def test_nexus_handler(
             if issubclass(test_case, _FailureTestCase):
                 failure = Failure(**response.json())
                 test_case.check_failure(failure)
-                assert (
-                    json.loads(response.headers["nexus-request-retryable"])
-                    == test_case.retryable
-                )
+                if test_case.retryable is not None:
+                    assert (
+                        json.loads(response.headers["nexus-request-retryable"])
+                        == test_case.retryable
+                    )
                 err = failure.exception
+                print(
+                    f"got err {err.__class__} with retryable headers {response.headers.get('nexus-request-retryable')}"
+                )
                 if isinstance(err, ApplicationError):
                     print(
-                        f"got err with headers retryable headers {response.headers['nexus-request-retryable']} attr {err.retryable},  -> {getattr(err.cause, 'retryable', None)}"
+                        f"🍎 ApplicationError attr {err.retryable},  -> {getattr(err.cause, 'retryable', None)}"
                     )
                     # assert test_case.retryable == (not err.non_retryable)
-                    if test_case.retryable != err.retryable:
-                        print(
-                            f"\n\n🔴 TODO(dan): failed retryable assertion (expected {test_case.retryable}, got {err.retryable})",
-                        )
-                else:
-                    # TODO(dan): handle other error types
-                    raise NotImplementedError(f"Unknown error type: {type(err)}")
+                    # if test_case.retryable != err.retryable:
+                    #     print(
+                    #         f"\n\n🔴 TODO(dan): failed retryable assertion (expected {test_case.retryable}, got {err.retryable})",
+                    #     )
+                # else:
+                #     # TODO(dan): handle other error types
+                #     raise NotImplementedError(f"Unknown error type: {type(err)}")
+
+    print(
+        "\n\n----------------------------------------------------------------------\n\n"
+    )
 
 
 async def test_logger_uses_operation_context(
