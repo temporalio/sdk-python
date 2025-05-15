@@ -11,6 +11,7 @@ import nexusrpc
 import nexusrpc.handler
 import pytest
 from google.protobuf import json_format
+from hyperlinked import print
 
 import temporalio.api.failure.v1
 from temporalio.client import Client
@@ -176,9 +177,14 @@ class SyncHandlerHappyPath(_TestCase):
 # temporal_sdk_core::worker::nexus: Failed to parse nexus timeout header value
 # '5.617792ms'
 
+# TODO(dan): test Nexus-Callback- headers
+
+# TODO(dan): should an async operation set `Nexus-Operation-State: succeeded`?
+
 
 class UpstreamTimeout(_TestCase):
     operation = "hang"
+    # TODO(dan): test Operation-Timeout header also?
     headers = {"Request-Timeout": "10ms"}
     expected_status_code = 520
 
@@ -313,11 +319,13 @@ async def test_nexus_handler(
                 )
                 err = failure.exception
                 if isinstance(err, ApplicationError):
-                    print("got err with non_retryable", err.non_retryable)
+                    print(
+                        f"got err with headers retryable headers {response.headers['nexus-request-retryable']} attr {err.retryable},  -> {getattr(err.cause, 'retryable', None)}"
+                    )
                     # assert test_case.retryable == (not err.non_retryable)
-                    if test_case.retryable != (not err.non_retryable):
+                    if test_case.retryable != err.retryable:
                         print(
-                            f"\n\n🔴 TODO(dan): failed retryable assertion (expected {test_case.retryable}, got {not err.non_retryable})",
+                            f"\n\n🔴 TODO(dan): failed retryable assertion (expected {test_case.retryable}, got {err.retryable})",
                         )
                 else:
                     # TODO(dan): handle other error types
