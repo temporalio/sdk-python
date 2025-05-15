@@ -6395,8 +6395,8 @@ async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
         assert timer_summs == {"hi!", "timer2"}
 
         describe_r = await handle.describe()
-        assert describe_r.static_summary == "cool workflow bro"
-        assert describe_r.static_details == "xtremely detailed"
+        assert await describe_r.static_summary() == "cool workflow bro"
+        assert await describe_r.static_details() == "xtremely detailed"
 
 
 @workflow.defn
