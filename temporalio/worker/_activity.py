@@ -219,7 +219,10 @@ class _ActivityWorker:
         activity.cancellation_details.details = (
             temporalio.activity.ActivityCancellationDetails._from_proto(cancel.details)
         )
-        activity.cancel(cancelled_by_request=cancel.details.is_cancelled)
+        activity.cancel(
+            cancelled_by_request=cancel.details.is_cancelled
+            or cancel.details.is_worker_shutdown
+        )
 
     def _heartbeat(self, task_token: bytes, *details: Any) -> None:
         # We intentionally make heartbeating non-async, but since the data
@@ -319,7 +322,8 @@ class _ActivityWorker:
                     )
                     await self._data_converter.encode_failure(
                         temporalio.exceptions.ApplicationError(
-                            "Unhandled activity cancel error produced by activity pause"
+                            type="ActivityPause",
+                            message="Unhandled activity cancel error produced by activity pause",
                         ),
                         completion.result.failed.failure,
                     )
