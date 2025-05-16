@@ -485,35 +485,6 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
-class ISO8601DatetimePayloadConverter(EncodingPayloadConverter):
-    """Converter for 'binary/iso8601' payloads supporting datetime values."""
-
-    @property
-    def encoding(self) -> str:
-        """See base class."""
-        return "binary/iso8601"
-
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
-        """See base class."""
-        if isinstance(value, datetime):
-            return temporalio.api.common.v1.Payload(
-                metadata={"encoding": self.encoding.encode()},
-                data=value.isoformat().encode(),
-            )
-        return None
-
-    def from_payload(
-        self,
-        payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
-    ) -> Any:
-        """See base class."""
-        try:
-            return datetime.fromisoformat(payload.data.decode())
-        except ValueError as err:
-            raise RuntimeError("Failed parsing ISO8601 datetime") from err
-
-
 class AdvancedJSONEncoder(json.JSONEncoder):
     """Advanced JSON encoder.
 
@@ -529,6 +500,9 @@ class AdvancedJSONEncoder(json.JSONEncoder):
 
         See :py:meth:`json.JSONEncoder.default`.
         """
+        # Datetime support
+        if isinstance(o, datetime):
+            return o.isoformat()
         # Dataclass support
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
@@ -1161,7 +1135,6 @@ DefaultPayloadConverter.default_encoding_payload_converters = (
     BinaryPlainPayloadConverter(),
     JSONProtoPayloadConverter(),
     BinaryProtoPayloadConverter(),
-    ISO8601DatetimePayloadConverter(),
     JSONPlainPayloadConverter(),  # JSON Plain needs to remain in last because it throws on unknown types
 )
 
@@ -1429,6 +1402,15 @@ def value_to_type(
     # Any or primitives
     if hint is Any:
         return value
+    elif hint is datetime:
+        if isinstance(value, str):
+            try:
+                return _get_iso_datetime_parser()(value)
+            except ValueError as err:
+                raise TypeError(f"Failed parsing datetime string: {value}") from err
+        elif isinstance(value, datetime):
+            return value
+        raise TypeError(f"Expected datetime or ISO8601 string, got {type(value)}")
     elif hint is int or hint is float:
         if not isinstance(value, (int, float)):
             raise TypeError(f"Expected value to be int|float, was {type(value)}")
