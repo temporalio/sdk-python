@@ -27,7 +27,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n(temporal/api/deployment/v1/message.proto\x12\x1atemporal.api.deployment.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&temporal/api/enums/v1/deployment.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a$temporal/api/common/v1/message.proto"\x91\x01\n\x17WorkerDeploymentOptions\x12\x17\n\x0f\x64\x65ployment_name\x18\x01 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t\x12K\n\x16worker_versioning_mode\x18\x03 \x01(\x0e\x32+.temporal.api.enums.v1.WorkerVersioningMode"3\n\nDeployment\x12\x13\n\x0bseries_name\x18\x01 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t"\x8e\x04\n\x0e\x44\x65ploymentInfo\x12:\n\ndeployment\x18\x01 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12R\n\x10task_queue_infos\x18\x03 \x03(\x0b\x32\x38.temporal.api.deployment.v1.DeploymentInfo.TaskQueueInfo\x12J\n\x08metadata\x18\x04 \x03(\x0b\x32\x38.temporal.api.deployment.v1.DeploymentInfo.MetadataEntry\x12\x12\n\nis_current\x18\x05 \x01(\x08\x1aP\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01\x1a\x88\x01\n\rTaskQueueInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04type\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12\x35\n\x11\x66irst_poller_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xea\x01\n\x18UpdateDeploymentMetadata\x12_\n\x0eupsert_entries\x18\x01 \x03(\x0b\x32G.temporal.api.deployment.v1.UpdateDeploymentMetadata.UpsertEntriesEntry\x12\x16\n\x0eremove_entries\x18\x02 \x03(\t\x1aU\n\x12UpsertEntriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\x95\x01\n\x12\x44\x65ploymentListInfo\x12:\n\ndeployment\x18\x01 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nis_current\x18\x03 \x01(\x08"\x84\x05\n\x1bWorkerDeploymentVersionInfo\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12/\n\x0b\x63reate_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x38\n\x14routing_changed_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12\x63urrent_since_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12ramping_since_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x17\n\x0framp_percentage\x18\x07 \x01(\x02\x12\x66\n\x10task_queue_infos\x18\x08 \x03(\x0b\x32L.temporal.api.deployment.v1.WorkerDeploymentVersionInfo.VersionTaskQueueInfo\x12\x46\n\rdrainage_info\x18\t \x01(\x0b\x32/.temporal.api.deployment.v1.VersionDrainageInfo\x12=\n\x08metadata\x18\n \x01(\x0b\x32+.temporal.api.deployment.v1.VersionMetadata\x1aX\n\x14VersionTaskQueueInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04type\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType"\xc1\x01\n\x13VersionDrainageInfo\x12<\n\x06status\x18\x01 \x01(\x0e\x32,.temporal.api.enums.v1.VersionDrainageStatus\x12\x35\n\x11last_changed_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x35\n\x11last_checked_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xd0\x03\n\x14WorkerDeploymentInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12j\n\x11version_summaries\x18\x02 \x03(\x0b\x32O.temporal.api.deployment.v1.WorkerDeploymentInfo.WorkerDeploymentVersionSummary\x12/\n\x0b\x63reate_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x41\n\x0erouting_config\x18\x04 \x01(\x0b\x32).temporal.api.deployment.v1.RoutingConfig\x12\x1e\n\x16last_modifier_identity\x18\x05 \x01(\t\x1a\xa9\x01\n\x1eWorkerDeploymentVersionSummary\x12\x0f\n\x07version\x18\x01 \x01(\t\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x45\n\x0f\x64rainage_status\x18\x03 \x01(\x0e\x32,.temporal.api.enums.v1.VersionDrainageStatus"\xad\x01\n\x0fVersionMetadata\x12I\n\x07\x65ntries\x18\x01 \x03(\x0b\x32\x38.temporal.api.deployment.v1.VersionMetadata.EntriesEntry\x1aO\n\x0c\x45ntriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\xb6\x02\n\rRoutingConfig\x12\x17\n\x0f\x63urrent_version\x18\x01 \x01(\t\x12\x17\n\x0framping_version\x18\x02 \x01(\t\x12"\n\x1aramping_version_percentage\x18\x03 \x01(\x02\x12@\n\x1c\x63urrent_version_changed_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12@\n\x1cramping_version_changed_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12K\n\'ramping_version_percentage_changed_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x9d\x01\n\x1dio.temporal.api.deployment.v1B\x0cMessageProtoP\x01Z+go.temporal.io/api/deployment/v1;deployment\xaa\x02\x1cTemporalio.Api.Deployment.V1\xea\x02\x1fTemporalio::Api::Deployment::V1b\x06proto3'
+    b'\n(temporal/api/deployment/v1/message.proto\x12\x1atemporal.api.deployment.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&temporal/api/enums/v1/deployment.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a$temporal/api/common/v1/message.proto"\x91\x01\n\x17WorkerDeploymentOptions\x12\x17\n\x0f\x64\x65ployment_name\x18\x01 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t\x12K\n\x16worker_versioning_mode\x18\x03 \x01(\x0e\x32+.temporal.api.enums.v1.WorkerVersioningMode"3\n\nDeployment\x12\x13\n\x0bseries_name\x18\x01 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t"\x8e\x04\n\x0e\x44\x65ploymentInfo\x12:\n\ndeployment\x18\x01 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12R\n\x10task_queue_infos\x18\x03 \x03(\x0b\x32\x38.temporal.api.deployment.v1.DeploymentInfo.TaskQueueInfo\x12J\n\x08metadata\x18\x04 \x03(\x0b\x32\x38.temporal.api.deployment.v1.DeploymentInfo.MetadataEntry\x12\x12\n\nis_current\x18\x05 \x01(\x08\x1aP\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01\x1a\x88\x01\n\rTaskQueueInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04type\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12\x35\n\x11\x66irst_poller_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xea\x01\n\x18UpdateDeploymentMetadata\x12_\n\x0eupsert_entries\x18\x01 \x03(\x0b\x32G.temporal.api.deployment.v1.UpdateDeploymentMetadata.UpsertEntriesEntry\x12\x16\n\x0eremove_entries\x18\x02 \x03(\t\x1aU\n\x12UpsertEntriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\x95\x01\n\x12\x44\x65ploymentListInfo\x12:\n\ndeployment\x18\x01 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nis_current\x18\x03 \x01(\x08"\xd9\x05\n\x1bWorkerDeploymentVersionInfo\x12\x13\n\x07version\x18\x01 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x0b \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12/\n\x0b\x63reate_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x38\n\x14routing_changed_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12\x63urrent_since_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12ramping_since_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x17\n\x0framp_percentage\x18\x07 \x01(\x02\x12\x66\n\x10task_queue_infos\x18\x08 \x03(\x0b\x32L.temporal.api.deployment.v1.WorkerDeploymentVersionInfo.VersionTaskQueueInfo\x12\x46\n\rdrainage_info\x18\t \x01(\x0b\x32/.temporal.api.deployment.v1.VersionDrainageInfo\x12=\n\x08metadata\x18\n \x01(\x0b\x32+.temporal.api.deployment.v1.VersionMetadata\x1aX\n\x14VersionTaskQueueInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04type\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType"\xc1\x01\n\x13VersionDrainageInfo\x12<\n\x06status\x18\x01 \x01(\x0e\x32,.temporal.api.enums.v1.VersionDrainageStatus\x12\x35\n\x11last_changed_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x35\n\x11last_checked_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xa5\x04\n\x14WorkerDeploymentInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12j\n\x11version_summaries\x18\x02 \x03(\x0b\x32O.temporal.api.deployment.v1.WorkerDeploymentInfo.WorkerDeploymentVersionSummary\x12/\n\x0b\x63reate_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x41\n\x0erouting_config\x18\x04 \x01(\x0b\x32).temporal.api.deployment.v1.RoutingConfig\x12\x1e\n\x16last_modifier_identity\x18\x05 \x01(\t\x1a\xfe\x01\n\x1eWorkerDeploymentVersionSummary\x12\x13\n\x07version\x18\x01 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x04 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x45\n\x0f\x64rainage_status\x18\x03 \x01(\x0e\x32,.temporal.api.enums.v1.VersionDrainageStatus"D\n\x17WorkerDeploymentVersion\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t"\xad\x01\n\x0fVersionMetadata\x12I\n\x07\x65ntries\x18\x01 \x03(\x0b\x32\x38.temporal.api.deployment.v1.VersionMetadata.EntriesEntry\x1aO\n\x0c\x45ntriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"\xf0\x03\n\rRoutingConfig\x12W\n\x1a\x63urrent_deployment_version\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x0f\x63urrent_version\x18\x01 \x01(\tB\x02\x18\x01\x12W\n\x1aramping_deployment_version\x18\t \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x0framping_version\x18\x02 \x01(\tB\x02\x18\x01\x12"\n\x1aramping_version_percentage\x18\x03 \x01(\x02\x12@\n\x1c\x63urrent_version_changed_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12@\n\x1cramping_version_changed_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12K\n\'ramping_version_percentage_changed_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x9d\x01\n\x1dio.temporal.api.deployment.v1B\x0cMessageProtoP\x01Z+go.temporal.io/api/deployment/v1;deployment\xaa\x02\x1cTemporalio.Api.Deployment.V1\xea\x02\x1fTemporalio::Api::Deployment::V1b\x06proto3'
 )
 
 
@@ -52,6 +52,7 @@ _WORKERDEPLOYMENTINFO = DESCRIPTOR.message_types_by_name["WorkerDeploymentInfo"]
 _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY = (
     _WORKERDEPLOYMENTINFO.nested_types_by_name["WorkerDeploymentVersionSummary"]
 )
+_WORKERDEPLOYMENTVERSION = DESCRIPTOR.message_types_by_name["WorkerDeploymentVersion"]
 _VERSIONMETADATA = DESCRIPTOR.message_types_by_name["VersionMetadata"]
 _VERSIONMETADATA_ENTRIESENTRY = _VERSIONMETADATA.nested_types_by_name["EntriesEntry"]
 _ROUTINGCONFIG = DESCRIPTOR.message_types_by_name["RoutingConfig"]
@@ -193,6 +194,17 @@ WorkerDeploymentInfo = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(WorkerDeploymentInfo)
 _sym_db.RegisterMessage(WorkerDeploymentInfo.WorkerDeploymentVersionSummary)
 
+WorkerDeploymentVersion = _reflection.GeneratedProtocolMessageType(
+    "WorkerDeploymentVersion",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _WORKERDEPLOYMENTVERSION,
+        "__module__": "temporal.api.deployment.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.WorkerDeploymentVersion)
+    },
+)
+_sym_db.RegisterMessage(WorkerDeploymentVersion)
+
 VersionMetadata = _reflection.GeneratedProtocolMessageType(
     "VersionMetadata",
     (_message.Message,),
@@ -232,8 +244,22 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _DEPLOYMENTINFO_METADATAENTRY._serialized_options = b"8\001"
     _UPDATEDEPLOYMENTMETADATA_UPSERTENTRIESENTRY._options = None
     _UPDATEDEPLOYMENTMETADATA_UPSERTENTRIESENTRY._serialized_options = b"8\001"
+    _WORKERDEPLOYMENTVERSIONINFO.fields_by_name["version"]._options = None
+    _WORKERDEPLOYMENTVERSIONINFO.fields_by_name[
+        "version"
+    ]._serialized_options = b"\030\001"
+    _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY.fields_by_name[
+        "version"
+    ]._options = None
+    _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY.fields_by_name[
+        "version"
+    ]._serialized_options = b"\030\001"
     _VERSIONMETADATA_ENTRIESENTRY._options = None
     _VERSIONMETADATA_ENTRIESENTRY._serialized_options = b"8\001"
+    _ROUTINGCONFIG.fields_by_name["current_version"]._options = None
+    _ROUTINGCONFIG.fields_by_name["current_version"]._serialized_options = b"\030\001"
+    _ROUTINGCONFIG.fields_by_name["ramping_version"]._options = None
+    _ROUTINGCONFIG.fields_by_name["ramping_version"]._serialized_options = b"\030\001"
     _WORKERDEPLOYMENTOPTIONS._serialized_start = 224
     _WORKERDEPLOYMENTOPTIONS._serialized_end = 369
     _DEPLOYMENT._serialized_start = 371
@@ -251,19 +277,21 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _DEPLOYMENTLISTINFO._serialized_start = 1191
     _DEPLOYMENTLISTINFO._serialized_end = 1340
     _WORKERDEPLOYMENTVERSIONINFO._serialized_start = 1343
-    _WORKERDEPLOYMENTVERSIONINFO._serialized_end = 1987
-    _WORKERDEPLOYMENTVERSIONINFO_VERSIONTASKQUEUEINFO._serialized_start = 1899
-    _WORKERDEPLOYMENTVERSIONINFO_VERSIONTASKQUEUEINFO._serialized_end = 1987
-    _VERSIONDRAINAGEINFO._serialized_start = 1990
-    _VERSIONDRAINAGEINFO._serialized_end = 2183
-    _WORKERDEPLOYMENTINFO._serialized_start = 2186
-    _WORKERDEPLOYMENTINFO._serialized_end = 2650
-    _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY._serialized_start = 2481
-    _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY._serialized_end = 2650
-    _VERSIONMETADATA._serialized_start = 2653
-    _VERSIONMETADATA._serialized_end = 2826
-    _VERSIONMETADATA_ENTRIESENTRY._serialized_start = 2747
-    _VERSIONMETADATA_ENTRIESENTRY._serialized_end = 2826
-    _ROUTINGCONFIG._serialized_start = 2829
-    _ROUTINGCONFIG._serialized_end = 3139
+    _WORKERDEPLOYMENTVERSIONINFO._serialized_end = 2072
+    _WORKERDEPLOYMENTVERSIONINFO_VERSIONTASKQUEUEINFO._serialized_start = 1984
+    _WORKERDEPLOYMENTVERSIONINFO_VERSIONTASKQUEUEINFO._serialized_end = 2072
+    _VERSIONDRAINAGEINFO._serialized_start = 2075
+    _VERSIONDRAINAGEINFO._serialized_end = 2268
+    _WORKERDEPLOYMENTINFO._serialized_start = 2271
+    _WORKERDEPLOYMENTINFO._serialized_end = 2820
+    _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY._serialized_start = 2566
+    _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY._serialized_end = 2820
+    _WORKERDEPLOYMENTVERSION._serialized_start = 2822
+    _WORKERDEPLOYMENTVERSION._serialized_end = 2890
+    _VERSIONMETADATA._serialized_start = 2893
+    _VERSIONMETADATA._serialized_end = 3066
+    _VERSIONMETADATA_ENTRIESENTRY._serialized_start = 2987
+    _VERSIONMETADATA_ENTRIESENTRY._serialized_end = 3066
+    _ROUTINGCONFIG._serialized_start = 3069
+    _ROUTINGCONFIG._serialized_end = 3565
 # @@protoc_insertion_point(module_scope)
