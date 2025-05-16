@@ -86,6 +86,11 @@ class MyDataClass:
     baz: SerializableEnum
 
 
+@dataclass
+class DatetimeClass:
+    datetime: datetime
+
+
 async def test_converter_default():
     async def assert_payload(
         input,
@@ -178,11 +183,28 @@ async def test_converter_default():
         type_hint=RawValue,
     )
 
+    # Without type hint, it is deserialized as a str
     await assert_payload(
-        datetime(2020, 1, 1, 1, 1, 1), "binary/iso8601", "2020-01-01T01:01:01"
+        datetime(2020, 1, 1, 1, 1, 1),
+        "json/plain",
+        '"2020-01-01T01:01:01"',
+        expected_decoded_input="2020-01-01T01:01:01",
     )
+
+    # With type hint, it is deserialized as a datetime
     await assert_payload(
-        datetime(2020, 1, 1, 1, 1, 1, 1), "binary/iso8601", "2020-01-01T01:01:01.000001"
+        datetime(2020, 1, 1, 1, 1, 1, 1),
+        "json/plain",
+        '"2020-01-01T01:01:01.000001"',
+        type_hint=datetime,
+    )
+
+    # Data class with datetime
+    await assert_payload(
+        DatetimeClass(datetime=datetime(2020, 1, 1, 1, 1, 1)),
+        "json/plain",
+        '{"datetime":"2020-01-01T01:01:01"}',
+        type_hint=DatetimeClass,
     )
 
 
