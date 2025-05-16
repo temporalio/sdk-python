@@ -178,6 +178,13 @@ async def test_converter_default():
         type_hint=RawValue,
     )
 
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1), "binary/iso8601", "2020-01-01T01:01:01"
+    )
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1, 1), "binary/iso8601", "2020-01-01T01:01:01.000001"
+    )
+
 
 def test_binary_proto():
     # We have to test this separately because by default it never encodes
