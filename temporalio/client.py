@@ -6264,8 +6264,9 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp_by_id.cancel_requested:
+            if resp_by_id.cancel_requested or resp_by_id.activity_paused:
                 raise AsyncActivityCancelledError()
+
         else:
             resp = await self._client.workflow_service.record_activity_task_heartbeat(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest(
@@ -6278,7 +6279,7 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp.cancel_requested:
+            if resp.cancel_requested or resp.activity_paused:
                 raise AsyncActivityCancelledError()
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import dataclasses
 import json
 import logging
@@ -38,6 +39,7 @@ from urllib.request import urlopen
 from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
+import temporalio.activity
 import temporalio.worker
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -47,6 +49,7 @@ from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
+    PauseActivityRequest,
     ResetStickyTaskQueueRequest,
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
@@ -116,11 +119,14 @@ from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
+    assert_pending_activity_exists_eventually,
     assert_task_fail_eventually,
     assert_workflow_exists_eventually,
     ensure_search_attributes_present,
     find_free_port,
     new_worker,
+    pause_and_assert,
+    unpause_and_assert,
     workflow_update_exists,
 )
 from tests.helpers.external_stack_trace import (
@@ -7622,3 +7628,201 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
             handle,
             message_contains="Activity function say_hello is not registered on this worker, no available activities",
         )
+
+
+@activity.defn
+async def heartbeat_activity(
+    catch_err: bool = True,
+) -> Optional[temporalio.activity.ActivityCancellationDetails]:
+    while True:
+        try:
+            activity.heartbeat()
+            # If we are on the second attempt, we have retried due to pause/unpause.
+            if activity.info().attempt > 1:
+                return activity.cancellation_details()
+            await asyncio.sleep(0.1)
+        except (CancelledError, asyncio.CancelledError) as err:
+            if not catch_err:
+                raise err
+            return activity.cancellation_details()
+
+
+@activity.defn
+def sync_heartbeat_activity(
+    catch_err: bool = True,
+) -> Optional[temporalio.activity.ActivityCancellationDetails]:
+    while True:
+        try:
+            activity.heartbeat()
+            # If we are on the second attempt, we have retried due to pause/unpause.
+            if activity.info().attempt > 1:
+                return activity.cancellation_details()
+            time.sleep(0.1)
+        except (CancelledError, asyncio.CancelledError) as err:
+            if not catch_err:
+                raise err
+            return activity.cancellation_details()
+
+
+@workflow.defn
+class ActivityHeartbeatWorkflow:
+    @workflow.run
+    async def run(
+        self, activity_id: str
+    ) -> list[Optional[temporalio.activity.ActivityCancellationDetails]]:
+        result = []
+        result.append(
+            await workflow.execute_activity(
+                sync_heartbeat_activity,
+                activity_id=activity_id,
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=2),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        )
+        result.append(
+            await workflow.execute_activity(
+                heartbeat_activity,
+                activity_id=f"{activity_id}-2",
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=2),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        )
+        return result
+
+
+async def test_activity_pause_cancellation_details(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not support pause API yet")
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        async with Worker(
+            client,
+            task_queue=str(uuid.uuid4()),
+            workflows=[ActivityHeartbeatWorkflow],
+            activities=[heartbeat_activity, sync_heartbeat_activity],
+            activity_executor=executor,
+        ) as worker:
+            test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
+
+            handle = await client.start_workflow(
+                ActivityHeartbeatWorkflow.run,
+                test_activity_id,
+                id=f"test-activity-pause-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            # Wait for sync activity
+            activity_info_1 = await assert_pending_activity_exists_eventually(
+                handle, test_activity_id
+            )
+            # Assert not paused
+            assert not activity_info_1.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_1.activity_id)
+
+            # Wait for async activity
+            activity_info_2 = await assert_pending_activity_exists_eventually(
+                handle, f"{test_activity_id}-2"
+            )
+            # Assert not paused
+            assert not activity_info_2.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_2.activity_id)
+
+            # Assert workflow return value for paused activities that caught the
+            # cancel error
+            result = await handle.result()
+            assert result[0] == temporalio.activity.ActivityCancellationDetails(
+                paused=True
+            )
+            assert result[1] == temporalio.activity.ActivityCancellationDetails(
+                paused=True
+            )
+
+
+@workflow.defn
+class ActivityHeartbeatPauseUnpauseWorkflow:
+    @workflow.run
+    async def run(
+        self, activity_id: str
+    ) -> list[Optional[temporalio.activity.ActivityCancellationDetails]]:
+        results = []
+        results.append(
+            await workflow.execute_activity(
+                sync_heartbeat_activity,
+                False,
+                activity_id=activity_id,
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=1),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        )
+        results.append(
+            await workflow.execute_activity(
+                heartbeat_activity,
+                False,
+                activity_id=f"{activity_id}-2",
+                start_to_close_timeout=timedelta(seconds=10),
+                heartbeat_timeout=timedelta(seconds=1),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        )
+        return results
+
+
+async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not support pause API yet")
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        async with Worker(
+            client,
+            task_queue=str(uuid.uuid4()),
+            workflows=[ActivityHeartbeatPauseUnpauseWorkflow],
+            activities=[heartbeat_activity, sync_heartbeat_activity],
+            activity_executor=executor,
+            max_heartbeat_throttle_interval=timedelta(milliseconds=300),
+            default_heartbeat_throttle_interval=timedelta(milliseconds=300),
+        ) as worker:
+            test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
+
+            handle = await client.start_workflow(
+                ActivityHeartbeatPauseUnpauseWorkflow.run,
+                test_activity_id,
+                id=f"test-activity-pause-unpause-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            # Wait for sync activity
+            activity_info_1 = await assert_pending_activity_exists_eventually(
+                handle, test_activity_id
+            )
+            # Assert not paused
+            assert not activity_info_1.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_1.activity_id)
+
+            # Wait for next heartbeat to propagate the cancellation. Unpausing before the heartbeat
+            # will show activity as unpaused to core. Consequently, it will *not* issue an activity cancel.
+            time.sleep(0.3)
+            # Unpause activity
+            await unpause_and_assert(client, handle, activity_info_1.activity_id)
+            # Expect second activity to have started now
+            activity_info_2 = await assert_pending_activity_exists_eventually(
+                handle, f"{test_activity_id}-2"
+            )
+            # Assert not paused
+            assert not activity_info_2.paused
+            # Pause activity then assert it is paused
+            await pause_and_assert(client, handle, activity_info_2.activity_id)
+            # Wait for next heartbeat to propagate the cancellation.
+            time.sleep(0.3)
+            # Unpause activity
+            await unpause_and_assert(client, handle, activity_info_2.activity_id)
+
+            # Check workflow complete
+            result = await handle.result()
+            assert result[0] == None
+            assert result[1] == None
