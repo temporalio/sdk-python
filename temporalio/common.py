@@ -1039,17 +1039,6 @@ class VersioningBehavior(IntEnum):
     queue) when the next task is dispatched."""
 
 
-class PinnedOverrideBehavior(IntEnum):
-    """Specifies different sub-types of pinned override.
-
-    .. warning::
-        Experimental API.
-    """
-
-    PINNED = temporalio.api.workflow.v1.VersioningOverride.PinnedOverrideBehavior.PINNED_OVERRIDE_BEHAVIOR_PINNED
-    """Override workflow behavior to be pinned."""
-
-
 @dataclass(frozen=True)
 class WorkerDeploymentVersion:
     """Represents the version of a specific worker deployment.
@@ -1106,7 +1095,6 @@ class PinnedVersioningOverride(VersioningOverride):
     """
 
     version: WorkerDeploymentVersion
-    behavior: PinnedOverrideBehavior = PinnedOverrideBehavior.PINNED
 
     def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
         """Convert to proto representation."""
@@ -1116,7 +1104,7 @@ class PinnedVersioningOverride(VersioningOverride):
             pinned_version=self.version.to_canonical_string(),
             pinned=temporalio.api.workflow.v1.VersioningOverride.PinnedOverride(
                 version=self.version._to_proto(),
-                behavior=self.behavior.value,
+                behavior=temporalio.api.workflow.v1.VersioningOverride.PinnedOverrideBehavior.PINNED_OVERRIDE_BEHAVIOR_PINNED,
             ),
         )
 
