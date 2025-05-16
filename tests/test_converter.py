@@ -8,7 +8,7 @@ import sys
 import traceback
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum, IntEnum
 from typing import (
     Any,
@@ -196,6 +196,14 @@ async def test_converter_default():
         datetime(2020, 1, 1, 1, 1, 1, 1),
         "json/plain",
         '"2020-01-01T01:01:01.000001"',
+        type_hint=datetime,
+    )
+
+    # Timezones work
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1, tzinfo=timezone(timedelta(hours=5))),
+        "json/plain",
+        '"2020-01-01T01:01:01+05:00"',
         type_hint=datetime,
     )
 
