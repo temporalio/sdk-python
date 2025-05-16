@@ -195,6 +195,11 @@ class _NexusWorker:
         #     }
         # }
 
+        # message UnsuccessfulOperationError {
+        #     string operation_state = 1;
+        #     Failure failure = 2;
+        # }
+
         # message HandlerError {
         #     string error_type = 1;
         #     Failure failure = 2;
@@ -235,7 +240,7 @@ class _NexusWorker:
                         type=HandlerErrorType.BAD_REQUEST,
                         cause=err,
                         retryable=False,
-                    )
+                    ) from err
 
                 options = nexusrpc.handler.StartOperationOptions(
                     headers=header,
