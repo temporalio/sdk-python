@@ -1109,6 +1109,7 @@ class PinnedVersioningOverride(VersioningOverride):
         )
 
 
+@dataclass(frozen=True)
 class AutoUpgradeVersioningOverride(VersioningOverride):
     """The workflow will auto-upgrade to the current deployment version on the next workflow task.
 
