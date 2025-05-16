@@ -1046,8 +1046,6 @@ class PinnedOverrideBehavior(IntEnum):
         Experimental API.
     """
 
-    UNSPECIFIED = temporalio.api.workflow.v1.VersioningOverride.PinnedOverrideBehavior.PINNED_OVERRIDE_BEHAVIOR_UNSPECIFIED
-    """Unspecified."""
     PINNED = temporalio.api.workflow.v1.VersioningOverride.PinnedOverrideBehavior.PINNED_OVERRIDE_BEHAVIOR_PINNED
     """Override workflow behavior to be pinned."""
 
