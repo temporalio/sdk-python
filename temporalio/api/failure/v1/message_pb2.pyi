@@ -32,6 +32,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.message
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.nexus_pb2
 import temporalio.api.enums.v1.workflow_pb2
 
@@ -49,6 +50,7 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
     NON_RETRYABLE_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     NEXT_RETRY_DELAY_FIELD_NUMBER: builtins.int
+    CATEGORY_FIELD_NUMBER: builtins.int
     type: builtins.str
     non_retryable: builtins.bool
     @property
@@ -60,6 +62,7 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
         still be subject to the maximum retries limit and total time limit
         defined by the policy.
         """
+    category: temporalio.api.enums.v1.common_pb2.ApplicationErrorCategory.ValueType
     def __init__(
         self,
         *,
@@ -67,6 +70,7 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
         non_retryable: builtins.bool = ...,
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         next_retry_delay: google.protobuf.duration_pb2.Duration | None = ...,
+        category: temporalio.api.enums.v1.common_pb2.ApplicationErrorCategory.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -77,6 +81,8 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "category",
+            b"category",
             "details",
             b"details",
             "next_retry_delay",

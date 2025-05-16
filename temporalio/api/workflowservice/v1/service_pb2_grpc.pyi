@@ -840,6 +840,42 @@ class WorkflowServiceStub:
 
     Returns a `NotFound` error if there is no pending activity with the provided ID or type.
     """
+    CreateWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
+    ]
+    """Create a new workflow rule. The rules are used to control the workflow execution.
+    The rule will be applied to all running and new workflows in the namespace.
+    If the rule with such ID already exist this call will fail
+    Note: the rules are part of namespace configuration and will be stored in the namespace config.
+    Namespace config is eventually consistent.
+    """
+    DescribeWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
+    ]
+    """DescribeWorkflowRule return the rule specification for existing rule id.
+    If there is no rule with such id - NOT FOUND error will be returned.
+    """
+    DeleteWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
+    ]
+    """Delete rule by rule id"""
+    ListWorkflowRules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
+    ]
+    """Return all namespace workflow rules"""
+    TriggerWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
+    ]
+    """TriggerWorkflowRule allows to:
+     * trigger existing rule for a specific workflow execution;
+     * trigger rule for a specific workflow execution without creating a rule;
+    This is useful for one-off operations.
+    """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -1821,6 +1857,54 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         'keep_paused': if the activity is paused, it will remain paused.
 
         Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+        """
+    @abc.abstractmethod
+    def CreateWorkflowRule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse:
+        """Create a new workflow rule. The rules are used to control the workflow execution.
+        The rule will be applied to all running and new workflows in the namespace.
+        If the rule with such ID already exist this call will fail
+        Note: the rules are part of namespace configuration and will be stored in the namespace config.
+        Namespace config is eventually consistent.
+        """
+    @abc.abstractmethod
+    def DescribeWorkflowRule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse:
+        """DescribeWorkflowRule return the rule specification for existing rule id.
+        If there is no rule with such id - NOT FOUND error will be returned.
+        """
+    @abc.abstractmethod
+    def DeleteWorkflowRule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse:
+        """Delete rule by rule id"""
+    @abc.abstractmethod
+    def ListWorkflowRules(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse
+    ):
+        """Return all namespace workflow rules"""
+    @abc.abstractmethod
+    def TriggerWorkflowRule(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse:
+        """TriggerWorkflowRule allows to:
+         * trigger existing rule for a specific workflow execution;
+         * trigger rule for a specific workflow execution without creating a rule;
+        This is useful for one-off operations.
         """
 
 def add_WorkflowServiceServicer_to_server(

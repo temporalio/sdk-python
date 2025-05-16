@@ -307,6 +307,7 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
     CANCEL_REQUESTED_FIELD_NUMBER: builtins.int
     LAST_RESET_TIME_FIELD_NUMBER: builtins.int
     ORIGINAL_START_TIME_FIELD_NUMBER: builtins.int
+    RESET_RUN_ID_FIELD_NUMBER: builtins.int
     @property
     def execution_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Workflow execution expiration time is defined as workflow start time plus expiration timeout.
@@ -323,6 +324,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
     @property
     def original_start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Original workflow start time."""
+    reset_run_id: builtins.str
+    """Reset Run ID points to the new run when this execution is reset. If the execution is reset multiple times, it points to the latest run."""
     def __init__(
         self,
         *,
@@ -331,6 +334,7 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
         cancel_requested: builtins.bool = ...,
         last_reset_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         original_start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        reset_run_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -356,6 +360,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
             b"last_reset_time",
             "original_start_time",
             b"original_start_time",
+            "reset_run_id",
+            b"reset_run_id",
             "run_expiration_time",
             b"run_expiration_time",
         ],
@@ -621,6 +627,79 @@ global___WorkflowExecutionConfig = WorkflowExecutionConfig
 class PendingActivityInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class PauseInfo(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class Manual(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            IDENTITY_FIELD_NUMBER: builtins.int
+            REASON_FIELD_NUMBER: builtins.int
+            identity: builtins.str
+            """The identity of the actor that paused the activity."""
+            reason: builtins.str
+            """Reason for pausing the activity."""
+            def __init__(
+                self,
+                *,
+                identity: builtins.str = ...,
+                reason: builtins.str = ...,
+            ) -> None: ...
+            def ClearField(
+                self,
+                field_name: typing_extensions.Literal[
+                    "identity", b"identity", "reason", b"reason"
+                ],
+            ) -> None: ...
+
+        PAUSE_TIME_FIELD_NUMBER: builtins.int
+        MANUAL_FIELD_NUMBER: builtins.int
+        RULE_ID_FIELD_NUMBER: builtins.int
+        @property
+        def pause_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """The time when the activity was paused."""
+        @property
+        def manual(self) -> global___PendingActivityInfo.PauseInfo.Manual:
+            """activity was paused by the manual intervention"""
+        rule_id: builtins.str
+        """Id of the rule that paused the activity."""
+        def __init__(
+            self,
+            *,
+            pause_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            manual: global___PendingActivityInfo.PauseInfo.Manual | None = ...,
+            rule_id: builtins.str = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "manual",
+                b"manual",
+                "pause_time",
+                b"pause_time",
+                "paused_by",
+                b"paused_by",
+                "rule_id",
+                b"rule_id",
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "manual",
+                b"manual",
+                "pause_time",
+                b"pause_time",
+                "paused_by",
+                b"paused_by",
+                "rule_id",
+                b"rule_id",
+            ],
+        ) -> None: ...
+        def WhichOneof(
+            self, oneof_group: typing_extensions.Literal["paused_by", b"paused_by"]
+        ) -> typing_extensions.Literal["manual", "rule_id"] | None: ...
+
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
@@ -643,6 +722,7 @@ class PendingActivityInfo(google.protobuf.message.Message):
     LAST_DEPLOYMENT_FIELD_NUMBER: builtins.int
     LAST_WORKER_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    PAUSE_INFO_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
@@ -706,6 +786,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata"""
+    @property
+    def pause_info(self) -> global___PendingActivityInfo.PauseInfo: ...
     def __init__(
         self,
         *,
@@ -735,6 +817,7 @@ class PendingActivityInfo(google.protobuf.message.Message):
         | None = ...,
         last_worker_deployment_version: builtins.str = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        pause_info: global___PendingActivityInfo.PauseInfo | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -765,6 +848,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"last_worker_version_stamp",
             "next_attempt_schedule_time",
             b"next_attempt_schedule_time",
+            "pause_info",
+            b"pause_info",
             "priority",
             b"priority",
             "scheduled_time",
@@ -812,6 +897,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
             b"maximum_attempts",
             "next_attempt_schedule_time",
             b"next_attempt_schedule_time",
+            "pause_info",
+            b"pause_info",
             "paused",
             b"paused",
             "priority",
