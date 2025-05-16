@@ -7692,7 +7692,11 @@ class ActivityHeartbeatWorkflow:
         return result
 
 
-async def test_activity_pause_cancellation_details(client: Client):
+async def test_activity_pause_cancellation_details(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not support pause API yet")
     with concurrent.futures.ThreadPoolExecutor() as executor:
         async with Worker(
             client,
@@ -7769,7 +7773,9 @@ class ActivityHeartbeatPauseUnpauseWorkflow:
         return results
 
 
-async def test_activity_pause_unpause(client: Client):
+async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not support pause API yet")
     with concurrent.futures.ThreadPoolExecutor() as executor:
         async with Worker(
             client,
