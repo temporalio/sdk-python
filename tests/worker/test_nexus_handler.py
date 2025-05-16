@@ -293,9 +293,8 @@ class HandlerErrorInternal(_FailureTestCase):
     @staticmethod
     def check_failure(failure: Failure) -> None:
         assert failure.metadata == {"type": "temporal.api.failure.v1.Failure"}
-        assert failure.message == "deliberate internal handler error"
-        assert failure.exception.cause is not None
-        assert failure.exception.cause.message == "cause message"
+        assert failure.message == "cause message"
+        assert failure.exception.cause is None
 
 
 class OperationError(_FailureTestCase):

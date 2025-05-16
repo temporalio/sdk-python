@@ -234,9 +234,8 @@ class _NexusWorker:
                         type_hints=[arg_types[0]] if arg_types else None,
                     )
                 except Exception as err:
-                    print("🌈 returning non-retryable HandlerError")
                     raise HandlerError(
-                        str(err),
+                        "Data converter failed to decode Nexus operation input",
                         type=HandlerErrorType.BAD_REQUEST,
                         cause=err,
                         retryable=False,
@@ -257,10 +256,7 @@ class _NexusWorker:
                     task_token=task_token,
                     completed=temporalio.api.nexus.v1.Response(
                         start_operation=temporalio.api.nexus.v1.StartOperationResponse(
-                            operation_error=temporalio.api.nexus.v1.UnsuccessfulOperationError(
-                                operation_state=err.state.value,
-                                failure=await self._exception_to_failure_proto(err),
-                            ),
+                            operation_error=await self._operation_error_to_proto(err),
                         ),
                     ),
                 )
@@ -268,15 +264,17 @@ class _NexusWorker:
                 # TODO(dan): should encode_failure be called here?? (It accepts the
                 # api.Failure proto struct, not the Nexus one.)
                 # await self._data_converter.encode_failure(err, completion.error.failure)
-                err = _exception_to_handler_error(err)
+                handler_err = _exception_to_handler_error(err)
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
                     error=temporalio.api.nexus.v1.HandlerError(
-                        error_type=err.type.value,
-                        failure=await self._exception_to_failure_proto(err),
+                        error_type=handler_err.type.value,
+                        failure=await self._exception_to_failure_proto(
+                            handler_err.__cause__
+                        ),
                         retry_behavior=(
                             temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-                            if err.retryable
+                            if handler_err.retryable
                             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
                         ),
                     ),
@@ -391,7 +389,7 @@ class _NexusWorker:
 
     async def _exception_to_failure_proto(
         self,
-        err: Exception,
+        err: BaseException,
     ) -> temporalio.api.nexus.v1.Failure:
         api_failure = temporalio.api.failure.v1.Failure()
         await self._data_converter.encode_failure(err, api_failure)
@@ -401,6 +399,18 @@ class _NexusWorker:
             message=api_failure.pop("message", ""),
             metadata={"type": "temporal.api.failure.v1.Failure"},
             details=json.dumps(api_failure).encode("utf-8"),
+        )
+
+    async def _operation_error_to_proto(
+        self,
+        err: nexusrpc.handler.OperationError,
+    ) -> temporalio.api.nexus.v1.UnsuccessfulOperationError:
+        cause = err.__cause__
+        if cause is None:
+            cause = Exception(*err.args).with_traceback(err.__traceback__)
+        return temporalio.api.nexus.v1.UnsuccessfulOperationError(
+            operation_state=err.state.value,
+            failure=await self._exception_to_failure_proto(cause),
         )
 
     async def _handler_error_to_proto(
