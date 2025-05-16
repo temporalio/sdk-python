@@ -223,12 +223,15 @@ async def assert_pending_activity_exists_eventually(
     timeout: timedelta = timedelta(seconds=5),
 ) -> PendingActivityInfo:
     """Wait until a pending activity with the given ID exists and return it."""
+
     async def check() -> Optional[PendingActivityInfo]:
         desc = await handle.describe()
         for act in desc.raw_description.pending_activities:
             if act.activity_id == activity_id:
                 return act
-        raise AssertionError(f"Activity with ID {activity_id} not found in pending activities")
+        raise AssertionError(
+            f"Activity with ID {activity_id} not found in pending activities"
+        )
 
     activity_info = await assert_eventually(check, timeout=timeout)
     return cast(PendingActivityInfo, activity_info)

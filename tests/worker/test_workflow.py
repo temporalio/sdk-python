@@ -49,8 +49,8 @@ from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
+    PauseActivityRequest,
     ResetStickyTaskQueueRequest,
-    PauseActivityRequest
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
@@ -95,7 +95,6 @@ from temporalio.exceptions import (
     TemporalError,
     TimeoutError,
     WorkflowAlreadyStartedError,
-    ActivityPausedError
 )
 from temporalio.runtime import (
     BUFFERED_METRIC_KIND_COUNTER,
@@ -120,10 +119,10 @@ from tests.helpers import (
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
+    assert_pending_activity_exists_eventually,
     assert_task_fail_eventually,
     assert_workflow_exists_eventually,
     ensure_search_attributes_present,
-    assert_pending_activity_exists_eventually,
     find_free_port,
     new_worker,
     pause_and_assert,
@@ -7632,9 +7631,6 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
 
 
 @activity.defn
-async def heartbeat_activity() -> (
-    Optional[temporalio.activity.ActivityCancellationDetails]
-):
 async def heartbeat_activity(
     catch_err: bool = True,
 ) -> Optional[temporalio.activity.ActivityCancellationDetails]:
