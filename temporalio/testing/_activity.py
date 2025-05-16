@@ -80,7 +80,7 @@ class ActivityEnvironment:
 
     def cancel(
         self,
-        cancellation_details: temporalio.activity.ActivityCancellationDetails,
+        cancellation_details: temporalio.activity.ActivityCancellationDetails = temporalio.activity.ActivityCancellationDetails(cancel_requested=True),
     ) -> None:
         """Cancel the activity.
 
