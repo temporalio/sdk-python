@@ -296,6 +296,7 @@ class Worker:
             activity_task_poller_behavior: Specify the behavior of activity task polling.
                 Defaults to a 5-poller maximum.
         """
+        max_cached_workflows = 0
         if not activities and not workflows:
             raise ValueError("At least one activity or workflow must be specified")
         if use_worker_versioning and not build_id:
