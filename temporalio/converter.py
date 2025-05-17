@@ -500,6 +500,9 @@ class AdvancedJSONEncoder(json.JSONEncoder):
 
         See :py:meth:`json.JSONEncoder.default`.
         """
+        # Datetime support
+        if isinstance(o, datetime):
+            return o.isoformat()
         # Dataclass support
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
@@ -1132,7 +1135,7 @@ DefaultPayloadConverter.default_encoding_payload_converters = (
     BinaryPlainPayloadConverter(),
     JSONProtoPayloadConverter(),
     BinaryProtoPayloadConverter(),
-    JSONPlainPayloadConverter(),
+    JSONPlainPayloadConverter(),  # JSON Plain needs to remain in last because it throws on unknown types
 )
 
 DataConverter.default = DataConverter()
@@ -1399,6 +1402,15 @@ def value_to_type(
     # Any or primitives
     if hint is Any:
         return value
+    elif hint is datetime:
+        if isinstance(value, str):
+            try:
+                return _get_iso_datetime_parser()(value)
+            except ValueError as err:
+                raise TypeError(f"Failed parsing datetime string: {value}") from err
+        elif isinstance(value, datetime):
+            return value
+        raise TypeError(f"Expected datetime or ISO8601 string, got {type(value)}")
     elif hint is int or hint is float:
         if not isinstance(value, (int, float)):
             raise TypeError(f"Expected value to be int|float, was {type(value)}")
