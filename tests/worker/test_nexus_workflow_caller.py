@@ -875,7 +875,7 @@ async def test_service_interface_and_implementation_names(client: Client):
     #   interface or implementation class.
     # - An interface class may optionally override its name.
     # - An implementation class may either override its name or specify an interface that
-    #   it is implementing.
+    #   it is implementing, but not both.
     # - On registering a service implementation with a worker, the name by which the
     #   service is addressed in requests is the interface name if the implementation
     #   supplies one, or else the name override made by the impl class, or else the impl

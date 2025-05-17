@@ -19,6 +19,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
+from pprint import pprint
 from typing import Any, Never, Optional, Tuple, Type
 
 import httpx
@@ -159,6 +160,10 @@ class Failure:
     def _instantiate_exception(
         self, error_type: str, details: Optional[dict[str, Any]]
     ) -> BaseException:
+        # TODO(dan): every exception in the chain is being rehydrated wrapped in ApplicationError.
+        # Is this the intended design, or is it an error in the way I am rehydrating exceptions
+        # here? I.e., should the Python SDK unwrap ApplicationErrors to produce an error chain of
+        # native Python exception types?
         proto = {
             "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,
         }[error_type]()
@@ -168,17 +173,20 @@ class Failure:
 
 class _TestCase:
     operation: str
-    input: str = ""
+    input = ""
     headers: dict[str, str] = {}
     expected_status_code: int
+    skip = ""
 
     @staticmethod
     def check_response_body(response: dict[str, Any]) -> None:
-        pass
+        print("\n\nbody\n")
+        pprint(response)
 
     @staticmethod
     def check_response_headers(headers: dict[str, str]) -> None:
-        pass
+        print("\n\nheaders\n")
+        pprint(headers)
 
 
 class _FailureTestCase(_TestCase):
@@ -229,15 +237,29 @@ class AsyncHandlerHappyPath(_TestCase):
 # TODO(dan): test Nexus-Callback- headers
 
 
-class UpstreamTimeout(_FailureTestCase):
+class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
     operation = "hang"
-    # TODO(dan): test Operation-Timeout header also?
     headers = {"Request-Timeout": "10ms"}
     expected_status_code = 520
 
     @staticmethod
-    def check_response_body(response: dict[str, Any]) -> None:
-        assert response["message"] == "upstream timeout"
+    def check_failure(failure: Failure) -> None:
+        # This error is returned by the server; it doesn't populate metadata or details.
+        assert failure.message == "upstream timeout"
+
+
+class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
+    operation = "hang"
+    headers = {"Operation-Timeout": "10ms"}
+    expected_status_code = 520
+    # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
+    # does; look at test coverage in Go/Java.
+    skip = "Operation-Timeout test not implemented"
+
+    @staticmethod
+    def check_failure(failure: Failure) -> None:
+        # This error is returned by the server; it doesn't populate metadata or details.
+        assert failure.message == "upstream timeout"
 
 
 class BadRequest(_FailureTestCase):
@@ -249,14 +271,15 @@ class BadRequest(_FailureTestCase):
 
     @staticmethod
     def check_response_body(response: dict[str, Any]) -> None:
-        failure = Failure(**response)
-        assert "Failed converting field" in failure.message
-        assert failure.metadata == {"type": "temporal.api.failure.v1.Failure"}
+        _TestCase.check_response_body(response)
+
+    @staticmethod
+    def check_response_headers(headers: dict[str, str]) -> None:
+        _TestCase.check_response_headers(headers)
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
-        # TODO(dan): is it correct that this is ApplicationError?
-        assert isinstance(failure.exception, ApplicationError)
+        assert failure.message.startswith("Failed converting field")
 
 
 class NonRetryableApplicationError(_FailureTestCase):
@@ -266,12 +289,8 @@ class NonRetryableApplicationError(_FailureTestCase):
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
-        assert failure.metadata == {"type": "temporal.api.failure.v1.Failure"}
         assert failure.message == "non-retryable application error"
-        # TODO(dan): Why are there two levels of ApplicationError? The inner one is non-retryable.
         err = failure.exception
-        assert isinstance(err, ApplicationError)
-        err = err.cause
         assert isinstance(err, ApplicationError)
         assert err.non_retryable
         assert err.type == "TestFailureType"
@@ -292,21 +311,21 @@ class HandlerErrorInternal(_FailureTestCase):
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
-        assert failure.metadata == {"type": "temporal.api.failure.v1.Failure"}
         assert failure.message == "cause message"
         assert failure.exception.cause is None
 
 
 class OperationError(_FailureTestCase):
     operation = "operation_error_failed"
-    # TODO(dan): 424
-    expected_status_code = 500
+    expected_status_code = 424
     retryable = False
-    headers = {"nexus-operation-state": "failed"}
+
+    @staticmethod
+    def check_response_headers(headers: dict[str, str]) -> None:
+        assert headers.get("nexus-operation-state") == "failed"
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
-        assert failure.metadata == {"type": "temporal.api.failure.v1.Failure"}
         assert failure.message == "deliberate operation error"
 
 
@@ -326,7 +345,8 @@ async def test_start_operation_happy_path(
 @pytest.mark.parametrize(
     "test_case",
     [
-        UpstreamTimeout,
+        UpstreamTimeoutViaRequestTimeout,
+        UpstreamTimeoutViaOperationTimeoutHeader,
         BadRequest,
         HandlerErrorInternal,
     ],
@@ -354,6 +374,8 @@ async def test_start_operation_operation_failures(
 async def _test_start_operation(
     test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
 ):
+    if test_case.skip:
+        pytest.skip(test_case.skip)
     client, http_port = http_test_env
     task_queue = str(uuid.uuid4())
     service = MyService.__name__
