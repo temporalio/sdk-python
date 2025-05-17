@@ -1,8 +1,7 @@
 import asyncio
 import os
-import socket
 import sys
-from typing import AsyncGenerator, AsyncIterator
+from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -116,6 +115,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "frontend.workerVersioningDataAPIs=true",
                 "--dynamic-config-value",
                 "system.enableDeploymentVersions=true",
+                "--http-port",
+                # TODO(dan): what should we use for HTTP port?
+                "7243",
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
@@ -159,22 +161,3 @@ CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
 @pytest.fixture
 def continue_as_new_suggest_history_count() -> int:
     return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT
-
-
-@pytest.fixture(scope="module")
-async def http_test_env() -> AsyncIterator[tuple[Client, int]]:
-    def _get_free_port() -> int:
-        """Get a free port by binding to port 0."""
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("", 0))
-            return s.getsockname()[1]
-
-    """Provides a client and a free HTTP port for Nexus HTTP tests."""
-    http_port = _get_free_port()
-    env = await WorkflowEnvironment.start_local(
-        dev_server_extra_args=["--http-port", str(http_port)]
-    )
-    try:
-        yield env.client, http_port
-    finally:
-        await env.shutdown()

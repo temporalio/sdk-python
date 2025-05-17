@@ -20,7 +20,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from pprint import pprint
-from typing import Any, Never, Optional, Tuple, Type
+from typing import Any, Never, Optional, Type
 
 import httpx
 import nexusrpc
@@ -39,6 +39,8 @@ from temporalio.nexus import logger
 from temporalio.nexus.handler import StartWorkflowOperationResult, start_workflow
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
+
+HTTP_PORT = 7243
 
 
 @dataclass
@@ -336,10 +338,8 @@ class OperationError(_FailureTestCase):
         AsyncHandlerHappyPath,
     ],
 )
-async def test_start_operation_happy_path(
-    test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
-):
-    await _test_start_operation(test_case, http_test_env)
+async def test_start_operation_happy_path(test_case: Type[_TestCase], client: Client):
+    await _test_start_operation(test_case, client)
 
 
 @pytest.mark.parametrize(
@@ -352,9 +352,9 @@ async def test_start_operation_happy_path(
     ],
 )
 async def test_start_operation_protocol_level_failures(
-    test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
+    test_case: Type[_TestCase], client: Client
 ):
-    await _test_start_operation(test_case, http_test_env)
+    await _test_start_operation(test_case, client)
 
 
 @pytest.mark.parametrize(
@@ -366,17 +366,14 @@ async def test_start_operation_protocol_level_failures(
     ],
 )
 async def test_start_operation_operation_failures(
-    test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
+    test_case: Type[_TestCase], client: Client
 ):
-    await _test_start_operation(test_case, http_test_env)
+    await _test_start_operation(test_case, client)
 
 
-async def _test_start_operation(
-    test_case: Type[_TestCase], http_test_env: Tuple[Client, int]
-):
+async def _test_start_operation(test_case: Type[_TestCase], client: Client):
     if test_case.skip:
         pytest.skip(test_case.skip)
-    client, http_port = http_test_env
     task_queue = str(uuid.uuid4())
     service = MyService.__name__
     endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
@@ -387,7 +384,7 @@ async def _test_start_operation(
     ):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
-                f"http://127.0.0.1:{http_port}/nexus/endpoints/{endpoint}/services/{service}/{test_case.operation}",
+                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service}/{test_case.operation}",
                 json={"value": test_case.input},
                 headers=test_case.headers,
             )
@@ -424,10 +421,7 @@ async def _test_start_operation(
     )
 
 
-async def test_logger_uses_operation_context(
-    http_test_env: Tuple[Client, int], caplog: Any
-):
-    client, http_port = http_test_env
+async def test_logger_uses_operation_context(client: Client, caplog: Any):
     task_queue = str(uuid.uuid4())
     service_name = MyService.__name__
     operation_name = "log"
@@ -443,7 +437,7 @@ async def test_logger_uses_operation_context(
     ):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
-                f"http://127.0.0.1:{http_port}/nexus/endpoints/{endpoint}/services/{service_name}/{operation_name}",
+                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/{operation_name}",
                 json={"value": "test_log"},
                 headers={
                     "Content-Type": "application/json",
