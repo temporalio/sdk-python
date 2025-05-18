@@ -173,24 +173,23 @@ class Failure:
 
 
 @dataclass
-class ExpectedResponse:
+class Response:
     status_code: int
 
 
 @dataclass
-class ExpectedUnsuccessfulResponse(ExpectedResponse):
+class UnsuccessfulResponse(Response):
     # Expected value of Nexux-Request-Retryable header
     retryable_header: Optional[bool]
-    # Expected value of inverse of non_retryable attribute of exception. The non_retryable attribute
-    # defaults to false, hence absence of this field is treated as `true`.
-    retryable_exception: bool
+    # Expected value of inverse of non_retryable attribute of exception.
+    retryable_exception: bool = True
 
 
 class _TestCase:
     operation: str
     input = ""
     headers: dict[str, str] = {}
-    expected_response: ExpectedResponse
+    expected_response: Response
     skip = ""
 
     @staticmethod
@@ -207,7 +206,7 @@ class _TestCase:
 
 
 class _FailureTestCase(_TestCase):
-    expected_response: ExpectedUnsuccessfulResponse
+    expected_response: UnsuccessfulResponse
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
@@ -222,7 +221,7 @@ class SyncHandlerHappyPath(_TestCase):
         "Test-Header-Key": "test-header-value",
         "Nexus-Link": '<http://test/>; type="test"',
     }
-    expected_response = ExpectedResponse(
+    expected_response = Response(
         status_code=200,
     )
 
@@ -245,7 +244,7 @@ class AsyncHandlerHappyPath(_TestCase):
     headers = {
         "Content-Type": "application/json",
     }
-    expected_response = ExpectedResponse(
+    expected_response = Response(
         status_code=201,
     )
 
@@ -261,11 +260,10 @@ class AsyncHandlerHappyPath(_TestCase):
 class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
     operation = "hang"
     headers = {"Request-Timeout": "10ms"}
-    expected_response = ExpectedUnsuccessfulResponse(
+    expected_response = UnsuccessfulResponse(
         status_code=520,
         # TODO(dan): should this have the retryable header set?
         retryable_header=None,
-        retryable_exception=True,
     )
 
     @staticmethod
@@ -277,11 +275,10 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
 class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
     operation = "hang"
     headers = {"Operation-Timeout": "10ms"}
-    expected_response = ExpectedUnsuccessfulResponse(
+    expected_response = UnsuccessfulResponse(
         status_code=520,
         # TODO(dan): should this have the retryable header set?
         retryable_header=None,
-        retryable_exception=True,
     )
     # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
     # does; look at test coverage in Go/Java.
@@ -296,10 +293,9 @@ class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
 class BadRequest(_FailureTestCase):
     operation = "echo"
     input = 7  # type: ignore
-    expected_response = ExpectedUnsuccessfulResponse(
+    expected_response = UnsuccessfulResponse(
         status_code=400,
         retryable_header=False,
-        retryable_exception=True,
     )
 
     @staticmethod
@@ -317,7 +313,7 @@ class BadRequest(_FailureTestCase):
 
 class NonRetryableApplicationError(_FailureTestCase):
     operation = "non_retryable_application_error"
-    expected_response = ExpectedUnsuccessfulResponse(
+    expected_response = UnsuccessfulResponse(
         status_code=500,
         retryable_header=False,
         retryable_exception=False,
@@ -335,20 +331,18 @@ class NonRetryableApplicationError(_FailureTestCase):
 
 class RetryableApplicationError(_FailureTestCase):
     operation = "retryable_application_error"
-    expected_response = ExpectedUnsuccessfulResponse(
+    expected_response = UnsuccessfulResponse(
         status_code=500,
         retryable_header=True,
-        retryable_exception=True,
     )
 
 
 class HandlerErrorInternal(_FailureTestCase):
     operation = "handler_error_internal"
-    expected_response = ExpectedUnsuccessfulResponse(
+    expected_response = UnsuccessfulResponse(
         status_code=500,
         # TODO(dan): check this assertion
         retryable_header=False,
-        retryable_exception=True,
     )
 
     @staticmethod
@@ -359,11 +353,10 @@ class HandlerErrorInternal(_FailureTestCase):
 
 class OperationError(_FailureTestCase):
     operation = "operation_error_failed"
-    expected_response = ExpectedUnsuccessfulResponse(
+    expected_response = UnsuccessfulResponse(
         status_code=424,
         # TODO(dan): check that OperationError should not set retryable header
         retryable_header=None,
-        retryable_exception=True,
     )
 
     @staticmethod
