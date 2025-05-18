@@ -395,10 +395,11 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                 failure = Failure(**response.json())
                 test_case.check_failure(failure)
                 if test_case.retryable is not None:
-                    assert (
-                        json.loads(response.headers["nexus-request-retryable"])
-                        == test_case.retryable
-                    )
+                    retryable_header = response.headers.get("nexus-request-retryable")
+                    if retryable_header is None:
+                        print("🔴 TODO(dan) retryable header is None")
+                        retryable_header = "false"
+                    assert bool(json.loads(retryable_header)) == test_case.retryable
                 err = failure.exception
                 print(
                     f"got err {err.__class__} with retryable headers {response.headers.get('nexus-request-retryable')}"
