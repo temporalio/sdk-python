@@ -519,7 +519,7 @@ async def test_sync_response(
             assert isinstance(e.__cause__.__cause__, NexusHandlerError)
             # ID of first command
             await print_history(caller_wf_handle)
-            # assert e.__cause__.scheduled_event_id == 5
+            assert e.__cause__.scheduled_event_id == 5
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
             assert e.__cause__.service == "ServiceInterface"
             assert (
@@ -993,10 +993,10 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
     assert link.workflow_event.workflow_id == caller_wf_handle.id
     assert link.workflow_event.run_id
     assert link.workflow_event.run_id == caller_wf_handle.first_execution_run_id
-    # assert (
-    #     link.workflow_event.event_ref.event_type
-    #     == temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
-    # )
+    assert (
+        link.workflow_event.event_ref.event_type
+        == temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
+    )
 
 
 # TODO(dan): test exceptions in Nexus worker are raised
