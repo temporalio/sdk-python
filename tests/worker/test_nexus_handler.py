@@ -175,7 +175,7 @@ class Failure:
 @dataclass
 class SuccessfulResponse:
     status_code: int
-    body: Optional[Union[str, Callable[[str], bool]]] = None
+    body: Optional[Union[dict[str, Any], Callable[[dict[str, Any]], bool]]] = None
     headers: Optional[dict[str, str]] = None
 
 
@@ -187,7 +187,7 @@ class UnsuccessfulResponse:
     failure_message: Union[str, Callable[[str], bool]]
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
-    body: Optional[Union[str, Callable[[str], bool]]] = None
+    body: Optional[Callable[[dict[str, Any]], bool]] = None
 
 
 class _TestCase:
@@ -200,17 +200,12 @@ class _TestCase:
     @classmethod
     def check_response(cls, response: httpx.Response) -> None:
         assert response.status_code == cls.expected_response.status_code
+        # TODO(dan): the body of a successful response need not be JSON
         body = response.json()
         if isinstance(cls.expected_response.body, str):
             assert body == cls.expected_response.body
         elif isinstance(cls.expected_response.body, Callable):
             assert cls.expected_response.body(body)
-
-    @staticmethod
-    def check_response_body(response: dict[str, Any]) -> None:
-        # print("\n\nbody\n")
-        # pprint(response)
-        pass
 
     @staticmethod
     def check_response_headers(headers: dict[str, str]) -> None:
@@ -261,19 +256,12 @@ class SyncHandlerHappyPath(_TestCase):
     }
     expected_response = SuccessfulResponse(
         status_code=200,
+        body={"value": "from handler: hello"},
     )
-
-    @staticmethod
-    def check_response_body(body: dict[str, Any]) -> None:
-        assert body["value"] == "from handler: hello"
-
-    @staticmethod
-    def check_response_headers(headers: dict[str, str]) -> None:
-        # TODO(dan): Support manually adding links in operation handler
-        # See e.g. TS nexus.handlerLinks().push(...options.links)
-        # assert headers.get("nexus-link") == "<http://test/>; type=\"test\"", \
-        #     "Nexus-Link header not echoed correctly."
-        pass
+    # TODO(dan): Support manually adding links in operation handler
+    # See e.g. TS nexus.handlerLinks().push(...options.links)
+    # assert headers.get("nexus-link") == "<http://test/>; type=\"test\"", \
+    #     "Nexus-Link header not echoed correctly."
 
 
 class AsyncHandlerHappyPath(_TestCase):
@@ -330,14 +318,6 @@ class BadRequest(_FailureTestCase):
         retryable_header=False,
         failure_message=lambda message: message.startswith("Failed converting field"),
     )
-
-    @staticmethod
-    def check_response_body(response: dict[str, Any]) -> None:
-        _TestCase.check_response_body(response)
-
-    @staticmethod
-    def check_response_headers(headers: dict[str, str]) -> None:
-        _TestCase.check_response_headers(headers)
 
 
 class NonRetryableApplicationError(_FailureTestCase):
@@ -457,7 +437,6 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                 headers=test_case.headers,
             )
             test_case.check_response(response)
-            test_case.check_response_body(response.json())
             test_case.check_response_headers(dict(response.headers))
 
             if issubclass(test_case, _FailureTestCase):
