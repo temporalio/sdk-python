@@ -175,7 +175,7 @@ class Failure:
 @dataclass
 class SuccessfulResponse:
     status_code: int
-    body: Optional[Union[dict[str, Any], Callable[[dict[str, Any]], bool]]] = None
+    body_json: Optional[Union[dict[str, Any], Callable[[dict[str, Any]], bool]]] = None
     headers: Optional[dict[str, str]] = None
 
 
@@ -187,7 +187,8 @@ class UnsuccessfulResponse:
     failure_message: Union[str, Callable[[str], bool]]
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
-    body: Optional[Callable[[dict[str, Any]], bool]] = None
+    # TODO(dan): the body of a successful response need not be JSON; test non-JSON-parseable string
+    body_json: Optional[Callable[[dict[str, Any]], bool]] = None
 
 
 class _TestCase:
@@ -200,12 +201,12 @@ class _TestCase:
     @classmethod
     def check_response(cls, response: httpx.Response) -> None:
         assert response.status_code == cls.expected_response.status_code
-        # TODO(dan): the body of a successful response need not be JSON
-        body = response.json()
-        if isinstance(cls.expected_response.body, str):
-            assert body == cls.expected_response.body
-        elif isinstance(cls.expected_response.body, Callable):
-            assert cls.expected_response.body(body)
+        if cls.expected_response.body_json is not None:
+            body = response.json()
+            if isinstance(cls.expected_response.body_json, dict):
+                assert body == cls.expected_response.body_json
+            else:
+                assert cls.expected_response.body_json(body)
 
     @staticmethod
     def check_response_headers(headers: dict[str, str]) -> None:
@@ -256,7 +257,7 @@ class SyncHandlerHappyPath(_TestCase):
     }
     expected_response = SuccessfulResponse(
         status_code=200,
-        body={"value": "from handler: hello"},
+        body_json={"value": "from handler: hello"},
     )
     # TODO(dan): Support manually adding links in operation handler
     # See e.g. TS nexus.handlerLinks().push(...options.links)
