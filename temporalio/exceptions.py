@@ -128,14 +128,6 @@ class ApplicationError(FailureError):
         return self._non_retryable
 
     @property
-    def retryable(self) -> bool:
-        """Whether the error is retryable.
-
-        This is the inverse of :py:attr:`non_retryable`.
-        """
-        return not self._non_retryable
-
-    @property
     def next_retry_delay(self) -> Optional[timedelta]:
         """Delay before the next activity retry attempt.
 

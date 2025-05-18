@@ -20,7 +20,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from pprint import pprint
-from typing import Any, Never, Optional, Type, TypedDict
+from typing import Any, Literal, Never, NotRequired, Optional, Type, TypedDict
 
 import httpx
 import nexusrpc
@@ -180,8 +180,9 @@ class ExpectedResponse(TypedDict):
 class ExpectedUnsuccessfulResponse(ExpectedResponse):
     # Expected value of Nexux-Request-Retryable header
     retryable_header: Optional[bool]
-    # Expected value of retryable attribute of exception
-    retryable_exception: bool
+    # Expected value of inverse of non_retryable attribute of exception. The non_retryable attribute
+    # defaults to false, hence absence of this field is treated as `true`.
+    retryable_exception: NotRequired[Literal[False]]
 
 
 class _TestCase:
@@ -261,7 +262,6 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
         "status_code": 520,
         # TODO(dan): should this have the retryable header set?
         "retryable_header": None,
-        "retryable_exception": True,
     }
 
     @staticmethod
@@ -277,7 +277,6 @@ class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
         "status_code": 520,
         # TODO(dan): should this have the retryable header set?
         "retryable_header": None,
-        "retryable_exception": True,
     }
     # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
     # does; look at test coverage in Go/Java.
@@ -295,7 +294,6 @@ class BadRequest(_FailureTestCase):
     expected_response = {
         "status_code": 400,
         "retryable_header": False,
-        "retryable_exception": True,
     }
 
     @staticmethod
@@ -334,7 +332,6 @@ class RetryableApplicationError(_FailureTestCase):
     expected_response = {
         "status_code": 500,
         "retryable_header": True,
-        "retryable_exception": True,
     }
 
 
@@ -344,7 +341,6 @@ class HandlerErrorInternal(_FailureTestCase):
         "status_code": 500,
         # TODO(dan): check this assertion
         "retryable_header": False,
-        "retryable_exception": True,
     }
 
     @staticmethod
@@ -359,7 +355,6 @@ class OperationError(_FailureTestCase):
         "status_code": 424,
         # TODO(dan): check that OperationError should not set retryable header
         "retryable_header": None,
-        "retryable_exception": True,
     }
 
     @staticmethod
@@ -448,9 +443,10 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                     assert test_case.expected_response["retryable_header"] is None
 
                 if isinstance(failure.exception, ApplicationError):
-                    assert (
-                        failure.exception.retryable
-                        == test_case.expected_response["retryable_exception"]
+                    assert failure.exception.non_retryable == (
+                        not bool(
+                            test_case.expected_response.get("retryable_exception", True)
+                        )
                     )
 
     print(
