@@ -19,7 +19,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, Never, Optional, Type, TypedDict
+from typing import Any, Never, Optional, Type
 
 import httpx
 import nexusrpc
@@ -172,10 +172,12 @@ class Failure:
         return FailureConverter.default.from_failure(proto, PayloadConverter.default)
 
 
-class ExpectedResponse(TypedDict):
+@dataclass
+class ExpectedResponse:
     status_code: int
 
 
+@dataclass
 class ExpectedUnsuccessfulResponse(ExpectedResponse):
     # Expected value of Nexux-Request-Retryable header
     retryable_header: Optional[bool]
@@ -220,9 +222,9 @@ class SyncHandlerHappyPath(_TestCase):
         "Test-Header-Key": "test-header-value",
         "Nexus-Link": '<http://test/>; type="test"',
     }
-    expected_response = {
-        "status_code": 200,
-    }
+    expected_response = ExpectedResponse(
+        status_code=200,
+    )
 
     @staticmethod
     def check_response_body(body: dict[str, Any]) -> None:
@@ -243,9 +245,9 @@ class AsyncHandlerHappyPath(_TestCase):
     headers = {
         "Content-Type": "application/json",
     }
-    expected_response = {
-        "status_code": 201,
-    }
+    expected_response = ExpectedResponse(
+        status_code=201,
+    )
 
 
 # TODO(dan): Before fixing the upstream-timeout test by implementing the handler for the
@@ -259,12 +261,12 @@ class AsyncHandlerHappyPath(_TestCase):
 class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
     operation = "hang"
     headers = {"Request-Timeout": "10ms"}
-    expected_response = {
-        "status_code": 520,
+    expected_response = ExpectedUnsuccessfulResponse(
+        status_code=520,
         # TODO(dan): should this have the retryable header set?
-        "retryable_header": None,
-        "retryable_exception": True,
-    }
+        retryable_header=None,
+        retryable_exception=True,
+    )
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
@@ -275,12 +277,12 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
 class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
     operation = "hang"
     headers = {"Operation-Timeout": "10ms"}
-    expected_response = {
-        "status_code": 520,
+    expected_response = ExpectedUnsuccessfulResponse(
+        status_code=520,
         # TODO(dan): should this have the retryable header set?
-        "retryable_header": None,
-        "retryable_exception": True,
-    }
+        retryable_header=None,
+        retryable_exception=True,
+    )
     # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
     # does; look at test coverage in Go/Java.
     skip = "Operation-Timeout test not implemented"
@@ -294,11 +296,11 @@ class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
 class BadRequest(_FailureTestCase):
     operation = "echo"
     input = 7  # type: ignore
-    expected_response = {
-        "status_code": 400,
-        "retryable_header": False,
-        "retryable_exception": True,
-    }
+    expected_response = ExpectedUnsuccessfulResponse(
+        status_code=400,
+        retryable_header=False,
+        retryable_exception=True,
+    )
 
     @staticmethod
     def check_response_body(response: dict[str, Any]) -> None:
@@ -315,11 +317,11 @@ class BadRequest(_FailureTestCase):
 
 class NonRetryableApplicationError(_FailureTestCase):
     operation = "non_retryable_application_error"
-    expected_response = {
-        "status_code": 500,
-        "retryable_header": False,
-        "retryable_exception": False,
-    }
+    expected_response = ExpectedUnsuccessfulResponse(
+        status_code=500,
+        retryable_header=False,
+        retryable_exception=False,
+    )
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
@@ -333,21 +335,21 @@ class NonRetryableApplicationError(_FailureTestCase):
 
 class RetryableApplicationError(_FailureTestCase):
     operation = "retryable_application_error"
-    expected_response = {
-        "status_code": 500,
-        "retryable_header": True,
-        "retryable_exception": True,
-    }
+    expected_response = ExpectedUnsuccessfulResponse(
+        status_code=500,
+        retryable_header=True,
+        retryable_exception=True,
+    )
 
 
 class HandlerErrorInternal(_FailureTestCase):
     operation = "handler_error_internal"
-    expected_response = {
-        "status_code": 500,
+    expected_response = ExpectedUnsuccessfulResponse(
+        status_code=500,
         # TODO(dan): check this assertion
-        "retryable_header": False,
-        "retryable_exception": True,
-    }
+        retryable_header=False,
+        retryable_exception=True,
+    )
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
@@ -357,12 +359,12 @@ class HandlerErrorInternal(_FailureTestCase):
 
 class OperationError(_FailureTestCase):
     operation = "operation_error_failed"
-    expected_response = {
-        "status_code": 424,
+    expected_response = ExpectedUnsuccessfulResponse(
+        status_code=424,
         # TODO(dan): check that OperationError should not set retryable header
-        "retryable_header": None,
-        "retryable_exception": True,
-    }
+        retryable_header=None,
+        retryable_exception=True,
+    )
 
     @staticmethod
     def check_response_headers(headers: dict[str, str]) -> None:
@@ -430,7 +432,7 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                 json={"value": test_case.input},
                 headers=test_case.headers,
             )
-            assert response.status_code == test_case.expected_response["status_code"]
+            assert response.status_code == test_case.expected_response.status_code
             test_case.check_response_body(response.json())
             test_case.check_response_headers(dict(response.headers))
 
@@ -447,16 +449,16 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                 ) is not None:
                     assert (
                         json.loads(retryable_header)
-                        == test_case.expected_response["retryable_header"]
+                        == test_case.expected_response.retryable_header
                     )
                 else:
-                    assert test_case.expected_response["retryable_header"] is None
+                    assert test_case.expected_response.retryable_header is None
 
                 if failure.exception:
                     assert isinstance(failure.exception, ApplicationError)
                     assert (
                         failure.exception.retryable
-                        == test_case.expected_response["retryable_exception"]
+                        == test_case.expected_response.retryable_exception
                     )
                 else:
                     print(
