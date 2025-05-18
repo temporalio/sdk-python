@@ -18,8 +18,8 @@ import dataclasses
 import json
 import logging
 import uuid
-from dataclasses import dataclass
-from typing import Any, Callable, Never, Optional, Type, Union
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional, Type, Union
 
 import httpx
 import nexusrpc
@@ -27,6 +27,7 @@ import nexusrpc.handler
 import pytest
 from google.protobuf import json_format
 from hyperlinked import print
+from typing_extensions import Never
 
 import temporalio.api.failure.v1
 import temporalio.nexus
@@ -182,13 +183,19 @@ class SuccessfulResponse:
 @dataclass
 class UnsuccessfulResponse:
     status_code: int
-    # Expected value of Nexux-Request-Retryable header
+    # Expected value of Nexus-Request-Retryable header
     retryable_header: Optional[bool]
     failure_message: Union[str, Callable[[str], bool]]
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
     # TODO(dan): the body of a successful response need not be JSON; test non-JSON-parseable string
     body_json: Optional[Callable[[dict[str, Any]], bool]] = None
+    headers: dict[str, str] = field(
+        default_factory=lambda: {
+            "content-type": "application/json",
+            "temporal-nexus-failure-source": "worker",
+        }
+    )
 
 
 class _TestCase:
@@ -207,12 +214,8 @@ class _TestCase:
                 assert body == cls.expected_response.body_json
             else:
                 assert cls.expected_response.body_json(body)
-
-    @staticmethod
-    def check_response_headers(headers: dict[str, str]) -> None:
-        # print("\n\nheaders\n")
-        # pprint(headers)
-        pass
+        if cls.expected_response.headers is not None:
+            assert response.headers.items() >= cls.expected_response.headers.items()
 
 
 class _FailureTestCase(_TestCase):
@@ -291,8 +294,12 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
         status_code=520,
         # TODO(dan): should this have the retryable header set?
         retryable_header=None,
-        # This error is returned by the server; it doesn't populate metadata or details.
+        # This error is returned by the server; it doesn't populate metadata or details, and it
+        # doesn't set temporal-nexus-failure-source.
         failure_message="upstream timeout",
+        headers={
+            "content-type": "application/json",
+        },
     )
 
 
@@ -317,7 +324,7 @@ class BadRequest(_FailureTestCase):
     expected_response = UnsuccessfulResponse(
         status_code=400,
         retryable_header=False,
-        failure_message=lambda message: message.startswith("Failed converting field"),
+        failure_message=lambda s: s.startswith("Failed converting field"),
     )
 
 
@@ -373,11 +380,8 @@ class OperationError(_FailureTestCase):
         # TODO(dan): check that OperationError should not set retryable header
         retryable_header=None,
         failure_message="deliberate operation error",
+        headers=_FailureTestCase.headers | {"nexus-operation-state": "failed"},
     )
-
-    @staticmethod
-    def check_response_headers(headers: dict[str, str]) -> None:
-        assert headers.get("nexus-operation-state") == "failed"
 
 
 @pytest.mark.parametrize(
@@ -438,13 +442,6 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                 headers=test_case.headers,
             )
             test_case.check_response(response)
-            test_case.check_response_headers(dict(response.headers))
-
-            if issubclass(test_case, _FailureTestCase):
-                if response.headers.get("temporal-nexus-failure-source") != "worker":
-                    print(f"🔴 {test_case} headers: {response.headers}")
-
-                failure = Failure(**response.json())
 
     print(
         "\n\n----------------------------------------------------------------------\n\n"
