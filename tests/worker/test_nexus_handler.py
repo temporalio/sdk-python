@@ -177,7 +177,11 @@ class Failure:
 class SuccessfulResponse:
     status_code: int
     body_json: Optional[Union[dict[str, Any], Callable[[dict[str, Any]], bool]]] = None
-    headers: Optional[dict[str, str]] = None
+    headers: dict[str, str] = field(
+        default_factory=lambda: {
+            "content-type": "application/json",
+        }
+    )
 
 
 @dataclass
@@ -271,9 +275,6 @@ class SyncHandlerHappyPath(_TestCase):
 class AsyncHandlerHappyPath(_TestCase):
     operation = "async_operation"
     input = "hello"
-    headers = {
-        "Content-Type": "application/json",
-    }
     expected_response = SuccessfulResponse(
         status_code=201,
     )
