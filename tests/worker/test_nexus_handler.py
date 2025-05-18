@@ -19,7 +19,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import Any, Never, Optional, Type
+from typing import Any, Callable, Never, Optional, Type, Union
 
 import httpx
 import nexusrpc
@@ -181,6 +181,7 @@ class Response:
 class UnsuccessfulResponse(Response):
     # Expected value of Nexux-Request-Retryable header
     retryable_header: Optional[bool]
+    failure_message: Union[str, Callable[[str], bool]]
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
 
@@ -264,12 +265,9 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
         status_code=520,
         # TODO(dan): should this have the retryable header set?
         retryable_header=None,
-    )
-
-    @staticmethod
-    def check_failure(failure: Failure) -> None:
         # This error is returned by the server; it doesn't populate metadata or details.
-        assert failure.message == "upstream timeout"
+        failure_message="upstream timeout",
+    )
 
 
 class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
@@ -279,15 +277,12 @@ class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
         status_code=520,
         # TODO(dan): should this have the retryable header set?
         retryable_header=None,
+        # This error is returned by the server; it doesn't populate metadata or details.
+        failure_message="upstream timeout",
     )
     # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
     # does; look at test coverage in Go/Java.
     skip = "Operation-Timeout test not implemented"
-
-    @staticmethod
-    def check_failure(failure: Failure) -> None:
-        # This error is returned by the server; it doesn't populate metadata or details.
-        assert failure.message == "upstream timeout"
 
 
 class BadRequest(_FailureTestCase):
@@ -296,6 +291,7 @@ class BadRequest(_FailureTestCase):
     expected_response = UnsuccessfulResponse(
         status_code=400,
         retryable_header=False,
+        failure_message=lambda message: message.startswith("Failed converting field"),
     )
 
     @staticmethod
@@ -306,10 +302,6 @@ class BadRequest(_FailureTestCase):
     def check_response_headers(headers: dict[str, str]) -> None:
         _TestCase.check_response_headers(headers)
 
-    @staticmethod
-    def check_failure(failure: Failure) -> None:
-        assert failure.message.startswith("Failed converting field")
-
 
 class NonRetryableApplicationError(_FailureTestCase):
     operation = "non_retryable_application_error"
@@ -317,11 +309,11 @@ class NonRetryableApplicationError(_FailureTestCase):
         status_code=500,
         retryable_header=False,
         retryable_exception=False,
+        failure_message="non-retryable application error",
     )
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
-        assert failure.message == "non-retryable application error"
         err = failure.exception
         assert isinstance(err, ApplicationError)
         assert err.non_retryable
@@ -334,6 +326,7 @@ class RetryableApplicationError(_FailureTestCase):
     expected_response = UnsuccessfulResponse(
         status_code=500,
         retryable_header=True,
+        failure_message="retryable application error",
     )
 
 
@@ -343,11 +336,11 @@ class HandlerErrorInternal(_FailureTestCase):
         status_code=500,
         # TODO(dan): check this assertion
         retryable_header=False,
+        failure_message="cause message",
     )
 
     @staticmethod
     def check_failure(failure: Failure) -> None:
-        assert failure.message == "cause message"
         assert failure.exception.cause is None
 
 
@@ -357,15 +350,12 @@ class OperationError(_FailureTestCase):
         status_code=424,
         # TODO(dan): check that OperationError should not set retryable header
         retryable_header=None,
+        failure_message="deliberate operation error",
     )
 
     @staticmethod
     def check_response_headers(headers: dict[str, str]) -> None:
         assert headers.get("nexus-operation-state") == "failed"
-
-    @staticmethod
-    def check_failure(failure: Failure) -> None:
-        assert failure.message == "deliberate operation error"
 
 
 @pytest.mark.parametrize(
@@ -434,6 +424,13 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                     print(f"🔴 {test_case} headers: {response.headers}")
 
                 failure = Failure(**response.json())
+                if isinstance(test_case.expected_response.failure_message, str):
+                    assert (
+                        failure.message == test_case.expected_response.failure_message
+                    )
+                else:
+                    assert test_case.expected_response.failure_message(failure.message)
+
                 test_case.check_failure(failure)
 
                 # retryability assertions
