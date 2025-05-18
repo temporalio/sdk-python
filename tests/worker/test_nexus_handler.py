@@ -19,7 +19,6 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from pprint import pprint
 from typing import Any, Never, Optional, Type, TypedDict
 
 import httpx
@@ -194,13 +193,15 @@ class _TestCase:
 
     @staticmethod
     def check_response_body(response: dict[str, Any]) -> None:
-        print("\n\nbody\n")
-        pprint(response)
+        # print("\n\nbody\n")
+        # pprint(response)
+        pass
 
     @staticmethod
     def check_response_headers(headers: dict[str, str]) -> None:
-        print("\n\nheaders\n")
-        pprint(headers)
+        # print("\n\nheaders\n")
+        # pprint(headers)
+        pass
 
 
 class _FailureTestCase(_TestCase):
@@ -434,6 +435,9 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
             test_case.check_response_headers(dict(response.headers))
 
             if issubclass(test_case, _FailureTestCase):
+                if response.headers.get("temporal-nexus-failure-source") != "worker":
+                    print(f"🔴 {test_case} headers: {response.headers}")
+
                 failure = Failure(**response.json())
                 test_case.check_failure(failure)
 
@@ -448,10 +452,15 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                 else:
                     assert test_case.expected_response["retryable_header"] is None
 
-                if isinstance(failure.exception, ApplicationError):
+                if failure.exception:
+                    assert isinstance(failure.exception, ApplicationError)
                     assert (
                         failure.exception.retryable
                         == test_case.expected_response["retryable_exception"]
+                    )
+                else:
+                    print(
+                        f"TODO(dan): {test_case} did not yield a Failure with exception details"
                     )
 
     print(
