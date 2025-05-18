@@ -5168,6 +5168,7 @@ class NexusService(Generic[S]):
         ],
         *,
         endpoint: str,
+        # TODO(dan): is there a desire to have a service-client-level timeout?
         schedule_to_close_timeout: Optional[timedelta] = None,
     ) -> None:
         # If service is not a str, then it must be a service interface or implementation

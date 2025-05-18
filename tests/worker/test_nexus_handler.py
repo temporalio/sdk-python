@@ -18,8 +18,9 @@ import dataclasses
 import json
 import logging
 import uuid
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Type, Union
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Any, Callable, Mapping, Optional, Type, Union
 
 import httpx
 import nexusrpc
@@ -139,6 +140,8 @@ class MyServiceHandler:
     async def async_operation(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> StartWorkflowOperationResult[Output]:
+        # TODO(dan): is it awkward for sync_operation to return O if this is returning
+        # StartWorkflowOperationResult[O]? I think this should return WorkflowHandle[O]?
         return await start_workflow(
             MyWorkflow.run,
             input,
@@ -173,15 +176,25 @@ class Failure:
         return FailureConverter.default.from_failure(proto, PayloadConverter.default)
 
 
+SUCCESSFUL_RESPONSE_HEADERS = MappingProxyType(
+    {
+        "content-type": "application/json",
+    }
+)
+
+UNSUCCESSFUL_RESPONSE_HEADERS = MappingProxyType(
+    {
+        "content-type": "application/json",
+        "temporal-nexus-failure-source": "worker",
+    }
+)
+
+
 @dataclass
 class SuccessfulResponse:
     status_code: int
     body_json: Optional[Union[dict[str, Any], Callable[[dict[str, Any]], bool]]] = None
-    headers: dict[str, str] = field(
-        default_factory=lambda: {
-            "content-type": "application/json",
-        }
-    )
+    headers: Mapping[str, str] = SUCCESSFUL_RESPONSE_HEADERS
 
 
 @dataclass
@@ -194,12 +207,7 @@ class UnsuccessfulResponse:
     retryable_exception: bool = True
     # TODO(dan): the body of a successful response need not be JSON; test non-JSON-parseable string
     body_json: Optional[Callable[[dict[str, Any]], bool]] = None
-    headers: dict[str, str] = field(
-        default_factory=lambda: {
-            "content-type": "application/json",
-            "temporal-nexus-failure-source": "worker",
-        }
-    )
+    headers: Mapping[str, str] = UNSUCCESSFUL_RESPONSE_HEADERS
 
 
 class _TestCase:
@@ -305,6 +313,10 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
 
 
 class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
+    # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
+    # does; look at test coverage in Go/Java.
+    skip = "Operation-Timeout test not implemented"
+
     operation = "hang"
     headers = {"Operation-Timeout": "10ms"}
     expected_response = UnsuccessfulResponse(
@@ -314,9 +326,6 @@ class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
         # This error is returned by the server; it doesn't populate metadata or details.
         failure_message="upstream timeout",
     )
-    # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
-    # does; look at test coverage in Go/Java.
-    skip = "Operation-Timeout test not implemented"
 
 
 class BadRequest(_FailureTestCase):
@@ -381,7 +390,7 @@ class OperationError(_FailureTestCase):
         # TODO(dan): check that OperationError should not set retryable header
         retryable_header=None,
         failure_message="deliberate operation error",
-        headers=_FailureTestCase.headers | {"nexus-operation-state": "failed"},
+        headers=UNSUCCESSFUL_RESPONSE_HEADERS | {"nexus-operation-state": "failed"},
     )
 
 
