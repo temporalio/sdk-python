@@ -173,25 +173,38 @@ class Failure:
 
 
 @dataclass
-class Response:
+class SuccessfulResponse:
     status_code: int
+    body: Optional[Union[str, Callable[[str], bool]]] = None
+    headers: Optional[dict[str, str]] = None
 
 
 @dataclass
-class UnsuccessfulResponse(Response):
+class UnsuccessfulResponse:
+    status_code: int
     # Expected value of Nexux-Request-Retryable header
     retryable_header: Optional[bool]
     failure_message: Union[str, Callable[[str], bool]]
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
+    body: Optional[Union[str, Callable[[str], bool]]] = None
 
 
 class _TestCase:
     operation: str
     input = ""
     headers: dict[str, str] = {}
-    expected_response: Response
+    expected_response: SuccessfulResponse
     skip = ""
+
+    @classmethod
+    def check_response(cls, response: httpx.Response) -> None:
+        assert response.status_code == cls.expected_response.status_code
+        body = response.json()
+        if isinstance(cls.expected_response.body, str):
+            assert body == cls.expected_response.body
+        elif isinstance(cls.expected_response.body, Callable):
+            assert cls.expected_response.body(body)
 
     @staticmethod
     def check_response_body(response: dict[str, Any]) -> None:
@@ -209,9 +222,33 @@ class _TestCase:
 class _FailureTestCase(_TestCase):
     expected_response: UnsuccessfulResponse
 
-    @staticmethod
-    def check_failure(failure: Failure) -> None:
-        pass
+    @classmethod
+    def check_response(cls, response: httpx.Response) -> None:
+        super().check_response(response)
+        failure = Failure(**response.json())
+
+        if isinstance(cls.expected_response.failure_message, str):
+            assert failure.message == cls.expected_response.failure_message
+        else:
+            assert cls.expected_response.failure_message(failure.message)
+
+        # retryability assertions
+        if (
+            retryable_header := response.headers.get("nexus-request-retryable")
+        ) is not None:
+            assert (
+                json.loads(retryable_header) == cls.expected_response.retryable_header
+            )
+        else:
+            assert cls.expected_response.retryable_header is None
+
+        if failure.exception:
+            assert isinstance(failure.exception, ApplicationError)
+            assert (
+                failure.exception.retryable == cls.expected_response.retryable_exception
+            )
+        else:
+            print(f"TODO(dan): {cls} did not yield a Failure with exception details")
 
 
 class SyncHandlerHappyPath(_TestCase):
@@ -222,7 +259,7 @@ class SyncHandlerHappyPath(_TestCase):
         "Test-Header-Key": "test-header-value",
         "Nexus-Link": '<http://test/>; type="test"',
     }
-    expected_response = Response(
+    expected_response = SuccessfulResponse(
         status_code=200,
     )
 
@@ -245,7 +282,7 @@ class AsyncHandlerHappyPath(_TestCase):
     headers = {
         "Content-Type": "application/json",
     }
-    expected_response = Response(
+    expected_response = SuccessfulResponse(
         status_code=201,
     )
 
@@ -312,8 +349,10 @@ class NonRetryableApplicationError(_FailureTestCase):
         failure_message="non-retryable application error",
     )
 
-    @staticmethod
-    def check_failure(failure: Failure) -> None:
+    @classmethod
+    def check_response(cls, response: httpx.Response) -> None:
+        super().check_response(response)
+        failure = Failure(**response.json())
         err = failure.exception
         assert isinstance(err, ApplicationError)
         assert err.non_retryable
@@ -339,8 +378,10 @@ class HandlerErrorInternal(_FailureTestCase):
         failure_message="cause message",
     )
 
-    @staticmethod
-    def check_failure(failure: Failure) -> None:
+    @classmethod
+    def check_response(cls, response: httpx.Response) -> None:
+        super().check_response(response)
+        failure = Failure(**response.json())
         assert failure.exception.cause is None
 
 
@@ -415,7 +456,7 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                 json={"value": test_case.input},
                 headers=test_case.headers,
             )
-            assert response.status_code == test_case.expected_response.status_code
+            test_case.check_response(response)
             test_case.check_response_body(response.json())
             test_case.check_response_headers(dict(response.headers))
 
@@ -424,36 +465,6 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
                     print(f"🔴 {test_case} headers: {response.headers}")
 
                 failure = Failure(**response.json())
-                if isinstance(test_case.expected_response.failure_message, str):
-                    assert (
-                        failure.message == test_case.expected_response.failure_message
-                    )
-                else:
-                    assert test_case.expected_response.failure_message(failure.message)
-
-                test_case.check_failure(failure)
-
-                # retryability assertions
-                if (
-                    retryable_header := response.headers.get("nexus-request-retryable")
-                ) is not None:
-                    assert (
-                        json.loads(retryable_header)
-                        == test_case.expected_response.retryable_header
-                    )
-                else:
-                    assert test_case.expected_response.retryable_header is None
-
-                if failure.exception:
-                    assert isinstance(failure.exception, ApplicationError)
-                    assert (
-                        failure.exception.retryable
-                        == test_case.expected_response.retryable_exception
-                    )
-                else:
-                    print(
-                        f"TODO(dan): {test_case} did not yield a Failure with exception details"
-                    )
 
     print(
         "\n\n----------------------------------------------------------------------\n\n"
