@@ -7,6 +7,7 @@ import re
 import types
 import typing
 import urllib.parse
+import warnings
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
@@ -126,31 +127,41 @@ class StartWorkflowOperationResult(
 
 
 # TODO(dan): naming, visibility, make this less awkward
-def get_input_and_output_types_from_async_start_method(
+def get_input_and_output_types_from_workflow_run_start_method(
     start_method: Callable[
         [S, I, nexusrpc.handler.StartOperationOptions],
         Awaitable[WorkflowHandle[Any, O]],
     ],
-) -> tuple[Type[I], Type[O]]:
-    input_type, output_type = (
-        nexusrpc.handler.get_input_and_output_types_from_sync_operation_start_method(
-            start_method
-        )
+) -> Optional[tuple[Type[I], Type[O]]]:
+    """Return operation input and output types.
+
+    `start_method` must be a type-annotated start method that returns a
+    :py:class:`WorkflowHandle`.
+
+    The output type is the workflow output type, which is expected to be the second type
+    parameter of the returned :py:class:`WorkflowHandle`.
+    """
+    io_types = nexusrpc.handler.get_input_and_output_types_from_sync_start_method(
+        start_method
     )
+    if not io_types:
+        return None
+    input_type, output_type = io_types
     origin_type = typing.get_origin(output_type)
     if not origin_type or not issubclass(origin_type, WorkflowHandle):
-        raise TypeError(
-            f"The return type of {start_method.__name__} must be a subclass of StartWorkflowOperationResult, "
+        warnings.warn(
+            f"Expected return type of {start_method.__name__} to be a subclass of WorkflowHandle, "
             f"but is {output_type}"
         )
+        return None
 
-    # TODO(dan): why are we using get_args here and get_type_hints in WorkflowRunOperation.__init__?
     args = typing.get_args(output_type)
     if len(args) != 2:
-        raise TypeError(
-            f"The return type of {start_method.__name__} must have exactly two type parameters, "
+        warnings.warn(
+            f"Expected return type of {start_method.__name__} to have exactly two type parameters, "
             f"but has {len(args)}: {args}"
         )
+        return None
     _wf_type, output_type = args
     return input_type, output_type
 
@@ -315,6 +326,7 @@ class WorkflowRunOperation(nexusrpc.handler.Operation[I, O], Generic[I, O, S]):
             [S, I, nexusrpc.handler.StartOperationOptions],
             Awaitable[WorkflowHandle[Any, O]],
         ],
+        output_type: Optional[Type] = None,
     ):
         self.service = service
 
@@ -333,14 +345,8 @@ class WorkflowRunOperation(nexusrpc.handler.Operation[I, O], Generic[I, O, S]):
         ) -> O:
             return await fetch_workflow_result(token, options)
 
-        args = typing.get_args(typing.get_type_hints(start_method)["return"])
-        if len(args) != 2:
-            raise TypeError(
-                f"The return type of {start_method.__name__} must have exactly two type parameters, "
-                f"but has {len(args)}: {args}"
-            )
-        _wf_type, output_type = args
-        fetch_result.__annotations__["return"] = output_type
+        if output_type:
+            fetch_result.__annotations__["return"] = output_type
 
         self.start = types.MethodType(start, self)
         self.fetch_result = types.MethodType(fetch_result, self)
@@ -367,12 +373,12 @@ def workflow_run_operation(
         Awaitable[WorkflowHandle[Any, O]],
     ],
 ) -> Callable[[S], WorkflowRunOperation[I, O, S]]:
-    def factory(service: S) -> WorkflowRunOperation[I, O, S]:
-        return WorkflowRunOperation(service, start_method)
+    io_types = get_input_and_output_types_from_workflow_run_start_method(start_method)
+    input_type, output_type = io_types if io_types is not None else (None, None)
 
-    input_type, output_type = get_input_and_output_types_from_async_start_method(
-        start_method
-    )
+    def factory(service: S) -> WorkflowRunOperation[I, O, S]:
+        return WorkflowRunOperation(service, start_method, output_type=output_type)
+
     factory.__nexus_operation__ = nexusrpc.handler.NexusOperationDefinition(  # type: ignore
         name=start_method.__name__,
         input_type=input_type,
