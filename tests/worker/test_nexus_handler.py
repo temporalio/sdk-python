@@ -176,6 +176,8 @@ class Failure:
         return FailureConverter.default.from_failure(proto, PayloadConverter.default)
 
 
+# Immutable dicts that can be used as dataclass field defaults
+
 SUCCESSFUL_RESPONSE_HEADERS = MappingProxyType(
     {
         "content-type": "application/json",
@@ -212,7 +214,7 @@ class UnsuccessfulResponse:
 
 class _TestCase:
     operation: str
-    input = ""
+    input: Input = Input("")
     headers: dict[str, str] = {}
     expected_response: SuccessfulResponse
     skip = ""
@@ -222,6 +224,7 @@ class _TestCase:
         assert response.status_code == cls.expected_response.status_code
         if cls.expected_response.body_json is not None:
             body = response.json()
+            assert isinstance(body, dict)
             if isinstance(cls.expected_response.body_json, dict):
                 assert body == cls.expected_response.body_json
             else:
@@ -264,7 +267,7 @@ class _FailureTestCase(_TestCase):
 
 class SyncHandlerHappyPath(_TestCase):
     operation = "echo"
-    input = "hello"
+    input = Input("hello")
     headers = {
         "Content-Type": "application/json",
         "Test-Header-Key": "test-header-value",
@@ -282,7 +285,7 @@ class SyncHandlerHappyPath(_TestCase):
 
 class AsyncHandlerHappyPath(_TestCase):
     operation = "async_operation"
-    input = "hello"
+    input = Input("hello")
     expected_response = SuccessfulResponse(
         status_code=201,
     )
@@ -330,7 +333,7 @@ class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
 
 class BadRequest(_FailureTestCase):
     operation = "echo"
-    input = 7  # type: ignore
+    input = Input(7)  # type: ignore
     expected_response = UnsuccessfulResponse(
         status_code=400,
         retryable_header=False,
@@ -448,7 +451,7 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
                 f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service}/{test_case.operation}",
-                json={"value": test_case.input},
+                json=dataclass_as_dict(test_case.input),
                 headers=test_case.headers,
             )
             test_case.check_response(response)
@@ -475,7 +478,8 @@ async def test_logger_uses_operation_context(client: Client, caplog: Any):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
                 f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/{operation_name}",
-                json={"value": "test_log"},
+                json=dataclass_as_dict(Input("test_log")),
+                # TODO(dan): why these headers?
                 headers={
                     "Content-Type": "application/json",
                     "Test-Log-Header": "test-log-header-value",
@@ -500,3 +504,15 @@ async def test_logger_uses_operation_context(client: Client, caplog: Any):
     assert getattr(record, "input_value", None) == "test_log"
     assert getattr(record, "service", None) == service_name
     assert getattr(record, "operation", None) == operation_name
+
+
+def dataclass_as_dict(dataclass: Any) -> dict[str, Any]:
+    """
+    Return a shallow dict of the dataclass's fields.
+
+    dataclasses.as_dict goes too far (attempts to pickle values)
+    """
+    return {
+        field.name: getattr(dataclass, field.name)
+        for field in dataclasses.fields(dataclass)
+    }
