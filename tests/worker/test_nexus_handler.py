@@ -71,6 +71,13 @@ class MyWorkflow:
         return Output(value=f"from workflow: {input.value}")
 
 
+@workflow.defn
+class WorkflowWithoutTypeAnnotations:
+    @workflow.run
+    async def run(self, input):
+        return Output(value=f"from workflow without type annotations: {input.value}")
+
+
 @nexusrpc.handler.service(interface=MyService)
 class MyServiceHandler:
     @nexusrpc.handler.sync_operation
@@ -78,7 +85,7 @@ class MyServiceHandler:
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
         assert options.headers["test-header-key"] == "test-header-value"
-        return Output(value=f"from handler: {input.value}")
+        return Output(value=f"from start method: {input.value}")
 
     @nexusrpc.handler.sync_operation
     async def hang(
@@ -134,13 +141,13 @@ class MyServiceHandler:
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
         assert "operation-timeout" in options.headers
-        return Output(value=f"from handler: {input.value}")
+        return Output(value=f"from start method: {input.value}")
 
     @nexusrpc.handler.sync_operation
     async def log(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
-        logger.info("Logging from handler", extra={"input_value": input.value})
+        logger.info("Logging from start method", extra={"input_value": input.value})
         return Output(value=f"logged: {input.value}")
 
     @temporalio.nexus.handler.workflow_run_operation
@@ -150,6 +157,21 @@ class MyServiceHandler:
         assert "operation-timeout" in options.headers
         return await start_workflow(
             MyWorkflow.run,
+            input,
+            id=str(uuid.uuid4()),
+            options=options,
+        )
+
+    @nexusrpc.handler.sync_operation
+    async def sync_operation_without_type_annotations(self, input, options):
+        return Output(
+            value=f"from start method without type annotations: {input['value']}"  # type: ignore
+        )
+
+    @temporalio.nexus.handler.workflow_run_operation
+    async def async_operation_without_type_annotations(self, input, options):
+        return await start_workflow(
+            WorkflowWithoutTypeAnnotations.run,
             input,
             id=str(uuid.uuid4()),
             options=options,
@@ -277,6 +299,7 @@ class _FailureTestCase(_TestCase):
 class SyncHandlerHappyPath(_TestCase):
     operation = "echo"
     input = Input("hello")
+    # TODO(dan): why is application/json randomly scattered around these tests?
     headers = {
         "Content-Type": "application/json",
         "Test-Header-Key": "test-header-value",
@@ -284,7 +307,7 @@ class SyncHandlerHappyPath(_TestCase):
     }
     expected_response = SuccessfulResponse(
         status_code=200,
-        body_json={"value": "from handler: hello"},
+        body_json={"value": "from start method: hello"},
     )
     # TODO(dan): Support manually adding links in operation handler
     # See e.g. TS nexus.handlerLinks().push(...options.links)
@@ -292,10 +315,27 @@ class SyncHandlerHappyPath(_TestCase):
     #     "Nexus-Link header not echoed correctly."
 
 
+class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
+    operation = "sync_operation_without_type_annotations"
+    input = Input("hello")
+    expected_response = SuccessfulResponse(
+        status_code=200,
+        body_json={"value": "from start method without type annotations: hello"},
+    )
+
+
 class AsyncHandlerHappyPath(_TestCase):
     operation = "async_operation"
     input = Input("hello")
     headers = {"Operation-Timeout": "777s"}
+    expected_response = SuccessfulResponse(
+        status_code=201,
+    )
+
+
+class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
+    operation = "async_operation_without_type_annotations"
+    input = Input("hello")
     expected_response = SuccessfulResponse(
         status_code=201,
     )
@@ -401,7 +441,9 @@ class OperationError(_FailureTestCase):
     "test_case",
     [
         SyncHandlerHappyPath,
+        SyncHandlerHappyPathWithoutTypeAnnotations,
         AsyncHandlerHappyPath,
+        AsyncHandlerHappyPathWithoutTypeAnnotations,
     ],
 )
 async def test_start_operation_happy_path(test_case: Type[_TestCase], client: Client):
@@ -495,7 +537,7 @@ async def test_logger_uses_operation_context(client: Client, caplog: Any):
             record
             for record in caplog.records
             if record.name == "temporalio.nexus"
-            and record.getMessage() == "Logging from handler"
+            and record.getMessage() == "Logging from start method"
         ),
         None,
     )

@@ -333,7 +333,6 @@ class WorkflowRunOperation(nexusrpc.handler.Operation[I, O], Generic[I, O, S]):
         ) -> O:
             return await fetch_workflow_result(token, options)
 
-        # TODO(dan): test usage with no type annotations
         args = typing.get_args(typing.get_type_hints(start_method)["return"])
         if len(args) != 2:
             raise TypeError(
