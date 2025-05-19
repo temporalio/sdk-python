@@ -44,9 +44,20 @@ from tests.helpers.nexus import create_nexus_endpoint
 HTTP_PORT = 7243
 
 
+EXPECTED_REQUEST_HEADERS = MappingProxyType(
+    {
+        "test-header-key": "test-header-value",
+    }
+)
+
+
 @dataclass
 class Input:
     value: str
+    expected_headers: dict[str, str] = dataclasses.field(
+        default_factory=lambda: dict(EXPECTED_REQUEST_HEADERS)
+    )
+    expected_header_keys: tuple[str, ...] = ()
 
 
 @dataclass
@@ -77,7 +88,8 @@ class MyServiceHandler:
     async def echo(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
-        assert options.headers["test-header-key"] == "test-header-value"
+        assert input.expected_headers.items() <= options.headers.items()
+        assert set(input.expected_header_keys) <= options.headers.keys()
         return Output(value=f"from handler: {input.value}")
 
     @nexusrpc.handler.sync_operation
