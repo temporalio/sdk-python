@@ -25,10 +25,10 @@ from temporalio.client import (
     WithStartWorkflowOperation,
     WorkflowExecutionStatus,
     WorkflowFailureError,
-    WorkflowHandle,
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
+from temporalio.nexus.handler import WorkflowHandle
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -151,11 +151,14 @@ class SyncOrAsyncOperation:
                 start_options_received_by_handler=options,
             )
         elif isinstance(input.response_type, AsyncResponse):
-            return await temporalio.nexus.handler.start_workflow(
+            wf_handle = await temporalio.nexus.handler.start_workflow(
                 HandlerWorkflow.run,
                 args=[HandlerWfInput(op_input=input), options],
                 id=input.response_type.operation_workflow_id,
                 options=options,
+            )
+            return temporalio.nexus.handler.StartWorkflowOperationResult.from_workflow_handle(
+                wf_handle
             )
         else:
             raise TypeError
@@ -217,7 +220,7 @@ class ServiceImpl:
     @temporalio.nexus.handler.workflow_run_operation
     async def async_operation(
         self, input: OpInput, options: nexusrpc.handler.StartOperationOptions
-    ) -> temporalio.nexus.handler.StartWorkflowOperationResult[HandlerWfOutput]:
+    ) -> WorkflowHandle[HandlerWorkflow, HandlerWfOutput]:
         assert isinstance(input.response_type, AsyncResponse)
         if input.response_type.exception_in_operation_start:
             raise RPCError(

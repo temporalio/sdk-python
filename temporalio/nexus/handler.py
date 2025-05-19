@@ -129,7 +129,7 @@ class StartWorkflowOperationResult(
 def get_input_and_output_types_from_async_start_method(
     start_method: Callable[
         [S, I, nexusrpc.handler.StartOperationOptions],
-        Awaitable[StartWorkflowOperationResult[O]],
+        Awaitable[WorkflowHandle[Any, O]],
     ],
 ) -> tuple[Type[I], Type[O]]:
     input_type, output_type = (
@@ -138,22 +138,21 @@ def get_input_and_output_types_from_async_start_method(
         )
     )
     origin_type = typing.get_origin(output_type)
-    if not origin_type or not issubclass(origin_type, StartWorkflowOperationResult):
+    if not origin_type or not issubclass(origin_type, WorkflowHandle):
         raise TypeError(
             f"The return type of {start_method.__name__} must be a subclass of StartWorkflowOperationResult, "
             f"but is {output_type}"
         )
 
+    # TODO(dan): why are we using get_args here and get_type_hints in WorkflowRunOperation.__init__?
     args = typing.get_args(output_type)
-    if len(args) != 1:
+    if len(args) != 2:
         raise TypeError(
-            f"The return type of {start_method.__name__} must have exactly one type parameter, "
+            f"The return type of {start_method.__name__} must have exactly two type parameters, "
             f"but has {len(args)}: {args}"
         )
-    return input_type, args[0]
-
-
-# TODO(dan): overloads should use SelfType, ParamType, ReturnType?
+    _wf_type, output_type = args
+    return input_type, output_type
 
 
 # No-param overload
@@ -165,7 +164,7 @@ async def start_workflow(
     options: nexusrpc.handler.StartOperationOptions,
     client: Optional[Client] = None,
     task_queue: Optional[str] = None,
-) -> StartWorkflowOperationResult[ReturnType]: ...
+) -> WorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Single-param overload
@@ -178,7 +177,7 @@ async def start_workflow(
     options: nexusrpc.handler.StartOperationOptions,
     client: Optional[Client] = None,
     task_queue: Optional[str] = None,
-) -> StartWorkflowOperationResult[ReturnType]: ...
+) -> WorkflowHandle[SelfType, ReturnType]: ...
 
 
 # Multiple-params overload
@@ -191,7 +190,7 @@ async def start_workflow(
     options: nexusrpc.handler.StartOperationOptions,
     client: Optional[Client] = None,
     task_queue: Optional[str] = None,
-) -> StartWorkflowOperationResult[ReturnType]: ...
+) -> WorkflowHandle[SelfType, ReturnType]: ...
 
 
 # TODO(dan): Overload for string-name workflow
@@ -207,7 +206,7 @@ async def start_workflow(
     options: nexusrpc.handler.StartOperationOptions,
     client: Optional[Client] = None,
     task_queue: Optional[str] = None,
-) -> StartWorkflowOperationResult[Any]:
+) -> WorkflowHandle[Any, Any]:
     if client is None:
         client = get_client()
     if task_queue is None:
@@ -232,7 +231,7 @@ async def start_workflow(
         print(f"🌈 link: {link}")
     # We need to pass options (completion_callbacks, links, on_conflict_options) which are
     # deliberately not exposed in any overload, hence the type error.
-    workflow_handle = await client.start_workflow(  # type: ignore
+    return await client.start_workflow(  # type: ignore
         workflow,
         args=temporalio.common._arg_or_args(arg, args),
         id=id,
@@ -240,7 +239,6 @@ async def start_workflow(
         nexus_completion_callbacks=completion_callbacks,
         workflow_event_links=[_nexus_link_to_workflow_event(l) for l in options.links],
     )
-    return StartWorkflowOperationResult.from_workflow_handle(workflow_handle)
 
 
 # Not for merge: this is not required for Temporal Nexus, but implementing in
@@ -315,17 +313,19 @@ class WorkflowRunOperation(nexusrpc.handler.Operation[I, O], Generic[I, O, S]):
         service: S,
         start_method: Callable[
             [S, I, nexusrpc.handler.StartOperationOptions],
-            Awaitable[StartWorkflowOperationResult[O]],
+            Awaitable[WorkflowHandle[Any, O]],
         ],
     ):
         self.service = service
 
         # TODO(dan): get rid of first parameter?
+        # TODO(dan): Is @wraps helping?
         @wraps(start_method)
         async def start(
             self, input: I, options: nexusrpc.handler.StartOperationOptions
         ) -> StartWorkflowOperationResult[O]:
-            return await start_method(service, input, options)
+            wf_handle = await start_method(service, input, options)
+            return StartWorkflowOperationResult.from_workflow_handle(wf_handle)
 
         # TODO(dan): get rid of first parameter?
         async def fetch_result(
@@ -333,9 +333,15 @@ class WorkflowRunOperation(nexusrpc.handler.Operation[I, O], Generic[I, O, S]):
         ) -> O:
             return await fetch_workflow_result(token, options)
 
-        # TODO(dan): experimental
-        [out_type] = typing.get_args(typing.get_type_hints(start_method)["return"])
-        fetch_result.__annotations__["return"] = out_type
+        # TODO(dan): test usage with no type annotations
+        args = typing.get_args(typing.get_type_hints(start_method)["return"])
+        if len(args) != 2:
+            raise TypeError(
+                f"The return type of {start_method.__name__} must have exactly two type parameters, "
+                f"but has {len(args)}: {args}"
+            )
+        _wf_type, output_type = args
+        fetch_result.__annotations__["return"] = output_type
 
         self.start = types.MethodType(start, self)
         self.fetch_result = types.MethodType(fetch_result, self)
@@ -359,7 +365,7 @@ class WorkflowRunOperation(nexusrpc.handler.Operation[I, O], Generic[I, O, S]):
 def workflow_run_operation(
     start_method: Callable[
         [S, I, nexusrpc.handler.StartOperationOptions],
-        Awaitable[StartWorkflowOperationResult[O]],
+        Awaitable[WorkflowHandle[Any, O]],
     ],
 ) -> Callable[[S], WorkflowRunOperation[I, O, S]]:
     def factory(service: S) -> WorkflowRunOperation[I, O, S]:

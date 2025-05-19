@@ -33,11 +33,11 @@ from typing_extensions import Never
 import temporalio.api.failure.v1
 import temporalio.nexus
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowHandle
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import logger
-from temporalio.nexus.handler import StartWorkflowOperationResult, start_workflow
+from temporalio.nexus.handler import start_workflow
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
 
@@ -146,9 +146,8 @@ class MyServiceHandler:
     @temporalio.nexus.handler.workflow_run_operation
     async def async_operation(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
-    ) -> StartWorkflowOperationResult[Output]:
-        # TODO(dan): is it awkward for sync_operation to return O if this is returning
-        # StartWorkflowOperationResult[O]? I think this should return WorkflowHandle[O]?
+    ) -> WorkflowHandle[Any, Output]:
+        assert "operation-timeout" in options.headers
         return await start_workflow(
             MyWorkflow.run,
             input,
@@ -296,6 +295,7 @@ class SyncHandlerHappyPath(_TestCase):
 class AsyncHandlerHappyPath(_TestCase):
     operation = "async_operation"
     input = Input("hello")
+    headers = {"Operation-Timeout": "777s"}
     expected_response = SuccessfulResponse(
         status_code=201,
     )
