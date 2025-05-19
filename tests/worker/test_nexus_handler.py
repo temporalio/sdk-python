@@ -130,6 +130,13 @@ class MyServiceHandler:
         )
 
     @nexusrpc.handler.sync_operation
+    async def check_operation_timeout_header(
+        self, input: Input, options: nexusrpc.handler.StartOperationOptions
+    ) -> Output:
+        assert "operation-timeout" in options.headers
+        return Output(value=f"from handler: {input.value}")
+
+    @nexusrpc.handler.sync_operation
     async def log(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
@@ -315,19 +322,14 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
     )
 
 
-class UpstreamTimeoutViaOperationTimeoutHeader(_FailureTestCase):
-    # TODO(dan): This doesn't cause the operation to be canceled in the way that Request-Timeout
-    # does; look at test coverage in Go/Java.
-    skip = "Operation-Timeout test not implemented"
-
-    operation = "hang"
+class OperationTimeoutHeader(_TestCase):
+    # The only assertion we make in the _handler_ test suite is that the header is present. The
+    # handler does not currently do anything with this header; the user may use it to configure
+    # timeouts on executions they start in their handler.
+    operation = "check_operation_timeout_header"
     headers = {"Operation-Timeout": "10ms"}
-    expected_response = UnsuccessfulResponse(
-        status_code=520,
-        # TODO(dan): should this have the retryable header set?
-        retryable_header=None,
-        # This error is returned by the server; it doesn't populate metadata or details.
-        failure_message="upstream timeout",
+    expected_response = SuccessfulResponse(
+        status_code=200,
     )
 
 
@@ -412,7 +414,7 @@ async def test_start_operation_happy_path(test_case: Type[_TestCase], client: Cl
     "test_case",
     [
         UpstreamTimeoutViaRequestTimeout,
-        UpstreamTimeoutViaOperationTimeoutHeader,
+        OperationTimeoutHeader,
         BadRequest,
         HandlerErrorInternal,
     ],
