@@ -21,5 +21,4 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 
 logger = LoggerAdapter(logging.getLogger(__name__), None)
-"""Logger that has additional details regarding the current Nexus operation."""
-# TODO(dan): add contextual details to logger
+"""Logger that emits additional data describing the current Nexus operation."""

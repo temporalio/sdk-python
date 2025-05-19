@@ -146,8 +146,6 @@ class Worker:
             maximum=5
         ),
     ) -> None:
-        # TODO(dan): consider not allowing max_workers < max_concurrent_nexus_operations?
-        # TODO(dan): Nexus tuner support?
         """Create a worker to process workflows and/or activities.
 
         Args:
@@ -173,14 +171,6 @@ class Worker:
                 executor should at least be ``max_concurrent_activities`` or a
                 warning is issued. Note, a broken-executor failure from this
                 executor will cause the worker to fail and shutdown.
-            nexus_operation_executor: Concurrent executor to use for non-async
-                Nexus operations. This is required if any operation start methods
-                are non-async. :py:class:`concurrent.futures.ThreadPoolExecutor`
-                is recommended. If this is a
-                :py:class:`concurrent.futures.ProcessPoolExecutor`, all non-async
-                start methods must be picklable. ``max_workers`` on the executor
-                should at least be ``max_concurrent_nexus_operations`` or a warning
-                is issued.
             workflow_task_executor: Thread pool executor for workflow tasks. If
                 this is not present, a new
                 :py:class:`concurrent.futures.ThreadPoolExecutor` will be
@@ -209,8 +199,6 @@ class Worker:
                 will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
                 tasks that will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
-            max_concurrent_nexus_operations: Maximum number of Nexus operations that
-                will ever be given to the Nexus worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_workflow_tasks: Maximum allowed number of
                 tasks that will ever be given to the workflow worker at one time. Mutually exclusive with ``tuner``.
             tuner:  Provide a custom :py:class:`WorkerTuner`. Mutually exclusive with the
@@ -312,6 +300,18 @@ class Worker:
             activity_task_poller_behavior: Specify the behavior of activity task polling.
                 Defaults to a 5-poller maximum.
         """
+        # TODO(dan): non-async (executor-based) Nexus worker; honor
+        # max_concurrent_nexus_operations and nexus_operation_executor.
+        # nexus_operation_executor: Concurrent executor to use for non-async
+        #     Nexus operations. This is required if any operation start methods
+        #     are non-async. :py:class:`concurrent.futures.ThreadPoolExecutor`
+        #     is recommended. If this is a
+        #     :py:class:`concurrent.futures.ProcessPoolExecutor`, all non-async
+        #     start methods must be picklable. ``max_workers`` on the executor
+        #     should at least be ``max_concurrent_nexus_operations`` or a warning
+        #     is issued.
+        # max_concurrent_nexus_operations: Maximum number of Nexus operations that
+        #     will ever be given to the Nexus worker concurrently. Mutually exclusive with ``tuner``.
         if not (activities or nexus_services or workflows):
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
@@ -378,7 +378,6 @@ class Worker:
         self._async_context_run_task: Optional[asyncio.Task] = None
         self._async_context_run_exception: Optional[BaseException] = None
 
-        # Create activity and workflow worker
         self._activity_worker: Optional[_ActivityWorker] = None
         self._runtime = (
             bridge_client.config.runtime or temporalio.runtime.Runtime.default()
@@ -412,6 +411,8 @@ class Worker:
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if nexus_services:
+            # TODO(dan): consider not allowing / warning on max_workers <
+            # max_concurrent_nexus_operations? See warning above for activity worker.
             self._nexus_worker = _NexusWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 client=client,
@@ -460,6 +461,7 @@ class Worker:
             )
 
         if tuner is not None:
+            # TODO(dan): Nexus tuner support
             if (
                 max_concurrent_workflow_tasks
                 or max_concurrent_activities

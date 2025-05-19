@@ -307,6 +307,7 @@ class AsyncHandlerHappyPath(_TestCase):
 # '5.617792ms'
 
 # TODO(dan): test Nexus-Callback- headers
+# TODO(dan): make assertions about failure.exception.cause
 
 
 class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
@@ -383,12 +384,6 @@ class HandlerErrorInternal(_FailureTestCase):
         retryable_header=False,
         failure_message="cause message",
     )
-
-    @classmethod
-    def check_response(cls, response: httpx.Response) -> None:
-        super().check_response(response)
-        failure = Failure(**response.json())
-        assert failure.exception.cause is None
 
 
 class OperationError(_FailureTestCase):

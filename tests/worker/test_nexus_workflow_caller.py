@@ -36,7 +36,6 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 # TODO(dan): test availability of Temporal client etc in async context set by worker
 # TODO(dan): test worker shutdown, wait_all_completed, drain etc
 # TODO(dan): test worker op handling failure
-# TODO(dan): test contextual logger
 
 # -----------------------------------------------------------------------------
 # Test definition
@@ -645,7 +644,6 @@ async def _start_wf_and_nexus_op(
     Start the caller workflow and wait until the Nexus operation has started.
     """
     await create_nexus_endpoint(task_queue, client)
-    # TODO(dan): this workflow ID is for xray; change to uuid before merge
     operation_workflow_id = str(uuid.uuid4())
 
     # Start the caller workflow and wait until it confirms the Nexus operation has started.
@@ -948,6 +946,7 @@ async def test_service_interface_and_implementation_names(client: Client):
 # TODO(dan): test service impls and interfaces with and without names, conflicting names, etc.
 # TODO(dan): test impl used without interface
 # TODO(dan): test empty service impl/interface names
+# TODO(dan): test caller passing output_type
 
 
 async def assert_caller_workflow_has_link_to_handler_workflow(
@@ -997,9 +996,6 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
         link.workflow_event.event_ref.event_type
         == temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
     )
-
-
-# TODO(dan): test exceptions in Nexus worker are raised
 
 
 async def print_history(handle: WorkflowHandle):
