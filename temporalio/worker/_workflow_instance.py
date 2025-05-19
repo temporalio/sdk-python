@@ -1670,6 +1670,7 @@ class _WorkflowInstanceImpl(
             # If the cancel command is for external workflow, we
             # have to add a seq and mark it pending
             if cancel_command.HasField("request_cancel_external_workflow_execution"):
+                assert False, "request_cancel_external_workflow_execution"
                 cancel_seq = self._next_seq("external_cancel")
                 cancel_command.request_cancel_external_workflow_execution.seq = (
                     cancel_seq
@@ -1683,9 +1684,7 @@ class _WorkflowInstanceImpl(
         async def run_child() -> Any:
             while True:
                 try:
-                    # We have to shield because we don't want the future itself
-                    # to be cancelled
-                    return await asyncio.shield(handle._result_fut)
+                    return await handle._result_fut
                 except asyncio.CancelledError:
                     apply_child_cancel_error()
 
@@ -1699,9 +1698,7 @@ class _WorkflowInstanceImpl(
         # Wait on start before returning
         while True:
             try:
-                # We have to shield because we don't want the future itself
-                # to be cancelled
-                await asyncio.shield(handle._start_fut)
+                await handle._start_fut
                 return handle
             except asyncio.CancelledError:
                 apply_child_cancel_error()
