@@ -704,94 +704,94 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
         context.heartbeat = outbound.heartbeat
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
-        # Handle synchronous activity
         is_async = inspect.iscoroutinefunction(input.fn) or inspect.iscoroutinefunction(
             input.fn.__call__  # type: ignore
         )
-        if not is_async:
-            # We execute a top-level function via the executor. It is top-level
-            # because it needs to be picklable. Also, by default Python does not
-            # propagate contextvars into executor futures so we don't either
-            # with the obvious exception of our context (if they want more, they
-            # can set the initializer on the executor).
-            ctx = temporalio.activity._Context.current()
-            info = ctx.info()
+        if is_async:
+            return await input.fn(*input.args)
 
-            # Heartbeat calls internally use a data converter which is async so
-            # they need to be called on the event loop
-            loop = asyncio.get_running_loop()
-            orig_heartbeat = ctx.heartbeat
+        # Handle synchronous activity
 
-            # We have to call the heartbeat function inside the asyncio event
-            # loop (even though it's sync). So we need a call that puts the
-            # context back on the activity and calls heartbeat, then another
-            # call schedules it.
-            async def heartbeat_with_context(*details: Any) -> None:
-                temporalio.activity._Context.set(ctx)
-                assert orig_heartbeat
-                orig_heartbeat(*details)
+        # We execute a top-level function via the executor. It is top-level
+        # because it needs to be picklable. Also, by default Python does not
+        # propagate contextvars into executor futures so we don't either
+        # with the obvious exception of our context (if they want more, they
+        # can set the initializer on the executor).
+        ctx = temporalio.activity._Context.current()
+        info = ctx.info()
 
-            # Invoke the async heartbeat waiting a max of 10 seconds for
-            # accepting
-            ctx.heartbeat = lambda *details: asyncio.run_coroutine_threadsafe(
-                heartbeat_with_context(*details), loop
-            ).result(10)
+        # Heartbeat calls internally use a data converter which is async so
+        # they need to be called on the event loop
+        loop = asyncio.get_running_loop()
+        orig_heartbeat = ctx.heartbeat
 
-            # For heartbeats, we use the existing heartbeat callable for thread
-            # pool executors or a multiprocessing queue for others
-            heartbeat: Union[Callable[..., None], SharedHeartbeatSender] = ctx.heartbeat
-            shared_manager: Optional[SharedStateManager] = None
-            if not isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
-                # Should always be present in worker, pre-checked on init
-                shared_manager = self._worker._shared_state_manager
-                assert shared_manager
-                heartbeat = await shared_manager.register_heartbeater(
-                    info.task_token, ctx.heartbeat
-                )
+        # We have to call the heartbeat function inside the asyncio event
+        # loop (even though it's sync). So we need a call that puts the
+        # context back on the activity and calls heartbeat, then another
+        # call schedules it.
+        async def heartbeat_with_context(*details: Any) -> None:
+            temporalio.activity._Context.set(ctx)
+            assert orig_heartbeat
+            orig_heartbeat(*details)
 
-            # The payload converter is the already instantiated one for thread
-            # or the picklable class for non-thread
-            payload_converter_class_or_instance = (
-                self._worker._data_converter.payload_converter
-                if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor)
-                else self._worker._data_converter.payload_converter_class
+        # Invoke the async heartbeat waiting a max of 10 seconds for
+        # accepting
+        ctx.heartbeat = lambda *details: asyncio.run_coroutine_threadsafe(
+            heartbeat_with_context(*details), loop
+        ).result(10)
+
+        # For heartbeats, we use the existing heartbeat callable for thread
+        # pool executors or a multiprocessing queue for others
+        heartbeat: Union[Callable[..., None], SharedHeartbeatSender] = ctx.heartbeat
+        shared_manager: Optional[SharedStateManager] = None
+        if not isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
+            # Should always be present in worker, pre-checked on init
+            shared_manager = self._worker._shared_state_manager
+            assert shared_manager
+            heartbeat = await shared_manager.register_heartbeater(
+                info.task_token, ctx.heartbeat
             )
 
-            try:
-                # Cancel and shutdown event always present here
-                cancelled_event = self._running_activity.cancelled_event
-                assert cancelled_event
-                worker_shutdown_event = self._worker._worker_shutdown_event
-                assert worker_shutdown_event
-                # Prepare func and args
-                func: Callable = _execute_sync_activity
-                args = [
-                    info,
-                    heartbeat,
-                    self._running_activity.cancel_thread_raiser,
-                    # Only thread event, this may cross a process boundary
-                    cancelled_event.thread_event,
-                    worker_shutdown_event.thread_event,
-                    payload_converter_class_or_instance,
-                    ctx.runtime_metric_meter,
-                    input.fn,
-                    *input.args,
-                ]
-                # If we're threaded, we want to pass the context through. We
-                # have to do this manually, see
-                # https://github.com/python/cpython/issues/78195.
-                if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
-                    current_context = contextvars.copy_context()
-                    args.insert(0, func)
-                    func = current_context.run
-                # Invoke
-                return await loop.run_in_executor(input.executor, func, *args)
-            finally:
-                if shared_manager:
-                    await shared_manager.unregister_heartbeater(info.task_token)
+        # The payload converter is the already instantiated one for thread
+        # or the picklable class for non-thread
+        payload_converter_class_or_instance = (
+            self._worker._data_converter.payload_converter
+            if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor)
+            else self._worker._data_converter.payload_converter_class
+        )
 
-        # Otherwise for async activity, just run
-        return await input.fn(*input.args)
+        try:
+            # Cancel and shutdown event always present here
+            cancelled_event = self._running_activity.cancelled_event
+            assert cancelled_event
+            worker_shutdown_event = self._worker._worker_shutdown_event
+            assert worker_shutdown_event
+            # Prepare func and args
+            func: Callable = _execute_sync_activity
+            args = [
+                info,
+                heartbeat,
+                self._running_activity.cancel_thread_raiser,
+                # Only thread event, this may cross a process boundary
+                cancelled_event.thread_event,
+                worker_shutdown_event.thread_event,
+                payload_converter_class_or_instance,
+                ctx.runtime_metric_meter,
+                input.fn,
+                *input.args,
+            ]
+            # If we're threaded, we want to pass the context through. We
+            # have to do this manually, see
+            # https://github.com/python/cpython/issues/78195.
+            if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
+                current_context = contextvars.copy_context()
+                args.insert(0, func)
+                func = current_context.run
+            # Invoke
+            return await loop.run_in_executor(input.executor, func, *args)
+        finally:
+            if shared_manager:
+                await shared_manager.unregister_heartbeater(info.task_token)
 
 
 class _ActivityOutboundImpl(ActivityOutboundInterceptor):
