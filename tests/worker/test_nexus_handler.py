@@ -228,7 +228,10 @@ class _TestCase:
 
     @classmethod
     def check_response(cls, response: httpx.Response) -> None:
-        assert response.status_code == cls.expected_response.status_code
+        assert response.status_code == cls.expected_response.status_code, (
+            f"expected status code {cls.expected_response.status_code} "
+            f"but got {response.status_code} for response content {response.content.decode()}"
+        )
         if cls.expected_response.body_json is not None:
             body = response.json()
             assert isinstance(body, dict)
