@@ -446,6 +446,52 @@ my_data_converter = dataclasses.replace(
 
 Now `IPv4Address` can be used in type hints including collections, optionals, etc.
 
+When the `JSONPlainPayloadConverter` is used a class can implement `to_temporal_json` and `from_temporal_json` methods to 
+support custom conversion logic. Custom conversion of generic classes is supported.
+These methods should have the following signatures:
+
+```
+        class MyClass:
+            ...
+```
+`from_temporal_json` be either classmethod:
+```
+            @classmethod
+            def from_temporal_json(cls, json: Any) -> MyClass:
+                ...
+```
+ or static method:
+ ```           
+            @staticmethod
+            def from_temporal_json(json: Any) -> MyClass:
+                ...
+```
+`to_temporal_json` is always an instance method:
+```
+            def to_temporal_json(self) -> Any:
+                ...
+```
+The to_json should return the same Python JSON types produced by JSONEncoder:
+```
+    +-------------------+---------------+
+    | Python            | JSON          |
+    +===================+===============+
+    | dict              | object        |
+    +-------------------+---------------+
+    | list, tuple       | array         |
+    +-------------------+---------------+
+    | str               | string        |
+    +-------------------+---------------+
+    | int, float        | number        |
+    +-------------------+---------------+
+    | True              | true          |
+    +-------------------+---------------+
+    | False             | false         |
+    +-------------------+---------------+
+    | None              | null          |
+    +-------------------+---------------+
+```
+
 ### Workers
 
 Workers host workflows and/or activities. Here's how to run a worker:
