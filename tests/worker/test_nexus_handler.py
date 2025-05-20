@@ -58,10 +58,16 @@ class Output:
 @nexusrpc.interface.service
 class MyService:
     echo: nexusrpc.interface.Operation[Input, Output]
-    hang: nexusrpc.interface.Operation[Input, Output]
+    hang: nexusrpc.interface.Operation[Input, Never]
     log: nexusrpc.interface.Operation[Input, Output]
-    error: nexusrpc.interface.Operation[Input, Output]
     async_operation: nexusrpc.interface.Operation[Input, Output]
+    async_operation_without_type_annotations: nexusrpc.interface.Operation[
+        Input, Output
+    ]
+    sync_operation_without_type_annotations: nexusrpc.interface.Operation[Input, Output]
+    non_retryable_application_error: nexusrpc.interface.Operation[Input, Output]
+    retryable_application_error: nexusrpc.interface.Operation[Input, Output]
+    check_operation_timeout_header: nexusrpc.interface.Operation[Input, Output]
 
 
 @workflow.defn
