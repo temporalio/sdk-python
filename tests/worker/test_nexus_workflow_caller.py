@@ -91,19 +91,6 @@ class OpOutput:
     start_options_received_by_handler: Optional[nexusrpc.handler.StartOperationOptions]
 
 
-@nexusrpc.interface.service
-class ServiceInterface:
-    sync_or_async_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
-    sync_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
-    non_async_sync_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
-    async_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
-
-
-# -----------------------------------------------------------------------------
-# Service implementation
-#
-
-
 @dataclass
 class HandlerWfInput:
     op_input: OpInput
@@ -113,6 +100,19 @@ class HandlerWfInput:
 class HandlerWfOutput:
     value: str
     start_options_received_by_handler: Optional[nexusrpc.handler.StartOperationOptions]
+
+
+@nexusrpc.interface.service
+class ServiceInterface:
+    sync_or_async_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
+    sync_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
+    non_async_sync_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
+    async_operation: nexusrpc.interface.Operation[OpInput, HandlerWfOutput]
+
+
+# -----------------------------------------------------------------------------
+# Service implementation
+#
 
 
 @workflow.defn
