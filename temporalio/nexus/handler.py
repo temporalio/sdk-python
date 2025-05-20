@@ -20,6 +20,7 @@ from typing import (
     Sequence,
     Type,
     TypeVar,
+    Union,
 )
 
 import nexusrpc.handler
@@ -132,7 +133,10 @@ def get_input_and_output_types_from_workflow_run_start_method(
         [S, I, nexusrpc.handler.StartOperationOptions],
         Awaitable[WorkflowHandle[Any, O]],
     ],
-) -> Optional[tuple[Type[I], Type[O]]]:
+) -> tuple[
+    Union[Type[I], Type[nexusrpc.handler.MISSING]],
+    Union[Type[O], Type[nexusrpc.handler.MISSING]],
+]:
     """Return operation input and output types.
 
     `start_method` must be a type-annotated start method that returns a
@@ -141,19 +145,16 @@ def get_input_and_output_types_from_workflow_run_start_method(
     The output type is the workflow output type, which is expected to be the second type
     parameter of the returned :py:class:`WorkflowHandle`.
     """
-    io_types = nexusrpc.handler.get_input_and_output_types_from_sync_start_method(
-        start_method
+    input_type, output_type = (
+        nexusrpc.handler.get_input_and_output_types_from_sync_start_method(start_method)
     )
-    if not io_types:
-        return None
-    input_type, output_type = io_types
     origin_type = typing.get_origin(output_type)
     if not origin_type or not issubclass(origin_type, WorkflowHandle):
         warnings.warn(
             f"Expected return type of {start_method.__name__} to be a subclass of WorkflowHandle, "
             f"but is {output_type}"
         )
-        return None
+        output_type = nexusrpc.handler.MISSING
 
     args = typing.get_args(output_type)
     if len(args) != 2:
@@ -161,8 +162,9 @@ def get_input_and_output_types_from_workflow_run_start_method(
             f"Expected return type of {start_method.__name__} to have exactly two type parameters, "
             f"but has {len(args)}: {args}"
         )
-        return None
-    _wf_type, output_type = args
+        output_type = nexusrpc.handler.MISSING
+    else:
+        _wf_type, output_type = args
     return input_type, output_type
 
 
@@ -373,8 +375,9 @@ def workflow_run_operation(
         Awaitable[WorkflowHandle[Any, O]],
     ],
 ) -> Callable[[S], WorkflowRunOperation[I, O, S]]:
-    io_types = get_input_and_output_types_from_workflow_run_start_method(start_method)
-    input_type, output_type = io_types if io_types is not None else (None, None)
+    input_type, output_type = get_input_and_output_types_from_workflow_run_start_method(
+        start_method
+    )
 
     def factory(service: S) -> WorkflowRunOperation[I, O, S]:
         return WorkflowRunOperation(service, start_method, output_type=output_type)
