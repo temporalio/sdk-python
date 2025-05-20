@@ -289,7 +289,7 @@ class _NexusWorker:
                 )
             else:
                 # TODO(dan): TS is wrapping the sync start method result, but Python is not
-                if isinstance(result, nexusrpc.handler.StartOperationAsyncResult):
+                if isinstance(result, nexusrpc.handler.StartOperationResultAsync):
                     op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                         async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
                             operation_token=result.token,

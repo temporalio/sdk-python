@@ -77,7 +77,7 @@ class Operation(nexusrpc.handler.Operation[I, O]):
 
 
 class StartWorkflowOperationResult(
-    nexusrpc.handler.StartOperationAsyncResult, Generic[O]
+    nexusrpc.handler.StartOperationResultAsync, Generic[O]
 ):
     @classmethod
     def from_workflow_handle(
@@ -146,7 +146,9 @@ def get_input_and_output_types_from_workflow_run_start_method(
     parameter of the returned :py:class:`WorkflowHandle`.
     """
     input_type, output_type = (
-        nexusrpc.handler.get_input_and_output_types_from_sync_start_method(start_method)
+        nexusrpc.handler.get_input_and_output_types_from_sync_operation_start_method(
+            start_method
+        )
     )
     origin_type = typing.get_origin(output_type)
     if not origin_type or not issubclass(origin_type, WorkflowHandle):
