@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 from typing import (
@@ -250,7 +251,14 @@ class _NexusWorker:
                     ],
                     callback_header=dict(start_request.callback_header),
                 )
-                result = await operation.start(input, options)
+                if inspect.iscoroutinefunction(operation.start):
+                    # TODO(dan): function returning an Awaitable
+                    result = await operation.start(input, options)
+                else:
+                    # TODO(dan): Executor for blocking operations. This is just a
+                    # temporary hack to allow developing type signatures that support
+                    # non-async start methods.
+                    result = operation.start(input, options)
             except nexusrpc.handler.OperationError as err:
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
