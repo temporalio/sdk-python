@@ -20,7 +20,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Awaitable, Callable, Mapping, Optional, Type, Union
+from typing import Any, Callable, Mapping, Optional, Type, Union
 
 import httpx
 import nexusrpc
@@ -119,9 +119,6 @@ class MyService:
     ]
     sync_operation_without_type_annotations: nexusrpc.interface.Operation[Input, Output]
     sync_operation_with_non_async_def: nexusrpc.interface.Operation[Input, Output]
-    sync_operation_with_non_async_def_returns_awaitable: nexusrpc.interface.Operation[
-        Input, Output
-    ]
     non_retryable_application_error: nexusrpc.interface.Operation[Input, Output]
     retryable_application_error: nexusrpc.interface.Operation[Input, Output]
     check_operation_timeout_header: nexusrpc.interface.Operation[Input, Output]
@@ -233,15 +230,6 @@ class MyServiceHandler:
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
         return Output(value=f"from start method: {input.value}")
-
-    @nexusrpc.handler.sync_operation
-    def sync_operation_with_non_async_def_returns_awaitable(
-        self, input: Input, options: nexusrpc.handler.StartOperationOptions
-    ) -> Awaitable[Output]:
-        output = Output(value=f"from start method: {input.value}")
-        fut: asyncio.Future[Output] = asyncio.Future()
-        fut.set_result(output)
-        return fut
 
     @nexusrpc.handler.sync_operation
     async def sync_operation_without_type_annotations(self, input, options):
@@ -400,15 +388,6 @@ class SyncHandlerHappyPathNonAsyncDef(_TestCase):
     )
 
 
-class SyncHandlerHappyPathNonAsyncDefReturnsAwaitable(_TestCase):
-    operation = "sync_operation_with_non_async_def_returns_awaitable"
-    input = Input("hello")
-    expected = SuccessfulResponse(
-        status_code=200,
-        body_json={"value": "from start method: hello"},
-    )
-
-
 class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     operation = "sync_operation_without_type_annotations"
     input = Input("hello")
@@ -536,7 +515,6 @@ class OperationError(_FailureTestCase):
     [
         SyncHandlerHappyPath,
         SyncHandlerHappyPathNonAsyncDef,
-        SyncHandlerHappyPathNonAsyncDefReturnsAwaitable,
         SyncHandlerHappyPathWithoutTypeAnnotations,
         AsyncHandlerHappyPath,
         AsyncHandlerHappyPathWithoutTypeAnnotations,
