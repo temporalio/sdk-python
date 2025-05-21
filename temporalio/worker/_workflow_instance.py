@@ -1934,8 +1934,8 @@ class _WorkflowInstanceImpl(
     async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput
     ) -> _NexusOperationHandle[Any]:
-        # A Nexus operation handle contains two futures: self._start_fut is resolved wheas
-        # a result of the Nexus operation starting (activation job:
+        # A Nexus operation handle contains two futures: self._start_fut is resolved as a
+        # result of the Nexus operation starting (activation job:
         # resolve_nexus_operation_start), and self._result_fut is resolved as a result of
         # the Nexus operation completing (activation job: resolve_nexus_operation). The
         # handle itself corresponds to an asyncio.Task which waits on self.result_fut,

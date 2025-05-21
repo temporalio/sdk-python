@@ -384,6 +384,7 @@ def workflow_run_operation(
     def factory(service: S) -> WorkflowRunOperation[I, O, S]:
         return WorkflowRunOperation(service, start_method, output_type=output_type)
 
+    # TODO(dan): handle callable instances: __class__.__name__ as in sync_operation
     factory.__nexus_operation__ = nexusrpc.handler.NexusOperationDefinition(  # type: ignore
         name=start_method.__name__,
         input_type=input_type,

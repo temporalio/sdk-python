@@ -213,6 +213,7 @@ class ServiceImpl:
     ) -> OpOutput:
         assert isinstance(input.response_type, SyncResponse)
         if input.response_type.exception_in_operation_start:
+            # TODO(dan): I don't think RPCError should be used here.
             raise RPCError(
                 "RPCError INVALID_ARGUMENT in Nexus operation",
                 RPCStatusCode.INVALID_ARGUMENT,
