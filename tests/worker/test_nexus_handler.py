@@ -235,7 +235,7 @@ class MyServiceHandler:
         return Output(value=f"from start method: {input.value}")
 
     @nexusrpc.handler.sync_operation
-    async def sync_operation_with_non_async_def_returns_awaitable(
+    def sync_operation_with_non_async_def_returns_awaitable(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Awaitable[Output]:
         output = Output(value=f"from start method: {input.value}")
@@ -536,7 +536,7 @@ class OperationError(_FailureTestCase):
     [
         SyncHandlerHappyPath,
         SyncHandlerHappyPathNonAsyncDef,
-        #        SyncHandlerHappyPathNonAsyncDefReturnsAwaitable,
+        SyncHandlerHappyPathNonAsyncDefReturnsAwaitable,
         SyncHandlerHappyPathWithoutTypeAnnotations,
         AsyncHandlerHappyPath,
         AsyncHandlerHappyPathWithoutTypeAnnotations,
