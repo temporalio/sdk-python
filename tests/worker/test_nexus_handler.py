@@ -119,6 +119,9 @@ class MyService:
     ]
     sync_operation_without_type_annotations: nexusrpc.interface.Operation[Input, Output]
     sync_operation_with_non_async_def: nexusrpc.interface.Operation[Input, Output]
+    sync_operation_with_non_async_callable_instance: nexusrpc.interface.Operation[
+        Input, Output
+    ]
     non_retryable_application_error: nexusrpc.interface.Operation[Input, Output]
     retryable_application_error: nexusrpc.interface.Operation[Input, Output]
     check_operation_timeout_header: nexusrpc.interface.Operation[Input, Output]
@@ -230,6 +233,16 @@ class MyServiceHandler:
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
         return Output(value=f"from start method: {input.value}")
+
+    class SyncOperationWithNonAsyncCallableInstance:
+        def __call__(
+            self, input: Input, options: nexusrpc.handler.StartOperationOptions
+        ) -> Output:
+            return Output(value=f"from start method: {input.value}")
+
+    sync_operation_with_non_async_callable_instance = nexusrpc.handler.sync_operation(
+        SyncOperationWithNonAsyncCallableInstance()
+    )
 
     @nexusrpc.handler.sync_operation
     async def sync_operation_without_type_annotations(self, input, options):
@@ -388,6 +401,15 @@ class SyncHandlerHappyPathNonAsyncDef(_TestCase):
     )
 
 
+class SyncHandlerHappyPathWithNonAsyncCallableInstance(_TestCase):
+    operation = "sync_operation_with_non_async_callable_instance"
+    input = Input("hello")
+    expected = SuccessfulResponse(
+        status_code=200,
+        body_json={"value": "from start method: hello"},
+    )
+
+
 class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     operation = "sync_operation_without_type_annotations"
     input = Input("hello")
@@ -515,6 +537,7 @@ class OperationError(_FailureTestCase):
     [
         SyncHandlerHappyPath,
         SyncHandlerHappyPathNonAsyncDef,
+        SyncHandlerHappyPathWithNonAsyncCallableInstance,
         SyncHandlerHappyPathWithoutTypeAnnotations,
         AsyncHandlerHappyPath,
         AsyncHandlerHappyPathWithoutTypeAnnotations,
