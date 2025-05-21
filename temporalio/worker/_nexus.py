@@ -299,12 +299,9 @@ class _NexusWorker:
                             ],
                         )
                     )
-                else:
-                    # TODO(dan): are we going to use StartOperationSyncResult from nexusrpc?
-                    # (contains links and headers in addition to result) IIRC Go does something
-                    # like that.
+                elif isinstance(result, nexusrpc.handler.StartOperationResultSync):
                     # TODO(dan): error handling here; what error type should it be?
-                    [payload] = await self._data_converter.encode([result])
+                    [payload] = await self._data_converter.encode([result.value])
                     op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                         sync_success=temporalio.api.nexus.v1.StartOperationResponse.Sync(
                             payload=payload

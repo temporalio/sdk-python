@@ -132,23 +132,29 @@ class HandlerWorkflow:
         )
 
 
+# TODO: make types pass pyright strict mode
+
+
 class SyncOrAsyncOperation:
     async def start(
         self, input: OpInput, options: nexusrpc.handler.StartOperationOptions
     ) -> Union[
-        OpOutput,
+        nexusrpc.handler.StartOperationResultSync[OpOutput],
         temporalio.nexus.handler.StartWorkflowOperationResult[HandlerWfOutput],
     ]:
         if input.response_type.exception_in_operation_start:
+            # TODO(dan): don't think RPCError should be used here
             raise RPCError(
                 "RPCError INVALID_ARGUMENT in Nexus operation",
                 RPCStatusCode.INVALID_ARGUMENT,
                 b"",
             )
         if isinstance(input.response_type, SyncResponse):
-            return OpOutput(
-                value="sync response",
-                start_options_received_by_handler=options,
+            return nexusrpc.handler.StartOperationResultSync(
+                value=OpOutput(
+                    value="sync response",
+                    start_options_received_by_handler=options,
+                )
             )
         elif isinstance(input.response_type, AsyncResponse):
             wf_handle = await temporalio.nexus.handler.start_workflow(
