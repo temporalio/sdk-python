@@ -106,7 +106,7 @@ class HandlerWfOutput:
 class ServiceInterface:
     sync_or_async_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
     sync_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
-    # non_async_sync_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
+    non_async_sync_operation: nexusrpc.interface.Operation[OpInput, OpOutput]
     async_operation: nexusrpc.interface.Operation[OpInput, HandlerWfOutput]
 
 
@@ -207,21 +207,21 @@ class ServiceImpl:
             start_options_received_by_handler=options,
         )
 
-    # @nexusrpc.handler.sync_operation
-    # def non_async_sync_operation(
-    #     self, input: OpInput, options: nexusrpc.handler.StartOperationOptions
-    # ) -> OpOutput:
-    #     assert isinstance(input.response_type, SyncResponse)
-    #     if input.response_type.exception_in_operation_start:
-    #         raise RPCError(
-    #             "RPCError INVALID_ARGUMENT in Nexus operation",
-    #             RPCStatusCode.INVALID_ARGUMENT,
-    #             b"",
-    #         )
-    #     return OpOutput(
-    #         value="sync response",
-    #         start_options_received_by_handler=options,
-    #     )
+    @nexusrpc.handler.sync_operation
+    def non_async_sync_operation(
+        self, input: OpInput, options: nexusrpc.handler.StartOperationOptions
+    ) -> OpOutput:
+        assert isinstance(input.response_type, SyncResponse)
+        if input.response_type.exception_in_operation_start:
+            raise RPCError(
+                "RPCError INVALID_ARGUMENT in Nexus operation",
+                RPCStatusCode.INVALID_ARGUMENT,
+                b"",
+            )
+        return OpOutput(
+            value="sync response",
+            start_options_received_by_handler=options,
+        )
 
     @temporalio.nexus.handler.workflow_run_operation
     async def async_operation(
@@ -329,18 +329,6 @@ class CallerWorkflow:
         nexusrpc.interface.Operation[OpInput, OpOutput],
         Callable[[Any], nexusrpc.handler.AbstractOperation[OpInput, OpOutput]],
     ]:
-        sync_or_async_response = {True: SyncResponse, False: AsyncResponse}[
-            isinstance(op_input.response_type, SyncResponse)
-        ]
-        op_definition_type = op_input.response_type.op_definition_type
-        caller_reference = op_input.caller_reference
-        use_async_def = (
-            op_input.response_type.use_async_def
-            if isinstance(op_input.response_type, SyncResponse)
-            else True
-        )
-        assert use_async_def
-
         return {
             (
                 SyncResponse,
@@ -354,18 +342,18 @@ class CallerWorkflow:
                 CallerReference.INTERFACE,
                 True,
             ): ServiceInterface.sync_operation,
-            # (
-            #     SyncResponse,
-            #     OpDefinitionType.SHORTHAND,
-            #     CallerReference.IMPL_WITH_INTERFACE,
-            #     False,
-            # ): ServiceImpl.non_async_sync_operation,
-            # (
-            #     SyncResponse,
-            #     OpDefinitionType.SHORTHAND,
-            #     CallerReference.INTERFACE,
-            #     False,
-            # ): ServiceInterface.non_async_sync_operation,
+            (
+                SyncResponse,
+                OpDefinitionType.SHORTHAND,
+                CallerReference.IMPL_WITH_INTERFACE,
+                False,
+            ): ServiceImpl.non_async_sync_operation,
+            (
+                SyncResponse,
+                OpDefinitionType.SHORTHAND,
+                CallerReference.INTERFACE,
+                False,
+            ): ServiceInterface.non_async_sync_operation,
             (
                 SyncResponse,
                 OpDefinitionType.LONGHAND,
@@ -402,7 +390,18 @@ class CallerWorkflow:
                 CallerReference.INTERFACE,
                 True,
             ): ServiceInterface.sync_or_async_operation,
-        }[sync_or_async_response, op_definition_type, caller_reference, use_async_def]
+        }[
+            {True: SyncResponse, False: AsyncResponse}[
+                isinstance(op_input.response_type, SyncResponse)
+            ],
+            op_input.response_type.op_definition_type,
+            op_input.caller_reference,
+            (
+                op_input.response_type.use_async_def
+                if isinstance(op_input.response_type, SyncResponse)
+                else True
+            ),
+        ]
 
 
 @workflow.defn

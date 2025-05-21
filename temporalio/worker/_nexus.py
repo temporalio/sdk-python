@@ -307,6 +307,12 @@ class _NexusWorker:
                             payload=payload
                         )
                     )
+                else:
+                    raise TypeError(
+                        "Nexus operation must return either nexusrpc.StartOperationResultSync "
+                        "or nexusrpc.StartOperationResultAsync"
+                    )
+
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
                     completed=temporalio.api.nexus.v1.Response(start_operation=op_resp),
