@@ -255,6 +255,7 @@ class _NexusWorker:
                     # TODO(dan): function returning an Awaitable
                     result = await operation.start(input, options)
                 else:
+                    print(f"\n\n🌈 operation.start is not async: {operation.start}\n\n")
                     # TODO(dan): Executor for blocking operations. This is just a
                     # temporary hack to allow developing type signatures that support
                     # non-async start methods.

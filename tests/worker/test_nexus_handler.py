@@ -325,53 +325,49 @@ class _TestCase:
     operation: str
     input: Input = Input("")
     headers: dict[str, str] = {}
-    expected_response: SuccessfulResponse
+    expected: SuccessfulResponse
     skip = ""
 
     @classmethod
     def check_response(cls, response: httpx.Response) -> None:
-        assert response.status_code == cls.expected_response.status_code, (
-            f"expected status code {cls.expected_response.status_code} "
+        assert response.status_code == cls.expected.status_code, (
+            f"expected status code {cls.expected.status_code} "
             f"but got {response.status_code} for response content {response.content.decode()}"
         )
-        if cls.expected_response.body_json is not None:
+        if cls.expected.body_json is not None:
             body = response.json()
             assert isinstance(body, dict)
-            if isinstance(cls.expected_response.body_json, dict):
-                assert body == cls.expected_response.body_json
+            if isinstance(cls.expected.body_json, dict):
+                assert body == cls.expected.body_json
             else:
-                assert cls.expected_response.body_json(body)
-        assert response.headers.items() >= cls.expected_response.headers.items()
+                assert cls.expected.body_json(body)
+        assert response.headers.items() >= cls.expected.headers.items()
 
 
 class _FailureTestCase(_TestCase):
-    expected_response: UnsuccessfulResponse
+    expected: UnsuccessfulResponse
 
     @classmethod
     def check_response(cls, response: httpx.Response) -> None:
         super().check_response(response)
         failure = Failure(**response.json())
 
-        if isinstance(cls.expected_response.failure_message, str):
-            assert failure.message == cls.expected_response.failure_message
+        if isinstance(cls.expected.failure_message, str):
+            assert failure.message == cls.expected.failure_message
         else:
-            assert cls.expected_response.failure_message(failure.message)
+            assert cls.expected.failure_message(failure.message)
 
         # retryability assertions
         if (
             retryable_header := response.headers.get("nexus-request-retryable")
         ) is not None:
-            assert (
-                json.loads(retryable_header) == cls.expected_response.retryable_header
-            )
+            assert json.loads(retryable_header) == cls.expected.retryable_header
         else:
-            assert cls.expected_response.retryable_header is None
+            assert cls.expected.retryable_header is None
 
         if failure.exception:
             assert isinstance(failure.exception, ApplicationError)
-            assert (
-                failure.exception.retryable == cls.expected_response.retryable_exception
-            )
+            assert failure.exception.retryable == cls.expected.retryable_exception
         else:
             print(f"TODO(dan): {cls} did not yield a Failure with exception details")
 
@@ -385,7 +381,7 @@ class SyncHandlerHappyPath(_TestCase):
         "Test-Header-Key": "test-header-value",
         "Nexus-Link": '<http://test/>; type="test"',
     }
-    expected_response = SuccessfulResponse(
+    expected = SuccessfulResponse(
         status_code=200,
         body_json={"value": "from start method: hello"},
     )
@@ -398,7 +394,7 @@ class SyncHandlerHappyPath(_TestCase):
 class SyncHandlerHappyPathNonAsyncDef(_TestCase):
     operation = "sync_operation_with_non_async_def"
     input = Input("hello")
-    expected_response = SuccessfulResponse(
+    expected = SuccessfulResponse(
         status_code=200,
         body_json={"value": "from start method: hello"},
     )
@@ -407,7 +403,7 @@ class SyncHandlerHappyPathNonAsyncDef(_TestCase):
 class SyncHandlerHappyPathNonAsyncDefReturnsAwaitable(_TestCase):
     operation = "sync_operation_with_non_async_def_returns_awaitable"
     input = Input("hello")
-    expected_response = SuccessfulResponse(
+    expected = SuccessfulResponse(
         status_code=200,
         body_json={"value": "from start method: hello"},
     )
@@ -416,7 +412,7 @@ class SyncHandlerHappyPathNonAsyncDefReturnsAwaitable(_TestCase):
 class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     operation = "sync_operation_without_type_annotations"
     input = Input("hello")
-    expected_response = SuccessfulResponse(
+    expected = SuccessfulResponse(
         status_code=200,
         body_json={"value": "from start method without type annotations: hello"},
     )
@@ -426,7 +422,7 @@ class AsyncHandlerHappyPath(_TestCase):
     operation = "async_operation"
     input = Input("hello")
     headers = {"Operation-Timeout": "777s"}
-    expected_response = SuccessfulResponse(
+    expected = SuccessfulResponse(
         status_code=201,
     )
 
@@ -434,7 +430,7 @@ class AsyncHandlerHappyPath(_TestCase):
 class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     operation = "async_operation_without_type_annotations"
     input = Input("hello")
-    expected_response = SuccessfulResponse(
+    expected = SuccessfulResponse(
         status_code=201,
     )
 
@@ -451,7 +447,7 @@ class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
 class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
     operation = "hang"
     headers = {"Request-Timeout": "10ms"}
-    expected_response = UnsuccessfulResponse(
+    expected = UnsuccessfulResponse(
         status_code=520,
         # TODO(dan): should this have the retryable header set?
         retryable_header=None,
@@ -470,7 +466,7 @@ class OperationTimeoutHeader(_TestCase):
     # timeouts on executions they start in their handler.
     operation = "check_operation_timeout_header"
     headers = {"Operation-Timeout": "10ms"}
-    expected_response = SuccessfulResponse(
+    expected = SuccessfulResponse(
         status_code=200,
     )
 
@@ -478,7 +474,7 @@ class OperationTimeoutHeader(_TestCase):
 class BadRequest(_FailureTestCase):
     operation = "echo"
     input = Input(7)  # type: ignore
-    expected_response = UnsuccessfulResponse(
+    expected = UnsuccessfulResponse(
         status_code=400,
         retryable_header=False,
         failure_message=lambda s: s.startswith("Failed converting field"),
@@ -487,7 +483,7 @@ class BadRequest(_FailureTestCase):
 
 class NonRetryableApplicationError(_FailureTestCase):
     operation = "non_retryable_application_error"
-    expected_response = UnsuccessfulResponse(
+    expected = UnsuccessfulResponse(
         status_code=500,
         retryable_header=False,
         retryable_exception=False,
@@ -507,7 +503,7 @@ class NonRetryableApplicationError(_FailureTestCase):
 
 class RetryableApplicationError(_FailureTestCase):
     operation = "retryable_application_error"
-    expected_response = UnsuccessfulResponse(
+    expected = UnsuccessfulResponse(
         status_code=500,
         retryable_header=True,
         failure_message="retryable application error",
@@ -516,7 +512,7 @@ class RetryableApplicationError(_FailureTestCase):
 
 class HandlerErrorInternal(_FailureTestCase):
     operation = "handler_error_internal"
-    expected_response = UnsuccessfulResponse(
+    expected = UnsuccessfulResponse(
         status_code=500,
         # TODO(dan): check this assertion
         retryable_header=False,
@@ -526,7 +522,7 @@ class HandlerErrorInternal(_FailureTestCase):
 
 class OperationError(_FailureTestCase):
     operation = "operation_error_failed"
-    expected_response = UnsuccessfulResponse(
+    expected = UnsuccessfulResponse(
         status_code=424,
         # TODO(dan): check that OperationError should not set retryable header
         retryable_header=None,
