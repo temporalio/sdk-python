@@ -308,9 +308,26 @@ class _NexusWorker:
                         )
                     )
                 else:
-                    raise TypeError(
+                    # TODO(dan): what should the error response be when the user has failed to wrap their return type?
+                    # TODO(dan): unify this failure completion with the path above
+                    err = TypeError(
                         "Nexus operation must return either nexusrpc.StartOperationResultSync "
                         "or nexusrpc.StartOperationResultAsync"
+                    )
+                    handler_err = _exception_to_handler_error(err)
+                    return temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                        task_token=task_token,
+                        error=temporalio.api.nexus.v1.HandlerError(
+                            error_type=handler_err.type.value,
+                            failure=await self._exception_to_failure_proto(
+                                handler_err.__cause__
+                            ),
+                            retry_behavior=(
+                                temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+                                if handler_err.retryable
+                                else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+                            ),
+                        ),
                     )
 
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
