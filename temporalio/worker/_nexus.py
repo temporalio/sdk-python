@@ -251,7 +251,11 @@ class _NexusWorker:
                     ],
                     callback_header=dict(start_request.callback_header),
                 )
-                if inspect.iscoroutinefunction(operation.start):
+                if inspect.iscoroutinefunction(
+                    operation.start
+                ) or inspect.iscoroutinefunction(
+                    operation.start.__call__  # type: ignore
+                ):
                     # TODO(dan): function returning an Awaitable
                     result = await operation.start(input, options)
                 else:
