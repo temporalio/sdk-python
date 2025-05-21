@@ -45,8 +45,8 @@ HTTP_PORT = 7243
 
 
 class _InterfaceImplementationTestCase:
-    Interface: Type
-    Impl: Type
+    Interface: Type[Any]
+    Impl: Type[Any]
     error_message: Optional[str]
 
 
@@ -135,6 +135,9 @@ class WorkflowWithoutTypeAnnotations:
     @workflow.run
     async def run(self, input):
         return Output(value=f"from workflow without type annotations: {input.value}")
+
+
+# TODO: implement some of these ops as explicit OperationHandler classes to provide coverage for that?
 
 
 @nexusrpc.handler.service(interface=MyService)
@@ -319,8 +322,7 @@ class _TestCase:
                 assert body == cls.expected_response.body_json
             else:
                 assert cls.expected_response.body_json(body)
-        if cls.expected_response.headers is not None:
-            assert response.headers.items() >= cls.expected_response.headers.items()
+        assert response.headers.items() >= cls.expected_response.headers.items()
 
 
 class _FailureTestCase(_TestCase):
