@@ -62,7 +62,7 @@ class _NexusWorker:
         self._client = client
         self._task_queue = task_queue
 
-        self._nexus_services = self._validate_nexus_services(nexus_services)
+        self._nexus_services = self._collect_services(nexus_services)
         self._data_converter = data_converter
         # TODO(dan): interceptors
         self._interceptors = interceptors
@@ -70,7 +70,7 @@ class _NexusWorker:
         self._metric_meter = metric_meter
         self._running_operations: dict[bytes, asyncio.Task] = {}
 
-    def _validate_nexus_services(
+    def _collect_services(
         self, nexus_services: Sequence[Any]
     ) -> dict[str, dict[str, nexusrpc.handler.Operation]]:
         # TODO(dan): Fail if multiple services have the same name.
