@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 # TODO(dan): confirm approach here: Temporal Nexus services will use this instead of
 # nexusrpc.handler.Operation in order to avoid having to implement fetch_info and
 # fetch_result.
-class Operation(nexusrpc.handler.Operation[I, O]):
+class Operation(nexusrpc.OperationHandler[I, O]):
     """
     Interface that must be implemented by an operation in a Temporal Nexus service.
     """
@@ -322,7 +322,7 @@ def get_task_queue() -> str:
     return context.task_queue
 
 
-class WorkflowRunOperation(nexusrpc.handler.Operation[I, O], Generic[I, O, S]):
+class WorkflowRunOperation(nexusrpc.OperationHandler[I, O], Generic[I, O, S]):
     def __init__(
         self,
         service: S,

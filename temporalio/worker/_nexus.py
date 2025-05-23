@@ -72,9 +72,9 @@ class _NexusWorker:
 
     def _collect_services(
         self, nexus_services: Sequence[Any]
-    ) -> dict[str, dict[str, nexusrpc.handler.Operation]]:
+    ) -> dict[str, dict[str, nexusrpc.OperationHandler]]:
         # TODO(dan): Fail if multiple services have the same name.
-        nexus_services_by_name: dict[str, dict[str, nexusrpc.handler.Operation]] = {}
+        nexus_services_by_name: dict[str, dict[str, nexusrpc.OperationHandler]] = {}
         for service in nexus_services:
             defn = nexusrpc.handler.NexusServiceDefinition.from_implementation(service)
             nexus_services_by_name[defn.name] = {
@@ -407,7 +407,7 @@ class _NexusWorker:
             temporalio.api.nexus.v1.StartOperationRequest,
             temporalio.api.nexus.v1.CancelOperationRequest,
         ],
-    ) -> nexusrpc.handler.Operation:
+    ) -> nexusrpc.OperationHandler:
         service = self._nexus_services.get(request.service)
         if service is None:
             raise RuntimeError(

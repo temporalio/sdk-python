@@ -188,7 +188,7 @@ class ServiceImpl:
     @nexusrpc.handler.operation
     def sync_or_async_operation(
         self,
-    ) -> nexusrpc.handler.Operation[OpInput, OpOutput]:
+    ) -> nexusrpc.OperationHandler[OpInput, OpOutput]:
         return SyncOrAsyncOperation()
 
     @nexusrpc.handler.sync_operation
