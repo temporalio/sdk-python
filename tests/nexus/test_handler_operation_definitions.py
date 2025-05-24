@@ -47,6 +47,23 @@ class WorkflowRunOperation(_TestCase):
     }
 
 
+class WorkflowRunOperationWithNameOverride(_TestCase):
+    @nexusrpc.handler.service
+    class Service:
+        @temporalio.nexus.handler.workflow_run_operation(name="operation-name")
+        async def workflow_run_operation_with_name_override(
+            self, input: Input, options: nexusrpc.handler.StartOperationOptions
+        ) -> WorkflowHandle[Any, Output]: ...
+
+    expected_operations = {
+        "workflow_run_operation_with_name_override": nexusrpc.handler.NexusOperationDefinition(
+            name="operation-name",
+            input_type=Input,
+            output_type=Output,
+        ),
+    }
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
