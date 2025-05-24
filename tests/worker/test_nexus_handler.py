@@ -151,7 +151,9 @@ class MyServiceHandler:
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
         assert options.headers["test-header-key"] == "test-header-value"
-        return Output(value=f"from start method: {input.value}")
+        return Output(
+            value=f"from start method on {self.__class__.__name__}: {input.value}"
+        )
 
     @nexusrpc.handler.sync_operation
     async def hang(
@@ -207,7 +209,9 @@ class MyServiceHandler:
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
         assert "operation-timeout" in options.headers
-        return Output(value=f"from start method: {input.value}")
+        return Output(
+            value=f"from start method on {self.__class__.__name__}: {input.value}"
+        )
 
     @nexusrpc.handler.sync_operation
     async def log(
@@ -232,7 +236,9 @@ class MyServiceHandler:
     def sync_operation_with_non_async_def(
         self, input: Input, options: nexusrpc.handler.StartOperationOptions
     ) -> Output:
-        return Output(value=f"from start method: {input.value}")
+        return Output(
+            value=f"from start method on {self.__class__.__name__}: {input.value}"
+        )
 
     class SyncOperationWithNonAsyncCallableInstance:
         def __call__(
@@ -241,7 +247,9 @@ class MyServiceHandler:
             input: Input,
             options: nexusrpc.handler.StartOperationOptions,
         ) -> Output:
-            return Output(value=f"from start method: {input.value}")
+            return Output(
+                value=f"from start method on {_handler.__class__.__name__}: {input.value}"
+            )
 
     sync_operation_with_non_async_callable_instance = nexusrpc.handler.sync_operation(
         SyncOperationWithNonAsyncCallableInstance()
@@ -250,7 +258,7 @@ class MyServiceHandler:
     @nexusrpc.handler.sync_operation
     async def sync_operation_without_type_annotations(self, input, options):
         return Output(
-            value=f"from start method without type annotations: {input['value']}"
+            value=f"from start method on {self.__class__.__name__} without type annotations: {input['value']}"
         )
 
     @temporalio.nexus.handler.workflow_run_operation
@@ -383,7 +391,7 @@ class SyncHandlerHappyPath(_TestCase):
     }
     expected = SuccessfulResponse(
         status_code=200,
-        body_json={"value": "from start method: hello"},
+        body_json={"value": "from start method on MyServiceHandler: hello"},
     )
     # TODO(dan): Support manually adding links in operation handler
     # See e.g. TS nexus.handlerLinks().push(...options.links)
@@ -396,7 +404,7 @@ class SyncHandlerHappyPathNonAsyncDef(_TestCase):
     input = Input("hello")
     expected = SuccessfulResponse(
         status_code=200,
-        body_json={"value": "from start method: hello"},
+        body_json={"value": "from start method on MyServiceHandler: hello"},
     )
 
 
@@ -405,7 +413,7 @@ class SyncHandlerHappyPathWithNonAsyncCallableInstance(_TestCase):
     input = Input("hello")
     expected = SuccessfulResponse(
         status_code=200,
-        body_json={"value": "from start method: hello"},
+        body_json={"value": "from start method on MyServiceHandler: hello"},
     )
 
 
@@ -414,7 +422,9 @@ class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     input = Input("hello")
     expected = SuccessfulResponse(
         status_code=200,
-        body_json={"value": "from start method without type annotations: hello"},
+        body_json={
+            "value": "from start method on MyServiceHandler without type annotations: hello"
+        },
     )
 
 
