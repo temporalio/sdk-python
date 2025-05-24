@@ -247,7 +247,7 @@ class MyServiceHandler:
     @nexusrpc.handler.sync_operation
     async def sync_operation_without_type_annotations(self, input, options):
         return Output(
-            value=f"from start method without type annotations: {input['value']}"  # type: ignore
+            value=f"from start method without type annotations: {input['value']}"
         )
 
     @temporalio.nexus.handler.workflow_run_operation
@@ -275,10 +275,6 @@ class Failure:
     def _instantiate_exception(
         self, error_type: str, details: Optional[dict[str, Any]]
     ) -> BaseException:
-        # TODO(dan): every exception in the chain is being rehydrated wrapped in ApplicationError.
-        # Is this the intended design, or is it an error in the way I am rehydrating exceptions
-        # here? I.e., should the Python SDK unwrap ApplicationErrors to produce an error chain of
-        # native Python exception types?
         proto = {
             "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,
         }[error_type]()
