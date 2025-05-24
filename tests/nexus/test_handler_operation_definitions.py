@@ -30,7 +30,7 @@ class _TestCase:
     expected_operations: dict[str, nexusrpc.handler.NexusOperationDefinition]
 
 
-class WorkflowRunOperation(_TestCase):
+class NotCalled(_TestCase):
     @nexusrpc.handler.service
     class Service:
         @temporalio.nexus.handler.workflow_run_operation
@@ -47,7 +47,18 @@ class WorkflowRunOperation(_TestCase):
     }
 
 
-class WorkflowRunOperationWithNameOverride(_TestCase):
+class CalledWithoutArgs(_TestCase):
+    @nexusrpc.handler.service
+    class Service:
+        @temporalio.nexus.handler.workflow_run_operation()
+        async def workflow_run_operation(
+            self, input: Input, options: nexusrpc.handler.StartOperationOptions
+        ) -> WorkflowHandle[Any, Output]: ...
+
+    expected_operations = NotCalled.expected_operations
+
+
+class CalledWithNameOverride(_TestCase):
     @nexusrpc.handler.service
     class Service:
         @temporalio.nexus.handler.workflow_run_operation(name="operation-name")
@@ -67,7 +78,9 @@ class WorkflowRunOperationWithNameOverride(_TestCase):
 @pytest.mark.parametrize(
     "test_case",
     [
-        WorkflowRunOperation,
+        NotCalled,
+        CalledWithoutArgs,
+        CalledWithNameOverride,
     ],
 )
 @pytest.mark.asyncio

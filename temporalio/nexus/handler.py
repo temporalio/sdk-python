@@ -372,26 +372,61 @@ class WorkflowRunOperation(nexusrpc.OperationHandler[I, O], Generic[I, O, S]):
 
 # TODO(dan): support overriding op name
 def workflow_run_operation(
-    start_method: Callable[
-        [S, I, nexusrpc.handler.StartOperationOptions],
-        Awaitable[WorkflowHandle[Any, O]],
+    start_method: Optional[
+        Callable[
+            [S, I, nexusrpc.handler.StartOperationOptions],
+            Awaitable[WorkflowHandle[Any, O]],
+        ]
+    ] = None,
+    *,
+    name: Optional[str] = None,
+) -> Union[
+    Callable[[S], WorkflowRunOperation[I, O, S]],
+    Callable[
+        [
+            Callable[
+                [S, I, nexusrpc.handler.StartOperationOptions],
+                Awaitable[WorkflowHandle[Any, O]],
+            ]
+        ],
+        Callable[[S], WorkflowRunOperation[I, O, S]],
     ],
-) -> Callable[[S], WorkflowRunOperation[I, O, S]]:
-    input_type, output_type = get_input_and_output_types_from_workflow_run_start_method(
-        start_method
-    )
+]:
+    def decorator(
+        start_method: Callable[
+            [S, I, nexusrpc.handler.StartOperationOptions],
+            Awaitable[WorkflowHandle[Any, O]],
+        ],
+    ) -> Callable[[S], WorkflowRunOperation[I, O, S]]:
+        input_type, output_type = (
+            get_input_and_output_types_from_workflow_run_start_method(start_method)
+        )
 
-    def factory(service: S) -> WorkflowRunOperation[I, O, S]:
-        return WorkflowRunOperation(service, start_method, output_type=output_type)
+        def factory(service: S) -> WorkflowRunOperation[I, O, S]:
+            return WorkflowRunOperation(service, start_method, output_type=output_type)
 
-    # TODO(dan): handle callable instances: __class__.__name__ as in sync_operation
-    factory.__nexus_operation__ = nexusrpc.handler.NexusOperationDefinition(  # type: ignore
-        name=start_method.__name__,
-        input_type=input_type,
-        output_type=output_type,
-    )
+        # TODO(dan): handle callable instances: __class__.__name__ as in sync_operation
+        nonlocal name
+        name = name or getattr(start_method, "__name__", None)
+        if not name:
+            if cls := getattr(start_method, "__class__", None):
+                name = cls.__name__
+        if not name:
+            raise ValueError(
+                f"Could not determine operation name: expected {start_method} to be a function or callable instance"
+            )
+        factory.__nexus_operation__ = nexusrpc.handler.NexusOperationDefinition(
+            name=name,
+            input_type=input_type,
+            output_type=output_type,
+        )
 
-    return factory
+        return factory
+
+    if start_method is None:
+        return decorator
+
+    return decorator(start_method)
 
 
 # TODO(dan): confirm that it is correct not to use event_id in the following functions.
