@@ -236,7 +236,10 @@ class MyServiceHandler:
 
     class SyncOperationWithNonAsyncCallableInstance:
         def __call__(
-            self, input: Input, options: nexusrpc.handler.StartOperationOptions
+            self,
+            _handler: "MyServiceHandler",
+            input: Input,
+            options: nexusrpc.handler.StartOperationOptions,
         ) -> Output:
             return Output(value=f"from start method: {input.value}")
 
