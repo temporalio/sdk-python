@@ -480,6 +480,7 @@ async def test_sync_response(
         nexus_services=[ServiceImpl()],
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
+        # TODO(dan): enable sandbox
         workflow_runner=UnsandboxedWorkflowRunner(),
         workflow_failure_exception_types=[Exception],
     ):
@@ -773,9 +774,6 @@ class ServiceClassNameOutput:
 
 
 # TODO(dan): test interface op types not matching
-# TODO(dan): test multiple registered services with the same name
-# TODO(dan): test no such registered service
-# TODO(dan): test no such registered operation
 # TODO(dan): async and non-async cancel methods
 
 
@@ -944,9 +942,6 @@ async def test_service_interface_and_implementation_names(client: Client):
 
 
 # TODO(dan): test invalid service interface implementations
-# TODO(dan): test service impls and interfaces with and without names, conflicting names, etc.
-# TODO(dan): test impl used without interface
-# TODO(dan): test empty service impl/interface names
 # TODO(dan): test caller passing output_type
 
 
