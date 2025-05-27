@@ -480,6 +480,7 @@ async def test_sync_response(
         nexus_services=[ServiceImpl()],
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
+        workflow_runner=UnsandboxedWorkflowRunner(),
         workflow_failure_exception_types=[Exception],
     ):
         await create_nexus_endpoint(task_queue, client)
