@@ -224,17 +224,49 @@ async def assert_pending_activity_exists_eventually(
 ) -> PendingActivityInfo:
     """Wait until a pending activity with the given ID exists and return it."""
 
-    async def check() -> Optional[PendingActivityInfo]:
-        desc = await handle.describe()
-        for act in desc.raw_description.pending_activities:
-            if act.activity_id == activity_id:
-                return act
+    async def check() -> PendingActivityInfo:
+        act_info = await _get_pending_activity_info(handle, activity_id)
+        if act_info is not None:
+            return act_info
         raise AssertionError(
             f"Activity with ID {activity_id} not found in pending activities"
         )
 
-    activity_info = await assert_eventually(check, timeout=timeout)
-    return cast(PendingActivityInfo, activity_info)
+    return await assert_eventually(check, timeout=timeout)
+
+
+async def wait_for_next_heartbeat_cycle(
+    handle: WorkflowHandle,
+    activity_id: str,
+    initial_heartbeat_time: Any,
+    timeout: timedelta = timedelta(seconds=5),
+) -> None:
+    """Wait for the next heartbeat cycle by monitoring last_heartbeat_time changes."""
+
+    async def check_heartbeat_changed() -> None:
+        current_info = await _get_pending_activity_info(handle, activity_id)
+        if current_info is None:
+            raise AssertionError(
+                f"Activity with ID {activity_id} not found in pending activities"
+            )
+        if current_info.last_heartbeat_time == initial_heartbeat_time:
+            raise AssertionError(
+                f"Activity with ID {activity_id} has not heartbeated yet"
+            )
+
+    await assert_eventually(check_heartbeat_changed, timeout=timeout)
+
+
+async def _get_pending_activity_info(
+    handle: WorkflowHandle,
+    activity_id: str,
+) -> Optional[PendingActivityInfo]:
+    """Get pending activity info by ID, or None if not found."""
+    desc = await handle.describe()
+    for act in desc.raw_description.pending_activities:
+        if act.activity_id == activity_id:
+            return act
+    return None
 
 
 async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):

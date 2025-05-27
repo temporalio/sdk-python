@@ -56,6 +56,7 @@ import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
+from temporalio.activity import ActivityCancellationDetails
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -5145,9 +5146,12 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""
 
-    def __init__(self) -> None:
+    details: Optional[ActivityCancellationDetails] = None
+
+    def __init__(self, details: Optional[ActivityCancellationDetails] = None) -> None:
         """Create async activity cancelled error."""
         super().__init__("Activity cancelled")
+        self.details = details
 
 
 class ScheduleAlreadyRunningError(temporalio.exceptions.TemporalError):
@@ -6288,7 +6292,12 @@ class _ClientImpl(OutboundInterceptor):
                 timeout=input.rpc_timeout,
             )
             if resp_by_id.cancel_requested or resp_by_id.activity_paused:
-                raise AsyncActivityCancelledError()
+                raise AsyncActivityCancelledError(
+                    details=ActivityCancellationDetails(
+                        cancel_requested=resp_by_id.cancel_requested,
+                        paused=resp_by_id.activity_paused,
+                    )
+                )
 
         else:
             resp = await self._client.workflow_service.record_activity_task_heartbeat(
@@ -6303,7 +6312,12 @@ class _ClientImpl(OutboundInterceptor):
                 timeout=input.rpc_timeout,
             )
             if resp.cancel_requested or resp.activity_paused:
-                raise AsyncActivityCancelledError()
+                raise AsyncActivityCancelledError(
+                    details=ActivityCancellationDetails(
+                        cancel_requested=resp.cancel_requested,
+                        paused=resp.activity_paused,
+                    )
+                )
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
         result = (
