@@ -5146,8 +5146,6 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""
 
-    details: Optional[ActivityCancellationDetails] = None
-
     def __init__(self, details: Optional[ActivityCancellationDetails] = None) -> None:
         """Create async activity cancelled error."""
         super().__init__("Activity cancelled")

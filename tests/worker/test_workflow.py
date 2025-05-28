@@ -124,10 +124,10 @@ from tests.helpers import (
     assert_workflow_exists_eventually,
     ensure_search_attributes_present,
     find_free_port,
+    get_pending_activity_info,
     new_worker,
     pause_and_assert,
     unpause_and_assert,
-    wait_for_next_heartbeat_cycle,
     workflow_update_exists,
 )
 from tests.helpers.external_stack_trace import (
@@ -7781,6 +7781,19 @@ class ActivityHeartbeatPauseUnpauseWorkflow:
 async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Time-skipping server does not support pause API yet")
+
+    async def check_heartbeat_details_exist(
+        handle: WorkflowHandle,
+        activity_id: str,
+    ) -> None:
+        act_info = await get_pending_activity_info(handle, activity_id)
+        if act_info is None:
+            raise AssertionError(f"Activity with ID {activity_id} not found.")
+        if len(act_info.heartbeat_details.payloads) == 0:
+            raise AssertionError(
+                f"Activity with ID {activity_id} has no heartbeat details"
+            )
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         async with Worker(
             client,
@@ -7809,10 +7822,12 @@ async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
             # Pause activity then assert it is paused
             await pause_and_assert(client, handle, activity_info_1.activity_id)
 
-            # Wait for next heartbeat to propagate the cancellation. Unpausing before the heartbeat
-            # will show activity as unpaused to core. Consequently, it will *not* issue an activity cancel.
-            await wait_for_next_heartbeat_cycle(
-                handle, activity_info_1.activity_id, activity_info_1.last_heartbeat_time
+            # Wait for heartbeat details to exist. At this point, the activity has finished executing
+            # due to cancellation from the pause.
+            await assert_eventually(
+                lambda: check_heartbeat_details_exist(
+                    handle, activity_info_1.activity_id
+                )
             )
 
             # Unpause activity
@@ -7825,9 +7840,12 @@ async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
             assert not activity_info_2.paused
             # Pause activity then assert it is paused
             await pause_and_assert(client, handle, activity_info_2.activity_id)
-            # Wait for next heartbeat to propagate the cancellation.
-            await wait_for_next_heartbeat_cycle(
-                handle, activity_info_2.activity_id, activity_info_2.last_heartbeat_time
+            # Wait for heartbeat details to exist. At this point, the activity has finished executing
+            # due to cancellation from the pause.
+            await assert_eventually(
+                lambda: check_heartbeat_details_exist(
+                    handle, activity_info_2.activity_id
+                )
             )
             # Unpause activity
             await unpause_and_assert(client, handle, activity_info_2.activity_id)
