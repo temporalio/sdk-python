@@ -19,7 +19,7 @@ from .testmodules import restrictions
 def test_workflow_sandbox_importer_invalid_module():
     with pytest.raises(RestrictedWorkflowAccessError) as err:
         with Importer(restrictions, RestrictionContext()).applied():
-            pass
+            import tests.worker.workflow_sandbox.testmodules.invalid_module
     assert (
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module"

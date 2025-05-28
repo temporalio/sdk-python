@@ -245,7 +245,7 @@ def in_activity() -> bool:
     Returns:
         True if in an activity, False otherwise.
     """
-    return _current_context.get(None) is not None
+    return not _current_context.get(None) is None
 
 
 def info() -> Info:

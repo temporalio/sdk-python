@@ -14,6 +14,35 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
+
+from temporalio.api.common.v1 import (
+    message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
+)
+from temporalio.bridge.proto.activity_result import (
+    activity_result_pb2 as temporal_dot_sdk_dot_core_dot_activity__result_dot_activity__result__pb2,
+)
+from temporalio.bridge.proto.activity_task import (
+    activity_task_pb2 as temporal_dot_sdk_dot_core_dot_activity__task_dot_activity__task__pb2,
+)
+from temporalio.bridge.proto.common import (
+    common_pb2 as temporal_dot_sdk_dot_core_dot_common_dot_common__pb2,
+)
+from temporalio.bridge.proto.external_data import (
+    external_data_pb2 as temporal_dot_sdk_dot_core_dot_external__data_dot_external__data__pb2,
+)
+from temporalio.bridge.proto.workflow_activation import (
+    workflow_activation_pb2 as temporal_dot_sdk_dot_core_dot_workflow__activation_dot_workflow__activation__pb2,
+)
+from temporalio.bridge.proto.workflow_commands import (
+    workflow_commands_pb2 as temporal_dot_sdk_dot_core_dot_workflow__commands_dot_workflow__commands__pb2,
+)
+from temporalio.bridge.proto.workflow_completion import (
+    workflow_completion_pb2 as temporal_dot_sdk_dot_core_dot_workflow__completion_dot_workflow__completion__pb2,
+)
+
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n&temporal/sdk/core/core_interface.proto\x12\x07\x63oresdk\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a\x37temporal/sdk/core/activity_result/activity_result.proto\x1a\x33temporal/sdk/core/activity_task/activity_task.proto\x1a%temporal/sdk/core/common/common.proto\x1a\x33temporal/sdk/core/external_data/external_data.proto\x1a?temporal/sdk/core/workflow_activation/workflow_activation.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto\x1a?temporal/sdk/core/workflow_completion/workflow_completion.proto"Y\n\x11\x41\x63tivityHeartbeat\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload"n\n\x16\x41\x63tivityTaskCompletion\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12@\n\x06result\x18\x02 \x01(\x0b\x32\x30.coresdk.activity_result.ActivityExecutionResult"<\n\x10WorkflowSlotInfo\x12\x15\n\rworkflow_type\x18\x01 \x01(\t\x12\x11\n\tis_sticky\x18\x02 \x01(\x08")\n\x10\x41\x63tivitySlotInfo\x12\x15\n\ractivity_type\x18\x01 \x01(\t".\n\x15LocalActivitySlotInfo\x12\x15\n\ractivity_type\x18\x01 \x01(\t"3\n\rNexusSlotInfo\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\tB3\xea\x02\x30Temporalio::Internal::Bridge::Api::CoreInterfaceb\x06proto3'
 )

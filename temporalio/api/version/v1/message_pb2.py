@@ -14,6 +14,12 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
+
+from temporalio.api.enums.v1 import (
+    common_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_common__pb2,
+)
+
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n%temporal/api/version/v1/message.proto\x12\x17temporal.api.version.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a"temporal/api/enums/v1/common.proto"_\n\x0bReleaseInfo\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x30\n\x0crelease_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\r\n\x05notes\x18\x03 \x01(\t"K\n\x05\x41lert\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x31\n\x08severity\x18\x02 \x01(\x0e\x32\x1f.temporal.api.enums.v1.Severity"\xfb\x01\n\x0bVersionInfo\x12\x35\n\x07\x63urrent\x18\x01 \x01(\x0b\x32$.temporal.api.version.v1.ReleaseInfo\x12\x39\n\x0brecommended\x18\x02 \x01(\x0b\x32$.temporal.api.version.v1.ReleaseInfo\x12\x14\n\x0cinstructions\x18\x03 \x01(\t\x12.\n\x06\x61lerts\x18\x04 \x03(\x0b\x32\x1e.temporal.api.version.v1.Alert\x12\x34\n\x10last_update_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x8e\x01\n\x1aio.temporal.api.version.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/version/v1;version\xaa\x02\x19Temporalio.Api.Version.V1\xea\x02\x1cTemporalio::Api::Version::V1b\x06proto3'
 )
