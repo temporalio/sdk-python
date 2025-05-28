@@ -256,7 +256,7 @@ class Replayer:
                         or load_default_build_id(),
                     ),
                     workflow_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
-                        1
+                        2
                     ),
                     activity_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
                         1
