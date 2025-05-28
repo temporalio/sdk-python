@@ -56,7 +56,7 @@ class _NexusWorker:
         self._client = client
         self._task_queue = task_queue
 
-        self._service_registry = nexusrpc.handler.ServiceRegistry(nexus_services)
+        self._service_handlers = nexusrpc.handler.ServiceHandlers(nexus_services)
         self._data_converter = data_converter
         # TODO(dan): interceptors
         self._interceptors = interceptors
@@ -239,7 +239,7 @@ class _NexusWorker:
                 )
 
                 try:
-                    operation_handler = self._service_registry.get_operation_handler(
+                    operation_handler = self._service_handlers.get_operation_handler(
                         ctx
                     )
                 except (
@@ -393,7 +393,7 @@ class _NexusWorker:
             operation=request.operation,
         )
 
-        operation_handler = self._service_registry.get_operation_handler(ctx)
+        operation_handler = self._service_handlers.get_operation_handler(ctx)
 
         # TODO(dan): header
         try:
