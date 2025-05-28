@@ -15,18 +15,10 @@ from typing import (
 import google.protobuf.json_format
 import nexusrpc
 
-import temporalio.activity
-import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 import temporalio.api.nexus.v1
-import temporalio.bridge.client
-import temporalio.bridge.proto
-import temporalio.bridge.proto.activity_result
-import temporalio.bridge.proto.activity_task
-import temporalio.bridge.proto.common
 import temporalio.bridge.proto.nexus
-import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
