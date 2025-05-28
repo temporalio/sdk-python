@@ -12,6 +12,9 @@ import threading
 import time
 import typing
 import uuid
+import concurrent.futures
+import random
+
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -7622,3 +7625,58 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
             handle,
             message_contains="Activity function say_hello is not registered on this worker, no available activities",
         )
+
+@activity.defn
+async def short_activity_async():
+   delay = random.uniform(0.05, 0.15)  # 50~150ms delay
+   await asyncio.sleep(delay)
+   return 1
+
+@workflow.defn
+class QuickActivityWorkflow:
+    @workflow.run
+    async def run(self, total_seconds: float = 10.0):
+        workflow.logger.info("Duration: %f", total_seconds)
+        end = workflow.now() + timedelta(seconds=total_seconds)
+        while True:
+            workflow.logger.info("Stage 1")
+            res = await workflow.execute_activity(
+                short_activity_async,
+                schedule_to_close_timeout=timedelta(seconds=10))
+            workflow.logger.info("Stage 2, %s", res)
+
+            if workflow.now() > end:
+                break
+
+async def test_quick_activity_swallows_cancellation(client: Client):
+        async with new_worker(
+                client,
+                QuickActivityWorkflow,
+                activities=[short_activity_async],
+                activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        ) as worker:
+            for i in range(10):
+                wf_duration = random.uniform(5.0, 15.0)
+                wf_handle = await client.start_workflow(
+                   QuickActivityWorkflow.run,
+                   id=f'short_activity_wf_id-{i}',
+                   args=[wf_duration],
+                   task_queue=worker.task_queue,
+                   execution_timeout=timedelta(minutes=1)
+                )
+
+                # Cancel wf
+                await asyncio.sleep(1.0)
+                await wf_handle.cancel()
+
+                try:
+                   await wf_handle.result()  # failed
+                   with open("history.json", "w") as file:
+                       file.write((await wf_handle.fetch_history()).to_json())
+                   assert False
+                except WorkflowFailureError as err_info:
+                    cause = err_info.value.cause
+
+                assert isinstance(cause, CancelledError), wf_handle.fetch_history().to_json()
+                assert cause.message == 'Workflow cancelled'
+                

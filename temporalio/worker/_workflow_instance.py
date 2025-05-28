@@ -74,6 +74,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
+from ..common import WorkflowLogicFlag
 
 logger = logging.getLogger(__name__)
 
@@ -367,8 +368,8 @@ class _WorkflowInstanceImpl(
         self._continue_as_new_suggested = act.continue_as_new_suggested
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
-
         self._current_thread_id = threading.get_ident()
+        self._current_internal_flags = act.available_internal_flags
         activation_err: Optional[Exception] = None
         try:
             # Split into job sets with patches, then signals + updates, then
@@ -1615,6 +1616,11 @@ class _WorkflowInstanceImpl(
                     # dict with its new seq
                     self._pending_activities[handle._seq] = handle
                 except asyncio.CancelledError:
+                    if handle._result_fut.done():
+                        # TODO in next release, add flag when not replaying
+                        if WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY in self._current_internal_flags:
+                            # self._current_completion.successful.used_internal_flags.append(WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
+                            raise
                     # Send a cancel request to the activity
                     handle._apply_cancel_command(self._add_command())
 

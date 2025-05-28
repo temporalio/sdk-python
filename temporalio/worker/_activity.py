@@ -542,6 +542,8 @@ class _ActivityWorker:
             logger.debug("Completing activity with completion: %s", completion)
             await self._bridge_worker().complete_activity_task(completion)
             del self._running_activities[task_token]
+            logger.debug("Completed activity with completion: %s", completion)
+
         except Exception:
             temporalio.activity.logger.exception("Failed completing activity task")
 
@@ -577,6 +579,7 @@ class _RunningActivity:
         cancelled_by_request: bool = False,
         cancelled_due_to_heartbeat_error: Optional[Exception] = None,
     ) -> None:
+        logger.warning("Cancelling running activity")
         self.cancelled_by_request = cancelled_by_request
         self.cancelled_due_to_heartbeat_error = cancelled_due_to_heartbeat_error
         if self.cancelled_event:
