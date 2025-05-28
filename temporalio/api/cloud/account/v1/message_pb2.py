@@ -14,10 +14,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from temporalio.api.cloud.resource.v1 import (
-    message_pb2 as temporal_dot_api_dot_cloud_dot_resource_dot_v1_dot_message__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n+temporal/api/cloud/account/v1/message.proto\x12\x1dtemporal.api.cloud.account.v1\x1a,temporal/api/cloud/resource/v1/message.proto")\n\x0bMetricsSpec\x12\x1a\n\x12\x61\x63\x63\x65pted_client_ca\x18\x02 \x01(\x0c"J\n\x0b\x41\x63\x63ountSpec\x12;\n\x07metrics\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.account.v1.MetricsSpec"\x16\n\x07Metrics\x12\x0b\n\x03uri\x18\x01 \x01(\t"\xfc\x01\n\x07\x41\x63\x63ount\x12\n\n\x02id\x18\x01 \x01(\t\x12\x38\n\x04spec\x18\x02 \x01(\x0b\x32*.temporal.api.cloud.account.v1.AccountSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12<\n\x05state\x18\x04 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x37\n\x07metrics\x18\x06 \x01(\x0b\x32&.temporal.api.cloud.account.v1.MetricsB\xa7\x01\n io.temporal.api.cloud.account.v1B\x0cMessageProtoP\x01Z+go.temporal.io/api/cloud/account/v1;account\xaa\x02\x1fTemporalio.Api.Cloud.Account.V1\xea\x02#Temporalio::Api::Cloud::Account::V1b\x06proto3'
 )

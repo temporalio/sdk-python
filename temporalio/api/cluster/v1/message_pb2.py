@@ -13,21 +13,6 @@ from google.protobuf.internal import builder as _builder
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
-
-from temporalio.api.dependencies.gogoproto import (
-    gogo_pb2 as dependencies_dot_gogoproto_dot_gogo__pb2,
-)
-from temporalio.api.enums.v1 import (
-    cluster_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_cluster__pb2,
-)
-from temporalio.api.enums.v1 import (
-    common_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_common__pb2,
-)
-from temporalio.api.version.v1 import (
-    message_pb2 as temporal_dot_api_dot_version_dot_v1_dot_message__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n%temporal/api/cluster/v1/message.proto\x12\x17temporal.api.cluster.v1\x1a!dependencies/gogoproto/gogo.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a#temporal/api/enums/v1/cluster.proto\x1a"temporal/api/enums/v1/common.proto\x1a%temporal/api/version/v1/message.proto"\x86\x04\n\x0f\x43lusterMetadata\x12\x0f\n\x07\x63luster\x18\x01 \x01(\t\x12\x1b\n\x13history_shard_count\x18\x02 \x01(\x05\x12\x12\n\ncluster_id\x18\x03 \x01(\t\x12:\n\x0cversion_info\x18\x04 \x01(\x0b\x32$.temporal.api.version.v1.VersionInfo\x12\x64\n\x17index_search_attributes\x18\x05 \x03(\x0b\x32\x43.temporal.api.cluster.v1.ClusterMetadata.IndexSearchAttributesEntry\x12\x17\n\x0f\x63luster_address\x18\x06 \x01(\t\x12"\n\x1a\x66\x61ilover_version_increment\x18\x07 \x01(\x03\x12 \n\x18initial_failover_version\x18\x08 \x01(\x03\x12#\n\x1bis_global_namespace_enabled\x18\t \x01(\x08\x12\x1d\n\x15is_connection_enabled\x18\n \x01(\x08\x1al\n\x1aIndexSearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12=\n\x05value\x18\x02 \x01(\x0b\x32..temporal.api.cluster.v1.IndexSearchAttributes:\x02\x38\x01"\xed\x01\n\x15IndexSearchAttributes\x12l\n\x18\x63ustom_search_attributes\x18\x01 \x03(\x0b\x32J.temporal.api.cluster.v1.IndexSearchAttributes.CustomSearchAttributesEntry\x1a\x66\n\x1b\x43ustomSearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1c\n\x08HostInfo\x12\x10\n\x08identity\x18\x01 \x01(\t"b\n\x08RingInfo\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x14\n\x0cmember_count\x18\x02 \x01(\x05\x12\x32\n\x07members\x18\x03 \x03(\x0b\x32!.temporal.api.cluster.v1.HostInfo"\x96\x01\n\x0eMembershipInfo\x12\x37\n\x0c\x63urrent_host\x18\x01 \x01(\x0b\x32!.temporal.api.cluster.v1.HostInfo\x12\x19\n\x11reachable_members\x18\x02 \x03(\t\x12\x30\n\x05rings\x18\x03 \x03(\x0b\x32!.temporal.api.cluster.v1.RingInfo"\xb9\x02\n\rClusterMember\x12\x36\n\x04role\x18\x01 \x01(\x0e\x32(.temporal.api.enums.v1.ClusterMemberRole\x12\x0f\n\x07host_id\x18\x02 \x01(\t\x12\x13\n\x0brpc_address\x18\x03 \x01(\t\x12\x10\n\x08rpc_port\x18\x04 \x01(\x05\x12<\n\x12session_start_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12<\n\x12last_heartbit_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x12<\n\x12record_expiry_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x04\x90\xdf\x1f\x01\x42\x8a\x01\n\x1aio.temporal.api.cluster.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/cluster/v1;cluster\xaa\x02\x17Temporal.Api.Cluster.V1\xea\x02\x1aTemporal::Api::Cluster::V1b\x06proto3'
 )

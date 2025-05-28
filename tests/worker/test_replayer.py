@@ -506,11 +506,13 @@ async def test_replayer_alternate_async_ordering() -> None:
         "act-done",
     ]
 
+
 @activity.defn
 async def short_activity_async():
-   delay = random.uniform(0.05, 0.15)  # 50~150ms delay
-   await asyncio.sleep(delay)
-   return 1
+    delay = random.uniform(0.05, 0.15)  # 50~150ms delay
+    await asyncio.sleep(delay)
+    return 1
+
 
 @workflow.defn
 class QuickActivityWorkflow:
@@ -521,12 +523,13 @@ class QuickActivityWorkflow:
         while True:
             workflow.logger.info("Stage 1")
             res = await workflow.execute_activity(
-                short_activity_async,
-                schedule_to_close_timeout=timedelta(seconds=10))
+                short_activity_async, schedule_to_close_timeout=timedelta(seconds=10)
+            )
             workflow.logger.info("Stage 2, %s", res)
 
             if workflow.now() > end:
                 break
+
 
 async def test_swallowed_cancellation() -> None:
     with (

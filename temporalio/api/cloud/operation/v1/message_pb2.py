@@ -14,10 +14,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import any_pb2 as google_dot_protobuf_dot_any__pb2
-from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
-from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n-temporal/api/cloud/operation/v1/message.proto\x12\x1ftemporal.api.cloud.operation.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x19google/protobuf/any.proto"\xfe\x03\n\x0e\x41syncOperation\x12\n\n\x02id\x18\x01 \x01(\t\x12\x1c\n\x10state_deprecated\x18\x02 \x01(\tB\x02\x18\x01\x12\x44\n\x05state\x18\t \x01(\x0e\x32\x35.temporal.api.cloud.operation.v1.AsyncOperation.State\x12\x31\n\x0e\x63heck_duration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x16\n\x0eoperation_type\x18\x04 \x01(\t\x12-\n\x0foperation_input\x18\x05 \x01(\x0b\x32\x14.google.protobuf.Any\x12\x16\n\x0e\x66\x61ilure_reason\x18\x06 \x01(\t\x12\x30\n\x0cstarted_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x31\n\rfinished_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\x84\x01\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\x11\n\rSTATE_PENDING\x10\x01\x12\x15\n\x11STATE_IN_PROGRESS\x10\x02\x12\x10\n\x0cSTATE_FAILED\x10\x03\x12\x13\n\x0fSTATE_CANCELLED\x10\x04\x12\x13\n\x0fSTATE_FULFILLED\x10\x05\x42\xb1\x01\n"io.temporal.api.cloud.operation.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/cloud/operation/v1;operation\xaa\x02!Temporalio.Api.Cloud.Operation.V1\xea\x02%Temporalio::Api::Cloud::Operation::V1b\x06proto3'
 )

@@ -14,8 +14,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from google.protobuf import any_pb2 as google_dot_protobuf_dot_any__pb2
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n(temporal/api/common/v1/grpc_status.proto\x12\x16temporal.api.common.v1\x1a\x19google/protobuf/any.proto"R\n\nGrpcStatus\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12%\n\x07\x64\x65tails\x18\x03 \x03(\x0b\x32\x14.google.protobuf.Anyb\x06proto3'
 )

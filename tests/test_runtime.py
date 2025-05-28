@@ -3,7 +3,6 @@ import logging.handlers
 import queue
 import re
 import uuid
-from datetime import timedelta
 from typing import List, cast
 from urllib.request import urlopen
 

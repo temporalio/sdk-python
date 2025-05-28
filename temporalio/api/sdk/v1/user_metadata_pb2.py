@@ -14,10 +14,6 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from temporalio.api.common.v1 import (
-    message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
-)
-
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b"\n'temporal/api/sdk/v1/user_metadata.proto\x12\x13temporal.api.sdk.v1\x1a$temporal/api/common/v1/message.proto\"r\n\x0cUserMetadata\x12\x30\n\x07summary\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x30\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.PayloadB\x7f\n\x16io.temporal.api.sdk.v1B\x11UserMetadataProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3"
 )

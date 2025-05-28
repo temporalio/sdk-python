@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-import dataclasses
 import inspect
 import logging
 import threading
