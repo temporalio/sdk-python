@@ -60,6 +60,7 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
+from ..common import WorkflowLogicFlag
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -74,7 +75,6 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
-from ..common import WorkflowLogicFlag
 
 logger = logging.getLogger(__name__)
 
@@ -1618,7 +1618,10 @@ class _WorkflowInstanceImpl(
                 except asyncio.CancelledError:
                     if handle._result_fut.done():
                         # TODO in next release, add flag when not replaying
-                        if WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY in self._current_internal_flags:
+                        if (
+                            WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
+                            in self._current_internal_flags
+                        ):
                             # self._current_completion.successful.used_internal_flags.append(WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
                             raise
                     # Send a cancel request to the activity

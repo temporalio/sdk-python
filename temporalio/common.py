@@ -1169,5 +1169,6 @@ def _type_hints_from_func(
         args.append(arg_hint)  # type: ignore
     return args, ret
 
+
 class WorkflowLogicFlag(IntEnum):
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
