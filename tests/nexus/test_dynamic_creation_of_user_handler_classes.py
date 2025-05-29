@@ -13,7 +13,7 @@ HTTP_PORT = 7243
 
 def make_incrementer_service_from_service_handler(
     op_names: list[str],
-) -> tuple[type, type]:
+) -> tuple[str, type]:
     pass
 
 
