@@ -316,10 +316,11 @@ The default data converter supports converting multiple types including:
   * Iterables including ones JSON dump may not support by default, e.g. `set`
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
+  * `datetime.datetime`
 
 To use pydantic model instances, see [Pydantic Support](#pydantic-support).
 
-`datetime.date`, `datetime.time`, and `datetime.datetime` can only be used with the Pydantic data converter.
+`datetime.date` and `datetime.time` can only be used with the Pydantic data converter.
 
 Although workflows, updates, signals, and queries can all be defined with multiple input parameters, users are strongly
 encouraged to use a single `dataclass` or Pydantic model parameter, so that fields with defaults can be easily added
