@@ -11,16 +11,24 @@ from tests.helpers.nexus import create_nexus_endpoint
 HTTP_PORT = 7243
 
 
-def make_incrementer_service(op_names: list[str]) -> tuple[type, type]:
+def make_incrementer_service_from_service_handler(
+    op_names: list[str],
+) -> tuple[type, type]:
+    pass
+
+
+def make_incrementer_service_from_user_classes(
+    op_names: list[str],
+) -> tuple[str, type]:
     #
     # service contract
     #
 
-    op_contracts = {name: nexusrpc.contract.Operation[int, int] for name in op_names}
-    contract_cls = nexusrpc.contract.service(type("ServiceContract", (), op_contracts))
+    ops = {name: nexusrpc.contract.Operation[int, int] for name in op_names}
+    service_cls = nexusrpc.contract.service(type("ServiceContract", (), ops))
 
     #
-    # service impl
+    # service handler
     #
     async def _increment_op(
         self,
@@ -29,7 +37,7 @@ def make_incrementer_service(op_names: list[str]) -> tuple[type, type]:
     ) -> int:
         return input + 1
 
-    op_factories = {
+    op_handler_factories = {
         # TODO(dan): check that name=name should be required here. Should the op factory
         # name not default to the name of the method attribute (i.e. key), as opposed to
         # the name of the method object (i.e. value.__name__)?
@@ -37,28 +45,29 @@ def make_incrementer_service(op_names: list[str]) -> tuple[type, type]:
         for name in op_names
     }
 
-    impl_cls = nexusrpc.handler.service_handler(service=contract_cls)(
-        type("ServiceImpl", (), op_factories)
+    handler_cls = nexusrpc.handler.service_handler(service=service_cls)(
+        type("ServiceImpl", (), op_handler_factories)
     )
 
-    return contract_cls, impl_cls
+    return service_cls.__name__, handler_cls
 
 
 async def test_dynamic_creation_of_user_handler_classes(client: Client):
     task_queue = str(uuid.uuid4())
 
-    contract_cls, impl_cls = make_incrementer_service(["increment"])
+    service_name, handler_cls = make_incrementer_service_from_user_classes(
+        ["increment"]
+    )
 
-    service = contract_cls.__name__
     endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
     async with Worker(
         client,
         task_queue=task_queue,
-        nexus_services=[impl_cls()],
+        nexus_services=[handler_cls()],
     ):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
-                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service}/increment",
+                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
                 json=1,
                 headers={},
             )
