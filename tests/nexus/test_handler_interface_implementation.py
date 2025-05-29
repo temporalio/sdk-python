@@ -23,7 +23,7 @@ class ValidImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.contract.Operation[None, None]
 
     class Impl:
-        @nexusrpc.handler.sync_operation
+        @nexusrpc.handler.sync_operation_handler
         async def op(
             self, ctx: nexusrpc.handler.StartOperationContext, input: None
         ) -> None: ...
@@ -37,7 +37,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.contract.Operation[str, int]
 
     class Impl:
-        @temporalio.nexus.handler.workflow_run_operation
+        @temporalio.nexus.handler.workflow_run_operation_handler
         async def op(
             self, ctx: nexusrpc.handler.StartOperationContext, input: str
         ) -> WorkflowHandle[Any, int]: ...

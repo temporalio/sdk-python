@@ -108,7 +108,7 @@ class MyLinkTestWorkflow:
 
 @nexusrpc.handler.service_handler(service=MyService)
 class MyServiceHandler:
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def echo(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
@@ -118,13 +118,13 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def hang(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Never:
         await asyncio.Future()
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def non_retryable_application_error(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
@@ -136,7 +136,7 @@ class MyServiceHandler:
             non_retryable=True,
         )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def retryable_application_error(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
@@ -147,7 +147,7 @@ class MyServiceHandler:
             non_retryable=False,
         )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def handler_error_internal(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
@@ -158,7 +158,7 @@ class MyServiceHandler:
             cause=RuntimeError("cause message"),
         )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def operation_error_failed(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
@@ -167,7 +167,7 @@ class MyServiceHandler:
             state=nexusrpc.handler.OperationErrorState.FAILED,
         )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def check_operation_timeout_header(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
@@ -176,14 +176,14 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def log(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
         logger.info("Logging from start method", extra={"input_value": input.value})
         return Output(value=f"logged: {input.value}")
 
-    @temporalio.nexus.handler.workflow_run_operation
+    @temporalio.nexus.handler.workflow_run_operation_handler
     async def async_operation(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
@@ -195,7 +195,7 @@ class MyServiceHandler:
             id=str(uuid.uuid4()),
         )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     def sync_operation_with_non_async_def(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> Output:
@@ -214,17 +214,19 @@ class MyServiceHandler:
                 value=f"from start method on {_handler.__class__.__name__}: {input.value}"
             )
 
-    sync_operation_with_non_async_callable_instance = nexusrpc.handler.sync_operation(
-        SyncOperationWithNonAsyncCallableInstance()
+    sync_operation_with_non_async_callable_instance = (
+        nexusrpc.handler.sync_operation_handler(
+            SyncOperationWithNonAsyncCallableInstance()
+        )
     )
 
-    @nexusrpc.handler.sync_operation
+    @nexusrpc.handler.sync_operation_handler
     async def sync_operation_without_type_annotations(self, ctx, input):  # type: ignore
         return Output(
             value=f"from start method on {self.__class__.__name__} without type annotations: {input['value']}"  # type: ignore
         )
 
-    @temporalio.nexus.handler.workflow_run_operation
+    @temporalio.nexus.handler.workflow_run_operation_handler
     async def async_operation_without_type_annotations(self, ctx, input):  # type: ignore
         return await start_workflow(
             ctx,
@@ -233,7 +235,7 @@ class MyServiceHandler:
             id=str(uuid.uuid4()),
         )
 
-    @temporalio.nexus.handler.workflow_run_operation
+    @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_op_link_test(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:

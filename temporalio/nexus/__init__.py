@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any, Optional
 
 from .handler import _current_context as _current_context
-from .handler import workflow_run_operation as workflow_run_operation
+from .handler import workflow_run_operation_handler as workflow_run_operation_handler
 from .token import WorkflowOperationToken as WorkflowOperationToken
 
 

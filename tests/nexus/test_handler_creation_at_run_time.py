@@ -30,7 +30,8 @@ def make_incrementer_service(op_names: list[str]) -> tuple[type, type]:
         return input + 1
 
     op_factories = {
-        name: nexusrpc.handler.sync_operation(_increment_op) for name in op_names
+        name: nexusrpc.handler.sync_operation_handler(_increment_op)
+        for name in op_names
     }
 
     impl_cls = nexusrpc.handler.service_handler(service=contract_cls)(

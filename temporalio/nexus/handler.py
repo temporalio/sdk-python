@@ -365,7 +365,9 @@ class WorkflowRunOperation(nexusrpc.handler.OperationHandler[I, O], Generic[I, O
         self.start = types.MethodType(start, self)
         self.fetch_result = types.MethodType(fetch_result, self)
 
-    async def cancel(self, ctx: nexusrpc.handler.CancelOperationContext, token: str) -> None:
+    async def cancel(
+        self, ctx: nexusrpc.handler.CancelOperationContext, token: str
+    ) -> None:
         await cancel_workflow(ctx, token)
 
     # TODO(dan): remove before merge; implementing temporarily to check that design extends well to this
@@ -378,7 +380,7 @@ class WorkflowRunOperation(nexusrpc.handler.OperationHandler[I, O], Generic[I, O
 # TODO(dan): interceptor
 
 
-def workflow_run_operation(
+def workflow_run_operation_handler(
     start_method: Optional[
         Callable[
             [S, nexusrpc.handler.StartOperationContext, I],
@@ -412,7 +414,7 @@ def workflow_run_operation(
         def factory(service: S) -> WorkflowRunOperation[I, O, S]:
             return WorkflowRunOperation(service, start_method, output_type=output_type)
 
-        # TODO(dan): handle callable instances: __class__.__name__ as in sync_operation
+        # TODO(dan): handle callable instances: __class__.__name__ as in sync_operation_handler
         nonlocal name
         name = name or getattr(start_method, "__name__", None)
         if not name:

@@ -1,5 +1,5 @@
 """
-Test that workflow_run_operation decorator results in operation definitions with the correct name
+Test that workflow_run_operation_handler decorator results in operation definitions with the correct name
 and input/output types.
 """
 
@@ -32,14 +32,14 @@ class _TestCase:
 class NotCalled(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @temporalio.nexus.handler.workflow_run_operation
-        async def workflow_run_operation(
+        @temporalio.nexus.handler.workflow_run_operation_handler
+        async def workflow_run_operation_handler(
             self, ctx: nexusrpc.handler.StartOperationContext, input: Input
         ) -> WorkflowHandle[Any, Output]: ...
 
     expected_operations = {
-        "workflow_run_operation": nexusrpc.handler.NexusOperationDefinition(
-            name="workflow_run_operation",
+        "workflow_run_operation_handler": nexusrpc.handler.NexusOperationDefinition(
+            name="workflow_run_operation_handler",
             input_type=Input,
             output_type=Output,
         ),
@@ -49,8 +49,8 @@ class NotCalled(_TestCase):
 class CalledWithoutArgs(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @temporalio.nexus.handler.workflow_run_operation()
-        async def workflow_run_operation(
+        @temporalio.nexus.handler.workflow_run_operation_handler()
+        async def workflow_run_operation_handler(
             self, ctx: nexusrpc.handler.StartOperationContext, input: Input
         ) -> WorkflowHandle[Any, Output]: ...
 
@@ -60,7 +60,7 @@ class CalledWithoutArgs(_TestCase):
 class CalledWithNameOverride(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @temporalio.nexus.handler.workflow_run_operation(name="operation-name")
+        @temporalio.nexus.handler.workflow_run_operation_handler(name="operation-name")
         async def workflow_run_operation_with_name_override(
             self, ctx: nexusrpc.handler.StartOperationContext, input: Input
         ) -> WorkflowHandle[Any, Output]: ...
