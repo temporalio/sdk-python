@@ -56,6 +56,7 @@ import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
+from temporalio.activity import ActivityCancellationDetails
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -320,6 +321,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for single-param workflow
@@ -354,6 +356,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for multi-param workflow
@@ -390,6 +393,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for string-name workflow
@@ -426,6 +430,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowHandle[Any, Any]: ...
 
     async def start_workflow(
@@ -461,6 +466,7 @@ class Client:
         request_eager_start: bool = False,
         stack_level: int = 2,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -507,6 +513,7 @@ class Client:
                 encouraging the server to start it on a local worker running with
                 this same client.
             priority: Priority of the workflow execution.
+            versioning_override: Overrides the versioning behavior for this workflow.
 
         Returns:
             A workflow handle to the started workflow.
@@ -539,6 +546,7 @@ class Client:
                 memo=memo,
                 search_attributes=search_attributes,
                 start_delay=start_delay,
+                versioning_override=versioning_override,
                 headers={},
                 static_summary=static_summary,
                 static_details=static_details,
@@ -583,6 +591,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> ReturnType: ...
 
     # Overload for single-param workflow
@@ -617,6 +626,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> ReturnType: ...
 
     # Overload for multi-param workflow
@@ -653,6 +663,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> ReturnType: ...
 
     # Overload for string-name workflow
@@ -689,6 +700,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> Any: ...
 
     async def execute_workflow(
@@ -723,6 +735,7 @@ class Client:
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> Any:
         """Start a workflow and wait for completion.
 
@@ -757,6 +770,7 @@ class Client:
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
                 priority=priority,
+                versioning_override=versioning_override,
                 stack_level=3,
             )
         ).result()
@@ -2453,6 +2467,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> None: ...
 
     # Overload for single-param workflow, with_start
@@ -2484,6 +2499,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> None: ...
 
     # Overload for multi-param workflow, with_start
@@ -2517,6 +2533,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> None: ...
 
     # Overload for string-name workflow, with_start
@@ -2550,6 +2567,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> None: ...
 
     def __init__(
@@ -2581,6 +2599,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
         stack_level: int = 2,
     ) -> None:
         """Create a WithStartWorkflowOperation.
@@ -2622,6 +2641,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
             priority=priority,
+            versioning_override=versioning_override,
         )
         self._workflow_handle: Future[WorkflowHandle[SelfType, ReturnType]] = Future()
         self._used = False
@@ -5126,9 +5146,10 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""
 
-    def __init__(self) -> None:
+    def __init__(self, details: Optional[ActivityCancellationDetails] = None) -> None:
         """Create async activity cancelled error."""
         super().__init__("Activity cancelled")
+        self.details = details
 
 
 class ScheduleAlreadyRunningError(temporalio.exceptions.TemporalError):
@@ -5172,6 +5193,7 @@ class StartWorkflowInput:
     rpc_timeout: Optional[timedelta]
     request_eager_start: bool
     priority: temporalio.common.Priority
+    versioning_override: Optional[temporalio.common.VersioningOverride] = None
 
 
 @dataclass
@@ -5345,6 +5367,7 @@ class UpdateWithStartStartWorkflowInput:
     rpc_metadata: Mapping[str, str]
     rpc_timeout: Optional[timedelta]
     priority: temporalio.common.Priority
+    versioning_override: Optional[temporalio.common.VersioningOverride] = None
 
 
 @dataclass
@@ -5864,6 +5887,8 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.common._apply_headers(input.headers, req.header.fields)
         if input.priority is not None:
             req.priority.CopyFrom(input.priority._to_proto())
+        if input.versioning_override is not None:
+            req.versioning_override.CopyFrom(input.versioning_override._to_proto())
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         await self._client.workflow_service.request_cancel_workflow_execution(
@@ -6264,8 +6289,14 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp_by_id.cancel_requested:
-                raise AsyncActivityCancelledError()
+            if resp_by_id.cancel_requested or resp_by_id.activity_paused:
+                raise AsyncActivityCancelledError(
+                    details=ActivityCancellationDetails(
+                        cancel_requested=resp_by_id.cancel_requested,
+                        paused=resp_by_id.activity_paused,
+                    )
+                )
+
         else:
             resp = await self._client.workflow_service.record_activity_task_heartbeat(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatRequest(
@@ -6278,8 +6309,13 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp.cancel_requested:
-                raise AsyncActivityCancelledError()
+            if resp.cancel_requested or resp.activity_paused:
+                raise AsyncActivityCancelledError(
+                    details=ActivityCancellationDetails(
+                        cancel_requested=resp.cancel_requested,
+                        paused=resp.activity_paused,
+                    )
+                )
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
         result = (

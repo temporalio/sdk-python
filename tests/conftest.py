@@ -115,6 +115,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "frontend.workerVersioningDataAPIs=true",
                 "--dynamic-config-value",
                 "system.enableDeploymentVersions=true",
+                "--dynamic-config-value",
+                "frontend.activityAPIsEnabled=true",
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )

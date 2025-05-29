@@ -1591,12 +1591,10 @@ class _WorkflowInstanceImpl(
                 "Activity must have start_to_close_timeout or schedule_to_close_timeout"
             )
 
-        handle: Optional[_ActivityHandle] = None
+        handle: _ActivityHandle
 
         # Function that runs in the handle
         async def run_activity() -> Any:
-            nonlocal handle
-            assert handle
             while True:
                 # Mark it as started each loop because backoff could cause it to
                 # be marked as unstarted
@@ -1671,12 +1669,10 @@ class _WorkflowInstanceImpl(
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> _ChildWorkflowHandle:
-        handle: Optional[_ChildWorkflowHandle] = None
+        handle: _ChildWorkflowHandle
 
         # Common code for handling cancel for start and run
         def apply_child_cancel_error() -> None:
-            nonlocal handle
-            assert handle
             # Send a cancel request to the child
             cancel_command = self._add_command()
             handle._apply_cancel_command(cancel_command)
@@ -1694,9 +1690,7 @@ class _WorkflowInstanceImpl(
 
         # Function that runs in the handle
         async def run_child() -> Any:
-            nonlocal handle
             while True:
-                assert handle
                 try:
                     # We have to shield because we don't want the future itself
                     # to be cancelled
@@ -2447,17 +2441,17 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
 
     def start_activity(
         self, input: StartActivityInput
-    ) -> temporalio.workflow.ActivityHandle:
+    ) -> temporalio.workflow.ActivityHandle[Any]:
         return self._instance._outbound_schedule_activity(input)
 
     async def start_child_workflow(
         self, input: StartChildWorkflowInput
-    ) -> temporalio.workflow.ChildWorkflowHandle:
+    ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         return await self._instance._outbound_start_child_workflow(input)
 
     def start_local_activity(
         self, input: StartLocalActivityInput
-    ) -> temporalio.workflow.ActivityHandle:
+    ) -> temporalio.workflow.ActivityHandle[Any]:
         return self._instance._outbound_schedule_activity(input)
 
 

@@ -17,7 +17,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n#temporal/api/rules/v1/message.proto\x12\x15temporal.api.rules.v1\x1a\x1fgoogle/protobuf/timestamp.proto"\x8f\x01\n\x12WorkflowRuleAction\x12W\n\x0e\x61\x63tivity_pause\x18\x01 \x01(\x0b\x32=.temporal.api.rules.v1.WorkflowRuleAction.ActionActivityPauseH\x00\x1a\x15\n\x13\x41\x63tionActivityPauseB\t\n\x07variant"\xbd\x02\n\x10WorkflowRuleSpec\x12\n\n\x02id\x18\x01 \x01(\t\x12Y\n\x0e\x61\x63tivity_start\x18\x02 \x01(\x0b\x32?.temporal.api.rules.v1.WorkflowRuleSpec.ActivityStartingTriggerH\x00\x12\x18\n\x10visibility_query\x18\x03 \x01(\t\x12:\n\x07\x61\x63tions\x18\x04 \x03(\x0b\x32).temporal.api.rules.v1.WorkflowRuleAction\x12\x33\n\x0f\x65xpiration_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x1a,\n\x17\x41\x63tivityStartingTrigger\x12\x11\n\tpredicate\x18\x01 \x01(\tB\t\n\x07trigger"v\n\x0cWorkflowRule\x12/\n\x0b\x63reate_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x35\n\x04spec\x18\x02 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpecB\x84\x01\n\x18io.temporal.api.rules.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/rules/v1;rules\xaa\x02\x17Temporalio.Api.Rules.V1\xea\x02\x1aTemporalio::Api::Rules::V1b\x06proto3'
+    b'\n#temporal/api/rules/v1/message.proto\x12\x15temporal.api.rules.v1\x1a\x1fgoogle/protobuf/timestamp.proto"\x8f\x01\n\x12WorkflowRuleAction\x12W\n\x0e\x61\x63tivity_pause\x18\x01 \x01(\x0b\x32=.temporal.api.rules.v1.WorkflowRuleAction.ActionActivityPauseH\x00\x1a\x15\n\x13\x41\x63tionActivityPauseB\t\n\x07variant"\xbd\x02\n\x10WorkflowRuleSpec\x12\n\n\x02id\x18\x01 \x01(\t\x12Y\n\x0e\x61\x63tivity_start\x18\x02 \x01(\x0b\x32?.temporal.api.rules.v1.WorkflowRuleSpec.ActivityStartingTriggerH\x00\x12\x18\n\x10visibility_query\x18\x03 \x01(\t\x12:\n\x07\x61\x63tions\x18\x04 \x03(\x0b\x32).temporal.api.rules.v1.WorkflowRuleAction\x12\x33\n\x0f\x65xpiration_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x1a,\n\x17\x41\x63tivityStartingTrigger\x12\x11\n\tpredicate\x18\x01 \x01(\tB\t\n\x07trigger"\xa8\x01\n\x0cWorkflowRule\x12/\n\x0b\x63reate_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x35\n\x04spec\x18\x02 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpec\x12\x1b\n\x13\x63reated_by_identity\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\tB\x84\x01\n\x18io.temporal.api.rules.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/rules/v1;rules\xaa\x02\x17Temporalio.Api.Rules.V1\xea\x02\x1aTemporalio::Api::Rules::V1b\x06proto3'
 )
 
 
@@ -94,6 +94,6 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _WORKFLOWRULESPEC._serialized_end = 559
     _WORKFLOWRULESPEC_ACTIVITYSTARTINGTRIGGER._serialized_start = 504
     _WORKFLOWRULESPEC_ACTIVITYSTARTINGTRIGGER._serialized_end = 548
-    _WORKFLOWRULE._serialized_start = 561
-    _WORKFLOWRULE._serialized_end = 679
+    _WORKFLOWRULE._serialized_start = 562
+    _WORKFLOWRULE._serialized_end = 730
 # @@protoc_insertion_point(module_scope)
