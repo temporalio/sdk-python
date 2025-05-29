@@ -1230,9 +1230,3 @@ def _type_hints_from_func(
         # necessarily
         args.append(arg_hint)  # type: ignore
     return args, ret
-
-
-class WorkflowLogicFlag(IntEnum):
-    """Flags that may be set on task/activation completion to differentiate new from old workflow behavior."""
-
-    RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1

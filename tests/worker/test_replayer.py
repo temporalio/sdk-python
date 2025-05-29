@@ -531,10 +531,10 @@ class QuickActivityWorkflow:
                 break
 
 
-async def test_swallowed_cancellation() -> None:
+async def test_swallowed_activity_cancellation() -> None:
     with (
         Path(__file__)
-        .with_name("test_replayer_swallowed_cancellation.json")
+        .with_name("test_replayer_swallowed_activity_cancellation.json")
         .open() as f
     ):
         history = f.read()

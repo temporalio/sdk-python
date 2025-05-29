@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import IntEnum
 from typing import (
     Any,
     Awaitable,
@@ -60,7 +61,6 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
-from ..common import WorkflowLogicFlag
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -1614,10 +1614,16 @@ class _WorkflowInstanceImpl(
                     # dict with its new seq
                     self._pending_activities[handle._seq] = handle
                 except asyncio.CancelledError:
+                    # If an activity future completes at the same time as a cancellation is being processed, the cancellation would be swallowed
+                    # _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY will correctly reraise the exception
                     if handle._result_fut.done():
-                        # TODO in next release, add flag when not replaying
+                        # TODO in next release, check sdk flag when not replaying instead of global override, remove the override, and set flag use
                         if (
-                            WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
+                            (
+                                not self._is_replaying
+                                and _raise_on_cancelling_completed_activity_override
+                            )
+                            or _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
                             in self._current_internal_flags
                         ):
                             # self._current_completion.successful.used_internal_flags.append(WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
@@ -3121,3 +3127,13 @@ finishes, then you can disable this warning via the signal handler decorator:
             [{"name": name, "count": count} for name, count in names.most_common()]
         )
     )
+
+
+class _WorkflowLogicFlag(IntEnum):
+    """Flags that may be set on task/activation completion to differentiate new from old workflow behavior."""
+
+    RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
+
+
+# Used by tests to validate behavior prior to SDK flag becoming default
+_raise_on_cancelling_completed_activity_override = False
