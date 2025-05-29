@@ -44,7 +44,7 @@ def make_incrementer_service(op_names: list[str]) -> tuple[type, type]:
     return contract_cls, impl_cls
 
 
-async def test_handler_creation_at_run_time(client: Client):
+async def test_dynamic_creation_of_user_handler_classes(client: Client):
     task_queue = str(uuid.uuid4())
 
     contract_cls, impl_cls = make_incrementer_service(["increment"])
