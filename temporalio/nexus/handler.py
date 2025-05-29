@@ -41,9 +41,9 @@ from temporalio.types import (
     SelfType,
 )
 
-O = TypeVar("O")
-I = TypeVar("I")
-S = TypeVar("S")
+I = TypeVar("I", contravariant=True)  # operation input
+O = TypeVar("O", covariant=True)  # operation output
+S = TypeVar("S")  # a service
 
 logger = logging.getLogger(__name__)
 
