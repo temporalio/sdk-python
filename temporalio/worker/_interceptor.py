@@ -302,7 +302,7 @@ class StartNexusOperationInput(Generic[I, O]):
     service: str
     operation: Union[
         nexusrpc.contract.Operation[I, O],
-        Callable[[Any], nexusrpc.handler.Operation[I, O]],
+        Callable[[Any], nexusrpc.contract.Operation[I, O]],
         str,
     ]
     input: I
