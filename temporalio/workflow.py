@@ -5182,7 +5182,7 @@ class NexusService(Generic[S]):
         else:
             raise ValueError(
                 f"`service` may be a name (str), or a class decorated with either "
-                f"@nexusrpc.handler.service or @nexusrpc.contract.service. "
+                f"@nexusrpc.handler.service_handler or @nexusrpc.contract.service. "
                 f"Invalid service type: {type(service)}"
             )
         print(f"🌈 NexusClient using service name: {self._service_name}")

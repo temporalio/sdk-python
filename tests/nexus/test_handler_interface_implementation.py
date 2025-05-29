@@ -57,8 +57,8 @@ def test_service_decorator_enforces_interface_conformance(
 ):
     if test_case.error_message:
         with pytest.raises(Exception) as ei:
-            nexusrpc.handler.service(test_case.Interface)(test_case.Impl)
+            nexusrpc.handler.service_handler(test_case.Interface)(test_case.Impl)
         err = ei.value
         assert test_case.error_message in str(err)
     else:
-        nexusrpc.handler.service(test_case.Interface)(test_case.Impl)
+        nexusrpc.handler.service_handler(test_case.Interface)(test_case.Impl)

@@ -176,7 +176,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
         return await temporalio.nexus.handler.cancel_workflow(ctx, token)
 
 
-@nexusrpc.handler.service(contract=ServiceInterface)
+@nexusrpc.handler.service_handler(service=ServiceInterface)
 class ServiceImpl:
     @nexusrpc.handler.operation
     def sync_or_async_operation(
@@ -787,7 +787,7 @@ class ServiceInterfaceWithNameOverride:
     op: nexusrpc.contract.Operation[None, ServiceClassNameOutput]
 
 
-@nexusrpc.handler.service
+@nexusrpc.handler.service_handler
 class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
     @nexusrpc.handler.sync_operation
     async def op(
@@ -796,7 +796,7 @@ class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
         return ServiceClassNameOutput(self.__class__.__name__)
 
 
-@nexusrpc.handler.service(contract=ServiceInterfaceWithoutNameOverride)
+@nexusrpc.handler.service_handler(service=ServiceInterfaceWithoutNameOverride)
 class ServiceImplInterfaceWithoutNameOverride:
     @nexusrpc.handler.sync_operation
     async def op(
@@ -805,7 +805,7 @@ class ServiceImplInterfaceWithoutNameOverride:
         return ServiceClassNameOutput(self.__class__.__name__)
 
 
-@nexusrpc.handler.service(contract=ServiceInterfaceWithNameOverride)
+@nexusrpc.handler.service_handler(service=ServiceInterfaceWithNameOverride)
 class ServiceImplInterfaceWithNameOverride:
     @nexusrpc.handler.sync_operation
     async def op(
@@ -814,7 +814,7 @@ class ServiceImplInterfaceWithNameOverride:
         return ServiceClassNameOutput(self.__class__.__name__)
 
 
-@nexusrpc.handler.service(name="service-impl-🌈")
+@nexusrpc.handler.service_handler(name="service-impl-🌈")
 class ServiceImplWithNameOverride:
     @nexusrpc.handler.sync_operation
     async def op(

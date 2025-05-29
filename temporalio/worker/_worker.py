@@ -159,7 +159,7 @@ class Worker:
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
             nexus_services: Nexus service instances decorated with
-                :py:func:`@nexusrpc.handler.service<nexusrpc.service>`.
+                :py:func:`@nexusrpc.handler.service_handler<nexusrpc.service>`.
             workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async

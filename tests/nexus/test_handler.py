@@ -106,7 +106,7 @@ class MyLinkTestWorkflow:
 # TODO: implement some of these ops as explicit OperationHandler classes to provide coverage for that?
 
 
-@nexusrpc.handler.service(contract=MyService)
+@nexusrpc.handler.service_handler(service=MyService)
 class MyServiceHandler:
     @nexusrpc.handler.sync_operation
     async def echo(

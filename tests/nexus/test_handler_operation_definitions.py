@@ -30,7 +30,7 @@ class _TestCase:
 
 
 class NotCalled(_TestCase):
-    @nexusrpc.handler.service
+    @nexusrpc.handler.service_handler
     class Service:
         @temporalio.nexus.handler.workflow_run_operation
         async def workflow_run_operation(
@@ -47,7 +47,7 @@ class NotCalled(_TestCase):
 
 
 class CalledWithoutArgs(_TestCase):
-    @nexusrpc.handler.service
+    @nexusrpc.handler.service_handler
     class Service:
         @temporalio.nexus.handler.workflow_run_operation()
         async def workflow_run_operation(
@@ -58,7 +58,7 @@ class CalledWithoutArgs(_TestCase):
 
 
 class CalledWithNameOverride(_TestCase):
-    @nexusrpc.handler.service
+    @nexusrpc.handler.service_handler
     class Service:
         @temporalio.nexus.handler.workflow_run_operation(name="operation-name")
         async def workflow_run_operation_with_name_override(
