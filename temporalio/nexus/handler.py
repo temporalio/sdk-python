@@ -81,8 +81,8 @@ def get_input_and_output_types_from_workflow_run_start_method(
         Awaitable[WorkflowHandle[Any, O]],
     ],
 ) -> tuple[
-    Union[Type[I], Type[nexusrpc.handler.MISSING]],
-    Union[Type[O], Type[nexusrpc.handler.MISSING]],
+    Union[Type[I], Type[nexusrpc.handler.MISSING_TYPE]],
+    Union[Type[O], Type[nexusrpc.handler.MISSING_TYPE]],
 ]:
     """Return operation input and output types.
 
@@ -103,7 +103,7 @@ def get_input_and_output_types_from_workflow_run_start_method(
             f"Expected return type of {start_method.__name__} to be a subclass of WorkflowHandle, "
             f"but is {output_type}"
         )
-        output_type = nexusrpc.handler.MISSING
+        output_type = nexusrpc.handler.MISSING_TYPE
 
     args = typing.get_args(output_type)
     if len(args) != 2:
@@ -111,7 +111,7 @@ def get_input_and_output_types_from_workflow_run_start_method(
             f"Expected return type of {start_method.__name__} to have exactly two type parameters, "
             f"but has {len(args)}: {args}"
         )
-        output_type = nexusrpc.handler.MISSING
+        output_type = nexusrpc.handler.MISSING_TYPE
     else:
         _wf_type, output_type = args
     return input_type, output_type
