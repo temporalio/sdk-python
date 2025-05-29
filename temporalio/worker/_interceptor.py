@@ -20,7 +20,6 @@ from typing import (
 )
 
 import nexusrpc
-import nexusrpc.handler
 import nexusrpc.contract
 
 import temporalio.activity
@@ -322,11 +321,11 @@ class StartNexusOperationInput(Generic[I, O]):
             self._input_type = self.operation.input_type
             self.output_type = self.operation.output_type
         elif isinstance(self.operation, Callable):
-            defn = getattr(self.operation, "__nexus_operation__", None)
-            if isinstance(defn, nexusrpc.handler.NexusOperationDefinition):
-                self._operation_name = defn.name
-                self._input_type = defn.input_type
-                self.output_type = defn.output_type
+            op = getattr(self.operation, "__nexus_operation__", None)
+            if isinstance(op, nexusrpc.contract.Operation):
+                self._operation_name = op.name
+                self._input_type = op.input_type
+                self.output_type = op.output_type
             else:
                 raise ValueError(
                     f"Operation callable is not a Nexus operation: {self.operation}"

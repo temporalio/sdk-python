@@ -26,7 +26,7 @@ class Output:
 @dataclass
 class _TestCase:
     Service: Type[Any]
-    expected_operations: dict[str, nexusrpc.handler.NexusOperationDefinition]
+    expected_operations: dict[str, nexusrpc.contract.Operation]
 
 
 class NotCalled(_TestCase):
@@ -38,7 +38,7 @@ class NotCalled(_TestCase):
         ) -> WorkflowHandle[Any, Output]: ...
 
     expected_operations = {
-        "workflow_run_operation_handler": nexusrpc.handler.NexusOperationDefinition(
+        "workflow_run_operation_handler": nexusrpc.contract.Operation._create(
             name="workflow_run_operation_handler",
             input_type=Input,
             output_type=Output,
@@ -66,7 +66,7 @@ class CalledWithNameOverride(_TestCase):
         ) -> WorkflowHandle[Any, Output]: ...
 
     expected_operations = {
-        "workflow_run_operation_with_name_override": nexusrpc.handler.NexusOperationDefinition(
+        "workflow_run_operation_with_name_override": nexusrpc.contract.Operation._create(
             name="operation-name",
             input_type=Input,
             output_type=Output,
@@ -89,9 +89,9 @@ async def test_collected_operation_names(
     service: nexusrpc.contract.Service = getattr(test_case.Service, "__nexus_service__")
     assert isinstance(service, nexusrpc.contract.Service)
     assert service.name == "Service"
-    for method_name, expected_defn in test_case.expected_operations.items():
-        actual_defn = getattr(test_case.Service, method_name).__nexus_operation__
-        assert isinstance(actual_defn, nexusrpc.handler.NexusOperationDefinition)
-        assert actual_defn.name == expected_defn.name
-        assert actual_defn.input_type == expected_defn.input_type
-        assert actual_defn.output_type == expected_defn.output_type
+    for method_name, expected_op in test_case.expected_operations.items():
+        actual_op = getattr(test_case.Service, method_name).__nexus_operation__
+        assert isinstance(actual_op, nexusrpc.contract.Operation)
+        assert actual_op.name == expected_op.name
+        assert actual_op.input_type == expected_op.input_type
+        assert actual_op.output_type == expected_op.output_type
