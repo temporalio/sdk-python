@@ -7218,8 +7218,8 @@ async def test_workflow_deadlock_fill_up_slots(client: Client):
         client,
         DeadlockFillUpBlockWorkflow,
         DeadlockFillUpSimpleWorkflow,
-        # Start the worker with CPU count + 10 task slots
-        max_concurrent_workflow_tasks=cpu_count + 10,
+        # Start the worker with CPU count + 11 task slots
+        max_concurrent_workflow_tasks=cpu_count + 11,
     ) as worker:
         # For this test we're going to start cpu_count + 5 workflows that
         # deadlock. In previous SDK versions we defaulted to CPU count
