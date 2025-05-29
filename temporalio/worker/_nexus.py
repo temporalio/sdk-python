@@ -247,8 +247,8 @@ class _NexusWorker:
                 try:
                     operation_handler = self._handler.get_operation_handler(ctx)
                 except (
-                    nexusrpc.handler.UnregisteredServiceError,
-                    nexusrpc.handler.UnregisteredOperationError,
+                    nexusrpc.handler.UnknownServiceError,
+                    nexusrpc.handler.UnknownOperationError,
                 ) as err:
                     raise nexusrpc.handler.HandlerError(
                         "No matching operation handler",

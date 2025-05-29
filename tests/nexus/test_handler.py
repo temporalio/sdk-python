@@ -580,7 +580,7 @@ class OperationError(_FailureTestCase):
     )
 
 
-class UnregisteredService(_FailureTestCase):
+class UnknownService(_FailureTestCase):
     operation = "echo"
     service = "NonExistentService"
     expected = UnsuccessfulResponse(
@@ -590,7 +590,7 @@ class UnregisteredService(_FailureTestCase):
     )
 
 
-class UnregisteredOperation(_FailureTestCase):
+class UnknownOperation(_FailureTestCase):
     operation = "NonExistentOperation"
     expected = UnsuccessfulResponse(
         status_code=404,
@@ -624,8 +624,8 @@ async def test_start_operation_happy_path(test_case: Type[_TestCase], client: Cl
         OperationTimeoutHeader,
         BadRequest,
         HandlerErrorInternal,
-        UnregisteredService,
-        UnregisteredOperation,
+        UnknownService,
+        UnknownOperation,
     ],
 )
 async def test_start_operation_protocol_level_failures(
