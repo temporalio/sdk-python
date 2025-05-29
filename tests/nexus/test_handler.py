@@ -216,7 +216,8 @@ class MyServiceHandler:
 
     sync_operation_with_non_async_callable_instance = (
         nexusrpc.handler.sync_operation_handler(
-            SyncOperationWithNonAsyncCallableInstance()
+            SyncOperationWithNonAsyncCallableInstance(),
+            name="sync_operation_with_non_async_callable_instance",
         )
     )
 

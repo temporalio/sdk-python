@@ -30,7 +30,10 @@ def make_incrementer_service(op_names: list[str]) -> tuple[type, type]:
         return input + 1
 
     op_factories = {
-        name: nexusrpc.handler.sync_operation_handler(_increment_op)
+        # TODO(dan): check that name=name should be required here. Should the op factory
+        # name not default to the name of the method attribute (i.e. key), as opposed to
+        # the name of the method object (i.e. value.__name__)?
+        name: nexusrpc.handler.sync_operation_handler(_increment_op, name=name)
         for name in op_names
     }
 
