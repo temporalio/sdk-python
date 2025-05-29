@@ -933,7 +933,8 @@ class _RestrictedProxyIOp(_RestrictedProxyLookup):
 
         def bind_f(instance: _RestrictedProxy, obj: Any) -> Callable:
             def i_op(self: Any, other: Any) -> _RestrictedProxy:
-                f(self, other)  # type: ignore
+                # TODO: wat
+                f(self, other)  # type: ignore # noqa: F821
                 return instance
 
             return i_op.__get__(obj, type(obj))  # type: ignore
