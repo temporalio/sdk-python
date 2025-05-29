@@ -263,7 +263,7 @@ class MyServiceHandler:
             # or StartOperationResultAsync
             return Output(value="unwrapped result error")  # type: ignore
 
-    @nexusrpc.handler.operation
+    @nexusrpc.handler.operation_handler
     def operation_returning_unwrapped_result_at_runtime_error(
         self,
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
