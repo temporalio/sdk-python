@@ -7971,3 +7971,5 @@ async def test_quick_activity_swallows_cancellation(client: Client):
 
             assert isinstance(cause, CancelledError)
             assert cause.message == "Workflow cancelled"
+
+        temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = False

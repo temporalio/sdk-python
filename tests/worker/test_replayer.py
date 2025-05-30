@@ -1,5 +1,6 @@
 import asyncio
 import random
+import re
 import sys
 import uuid
 from dataclasses import dataclass
@@ -543,3 +544,17 @@ async def test_swallowed_activity_cancellation() -> None:
             workflows=[QuickActivityWorkflow],
             interceptors=[WorkerWorkflowResultInterceptor()],
         ).replay_workflow(WorkflowHistory.from_json("fake", history))
+
+
+async def test_swallowed_activity_cancellation_no_flag() -> None:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_swallowed_activity_cancellation.json")
+        .open() as f
+    ):
+        history = f.read()
+        history = re.sub(r'"langUsedFlags": \[\s*1\s*]', "", history)
+    await Replayer(
+        workflows=[QuickActivityWorkflow],
+        interceptors=[WorkerWorkflowResultInterceptor()],
+    ).replay_workflow(WorkflowHistory.from_json("fake", history))
