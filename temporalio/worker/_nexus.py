@@ -244,6 +244,7 @@ class _NexusWorker:
                     callback_header=dict(start_request.callback_header),
                 )
 
+                # TODO(dan): stop calling this twice
                 try:
                     operation_handler = self._handler.get_operation_handler(ctx)
                 except (
@@ -284,19 +285,13 @@ class _NexusWorker:
                         retryable=False,
                     ) from err
 
-                if inspect.iscoroutinefunction(
-                    operation_handler.start
-                ) or inspect.iscoroutinefunction(operation_handler.start.__call__):
-                    # pyright does not infer awaitable from iscoroutinefunction(__call__)
-                    result = await operation_handler.start(ctx, input)  # type: ignore
-                else:
-                    raise NotImplementedError(
-                        "Nexus operation start method must be async"
-                    )
-                    # TODO(dan): Executor for blocking operations. This is just a
-                    # temporary hack to allow developing type signatures that support
-                    # non-async start methods.
-                    result = operation_handler.start(ctx, input)
+                result = await self._handler.start_operation(
+                    ctx,
+                    start_request.service,
+                    start_request.operation,
+                    input,
+                )
+
             except nexusrpc.handler.OperationError as err:
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
