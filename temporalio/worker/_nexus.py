@@ -257,6 +257,10 @@ class _NexusWorker:
                         retryable=False,
                     ) from err
 
+                # TODO(dan): plug into Nexus SDK serializer framework
+                # ServiceHandler.Builder serviceHandlerBuilder =
+                #     ServiceHandler.newBuilder().setSerializer(new PayloadSerializer(dataConverter));
+
                 arg_types, _ = temporalio.common._type_hints_from_func(
                     operation_handler.start
                 )
