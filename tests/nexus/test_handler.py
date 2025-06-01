@@ -108,6 +108,8 @@ class MyLinkTestWorkflow:
 # TODO: implement some of these ops as explicit OperationHandler classes to provide coverage for that?
 
 
+# TODO(dan): Create a version of this test without supplying the service contract.
+# Assertions will change for e.g. impls without type annotations.
 @nexusrpc.handler.service_handler(service=MyService)
 class MyServiceHandler:
     @nexusrpc.handler.sync_operation_handler
@@ -224,13 +226,14 @@ class MyServiceHandler:
     )
 
     @nexusrpc.handler.sync_operation_handler
-    async def sync_operation_without_type_annotations(self, ctx, input):  # type: ignore
+    async def sync_operation_without_type_annotations(self, ctx, input):
+        # The input type from the op definition in the service definition is used to deserialize the input.
         return Output(
-            value=f"from start method on {self.__class__.__name__} without type annotations: {input['value']}"  # type: ignore
+            value=f"from start method on {self.__class__.__name__} without type annotations: {input.value}"
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
-    async def async_operation_without_type_annotations(self, ctx, input):  # type: ignore
+    async def async_operation_without_type_annotations(self, ctx, input):
         return await start_workflow(
             ctx,
             WorkflowWithoutTypeAnnotations.run,
@@ -597,7 +600,9 @@ class UnknownOperation(_FailureTestCase):
     expected = UnsuccessfulResponse(
         status_code=404,
         retryable_header=False,
-        failure_message="Nexus service 'MyService' has no handler for operation 'NonExistentOperation'.",
+        failure_message=lambda s: s.startswith(
+            "Nexus service contract 'MyService' has no operation 'NonExistentOperation'."
+        ),
     )
 
 
