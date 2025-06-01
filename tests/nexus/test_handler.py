@@ -258,7 +258,7 @@ class MyServiceHandler:
         )
 
     class OperationHandlerReturningUnwrappedResult(
-        nexusrpc.handler.OperationHandler[Input, Output]
+        nexusrpc.handler.SyncOperationHandler[Input, Output]
     ):
         async def start(
             self,

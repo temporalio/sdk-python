@@ -365,16 +365,34 @@ class WorkflowRunOperation(nexusrpc.handler.OperationHandler[I, O], Generic[I, O
         self.start = types.MethodType(start, self)
         self.fetch_result = types.MethodType(fetch_result, self)
 
+    async def start(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: I
+    ) -> nexusrpc.handler.StartOperationResultAsync:
+        raise NotImplementedError(
+            "The start method of a WorkflowRunOperation should be set "
+            "dynamically in the __init__ method.(Did you forget to call super()?)"
+        )
+
     async def cancel(
         self, ctx: nexusrpc.handler.CancelOperationContext, token: str
     ) -> None:
         await cancel_workflow(ctx, token)
 
-    # TODO(dan): remove before merge; implementing temporarily to check that design extends well to this
-    async def fetch_info(
+    def fetch_info(
         self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
-    ) -> nexusrpc.handler.OperationInfo:
-        return await fetch_workflow_info(ctx, token)
+    ) -> Union[
+        nexusrpc.handler.OperationInfo, Awaitable[nexusrpc.handler.OperationInfo]
+    ]:
+        raise NotImplementedError(
+            "Temporal Nexus operation handlers do not support fetching operation info."
+        )
+
+    def fetch_result(
+        self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
+    ) -> Union[O, Awaitable[O]]:
+        raise NotImplementedError(
+            "Temporal Nexus operation handlers do not support fetching operation results."
+        )
 
 
 # TODO(dan): interceptor

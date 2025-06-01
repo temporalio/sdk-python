@@ -175,6 +175,16 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
     ) -> None:
         return await temporalio.nexus.handler.cancel_workflow(ctx, token)
 
+    async def fetch_info(
+        self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
+    ) -> nexusrpc.handler.OperationInfo:
+        raise NotImplementedError
+
+    async def fetch_result(
+        self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
+    ) -> OpOutput:
+        raise NotImplementedError
+
 
 @nexusrpc.handler.service_handler(service=ServiceInterface)
 class ServiceImpl:
