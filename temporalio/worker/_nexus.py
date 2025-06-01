@@ -378,7 +378,10 @@ class _NexusWorker:
             operation=request.operation,
         )
 
-        operation_handler = self._handler.get_operation_handler(ctx)
+        # TODO(dan): Temporary; cancel handling needs to be switched to use
+        # cancel_operation; this isn't the API we'll be exposing
+        service_handler = self._handler.get_service_handler(ctx.service)
+        operation_handler = service_handler.get_operation_handler(ctx.operation)
 
         # TODO(dan): header
         try:
