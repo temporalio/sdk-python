@@ -9,7 +9,9 @@ import logging
 from typing import (
     Any,
     Callable,
+    Optional,
     Sequence,
+    Type,
 )
 
 import google.protobuf.json_format
@@ -263,13 +265,6 @@ class _NexusWorker:
                 #     ServiceHandler.newBuilder().setSerializer(new PayloadSerializer(dataConverter));
 
                 data_converter = self._data_converter
-                arg_types, _ = temporalio.common._type_hints_from_func(
-                    operation_handler.start
-                )
-                if arg_types and len(arg_types) == 2:
-                    _ctx_type, input_type = arg_types
-                else:
-                    input_type = _MISSING_TYPE
 
                 class _PayloadSerializer:
                     async def serialize(self, value: Any) -> nexusrpc.handler.Content:
@@ -278,14 +273,20 @@ class _NexusWorker:
                         )
 
                     async def deserialize(
-                        self, content: nexusrpc.handler.Content
+                        self,
+                        content: nexusrpc.handler.Content,
+                        as_type: Optional[Type[Any]] = None,
                     ) -> Any:
                         try:
                             [input] = await data_converter.decode(
                                 [start_request.payload],
                                 type_hints=(
-                                    [input_type]
-                                    if input_type != _MISSING_TYPE
+                                    [as_type]
+                                    # TODO(dan): HACK
+                                    if (
+                                        as_type
+                                        and as_type != nexusrpc.handler.MISSING_TYPE
+                                    )
                                     else None
                                 ),
                             )
