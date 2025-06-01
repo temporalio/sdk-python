@@ -1774,6 +1774,8 @@ class _WorkflowInstanceImpl(
             # Don't wrap payload conversion errors that would fail the workflow
             raise
         except Exception as err:
+            if self._is_workflow_failure_exception(err):
+                raise
             raise RuntimeError("Failed decoding arguments") from err
 
     def _instantiate_workflow_object(self) -> Any:
