@@ -25,6 +25,10 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
 # Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x lib
 import google.protobuf
 
+from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
+from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
+
 protobuf_version = google.protobuf.__version__
 if os.getenv("TEMPORAL_TEST_PROTO3"):
     assert protobuf_version.startswith(
@@ -34,10 +38,6 @@ else:
     assert protobuf_version.startswith("4.") or protobuf_version.startswith(
         "5."
     ), f"Expected protobuf 4.x/5.x, got {protobuf_version}"
-
-from temporalio.client import Client
-from temporalio.testing import WorkflowEnvironment
-from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 
 def pytest_addoption(parser):

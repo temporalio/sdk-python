@@ -593,7 +593,7 @@ class SomeClass2:
 
 
 async def test_activity_type_hints(client: Client, worker: ExternalWorker):
-    activity_param1: SomeClass2
+    activity_param1: Optional[SomeClass2] = None
 
     @activity.defn
     async def some_activity(param1: SomeClass2, param2: str) -> str:
