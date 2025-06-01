@@ -285,11 +285,24 @@ class _NexusWorker:
                         retryable=False,
                     ) from err
 
+                class _PayloadSerializer:
+                    def serialize(self, value: Any) -> nexusrpc.handler.Content:
+                        raise NotImplementedError(
+                            "The serialize method of the Serializer is not used by handlers"
+                        )
+
+                    def deserialize(self, content: nexusrpc.handler.Content) -> Any:
+                        return input
+
                 result = await self._handler.start_operation(
                     ctx,
                     start_request.service,
                     start_request.operation,
-                    input,
+                    nexusrpc.handler.LazyValue(
+                        serializer=_PayloadSerializer(),
+                        headers={},
+                        stream=None,
+                    ),
                 )
 
             except nexusrpc.handler.OperationError as err:
