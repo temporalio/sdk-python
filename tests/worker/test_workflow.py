@@ -5163,14 +5163,15 @@ async def test_workflow_failure_types_configured(client: Client):
         )
 
 
+class Foo(pydantic.BaseModel):
+    bar: str
+
+
 @workflow.defn(failure_exception_types=[pydantic.ValidationError])
 class FailOnBadPydanticInputWorkflow:
     @workflow.run
-    async def run(self, params: dict[str, Any]) -> None:
-        class Foo(pydantic.BaseModel):
-            bar: str
-
-        _ = Foo.model_validate(params)
+    async def run(self, params: Foo) -> None:
+        pass
 
 
 async def test_workflow_fail_on_bad_pydantic_input(client: Client):
