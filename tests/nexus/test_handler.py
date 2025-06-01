@@ -80,6 +80,8 @@ class MyService:
     retryable_application_error: nexusrpc.contract.Operation[Input, Output]
     check_operation_timeout_header: nexusrpc.contract.Operation[Input, Output]
     workflow_run_op_link_test: nexusrpc.contract.Operation[Input, Output]
+    handler_error_internal: nexusrpc.contract.Operation[Input, Output]
+    operation_error_failed: nexusrpc.contract.Operation[Input, Output]
 
 
 @workflow.defn
