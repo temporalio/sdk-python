@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import json
 import logging
+from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
@@ -17,6 +18,7 @@ from typing import (
 import google.protobuf.json_format
 import nexusrpc
 
+import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 import temporalio.api.nexus.v1
@@ -245,70 +247,32 @@ class _NexusWorker:
                     ],
                     callback_header=dict(start_request.callback_header),
                 )
-
-                # TODO(dan): stop calling this twice
+                input = nexusrpc.handler.LazyValue(
+                    serializer=_DummyPayloadSerializer(
+                        data_converter=self._data_converter,
+                        payload=start_request.payload,
+                    ),
+                    headers={},
+                    stream=None,
+                )
                 try:
-                    operation_handler = self._handler.get_operation_handler(ctx)
+                    result = await self._handler.start_operation(
+                        ctx,
+                        start_request.service,
+                        start_request.operation,
+                        input,
+                    )
                 except (
                     nexusrpc.handler.UnknownServiceError,
                     nexusrpc.handler.UnknownOperationError,
                 ) as err:
+                    # TODO(dan): error message
                     raise nexusrpc.handler.HandlerError(
                         "No matching operation handler",
                         type=nexusrpc.handler.HandlerErrorType.NOT_FOUND,
                         cause=err,
                         retryable=False,
                     ) from err
-
-                # TODO(dan): plug into Nexus SDK serializer framework
-                # ServiceHandler.Builder serviceHandlerBuilder =
-                #     ServiceHandler.newBuilder().setSerializer(new PayloadSerializer(dataConverter));
-
-                data_converter = self._data_converter
-
-                class _PayloadSerializer:
-                    async def serialize(self, value: Any) -> nexusrpc.handler.Content:
-                        raise NotImplementedError(
-                            "The serialize method of the Serializer is not used by handlers"
-                        )
-
-                    async def deserialize(
-                        self,
-                        content: nexusrpc.handler.Content,
-                        as_type: Optional[Type[Any]] = None,
-                    ) -> Any:
-                        try:
-                            [input] = await data_converter.decode(
-                                [start_request.payload],
-                                type_hints=(
-                                    [as_type]
-                                    # TODO(dan): HACK
-                                    if (
-                                        as_type
-                                        and as_type != nexusrpc.handler.MISSING_TYPE
-                                    )
-                                    else None
-                                ),
-                            )
-                        except Exception as err:
-                            raise nexusrpc.handler.HandlerError(
-                                "Data converter failed to decode Nexus operation input",
-                                type=nexusrpc.handler.HandlerErrorType.BAD_REQUEST,
-                                cause=err,
-                                retryable=False,
-                            ) from err
-                        return input
-
-                result = await self._handler.start_operation(
-                    ctx,
-                    start_request.service,
-                    start_request.operation,
-                    nexusrpc.handler.LazyValue(
-                        serializer=_PayloadSerializer(),
-                        headers={},
-                        stream=None,
-                    ),
-                )
 
             except nexusrpc.handler.OperationError as err:
                 return temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -503,6 +467,41 @@ class _NexusWorker:
                 else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
             ),
         )
+
+
+@dataclass
+class _DummyPayloadSerializer:
+    data_converter: temporalio.converter.DataConverter
+    payload: temporalio.api.common.v1.Payload
+
+    async def serialize(self, value: Any) -> nexusrpc.handler.Content:
+        raise NotImplementedError(
+            "The serialize method of the Serializer is not used by handlers"
+        )
+
+    async def deserialize(
+        self,
+        content: nexusrpc.handler.Content,
+        as_type: Optional[Type[Any]] = None,
+    ) -> Any:
+        try:
+            [input] = await self.data_converter.decode(
+                [self.payload],
+                type_hints=(
+                    [as_type]
+                    # TODO(dan): HACK
+                    if (as_type and as_type != nexusrpc.handler.MISSING_TYPE)
+                    else None
+                ),
+            )
+        except Exception as err:
+            raise nexusrpc.handler.HandlerError(
+                "Data converter failed to decode Nexus operation input",
+                type=nexusrpc.handler.HandlerErrorType.BAD_REQUEST,
+                cause=err,
+                retryable=False,
+            ) from err
+        return input
 
 
 # TODO(dan): tests for this function
