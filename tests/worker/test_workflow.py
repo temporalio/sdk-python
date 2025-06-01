@@ -5169,6 +5169,7 @@ class FailOnBadPydanticInputWorkflow:
     async def run(self, params: dict[str, Any]) -> None:
         class Foo(pydantic.BaseModel):
             bar: str
+
         _ = Foo.model_validate(params)
 
 
