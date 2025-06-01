@@ -262,6 +262,7 @@ class _NexusWorker:
                 # ServiceHandler.Builder serviceHandlerBuilder =
                 #     ServiceHandler.newBuilder().setSerializer(new PayloadSerializer(dataConverter));
 
+                data_converter = self._data_converter
                 arg_types, _ = temporalio.common._type_hints_from_func(
                     operation_handler.start
                 )
@@ -270,28 +271,31 @@ class _NexusWorker:
                 else:
                     input_type = _MISSING_TYPE
 
-                try:
-                    [input] = await self._data_converter.decode(
-                        [start_request.payload],
-                        type_hints=(
-                            [input_type] if input_type != _MISSING_TYPE else None
-                        ),
-                    )
-                except Exception as err:
-                    raise nexusrpc.handler.HandlerError(
-                        "Data converter failed to decode Nexus operation input",
-                        type=nexusrpc.handler.HandlerErrorType.BAD_REQUEST,
-                        cause=err,
-                        retryable=False,
-                    ) from err
-
                 class _PayloadSerializer:
-                    def serialize(self, value: Any) -> nexusrpc.handler.Content:
+                    async def serialize(self, value: Any) -> nexusrpc.handler.Content:
                         raise NotImplementedError(
                             "The serialize method of the Serializer is not used by handlers"
                         )
 
-                    def deserialize(self, content: nexusrpc.handler.Content) -> Any:
+                    async def deserialize(
+                        self, content: nexusrpc.handler.Content
+                    ) -> Any:
+                        try:
+                            [input] = await data_converter.decode(
+                                [start_request.payload],
+                                type_hints=(
+                                    [input_type]
+                                    if input_type != _MISSING_TYPE
+                                    else None
+                                ),
+                            )
+                        except Exception as err:
+                            raise nexusrpc.handler.HandlerError(
+                                "Data converter failed to decode Nexus operation input",
+                                type=nexusrpc.handler.HandlerErrorType.BAD_REQUEST,
+                                cause=err,
+                                retryable=False,
+                            ) from err
                         return input
 
                 result = await self._handler.start_operation(
