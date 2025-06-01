@@ -3,6 +3,7 @@ import uuid
 import httpx
 import nexusrpc
 import nexusrpc.handler
+import pytest
 
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -11,15 +12,16 @@ from tests.helpers.nexus import create_nexus_endpoint
 HTTP_PORT = 7243
 
 
+# TODO(dan): test programmatic creation from ServiceHandler
 def make_incrementer_service_from_service_handler(
     op_names: list[str],
 ) -> tuple[str, type]:
     pass
 
 
-def make_incrementer_service_from_user_classes(
+def make_incrementer_user_service_definition_and_service_handler_classes(
     op_names: list[str],
-) -> tuple[str, type]:
+) -> tuple[type, type]:
     #
     # service contract
     #
@@ -49,15 +51,22 @@ def make_incrementer_service_from_user_classes(
         type("ServiceImpl", (), op_handler_factories)
     )
 
-    return service_cls.__name__, handler_cls
+    return service_cls, handler_cls
 
 
+@pytest.mark.skip(
+    reason="Dynamic creation of service contract using type() is not supported"
+)
 async def test_dynamic_creation_of_user_handler_classes(client: Client):
     task_queue = str(uuid.uuid4())
 
-    service_name, handler_cls = make_incrementer_service_from_user_classes(
-        ["increment"]
+    service_cls, handler_cls = (
+        make_incrementer_user_service_definition_and_service_handler_classes(
+            ["increment"]
+        )
     )
+
+    service_name = service_cls.__nexus_service__.name
 
     endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
     async with Worker(
