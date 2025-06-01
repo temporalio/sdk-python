@@ -586,7 +586,7 @@ class UnknownService(_FailureTestCase):
     expected = UnsuccessfulResponse(
         status_code=404,
         retryable_header=False,
-        failure_message="Nexus service 'NonExistentService' has not been registered.",
+        failure_message="No handler for service 'NonExistentService'.",
     )
 
 
@@ -595,7 +595,7 @@ class UnknownOperation(_FailureTestCase):
     expected = UnsuccessfulResponse(
         status_code=404,
         retryable_header=False,
-        failure_message="Nexus service 'MyService' has no operation 'NonExistentOperation'.",
+        failure_message="Nexus service 'MyService' has no handler for operation 'NonExistentOperation'.",
     )
 
 
