@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO(dan): confirm approach here: Temporal Nexus services will use this instead of
-# nexusrpc.handler.Operation in order to avoid having to implement fetch_info and
+# nexusrpc.handler.OperationHandler in order to avoid having to implement fetch_info and
 # fetch_result.
 class Operation(nexusrpc.handler.OperationHandler[I, O]):
     """

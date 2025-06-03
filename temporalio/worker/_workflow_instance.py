@@ -1565,7 +1565,7 @@ class _WorkflowInstanceImpl(
         service: str,
         operation: Union[
             nexusrpc.contract.Operation[I, O],
-            Callable[[Any], nexusrpc.handler.Operation[I, O]],
+            Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
             str,
         ],
         input: Any,
