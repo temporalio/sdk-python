@@ -693,6 +693,7 @@ async def test_logger_uses_operation_context(client: Client, caplog: Any):
         client,
         task_queue=task_queue,
         nexus_services=[MyServiceHandler()],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
