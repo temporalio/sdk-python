@@ -642,7 +642,12 @@ class _Runtime(ABC):
 
     @staticmethod
     def maybe_current() -> Optional[_Runtime]:
-        return getattr(asyncio.get_running_loop(), "__temporal_workflow_runtime", None)
+        try:
+            return getattr(
+                asyncio.get_running_loop(), "__temporal_workflow_runtime", None
+            )
+        except RuntimeError:
+            return None
 
     @staticmethod
     def set_on_loop(
@@ -940,10 +945,7 @@ def instance() -> Any:
 
 def in_workflow() -> bool:
     """Whether the code is currently running in a workflow."""
-    try:
-        return _Runtime.maybe_current() is not None
-    except RuntimeError:
-        return False
+    return _Runtime.maybe_current() is not None
 
 
 def memo() -> Mapping[str, Any]:
