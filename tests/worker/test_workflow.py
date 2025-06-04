@@ -7988,6 +7988,7 @@ class UseInWorkflow:
             use_in_workflow, schedule_to_close_timeout=timedelta(seconds=10)
         )
 
+
 async def test_in_workflow_sync(client: Client):
     async with new_worker(
         client,
@@ -8001,4 +8002,3 @@ async def test_in_workflow_sync(client: Client):
             task_queue=worker.task_queue,
             execution_timeout=timedelta(minutes=1),
         )
-
