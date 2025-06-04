@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent
 import inspect
 import json
 import logging
+from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -13,10 +15,12 @@ from typing import (
     Optional,
     Sequence,
     Type,
+    Awaitable,
 )
 
 import google.protobuf.json_format
 import nexusrpc
+from nexusrpc.handler._core import SyncFuncExecutor
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -52,6 +56,7 @@ class _NexusWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
+        executor: Optional[concurrent.futures.ThreadPoolExecutor],
     ) -> None:
         # TODO(dan): make it possible to query task queue of bridge worker
         # instead of passing unused task_queue into _NexusWorker,
@@ -66,7 +71,10 @@ class _NexusWorker:
                     f"Expected a service instance, but got a class: {type(service)}."
                     "Nexus services must be passed as instances, not classes."
                 )
-        self._handler = nexusrpc.handler.Handler(nexus_services)
+        self._handler = nexusrpc.handler.Handler(
+            nexus_services,
+            AsyncIoSyncFuncExecutor(executor) if executor is not None else None,
+        )
         self._data_converter = data_converter
         # TODO(dan): interceptors
         self._interceptors = interceptors
@@ -592,3 +600,11 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.handler.HandlerE
     return nexusrpc.handler.HandlerError(
         str(err), type=nexusrpc.handler.HandlerErrorType.INTERNAL, cause=err
     )
+
+
+class AsyncIoSyncFuncExecutor(SyncFuncExecutor):
+    def __init__(self, executor: ThreadPoolExecutor):
+        self._executor = executor
+
+    def run_sync(self, fn, *args) -> Awaitable[Any]:
+        return asyncio.get_event_loop().run_in_executor(self._executor, fn, *args)

@@ -14,10 +14,12 @@ Failure object.
 """
 
 import asyncio
+import concurrent
 import dataclasses
 import json
 import logging
 import uuid
+from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, Optional, Type, Union
@@ -408,7 +410,6 @@ class SyncHandlerHappyPath(_TestCase):
 
 
 class SyncHandlerHappyPathNonAsyncDef(_TestCase):
-    skip = "Non-async def executor not implemented"
     operation = "sync_operation_with_non_async_def"
     input = Input("hello")
     expected = SuccessfulResponse(
@@ -664,6 +665,7 @@ async def _test_start_operation(test_case: Type[_TestCase], client: Client):
         client,
         task_queue=task_queue,
         nexus_services=[MyServiceHandler()],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
@@ -733,3 +735,109 @@ def dataclass_as_dict(dataclass: Any) -> dict[str, Any]:
         field.name: getattr(dataclass, field.name)
         for field in dataclasses.fields(dataclass)
     }
+
+
+class _InstantiationCase:
+    executor: bool
+    handler: Callable[[], Any]
+    exception: Optional[Type[Exception]]
+    match: Optional[str]
+
+
+@nexusrpc.contract.service
+class EchoService:
+    echo: nexusrpc.contract.Operation[Input, Output]
+
+
+@nexusrpc.handler.service_handler(service=EchoService)
+class SyncStartHandler:
+    @nexusrpc.handler.sync_operation_handler
+    def echo(self, ctx: nexusrpc.handler.StartOperationContext, input: Input) -> Output:
+        assert ctx.headers["test-header-key"] == "test-header-value"
+        ctx.handler_links.extend(ctx.caller_links)
+        return Output(
+            value=f"from start method on {self.__class__.__name__}: {input.value}"
+        )
+
+
+@nexusrpc.handler.service_handler(service=EchoService)
+class DefaultCancelHandler:
+    @nexusrpc.handler.sync_operation_handler
+    async def echo(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+    ) -> Output:
+        return Output(
+            value=f"from start method on {self.__class__.__name__}: {input.value}"
+        )
+
+
+@nexusrpc.handler.service_handler(service=EchoService)
+class SyncCancelHandler:
+    class SyncCancel(nexusrpc.handler.SyncOperationHandler[Input, Output]):
+        async def start(
+            self,
+            ctx: nexusrpc.handler.StartOperationContext,
+            input: Input,
+            # This return type is a type error, but VSCode doesn't flag it unless
+            # "python.analysis.typeCheckingMode" is set to "strict"
+        ) -> Output:
+            # Invalid: start method must wrap result as StartOperationResultSync
+            # or StartOperationResultAsync
+            return Output(value="Hello")  # type: ignore
+
+        def cancel(
+            self, ctx: nexusrpc.handler.CancelOperationContext, token: str
+        ) -> Output:
+            return Output(value="Hello")  # type: ignore
+
+    @nexusrpc.handler.operation_handler
+    def echo(self) -> nexusrpc.handler.OperationHandler[Input, Output]:
+        return SyncCancelHandler.SyncCancel()
+
+
+class SyncHandlerNoExecutor(_InstantiationCase):
+    handler = SyncStartHandler
+    executor = False
+    exception = RuntimeError
+    match = "start must be async"
+
+
+class DefaultCancel(_InstantiationCase):
+    handler = DefaultCancelHandler
+    executor = False
+    exception = None
+
+
+class SyncCancel(_InstantiationCase):
+    handler = SyncCancelHandler
+    executor = False
+    exception = RuntimeError
+    match = "cancel must be async"
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [SyncHandlerNoExecutor, DefaultCancel, SyncCancel],
+)
+async def test_handler_instantiation(
+    test_case: Type[_InstantiationCase], client: Client
+):
+    task_queue = str(uuid.uuid4())
+
+    if test_case.exception is not None:
+        with pytest.raises(test_case.exception, match=test_case.match):
+            Worker(
+                client,
+                task_queue=task_queue,
+                nexus_services=[test_case.handler()],
+                nexus_task_executor=ThreadPoolExecutor()
+                if test_case.executor
+                else None,
+            )
+    else:
+        Worker(
+            client,
+            task_queue=task_queue,
+            nexus_services=[test_case.handler()],
+            nexus_task_executor=ThreadPoolExecutor() if test_case.executor else None,
+        )

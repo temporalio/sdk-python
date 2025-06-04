@@ -111,6 +111,7 @@ class Worker:
         workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         interceptors: Sequence[Interceptor] = [],
@@ -344,6 +345,7 @@ class Worker:
             workflows=workflows,
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
+            nexus_task_executor=nexus_task_executor,
             workflow_runner=workflow_runner,
             unsandboxed_workflow_runner=unsandboxed_workflow_runner,
             interceptors=interceptors,
@@ -421,6 +423,7 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
+                executor=nexus_task_executor,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
@@ -804,6 +807,7 @@ class WorkerConfig(TypedDict, total=False):
     workflows: Sequence[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     interceptors: Sequence[Interceptor]
