@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.14"]
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
         include:
           # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
