@@ -107,7 +107,6 @@ class HandlerWfOutput:
 class ServiceInterface:
     sync_or_async_operation: nexusrpc.contract.Operation[OpInput, OpOutput]
     sync_operation: nexusrpc.contract.Operation[OpInput, OpOutput]
-    non_async_sync_operation: nexusrpc.contract.Operation[OpInput, OpOutput]
     async_operation: nexusrpc.contract.Operation[OpInput, HandlerWfOutput]
 
 
@@ -200,23 +199,6 @@ class ServiceImpl:
     ) -> OpOutput:
         assert isinstance(input.response_type, SyncResponse)
         if input.response_type.exception_in_operation_start:
-            raise RPCError(
-                "RPCError INVALID_ARGUMENT in Nexus operation",
-                RPCStatusCode.INVALID_ARGUMENT,
-                b"",
-            )
-        return OpOutput(
-            value="sync response",
-            start_options_received_by_handler=ctx,
-        )
-
-    @nexusrpc.handler.sync_operation_handler
-    def non_async_sync_operation(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: OpInput
-    ) -> OpOutput:
-        assert isinstance(input.response_type, SyncResponse)
-        if input.response_type.exception_in_operation_start:
-            # TODO(dan): I don't think RPCError should be used here.
             raise RPCError(
                 "RPCError INVALID_ARGUMENT in Nexus operation",
                 RPCStatusCode.INVALID_ARGUMENT,
@@ -346,18 +328,6 @@ class CallerWorkflow:
                 CallerReference.INTERFACE,
                 True,
             ): ServiceInterface.sync_operation,
-            (
-                SyncResponse,
-                OpDefinitionType.SHORTHAND,
-                CallerReference.IMPL_WITH_INTERFACE,
-                False,
-            ): ServiceImpl.non_async_sync_operation,
-            (
-                SyncResponse,
-                OpDefinitionType.SHORTHAND,
-                CallerReference.INTERFACE,
-                False,
-            ): ServiceInterface.non_async_sync_operation,
             (
                 SyncResponse,
                 OpDefinitionType.LONGHAND,

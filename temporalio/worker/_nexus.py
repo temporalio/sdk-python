@@ -73,7 +73,7 @@ class _NexusWorker:
                 )
         self._handler = nexusrpc.handler.Handler(
             nexus_services,
-            AsyncIoSyncFuncExecutor(executor) if executor is not None else None,
+            SyncFuncExecutor(executor) if executor is not None else None,
         )
         self._data_converter = data_converter
         # TODO(dan): interceptors
@@ -601,10 +601,3 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.handler.HandlerE
         str(err), type=nexusrpc.handler.HandlerErrorType.INTERNAL, cause=err
     )
 
-
-class AsyncIoSyncFuncExecutor(SyncFuncExecutor):
-    def __init__(self, executor: ThreadPoolExecutor):
-        self._executor = executor
-
-    def run_sync(self, fn, *args) -> Awaitable[Any]:
-        return asyncio.get_event_loop().run_in_executor(self._executor, fn, *args)
