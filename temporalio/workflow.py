@@ -940,7 +940,10 @@ def instance() -> Any:
 
 def in_workflow() -> bool:
     """Whether the code is currently running in a workflow."""
-    return _Runtime.maybe_current() is not None
+    try:
+        return _Runtime.maybe_current() is not None
+    except RuntimeError:
+        return False
 
 
 def memo() -> Mapping[str, Any]:

@@ -7973,3 +7973,32 @@ async def test_quick_activity_swallows_cancellation(client: Client):
             assert cause.message == "Workflow cancelled"
 
         temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = False
+
+
+@activity.defn
+def use_in_workflow():
+    return workflow.in_workflow()
+
+
+@workflow.defn
+class UseInWorkflow:
+    @workflow.run
+    async def run(self):
+        res = await workflow.execute_activity(
+            use_in_workflow, schedule_to_close_timeout=timedelta(seconds=10)
+        )
+
+async def test_in_workflow_sync(client: Client):
+    async with new_worker(
+        client,
+        UseInWorkflow,
+        activities=[use_in_workflow],
+        activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+    ) as worker:
+        await client.execute_workflow(
+            UseInWorkflow.run,
+            id=f"test_in_workflow_sync",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(minutes=1),
+        )
+
