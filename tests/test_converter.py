@@ -8,7 +8,7 @@ import sys
 import traceback
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from typing import (
     Any,
@@ -84,6 +84,11 @@ class MyDataClass:
     foo: str
     bar: int
     baz: SerializableEnum
+
+
+@dataclass
+class DatetimeClass:
+    datetime: datetime
 
 
 async def test_converter_default():
@@ -176,6 +181,38 @@ async def test_converter_default():
         "my-encoding",
         "blah blah",
         type_hint=RawValue,
+    )
+
+    # Without type hint, it is deserialized as a str
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1),
+        "json/plain",
+        '"2020-01-01T01:01:01"',
+        expected_decoded_input="2020-01-01T01:01:01",
+    )
+
+    # With type hint, it is deserialized as a datetime
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1, 1),
+        "json/plain",
+        '"2020-01-01T01:01:01.000001"',
+        type_hint=datetime,
+    )
+
+    # Timezones work
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1, tzinfo=timezone(timedelta(hours=5))),
+        "json/plain",
+        '"2020-01-01T01:01:01+05:00"',
+        type_hint=datetime,
+    )
+
+    # Data class with datetime
+    await assert_payload(
+        DatetimeClass(datetime=datetime(2020, 1, 1, 1, 1, 1)),
+        "json/plain",
+        '{"datetime":"2020-01-01T01:01:01"}',
+        type_hint=DatetimeClass,
     )
 
 
