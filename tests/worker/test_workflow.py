@@ -7976,7 +7976,7 @@ async def test_quick_activity_swallows_cancellation(client: Client):
 
 
 @activity.defn
-def use_in_workflow():
+def use_in_workflow() -> bool:
     return workflow.in_workflow()
 
 
@@ -7987,6 +7987,7 @@ class UseInWorkflow:
         res = await workflow.execute_activity(
             use_in_workflow, schedule_to_close_timeout=timedelta(seconds=10)
         )
+        return res
 
 
 async def test_in_workflow_sync(client: Client):
@@ -7996,9 +7997,10 @@ async def test_in_workflow_sync(client: Client):
         activities=[use_in_workflow],
         activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
     ) as worker:
-        await client.execute_workflow(
+        res = await client.execute_workflow(
             UseInWorkflow.run,
             id=f"test_in_workflow_sync",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(minutes=1),
         )
+        assert not res
