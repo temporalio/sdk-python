@@ -64,6 +64,10 @@ class Output:
 @nexusrpc.contract.service
 class MyService:
     echo: nexusrpc.contract.Operation[Input, Output]
+    # TODO(dan): support renamed operations!
+    # echo_renamed: nexusrpc.contract.Operation[Input, Output] = (
+    #     nexusrpc.contract.Operation(name="echo-renamed")
+    # )
     hang: nexusrpc.contract.Operation[Input, Never]
     log: nexusrpc.contract.Operation[Input, Output]
     async_operation: nexusrpc.contract.Operation[Input, Output]
@@ -407,6 +411,15 @@ class SyncHandlerHappyPath(_TestCase):
     ), "Nexus-Link header not echoed correctly."
 
 
+class SyncHandlerHappyPathRenamed(_TestCase):
+    operation = "echo-renamed"
+    input = Input("hello")
+    expected = SuccessfulResponse(
+        status_code=200,
+        body_json={"value": "from start method on MyServiceHandler: hello"},
+    )
+
+
 class SyncHandlerHappyPathNonAsyncDef(_TestCase):
     skip = "Non-async def executor not implemented"
     operation = "sync_operation_with_non_async_def"
@@ -610,6 +623,8 @@ class UnknownOperation(_FailureTestCase):
     "test_case",
     [
         SyncHandlerHappyPath,
+        # TODO(dan): support renamed operations!
+        # SyncHandlerHappyPathRenamed,
         SyncHandlerHappyPathNonAsyncDef,
         # TODO(dan): make callable instance work
         # SyncHandlerHappyPathWithNonAsyncCallableInstance,
