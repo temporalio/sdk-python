@@ -53,10 +53,7 @@ from ._interceptor import (
     ExecuteActivityInput,
     Interceptor,
 )
-from ..common import (
-    trace_identifier_key,
-    TraceIdentifier
-)
+from ..common import trace_identifier_key, TraceIdentifier
 
 logger = logging.getLogger(__name__)
 
@@ -355,11 +352,19 @@ class _ActivityWorker:
                     ):
                         # Downgrade log level to DEBUG for BENIGN application errors.
                         temporalio.activity.logger.debug(
-                            "Completing activity as failed", exc_info=True, extra={trace_identifier_key: TraceIdentifier.ACTIVITY_FAILURE}
+                            "Completing activity as failed",
+                            exc_info=True,
+                            extra={
+                                trace_identifier_key: TraceIdentifier.ACTIVITY_FAILURE
+                            },
                         )
                     else:
                         temporalio.activity.logger.warning(
-                            "Completing activity as failed", exc_info=True, extra={trace_identifier_key: TraceIdentifier.ACTIVITY_FAILURE}
+                            "Completing activity as failed",
+                            exc_info=True,
+                            extra={
+                                trace_identifier_key: TraceIdentifier.ACTIVITY_FAILURE
+                            },
                         )
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure

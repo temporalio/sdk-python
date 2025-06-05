@@ -1231,7 +1231,10 @@ def _type_hints_from_func(
         args.append(arg_hint)  # type: ignore
     return args, ret
 
+
 trace_identifier_key: str = "TraceIdentifier"
+
+
 class TraceIdentifier(IntEnum):
     WORKFLOW_FAILURE = int(1)
     ACTIVITY_FAILURE = int(2)
