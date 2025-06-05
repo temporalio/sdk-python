@@ -15,7 +15,7 @@ import threading
 import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
@@ -216,7 +216,13 @@ class _ActivityWorker:
             warnings.warn(f"Cannot find activity to cancel for token {task_token!r}")
             return
         logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
-        activity.cancel(cancelled_by_request=True)
+        activity.cancellation_details.details = (
+            temporalio.activity.ActivityCancellationDetails._from_proto(cancel.details)
+        )
+        activity.cancel(
+            cancelled_by_request=cancel.details.is_cancelled
+            or cancel.details.is_worker_shutdown
+        )
 
     def _heartbeat(self, task_token: bytes, *details: Any) -> None:
         # We intentionally make heartbeating non-async, but since the data
@@ -308,6 +314,24 @@ class _ActivityWorker:
                         err,
                         (asyncio.CancelledError, temporalio.exceptions.CancelledError),
                     )
+                    and running_activity.cancellation_details.details
+                    and running_activity.cancellation_details.details.paused
+                ):
+                    temporalio.activity.logger.warning(
+                        f"Completing as failure due to unhandled cancel error produced by activity pause",
+                    )
+                    await self._data_converter.encode_failure(
+                        temporalio.exceptions.ApplicationError(
+                            type="ActivityPause",
+                            message="Unhandled activity cancel error produced by activity pause",
+                        ),
+                        completion.result.failed.failure,
+                    )
+                elif (
+                    isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    )
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
@@ -336,7 +360,6 @@ class _ActivityWorker:
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
-
                     # For broken executors, we have to fail the entire worker
                     if isinstance(err, concurrent.futures.BrokenExecutor):
                         self._fail_worker_exception_queue.put_nowait(err)
@@ -524,6 +547,7 @@ class _ActivityWorker:
                 else running_activity.cancel_thread_raiser.shielded,
                 payload_converter_class_or_instance=self._data_converter.payload_converter,
                 runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
+                cancellation_details=running_activity.cancellation_details,
             )
         )
         temporalio.activity.logger.debug("Starting activity")
@@ -570,6 +594,9 @@ class _RunningActivity:
     done: bool = False
     cancelled_by_request: bool = False
     cancelled_due_to_heartbeat_error: Optional[Exception] = None
+    cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder = (
+        field(default_factory=temporalio.activity._ActivityCancellationDetailsHolder)
+    )
 
     def cancel(
         self,
@@ -659,6 +686,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             # can set the initializer on the executor).
             ctx = temporalio.activity._Context.current()
             info = ctx.info()
+            cancellation_details = ctx.cancellation_details
 
             # Heartbeat calls internally use a data converter which is async so
             # they need to be called on the event loop
@@ -717,6 +745,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     worker_shutdown_event.thread_event,
                     payload_converter_class_or_instance,
                     ctx.runtime_metric_meter,
+                    cancellation_details,
                     input.fn,
                     *input.args,
                 ]
@@ -732,7 +761,6 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             finally:
                 if shared_manager:
                     await shared_manager.unregister_heartbeater(info.task_token)
-
         # Otherwise for async activity, just run
         return await input.fn(*input.args)
 
@@ -764,6 +792,7 @@ def _execute_sync_activity(
         temporalio.converter.PayloadConverter,
     ],
     runtime_metric_meter: Optional[temporalio.common.MetricMeter],
+    cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder,
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -795,6 +824,7 @@ def _execute_sync_activity(
             else cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
+            cancellation_details=cancellation_details,
         )
     )
     return fn(*args)
