@@ -78,6 +78,7 @@ from temporalio.common import (
     SearchAttributeValues,
     TypedSearchAttributes,
     WorkflowIDConflictPolicy,
+    trace_identifier_key
 )
 from temporalio.converter import (
     DataConverter,
@@ -7973,3 +7974,34 @@ async def test_quick_activity_swallows_cancellation(client: Client):
             assert cause.message == "Workflow cancelled"
 
         temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = False
+
+class CustomLogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self._trace_identifiers = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if hasattr(record, trace_identifier_key) and record.TraceIdentifier == 1:
+            assert record.msg.startswith("Failed activation on workflow")
+            self._trace_identifiers += 1
+        return None
+
+async def test_workflow_failure_trace_identifier(client: Client, worker: ExternalWorker):
+    handler = CustomLogHandler()
+    temporalio.worker._workflow_instance.logger.addHandler(handler)
+
+    try:
+        async with new_worker(
+                client,
+                TaskFailOnceWorkflow,
+                activities=[task_fail_once_activity],
+        ) as worker:
+            await client.execute_workflow(
+                TaskFailOnceWorkflow.run,
+                id=f"workflow_failure_trace_identifier",
+                task_queue=worker.task_queue,
+            )
+            assert handler._trace_identifiers == 1
+
+    finally:
+        activity.logger.base_logger.removeHandler(CustomLogHandler())

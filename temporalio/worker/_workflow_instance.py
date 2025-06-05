@@ -76,6 +76,11 @@ from ._interceptor import (
     WorkflowOutboundInterceptor,
 )
 
+from ..common import (
+    trace_identifier_key,
+    TraceIdentifier,
+)
+
 logger = logging.getLogger(__name__)
 
 # Set to true to log all cases where we're ignoring things during delete
@@ -447,7 +452,7 @@ class _WorkflowInstanceImpl(
             logger.warning(
                 f"Failed activation on workflow {self._info.workflow_type} with ID {self._info.workflow_id} and run ID {self._info.run_id}",
                 exc_info=activation_err,
-                extra={"temporal_workflow": self._info._logger_details()},
+                extra={"temporal_workflow": self._info._logger_details(), trace_identifier_key: TraceIdentifier.WORKFLOW_FAILURE},
             )
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()

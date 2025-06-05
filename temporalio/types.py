@@ -1,5 +1,5 @@
 """Advanced types."""
-
+from enum import IntEnum
 from typing import Any, Awaitable, Callable, Type, TypeVar, Union
 
 from typing_extensions import ParamSpec, Protocol
