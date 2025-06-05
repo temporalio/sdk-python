@@ -416,7 +416,7 @@ def test_json_type_hints():
     ok(MyTypedDict, {"foo": "bar", "blah": "meh"})
 
     # Non-string dict keys are supported
-    ok(Dict[int, str], {1: "1"})
+    ok(Dict[int, str], {1: "2"})
     ok(Dict[float, str], {1.0: "1"})
     ok(Dict[bool, str], {True: "1"})
     ok(Dict[None, str], {None: "1"})
