@@ -7975,6 +7975,7 @@ async def test_quick_activity_swallows_cancellation(client: Client):
         temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = False
 
 
+        
 @activity.defn
 def use_in_workflow() -> bool:
     return workflow.in_workflow()
@@ -8004,3 +8005,34 @@ async def test_in_workflow_sync(client: Client):
             execution_timeout=timedelta(minutes=1),
         )
         assert not res
+
+        
+class SignalInterceptor(temporalio.worker.Interceptor):
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> Type[SignalInboundInterceptor]:
+        return SignalInboundInterceptor
+
+
+class SignalInboundInterceptor(temporalio.worker.WorkflowInboundInterceptor):
+    def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
+        def unblock() -> None:
+            return None
+
+        workflow.set_signal_handler("my_random_signal", unblock)
+        super().init(outbound)
+
+
+async def test_signal_handler_in_interceptor(client: Client):
+    async with new_worker(
+        client,
+        HelloWorkflow,
+        interceptors=[SignalInterceptor()],
+    ) as worker:
+        await client.execute_workflow(
+            HelloWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
