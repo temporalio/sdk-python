@@ -61,6 +61,10 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
+from ..common import (
+    TraceIdentifier,
+    trace_identifier_key,
+)
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -74,11 +78,6 @@ from ._interceptor import (
     StartLocalActivityInput,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
-)
-
-from ..common import (
-    trace_identifier_key,
-    TraceIdentifier,
 )
 
 logger = logging.getLogger(__name__)

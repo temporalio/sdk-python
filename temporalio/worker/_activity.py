@@ -47,13 +47,13 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 
+from ..common import TraceIdentifier, trace_identifier_key
 from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
     ExecuteActivityInput,
     Interceptor,
 )
-from ..common import trace_identifier_key, TraceIdentifier
 
 logger = logging.getLogger(__name__)
 
