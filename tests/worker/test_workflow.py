@@ -78,7 +78,6 @@ from temporalio.common import (
     SearchAttributeValues,
     TypedSearchAttributes,
     WorkflowIDConflictPolicy,
-    trace_identifier_key,
 )
 from temporalio.converter import (
     DataConverter,
@@ -7979,12 +7978,16 @@ async def test_quick_activity_swallows_cancellation(client: Client):
 class CustomLogHandler(logging.Handler):
     def __init__(self):
         super().__init__()
-        self._trace_identifiers = 0
+        self._workflow_task_failures = 0
 
     def emit(self, record: logging.LogRecord) -> None:
-        if hasattr(record, trace_identifier_key) and record.TraceIdentifier == 1:
+        if (
+            hasattr(record, "__temporal_error_identifier")
+            and getattr(record, "__temporal_error_identifier") == "WorkflowTaskFailure"
+        ):
             assert record.msg.startswith("Failed activation on workflow")
-            self._trace_identifiers += 1
+            self._workflow_task_failures += 1
+
         return None
 
 
@@ -8005,7 +8008,7 @@ async def test_workflow_failure_trace_identifier(
                 id=f"workflow_failure_trace_identifier",
                 task_queue=worker.task_queue,
             )
-            assert handler._trace_identifiers == 1
+            assert handler._workflow_task_failures == 1
 
     finally:
         activity.logger.base_logger.removeHandler(CustomLogHandler())

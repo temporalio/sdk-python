@@ -47,7 +47,6 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 
-from ..common import TraceIdentifier, trace_identifier_key
 from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
@@ -354,17 +353,13 @@ class _ActivityWorker:
                         temporalio.activity.logger.debug(
                             "Completing activity as failed",
                             exc_info=True,
-                            extra={
-                                trace_identifier_key: TraceIdentifier.ACTIVITY_FAILURE
-                            },
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
                     else:
                         temporalio.activity.logger.warning(
                             "Completing activity as failed",
                             exc_info=True,
-                            extra={
-                                trace_identifier_key: TraceIdentifier.ACTIVITY_FAILURE
-                            },
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure

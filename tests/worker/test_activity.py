@@ -22,7 +22,7 @@ from temporalio.client import (
     WorkflowFailureError,
     WorkflowHandle,
 )
-from temporalio.common import RawValue, RetryPolicy, trace_identifier_key
+from temporalio.common import RawValue, RetryPolicy
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -1387,7 +1387,10 @@ class CustomLogHandler(logging.Handler):
         self._trace_identifiers = 0
 
     def emit(self, record: logging.LogRecord) -> None:
-        if hasattr(record, trace_identifier_key) and record.TraceIdentifier == 2:
+        if (
+            hasattr(record, "__temporal_error_identifier")
+            and getattr(record, "__temporal_error_identifier") == "ActivityFailure"
+        ):
             assert record.msg.startswith("Completing activity as failed")
             self._trace_identifiers += 1
         return None

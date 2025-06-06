@@ -61,10 +61,6 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
-from ..common import (
-    TraceIdentifier,
-    trace_identifier_key,
-)
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -453,7 +449,7 @@ class _WorkflowInstanceImpl(
                 exc_info=activation_err,
                 extra={
                     "temporal_workflow": self._info._logger_details(),
-                    trace_identifier_key: TraceIdentifier.WORKFLOW_FAILURE,
+                    "__temporal_error_identifier": "WorkflowTaskFailure",
                 },
             )
             # Set completion failure
