@@ -8012,3 +8012,64 @@ async def test_workflow_failure_trace_identifier(
 
     finally:
         activity.logger.base_logger.removeHandler(CustomLogHandler())
+
+
+@activity.defn
+def use_in_workflow() -> bool:
+    return workflow.in_workflow()
+
+
+@workflow.defn
+class UseInWorkflow:
+    @workflow.run
+    async def run(self):
+        res = await workflow.execute_activity(
+            use_in_workflow, schedule_to_close_timeout=timedelta(seconds=10)
+        )
+        return res
+
+
+async def test_in_workflow_sync(client: Client):
+    async with new_worker(
+        client,
+        UseInWorkflow,
+        activities=[use_in_workflow],
+        activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+    ) as worker:
+        res = await client.execute_workflow(
+            UseInWorkflow.run,
+            id=f"test_in_workflow_sync",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(minutes=1),
+        )
+        assert not res
+
+
+class SignalInterceptor(temporalio.worker.Interceptor):
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> Type[SignalInboundInterceptor]:
+        return SignalInboundInterceptor
+
+
+class SignalInboundInterceptor(temporalio.worker.WorkflowInboundInterceptor):
+    def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
+        def unblock() -> None:
+            return None
+
+        workflow.set_signal_handler("my_random_signal", unblock)
+        super().init(outbound)
+
+
+async def test_signal_handler_in_interceptor(client: Client):
+    async with new_worker(
+        client,
+        HelloWorkflow,
+        interceptors=[SignalInterceptor()],
+    ) as worker:
+        await client.execute_workflow(
+            HelloWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
