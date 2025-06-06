@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="1.250" timestamp="2025-06-06T11:25:06.501123" hostname="Tims-MacBook-Pro.local"><testcase classname="tests.worker.test_workflow" name="test_workflow_failure_trace_identifier" time="1.196" /></testsuite></testsuites>

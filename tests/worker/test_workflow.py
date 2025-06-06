@@ -1961,8 +1961,13 @@ class LogCapturer:
                 l.setLevel(prev_levels[i])
 
     def find_log(self, starts_with: str) -> Optional[logging.LogRecord]:
+        return self.find(lambda l: l.message.startswith(starts_with))
+
+    def find(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> Optional[logging.LogRecord]:
         for record in cast(List[logging.LogRecord], self.log_queue.queue):
-            if record.message.startswith(starts_with):
+            if pred(record):
                 return record
         return None
 
@@ -7992,10 +7997,9 @@ class CustomLogHandler(logging.Handler):
 
 
 async def test_workflow_failure_trace_identifier(client: Client):
-    handler = CustomLogHandler()
-    temporalio.worker._workflow_instance.logger.addHandler(handler)
-
-    try:
+    with LogCapturer().logs_captured(
+        temporalio.worker._workflow_instance.logger, activity.logger.base_logger
+    ) as capturer:
         async with new_worker(
             client,
             TaskFailOnceWorkflow,
@@ -8006,10 +8010,17 @@ async def test_workflow_failure_trace_identifier(client: Client):
                 id=f"workflow_failure_trace_identifier",
                 task_queue=worker.task_queue,
             )
-            assert handler._workflow_task_failures == 1
 
-    finally:
-        activity.logger.base_logger.removeHandler(CustomLogHandler())
+        def workflow_failure(l: logging.LogRecord):
+            if (
+                hasattr(l, "__temporal_error_identifier")
+                and getattr(l, "__temporal_error_identifier") == "WorkflowTaskFailure"
+            ):
+                assert l.msg.startswith("Failed activation on workflow")
+                return True
+            return False
+
+        assert capturer.find(workflow_failure) is not None
 
 
 @activity.defn
