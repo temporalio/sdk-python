@@ -7991,9 +7991,7 @@ class CustomLogHandler(logging.Handler):
         return None
 
 
-async def test_workflow_failure_trace_identifier(
-    client: Client, worker: ExternalWorker
-):
+async def test_workflow_failure_trace_identifier(client: Client):
     handler = CustomLogHandler()
     temporalio.worker._workflow_instance.logger.addHandler(handler)
 
