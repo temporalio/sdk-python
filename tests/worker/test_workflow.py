@@ -1961,8 +1961,13 @@ class LogCapturer:
                 l.setLevel(prev_levels[i])
 
     def find_log(self, starts_with: str) -> Optional[logging.LogRecord]:
+        return self.find(lambda l: l.message.startswith(starts_with))
+
+    def find(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> Optional[logging.LogRecord]:
         for record in cast(List[logging.LogRecord], self.log_queue.queue):
-            if record.message.startswith(starts_with):
+            if pred(record):
                 return record
         return None
 
@@ -7973,6 +7978,49 @@ async def test_quick_activity_swallows_cancellation(client: Client):
             assert cause.message == "Workflow cancelled"
 
         temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = False
+
+
+class CustomLogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self._workflow_task_failures = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if (
+            hasattr(record, "__temporal_error_identifier")
+            and getattr(record, "__temporal_error_identifier") == "WorkflowTaskFailure"
+        ):
+            assert record.msg.startswith("Failed activation on workflow")
+            self._workflow_task_failures += 1
+
+        return None
+
+
+async def test_workflow_failure_trace_identifier(client: Client):
+    with LogCapturer().logs_captured(
+        temporalio.worker._workflow_instance.logger, activity.logger.base_logger
+    ) as capturer:
+        async with new_worker(
+            client,
+            TaskFailOnceWorkflow,
+            activities=[task_fail_once_activity],
+        ) as worker:
+            await client.execute_workflow(
+                TaskFailOnceWorkflow.run,
+                id=f"workflow_failure_trace_identifier",
+                task_queue=worker.task_queue,
+            )
+
+        def workflow_failure(l: logging.LogRecord):
+            if (
+                hasattr(l, "__temporal_error_identifier")
+                and getattr(l, "__temporal_error_identifier") == "WorkflowTaskFailure"
+            ):
+                assert l.msg.startswith("Failed activation on workflow")
+                return True
+            return False
+
+        assert capturer.find(workflow_failure) is not None
 
 
 @activity.defn
