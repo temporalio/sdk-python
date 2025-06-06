@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO(dan): confirm approach here: Temporal Nexus services will use this instead of
-# nexusrpc.handler.Operation in order to avoid having to implement fetch_info and
+# nexusrpc.handler.OperationHandler in order to avoid having to implement fetch_info and
 # fetch_result.
 class Operation(nexusrpc.handler.OperationHandler[I, O]):
     """
@@ -433,17 +433,18 @@ def workflow_run_operation_handler(
             return WorkflowRunOperation(service, start_method, output_type=output_type)
 
         # TODO(dan): handle callable instances: __class__.__name__ as in sync_operation_handler
-        nonlocal name
-        name = name or getattr(start_method, "__name__", None)
-        if not name:
-            if cls := getattr(start_method, "__class__", None):
-                name = cls.__name__
-        if not name:
-            raise ValueError(
-                f"Could not determine operation name: expected {start_method} to be a function or callable instance"
+        method_name = getattr(start_method, "__name__", None)
+        if not method_name and callable(start_method):
+            method_name = start_method.__class__.__name__
+        if not method_name:
+            raise TypeError(
+                f"Could not determine operation method name: "
+                f"expected {start_method} to be a function or callable instance."
             )
+
         factory.__nexus_operation__ = nexusrpc.contract.Operation._create(
             name=name,
+            method_name=method_name,
             input_type=input_type,
             output_type=output_type,
         )

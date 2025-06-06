@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import concurrent
-import inspect
 import json
 import logging
-from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -15,7 +13,6 @@ from typing import (
     Optional,
     Sequence,
     Type,
-    Awaitable,
 )
 
 import google.protobuf.json_format
@@ -385,28 +382,14 @@ class _NexusWorker:
             service=request.service,
             operation=request.operation,
         )
-
-        # TODO(dan): Temporary; cancel handling needs to be switched to use
-        # cancel_operation; this isn't the API we'll be exposing
-        service_handler = self._handler._get_service_handler(ctx.service)
-        operation_handler = service_handler._get_operation_handler(ctx.operation)
-
         # TODO(dan): header
         try:
-            if inspect.iscoroutinefunction(
-                operation_handler.cancel
-            ) or inspect.iscoroutinefunction(operation_handler.cancel.__call__):
-                # pyright does not infer awaitable from iscoroutinefunction(__call__)
-                await operation_handler.cancel(  # type: ignore
-                    ctx,
-                    request.operation_token,
-                )
-            else:
-                raise NotImplementedError("Nexus operation cancel method must be async")
-                operation_handler.cancel(
-                    ctx,
-                    request.operation_token,
-                )
+            await self._handler.cancel_operation(
+                ctx,
+                request.service,
+                request.operation,
+                request.operation_token,
+            )
         except Exception as err:
             temporalio.nexus.logger.exception(
                 "Failed to execute Nexus operation cancel method", err
@@ -600,4 +583,3 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.handler.HandlerE
     return nexusrpc.handler.HandlerError(
         str(err), type=nexusrpc.handler.HandlerErrorType.INTERNAL, cause=err
     )
-

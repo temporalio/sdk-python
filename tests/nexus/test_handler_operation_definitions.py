@@ -39,7 +39,7 @@ class NotCalled(_TestCase):
 
     expected_operations = {
         "workflow_run_operation_handler": nexusrpc.contract.Operation._create(
-            name="workflow_run_operation_handler",
+            method_name="workflow_run_operation_handler",
             input_type=Input,
             output_type=Output,
         ),
@@ -68,6 +68,7 @@ class CalledWithNameOverride(_TestCase):
     expected_operations = {
         "workflow_run_operation_with_name_override": nexusrpc.contract.Operation._create(
             name="operation-name",
+            method_name="workflow_run_operation_with_name_override",
             input_type=Input,
             output_type=Output,
         ),

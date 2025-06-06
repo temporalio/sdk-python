@@ -29,16 +29,18 @@ import nexusrpc
 import nexusrpc.handler
 import pytest
 from google.protobuf import json_format
+from nexusrpc.testing.client import ServiceClient
 from typing_extensions import Never
 
 import temporalio.api.failure.v1
 import temporalio.nexus
 from temporalio import workflow
-from temporalio.client import Client, WorkflowHandle
+from temporalio.client import WorkflowHandle
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import logger
 from temporalio.nexus.handler import start_workflow
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
 
@@ -66,6 +68,10 @@ class Output:
 @nexusrpc.contract.service
 class MyService:
     echo: nexusrpc.contract.Operation[Input, Output]
+    # TODO(dan): support renamed operations!
+    # echo_renamed: nexusrpc.contract.Operation[Input, Output] = (
+    #     nexusrpc.contract.Operation(name="echo-renamed")
+    # )
     hang: nexusrpc.contract.Operation[Input, Never]
     log: nexusrpc.contract.Operation[Input, Output]
     async_operation: nexusrpc.contract.Operation[Input, Output]
@@ -409,6 +415,15 @@ class SyncHandlerHappyPath(_TestCase):
     ), "Nexus-Link header not echoed correctly."
 
 
+class SyncHandlerHappyPathRenamed(_TestCase):
+    operation = "echo-renamed"
+    input = Input("hello")
+    expected = SuccessfulResponse(
+        status_code=200,
+        body_json={"value": "from start method on MyServiceHandler: hello"},
+    )
+
+
 class SyncHandlerHappyPathNonAsyncDef(_TestCase):
     operation = "sync_operation_with_non_async_def"
     input = Input("hello")
@@ -611,6 +626,8 @@ class UnknownOperation(_FailureTestCase):
     "test_case",
     [
         SyncHandlerHappyPath,
+        # TODO(dan): support renamed operations!
+        # SyncHandlerHappyPathRenamed,
         SyncHandlerHappyPathNonAsyncDef,
         # TODO(dan): make callable instance work
         # SyncHandlerHappyPathWithNonAsyncCallableInstance,
@@ -620,8 +637,10 @@ class UnknownOperation(_FailureTestCase):
         WorkflowRunOpLinkTestHappyPath,
     ],
 )
-async def test_start_operation_happy_path(test_case: Type[_TestCase], client: Client):
-    await _test_start_operation(test_case, client)
+async def test_start_operation_happy_path(
+    test_case: Type[_TestCase], env: WorkflowEnvironment
+):
+    await _test_start_operation(test_case, env)
 
 
 @pytest.mark.parametrize(
@@ -637,9 +656,9 @@ async def test_start_operation_happy_path(test_case: Type[_TestCase], client: Cl
     ],
 )
 async def test_start_operation_protocol_level_failures(
-    test_case: Type[_TestCase], client: Client
+    test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
-    await _test_start_operation(test_case, client)
+    await _test_start_operation(test_case, env)
 
 
 @pytest.mark.parametrize(
@@ -651,64 +670,66 @@ async def test_start_operation_protocol_level_failures(
     ],
 )
 async def test_start_operation_operation_failures(
-    test_case: Type[_TestCase], client: Client
+    test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
-    await _test_start_operation(test_case, client)
+    await _test_start_operation(test_case, env)
 
 
-async def _test_start_operation(test_case: Type[_TestCase], client: Client):
+async def _test_start_operation(test_case: Type[_TestCase], env: WorkflowEnvironment):
     if test_case.skip:
         pytest.skip(test_case.skip)
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        endpoint=endpoint,
+        service=test_case.service,
+    )
     async with Worker(
-        client,
+        env.client,
         task_queue=task_queue,
         nexus_services=[MyServiceHandler()],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{test_case.service}/{test_case.operation}",
-                json=dataclass_as_dict(test_case.input),
-                headers=test_case.headers,
-            )
-            test_case.check_response(response)
-
-    print(
-        "\n\n----------------------------------------------------------------------\n\n"
-    )
+        response = await service_client.start_operation(
+            test_case.operation,
+            dataclass_as_dict(test_case.input),
+            test_case.headers,
+        )
+        test_case.check_response(response)
 
 
-async def test_logger_uses_operation_context(client: Client, caplog: Any):
+async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: Any):
     task_queue = str(uuid.uuid4())
     service_name = MyService.__name__
     operation_name = "log"
-    resp = await create_nexus_endpoint(task_queue, client)
+    resp = await create_nexus_endpoint(task_queue, env.client)
     endpoint = resp.endpoint.id
-
+    service_client = ServiceClient(
+        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        endpoint=endpoint,
+        service=service_name,
+    )
     caplog.set_level(logging.INFO)
 
     async with Worker(
-        client,
+        env.client,
         task_queue=task_queue,
         nexus_services=[MyServiceHandler()],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/{operation_name}",
-                json=dataclass_as_dict(Input("test_log")),
-                # TODO(dan): why these headers?
-                headers={
-                    "Content-Type": "application/json",
-                    "Test-Log-Header": "test-log-header-value",
-                },
-            )
-            assert response.is_success
-            response.raise_for_status()
-            output_json = response.json()
-            assert output_json == {"value": "logged: test_log"}
+        response = await service_client.start_operation(
+            operation_name,
+            dataclass_as_dict(Input("test_log")),
+            {
+                "Content-Type": "application/json",
+                "Test-Log-Header": "test-log-header-value",
+            },
+        )
+        assert response.is_success
+        response.raise_for_status()
+        output_json = response.json()
+        assert output_json == {"value": "logged: test_log"}
 
     record = next(
         (

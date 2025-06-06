@@ -850,7 +850,7 @@ class _Runtime(ABC):
         service: str,
         operation: Union[
             nexusrpc.contract.Operation[I, O],
-            Callable[[Any], nexusrpc.handler.Operation[I, O]],
+            Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
             str,
         ],
         input: Any,
@@ -4412,7 +4412,7 @@ async def start_nexus_operation(
     service: str,
     operation: Union[
         nexusrpc.contract.Operation[I, O],
-        Callable[[Any], nexusrpc.handler.Operation[I, O]],
+        Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
         str,
     ],
     input: Any,
@@ -5195,7 +5195,7 @@ class NexusService(Generic[S]):
         self,
         operation: Union[
             nexusrpc.contract.Operation[I, O],
-            Callable[[S], nexusrpc.handler.Operation[I, O]],
+            Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
             str,
         ],
         input: I,
@@ -5221,7 +5221,7 @@ class NexusService(Generic[S]):
         self,
         operation: Union[
             nexusrpc.contract.Operation[I, O],
-            Callable[[S], nexusrpc.handler.Operation[I, O]],
+            Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
             str,
         ],
         input: I,
