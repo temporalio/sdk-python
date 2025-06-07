@@ -1,7 +1,7 @@
 import enum
 import json
 from dataclasses import dataclass
-from typing import Any, Optional, TypedDict, Union, cast
+from typing import Any, Optional, Required, TypedDict, Union, cast
 
 from agents import (
     AgentOutputSchemaBase,
@@ -89,12 +89,12 @@ class ModelTracingInput(enum.IntEnum):
 class ActivityModelInput(TypedDict, total=False):
     model_name: Optional[str]
     system_instructions: Optional[str]
-    input: str | list[TResponseInputItem]
-    model_settings: ModelSettings
+    input: Required[str | list[TResponseInputItem]]
+    model_settings: Required[ModelSettings]
     tools: list[ToolInput]
     output_schema: Optional[AgentOutputSchemaInput]
     handoffs: list[HandoffInput]
-    tracing: ModelTracingInput
+    tracing: Required[ModelTracingInput]
     previous_response_id: Optional[str]
 
 

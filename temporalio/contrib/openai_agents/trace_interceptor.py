@@ -4,7 +4,9 @@ from contextlib import contextmanager
 from typing import Any, Mapping, Protocol, Type
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
-from agents.tracing import get_trace_provider
+from agents.tracing import (
+    get_trace_provider,  # pyright: ignore[reportPrivateImportUsage]
+)
 from agents.tracing.spans import NoOpSpan, SpanImpl
 
 import temporalio.activity
@@ -54,8 +56,8 @@ def context_from_header(
         yield
     else:
         span = SpanImpl(
-            trace_id=span_info["traceId"] if span_info else None,
-            span_id=span_info["spanId"] if span_info else None,
+            trace_id=str(span_info["traceId"]),
+            span_id=span_info["spanId"],
             parent_id=None,
             span_data=CustomSpanData(
                 name="Parent Temporal Span",

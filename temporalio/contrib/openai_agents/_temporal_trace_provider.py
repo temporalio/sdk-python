@@ -3,8 +3,8 @@ from typing import Any
 
 from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (  # TODO: TraceProvider is not declared in __all__
-    TraceProvider,
-    get_trace_provider,
+    TraceProvider,  # pyright: ignore[reportPrivateImportUsage]
+    get_trace_provider,  # pyright: ignore[reportPrivateImportUsage]
 )
 from agents.tracing.spans import Span
 

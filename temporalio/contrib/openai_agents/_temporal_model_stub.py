@@ -26,6 +26,7 @@ with workflow.unsafe.imports_passed_through():
         AgentOutputSchemaInput,
         FunctionToolInput,
         HandoffInput,
+        ModelTracingInput,
         ToolInput,
         invoke_model_activity,
     )
@@ -89,21 +90,17 @@ class _TemporalModelStub(Model):
             else:
                 raise ValueError(f"Unknown tool type: {tool.name}")
 
-        tool_infos = [make_tool_info(x) for x in tools] if tools is not None else None
-        handoff_infos = (
-            [
-                HandoffInput(
-                    tool_name=x.tool_name,
-                    tool_description=x.tool_description,
-                    input_json_schema=x.input_json_schema,
-                    agent_name=x.agent_name,
-                    strict_json_schema=x.strict_json_schema,
-                )
-                for x in handoffs
-            ]
-            if handoffs is not None
-            else None
-        )
+        tool_infos = [make_tool_info(x) for x in tools]
+        handoff_infos = [
+            HandoffInput(
+                tool_name=x.tool_name,
+                tool_description=x.tool_description,
+                input_json_schema=x.input_json_schema,
+                agent_name=x.agent_name,
+                strict_json_schema=x.strict_json_schema,
+            )
+            for x in handoffs
+        ]
         if output_schema is not None and not isinstance(
             output_schema, AgentOutputSchema
         ):
@@ -132,7 +129,7 @@ class _TemporalModelStub(Model):
             tools=tool_infos,
             output_schema=output_schema_input,
             handoffs=handoff_infos,
-            tracing=tracing.value,
+            tracing=ModelTracingInput(tracing.value),
             previous_response_id=previous_response_id,
         )
         return await workflow.execute_activity(
