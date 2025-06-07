@@ -1,6 +1,6 @@
-"""
-DataConverter that supports conversion of types used by OpenAI Agents SDK.
-These are mostly Pydantic types. NotGiven requires special handling.
+"""DataConverter that supports conversion of types used by OpenAI Agents SDK.
+
+These are mostly Pydantic types. Some of them should be explicitly imported.
 """
 
 from __future__ import annotations
@@ -52,7 +52,6 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
         """See base class.
         Needs _WrapperModel configure arbitrary_types_allowed=True
         """
-
         wrapper = _WrapperModel[Any](root=value)
         data = wrapper.model_dump_json().encode()
 

@@ -1,3 +1,5 @@
+"""Adds OpenAI Agents traces and spans to Temporal workflows and activities."""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -27,6 +29,7 @@ class _InputWithHeaders(Protocol):
 def set_header_from_context(
     input: _InputWithHeaders, payload_converter: temporalio.converter.PayloadConverter
 ) -> None:
+    """Inserts the OpenAI Agents trace/span data in the input header."""
     current = get_current_span()
     if current is None or isinstance(current, NoOpSpan):
         return
@@ -50,6 +53,7 @@ def context_from_header(
     input: _InputWithHeaders,
     payload_converter: temporalio.converter.PayloadConverter,
 ):
+    """Extracts and initializes trace information the input header."""
     payload = input.headers.get(HEADER_KEY)
     span_info = payload_converter.from_payload(payload) if payload else None
     if span_info is None:
@@ -106,11 +110,13 @@ class OpenAIAgentsTracingInterceptor(
         self,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
     ) -> None:
+        """Initialize the interceptor with a payload converter."""
         self._payload_converter = payload_converter
 
     def intercept_client(
         self, next: temporalio.client.OutboundInterceptor
     ) -> temporalio.client.OutboundInterceptor:
+        """Intercepts client calls to propagate context."""
         return _ContextPropagationClientOutboundInterceptor(
             next, self._payload_converter
         )
@@ -118,11 +124,13 @@ class OpenAIAgentsTracingInterceptor(
     def intercept_activity(
         self, next: temporalio.worker.ActivityInboundInterceptor
     ) -> temporalio.worker.ActivityInboundInterceptor:
+        """Intercepts activity calls to propagate context."""
         return _ContextPropagationActivityInboundInterceptor(next)
 
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
     ) -> Type[_ContextPropagationWorkflowInboundInterceptor]:
+        """Returns the workflow interceptor class to propagate context."""
         return _ContextPropagationWorkflowInboundInterceptor
 
 

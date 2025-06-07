@@ -1,3 +1,5 @@
+"""Support for using Temporal activities as OpenAI agents tools."""
+
 from temporalio.workflow import unsafe
 
 with unsafe.imports_passed_through():
@@ -12,11 +14,12 @@ with unsafe.imports_passed_through():
 
 
 def activities_as_tools(*tools: Callable) -> list[Tool]:
-    """Convert activities to tools."""
+    """Convert Temporal activities to OpenAI agents tools."""
     return [activity_as_tool(tool) for tool in tools]
 
 
 def activity_as_tool(fn: Callable) -> Tool:
+    """Convert a Temporal activity function to an OpenAI agents tool."""
     ret = activity._Definition.from_callable(fn)
     if not ret:
         raise ApplicationError(

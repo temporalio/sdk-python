@@ -31,7 +31,7 @@ def _auto_heartbeater(fn: F) -> F:
 
 
 async def heartbeat_every(delay: float, *details: Any) -> None:
-    # Heartbeat every so often while not cancelled
+    """Heartbeat every so often while not cancelled"""
     while True:
         await asyncio.sleep(delay)
         activity.heartbeat(*details)

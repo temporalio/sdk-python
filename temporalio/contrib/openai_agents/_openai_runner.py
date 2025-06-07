@@ -22,12 +22,15 @@ from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModel
 
 
 class TemporalOpenAIRunner(Runner):
-    """
-    Temporal Runner for OpenAI agents.
+    """Temporal Runner for OpenAI agents.
+
+    Forwards model calls to a Temporal activity.
+
     TODO: Implement original runner forwarding
     """
 
     def __init__(self):
+        """Initialize the Temporal OpenAI Runner."""
         self._runner = DEFAULT_RUNNER or DefaultRunner()
 
     async def _run_impl(
@@ -41,6 +44,7 @@ class TemporalOpenAIRunner(Runner):
         run_config: RunConfig | None = None,
         previous_response_id: str | None = None,
     ) -> RunResult:
+        """Run the agent in a Temporal workflow."""
         if not workflow.in_workflow():
             return await self._runner._run_impl(
                 starting_agent,

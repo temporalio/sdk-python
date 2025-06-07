@@ -1,3 +1,8 @@
+"""A temporal activity that invokes a LLM model.
+
+Implements mapping of OpenAI datastructures to Pydantic friendly types.
+"""
+
 import enum
 import json
 from dataclasses import dataclass
@@ -26,6 +31,8 @@ from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbea
 
 @dataclass
 class HandoffInput:
+    """Data conversion friendly representation of a Handoff."""
+
     tool_name: str
     tool_description: str
     input_json_schema: dict[str, Any]
@@ -36,6 +43,8 @@ class HandoffInput:
 
 @dataclass
 class FunctionToolInput:
+    """Data conversion friendly representation of a FunctionTool."""
+
     name: str
     description: str
     params_json_schema: dict[str, Any]
@@ -48,6 +57,8 @@ ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
 
 @dataclass
 class AgentOutputSchemaInput(AgentOutputSchemaBase):
+    """Data conversion friendly representation of AgentOutputSchema."""
+
     output_type_name: str | None
     is_wrapped: bool
     output_schema: dict[str, Any] | None
@@ -70,16 +81,21 @@ class AgentOutputSchemaInput(AgentOutputSchemaBase):
         return self.output_schema
 
     def validate_json(self, json_str: str) -> Any:
+        """Validate the JSON string against the schema."""
         raise NotImplementedError()
 
     def name(self) -> str:
+        """Get the name of the output type."""
         if self.output_type_name is None:
             raise ValueError("output_type_name is None")
         return self.output_type_name
 
 
 class ModelTracingInput(enum.IntEnum):
-    """ModelTracing is enum.Enum instead of IntEnum"""
+    """Conversion friendly representation of ModelTracing.
+
+    Needed as ModelTracing is enum.Enum instead of IntEnum
+    """
 
     DISABLED = 0
     ENABLED = 1
@@ -87,6 +103,8 @@ class ModelTracingInput(enum.IntEnum):
 
 
 class ActivityModelInput(TypedDict, total=False):
+    """Input for the invoke_model_activity activity."""
+
     model_name: Optional[str]
     system_instructions: Optional[str]
     input: Required[str | list[TResponseInputItem]]
@@ -101,6 +119,7 @@ class ActivityModelInput(TypedDict, total=False):
 @activity.defn
 @_auto_heartbeater
 async def invoke_model_activity(input: ActivityModelInput) -> ModelResponse:
+    """Activity that invokes a model with the given input."""
     # TODO: Is model caching needed here?
     model = MultiProvider().get_model(input.get("model_name"))
 

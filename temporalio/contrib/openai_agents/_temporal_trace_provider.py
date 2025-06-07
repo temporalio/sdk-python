@@ -13,9 +13,7 @@ from temporalio.workflow import ReadOnlyContextError
 
 
 class ActivitySpanData(SpanData):
-    """
-    Captures fields from ActivityTaskScheduledEventAttributes for tracing.
-    """
+    """Captures fields from ActivityTaskScheduledEventAttributes for tracing."""
 
     def __init__(
         self,
@@ -27,6 +25,7 @@ class ActivitySpanData(SpanData):
         start_to_close_timeout: float | None = None,
         heartbeat_timeout: float | None = None,
     ):
+        """Initialize an ActivitySpanData instance."""
         self.activity_id = activity_id
         self.activity_type = activity_type
         self.task_queue = task_queue
@@ -37,9 +36,11 @@ class ActivitySpanData(SpanData):
 
     @property
     def type(self) -> str:
+        """Return the type of this span data."""
         return "temporal-activity"
 
     def export(self) -> dict[str, Any]:
+        """Export the span data as a dictionary."""
         return {
             "type": self.type,
             "activity_id": self.activity_id,
@@ -61,6 +62,7 @@ def activity_span(
     start_to_close_timeout: float,
     # heartbeat_timeout: float,
 ) -> Span[ActivitySpanData]:
+    """Create a trace span for a Temporal activity."""
     return get_trace_provider().create_span(
         span_data=ActivitySpanData(
             activity_id=activity_id,
@@ -120,6 +122,7 @@ class TemporalTraceProvider(TraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
     def __init__(self):
+        """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = get_trace_provider()
         self._multi_processor = _TemporalTracingProcessor(  # type: ignore[assignment]
@@ -127,12 +130,13 @@ class TemporalTraceProvider(TraceProvider):
         )
 
     def time_iso(self) -> str:
+        """Return the current deterministic time in ISO 8601 format."""
         if workflow.in_workflow():
-            """Return the current deterministic time in ISO 8601 format."""
             return workflow.now().isoformat()
         return super().time_iso()
 
     def gen_trace_id(self) -> str:
+        """Generate a new trace ID."""
         if workflow.in_workflow():
             try:
                 """Generate a new trace ID."""
@@ -142,27 +146,30 @@ class TemporalTraceProvider(TraceProvider):
         return super().gen_trace_id()
 
     def gen_span_id(self) -> str:
+        """Generate a span ID."""
         if workflow.in_workflow():
             try:
-                """Generate a new span ID."""
+                """Generate a deterministic span ID."""
                 return f"span_{workflow.uuid4().hex[:24]}"
             except ReadOnlyContextError:
                 return f"span_{uuid.uuid4().hex[:24]}"
         return super().gen_span_id()
 
     def gen_group_id(self) -> str:
+        """Generate a group ID."""
         if workflow.in_workflow():
             try:
-                """Generate a new group ID."""
+                """Generate a deterministic group ID."""
                 return f"group_{workflow.uuid4().hex[:24]}"
             except ReadOnlyContextError:
                 return f"group_{uuid.uuid4().hex[:24]}"
         return super().gen_group_id()
 
     def __enter__(self):
-        # setup code
+        """Enter the context of the Temporal trace provider."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the context of the Temporal trace provider."""
         # cleanup code
         self._multi_processor.shutdown()
