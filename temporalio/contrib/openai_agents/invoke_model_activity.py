@@ -1,0 +1,160 @@
+import enum
+import json
+from dataclasses import dataclass
+from typing import Any, Optional, TypedDict, Union, cast
+
+from agents import (
+    AgentOutputSchemaBase,
+    ComputerTool,
+    FileSearchTool,
+    FunctionTool,
+    Handoff,
+    ModelResponse,
+    ModelSettings,
+    ModelTracing,
+    RunContextWrapper,
+    Tool,
+    TResponseInputItem,
+    UserError,
+    WebSearchTool,
+)
+from agents.models.multi_provider import MultiProvider
+
+from temporalio import activity
+from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
+
+
+@dataclass
+class HandoffInput:
+    tool_name: str
+    tool_description: str
+    input_json_schema: dict[str, Any]
+    agent_name: str
+    # input_filter: HandoffInputFilter | None = None
+    strict_json_schema: bool = True
+
+
+@dataclass
+class FunctionToolInput:
+    name: str
+    description: str
+    params_json_schema: dict[str, Any]
+    # on_invoke_tool: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
+    strict_json_schema: bool = True
+
+
+ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
+
+
+@dataclass
+class HandoffInput:
+    tool_name: str
+    tool_description: str
+    input_json_schema: dict[str, Any]
+    agent_name: str
+    strict_json_schema: bool = True
+
+
+@dataclass
+class AgentOutputSchemaInput(AgentOutputSchemaBase):
+    output_type_name: str | None
+    is_wrapped: bool
+    output_schema: dict[str, Any] | None
+    strict_json_schema: bool
+
+    def is_plain_text(self) -> bool:
+        """Whether the output type is plain text (versus a JSON object)."""
+        return self.output_type_name is None or self.output_type_name == "str"
+
+    def is_strict_json_schema(self) -> bool:
+        """Whether the JSON schema is in strict mode."""
+        return self.strict_json_schema
+
+    def json_schema(self) -> dict[str, Any]:
+        """The JSON schema of the output type."""
+        if self.is_plain_text():
+            raise UserError("Output type is plain text, so no JSON schema is available")
+        return self.output_schema
+
+    def validate_json(self, json_str: str) -> Any:
+        raise NotImplementedError()
+
+    def name(self) -> str:
+        return self.output_type_name
+
+
+class ModelTracingInput(enum.IntEnum):
+    """ModelTracing is enum.Enum instead of IntEnum"""
+
+    DISABLED = 0
+    ENABLED = 1
+    ENABLED_WITHOUT_DATA = 2
+
+
+class ActivityModelInput(TypedDict, total=False):
+    model_name: Optional[str]
+    system_instructions: Optional[str]
+    input: str | list[TResponseInputItem]
+    model_settings: ModelSettings
+    tools: list[ToolInput]
+    output_schema: Optional[AgentOutputSchemaInput]
+    handoffs: list[HandoffInput]
+    tracing: ModelTracingInput
+    previous_response_id: Optional[str]
+
+
+@activity.defn
+@_auto_heartbeater
+async def invoke_model_activity(input: ActivityModelInput) -> ModelResponse:
+    # TODO: Is model caching needed here?
+    model = MultiProvider().get_model(input.get("model_name"))
+
+    async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
+        pass
+
+    async def empty_on_invoke_handoff(ctx: RunContextWrapper[Any], input: str) -> Any:
+        pass
+
+    # workaround for https://github.com/pydantic/pydantic/issues/9541
+    # ValidatorIterator returned
+    input_json = json.dumps(input["input"], default=lambda o: str(o))
+    input_input = json.loads(input_json)
+
+    def make_tool(tool: ToolInput) -> Tool:
+        if tool.name == "file_search":
+            return cast(FileSearchTool, tool)
+        elif tool.name == "web_search_preview":
+            return cast(WebSearchTool, tool)
+        elif tool.name == "computer_search_preview":
+            return cast(ComputerTool, tool)
+        else:
+            return FunctionTool(
+                name=tool.name,
+                description=tool.description,
+                params_json_schema=tool.params_json_schema,
+                on_invoke_tool=empty_on_invoke_tool,
+                strict_json_schema=tool.strict_json_schema,
+            )
+
+    tools = [make_tool(x) for x in input.get("tools", [])]
+    handoffs = [
+        Handoff(
+            tool_name=x.tool_name,
+            tool_description=x.tool_description,
+            input_json_schema=x.input_json_schema,
+            agent_name=x.agent_name,
+            strict_json_schema=x.strict_json_schema,
+            on_invoke_handoff=empty_on_invoke_handoff,
+        )
+        for x in input.get("handoffs", [])
+    ]
+    return await model.get_response(
+        system_instructions=input.get("system_instructions"),
+        input=input_input,
+        model_settings=input["model_settings"],
+        tools=tools,
+        output_schema=input.get("output_schema"),
+        handoffs=handoffs,
+        tracing=ModelTracing(input["tracing"]),
+        previous_response_id=input.get("previous_response_id"),
+    )
