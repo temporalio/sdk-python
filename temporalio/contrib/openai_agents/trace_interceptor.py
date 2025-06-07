@@ -3,15 +3,16 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Mapping, Protocol, Type
 
+from agents import CustomSpanData, custom_span, get_current_span, trace
+from agents.tracing import get_trace_provider
+from agents.tracing.spans import NoOpSpan, SpanImpl
+
 import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.client
 import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
-from agents import CustomSpanData, custom_span, get_current_span, trace
-from agents.tracing import get_trace_provider
-from agents.tracing.spans import NoOpSpan, SpanImpl
 from temporalio import activity, workflow
 
 HEADER_KEY = "__openai_span"
@@ -28,11 +29,12 @@ def set_header_from_context(
     if current is None or isinstance(current, NoOpSpan):
         return
 
+    trace = get_trace_provider().get_current_trace()
     input.headers = {
         **input.headers,
         HEADER_KEY: payload_converter.to_payload(
             {
-                "traceWorkflowName": get_trace_provider().get_current_trace().name,
+                "traceName": trace.name if trace else "Unknown Workflow",
                 "spanId": current.span_id,
                 "traceId": current.trace_id,
             }
@@ -82,7 +84,7 @@ def context_from_header(
                 "temporal:workflowType": workflow_type,
             }
             with trace(
-                span_info["traceWorkflowName"],
+                span_info["traceName"],
                 trace_id=span_info["traceId"],
                 metadata=metadata,
             ):

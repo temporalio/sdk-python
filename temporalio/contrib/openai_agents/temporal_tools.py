@@ -6,6 +6,7 @@ with unsafe.imports_passed_through():
 
     from agents import FunctionTool, RunContextWrapper, Tool
     from agents.function_schema import function_schema
+
     from temporalio import activity, workflow
     from temporalio.exceptions import ApplicationError
 

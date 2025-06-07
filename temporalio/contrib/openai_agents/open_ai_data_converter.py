@@ -53,7 +53,7 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
         Needs _WrapperModel configure arbitrary_types_allowed=True
         """
 
-        wrapper = _WrapperModel[type(value)](root=value)
+        wrapper = _WrapperModel[Any](root=value)
         data = wrapper.model_dump_json().encode()
 
         return temporalio.api.common.v1.Payload(
@@ -66,7 +66,7 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
         type_hint: Optional[Type] = None,
     ) -> Any:
         _type_hint = type_hint if type_hint is not None else Any
-        wrapper = _WrapperModel[_type_hint]
+        wrapper = _WrapperModel[_type_hint]  # type: ignore[valid-type]
         # Needed due to
         # if TYPE_CHECKING:
         #     from .agent import Agent

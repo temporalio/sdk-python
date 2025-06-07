@@ -4,7 +4,7 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from datetime import timedelta
-    from typing import AsyncIterator, cast
+    from typing import Any, AsyncIterator, Sequence, cast
 
     from agents import (
         AgentOutputSchema,
@@ -56,7 +56,13 @@ class _TemporalModelStub(Model):
                 if isinstance(input, str):
                     return input[:max_size]
                 elif isinstance(input, list):
-                    return input[-1].get("content", "")[:max_size]
+                    seq_input = cast(Sequence[Any], input)
+                    last_item = seq_input[-1]
+                    if isinstance(last_item, dict):
+                        return last_item.get("content", "")[:max_size]
+                    elif hasattr(last_item, "content"):
+                        return str(getattr(last_item, "content"))[:max_size]
+                    return str(last_item)[:max_size]
                 elif isinstance(input, dict):
                     return input.get("content", "")[:max_size]
             except Exception as e:
@@ -72,13 +78,16 @@ class _TemporalModelStub(Model):
                 raise NotImplementedError(
                     "Computer search preview is not supported in Temporal model"
                 )
-            else:
+            elif tool.name == "function_tool":
+                t = cast(FunctionToolInput, tool)
                 return FunctionToolInput(
-                    name=tool.name,
-                    description=tool.description,
-                    params_json_schema=tool.params_json_schema,
-                    strict_json_schema=tool.strict_json_schema,
+                    name=t.name,
+                    description=t.description,
+                    params_json_schema=t.params_json_schema,
+                    strict_json_schema=t.strict_json_schema,
                 )
+            else:
+                raise ValueError(f"Unknown tool type: {tool.name}")
 
         tool_infos = [make_tool_info(x) for x in tools] if tools is not None else None
         handoff_infos = (

@@ -122,7 +122,7 @@ class TemporalTraceProvider(TraceProvider):
     def __init__(self):
         super().__init__()
         self._original_provider = get_trace_provider()
-        self._multi_processor = _TemporalTracingProcessor(
+        self._multi_processor = _TemporalTracingProcessor(  # type: ignore[assignment]
             self._original_provider._multi_processor
         )
 

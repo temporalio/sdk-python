@@ -47,15 +47,6 @@ ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
 
 
 @dataclass
-class HandoffInput:
-    tool_name: str
-    tool_description: str
-    input_json_schema: dict[str, Any]
-    agent_name: str
-    strict_json_schema: bool = True
-
-
-@dataclass
 class AgentOutputSchemaInput(AgentOutputSchemaBase):
     output_type_name: str | None
     is_wrapped: bool
@@ -74,12 +65,16 @@ class AgentOutputSchemaInput(AgentOutputSchemaBase):
         """The JSON schema of the output type."""
         if self.is_plain_text():
             raise UserError("Output type is plain text, so no JSON schema is available")
+        if self.output_schema is None:
+            raise UserError("Output schema is not defined")
         return self.output_schema
 
     def validate_json(self, json_str: str) -> Any:
         raise NotImplementedError()
 
     def name(self) -> str:
+        if self.output_type_name is None:
+            raise ValueError("output_type_name is None")
         return self.output_type_name
 
 
@@ -110,10 +105,10 @@ async def invoke_model_activity(input: ActivityModelInput) -> ModelResponse:
     model = MultiProvider().get_model(input.get("model_name"))
 
     async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
-        pass
+        return ""
 
     async def empty_on_invoke_handoff(ctx: RunContextWrapper[Any], input: str) -> Any:
-        pass
+        return None
 
     # workaround for https://github.com/pydantic/pydantic/issues/9541
     # ValidatorIterator returned
@@ -127,14 +122,17 @@ async def invoke_model_activity(input: ActivityModelInput) -> ModelResponse:
             return cast(WebSearchTool, tool)
         elif tool.name == "computer_search_preview":
             return cast(ComputerTool, tool)
-        else:
+        elif tool.name == "function_tool":
+            t = cast(FunctionToolInput, tool)
             return FunctionTool(
-                name=tool.name,
-                description=tool.description,
-                params_json_schema=tool.params_json_schema,
+                name=t.name,
+                description=t.description,
+                params_json_schema=t.params_json_schema,
                 on_invoke_tool=empty_on_invoke_tool,
-                strict_json_schema=tool.strict_json_schema,
+                strict_json_schema=t.strict_json_schema,
             )
+        else:
+            raise UserError(f"Unknown tool type: {tool.name}")
 
     tools = [make_tool(x) for x in input.get("tools", [])]
     handoffs = [
