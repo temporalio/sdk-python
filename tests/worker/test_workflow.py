@@ -7051,7 +7051,7 @@ class TimeoutErrorWorkflow:
         if scenario == "workflow.wait_condition":
             await workflow.wait_condition(lambda: False, timeout=0.01)
         elif scenario == "asyncio.wait_for":
-            await asyncio.wait_for(asyncio.sleep(1000), timeout=0.0)
+            await asyncio.wait_for(asyncio.sleep(1000), timeout=0.01)
         elif scenario == "asyncio.timeout":
             if sys.version_info >= (3, 11):
                 async with asyncio.timeout(0.1):
@@ -7136,7 +7136,7 @@ async def test_workflow_deadlock_interruptible(client: Client):
 
         # Confirm workflow was interrupted
         async def check_completed():
-            assert deadlock_interruptible_completed < 1
+            assert deadlock_interruptible_completed >= 1
 
         await assert_eventually(check_completed)
         completed_sec = time.monotonic()
