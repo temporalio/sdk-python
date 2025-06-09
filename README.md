@@ -25,9 +25,7 @@ starting a workflow with an `int` parameter when it accepts a `str` parameter wo
 
 **Different Activity Types**
 
-The activity worker has been developed to work with `async def`, threaded, and multiprocess activities. While
-`async def` activities are the easiest and recommended, care has been taken to make heartbeating and cancellation also
-work across threads/processes.
+The activity worker has been developed to work with `async def`, threaded, and multiprocess activities. Threaded activities are the initial recommendation, and further guidance can be found in [the docs](https://docs.temporal.io/develop/python/python-sdk-sync-vs-async).
 
 **Custom `asyncio` Event Loop**
 
