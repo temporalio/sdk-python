@@ -9,7 +9,9 @@ with workflow.unsafe.imports_passed_through():
     from agents import (
         AgentOutputSchema,
         AgentOutputSchemaBase,
+        ComputerTool,
         FileSearchTool,
+        FunctionTool,
         Handoff,
         Model,
         ModelResponse,
@@ -71,15 +73,15 @@ class _TemporalModelStub(Model):
             return ""
 
         def make_tool_info(tool: Tool) -> ToolInput:
-            if tool.name == "file_search":
+            if isinstance(tool, FileSearchTool):
                 return cast(FileSearchTool, tool)
-            elif tool.name == "web_search_preview":
+            elif isinstance(tool, WebSearchTool):
                 return cast(WebSearchTool, tool)
-            elif tool.name == "computer_search_preview":
+            elif isinstance(tool, ComputerTool):
                 raise NotImplementedError(
                     "Computer search preview is not supported in Temporal model"
                 )
-            elif tool.name == "function_tool":
+            elif isinstance(tool, FunctionTool):
                 t = cast(FunctionToolInput, tool)
                 return FunctionToolInput(
                     name=t.name,

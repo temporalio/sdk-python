@@ -135,13 +135,11 @@ async def invoke_model_activity(input: ActivityModelInput) -> ModelResponse:
     input_input = json.loads(input_json)
 
     def make_tool(tool: ToolInput) -> Tool:
-        if tool.name == "file_search":
+        if isinstance(tool, FileSearchTool):
             return cast(FileSearchTool, tool)
-        elif tool.name == "web_search_preview":
+        elif isinstance(tool, WebSearchTool):
             return cast(WebSearchTool, tool)
-        elif tool.name == "computer_search_preview":
-            return cast(ComputerTool, tool)
-        elif tool.name == "function_tool":
+        elif isinstance(tool, FunctionToolInput):
             t = cast(FunctionToolInput, tool)
             return FunctionTool(
                 name=t.name,
