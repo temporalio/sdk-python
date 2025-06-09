@@ -259,6 +259,9 @@ impl ClientRef {
                 "request_cancel_workflow_execution" => {
                     rpc_call!(retry_client, call, request_cancel_workflow_execution)
                 }
+                "reset_activity" => {
+                    rpc_call!(retry_client, call, reset_activity)
+                }
                 "reset_sticky_task_queue" => {
                     rpc_call!(retry_client, call, reset_sticky_task_queue)
                 }

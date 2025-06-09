@@ -8034,3 +8034,4 @@ async def test_signal_handler_in_interceptor(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+

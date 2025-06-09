@@ -15,7 +15,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
+import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
+from temporalio.api.workflowservice.v1.request_response_pb2 import ResetActivityRequest
 from temporalio.client import (
     AsyncActivityHandle,
     Client,
@@ -1379,3 +1381,35 @@ def assert_activity_application_error(
     ret = assert_activity_error(err)
     assert isinstance(ret, ApplicationError)
     return ret
+
+async def test_activity_reset(client: Client, worker: ExternalWorker):
+
+    @activity.defn
+    async def reset_activity() -> None:
+
+        await client.workflow_service.reset_activity(temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+            ))
+        reset = False
+        for _ in range(5):
+            try:
+                if reset:
+                    return None
+                await asyncio.sleep(1)
+            except Exception as e:
+                activity.logger.warning("Exception: ", e)
+                reset = True
+                raise
+
+        assert False
+
+    await _execute_workflow_with_activity(
+        client, worker, reset_activity
+    )
+
+
