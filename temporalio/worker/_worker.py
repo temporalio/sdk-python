@@ -192,7 +192,8 @@ class Worker:
             max_cached_workflows: If nonzero, workflows will be cached and
                 sticky task queues will be used.
             max_concurrent_workflow_tasks: Maximum allowed number of workflow
-                tasks that will ever be given to this worker at one time. Mutually exclusive with ``tuner``.
+                tasks that will ever be given to this worker at one time. Mutually exclusive with
+                ``tuner``. Must be set to at least two if ``max_cached_workflows`` is nonzero.
             max_concurrent_activities: Maximum number of activity tasks that
                 will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
@@ -206,8 +207,8 @@ class Worker:
 
                 WARNING: This argument is experimental
             max_concurrent_workflow_task_polls: Maximum number of concurrent
-                poll workflow task requests we will perform at a time on this
-                worker's task queue.
+                poll workflow task requests we will perform at a time on this worker's task queue.
+                Must be set to at least two if ``max_cached_workflows`` is nonzero.
 
                 If set, will override any value passed to ``workflow_task_poller_behavior``.
 

@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import IntEnum
 from typing import (
     Any,
     Awaitable,
@@ -300,24 +301,6 @@ class _WorkflowInstanceImpl(
             str, List[temporalio.bridge.proto.workflow_activation.SignalWorkflow]
         ] = {}
 
-        # Create interceptors. We do this with our runtime on the loop just in
-        # case they want to access info() during init().
-        temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), self)
-        try:
-            root_inbound = _WorkflowInboundImpl(self)
-            self._inbound: WorkflowInboundInterceptor = root_inbound
-            for interceptor_class in reversed(list(det.interceptor_classes)):
-                self._inbound = interceptor_class(self._inbound)
-            # During init we set ourselves on the current loop
-            self._inbound.init(_WorkflowOutboundImpl(self))
-            self._outbound = root_inbound._outbound
-        finally:
-            # Remove our runtime from the loop
-            temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), None)
-
-        # Set ourselves on our own loop
-        temporalio.workflow._Runtime.set_on_loop(self, self)
-
         # When we evict, we have to mark the workflow as deleting so we don't
         # add any commands and we swallow exceptions on tear down
         self._deleting = False
@@ -340,6 +323,24 @@ class _WorkflowInstanceImpl(
         self._dynamic_failure_exception_types: Optional[
             Sequence[type[BaseException]]
         ] = None
+
+        # Create interceptors. We do this with our runtime on the loop just in
+        # case they want to access info() during init(). This should remain at the end of the constructor so that variables are defined during interceptor creation
+        temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), self)
+        try:
+            root_inbound = _WorkflowInboundImpl(self)
+            self._inbound: WorkflowInboundInterceptor = root_inbound
+            for interceptor_class in reversed(list(det.interceptor_classes)):
+                self._inbound = interceptor_class(self._inbound)
+            # During init we set ourselves on the current loop
+            self._inbound.init(_WorkflowOutboundImpl(self))
+            self._outbound = root_inbound._outbound
+        finally:
+            # Remove our runtime from the loop
+            temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), None)
+
+        # Set ourselves on our own loop
+        temporalio.workflow._Runtime.set_on_loop(self, self)
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
@@ -367,8 +368,8 @@ class _WorkflowInstanceImpl(
         self._continue_as_new_suggested = act.continue_as_new_suggested
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
-
         self._current_thread_id = threading.get_ident()
+        self._current_internal_flags = act.available_internal_flags
         activation_err: Optional[Exception] = None
         try:
             # Split into job sets with patches, then signals + updates, then
@@ -1613,6 +1614,20 @@ class _WorkflowInstanceImpl(
                     # dict with its new seq
                     self._pending_activities[handle._seq] = handle
                 except asyncio.CancelledError:
+                    # If an activity future completes at the same time as a cancellation is being processed, the cancellation would be swallowed
+                    # _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY will correctly reraise the exception
+                    if handle._result_fut.done():
+                        # TODO in next release, check sdk flag when not replaying instead of global override, remove the override, and set flag use
+                        if (
+                            (
+                                not self._is_replaying
+                                and _raise_on_cancelling_completed_activity_override
+                            )
+                            or _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
+                            in self._current_internal_flags
+                        ):
+                            # self._current_completion.successful.used_internal_flags.append(WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
+                            raise
                     # Send a cancel request to the activity
                     handle._apply_cancel_command(self._add_command())
 
@@ -3112,3 +3127,13 @@ finishes, then you can disable this warning via the signal handler decorator:
             [{"name": name, "count": count} for name, count in names.most_common()]
         )
     )
+
+
+class _WorkflowLogicFlag(IntEnum):
+    """Flags that may be set on task/activation completion to differentiate new from old workflow behavior."""
+
+    RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
+
+
+# Used by tests to validate behavior prior to SDK flag becoming default
+_raise_on_cancelling_completed_activity_override = False

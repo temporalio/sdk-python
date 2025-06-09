@@ -1,4 +1,6 @@
 import asyncio
+import random
+import re
 import sys
 import uuid
 from dataclasses import dataclass
@@ -18,6 +20,7 @@ from temporalio.worker import (
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
 )
+from temporalio.workflow import NondeterminismError
 from tests.helpers import assert_eq_eventually
 from tests.worker.test_workflow import (
     ActivityAndSignalsWhileWorkflowDown,
@@ -503,3 +506,55 @@ async def test_replayer_alternate_async_ordering() -> None:
         "counter-2",
         "act-done",
     ]
+
+
+@activity.defn
+async def short_activity_async():
+    delay = random.uniform(0.05, 0.15)  # 50~150ms delay
+    await asyncio.sleep(delay)
+    return 1
+
+
+@workflow.defn
+class QuickActivityWorkflow:
+    @workflow.run
+    async def run(self, total_seconds: float = 10.0):
+        workflow.logger.info("Duration: %f", total_seconds)
+        end = workflow.now() + timedelta(seconds=total_seconds)
+        while True:
+            workflow.logger.info("Stage 1")
+            res = await workflow.execute_activity(
+                short_activity_async, schedule_to_close_timeout=timedelta(seconds=10)
+            )
+            workflow.logger.info("Stage 2, %s", res)
+
+            if workflow.now() > end:
+                break
+
+
+async def test_swallowed_activity_cancellation() -> None:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_swallowed_activity_cancellation.json")
+        .open() as f
+    ):
+        history = f.read()
+    with pytest.raises(NondeterminismError):
+        await Replayer(
+            workflows=[QuickActivityWorkflow],
+            interceptors=[WorkerWorkflowResultInterceptor()],
+        ).replay_workflow(WorkflowHistory.from_json("fake", history))
+
+
+async def test_swallowed_activity_cancellation_no_flag() -> None:
+    with (
+        Path(__file__)
+        .with_name("test_replayer_swallowed_activity_cancellation.json")
+        .open() as f
+    ):
+        history = f.read()
+        history = re.sub(r'"langUsedFlags": \[\s*1\s*]', "", history)
+    await Replayer(
+        workflows=[QuickActivityWorkflow],
+        interceptors=[WorkerWorkflowResultInterceptor()],
+    ).replay_workflow(WorkflowHistory.from_json("fake", history))

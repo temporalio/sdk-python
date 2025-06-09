@@ -74,15 +74,29 @@ class ActivityEnvironment:
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
+        self._cancellation_details = (
+            temporalio.activity._ActivityCancellationDetailsHolder()
+        )
 
-    def cancel(self) -> None:
+    def cancel(
+        self,
+        cancellation_details: temporalio.activity.ActivityCancellationDetails = temporalio.activity.ActivityCancellationDetails(
+            cancel_requested=True
+        ),
+    ) -> None:
         """Cancel the activity.
+
+        Args:
+            cancellation_details: details about the cancellation. These will
+                be accessible through temporalio.activity.cancellation_details()
+                in the activity after cancellation.
 
         This only has an effect on the first call.
         """
         if self._cancelled:
             return
         self._cancelled = True
+        self._cancellation_details.details = cancellation_details
         for act in self._activities:
             act.cancel()
 
@@ -154,6 +168,7 @@ class _Activity:
             else self.cancel_thread_raiser.shielded,
             payload_converter_class_or_instance=env.payload_converter,
             runtime_metric_meter=env.metric_meter,
+            cancellation_details=env._cancellation_details,
         )
         self.task: Optional[asyncio.Task] = None
 
