@@ -34,7 +34,7 @@ ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Messa
 logger = logging.getLogger(__name__)
 
 # Set to true to log all requests and responses
-LOG_PROTOS = False
+LOG_PROTOS = True
 
 
 @dataclass
