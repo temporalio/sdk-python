@@ -355,17 +355,6 @@ class _WorkflowInstanceImpl(
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
-        print(
-            f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> WFT {self._info.workflow_id}\\n"
-        )
-
-        completion = self._activate(act)
-        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-        return completion
-
-    def _activate(
-        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
-    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         # Reset current completion, time, and whether replaying
         self._current_completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
@@ -784,22 +773,6 @@ class _WorkflowInstanceImpl(
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveChildWorkflowExecution,
     ) -> None:
-        # message ResolveChildWorkflowExecution {
-        #     // Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command
-        #     uint32 seq = 1;
-        #     child_workflow.ChildWorkflowResult result = 2;
-        # }
-        # No matter the result, we know we want to pop
-
-        # // Used by core to resolve child workflow executions.
-        # message ChildWorkflowResult {
-        #     oneof status {
-        #         Success completed = 1;
-        #         Failure failed = 2;
-        #         Cancellation cancelled = 3;
-        #     }
-        # }
-
         handle = self._pending_child_workflows.pop(job.seq, None)
         if not handle:
             raise RuntimeError(
@@ -816,11 +789,6 @@ class _WorkflowInstanceImpl(
                 ret = ret_vals[0]
             handle._resolve_success(ret)
         elif job.result.HasField("failed"):
-            # // Used in ChildWorkflowResult to report non successful outcomes such as
-            # // application failures, timeouts, terminations, and cancellations.
-            # message Failure {
-            #     temporal.api.failure.v1.Failure failure = 1;
-            # }
             handle._resolve_failure(
                 self._failure_converter.from_failure(
                     job.result.failed.failure, self._payload_converter
@@ -877,23 +845,6 @@ class _WorkflowInstanceImpl(
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperationStart,
     ) -> None:
-        # message ResolveNexusOperationStart {
-        #   // Sequence number as provided by lang in the corresponding ScheduleNexusOperation command
-        #   uint32 seq = 1;
-        #   oneof status {
-        #       // The operation started asynchronously. Contains an ID that can be used to perform
-        #       // operations on the started operation by, ex, clients. A `ResolveNexusOperation` job will
-        #       // follow at some point.
-        #       string operation_id = 2;
-        #       // If true the operation "started" but only because it's also already resolved. A
-        #       // `ResolveNexusOperation` job will be in the same activation.
-        #       bool started_sync = 3;
-        #       // The operation was cancelled before it was ever sent to server (same WFT).
-        #       // Note that core will still send a `ResolveNexusOperation` job in the same activation, so
-        #       // there does not need to be an exceptional case for this in lang.
-        #       temporal.api.failure.v1.Failure cancelled_before_start = 4;
-        #   }
-        # }
         handle = self._pending_nexus_operations.get(job.seq)
         if not handle:
             raise RuntimeError(
@@ -922,36 +873,15 @@ class _WorkflowInstanceImpl(
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperation,
     ) -> None:
-        # message ResolveNexusOperation {
-        #   // Sequence number as provided by lang in the corresponding ScheduleNexusOperation command
-        #   uint32 seq = 1;
-        #   nexus.NexusOperationResult result = 2;
-        # }
         handle = self._pending_nexus_operations.get(job.seq)
         if not handle:
             raise RuntimeError(
                 f"Failed to find nexus operation handle for job sequence number {job.seq}"
             )
 
-        result = job.result
-        # message NexusOperationResult {
-        #   oneof status {
-        #       temporal.api.common.v1.Payload completed = 1;
-        #       temporal.api.failure.v1.Failure failed = 2;
-        #       temporal.api.failure.v1.Failure cancelled = 3;
-        #       temporal.api.failure.v1.Failure timed_out = 4;
-        #   }
-        # }
         # Handle the four oneof variants of NexusOperationResult
-
+        result = job.result
         if result.HasField("completed"):
-            # message Payload {
-            #     map<string,bytes> metadata = 1;
-            #     bytes data = 2;
-            # }
-            print(
-                f"🌈 converting payload using output_type {handle._input.output_type}"
-            )
             [output] = self._convert_payloads(
                 [result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
@@ -2866,7 +2796,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             command.request_cancel_local_activity.seq = self._seq
 
 
-# _ChildWorkflowHandle
 class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def __init__(
         self,
