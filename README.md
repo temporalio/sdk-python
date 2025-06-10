@@ -97,7 +97,6 @@ informal introduction to the features and their implementation.
         - [Worker Shutdown](#worker-shutdown)
       - [Testing](#testing-1)
     - [Nexus](#nexus)
-      - [hello](#hello)
     - [Workflow Replay](#workflow-replay)
     - [Observability](#observability)
       - [Metrics](#metrics)

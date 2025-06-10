@@ -126,7 +126,7 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     else:
         env = WorkflowEnvironment.from_client(await Client.connect(env_type))
 
-    # TODO(dan): expose this in a principled way
+    # TODO(nexus-prerelease): expose this in a principled way
     env._http_port = http_port  # type: ignore
     yield env
     await env.shutdown()

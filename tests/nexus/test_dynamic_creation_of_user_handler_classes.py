@@ -11,7 +11,7 @@ from tests.helpers.nexus import create_nexus_endpoint
 HTTP_PORT = 7243
 
 
-# TODO(dan): test programmatic creation from ServiceHandler
+# TODO(nexus-prerelease): test programmatic creation from ServiceHandler
 def make_incrementer_service_from_service_handler(
     op_names: list[str],
 ) -> tuple[str, type]:
@@ -39,7 +39,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
         return input + 1
 
     op_handler_factories = {
-        # TODO(dan): check that name=name should be required here. Should the op factory
+        # TODO(nexus-prerelease): check that name=name should be required here. Should the op factory
         # name not default to the name of the method attribute (i.e. key), as opposed to
         # the name of the method object (i.e. value.__name__)?
         name: nexusrpc.handler.sync_operation_handler(_increment_op, name=name)
@@ -79,7 +79,5 @@ async def test_dynamic_creation_of_user_handler_classes(client: Client):
                 json=1,
                 headers={},
             )
-            print(f"\n\n{response.json()}\n\n")
-
             assert response.status_code == 200
             assert response.json() == 2

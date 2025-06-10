@@ -59,16 +59,16 @@ class Output:
 
 # TODO: type check nexus implementation under mypy
 
-# TODO(dan): test dynamic creation of a service from unsugared definition
-# TODO(dan): test malformed inbound_links and outbound_links
+# TODO(nexus-prerelease): test dynamic creation of a service from unsugared definition
+# TODO(nexus-prerelease): test malformed inbound_links and outbound_links
 
-# TODO(dan): test good error message on forgetting to add decorators etc
+# TODO(nexus-prerelease): test good error message on forgetting to add decorators etc
 
 
 @nexusrpc.service
 class MyService:
     echo: nexusrpc.Operation[Input, Output]
-    # TODO(dan): support renamed operations!
+    # TODO(nexus-prerelease): support renamed operations!
     # echo_renamed: nexusrpc.Operation[Input, Output] = (
     #     nexusrpc.Operation(name="echo-renamed")
     # )
@@ -139,7 +139,7 @@ class MyServiceHandler:
         raise ApplicationError(
             "non-retryable application error",
             "details arg",
-            # TODO(dan): what values of `type` should be tested?
+            # TODO(nexus-prerelease): what values of `type` should be tested?
             type="TestFailureType",
             non_retryable=True,
         )
@@ -336,7 +336,7 @@ class UnsuccessfulResponse:
     failure_message: Union[str, Callable[[str], bool]]
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
-    # TODO(dan): the body of a successful response need not be JSON; test non-JSON-parseable string
+    # TODO(nexus-prerelease): the body of a successful response need not be JSON; test non-JSON-parseable string
     body_json: Optional[Callable[[dict[str, Any]], bool]] = None
     headers: Mapping[str, str] = UNSUCCESSFUL_RESPONSE_HEADERS
 
@@ -398,15 +398,17 @@ class _FailureTestCase(_TestCase):
 
         if failure.exception:
             assert isinstance(failure.exception, ApplicationError)
-            assert failure.exception.retryable == cls.expected.retryable_exception
+            assert failure.exception.non_retryable == (
+                not cls.expected.retryable_exception
+            )
         else:
-            print(f"TODO(dan): {cls} did not yield a Failure with exception details")
+            pytest.fail(f"{cls} did not yield a Failure with exception details")
 
 
 class SyncHandlerHappyPath(_TestCase):
     operation = "echo"
     input = Input("hello")
-    # TODO(dan): why is application/json randomly scattered around these tests?
+    # TODO(nexus-prerelease): why is application/json randomly scattered around these tests?
     headers = {
         "Content-Type": "application/json",
         "Test-Header-Key": "test-header-value",
@@ -416,7 +418,7 @@ class SyncHandlerHappyPath(_TestCase):
         status_code=200,
         body_json={"value": "from start method on MyServiceHandler: hello"},
     )
-    # TODO(dan): headers should be lower-cased
+    # TODO(nexus-prerelease): headers should be lower-cased
     assert (
         headers.get("Nexus-Link") == '<http://test/>; type="test"'
     ), "Nexus-Link header not echoed correctly."
@@ -484,7 +486,7 @@ class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
 
 
 class WorkflowRunOpLinkTestHappyPath(_TestCase):
-    # TODO(dan): fix this test
+    # TODO(nexus-prerelease): fix this test
     skip = "Yields invalid link"
     operation = "workflow_run_op_link_test"
     input = Input("link-test-input")
@@ -508,13 +510,13 @@ class WorkflowRunOpLinkTestHappyPath(_TestCase):
         ), f"nexus-link header {nexus_link} does not start with <temporal://"
 
 
-# TODO(dan): Before fixing the upstream-timeout test by implementing the handler for the
+# TODO(nexus-prerelease): Before fixing the upstream-timeout test by implementing the handler for the
 # timeout cancellation sent by core, I was seeing 2025-05-11T22:41:51.853243Z  WARN
 # temporal_sdk_core::worker::nexus: Failed to parse nexus timeout header value
 # '5.617792ms'
 
-# TODO(dan): test Nexus-Callback- headers
-# TODO(dan): make assertions about failure.exception.cause
+# TODO(nexus-prerelease): test Nexus-Callback- headers
+# TODO(nexus-prerelease): make assertions about failure.exception.cause
 
 
 class OperationHandlerReturningUnwrappedResultError(_FailureTestCase):
@@ -534,7 +536,7 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
     headers = {"Request-Timeout": "10ms"}
     expected = UnsuccessfulResponse(
         status_code=520,
-        # TODO(dan): should this have the retryable header set?
+        # TODO(nexus-prerelease): should this have the retryable header set?
         retryable_header=None,
         # This error is returned by the server; it doesn't populate metadata or details, and it
         # doesn't set temporal-nexus-failure-source.
@@ -601,7 +603,7 @@ class HandlerErrorInternal(_FailureTestCase):
     operation = "handler_error_internal"
     expected = UnsuccessfulResponse(
         status_code=500,
-        # TODO(dan): check this assertion
+        # TODO(nexus-prerelease): check this assertion
         retryable_header=False,
         failure_message="cause message",
     )
@@ -611,7 +613,7 @@ class OperationError(_FailureTestCase):
     operation = "operation_error_failed"
     expected = UnsuccessfulResponse(
         status_code=424,
-        # TODO(dan): check that OperationError should not set retryable header
+        # TODO(nexus-prerelease): check that OperationError should not set retryable header
         retryable_header=None,
         failure_message="deliberate operation error",
         headers=UNSUCCESSFUL_RESPONSE_HEADERS | {"nexus-operation-state": "failed"},
@@ -643,10 +645,10 @@ class UnknownOperation(_FailureTestCase):
     "test_case",
     [
         SyncHandlerHappyPath,
-        # TODO(dan): support renamed operations!
+        # TODO(nexus-prerelease): support renamed operations!
         # SyncHandlerHappyPathRenamed,
         SyncHandlerHappyPathNonAsyncDef,
-        # TODO(dan): make callable instance work
+        # TODO(nexus-prerelease): make callable instance work
         # SyncHandlerHappyPathWithNonAsyncCallableInstance,
         SyncHandlerHappyPathWithoutTypeAnnotations,
         AsyncHandlerHappyPath,

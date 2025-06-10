@@ -530,11 +530,6 @@ class Client:
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
 
-        for l in workflow_event_links:
-            print(
-                f"🌈@@ worker starting workflow with link: {google.protobuf.json_format.MessageToJson(l)}"
-            )
-
         return await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,

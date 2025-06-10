@@ -301,7 +301,7 @@ class Worker:
             activity_task_poller_behavior: Specify the behavior of activity task polling.
                 Defaults to a 5-poller maximum.
         """
-        # TODO(dan): non-async (executor-based) Nexus worker; honor
+        # TODO(nexus-prerelease): non-async (executor-based) Nexus worker; honor
         # max_concurrent_nexus_operations and nexus_operation_executor.
         # nexus_operation_executor: Concurrent executor to use for non-async
         #     Nexus operations. This is required if any operation start methods
@@ -413,7 +413,7 @@ class Worker:
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if nexus_services:
-            # TODO(dan): consider not allowing / warning on max_workers <
+            # TODO(nexus-prerelease): consider not allowing / warning on max_workers <
             # max_concurrent_nexus_operations? See warning above for activity worker.
             self._nexus_worker = _NexusWorker(
                 bridge_worker=lambda: self._bridge_worker,
@@ -464,7 +464,7 @@ class Worker:
             )
 
         if tuner is not None:
-            # TODO(dan): Nexus tuner support
+            # TODO(nexus-prerelease): Nexus tuner support
             if (
                 max_concurrent_workflow_tasks
                 or max_concurrent_activities
@@ -725,7 +725,7 @@ class Worker:
         if self._nexus_worker:
             await self._nexus_worker.wait_all_completed()
 
-        # TODO(dan): check that we do all appropriate things for nexus worker that we do for activity worker
+        # TODO(nexus-prerelease): check that we do all appropriate things for nexus worker that we do for activity worker
 
         # Do final shutdown
         try:

@@ -51,7 +51,7 @@ class _NexusWorker:
         metric_meter: temporalio.common.MetricMeter,
         executor: Optional[concurrent.futures.ThreadPoolExecutor],
     ) -> None:
-        # TODO(dan): make it possible to query task queue of bridge worker
+        # TODO(nexus-prerelease): make it possible to query task queue of bridge worker
         # instead of passing unused task_queue into _NexusWorker,
         # _ActivityWorker, etc?
         self._bridge_worker = bridge_worker
@@ -69,32 +69,13 @@ class _NexusWorker:
             SyncExecutor(executor) if executor is not None else None,
         )
         self._data_converter = data_converter
-        # TODO(dan): interceptors
+        # TODO(nexus-prerelease): interceptors
         self._interceptors = interceptors
-        # TODO(dan): metric_meter
+        # TODO(nexus-prerelease): metric_meter
         self._metric_meter = metric_meter
         self._running_operations: dict[bytes, asyncio.Task[Any]] = {}
 
     async def run(self) -> None:
-        # message NexusTask {
-        #     oneof variant {
-        #         // A nexus task from server
-        #         temporal.api.workflowservice.v1.PollNexusTaskQueueResponse task = 1;
-        #         // A request by Core to notify an in-progress operation handler that it should cancel. This
-        #         // is distinct from a `CancelOperationRequest` from the server, which results from the user
-        #         // requesting the cancellation of an operation. Handling this variant should result in
-        #         // something like cancelling a cancellation token given to the user's operation handler.
-        #         //
-        #         // These do not count as a separate task for the purposes of completing all issued tasks,
-        #         // but rather count as a sort of modification to the already-issued task which is being
-        #         // cancelled.
-        #         //
-        #         // EX: Core knows the nexus operation has timed out, and it does not make sense for the
-        #         // user's operation handler to continue doing work.
-        #         CancelNexusTask cancel_task = 2;
-        #     }
-        # }
-
         while True:
             try:
                 poll_task = asyncio.create_task(self._bridge_worker().poll_nexus_task())
@@ -114,7 +95,7 @@ class _NexusWorker:
                         )
                     )
                 elif task.request.HasField("cancel_operation"):
-                    # TODO(dan): report errors occurring during execution of user
+                    # TODO(nexus-prerelease): report errors occurring during execution of user
                     # cancellation method
                     asyncio.create_task(
                         self._handle_cancel_operation(
@@ -128,7 +109,7 @@ class _NexusWorker:
             elif task.HasField("cancel_task"):
                 task = task.cancel_task
                 if _task := self._running_operations.get(task.task_token):
-                    # TODO(dan): when do we remove the entry from _running_operations?
+                    # TODO(nexus-prerelease): when do we remove the entry from _running_operations?
                     _task.cancel()
                 else:
                     temporalio.nexus.logger.warning(
@@ -157,7 +138,7 @@ class _NexusWorker:
             *self._running_operations.values(), return_exceptions=False
         )
 
-    # TODO(dan): stack trace pruning. See sdk-typescript NexusHandler.execute
+    # TODO(nexus-prerelease): stack trace pruning. See sdk-typescript NexusHandler.execute
     # "Any call up to this function and including this one will be trimmed out of stack traces.""
 
     async def _run_nexus_operation(
@@ -166,66 +147,6 @@ class _NexusWorker:
         start_request: temporalio.api.nexus.v1.StartOperationRequest,
         header: dict[str, str],
     ) -> None:
-        # // A request to start an operation.
-        # message StartOperationRequest {
-        #     // Name of service to start the operation in.
-        #     string service = 1;
-        #     // Type of operation to start.
-        #     string operation = 2;
-        #     // A request ID that can be used as an idempotentency key.
-        #     string request_id = 3;
-        #     // Callback URL to call upon completion if the started operation is async.
-        #     string callback = 4;
-        #     // Full request body from the incoming HTTP request.
-        #     temporal.api.common.v1.Payload payload = 5;
-        #     // Header that is expected to be attached to the callback request when the operation completes.
-        #     map<string, string> callback_header = 6;
-        #     // Links contain caller information and can be attached to the operations started by the handler.
-        #     repeated Link links = 7;
-        # }
-
-        # message NexusTaskCompletion {
-        #     bytes task_token = 1;
-        #     oneof status {
-        #         temporal.api.nexus.v1.Response completed = 2;
-        #         temporal.api.nexus.v1.HandlerError error = 3;
-        #         bool ack_cancel = 4;
-        #     }
-        # }
-
-        # message Response {
-        #     oneof variant {
-        #         StartOperationResponse start_operation = 1;
-        #         CancelOperationResponse cancel_operation = 2;
-        #     }
-        # }
-
-        # message StartOperationResponse {
-        #     oneof variant {
-        #         Sync sync_success = 1;
-        #         Async async_success = 2;
-        #         UnsuccessfulOperationError operation_error = 3;
-        #     }
-        # }
-
-        # message UnsuccessfulOperationError {
-        #     string operation_state = 1;
-        #     Failure failure = 2;
-        # }
-
-        # message HandlerError {
-        #     string error_type = 1;
-        #     Failure failure = 2;
-        #     temporal.api.enums.v1.NexusHandlerErrorRetryBehavior retry_behavior = 3;
-        # }
-
-        # message Failure {
-        #     string message = 1;
-        #     map<string, string> metadata = 2;
-        #     // UTF-8 encoded JSON serializable details.
-        #     bytes details = 3;
-        # }
-
         async def run() -> temporalio.bridge.proto.nexus.NexusTaskCompletion:
             temporalio.nexus.handler._current_context.set(
                 temporalio.nexus.handler._Context(
@@ -262,7 +183,7 @@ class _NexusWorker:
                     nexusrpc.handler.UnknownServiceError,
                     nexusrpc.handler.UnknownOperationError,
                 ) as err:
-                    # TODO(dan): error message
+                    # TODO(nexus-prerelease): error message
                     raise nexusrpc.handler.HandlerError(
                         "No matching operation handler",
                         type=nexusrpc.handler.HandlerErrorType.NOT_FOUND,
@@ -307,7 +228,7 @@ class _NexusWorker:
                         )
                     )
                 elif isinstance(result, nexusrpc.handler.StartOperationResultSync):
-                    # TODO(dan): error handling here; what error type should it be?
+                    # TODO(nexus-prerelease): error handling here; what error type should it be?
                     [payload] = await self._data_converter.encode([result.value])
                     op_resp = temporalio.api.nexus.v1.StartOperationResponse(
                         sync_success=temporalio.api.nexus.v1.StartOperationResponse.Sync(
@@ -315,8 +236,8 @@ class _NexusWorker:
                         )
                     )
                 else:
-                    # TODO(dan): what should the error response be when the user has failed to wrap their return type?
-                    # TODO(dan): unify this failure completion with the path above
+                    # TODO(nexus-prerelease): what should the error response be when the user has failed to wrap their return type?
+                    # TODO(nexus-prerelease): unify this failure completion with the path above
                     err = TypeError(
                         "Operation start method must return either nexusrpc.handler.StartOperationResultSync "
                         "or nexusrpc.handler.StartOperationResultAsync"
@@ -344,9 +265,6 @@ class _NexusWorker:
 
         try:
             completion = await run()
-            print(
-                f"returning completion with retry behavior = {completion.error.retry_behavior}"
-            )
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
             temporalio.nexus.logger.exception("Failed completing Nexus operation")
@@ -373,23 +291,14 @@ class _NexusWorker:
             service=request.service,
             operation=request.operation,
         )
-        # TODO(dan): header
+        # TODO(nexus-prerelease): header
         try:
             await self._handler.cancel_operation(ctx, request.operation_token)
         except Exception as err:
             temporalio.nexus.logger.exception(
                 "Failed to execute Nexus operation cancel method", err
             )
-        # message NexusTaskCompletion {
-        #     bytes task_token = 1;
-        #     oneof status {
-        #         temporal.api.nexus.v1.Response completed = 2;
-        #         temporal.api.nexus.v1.HandlerError error = 3;
-        #         bool ack_cancel = 4;
-        #     }
-        # }
-        # TODO(dan): when do we use ack_cancel?
-        # TODO(dan): HandlerError
+        # TODO(nexus-prerelease): when do we use ack_cancel?
         completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
             task_token=task_token,
             completed=temporalio.api.nexus.v1.Response(
@@ -410,7 +319,7 @@ class _NexusWorker:
         api_failure = temporalio.api.failure.v1.Failure()
         await self._data_converter.encode_failure(err, api_failure)
         api_failure = google.protobuf.json_format.MessageToDict(api_failure)
-        # TODO(dan): is metadata correct and playing intended role here?
+        # TODO(nexus-prerelease): is metadata correct and playing intended role here?
         return temporalio.api.nexus.v1.Failure(
             message=api_failure.pop("message", ""),
             metadata={"type": "temporal.api.failure.v1.Failure"},
@@ -432,15 +341,10 @@ class _NexusWorker:
     async def _handler_error_to_proto(
         self, err: nexusrpc.handler.HandlerError
     ) -> temporalio.api.nexus.v1.HandlerError:
-        # message HandlerError {
-        #     string error_type = 1;
-        #     Failure failure = 2;
-        #     temporal.api.enums.v1.NexusHandlerErrorRetryBehavior retry_behavior = 3;
-        # }
         return temporalio.api.nexus.v1.HandlerError(
             error_type=err.type.value,
             failure=await self._exception_to_failure_proto(err),
-            # TODO(dan): is there a reason to support retryable=None?
+            # TODO(nexus-prerelease): is there a reason to support retryable=None?
             retry_behavior=(
                 temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
                 if err.retryable
@@ -469,7 +373,7 @@ class _DummyPayloadSerializer:
                 [self.payload],
                 type_hints=(  # type: ignore
                     [as_type]
-                    # TODO(dan): HACK
+                    # TODO(nexus-prerelease): HACK
                     if (as_type and as_type != nexusrpc.handler.MISSING_TYPE)
                     else [Any]
                 ),
@@ -484,7 +388,7 @@ class _DummyPayloadSerializer:
         return input
 
 
-# TODO(dan): tests for this function
+# TODO(nexus-prerelease): tests for this function
 def _exception_to_handler_error(err: BaseException) -> nexusrpc.handler.HandlerError:
     # Based on sdk-typescript's convertKnownErrors:
     # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/worker/src/nexus.ts
@@ -492,11 +396,11 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.handler.HandlerE
         return err
     elif isinstance(err, ApplicationError):
         return nexusrpc.handler.HandlerError(
-            # TODO(dan): what should message be?
+            # TODO(nexus-prerelease): what should message be?
             err.message,
             type=nexusrpc.handler.HandlerErrorType.INTERNAL,
             cause=err,
-            # TODO(dan): is there a reason to support retryable=None?
+            # TODO(nexus-prerelease): is there a reason to support retryable=None?
             retryable=not err.non_retryable,
         )
     elif isinstance(err, RPCError):

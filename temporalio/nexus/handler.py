@@ -49,30 +49,6 @@ logger = logging.getLogger(__name__)
 
 
 # TODO(nexus-preview): demonstrate obtaining Temporal client in sync operation.
-# TODO(dan): resolve comments in proposal
-# TODO(dan): comment in proposal re ABC
-# TODO(dan): naming: Operation vs OperationHandler; Service interface and impl
-
-
-# TODO(dan): confirm approach here: Temporal Nexus services will use this instead of
-# nexusrpc.handler.OperationHandler in order to avoid having to implement fetch_info and
-# fetch_result.
-class Operation(nexusrpc.handler.OperationHandler[I, O]):
-    """
-    Interface that must be implemented by an operation in a Temporal Nexus service.
-    """
-
-    # fetch_info and fetch_result are not currently to be implemented by Temporal Nexus services.
-
-    async def fetch_info(
-        self, token: str, ctx: nexusrpc.handler.FetchOperationInfoContext
-    ) -> nexusrpc.handler.OperationInfo:
-        raise NotImplementedError
-
-    async def fetch_result(
-        self, token: str, ctx: nexusrpc.handler.FetchOperationResultContext
-    ) -> O:
-        raise NotImplementedError
 
 
 def _get_workflow_run_start_method_input_and_output_type_annotations(
@@ -152,7 +128,7 @@ async def start_workflow(
 ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
 
-# TODO(dan): Overload for string-name workflow
+# TODO(nexus-prerelease): Overload for string-name workflow
 
 
 async def start_workflow(
@@ -168,7 +144,7 @@ async def start_workflow(
     if client is None:
         client = get_client()
     if task_queue is None:
-        # TODO(dan): are we handling empty string well elsewhere?
+        # TODO(nexus-prerelease): are we handling empty string well elsewhere?
         task_queue = get_task_queue()
     completion_callbacks = (
         [
@@ -206,7 +182,7 @@ async def start_workflow(
         )
     else:
         ctx.outbound_links.append(
-            # TODO(dan): Before, WorkflowRunOperation was generating an EventReference
+            # TODO(nexus-prerelease): Before, WorkflowRunOperation was generating an EventReference
             # link to send back to the caller. Now, it checks if the server returned
             # the link in the StartWorkflowExecutionResponse, and if so, send the link
             # from the response to the caller. Fallback to generating the link for
@@ -217,75 +193,10 @@ async def start_workflow(
     return wf_handle
 
 
-# TODO(dan): support request_id
-# The `requestId` from `nexus.StartOperationContext` (available as `ctx.requestId` in a `start` handler) is primarily used in the `sdk-typescript` repository in the following locations:
-#
-# 1.  **`packages/nexus/src/context.ts` (within the `startWorkflow` helper function)**:
-#     *   When the `startWorkflow` helper is called (typically from a user's Nexus `start` handler or from `WorkflowRunOperation.start`), it takes `ctx: nexus.StartOperationContext` as an argument.
-#     *   It then uses `ctx.requestId` to populate the `requestId` field within the `InternalWorkflowStartOptions` when preparing to start a Temporal workflow.
-#     ```typescript
-#     export async function startWorkflow<T extends Workflow>(
-#       ctx: nexus.StartOperationContext,
-#       // ...
-#     ): Promise<WorkflowHandle<T>> {
-#       // ...
-#       const internalOptions: InternalWorkflowStartOptions = { links, requestId: ctx.requestId }; // <-- Usage here
-#       // ...
-#       if (workflowOptions.workflowIdConflictPolicy === 'USE_EXISTING') {
-#         internalOptions.onConflictOptions = {
-#           // ...
-#           attachRequestId: true, // This indicates the server should attach the requestId if the workflow already exists
-#         };
-#       }
-#       // ...
-#       const handle = await client.workflow.start(workflowTypeOrFunc, startOptions);
-#       // ...
-#     }
-#     ```
-#     This means the `requestId` originating from the Nexus call is passed through to the Temporal server when a workflow is started. The Temporal server can then use this `requestId` for idempotency, ensuring that if the same `startWorkflow` command with the same `requestId` is received multiple times (e.g., due to retries), it only starts the workflow once. The `attachRequestId: true` option for `USE_EXISTING` conflict policy further ensures this `requestId` is associated even if an existing workflow is used.
-#
-# 2.  **`packages/test/src/test-nexus-handler.ts` (in test assertions)**:
-#     *   The integration tests for Nexus handlers verify that `ctx.requestId` is correctly populated and available within the `start` handler.
-#     *   For example, a test handler might assert its presence:
-#         ```typescript
-#         // Inside a test's OperationHandler implementation:
-#         async start(ctx, input): Promise<nexus.HandlerStartOperationResult<string>> {
-#           // ...
-#           if (!ctx.requestId) {
-#             throw new nexus.HandlerError({ message: 'expected requestId to be set', type: 'BAD_REQUEST' });
-#           }
-#           return { token: ctx.requestId }; // Example: using requestId as the operation token
-#         },
-#         ```
-#     This confirms that the worker infrastructure correctly extracts the `Nexus-Request-Id` header (or equivalent from the gRPC request) and makes it available on `ctx.requestId`.
-#
-# In essence, the `sdk-typescript` repository uses `ctx.requestId` to bridge the Nexus concept of a request identifier to Temporal's workflow start mechanism, primarily for enabling idempotent workflow starts. The tests ensure this bridging works as expected.
-
-
-# TODO(dan): Not for merge: this is not required for Temporal Nexus, but implementing in
-# order to check that the design extends well to this.
-async def fetch_workflow_info(
-    ctx: nexusrpc.handler.FetchOperationInfoContext,
-    token: str,
-) -> nexusrpc.handler.OperationInfo:
-    # TODO(dan)
-    return nexusrpc.handler.OperationInfo(
-        token=token,
-        status=nexusrpc.handler.OperationState.RUNNING,
-    )
-
-
-# TODO(dan): Not for merge: this is not required for Temporal Nexus, but implementing temporarily in
-# order to check that the design extends well to this.
-async def fetch_workflow_result(
-    ctx: nexusrpc.handler.FetchOperationResultContext,
-    token: str,
-    client: Optional[Client] = None,
-) -> Any:
-    # TODO(dan): type safety
-    _client = client or get_client()
-    handle = WorkflowOperationToken.decode(token).to_workflow_handle(_client)
-    return await handle.result()
+# TODO(nexus-prerelease): support request_id
+# See e.g. TS
+# packages/nexus/src/context.ts attachRequestId
+# packages/test/src/test-nexus-handler.ts ctx.requestId
 
 
 async def cancel_workflow(
@@ -347,17 +258,7 @@ class WorkflowRunOperation(nexusrpc.handler.OperationHandler[I, O], Generic[I, O
             # TODO(nexus-prerelease): Error message if user has accidentally used the normal client.start_workflow
             return WorkflowRunOperationResult.from_workflow_handle(wf_handle)
 
-        # TODO(dan): remove before merge; implementing temporarily to check that design extends well to this
-        async def fetch_result(
-            self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
-        ) -> O:
-            return await fetch_workflow_result(ctx, token)
-
-        if output_type:
-            fetch_result.__annotations__["return"] = output_type
-
         self.start = types.MethodType(start, self)
-        self.fetch_result = types.MethodType(fetch_result, self)
 
     async def start(
         self, ctx: nexusrpc.handler.StartOperationContext, input: I
@@ -464,7 +365,7 @@ def workflow_run_operation_handler(
         def factory(service: S) -> WorkflowRunOperation[I, O, S]:
             return WorkflowRunOperation(service, start_method, output_type=output_type)
 
-        # TODO(dan): handle callable instances: __class__.__name__ as in sync_operation_handler
+        # TODO(nexus-prerelease): handle callable instances: __class__.__name__ as in sync_operation_handler
         method_name = getattr(start_method, "__name__", None)
         if not method_name and callable(start_method):
             method_name = start_method.__class__.__name__
@@ -489,7 +390,7 @@ def workflow_run_operation_handler(
     return decorator(start_method)
 
 
-# TODO(dan): confirm that it is correct not to use event_id in the following functions.
+# TODO(nexus-prerelease): confirm that it is correct not to use event_id in the following functions.
 # Should the proto say explicitly that it's optional or how it behaves when it's missing?
 def _workflow_handle_to_workflow_execution_started_event_link(
     handle: WorkflowHandle[Any, Any],
@@ -568,28 +469,3 @@ def _nexus_link_to_workflow_event(
         run_id=urllib.parse.unquote(groups["run_id"]),
         event_ref=event_ref,
     )
-
-
-@dataclass(frozen=True)
-class StartOperationResultAsync:
-    """A value returned by the start method of a :py:class:`Operation`.
-
-    It indicates that the operation is responding asynchronously, and contains a token
-    that can be used in subsequent calls to ``fetch_info``, ``fetch_result``, and
-    ``cancel``.
-    """
-
-    token: str
-
-
-@dataclass(frozen=True)
-class StartOperationResultWorkflowRun:
-    """A value returned by the start method of a :py:class:`WorkflowRunOperation`.
-
-    It indicates that the operation is responding asynchronously, and contains a token that
-    the handler can use to construct a
-    :py:class:`~temporalio.client.WorkflowHandle` to interact with the
-    workflow.
-    """
-
-    token: str

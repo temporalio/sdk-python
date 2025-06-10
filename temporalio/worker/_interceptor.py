@@ -287,7 +287,7 @@ class StartChildWorkflowInput:
     ret_type: Optional[Type]
 
 
-# TODO(dan): Put these in a better location. Type variance?
+# TODO(nexus-prerelease): Put these in a better location. Type variance?
 I = TypeVar("I")
 O = TypeVar("O")
 
