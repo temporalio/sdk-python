@@ -1382,6 +1382,43 @@ def assert_activity_application_error(
     assert isinstance(ret, ApplicationError)
     return ret
 
+
+class CustomLogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self._trace_identifiers = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if (
+            hasattr(record, "__temporal_error_identifier")
+            and getattr(record, "__temporal_error_identifier") == "ActivityFailure"
+        ):
+            assert record.msg.startswith("Completing activity as failed")
+            self._trace_identifiers += 1
+        return None
+
+
+async def test_activity_failure_trace_identifier(
+    client: Client, worker: ExternalWorker
+):
+    @activity.defn
+    async def raise_error():
+        raise RuntimeError("oh no!")
+
+    handler = CustomLogHandler()
+    activity.logger.base_logger.addHandler(handler)
+
+    try:
+        with pytest.raises(WorkflowFailureError) as err:
+            await _execute_workflow_with_activity(client, worker, raise_error)
+        assert (
+            str(assert_activity_application_error(err.value)) == "RuntimeError: oh no!"
+        )
+        assert handler._trace_identifiers == 1
+
+    finally:
+        activity.logger.base_logger.removeHandler(CustomLogHandler())
+
 async def test_activity_reset(client: Client, worker: ExternalWorker):
 
     @activity.defn
