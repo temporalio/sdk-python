@@ -365,8 +365,7 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Python::with_gil(|py| Ok(bytes.into_pyobject(py)?.unbind()))
+            Ok(bytes)
         })
     }
 
@@ -411,8 +410,7 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Python::with_gil(|py| Ok(bytes.into_pyobject(py)?.unbind()))
+            Ok(bytes)
         })
     }
 
@@ -474,8 +472,7 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Python::with_gil(|py| Ok(bytes.into_pyobject(py)?.unbind()))
+            Ok(bytes)
         })
     }
 
@@ -498,8 +495,7 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Python::with_gil(|py| Ok(bytes.into_pyobject(py)?.unbind()))
+            Ok(bytes)
         })
     }
 
@@ -515,8 +511,7 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Python::with_gil(|py| Ok(bytes.into_pyobject(py)?.unbind()))
+            Ok(bytes)
         })
     }
 }

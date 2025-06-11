@@ -553,8 +553,7 @@ impl WorkerRef {
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
                 Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
             };
-            let bytes: &[u8] = &bytes;
-            Python::with_gil(|py| Ok(bytes.into_pyobject(py)?.unbind()))
+            Ok(bytes)
         })
     }
 
@@ -566,8 +565,7 @@ impl WorkerRef {
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
                 Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
             };
-            let bytes: &[u8] = &bytes;
-            Python::with_gil(|py| Ok(bytes.into_pyobject(py)?.unbind()))
+            Ok(bytes)
         })
     }
 
