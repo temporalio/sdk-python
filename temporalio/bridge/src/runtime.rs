@@ -16,8 +16,8 @@ use temporal_sdk_core::telemetry::{
 use temporal_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
 use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
 use temporal_sdk_core_api::telemetry::{
-    CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder,
-    PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder, OtlpProtocol
+    CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder, OtlpProtocol,
+    PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder,
 };
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
@@ -180,7 +180,11 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
     })
 }
 
-pub fn raise_in_thread(_py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, PyAny>) -> bool {
+pub fn raise_in_thread(
+    _py: Python,
+    thread_id: std::os::raw::c_long,
+    exc: &Bound<'_, PyAny>,
+) -> bool {
     unsafe { pyo3::ffi::PyThreadState_SetAsyncExc(thread_id, exc.as_ptr()) == 1 }
 }
 
@@ -349,9 +353,9 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
                 build.global_tags(global_tags);
             }
             if let Some(overrides) = prom_conf.histogram_bucket_overrides {
-                build.histogram_bucket_overrides(temporal_sdk_core_api::telemetry::HistogramBucketOverrides {
-                    overrides,
-                });
+                build.histogram_bucket_overrides(
+                    temporal_sdk_core_api::telemetry::HistogramBucketOverrides { overrides },
+                );
             }
             let prom_options = build.build().map_err(|err| {
                 PyValueError::new_err(format!("Invalid Prometheus config: {}", err))

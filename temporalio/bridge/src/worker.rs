@@ -258,20 +258,24 @@ fn slot_info_to_py_obj<'py>(py: Python<'py>, info: SlotInfo) -> PyResult<Bound<'
             workflow_type: w.workflow_type.clone(),
             is_sticky: w.is_sticky,
         }
-        .into_pyobject(py)?.into_any(),
+        .into_pyobject(py)?
+        .into_any(),
         SlotInfo::Activity(a) => ActivitySlotInfo {
             activity_type: a.activity_type.clone(),
         }
-        .into_pyobject(py)?.into_any(),
+        .into_pyobject(py)?
+        .into_any(),
         SlotInfo::LocalActivity(a) => LocalActivitySlotInfo {
             activity_type: a.activity_type.clone(),
         }
-        .into_pyobject(py)?.into_any(),
+        .into_pyobject(py)?
+        .into_any(),
         SlotInfo::Nexus(n) => NexusSlotInfo {
             service: n.service.clone(),
             operation: n.operation.clone(),
         }
-        .into_pyobject(py)?.into_any(),
+        .into_pyobject(py)?
+        .into_any(),
     })
 }
 
@@ -291,7 +295,9 @@ struct CustomSlotSupplierOfType<SK: SlotKind> {
 impl CustomSlotSupplier {
     #[new]
     fn new(inner: PyObject) -> Self {
-        CustomSlotSupplier { inner: Arc::new(inner) }
+        CustomSlotSupplier {
+            inner: Arc::new(inner),
+        }
     }
 }
 
@@ -390,7 +396,9 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             if pa.is_none() {
                 return Ok(None);
             }
-            PyResult::Ok(Some(SlotSupplierPermit::with_user_data(pa.into_pyobject(py)?.unbind())))
+            PyResult::Ok(Some(SlotSupplierPermit::with_user_data(
+                pa.into_pyobject(py)?.unbind(),
+            )))
         })
         .unwrap_or_else(|e| {
             error!(
@@ -438,13 +446,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             } else {
                 None
             };
-            py_obj.call_method1(
-                "release_slot",
-                (SlotReleaseCtx {
-                    slot_info,
-                    permit,
-                },),
-            )?;
+            py_obj.call_method1("release_slot", (SlotReleaseCtx { slot_info, permit },))?;
             PyResult::Ok(())
         }) {
             error!(
@@ -513,19 +515,23 @@ pub fn new_replay_worker<'a>(
         event_loop_task_locals: Default::default(),
         runtime: runtime_ref.runtime.clone(),
     };
-    Ok(PyTuple::new(
+    PyTuple::new(
         py,
-        [worker.into_pyobject(py)?.into_any(), history_pusher.into_pyobject(py)?.into_any()],
-    )?)
+        [
+            worker.into_pyobject(py)?.into_any(),
+            history_pusher.into_pyobject(py)?.into_any(),
+        ],
+    )
 }
 
 #[pymethods]
 impl WorkerRef {
-    fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<PyAny,'p>> {
+    fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<PyAny, 'p>> {
         let worker = self.worker.as_ref().unwrap().clone();
         // Set custom slot supplier task locals so they can run futures.
         // Event loop is assumed to be running at this point.
-        let task_locals = pyo3_async_runtimes::TaskLocals::with_running_loop(py)?.copy_context(py)?;
+        let task_locals =
+            pyo3_async_runtimes::TaskLocals::with_running_loop(py)?.copy_context(py)?;
         self.event_loop_task_locals
             .set(task_locals)
             .expect("must only be set once");
@@ -582,7 +588,11 @@ impl WorkerRef {
         })
     }
 
-    fn complete_activity_task<'p>(&self, py: Python<'p>, proto: &Bound<'_, PyBytes>) -> PyResult<Bound<'p, PyAny>> {
+    fn complete_activity_task<'p>(
+        &self,
+        py: Python<'p>,
+        proto: &Bound<'_, PyBytes>,
+    ) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = ActivityTaskCompletion::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;

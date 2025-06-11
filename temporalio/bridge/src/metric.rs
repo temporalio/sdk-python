@@ -330,8 +330,8 @@ fn convert_metric_event(
             populate_into,
             kind,
         } => {
-            let buffered_ref = BufferedMetricRef(
-                Arc::new(Py::new(
+            let buffered_ref = BufferedMetricRef(Arc::new(
+                Py::new(
                     py,
                     BufferedMetric {
                         name: params.name.to_string(),
