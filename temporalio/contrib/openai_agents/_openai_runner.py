@@ -26,7 +26,6 @@ class TemporalOpenAIRunner(Runner):
 
     Forwards model calls to a Temporal activity.
 
-    TODO: Implement original runner forwarding
     """
 
     def __init__(self):

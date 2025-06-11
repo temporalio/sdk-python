@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Mapping, Protocol, Type
+from typing import Any, Mapping, Protocol, Type, cast
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
     get_trace_provider,  # pyright: ignore[reportPrivateImportUsage]
 )
 from agents.tracing.spans import NoOpSpan, SpanImpl
+from src.agents.tracing.provider import DefaultTraceProvider
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -67,7 +68,7 @@ def context_from_header(
                 name="Parent Temporal Span",
                 data={},
             ),
-            processor=get_trace_provider()._multi_processor,
+            processor=cast(DefaultTraceProvider, get_trace_provider())._multi_processor,
         )
         workflow_type = (
             activity.info().workflow_type
