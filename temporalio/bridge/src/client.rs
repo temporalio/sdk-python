@@ -136,6 +136,9 @@ impl ClientRef {
                 "create_schedule" => {
                     rpc_call!(retry_client, call, create_schedule)
                 }
+                "create_workflow_rule" => {
+                    rpc_call!(retry_client, call, create_workflow_rule)
+                }
                 "delete_schedule" => {
                     rpc_call!(retry_client, call, delete_schedule)
                 }
@@ -147,6 +150,9 @@ impl ClientRef {
                 }
                 "delete_workflow_execution" => {
                     rpc_call!(retry_client, call, delete_workflow_execution)
+                }
+                "delete_workflow_rule" => {
+                    rpc_call!(retry_client, call, delete_workflow_rule)
                 }
                 "describe_batch_operation" => {
                     rpc_call!(retry_client, call, describe_batch_operation)
@@ -166,6 +172,9 @@ impl ClientRef {
                 }
                 "describe_workflow_execution" => {
                     rpc_call!(retry_client, call, describe_workflow_execution)
+                }
+                "describe_workflow_rule" => {
+                    rpc_call!(retry_client, call, describe_workflow_rule)
                 }
                 "execute_multi_operation" => rpc_call!(retry_client, call, execute_multi_operation),
                 "get_cluster_info" => rpc_call!(retry_client, call, get_cluster_info),
@@ -220,8 +229,14 @@ impl ClientRef {
                 "list_workflow_executions" => {
                     rpc_call!(retry_client, call, list_workflow_executions)
                 }
+                "list_workflow_rules" => {
+                    rpc_call!(retry_client, call, list_workflow_rules)
+                }
                 "patch_schedule" => {
                     rpc_call!(retry_client, call, patch_schedule)
+                }
+                "pause_activity" => {
+                    rpc_call!(retry_client, call, pause_activity)
                 }
                 "poll_activity_task_queue" => {
                     rpc_call!(retry_client, call, poll_activity_task_queue)
@@ -310,6 +325,12 @@ impl ClientRef {
                 "terminate_workflow_execution" => {
                     rpc_call!(retry_client, call, terminate_workflow_execution)
                 }
+                "trigger_workflow_rule" => {
+                    rpc_call!(retry_client, call, trigger_workflow_rule)
+                }
+                "unpause_activity" => {
+                    rpc_call!(retry_client, call, unpause_activity)
+                }
                 "update_namespace" => {
                     rpc_call_on_trait!(retry_client, call, WorkflowService, update_namespace)
                 }
@@ -321,14 +342,17 @@ impl ClientRef {
                         update_worker_deployment_version_metadata
                     )
                 }
-                "update_workflow_execution" => {
-                    rpc_call!(retry_client, call, update_workflow_execution)
-                }
                 "update_worker_build_id_compatibility" => {
                     rpc_call!(retry_client, call, update_worker_build_id_compatibility)
                 }
                 "update_worker_versioning_rules" => {
                     rpc_call!(retry_client, call, update_worker_versioning_rules)
+                }
+                "update_workflow_execution" => {
+                    rpc_call!(retry_client, call, update_workflow_execution)
+                }
+                "update_workflow_execution_options" => {
+                    rpc_call!(retry_client, call, update_workflow_execution_options)
                 }
                 _ => {
                     return Err(PyValueError::new_err(format!(

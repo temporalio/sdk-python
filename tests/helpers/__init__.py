@@ -4,7 +4,7 @@ import time
 import uuid
 from contextlib import closing
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar, Union
+from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import IndexedValueType
@@ -13,7 +13,12 @@ from temporalio.api.operatorservice.v1 import (
     ListSearchAttributesRequest,
 )
 from temporalio.api.update.v1 import UpdateRef
-from temporalio.api.workflowservice.v1 import PollWorkflowExecutionUpdateRequest
+from temporalio.api.workflow.v1 import PendingActivityInfo
+from temporalio.api.workflowservice.v1 import (
+    PauseActivityRequest,
+    PollWorkflowExecutionUpdateRequest,
+    UnpauseActivityRequest,
+)
 from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
 from temporalio.common import SearchAttributeKey
 from temporalio.service import RPCError, RPCStatusCode
@@ -210,3 +215,75 @@ async def assert_workflow_exists_eventually(
     await assert_eq_eventually(True, check_workflow_exists)
     assert handle is not None
     return handle
+
+
+async def assert_pending_activity_exists_eventually(
+    handle: WorkflowHandle,
+    activity_id: str,
+    timeout: timedelta = timedelta(seconds=5),
+) -> PendingActivityInfo:
+    """Wait until a pending activity with the given ID exists and return it."""
+
+    async def check() -> PendingActivityInfo:
+        act_info = await get_pending_activity_info(handle, activity_id)
+        if act_info is not None:
+            return act_info
+        raise AssertionError(
+            f"Activity with ID {activity_id} not found in pending activities"
+        )
+
+    return await assert_eventually(check, timeout=timeout)
+
+
+async def get_pending_activity_info(
+    handle: WorkflowHandle,
+    activity_id: str,
+) -> Optional[PendingActivityInfo]:
+    """Get pending activity info by ID, or None if not found."""
+    desc = await handle.describe()
+    for act in desc.raw_description.pending_activities:
+        if act.activity_id == activity_id:
+            return act
+    return None
+
+
+async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
+    """Pause the given activity and assert it becomes paused."""
+    desc = await handle.describe()
+    req = PauseActivityRequest(
+        namespace=client.namespace,
+        execution=WorkflowExecution(
+            workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
+            run_id=desc.raw_description.workflow_execution_info.execution.run_id,
+        ),
+        id=activity_id,
+    )
+    await client.workflow_service.pause_activity(req)
+
+    # Assert eventually paused
+    async def check_paused() -> bool:
+        info = await assert_pending_activity_exists_eventually(handle, activity_id)
+        return info.paused
+
+    await assert_eventually(check_paused)
+
+
+async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
+    """Unpause the given activity and assert it is not paused."""
+    desc = await handle.describe()
+    req = UnpauseActivityRequest(
+        namespace=client.namespace,
+        execution=WorkflowExecution(
+            workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
+            run_id=desc.raw_description.workflow_execution_info.execution.run_id,
+        ),
+        id=activity_id,
+    )
+    await client.workflow_service.unpause_activity(req)
+
+    # Assert eventually not paused
+    async def check_unpaused() -> bool:
+        info = await assert_pending_activity_exists_eventually(handle, activity_id)
+        return not info.paused
+
+    await assert_eventually(check_unpaused)

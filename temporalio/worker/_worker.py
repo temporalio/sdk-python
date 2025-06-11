@@ -192,7 +192,8 @@ class Worker:
             max_cached_workflows: If nonzero, workflows will be cached and
                 sticky task queues will be used.
             max_concurrent_workflow_tasks: Maximum allowed number of workflow
-                tasks that will ever be given to this worker at one time. Mutually exclusive with ``tuner``.
+                tasks that will ever be given to this worker at one time. Mutually exclusive with
+                ``tuner``. Must be set to at least two if ``max_cached_workflows`` is nonzero.
             max_concurrent_activities: Maximum number of activity tasks that
                 will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
@@ -206,8 +207,8 @@ class Worker:
 
                 WARNING: This argument is experimental
             max_concurrent_workflow_task_polls: Maximum number of concurrent
-                poll workflow task requests we will perform at a time on this
-                worker's task queue.
+                poll workflow task requests we will perform at a time on this worker's task queue.
+                Must be set to at least two if ``max_cached_workflows`` is nonzero.
 
                 If set, will override any value passed to ``workflow_task_poller_behavior``.
 
@@ -400,6 +401,15 @@ class Worker:
                 and deployment_config.default_versioning_behavior
                 == temporalio.common.VersioningBehavior.UNSPECIFIED
             )
+
+            def check_activity(activity):
+                if self._activity_worker is None:
+                    raise ValueError(
+                        f"Activity function {activity} "
+                        f"is not registered on this worker, no available activities.",
+                    )
+                self._activity_worker.assert_activity_valid(activity)
+
             self._workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 namespace=client.namespace,
@@ -418,6 +428,7 @@ class Worker:
                 on_eviction_hook=None,
                 disable_safe_eviction=disable_safe_workflow_eviction,
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
+                assert_local_activity_valid=check_activity,
             )
 
         if tuner is not None:
@@ -448,13 +459,13 @@ class Worker:
             build_id = build_id or load_default_build_id()
             versioning_strategy = (
                 temporalio.bridge.worker.WorkerVersioningStrategyLegacyBuildIdBased(
-                    build_id=build_id
+                    build_id_with_versioning=build_id
                 )
             )
         else:
             build_id = build_id or load_default_build_id()
             versioning_strategy = temporalio.bridge.worker.WorkerVersioningStrategyNone(
-                build_id=build_id
+                build_id_no_versioning=build_id
             )
 
         if max_concurrent_workflow_task_polls:

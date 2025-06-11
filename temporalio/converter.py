@@ -23,6 +23,7 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    Literal,
     Mapping,
     NewType,
     Optional,
@@ -39,7 +40,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
-from typing_extensions import Literal
+import typing_extensions
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -499,6 +500,9 @@ class AdvancedJSONEncoder(json.JSONEncoder):
 
         See :py:meth:`json.JSONEncoder.default`.
         """
+        # Datetime support
+        if isinstance(o, datetime):
+            return o.isoformat()
         # Dataclass support
         if dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
@@ -852,6 +856,12 @@ class DefaultFailureConverter(FailureConverter):
                 failure.application_failure_info.next_retry_delay.FromTimedelta(
                     error.next_retry_delay
                 )
+            if error.category:
+                failure.application_failure_info.category = (
+                    temporalio.api.enums.v1.ApplicationErrorCategory.ValueType(
+                        error.category
+                    )
+                )
         elif isinstance(error, temporalio.exceptions.TimeoutError):
             failure.timeout_failure_info.SetInParent()
             failure.timeout_failure_info.timeout_type = (
@@ -938,6 +948,9 @@ class DefaultFailureConverter(FailureConverter):
                 type=app_info.type or None,
                 non_retryable=app_info.non_retryable,
                 next_retry_delay=app_info.next_retry_delay.ToTimedelta(),
+                category=temporalio.exceptions.ApplicationErrorCategory(
+                    int(app_info.category)
+                ),
             )
         elif failure.HasField("timeout_failure_info"):
             timeout_info = failure.timeout_failure_info
@@ -1122,7 +1135,7 @@ DefaultPayloadConverter.default_encoding_payload_converters = (
     BinaryPlainPayloadConverter(),
     JSONProtoPayloadConverter(),
     BinaryProtoPayloadConverter(),
-    JSONPlainPayloadConverter(),
+    JSONPlainPayloadConverter(),  # JSON Plain needs to remain in last because it throws on unknown types
 )
 
 DataConverter.default = DataConverter()
@@ -1389,6 +1402,15 @@ def value_to_type(
     # Any or primitives
     if hint is Any:
         return value
+    elif hint is datetime:
+        if isinstance(value, str):
+            try:
+                return _get_iso_datetime_parser()(value)
+            except ValueError as err:
+                raise TypeError(f"Failed parsing datetime string: {value}") from err
+        elif isinstance(value, datetime):
+            return value
+        raise TypeError(f"Expected datetime or ISO8601 string, got {type(value)}")
     elif hint is int or hint is float:
         if not isinstance(value, (int, float)):
             raise TypeError(f"Expected value to be int|float, was {type(value)}")
@@ -1424,7 +1446,7 @@ def value_to_type(
     type_args: Tuple = getattr(hint, "__args__", ())
 
     # Literal
-    if origin is Literal:
+    if origin is Literal or origin is typing_extensions.Literal:
         if value not in type_args:
             raise TypeError(f"Value {value} not in literal values {type_args}")
         return value
