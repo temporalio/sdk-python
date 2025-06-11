@@ -180,18 +180,18 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
     })
 }
 
-pub fn raise_in_thread(_py: Python, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+pub fn raise_in_thread(_py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, PyAny>) -> bool {
     unsafe { pyo3::ffi::PyThreadState_SetAsyncExc(thread_id, exc.as_ptr()) == 1 }
 }
 
 impl Runtime {
-    pub fn future_into_py<'a, F, T>(&self, py: Python<'a>, fut: F) -> PyResult<&'a PyAny>
+    pub fn future_into_py<'a, F, T>(&self, py: Python<'a>, fut: F) -> PyResult<Bound<'a, PyAny>>
     where
         F: Future<Output = PyResult<T>> + Send + 'static,
-        T: IntoPy<PyObject>,
+        T: for<'py> IntoPyObject<'py>,
     {
         let _guard = self.core.tokio_handle().enter();
-        pyo3_asyncio::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
+        pyo3_async_runtimes::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
     }
 }
 
@@ -287,7 +287,7 @@ impl BufferedLogEntry {
             .fields
             .iter()
             .map(|(key, value)| match pythonize(py, value) {
-                Ok(value) => Ok((key.as_str(), value)),
+                Ok(value) => Ok((key.as_str(), value.unbind())),
                 Err(err) => Err(err.into()),
             })
             .collect()
@@ -377,10 +377,10 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
 pub(crate) struct TokioRuntime;
 
 tokio::task_local! {
-    static TASK_LOCALS: std::cell::OnceCell<pyo3_asyncio::TaskLocals>;
+    static TASK_LOCALS: std::cell::OnceCell<pyo3_async_runtimes::TaskLocals>;
 }
 
-impl pyo3_asyncio::generic::Runtime for TokioRuntime {
+impl pyo3_async_runtimes::generic::Runtime for TokioRuntime {
     type JoinError = tokio::task::JoinError;
     type JoinHandle = tokio::task::JoinHandle<()>;
 
@@ -392,9 +392,9 @@ impl pyo3_asyncio::generic::Runtime for TokioRuntime {
     }
 }
 
-impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
+impl pyo3_async_runtimes::generic::ContextExt for TokioRuntime {
     fn scope<F, R>(
-        locals: pyo3_asyncio::TaskLocals,
+        locals: pyo3_async_runtimes::TaskLocals,
         fut: F,
     ) -> Pin<Box<dyn Future<Output = R> + Send>>
     where
@@ -406,9 +406,12 @@ impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
         Box::pin(TASK_LOCALS.scope(cell, fut))
     }
 
-    fn get_task_locals() -> Option<pyo3_asyncio::TaskLocals> {
+    fn get_task_locals() -> Option<pyo3_async_runtimes::TaskLocals> {
         TASK_LOCALS
-            .try_with(|c| c.get().cloned())
+            .try_with(|c| {
+                c.get()
+                    .map(|locals| Python::with_gil(|py| locals.clone_ref(py)))
+            })
             .unwrap_or_default()
     }
 }
