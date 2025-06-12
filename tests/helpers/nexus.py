@@ -1,13 +1,11 @@
+from dataclasses import dataclass
+from typing import Any, Mapping, Optional
+
+import httpx
+
 import temporalio.api
-import temporalio.api.common
-import temporalio.api.common.v1
-import temporalio.api.enums.v1
-import temporalio.api.nexus
 import temporalio.api.nexus.v1
-import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
-import temporalio.nexus
-import temporalio.nexus.handler
 from temporalio.client import Client
 
 
@@ -35,3 +33,62 @@ async def create_nexus_endpoint(
             )
         )
     )
+
+
+@dataclass
+class ServiceClient:
+    server_address: str  # E.g. http://127.0.0.1:7243
+    endpoint: str
+    service: str
+
+    async def start_operation(
+        self,
+        operation: str,
+        body: Optional[dict[str, Any]] = None,
+        headers: Mapping[str, str] = {},
+    ) -> httpx.Response:
+        """
+        Start a Nexus operation.
+        """
+        async with httpx.AsyncClient() as http_client:
+            return await http_client.post(
+                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}",
+                json=body,
+                headers=headers,
+            )
+
+    async def fetch_operation_info(
+        self,
+        operation: str,
+        token: str,
+    ) -> httpx.Response:
+        async with httpx.AsyncClient() as http_client:
+            return await http_client.get(
+                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}",
+                # Token can also be sent as "Nexus-Operation-Token" header
+                params={"token": token},
+            )
+
+    async def fetch_operation_result(
+        self,
+        operation: str,
+        token: str,
+    ) -> httpx.Response:
+        async with httpx.AsyncClient() as http_client:
+            return await http_client.get(
+                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}/result",
+                # Token can also be sent as "Nexus-Operation-Token" header
+                params={"token": token},
+            )
+
+    async def cancel_operation(
+        self,
+        operation: str,
+        token: str,
+    ) -> httpx.Response:
+        async with httpx.AsyncClient() as http_client:
+            return await http_client.post(
+                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}/cancel",
+                # Token can also be sent as "Nexus-Operation-Token" header
+                params={"token": token},
+            )

@@ -15,11 +15,14 @@ from typing import (
     Optional,
     Sequence,
     Type,
-    TypeVar,
     Union,
 )
 
 import nexusrpc.handler
+from nexusrpc.types import (
+    InputT,
+    OutputT,
+)
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -287,29 +290,24 @@ class StartChildWorkflowInput:
     ret_type: Optional[Type]
 
 
-# TODO(nexus-prerelease): Put these in a better location. Type variance?
-I = TypeVar("I")
-O = TypeVar("O")
-
-
 @dataclass
-class StartNexusOperationInput(Generic[I, O]):
+class StartNexusOperationInput(Generic[InputT, OutputT]):
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_nexus_operation`."""
 
     endpoint: str
     service: str
     operation: Union[
-        nexusrpc.Operation[I, O],
-        Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
+        nexusrpc.Operation[InputT, OutputT],
+        Callable[[Any], nexusrpc.handler.OperationHandler[InputT, OutputT]],
         str,
     ]
-    input: I
+    input: InputT
     schedule_to_close_timeout: Optional[timedelta]
     headers: Optional[Mapping[str, str]]
-    output_type: Optional[Type[O]] = None
+    output_type: Optional[Type[OutputT]] = None
 
     _operation_name: str = field(init=False, repr=False)
-    _input_type: Optional[Type[I]] = field(init=False, repr=False)
+    _input_type: Optional[Type[InputT]] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if isinstance(self.operation, str):
@@ -336,8 +334,9 @@ class StartNexusOperationInput(Generic[I, O]):
     def operation_name(self) -> str:
         return self._operation_name
 
+    # TODO(nexus-prerelease) contravariant type in output
     @property
-    def input_type(self) -> Optional[Type[I]]:
+    def input_type(self) -> Optional[Type[InputT]]:
         return self._input_type
 
 

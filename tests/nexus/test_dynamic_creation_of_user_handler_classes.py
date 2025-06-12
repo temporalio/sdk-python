@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import httpx
 import nexusrpc.handler
@@ -32,7 +33,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
     # service handler
     #
     async def _increment_op(
-        self,
+        self: Any,
         ctx: nexusrpc.handler.StartOperationContext,
         input: int,
     ) -> int:
@@ -42,6 +43,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
         # TODO(nexus-prerelease): check that name=name should be required here. Should the op factory
         # name not default to the name of the method attribute (i.e. key), as opposed to
         # the name of the method object (i.e. value.__name__)?
+        # TODO(nexus-prerelease): type error
         name: nexusrpc.handler.sync_operation_handler(_increment_op, name=name)
         for name in op_names
     }
@@ -71,7 +73,7 @@ async def test_dynamic_creation_of_user_handler_classes(client: Client):
     async with Worker(
         client,
         task_queue=task_queue,
-        nexus_services=[handler_cls()],
+        nexus_service_handlers=[handler_cls()],
     ):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(

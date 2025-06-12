@@ -53,10 +53,14 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus.handler
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
+from temporalio.nexus.handler import (
+    TemporalNexusOperationContext,
+)
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -468,12 +472,6 @@ class Client:
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
         # The following options are deliberately not exposed in overloads
         stack_level: int = 2,
-        nexus_completion_callbacks: Sequence[
-            temporalio.common.NexusCompletionCallback
-        ] = [],
-        workflow_event_links: Sequence[
-            temporalio.api.common.v1.Link.WorkflowEvent
-        ] = [],
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -536,8 +534,21 @@ class Client:
         name, result_type_from_type_hint = (
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
+        nexus_start_ctx = None
+        if nexus_ctx := TemporalNexusOperationContext.try_current():
+            # TODO(prerelease): I think this is too magical: what if a user implements a
+            # nexus handler by running one workflow to completion, and then starting a
+            # second workflow to act as the async operation itself?
+            # TODO(prerelease): What do we do if the Temporal Nexus context client
+            # (namespace) is not the same as the one being used to start this workflow?
+            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
+                nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
+                workflow_event_links = nexus_start_ctx.get_workflow_event_links()
+        else:
+            nexus_completion_callbacks = []
+            workflow_event_links = []
 
-        return await self._impl.start_workflow(
+        wf_handle = await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,
                 args=temporalio.common._arg_or_args(arg, args),
@@ -568,6 +579,11 @@ class Client:
                 workflow_event_links=workflow_event_links,
             )
         )
+
+        if nexus_start_ctx:
+            nexus_start_ctx.add_outbound_links(wf_handle)
+
+        return wf_handle
 
     # Overload for no-param workflow
     @overload
@@ -5876,7 +5892,18 @@ class _ClientImpl(OutboundInterceptor):
         if input.task_timeout is not None:
             req.workflow_task_timeout.FromTimedelta(input.task_timeout)
         req.identity = self._client.identity
-        req.request_id = str(uuid.uuid4())
+        # Use Nexus request ID if we're handling a Nexus Start operation
+        # TODO(prerelease): confirm that we should do this for every workflow started
+        # TODO(prerelease): add test coverage for multiple workflows started by a Nexus operation
+        if nexus_ctx := TemporalNexusOperationContext.try_current():
+            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
+                if (
+                    nexus_request_id
+                    := nexus_start_ctx.nexus_operation_context.request_id
+                ):
+                    req.request_id = nexus_request_id
+        if not req.request_id:
+            req.request_id = str(uuid.uuid4())
         req.workflow_id_reuse_policy = cast(
             "temporalio.api.enums.v1.WorkflowIdReusePolicy.ValueType",
             int(input.id_reuse_policy),
