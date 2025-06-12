@@ -47,6 +47,7 @@ class _OperationContext:
         return self._task_queue
 
 
+# TODO(nexus-prerelease) see https://github.com/temporalio/sdk-python/pull/740/files
 @dataclass
 class StartOperationContext(_OperationContext, nexusrpc.handler.StartOperationContext):
     def get_completion_callbacks(
