@@ -1,4 +1,5 @@
 from dataclasses import replace
+from typing import Union
 
 from agents import (
     Agent,
@@ -35,13 +36,13 @@ class TemporalOpenAIRunner(Runner):
     async def _run_impl(
         self,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: Union[str, list[TResponseInputItem]],
         *,
-        context: TContext | None = None,
+        context: Union[TContext, None] = None,
         max_turns: int = DEFAULT_MAX_TURNS,
         hooks: RunHooks[TContext] | None = None,
-        run_config: RunConfig | None = None,
-        previous_response_id: str | None = None,
+        run_config: Union[RunConfig, None] = None,
+        previous_response_id: Union[str, None] = None,
     ) -> RunResult:
         """Run the agent in a Temporal workflow."""
         if not workflow.in_workflow():
@@ -82,13 +83,13 @@ class TemporalOpenAIRunner(Runner):
     def _run_sync_impl(
         self,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: Union[str, list[TResponseInputItem]],
         *,
-        context: TContext | None = None,
+        context: Union[TContext, None] = None,
         max_turns: int = DEFAULT_MAX_TURNS,
         hooks: RunHooks[TContext] | None = None,
-        run_config: RunConfig | None = None,
-        previous_response_id: str | None = None,
+        run_config: Union[RunConfig, None] = None,
+        previous_response_id: Union[str, None] = None,
     ) -> RunResult:
         if not workflow.in_workflow():
             return self._runner._run_sync_impl(
@@ -105,12 +106,12 @@ class TemporalOpenAIRunner(Runner):
     def _run_streamed_impl(
         self,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
-        context: TContext | None = None,
+        input: Union[str, list[TResponseInputItem]],
+        context: Union[TContext, None] = None,
         max_turns: int = DEFAULT_MAX_TURNS,
         hooks: RunHooks[TContext] | None = None,
-        run_config: RunConfig | None = None,
-        previous_response_id: str | None = None,
+        run_config: Union[RunConfig, None] = None,
+        previous_response_id: Union[str, None] = None,
     ) -> RunResultStreaming:
         if not workflow.in_workflow():
             return self._runner._run_streamed_impl(

@@ -10,7 +10,6 @@ from typing import Any, Optional, Required, TypedDict, Union, cast
 
 from agents import (
     AgentOutputSchemaBase,
-    ComputerTool,
     FileSearchTool,
     FunctionTool,
     Handoff,
@@ -59,7 +58,7 @@ ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
 class AgentOutputSchemaInput(AgentOutputSchemaBase):
     """Data conversion friendly representation of AgentOutputSchema."""
 
-    output_type_name: str | None
+    output_type_name: Union[str, None]
     is_wrapped: bool
     output_schema: dict[str, Any] | None
     strict_json_schema: bool
@@ -107,7 +106,7 @@ class ActivityModelInput(TypedDict, total=False):
 
     model_name: Optional[str]
     system_instructions: Optional[str]
-    input: Required[str | list[TResponseInputItem]]
+    input: Required[Union[str, list][TResponseInputItem]]  # type: ignore
     model_settings: Required[ModelSettings]
     tools: list[ToolInput]
     output_schema: Optional[AgentOutputSchemaInput]

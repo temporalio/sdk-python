@@ -4,7 +4,7 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from datetime import timedelta
-    from typing import Any, AsyncIterator, Sequence, cast
+    from typing import Any, AsyncIterator, Sequence, Union, cast
 
     from agents import (
         AgentOutputSchema,
@@ -37,22 +37,22 @@ with workflow.unsafe.imports_passed_through():
 class _TemporalModelStub(Model):
     """A stub that allows invoking models as Temporal activities."""
 
-    def __init__(self, model_name: str | None) -> None:
+    def __init__(self, model_name: Union[str, None]) -> None:
         self.model_name = model_name
 
     async def get_response(
         self,
-        system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        system_instructions: Union[str, None],
+        input: Union[str, list][TResponseInputItem],  # type: ignore
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: AgentOutputSchemaBase | None,
+        output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
         *,
-        previous_response_id: str | None,
+        previous_response_id: Union[str, None],
     ) -> ModelResponse:
-        def get_summary(input: str | list[TResponseInputItem]) -> str:
+        def get_summary(input: Union[str, list[TResponseInputItem]]) -> str:
             ### Activity summary shown in the UI
             try:
                 max_size = 100
@@ -145,14 +145,14 @@ class _TemporalModelStub(Model):
 
     def stream_response(
         self,
-        system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        system_instructions: Union[str, None],
+        input: Union[str, list][TResponseInputItem],  # type: ignore
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: AgentOutputSchemaBase | None,
+        output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
         *,
-        previous_response_id: str | None,
+        previous_response_id: Union[str, None],
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError("Temporal model doesn't support streams yet")
