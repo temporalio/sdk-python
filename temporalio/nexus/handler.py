@@ -238,7 +238,7 @@ def get_task_queue() -> str:
     return context.task_queue
 
 
-class WorkflowRunOperation(
+class WorkflowRunOperationHandler(
     nexusrpc.handler.OperationHandler[InputT, OutputT],
     Generic[InputT, OutputT, ServiceHandlerT],
 ):
@@ -315,7 +315,7 @@ def workflow_run_operation_handler(
         Awaitable[WorkflowHandle[Any, OutputT]],
     ],
 ) -> Callable[
-    [ServiceHandlerT], WorkflowRunOperation[InputT, OutputT, ServiceHandlerT]
+    [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
 ]: ...
 
 
@@ -330,7 +330,9 @@ def workflow_run_operation_handler(
             Awaitable[WorkflowHandle[Any, OutputT]],
         ]
     ],
-    Callable[[ServiceHandlerT], WorkflowRunOperation[InputT, OutputT, ServiceHandlerT]],
+    Callable[
+        [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
+    ],
 ]: ...
 
 
@@ -344,7 +346,9 @@ def workflow_run_operation_handler(
     *,
     name: Optional[str] = None,
 ) -> Union[
-    Callable[[ServiceHandlerT], WorkflowRunOperation[InputT, OutputT, ServiceHandlerT]],
+    Callable[
+        [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
+    ],
     Callable[
         [
             Callable[
@@ -353,7 +357,8 @@ def workflow_run_operation_handler(
             ]
         ],
         Callable[
-            [ServiceHandlerT], WorkflowRunOperation[InputT, OutputT, ServiceHandlerT]
+            [ServiceHandlerT],
+            WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT],
         ],
     ],
 ]:
@@ -363,7 +368,7 @@ def workflow_run_operation_handler(
             Awaitable[WorkflowHandle[Any, OutputT]],
         ],
     ) -> Callable[
-        [ServiceHandlerT], WorkflowRunOperation[InputT, OutputT, ServiceHandlerT]
+        [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
     ]:
         input_type, output_type = (
             _get_workflow_run_start_method_input_and_output_type_annotations(
@@ -373,8 +378,10 @@ def workflow_run_operation_handler(
 
         def factory(
             service: ServiceHandlerT,
-        ) -> WorkflowRunOperation[InputT, OutputT, ServiceHandlerT]:
-            return WorkflowRunOperation(service, start_method, output_type=output_type)
+        ) -> WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]:
+            return WorkflowRunOperationHandler(
+                service, start_method, output_type=output_type
+            )
 
         # TODO(nexus-prerelease): handle callable instances: __class__.__name__ as in sync_operation_handler
         method_name = getattr(start_method, "__name__", None)
