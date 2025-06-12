@@ -37,7 +37,7 @@ from temporalio import workflow
 from temporalio.client import Client, WorkflowHandle
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus import logger
+from temporalio.nexus import CancelOperationContext, StartOperationContext, logger
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
@@ -115,9 +115,7 @@ class MyLinkTestWorkflow:
 # The service_handler decorator is applied by the test
 class MyServiceHandler:
     @nexusrpc.handler.sync_operation_handler
-    async def echo(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
         return Output(
@@ -125,15 +123,13 @@ class MyServiceHandler:
         )
 
     @nexusrpc.handler.sync_operation_handler
-    async def hang(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def hang(self, ctx: StartOperationContext, input: Input) -> Output:
         await asyncio.Future()
         return Output(value="won't reach here")
 
     @nexusrpc.handler.sync_operation_handler
     async def non_retryable_application_error(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise ApplicationError(
             "non-retryable application error",
@@ -145,7 +141,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def retryable_application_error(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise ApplicationError(
             "retryable application error",
@@ -156,7 +152,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def handler_error_internal(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise nexusrpc.handler.HandlerError(
             message="deliberate internal handler error",
@@ -167,7 +163,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def operation_error_failed(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise nexusrpc.handler.OperationError(
             message="deliberate operation error",
@@ -176,7 +172,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def check_operation_timeout_header(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         assert "operation-timeout" in ctx.headers
         return Output(
@@ -184,15 +180,13 @@ class MyServiceHandler:
         )
 
     @nexusrpc.handler.sync_operation_handler
-    async def log(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def log(self, ctx: StartOperationContext, input: Input) -> Output:
         logger.info("Logging from start method", extra={"input_value": input.value})
         return Output(value=f"logged: {input.value}")
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def async_operation(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
         assert "operation-timeout" in ctx.headers
         return await ctx.client.start_workflow(
@@ -204,7 +198,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     def sync_operation_with_non_async_def(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
@@ -214,7 +208,7 @@ class MyServiceHandler:
         def __call__(
             self,
             _handler: "MyServiceHandler",
-            ctx: nexusrpc.handler.StartOperationContext,
+            ctx: StartOperationContext,
             input: Input,
         ) -> Output:
             return Output(
@@ -247,7 +241,7 @@ class MyServiceHandler:
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_op_link_test(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
         assert any(
             link.url == "http://inbound-link/" for link in ctx.inbound_links
@@ -266,7 +260,7 @@ class MyServiceHandler:
     ):
         async def start(
             self,
-            ctx: nexusrpc.handler.StartOperationContext,
+            ctx: StartOperationContext,
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
@@ -812,7 +806,7 @@ class EchoService:
 @nexusrpc.handler.service_handler(service=EchoService)
 class SyncStartHandler:
     @nexusrpc.handler.sync_operation_handler
-    def echo(self, ctx: nexusrpc.handler.StartOperationContext, input: Input) -> Output:
+    def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
         return Output(
@@ -823,9 +817,7 @@ class SyncStartHandler:
 @nexusrpc.handler.service_handler(service=EchoService)
 class DefaultCancelHandler:
     @nexusrpc.handler.sync_operation_handler
-    async def echo(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
@@ -836,7 +828,7 @@ class SyncCancelHandler:
     class SyncCancel(nexusrpc.handler.SyncOperationHandler[Input, Output]):
         async def start(
             self,
-            ctx: nexusrpc.handler.StartOperationContext,
+            ctx: StartOperationContext,
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
@@ -845,9 +837,7 @@ class SyncCancelHandler:
             # or StartOperationResultAsync
             return Output(value="Hello")  # type: ignore
 
-        def cancel(
-            self, ctx: nexusrpc.handler.CancelOperationContext, token: str
-        ) -> Output:
+        def cancel(self, ctx: CancelOperationContext, token: str) -> Output:
             return Output(value="Hello")  # type: ignore
 
     @nexusrpc.handler.operation_handler
