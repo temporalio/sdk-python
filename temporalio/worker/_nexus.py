@@ -292,20 +292,24 @@ class _NexusWorker:
             temporalio.nexus.logger.exception(
                 "Failed to execute Nexus cancel operation method"
             )
+            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                task_token=task_token,
+                error=await self._handler_error_to_proto(
+                    _exception_to_handler_error(err)
+                ),
             )
-        # TODO(nexus-prerelease): when do we use ack_cancel?
-        completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-            task_token=task_token,
-            completed=temporalio.api.nexus.v1.Response(
-                cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
-            ),
-        )
+        else:
+            # TODO(nexus-prerelease): when do we use ack_cancel?
+            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                task_token=task_token,
+                completed=temporalio.api.nexus.v1.Response(
+                    cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
+                ),
+            )
         try:
             await self._bridge_worker().complete_nexus_task(completion)
-        except Exception as err:
-            temporalio.nexus.logger.exception(
-                "Failed to send Nexus task completion", err
-            )
+        except Exception:
+            temporalio.nexus.logger.exception("Failed to send Nexus task completion")
 
     async def _exception_to_failure_proto(
         self,
