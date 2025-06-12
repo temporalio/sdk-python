@@ -1518,7 +1518,7 @@ requires-dist = [
     { name = "nexus-rpc", editable = "../nexus-sdk-python" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
-    { name = "protobuf", specifier = "==5.29.3" },
+    { name = "protobuf", specifier = ">=3.20" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.0.0,<3" },
     { name = "python-dateutil", marker = "python_full_version < '3.11'", specifier = ">=2.8.2,<3" },
     { name = "types-protobuf", specifier = ">=3.20" },
