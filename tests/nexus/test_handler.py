@@ -891,3 +891,31 @@ async def test_handler_instantiation(
             nexus_services=[test_case.handler()],
             nexus_task_executor=ThreadPoolExecutor() if test_case.executor else None,
         )
+
+
+async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
+    """Verify that canceling an operation with an invalid token fails correctly."""
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = nexusrpc.handler.service_handler(service=MyService)
+    service_handler = decorator(MyServiceHandler)()
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_services=[service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        cancel_response = await service_client.cancel_operation(
+            "async_operation",
+            token="this-is-not-a-valid-token",
+        )
+        assert cancel_response.status_code == 404
+        failure = Failure(**cancel_response.json())
+        assert "failed to decode workflow operation token" in failure.message.lower()
