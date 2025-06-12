@@ -17,6 +17,7 @@ from typing import (
 )
 
 import nexusrpc.handler
+from nexusrpc.handler._common import HandlerError, HandlerErrorType
 from nexusrpc.types import (
     InputT,
     OutputT,
@@ -92,9 +93,22 @@ async def cancel_workflow(
     client: Optional[Client] = None,
 ) -> None:
     client = client or ctx.client
-    if not client:
-        raise RuntimeError("Nexus handler client not set")
-    handle = WorkflowOperationToken.decode(token).to_workflow_handle(client)
+    try:
+        decoded = WorkflowOperationToken.decode(token)
+    except Exception as err:
+        raise HandlerError(
+            "Failed to decode workflow operation token",
+            type=HandlerErrorType.NOT_FOUND,
+            cause=err,
+        )
+    try:
+        handle = decoded.to_workflow_handle(client)
+    except Exception as err:
+        raise HandlerError(
+            "Failed to construct workflow handle from workflow operation token",
+            type=HandlerErrorType.NOT_FOUND,
+            cause=err,
+        )
     await handle.cancel()
 
 
