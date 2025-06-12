@@ -107,7 +107,10 @@ class Worker:
         *,
         task_queue: str,
         activities: Sequence[Callable] = [],
-        nexus_services: Sequence[Any] = [],
+        # TODO(nexus-prerelease): for naming consistency this should be named
+        # nexus_service_handlers. That will prevent users from mistakenly trying to add
+        # their service definitions here.
+        nexus_service_handlers: Sequence[Any] = [],
         workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
@@ -159,8 +162,8 @@ class Worker:
             activities: Activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
-            nexus_services: Nexus service instances decorated with
-                :py:func:`@nexusrpc.handler.service_handler<nexusrpc.service>`.
+            nexus_service_handlers: Nexus service handler instances decorated with
+                :py:func:`@nexusrpc.handler.service_handler`.
             workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
@@ -316,7 +319,7 @@ class Worker:
         #     is issued.
         # max_concurrent_nexus_operations: Maximum number of Nexus operations that
         #     will ever be given to the Nexus worker concurrently. Mutually exclusive with ``tuner``.
-        if not (activities or nexus_services or workflows):
+        if not (activities or nexus_service_handlers or workflows):
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
             )
@@ -415,14 +418,14 @@ class Worker:
                 metric_meter=self._runtime.metric_meter,
             )
         self._nexus_worker: Optional[_NexusWorker] = None
-        if nexus_services:
+        if nexus_service_handlers:
             # TODO(nexus-prerelease): consider not allowing / warning on max_workers <
             # max_concurrent_nexus_operations? See warning above for activity worker.
             self._nexus_worker = _NexusWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 client=client,
                 task_queue=task_queue,
-                nexus_services=nexus_services,
+                service_handlers=nexus_service_handlers,
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
