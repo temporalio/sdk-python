@@ -18,6 +18,7 @@ import concurrent.futures
 import dataclasses
 import json
 import logging
+import pprint
 import uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -29,19 +30,25 @@ import nexusrpc
 import nexusrpc.handler
 import pytest
 from google.protobuf import json_format
-from nexusrpc.testing.client import ServiceClient
+from nexusrpc.handler import (
+    CancelOperationContext,
+    StartOperationContext,
+)
 
 import temporalio.api.failure.v1
 import temporalio.nexus
 from temporalio import workflow
 from temporalio.client import Client, WorkflowHandle
+from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus import logger
-from temporalio.nexus.handler import start_workflow
+from temporalio.nexus.handler import (
+    logger,
+)
+from temporalio.nexus.handler._operation_context import TemporalNexusOperationContext
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint
+from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
 
 HTTP_PORT = 7243
 
@@ -54,6 +61,19 @@ class Input:
 @dataclass
 class Output:
     value: str
+
+
+@dataclass
+class NonSerializableOutput:
+    callable: Callable[[], Any] = lambda: None
+
+
+@dataclass
+class TestContext:
+    workflow_id: Optional[str] = None
+
+
+test_context = TestContext()
 
 
 # TODO: type check nexus implementation under mypy
@@ -73,8 +93,8 @@ class MyService:
     # )
     hang: nexusrpc.Operation[Input, Output]
     log: nexusrpc.Operation[Input, Output]
-    async_operation: nexusrpc.Operation[Input, Output]
-    async_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
+    workflow_run_operation: nexusrpc.Operation[Input, Output]
+    workflow_run_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_with_non_async_def: nexusrpc.Operation[Input, Output]
     sync_operation_with_non_async_callable_instance: nexusrpc.Operation[Input, Output]
@@ -87,6 +107,8 @@ class MyService:
     workflow_run_op_link_test: nexusrpc.Operation[Input, Output]
     handler_error_internal: nexusrpc.Operation[Input, Output]
     operation_error_failed: nexusrpc.Operation[Input, Output]
+    idempotency_check: nexusrpc.Operation[None, Output]
+    non_serializable_output: nexusrpc.Operation[Input, NonSerializableOutput]
 
 
 @workflow.defn
@@ -116,9 +138,7 @@ class MyLinkTestWorkflow:
 # The service_handler decorator is applied by the test
 class MyServiceHandler:
     @nexusrpc.handler.sync_operation_handler
-    async def echo(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
         return Output(
@@ -126,15 +146,13 @@ class MyServiceHandler:
         )
 
     @nexusrpc.handler.sync_operation_handler
-    async def hang(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def hang(self, ctx: StartOperationContext, input: Input) -> Output:
         await asyncio.Future()
         return Output(value="won't reach here")
 
     @nexusrpc.handler.sync_operation_handler
     async def non_retryable_application_error(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise ApplicationError(
             "non-retryable application error",
@@ -146,7 +164,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def retryable_application_error(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise ApplicationError(
             "retryable application error",
@@ -157,7 +175,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def handler_error_internal(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise nexusrpc.handler.HandlerError(
             message="deliberate internal handler error",
@@ -168,7 +186,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def operation_error_failed(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         raise nexusrpc.handler.OperationError(
             message="deliberate operation error",
@@ -177,7 +195,7 @@ class MyServiceHandler:
 
     @nexusrpc.handler.sync_operation_handler
     async def check_operation_timeout_header(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         assert "operation-timeout" in ctx.headers
         return Output(
@@ -185,27 +203,26 @@ class MyServiceHandler:
         )
 
     @nexusrpc.handler.sync_operation_handler
-    async def log(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def log(self, ctx: StartOperationContext, input: Input) -> Output:
         logger.info("Logging from start method", extra={"input_value": input.value})
         return Output(value=f"logged: {input.value}")
 
     @temporalio.nexus.handler.workflow_run_operation_handler
-    async def async_operation(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+    async def workflow_run_operation(
+        self, ctx: StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
-        assert "operation-timeout" in ctx.headers
-        return await start_workflow(
-            ctx,
+        tctx = TemporalNexusOperationContext.current()
+        return await tctx.client.start_workflow(
             MyWorkflow.run,
             input,
-            id=str(uuid.uuid4()),
+            id=test_context.workflow_id or str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
     @nexusrpc.handler.sync_operation_handler
     def sync_operation_with_non_async_def(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
@@ -215,7 +232,7 @@ class MyServiceHandler:
         def __call__(
             self,
             _handler: "MyServiceHandler",
-            ctx: nexusrpc.handler.StartOperationContext,
+            ctx: StartOperationContext,
             input: Input,
         ) -> Output:
             return Output(
@@ -238,28 +255,31 @@ class MyServiceHandler:
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
-    async def async_operation_without_type_annotations(self, ctx, input):
-        return await start_workflow(
-            ctx,
+    async def workflow_run_operation_without_type_annotations(self, ctx, input):
+        tctx = TemporalNexusOperationContext.current()
+        return await tctx.client.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
-            id=str(uuid.uuid4()),
+            id=test_context.workflow_id or str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_op_link_test(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
+        self, ctx: StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
         assert any(
             link.url == "http://inbound-link/" for link in ctx.inbound_links
         ), "Inbound link not found"
         assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
         ctx.outbound_links.extend(ctx.inbound_links)
-        return await start_workflow(
-            ctx,
+
+        tctx = TemporalNexusOperationContext.current()
+        return await tctx.client.start_workflow(
             MyLinkTestWorkflow.run,
             input,
-            id=f"link-test-{uuid.uuid4()}",
+            id=test_context.workflow_id or str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
         )
 
     class OperationHandlerReturningUnwrappedResult(
@@ -267,7 +287,7 @@ class MyServiceHandler:
     ):
         async def start(
             self,
-            ctx: nexusrpc.handler.StartOperationContext,
+            ctx: StartOperationContext,
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
@@ -282,18 +302,39 @@ class MyServiceHandler:
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
         return MyServiceHandler.OperationHandlerReturningUnwrappedResult()
 
+    @nexusrpc.handler.sync_operation_handler
+    async def idempotency_check(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: None
+    ) -> Output:
+        return Output(value=f"request_id: {ctx.request_id}")
+
+    @nexusrpc.handler.sync_operation_handler
+    async def non_serializable_output(
+        self, ctx: StartOperationContext, input: Input
+    ) -> NonSerializableOutput:
+        return NonSerializableOutput()
+
 
 @dataclass
 class Failure:
+    """A Nexus Failure object, with details parsed into an exception.
+
+    https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
+    """
+
     message: str = ""
     metadata: Optional[dict[str, str]] = None
     details: Optional[dict[str, Any]] = None
 
-    exception: Optional[BaseException] = dataclasses.field(init=False, default=None)
+    exception_from_details: Optional[BaseException] = dataclasses.field(
+        init=False, default=None
+    )
 
     def __post_init__(self) -> None:
         if self.metadata and (error_type := self.metadata.get("type")):
-            self.exception = self._instantiate_exception(error_type, self.details)
+            self.exception_from_details = self._instantiate_exception(
+                error_type, self.details
+            )
 
     def _instantiate_exception(
         self, error_type: str, details: Optional[dict[str, Any]]
@@ -334,6 +375,8 @@ class UnsuccessfulResponse:
     # Expected value of Nexus-Request-Retryable header
     retryable_header: Optional[bool]
     failure_message: Union[str, Callable[[str], bool]]
+    # Is the Nexus Failure expected to have the details field populated?
+    failure_details: bool = True
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
     # TODO(nexus-prerelease): the body of a successful response need not be JSON; test non-JSON-parseable string
@@ -358,7 +401,8 @@ class _TestCase:
     ) -> None:
         assert response.status_code == cls.expected.status_code, (
             f"expected status code {cls.expected.status_code} "
-            f"but got {response.status_code} for response content {response.content.decode()}"
+            f"but got {response.status_code} for response content"
+            f"{pprint.pformat(response.content.decode())}"
         )
         if not with_service_definition and cls.expected_without_service_definition:
             expected = cls.expected_without_service_definition
@@ -397,13 +441,25 @@ class _FailureTestCase(_TestCase):
         else:
             assert cls.expected.retryable_header is None
 
-        if failure.exception:
-            assert isinstance(failure.exception, ApplicationError)
-            assert failure.exception.non_retryable == (
+        if cls.expected.failure_details:
+            assert (
+                failure.exception_from_details is not None
+            ), "Expected exception details, but found none."
+            assert isinstance(failure.exception_from_details, ApplicationError)
+
+            exception_from_failure_details = failure.exception_from_details
+            if (
+                exception_from_failure_details.type == "HandlerError"
+                and exception_from_failure_details.__cause__
+            ):
+                exception_from_failure_details = (
+                    exception_from_failure_details.__cause__
+                )
+                assert isinstance(exception_from_failure_details, ApplicationError)
+
+            assert exception_from_failure_details.non_retryable == (
                 not cls.expected.retryable_exception
             )
-        else:
-            print(f"TODO(dan): {cls} did not yield a Failure with exception details")
 
 
 class SyncHandlerHappyPath(_TestCase):
@@ -470,7 +526,7 @@ class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
 
 
 class AsyncHandlerHappyPath(_TestCase):
-    operation = "async_operation"
+    operation = "workflow_run_operation"
     input = Input("hello")
     headers = {"Operation-Timeout": "777s"}
     expected = SuccessfulResponse(
@@ -479,7 +535,7 @@ class AsyncHandlerHappyPath(_TestCase):
 
 
 class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
-    operation = "async_operation_without_type_annotations"
+    operation = "workflow_run_operation_without_type_annotations"
     input = Input("hello")
     expected = SuccessfulResponse(
         status_code=201,
@@ -527,7 +583,7 @@ class OperationHandlerReturningUnwrappedResultError(_FailureTestCase):
         retryable_header=False,
         failure_message=(
             "Operation start method must return either "
-            "nexusrpc.handler.StartOperationResultSync or nexusrpc.handler.StartOperationResultAsync"
+            "nexusrpc.handler.StartOperationResultSync or nexusrpc.handler.StartOperationResultAsync."
         ),
     )
 
@@ -541,6 +597,7 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
         retryable_header=None,
         # This error is returned by the server; it doesn't populate metadata or details, and it
         # doesn't set temporal-nexus-failure-source.
+        failure_details=False,
         failure_message="upstream timeout",
         headers={
             "content-type": "application/json",
@@ -565,11 +622,30 @@ class BadRequest(_FailureTestCase):
     expected = UnsuccessfulResponse(
         status_code=400,
         retryable_header=False,
-        failure_message=lambda s: s.startswith("Failed converting field"),
+        failure_message=lambda s: s.startswith(
+            "Data converter failed to decode Nexus operation input"
+        ),
     )
 
 
-class NonRetryableApplicationError(_FailureTestCase):
+class _ApplicationErrorTestCase(_FailureTestCase):
+    """Test cases in which the operation raises an ApplicationError."""
+
+    @classmethod
+    def check_response(
+        cls, response: httpx.Response, with_service_definition: bool
+    ) -> None:
+        super().check_response(response, with_service_definition)
+        failure = Failure(**response.json())
+        assert failure.exception_from_details
+        assert isinstance(failure.exception_from_details, ApplicationError)
+        err = failure.exception_from_details.__cause__
+        assert isinstance(err, ApplicationError)
+        assert err.type == "TestFailureType"
+        assert err.details == ("details arg",)
+
+
+class NonRetryableApplicationError(_ApplicationErrorTestCase):
     operation = "non_retryable_application_error"
     expected = UnsuccessfulResponse(
         status_code=500,
@@ -578,20 +654,8 @@ class NonRetryableApplicationError(_FailureTestCase):
         failure_message="non-retryable application error",
     )
 
-    @classmethod
-    def check_response(
-        cls, response: httpx.Response, with_service_definition: bool
-    ) -> None:
-        super().check_response(response, with_service_definition)
-        failure = Failure(**response.json())
-        err = failure.exception
-        assert isinstance(err, ApplicationError)
-        assert err.non_retryable
-        assert err.type == "TestFailureType"
-        assert err.details == ("details arg",)
 
-
-class RetryableApplicationError(_FailureTestCase):
+class RetryableApplicationError(_ApplicationErrorTestCase):
     operation = "retryable_application_error"
     expected = UnsuccessfulResponse(
         status_code=500,
@@ -606,7 +670,7 @@ class HandlerErrorInternal(_FailureTestCase):
         status_code=500,
         # TODO(nexus-prerelease): check this assertion
         retryable_header=False,
-        failure_message="cause message",
+        failure_message="deliberate internal handler error",
     )
 
 
@@ -639,6 +703,15 @@ class UnknownOperation(_FailureTestCase):
         failure_message=lambda s: s.startswith(
             "Nexus service definition 'MyService' has no operation 'NonExistentOperation'."
         ),
+    )
+
+
+class NonSerializableOutputFailure(_FailureTestCase):
+    operation = "non_serializable_output"
+    expected = UnsuccessfulResponse(
+        status_code=500,
+        retryable_header=False,
+        failure_message="Object of type function is not JSON serializable",
     )
 
 
@@ -676,6 +749,7 @@ async def test_start_operation_happy_path(
         HandlerErrorInternal,
         UnknownService,
         UnknownOperation,
+        NonSerializableOutputFailure,
     ],
 )
 async def test_start_operation_protocol_level_failures(
@@ -708,7 +782,7 @@ async def _test_start_operation(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        server_address=server_address(env),
         endpoint=endpoint,
         service=(
             test_case.service_defn
@@ -727,7 +801,7 @@ async def _test_start_operation(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[service_handler],
+        nexus_service_handlers=[service_handler],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         response = await service_client.start_operation(
@@ -745,7 +819,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     resp = await create_nexus_endpoint(task_queue, env.client)
     endpoint = resp.endpoint.id
     service_client = ServiceClient(
-        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        server_address=server_address(env),
         endpoint=endpoint,
         service=service_name,
     )
@@ -754,7 +828,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[MyServiceHandler()],
+        nexus_service_handlers=[MyServiceHandler()],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         response = await service_client.start_operation(
@@ -774,7 +848,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
         (
             record
             for record in caplog.records
-            if record.name == "temporalio.nexus"
+            if record.name == "temporalio.nexus.handler"
             and record.getMessage() == "Logging from start method"
         ),
         None,
@@ -813,7 +887,7 @@ class EchoService:
 @nexusrpc.handler.service_handler(service=EchoService)
 class SyncStartHandler:
     @nexusrpc.handler.sync_operation_handler
-    def echo(self, ctx: nexusrpc.handler.StartOperationContext, input: Input) -> Output:
+    def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
         return Output(
@@ -824,9 +898,7 @@ class SyncStartHandler:
 @nexusrpc.handler.service_handler(service=EchoService)
 class DefaultCancelHandler:
     @nexusrpc.handler.sync_operation_handler
-    async def echo(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-    ) -> Output:
+    async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
@@ -837,7 +909,7 @@ class SyncCancelHandler:
     class SyncCancel(nexusrpc.handler.SyncOperationHandler[Input, Output]):
         async def start(
             self,
-            ctx: nexusrpc.handler.StartOperationContext,
+            ctx: StartOperationContext,
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
@@ -846,9 +918,7 @@ class SyncCancelHandler:
             # or StartOperationResultAsync
             return Output(value="Hello")  # type: ignore
 
-        def cancel(
-            self, ctx: nexusrpc.handler.CancelOperationContext, token: str
-        ) -> Output:
+        def cancel(self, ctx: CancelOperationContext, token: str) -> Output:
             return Output(value="Hello")  # type: ignore
 
     @nexusrpc.handler.operation_handler
@@ -890,7 +960,7 @@ async def test_handler_instantiation(
             Worker(
                 client,
                 task_queue=task_queue,
-                nexus_services=[test_case.handler()],
+                nexus_service_handlers=[test_case.handler()],
                 nexus_task_executor=ThreadPoolExecutor()
                 if test_case.executor
                 else None,
@@ -899,6 +969,123 @@ async def test_handler_instantiation(
         Worker(
             client,
             task_queue=task_queue,
-            nexus_services=[test_case.handler()],
+            nexus_service_handlers=[test_case.handler()],
             nexus_task_executor=ThreadPoolExecutor() if test_case.executor else None,
         )
+
+
+async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
+    """Verify that canceling an operation with an invalid token fails correctly."""
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=server_address(env),
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = nexusrpc.handler.service_handler(service=MyService)
+    service_handler = decorator(MyServiceHandler)()
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        cancel_response = await service_client.cancel_operation(
+            "workflow_run_operation",
+            token="this-is-not-a-valid-token",
+        )
+        assert cancel_response.status_code == 404
+        failure = Failure(**cancel_response.json())
+        assert "failed to decode workflow operation token" in failure.message.lower()
+
+
+async def test_request_id_is_received_by_sync_operation_handler(
+    env: WorkflowEnvironment,
+):
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=server_address(env),
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = nexusrpc.handler.service_handler(service=MyService)
+    service_handler = decorator(MyServiceHandler)()
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        request_id = str(uuid.uuid4())
+        resp = await service_client.start_operation(
+            "idempotency_check", None, {"Nexus-Request-Id": request_id}
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"value": f"request_id: {request_id}"}
+
+
+async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnvironment):
+    # We send two Nexus requests that would start a workflow with the same workflow ID,
+    # using reuse_policy=REJECT_DUPLICATE. This would fail if they used different
+    # request IDs. However, when we use the same request ID, it does not fail,
+    # demonstrating that the Nexus Start Operation request ID has become the
+    # StartWorkflow request ID.
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=server_address(env),
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = nexusrpc.handler.service_handler(service=MyService)
+    service_handler = decorator(MyServiceHandler)()
+
+    async def start_two_workflows_with_conflicting_workflow_ids(
+        request_ids: tuple[tuple[str, int], tuple[str, int]],
+    ):
+        test_context.workflow_id = str(uuid.uuid4())
+        for request_id, status_code in request_ids:
+            resp = await service_client.start_operation(
+                "workflow_run_operation",
+                dataclass_as_dict(Input("")),
+                {"Nexus-Request-Id": request_id},
+            )
+            assert resp.status_code == status_code, (
+                f"expected status code {status_code} "
+                f"but got {resp.status_code} for response content "
+                f"{pprint.pformat(resp.content.decode())}"
+            )
+            if status_code == 201:
+                op_info = resp.json()
+                assert op_info["token"]
+                assert op_info["state"] == nexusrpc.OperationState.RUNNING.value
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        request_id_1, request_id_2 = str(uuid.uuid4()), str(uuid.uuid4())
+        # Reusing the same request ID does not fail
+        await start_two_workflows_with_conflicting_workflow_ids(
+            ((request_id_1, 201), (request_id_1, 201))
+        )
+        # Using a different request ID does fail
+        # TODO(nexus-prerelease) I think that this should be a 409 per the spec. Go and
+        # Java are not doing that.
+        await start_two_workflows_with_conflicting_workflow_ids(
+            ((request_id_1, 201), (request_id_2, 500))
+        )
+
+
+def server_address(env: WorkflowEnvironment) -> str:
+    http_port = getattr(env, "_http_port", 7243)
+    return f"http://127.0.0.1:{http_port}"
