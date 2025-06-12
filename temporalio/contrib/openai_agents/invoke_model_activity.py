@@ -122,6 +122,7 @@ async def invoke_model_activity(input: ActivityModelInput) -> ModelResponse:
     """Activity that invokes a model with the given input."""
     # TODO: Is model caching needed here?
     model = MultiProvider().get_model(input.get("model_name"))
+    activity.logger.info(model)
 
     async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
         return ""

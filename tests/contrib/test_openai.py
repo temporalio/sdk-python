@@ -1,31 +1,70 @@
 import uuid
 from datetime import timedelta
 
+from agents.models.multi_provider import MultiProvider
+from openai import AsyncOpenAI
+from openai.types.responses import ResponseOutputMessage, ResponseOutputText
+
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.common import WorkflowIDReusePolicy
-from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
-from temporalio.contrib.openai_agents._temporal_trace_provider import (
-    _TemporalTracingProcessor,
-)
 from temporalio.contrib.openai_agents.invoke_model_activity import invoke_model_activity
 from temporalio.contrib.openai_agents.temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
 )
 from tests.helpers import new_worker
+from agents import (
+    Agent,
+    AgentOutputSchemaBase,
+    Handoff,
+    ModelResponse,
+    ModelSettings,
+    ModelTracing,
+    OpenAIResponsesModel,
+    RunConfig,
+    Runner,
+    Tool,
+    TResponseInputItem,
+    Usage,
+)
 
-id_reuse_policy = (WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,)
+class TestModel(OpenAIResponsesModel):
+    __test__ = False
 
-# Import our activity, passing it through the sandbox
-with workflow.unsafe.imports_passed_through():
-    from agents import Agent, RunConfig, Runner, set_trace_processors
+    def __init__(
+        self,
+        model: str,
+        openai_client: AsyncOpenAI,
+    ) -> None:
+        super().__init__(model, openai_client)
 
-
-@workflow.defn
-class HelloWorkflow:
-    @workflow.run
-    async def run(self, name: str) -> str:
-        return f"Hello, {name}!"
+    async def get_response(
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        tracing: ModelTracing,
+        previous_response_id: str | None,
+    ) -> ModelResponse:
+        return ModelResponse(
+            output=[
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text="test", annotations=[], type="output_text"
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        )
 
 
 @workflow.defn(sandboxed=False)
@@ -38,7 +77,11 @@ class HelloWorldAgent:
             instructions="You only respond in haikus.",
         )  # type: Agent
         workflow.logger.warning("Created agent")
-        result = await Runner.run(agent, input=prompt)
+        MultiProvider.get_model = lambda self, name: TestModel(  # type: ignore
+            name or "", openai_client=AsyncOpenAI()
+        )
+        config = RunConfig(model="test_model")
+        result = await Runner.run(agent, input=prompt, run_config=config)
         workflow.logger.warning("Run result")
         return result.final_output
 
@@ -53,5 +96,6 @@ async def test_hello_world_agent(client: Client):
             "Tell me about recursion in programming.",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=5),
         )
-        print("\n--------\n", result, "\n---------\n")
+        assert result == "test"

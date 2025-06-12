@@ -7,10 +7,10 @@ from typing import Any, Mapping, Protocol, Type, cast
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
+    DefaultTraceProvider,  # pyright: ignore[reportPrivateImportUsage]
     get_trace_provider,  # pyright: ignore[reportPrivateImportUsage]
 )
 from agents.tracing.spans import NoOpSpan, SpanImpl
-from src.agents.tracing.provider import DefaultTraceProvider
 
 import temporalio.activity
 import temporalio.api.common.v1
