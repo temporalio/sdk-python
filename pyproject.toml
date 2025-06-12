@@ -15,7 +15,6 @@ dependencies = [
     "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
     "types-protobuf>=3.20",
     "typing-extensions>=4.2.0,<5",
-    "openai-agents @ file:///Users/tconley/openai-agents-python",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +24,7 @@ opentelemetry = [
     "opentelemetry-sdk>=1.11.1,<2",
 ]
 pydantic = ["pydantic>=2.0.0,<3"]
+openai = ["openai-agents @ git+https://github.com/openai/openai-agents-python@83251c385483cfdf89121ecf313880f6076f8917"]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"
