@@ -1,17 +1,6 @@
 import uuid
 from datetime import timedelta
 
-from agents.models.multi_provider import MultiProvider
-from openai import AsyncOpenAI
-from openai.types.responses import ResponseOutputMessage, ResponseOutputText
-
-from temporalio import workflow
-from temporalio.client import Client
-from temporalio.contrib.openai_agents.invoke_model_activity import invoke_model_activity
-from temporalio.contrib.openai_agents.temporal_openai_agents import (
-    set_open_ai_agent_temporal_overrides,
-)
-from tests.helpers import new_worker
 from agents import (
     Agent,
     AgentOutputSchemaBase,
@@ -26,6 +15,18 @@ from agents import (
     TResponseInputItem,
     Usage,
 )
+from agents.models.multi_provider import MultiProvider
+from openai import AsyncOpenAI
+from openai.types.responses import ResponseOutputMessage, ResponseOutputText
+
+from temporalio import workflow
+from temporalio.client import Client
+from temporalio.contrib.openai_agents.invoke_model_activity import invoke_model_activity
+from temporalio.contrib.openai_agents.temporal_openai_agents import (
+    set_open_ai_agent_temporal_overrides,
+)
+from tests.helpers import new_worker
+
 
 class TestModel(OpenAIResponsesModel):
     __test__ = False
