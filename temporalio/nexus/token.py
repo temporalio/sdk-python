@@ -3,9 +3,10 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from temporalio.client import Client, WorkflowHandle
+if TYPE_CHECKING:
+    from temporalio.client import Client, WorkflowHandle
 
 OPERATION_TOKEN_TYPE_WORKFLOW = 1
 OperationTokenType = Literal[1]

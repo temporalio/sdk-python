@@ -148,26 +148,23 @@ class _NexusWorker:
         header: dict[str, str],
     ) -> None:
         async def run() -> temporalio.bridge.proto.nexus.NexusTaskCompletion:
-            temporalio.nexus.handler._current_context.set(
-                temporalio.nexus.handler._Context(
-                    client=self._client,
-                    task_queue=self._task_queue,
-                    service=start_request.service,
-                    operation=start_request.operation,
-                )
-            )
             try:
-                ctx = nexusrpc.handler.StartOperationContext(
+                ctx = temporalio.nexus.StartOperationContext(
                     service=start_request.service,
                     operation=start_request.operation,
                     headers=header,
                     request_id=start_request.request_id,
                     callback_url=start_request.callback,
                     inbound_links=[
-                        nexusrpc.handler.Link(url=l.url, type=l.type)
-                        for l in start_request.links
+                        nexusrpc.handler.Link(url=link.url, type=link.type)
+                        for link in start_request.links
                     ],
                     callback_headers=dict(start_request.callback_header),
+                    _client=self._client,
+                    _task_queue=self._task_queue,
+                )
+                temporalio.nexus.current_context.set(
+                    temporalio.nexus.Context(operation_context=ctx)
                 )
                 input = nexusrpc.handler.LazyValue(
                     serializer=_DummyPayloadSerializer(
@@ -279,17 +276,14 @@ class _NexusWorker:
     async def _handle_cancel_operation(
         self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
     ) -> None:
-        temporalio.nexus.handler._current_context.set(
-            temporalio.nexus.handler._Context(
-                client=self._client,
-                task_queue=self._task_queue,
-                service=request.service,
-                operation=request.operation,
-            )
-        )
-        ctx = nexusrpc.handler.CancelOperationContext(
+        ctx = temporalio.nexus.CancelOperationContext(
             service=request.service,
             operation=request.operation,
+            _client=self._client,
+            _task_queue=self._task_queue,
+        )
+        temporalio.nexus.current_context.set(
+            temporalio.nexus.Context(operation_context=ctx)
         )
         # TODO(nexus-prerelease): header
         try:

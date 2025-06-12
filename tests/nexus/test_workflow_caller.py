@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Union
 
 import nexusrpc
 import nexusrpc.handler
@@ -24,10 +24,10 @@ from temporalio.client import (
     WithStartWorkflowOperation,
     WorkflowExecutionStatus,
     WorkflowFailureError,
+    WorkflowHandle,
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
-from temporalio.nexus.handler import WorkflowHandle
 from temporalio.nexus.token import WorkflowOperationToken
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
@@ -88,7 +88,6 @@ class OpInput:
 @dataclass
 class OpOutput:
     value: str
-    start_options_received_by_handler: Optional[nexusrpc.handler.StartOperationContext]
 
 
 @dataclass
@@ -99,7 +98,6 @@ class HandlerWfInput:
 @dataclass
 class HandlerWfOutput:
     value: str
-    start_options_received_by_handler: Optional[nexusrpc.handler.StartOperationContext]
 
 
 @nexusrpc.service
@@ -120,14 +118,12 @@ class HandlerWorkflow:
     async def run(
         self,
         input: HandlerWfInput,
-        start_options_received_by_handler: nexusrpc.handler.StartOperationContext,
     ) -> HandlerWfOutput:
         assert isinstance(input.op_input.response_type, AsyncResponse)
         if input.op_input.response_type.block_forever_waiting_for_cancellation:
             await asyncio.Future()
         return HandlerWfOutput(
             value="workflow result",
-            start_options_received_by_handler=start_options_received_by_handler,
         )
 
 
@@ -136,7 +132,7 @@ class HandlerWorkflow:
 
 class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput]):
     async def start(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: OpInput
+        self, ctx: temporalio.nexus.StartOperationContext, input: OpInput
     ) -> Union[
         nexusrpc.handler.StartOperationResultSync[OpOutput],
         nexusrpc.handler.StartOperationResultAsync,
@@ -150,17 +146,14 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
             )
         if isinstance(input.response_type, SyncResponse):
             return nexusrpc.handler.StartOperationResultSync(
-                value=OpOutput(
-                    value="sync response",
-                    start_options_received_by_handler=ctx,
-                )
+                value=OpOutput(value="sync response")
             )
         elif isinstance(input.response_type, AsyncResponse):
-            wf_handle = await temporalio.nexus.handler.start_workflow(
-                ctx,
+            wf_handle = await ctx.client.start_workflow(
                 HandlerWorkflow.run,
-                args=[HandlerWfInput(op_input=input), ctx],
+                args=[HandlerWfInput(op_input=input)],
                 id=input.response_type.operation_workflow_id,
+                task_queue=ctx.task_queue,
             )
             return nexusrpc.handler.StartOperationResultAsync(
                 WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
@@ -169,7 +162,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
             raise TypeError
 
     async def cancel(
-        self, ctx: nexusrpc.handler.CancelOperationContext, token: str
+        self, ctx: temporalio.nexus.CancelOperationContext, token: str
     ) -> None:
         return await temporalio.nexus.handler.cancel_workflow(ctx, token)
 
@@ -203,14 +196,11 @@ class ServiceImpl:
                 RPCStatusCode.INVALID_ARGUMENT,
                 b"",
             )
-        return OpOutput(
-            value="sync response",
-            start_options_received_by_handler=ctx,
-        )
+        return OpOutput(value="sync response")
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def async_operation(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: OpInput
+        self, ctx: temporalio.nexus.StartOperationContext, input: OpInput
     ) -> WorkflowHandle[HandlerWorkflow, HandlerWfOutput]:
         assert isinstance(input.response_type, AsyncResponse)
         if input.response_type.exception_in_operation_start:
@@ -219,11 +209,11 @@ class ServiceImpl:
                 RPCStatusCode.INVALID_ARGUMENT,
                 b"",
             )
-        return await temporalio.nexus.handler.start_workflow(
-            ctx,
+        return await ctx.client.start_workflow(
             HandlerWorkflow.run,
-            args=[HandlerWfInput(op_input=input), ctx],
+            args=[HandlerWfInput(op_input=input)],
             id=input.response_type.operation_workflow_id,
+            task_queue=ctx.task_queue,
         )
 
 
@@ -295,12 +285,7 @@ class CallerWorkflow:
             # transition doesn't happen until the handle is awaited.
             assert op_handle.cancel()
         op_output = await op_handle
-        return CallerWfOutput(
-            op_output=OpOutput(
-                value=op_output.value,
-                start_options_received_by_handler=op_output.start_options_received_by_handler,
-            )
-        )
+        return CallerWfOutput(op_output=OpOutput(value=op_output.value))
 
     @workflow.update
     async def wait_nexus_operation_started(self) -> None:
@@ -420,12 +405,7 @@ class UntypedCallerWorkflow:
                 headers=op_input.headers,
                 output_type=OpOutput,
             )
-        return CallerWfOutput(
-            op_output=OpOutput(
-                value=op_output.value,
-                start_options_received_by_handler=op_output.start_options_received_by_handler,
-            )
-        )
+        return CallerWfOutput(op_output=OpOutput(value=op_output.value))
 
 
 # -----------------------------------------------------------------------------
@@ -508,7 +488,6 @@ async def test_sync_response(
         else:
             result = await caller_wf_handle.result()
             assert result.op_output.value == "sync response"
-            assert result.op_output.start_options_received_by_handler
 
 
 @pytest.mark.parametrize("exception_in_operation_start", [False, True])
@@ -608,7 +587,6 @@ async def test_async_response(
             assert handler_wf_info.status == WorkflowExecutionStatus.COMPLETED
             result = await caller_wf_handle.result()
             assert result.op_output.value == "workflow result"
-            assert result.op_output.start_options_received_by_handler
 
 
 async def _start_wf_and_nexus_op(
@@ -738,7 +716,6 @@ async def test_untyped_caller(
                 if isinstance(response_type, SyncResponse)
                 else "workflow result"
             )
-            assert result.op_output.start_options_received_by_handler
 
 
 #
@@ -825,6 +802,7 @@ class ServiceInterfaceAndImplCallerWorkflow:
         elif (caller_reference, name_override) == (C.IMPL_WITH_INTERFACE, N.NO):
             service_cls = ServiceImplInterfaceWithoutNameOverride
         elif (caller_reference, name_override) == (C.IMPL_WITHOUT_INTERFACE, N.NO):
+            service_cls = ServiceImplInterfaceWithNameOverride
             service_cls = ServiceImplInterfaceWithNeitherInterfaceNorNameOverride
         else:
             raise ValueError(

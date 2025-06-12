@@ -38,7 +38,6 @@ from temporalio.client import Client, WorkflowHandle
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import logger
-from temporalio.nexus.handler import start_workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
@@ -196,11 +195,11 @@ class MyServiceHandler:
         self, ctx: nexusrpc.handler.StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
         assert "operation-timeout" in ctx.headers
-        return await start_workflow(
-            ctx,
+        return await ctx.client.start_workflow(
             MyWorkflow.run,
             input,
             id=str(uuid.uuid4()),
+            task_queue=ctx.task_queue,
         )
 
     @nexusrpc.handler.sync_operation_handler
@@ -239,11 +238,11 @@ class MyServiceHandler:
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def async_operation_without_type_annotations(self, ctx, input):
-        return await start_workflow(
-            ctx,
+        return await ctx.client.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
             id=str(uuid.uuid4()),
+            task_queue=ctx.task_queue,
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
@@ -255,11 +254,11 @@ class MyServiceHandler:
         ), "Inbound link not found"
         assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
         ctx.outbound_links.extend(ctx.inbound_links)
-        return await start_workflow(
-            ctx,
+        return await ctx.client.start_workflow(
             MyLinkTestWorkflow.run,
             input,
             id=f"link-test-{uuid.uuid4()}",
+            task_queue=ctx.task_queue,
         )
 
     class OperationHandlerReturningUnwrappedResult(

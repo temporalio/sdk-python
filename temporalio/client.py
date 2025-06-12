@@ -53,6 +53,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -468,12 +469,6 @@ class Client:
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
         # The following options are deliberately not exposed in overloads
         stack_level: int = 2,
-        nexus_completion_callbacks: Sequence[
-            temporalio.common.NexusCompletionCallback
-        ] = [],
-        workflow_event_links: Sequence[
-            temporalio.api.common.v1.Link.WorkflowEvent
-        ] = [],
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -536,8 +531,16 @@ class Client:
         name, result_type_from_type_hint = (
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
+        nexus_start_ctx = None
+        if nexus_ctx := temporalio.nexus.current_context.get(None):
+            if nexus_start_ctx := nexus_ctx.start_operation_context:
+                nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
+                workflow_event_links = nexus_start_ctx.get_workflow_event_links()
+        else:
+            nexus_completion_callbacks = []
+            workflow_event_links = []
 
-        return await self._impl.start_workflow(
+        wf_handle = await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,
                 args=temporalio.common._arg_or_args(arg, args),
@@ -568,6 +571,11 @@ class Client:
                 workflow_event_links=workflow_event_links,
             )
         )
+
+        if nexus_start_ctx:
+            nexus_start_ctx.add_outbound_links(wf_handle)
+
+        return wf_handle
 
     # Overload for no-param workflow
     @overload
