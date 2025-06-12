@@ -40,7 +40,7 @@ class TemporalOpenAIRunner(Runner):
         *,
         context: Union[TContext, None] = None,
         max_turns: int = DEFAULT_MAX_TURNS,
-        hooks: RunHooks[TContext] | None = None,
+        hooks: Union[RunHooks[TContext], None] = None,
         run_config: Union[RunConfig, None] = None,
         previous_response_id: Union[str, None] = None,
     ) -> RunResult:
@@ -87,7 +87,7 @@ class TemporalOpenAIRunner(Runner):
         *,
         context: Union[TContext, None] = None,
         max_turns: int = DEFAULT_MAX_TURNS,
-        hooks: RunHooks[TContext] | None = None,
+        hooks: Union[RunHooks[TContext], None] = None,
         run_config: Union[RunConfig, None] = None,
         previous_response_id: Union[str, None] = None,
     ) -> RunResult:
@@ -109,7 +109,7 @@ class TemporalOpenAIRunner(Runner):
         input: Union[str, list[TResponseInputItem]],
         context: Union[TContext, None] = None,
         max_turns: int = DEFAULT_MAX_TURNS,
-        hooks: RunHooks[TContext] | None = None,
+        hooks: Union[RunHooks[TContext], None] = None,
         run_config: Union[RunConfig, None] = None,
         previous_response_id: Union[str, None] = None,
     ) -> RunResultStreaming:

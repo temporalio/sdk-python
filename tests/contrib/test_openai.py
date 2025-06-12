@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta
+from typing import Union
 
 from agents import (
     Agent,
@@ -40,14 +41,14 @@ class TestModel(OpenAIResponsesModel):
 
     async def get_response(
         self,
-        system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        system_instructions: Union[str, None],
+        input: Union[str, list[TResponseInputItem]],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: AgentOutputSchemaBase | None,
+        output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        previous_response_id: str | None,
+        previous_response_id: Union[str, None],
     ) -> ModelResponse:
         return ModelResponse(
             output=[

@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, cast
+from typing import Any, Union, cast
 
 from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (  # TODO: TraceProvider is not declared in __all__
@@ -21,10 +21,10 @@ class ActivitySpanData(SpanData):
         activity_id: str,
         activity_type: str,
         task_queue: str,
-        schedule_to_close_timeout: float | None = None,
-        schedule_to_start_timeout: float | None = None,
-        start_to_close_timeout: float | None = None,
-        heartbeat_timeout: float | None = None,
+        schedule_to_close_timeout: Union[float, None] = None,
+        schedule_to_start_timeout: Union[float, None] = None,
+        start_to_close_timeout: Union[float, None] = None,
+        heartbeat_timeout: Union[float, None] = None,
     ):
         """Initialize an ActivitySpanData instance."""
         self.activity_id = activity_id

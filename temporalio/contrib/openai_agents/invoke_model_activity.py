@@ -6,7 +6,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 import enum
 import json
 from dataclasses import dataclass
-from typing import Any, Optional, Required, TypedDict, Union, cast
+from typing import Any, Optional, TypedDict, Union, cast
 
 from agents import (
     AgentOutputSchemaBase,
@@ -23,6 +23,7 @@ from agents import (
     WebSearchTool,
 )
 from agents.models.multi_provider import MultiProvider
+from typing_extensions import Required
 
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
@@ -60,7 +61,7 @@ class AgentOutputSchemaInput(AgentOutputSchemaBase):
 
     output_type_name: Union[str, None]
     is_wrapped: bool
-    output_schema: dict[str, Any] | None
+    output_schema: Union[dict[str, Any], None]
     strict_json_schema: bool
 
     def is_plain_text(self) -> bool:
