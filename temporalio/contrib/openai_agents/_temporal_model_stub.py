@@ -28,9 +28,9 @@ with workflow.unsafe.imports_passed_through():
         AgentOutputSchemaInput,
         FunctionToolInput,
         HandoffInput,
+        ModelActivity,
         ModelTracingInput,
         ToolInput,
-        invoke_model_activity,
     )
 
 
@@ -134,8 +134,8 @@ class _TemporalModelStub(Model):
             tracing=ModelTracingInput(tracing.value),
             previous_response_id=previous_response_id,
         )
-        return await workflow.execute_activity(
-            invoke_model_activity,
+        return await workflow.execute_activity_method(
+            ModelActivity.invoke_model_activity,
             activity_input,
             start_to_close_timeout=timedelta(seconds=60),
             heartbeat_timeout=timedelta(seconds=10),

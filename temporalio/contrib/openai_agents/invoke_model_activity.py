@@ -13,6 +13,7 @@ from agents import (
     FileSearchTool,
     FunctionTool,
     Handoff,
+    ModelProvider,
     ModelResponse,
     ModelSettings,
     ModelTracing,
@@ -116,61 +117,68 @@ class ActivityModelInput(TypedDict, total=False):
     previous_response_id: Optional[str]
 
 
-@activity.defn
-@_auto_heartbeater
-async def invoke_model_activity(input: ActivityModelInput) -> ModelResponse:
-    """Activity that invokes a model with the given input."""
-    # TODO: Is model caching needed here?
-    model = MultiProvider().get_model(input.get("model_name"))
-    activity.logger.info(model)
+class ModelActivity:
+    """Class wrapper for model invocation activities to allow model customization."""
 
-    async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
-        return ""
+    def __init__(self, model_provider: Union[ModelProvider, None]):
+        """Initialize the activity with a model provider."""
+        self._model_provider = model_provider or MultiProvider()
 
-    async def empty_on_invoke_handoff(ctx: RunContextWrapper[Any], input: str) -> Any:
-        return None
+    @activity.defn
+    @_auto_heartbeater
+    async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
+        """Activity that invokes a model with the given input."""
+        model = self._model_provider.get_model(input.get("model_name"))
 
-    # workaround for https://github.com/pydantic/pydantic/issues/9541
-    # ValidatorIterator returned
-    input_json = json.dumps(input["input"], default=lambda o: str(o))
-    input_input = json.loads(input_json)
+        async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
+            return ""
 
-    def make_tool(tool: ToolInput) -> Tool:
-        if isinstance(tool, FileSearchTool):
-            return cast(FileSearchTool, tool)
-        elif isinstance(tool, WebSearchTool):
-            return cast(WebSearchTool, tool)
-        elif isinstance(tool, FunctionToolInput):
-            t = cast(FunctionToolInput, tool)
-            return FunctionTool(
-                name=t.name,
-                description=t.description,
-                params_json_schema=t.params_json_schema,
-                on_invoke_tool=empty_on_invoke_tool,
-                strict_json_schema=t.strict_json_schema,
+        async def empty_on_invoke_handoff(
+            ctx: RunContextWrapper[Any], input: str
+        ) -> Any:
+            return None
+
+        # workaround for https://github.com/pydantic/pydantic/issues/9541
+        # ValidatorIterator returned
+        input_json = json.dumps(input["input"], default=lambda o: str(o))
+        input_input = json.loads(input_json)
+
+        def make_tool(tool: ToolInput) -> Tool:
+            if isinstance(tool, FileSearchTool):
+                return cast(FileSearchTool, tool)
+            elif isinstance(tool, WebSearchTool):
+                return cast(WebSearchTool, tool)
+            elif isinstance(tool, FunctionToolInput):
+                t = cast(FunctionToolInput, tool)
+                return FunctionTool(
+                    name=t.name,
+                    description=t.description,
+                    params_json_schema=t.params_json_schema,
+                    on_invoke_tool=empty_on_invoke_tool,
+                    strict_json_schema=t.strict_json_schema,
+                )
+            else:
+                raise UserError(f"Unknown tool type: {tool.name}")
+
+        tools = [make_tool(x) for x in input.get("tools", [])]
+        handoffs = [
+            Handoff(
+                tool_name=x.tool_name,
+                tool_description=x.tool_description,
+                input_json_schema=x.input_json_schema,
+                agent_name=x.agent_name,
+                strict_json_schema=x.strict_json_schema,
+                on_invoke_handoff=empty_on_invoke_handoff,
             )
-        else:
-            raise UserError(f"Unknown tool type: {tool.name}")
-
-    tools = [make_tool(x) for x in input.get("tools", [])]
-    handoffs = [
-        Handoff(
-            tool_name=x.tool_name,
-            tool_description=x.tool_description,
-            input_json_schema=x.input_json_schema,
-            agent_name=x.agent_name,
-            strict_json_schema=x.strict_json_schema,
-            on_invoke_handoff=empty_on_invoke_handoff,
+            for x in input.get("handoffs", [])
+        ]
+        return await model.get_response(
+            system_instructions=input.get("system_instructions"),
+            input=input_input,
+            model_settings=input["model_settings"],
+            tools=tools,
+            output_schema=input.get("output_schema"),
+            handoffs=handoffs,
+            tracing=ModelTracing(input["tracing"]),
+            previous_response_id=input.get("previous_response_id"),
         )
-        for x in input.get("handoffs", [])
-    ]
-    return await model.get_response(
-        system_instructions=input.get("system_instructions"),
-        input=input_input,
-        model_settings=input["model_settings"],
-        tools=tools,
-        output_schema=input.get("output_schema"),
-        handoffs=handoffs,
-        tracing=ModelTracing(input["tracing"]),
-        previous_response_id=input.get("previous_response_id"),
-    )
