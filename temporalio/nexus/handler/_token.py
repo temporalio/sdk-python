@@ -3,9 +3,10 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from temporalio.client import Client, WorkflowHandle
+if TYPE_CHECKING:
+    from temporalio.client import Client, WorkflowHandle
 
 OPERATION_TOKEN_TYPE_WORKFLOW = 1
 OperationTokenType = Literal[1]
@@ -53,41 +54,43 @@ class WorkflowOperationToken:
         )
 
     @classmethod
-    def decode(cls, data: str) -> WorkflowOperationToken:
+    def decode(cls, token: str) -> WorkflowOperationToken:
         """Decodes and validates a token from its base64url-encoded string representation."""
-        if not data:
+        if not token:
             raise TypeError("invalid workflow token: token is empty")
         try:
-            decoded_bytes = _base64url_decode_no_padding(data)
+            decoded_bytes = _base64url_decode_no_padding(token)
         except Exception as err:
             raise TypeError("failed to decode token as base64url") from err
         try:
-            token = json.loads(decoded_bytes.decode("utf-8"))
+            workflow_operation_token = json.loads(decoded_bytes.decode("utf-8"))
         except Exception as err:
             raise TypeError("failed to unmarshal workflow operation token") from err
 
-        if not isinstance(token, dict):
-            raise TypeError(f"invalid workflow token: expected dict, got {type(token)}")
+        if not isinstance(workflow_operation_token, dict):
+            raise TypeError(
+                f"invalid workflow token: expected dict, got {type(workflow_operation_token)}"
+            )
 
-        _type = token.get("t")
+        _type = workflow_operation_token.get("t")
         if _type != OPERATION_TOKEN_TYPE_WORKFLOW:
             raise TypeError(
                 f"invalid workflow token type: {_type}, expected: {OPERATION_TOKEN_TYPE_WORKFLOW}"
             )
 
-        version = token.get("v")
+        version = workflow_operation_token.get("v")
         if version is not None and version != 0:
             raise TypeError(
                 "invalid workflow token: 'v' field, if present, must be 0 or null/absent"
             )
 
-        workflow_id = token.get("wid")
+        workflow_id = workflow_operation_token.get("wid")
         if not workflow_id or not isinstance(workflow_id, str):
             raise TypeError(
                 "invalid workflow token: missing, empty, or non-string workflow ID (wid)"
             )
 
-        namespace = token.get("ns")
+        namespace = workflow_operation_token.get("ns")
         if namespace is None or not isinstance(namespace, str):
             # Allow empty string for ns, but it must be present and a string
             raise TypeError(

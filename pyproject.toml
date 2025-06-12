@@ -200,9 +200,6 @@ exclude = [
 [tool.ruff]
 target-version = "py39"
 
-[tool.ruff.lint]
-extend-ignore = ["E741"]  # Allow single-letter variable names like I, O
-
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"

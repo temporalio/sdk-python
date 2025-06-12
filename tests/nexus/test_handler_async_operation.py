@@ -24,11 +24,10 @@ from nexusrpc.handler import (
     StartOperationContext,
     StartOperationResultAsync,
 )
-from nexusrpc.testing.client import ServiceClient
 
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint
+from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
 
 
 @dataclass
@@ -155,7 +154,7 @@ async def test_async_operation_lifecycle(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[service_handler_cls(task_executor)],
+        nexus_service_handlers=[service_handler_cls(task_executor)],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         start_response = await service_client.start_operation(
@@ -209,16 +208,16 @@ class TaskExecutor:
             self.add_task(task_id, coro), self.event_loop
         ).result()
 
-    def get_task_status(self, task_id: str) -> nexusrpc.handler.OperationState:
+    def get_task_status(self, task_id: str) -> nexusrpc.OperationState:
         task = self.tasks[task_id]
         if not task.done():
-            return nexusrpc.handler.OperationState.RUNNING
+            return nexusrpc.OperationState.RUNNING
         elif task.cancelled():
-            return nexusrpc.handler.OperationState.CANCELED
+            return nexusrpc.OperationState.CANCELED
         elif task.exception():
-            return nexusrpc.handler.OperationState.FAILED
+            return nexusrpc.OperationState.FAILED
         else:
-            return nexusrpc.handler.OperationState.SUCCEEDED
+            return nexusrpc.OperationState.SUCCEEDED
 
     async def get_task_result(self, task_id: str) -> Any:
         """
