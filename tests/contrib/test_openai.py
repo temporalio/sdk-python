@@ -106,26 +106,25 @@ async def test_hello_world_agent(client: Client):
     if sys.version_info < (3, 11):
         pytest.skip("Open AI support has type errors on 3.9")
 
-    set_open_ai_agent_temporal_overrides()
-
-    model_activity = ModelActivity(
-        TestProvider(
-            TestModel(  # type: ignore
-                "", openai_client=AsyncOpenAI(api_key="Fake key")
+    with set_open_ai_agent_temporal_overrides():
+        model_activity = ModelActivity(
+            TestProvider(
+                TestModel(  # type: ignore
+                    "", openai_client=AsyncOpenAI(api_key="Fake key")
+                )
             )
         )
-    )
-    async with new_worker(
-        client, HelloWorldAgent, activities=[model_activity.invoke_model_activity]
-    ) as worker:
-        result = await client.execute_workflow(
-            HelloWorldAgent.run,
-            "Tell me about recursion in programming.",
-            id=f"hello-workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=5),
-        )
-        assert result == "test"
+        async with new_worker(
+            client, HelloWorldAgent, activities=[model_activity.invoke_model_activity]
+        ) as worker:
+            result = await client.execute_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming.",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=5),
+            )
+            assert result == "test"
 
 
 @dataclass
@@ -227,31 +226,31 @@ async def test_tool_workflow(client: Client):
     if sys.version_info < (3, 11):
         pytest.skip("Open AI support has type errors on 3.9")
 
-    set_open_ai_agent_temporal_overrides()
-    model_activity = ModelActivity(
-        TestProvider(
-            TestWeatherModel(  # type: ignore
-                "", openai_client=AsyncOpenAI(api_key="Fake key")
+    with set_open_ai_agent_temporal_overrides():
+        model_activity = ModelActivity(
+            TestProvider(
+                TestWeatherModel(  # type: ignore
+                    "", openai_client=AsyncOpenAI(api_key="Fake key")
+                )
             )
         )
-    )
-    async with new_worker(
-        client,
-        ToolsWorkflow,
-        activities=[model_activity.invoke_model_activity, get_weather],
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            ToolsWorkflow.run,
-            "What is the weather in Tokio?",
-            id=f"tools-workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=5),
-        )
-        result = await workflow_handle.result()
-        activity_count = 0
-        async for e in workflow_handle.fetch_history_events():
-            if e.HasField("activity_task_completed_event_attributes"):
-                activity_count += 1
+        async with new_worker(
+            client,
+            ToolsWorkflow,
+            activities=[model_activity.invoke_model_activity, get_weather],
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                ToolsWorkflow.run,
+                "What is the weather in Tokio?",
+                id=f"tools-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=5),
+            )
+            result = await workflow_handle.result()
+            activity_count = 0
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    activity_count += 1
 
-        assert activity_count == 3
-        assert result == "Test weather result"
+            assert activity_count == 3
+            assert result == "Test weather result"
