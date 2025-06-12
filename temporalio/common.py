@@ -8,7 +8,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum, IntEnum
+from enum import IntEnum
 from typing import (
     Any,
     Callable,
@@ -195,6 +195,37 @@ class RawValue:
         object.__setattr__(
             self, "payload", temporalio.api.common.v1.Payload.FromString(state[1:])
         )
+
+
+@dataclass(frozen=True)
+class NexusCompletionCallback:
+    """Nexus callback to attach to events such as workflow completion."""
+
+    url: str
+    """Callback URL."""
+
+    header: Mapping[str, str]
+    """Header to attach to callback request."""
+
+
+@dataclass(frozen=True)
+class WorkflowEventLink:
+    """A link to a history event that can be attached to a different history event."""
+
+    namespace: str
+    """Namespace of the workflow to link to."""
+
+    workflow_id: str
+    """ID of the workflow to link to."""
+
+    run_id: str
+    """Run ID of the workflow to link to."""
+
+    event_type: temporalio.api.enums.v1.EventType
+    """Type of the event to link to."""
+
+    event_id: int
+    """ID of the event to link to."""
 
 
 # We choose to make this a list instead of an sequence so we can catch if people

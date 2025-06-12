@@ -1,0 +1,83 @@
+import uuid
+
+import httpx
+import nexusrpc.handler
+import pytest
+
+from temporalio.client import Client
+from temporalio.worker import Worker
+from tests.helpers.nexus import create_nexus_endpoint
+
+HTTP_PORT = 7243
+
+
+# TODO(nexus-prerelease): test programmatic creation from ServiceHandler
+def make_incrementer_service_from_service_handler(
+    op_names: list[str],
+) -> tuple[str, type]:
+    pass
+
+
+def make_incrementer_user_service_definition_and_service_handler_classes(
+    op_names: list[str],
+) -> tuple[type, type]:
+    #
+    # service contract
+    #
+
+    ops = {name: nexusrpc.Operation[int, int] for name in op_names}
+    service_cls = nexusrpc.service(type("ServiceContract", (), ops))
+
+    #
+    # service handler
+    #
+    async def _increment_op(
+        self,
+        ctx: nexusrpc.handler.StartOperationContext,
+        input: int,
+    ) -> int:
+        return input + 1
+
+    op_handler_factories = {
+        # TODO(nexus-prerelease): check that name=name should be required here. Should the op factory
+        # name not default to the name of the method attribute (i.e. key), as opposed to
+        # the name of the method object (i.e. value.__name__)?
+        name: nexusrpc.handler.sync_operation_handler(_increment_op, name=name)
+        for name in op_names
+    }
+
+    handler_cls = nexusrpc.handler.service_handler(service=service_cls)(
+        type("ServiceImpl", (), op_handler_factories)
+    )
+
+    return service_cls, handler_cls
+
+
+@pytest.mark.skip(
+    reason="Dynamic creation of service contract using type() is not supported"
+)
+async def test_dynamic_creation_of_user_handler_classes(client: Client):
+    task_queue = str(uuid.uuid4())
+
+    service_cls, handler_cls = (
+        make_incrementer_user_service_definition_and_service_handler_classes(
+            ["increment"]
+        )
+    )
+
+    service_name = service_cls.__nexus_service__.name
+
+    endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_services=[handler_cls()],
+    ):
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
+                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
+                json=1,
+                headers={},
+            )
+            assert response.status_code == 200
+            assert response.json() == 2
