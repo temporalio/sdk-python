@@ -107,7 +107,7 @@ class ActivityModelInput(TypedDict, total=False):
 
     model_name: Optional[str]
     system_instructions: Optional[str]
-    input: Required[Union[str, list][TResponseInputItem]]  # type: ignore
+    input: Required[Union[str, list[TResponseInputItem]]]  # type: ignore
     model_settings: Required[ModelSettings]
     tools: list[ToolInput]
     output_schema: Optional[AgentOutputSchemaInput]
