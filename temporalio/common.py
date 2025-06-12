@@ -33,7 +33,9 @@ import google.protobuf.internal.containers
 from typing_extensions import NamedTuple, Self, TypeAlias, get_origin
 
 import temporalio.api.common.v1
+import temporalio.api.deployment.v1
 import temporalio.api.enums.v1
+import temporalio.api.workflow.v1
 import temporalio.types
 
 
@@ -1062,6 +1064,66 @@ class WorkerDeploymentVersion:
                 f"Cannot parse version string: {canonical}, must be in format <deployment_name>.<build_id>"
             )
         return WorkerDeploymentVersion(parts[0], parts[1])
+
+    def _to_proto(self) -> temporalio.api.deployment.v1.WorkerDeploymentVersion:
+        """Convert to proto representation."""
+        return temporalio.api.deployment.v1.WorkerDeploymentVersion(
+            build_id=self.build_id,
+            deployment_name=self.deployment_name,
+        )
+
+
+class VersioningOverride(ABC):
+    """Represents the override of a worker's versioning behavior for a workflow execution.
+
+    .. warning::
+        Experimental API.
+    """
+
+    @abstractmethod
+    def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
+        """Convert to proto representation."""
+        pass
+
+
+@dataclass(frozen=True)
+class PinnedVersioningOverride(VersioningOverride):
+    """Workflow will be pinned to a specific deployment version.
+
+    .. warning::
+        Experimental API.
+    """
+
+    version: WorkerDeploymentVersion
+
+    def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
+        """Convert to proto representation."""
+        # Include deprecated fields for backward compatibility
+        return temporalio.api.workflow.v1.VersioningOverride(
+            behavior=temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
+            pinned_version=self.version.to_canonical_string(),
+            pinned=temporalio.api.workflow.v1.VersioningOverride.PinnedOverride(
+                version=self.version._to_proto(),
+                behavior=temporalio.api.workflow.v1.VersioningOverride.PinnedOverrideBehavior.PINNED_OVERRIDE_BEHAVIOR_PINNED,
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class AutoUpgradeVersioningOverride(VersioningOverride):
+    """The workflow will auto-upgrade to the current deployment version on the next workflow task.
+
+    .. warning::
+        Experimental API.
+    """
+
+    def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
+        """Convert to proto representation."""
+        # Include deprecated fields for backward compatibility
+        return temporalio.api.workflow.v1.VersioningOverride(
+            behavior=temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE,
+            auto_upgrade=True,
+        )
 
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument

@@ -110,11 +110,13 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "--dynamic-config-value",
                 "frontend.enableExecuteMultiOperation=true",
                 "--dynamic-config-value",
-                "frontend.enableVersioningWorkflowAPIs=true",
+                "frontend.workerVersioningWorkflowAPIs=true",
                 "--dynamic-config-value",
-                "frontend.enableVersioningDataAPIs=true",
+                "frontend.workerVersioningDataAPIs=true",
                 "--dynamic-config-value",
                 "system.enableDeploymentVersions=true",
+                "--dynamic-config-value",
+                "frontend.activityAPIsEnabled=true",
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
@@ -140,18 +142,16 @@ async def worker(
     await worker.close()
 
 
-# There is an issue on 3.9 tests in GitHub actions where even though all tests
+# There is an issue in tests sometimes in GitHub actions where even though all tests
 # pass, an unclear outer area is killing the process with a bad exit code. This
 # hook forcefully kills the process as success when the exit code from pytest
 # is a success.
-if sys.version_info < (3, 10):
-
-    @pytest.hookimpl(hookwrapper=True, trylast=True)
-    def pytest_cmdline_main(config):
-        result = yield
-        if result.get_result() == 0:
-            os._exit(0)
-        return result.get_result()
+@pytest.hookimpl(hookwrapper=True, trylast=True)
+def pytest_cmdline_main(config):
+    result = yield
+    if result.get_result() == 0:
+        os._exit(0)
+    return result.get_result()
 
 
 CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50

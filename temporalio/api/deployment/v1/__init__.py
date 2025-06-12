@@ -8,6 +8,7 @@ from .message_pb2 import (
     VersionMetadata,
     WorkerDeploymentInfo,
     WorkerDeploymentOptions,
+    WorkerDeploymentVersion,
     WorkerDeploymentVersionInfo,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "VersionMetadata",
     "WorkerDeploymentInfo",
     "WorkerDeploymentOptions",
+    "WorkerDeploymentVersion",
     "WorkerDeploymentVersionInfo",
 ]

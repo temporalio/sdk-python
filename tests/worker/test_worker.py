@@ -20,7 +20,7 @@ from temporalio.api.workflowservice.v1 import (
     SetWorkerDeploymentRampingVersionResponse,
 )
 from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
-from temporalio.common import RawValue, VersioningBehavior
+from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
@@ -961,6 +961,55 @@ async def test_workflows_can_use_default_versioning_behavior(
             event.HasField("workflow_task_completed_event_attributes")
             and event.workflow_task_completed_event_attributes.versioning_behavior
             == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+            for event in history.events
+        )
+
+
+async def test_workflows_can_use_versioning_override(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker versioning")
+
+    deployment_name = f"deployment-versioning-override-{uuid.uuid4()}"
+    worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+
+    async with new_worker(
+        client,
+        DeploymentVersioningWorkflowV1AutoUpgrade,
+        deployment_config=WorkerDeploymentConfig(
+            version=worker_v1,
+            use_worker_versioning=True,
+        ),
+    ) as w:
+        describe_resp = await wait_until_worker_deployment_visible(
+            client,
+            worker_v1,
+        )
+        await set_current_deployment_version(
+            client, describe_resp.conflict_token, worker_v1
+        )
+
+        handle = await client.start_workflow(
+            DeploymentVersioningWorkflowV1AutoUpgrade.run,
+            id=f"override-versioning-behavior-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+            versioning_override=PinnedVersioningOverride(worker_v1),
+        )
+
+        await handle.signal(DeploymentVersioningWorkflowV1AutoUpgrade.do_finish)
+        await handle.result()
+
+        history = await handle.fetch_history()
+        assert any(
+            event.HasField("workflow_execution_started_event_attributes")
+            and (
+                event.workflow_execution_started_event_attributes.versioning_override.behavior
+                == temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+                or event.workflow_execution_started_event_attributes.versioning_override.HasField(
+                    "pinned"
+                )
+            )
             for event in history.events
         )
 

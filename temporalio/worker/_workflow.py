@@ -78,6 +78,7 @@ class _WorkflowWorker:
         ],
         disable_safe_eviction: bool,
         should_enforce_versioning_behavior: bool,
+        assert_local_activity_valid: Callable[[str], None],
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -104,8 +105,12 @@ class _WorkflowWorker:
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
         self._extern_functions.update(
-            **_WorkflowExternFunctions(__temporal_get_metric_meter=lambda: metric_meter)
+            **_WorkflowExternFunctions(
+                __temporal_get_metric_meter=lambda: metric_meter,
+                __temporal_assert_local_activity_valid=assert_local_activity_valid,
+            )
         )
+
         self._workflow_failure_exception_types = workflow_failure_exception_types
         self._running_workflows: Dict[str, _RunningWorkflow] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
@@ -527,6 +532,9 @@ class _WorkflowWorker:
                 init.search_attributes
             ),
             start_time=act.timestamp.ToDatetime().replace(tzinfo=timezone.utc),
+            workflow_start_time=init.start_time.ToDatetime().replace(
+                tzinfo=timezone.utc
+            ),
             task_queue=self._task_queue,
             task_timeout=init.workflow_task_timeout.ToTimedelta(),
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
