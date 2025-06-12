@@ -1,4 +1,6 @@
+import sys
 import uuid
+import pytest
 from datetime import timedelta
 from typing import Union
 
@@ -80,7 +82,7 @@ class HelloWorldAgent:
         )  # type: Agent
         workflow.logger.warning("Created agent")
         MultiProvider.get_model = lambda self, name: TestModel(  # type: ignore
-            name or "", openai_client=AsyncOpenAI()
+            name or "", openai_client=AsyncOpenAI(api_key="Fake key")
         )
         config = RunConfig(model="test_model")
         result = await Runner.run(agent, input=prompt, run_config=config)
@@ -89,6 +91,9 @@ class HelloWorldAgent:
 
 
 async def test_hello_world_agent(client: Client):
+    if sys.version_info < (3, 11):
+        pytest.skip("Open AI support has type errors on 3.9")
+
     set_open_ai_agent_temporal_overrides()
     async with new_worker(
         client, HelloWorldAgent, activities=[invoke_model_activity]

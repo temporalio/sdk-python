@@ -134,7 +134,6 @@ class _TemporalModelStub(Model):
             tracing=ModelTracingInput(tracing.value),
             previous_response_id=previous_response_id,
         )
-        workflow.logger.warning("Execute activity")
         return await workflow.execute_activity(
             invoke_model_activity,
             activity_input,
