@@ -86,6 +86,7 @@ class MyService:
     workflow_run_op_link_test: nexusrpc.Operation[Input, Output]
     handler_error_internal: nexusrpc.Operation[Input, Output]
     operation_error_failed: nexusrpc.Operation[Input, Output]
+    idempotency_check: nexusrpc.Operation[None, Output]
 
 
 @workflow.defn
@@ -274,6 +275,12 @@ class MyServiceHandler:
         self,
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
         return MyServiceHandler.OperationHandlerReturningUnwrappedResult()
+
+    @nexusrpc.handler.sync_operation_handler
+    async def idempotency_check(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: None
+    ) -> Output:
+        return Output(value=f"request_id: {ctx.request_id}")
 
 
 @dataclass
@@ -919,3 +926,31 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
         assert cancel_response.status_code == 404
         failure = Failure(**cancel_response.json())
         assert "failed to decode workflow operation token" in failure.message.lower()
+
+
+async def test_request_id_is_received_by_sync_operation_handler(
+    env: WorkflowEnvironment,
+):
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = nexusrpc.handler.service_handler(service=MyService)
+    service_handler = decorator(MyServiceHandler)()
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_services=[service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        request_id = str(uuid.uuid4())
+        resp = await service_client.start_operation(
+            "idempotency_check", None, {"Nexus-Request-Id": request_id}
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"value": f"request_id: {request_id}"}
