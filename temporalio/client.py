@@ -5884,7 +5884,13 @@ class _ClientImpl(OutboundInterceptor):
         if input.task_timeout is not None:
             req.workflow_task_timeout.FromTimedelta(input.task_timeout)
         req.identity = self._client.identity
-        req.request_id = str(uuid.uuid4())
+        # Use Nexus request ID if we're handling a Nexus Start operation
+        if nexus_ctx := temporalio.nexus.current_context.get(None):
+            if nexus_start_ctx := nexus_ctx.start_operation_context:
+                if nexus_request_id := nexus_start_ctx.request_id:
+                    req.request_id = nexus_request_id
+        if not req.request_id:
+            req.request_id = str(uuid.uuid4())
         req.workflow_id_reuse_policy = cast(
             "temporalio.api.enums.v1.WorkflowIdReusePolicy.ValueType",
             int(input.id_reuse_policy),
