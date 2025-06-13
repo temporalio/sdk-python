@@ -1,9 +1,8 @@
-import json
 import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, TypeVar, Union, cast
+from typing import Any, Union
 
 import pytest
 from agents import (
@@ -18,7 +17,6 @@ from agents import (
     ModelSettings,
     ModelTracing,
     OpenAIResponsesModel,
-    RunConfig,
     RunContextWrapper,
     Runner,
     Tool,
@@ -33,9 +31,7 @@ from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
     ToolCallOutputItem,
-    TResponseOutputItem,
 )
-from agents.models.multi_provider import MultiProvider
 from openai import AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseFunctionToolCall,
@@ -43,13 +39,10 @@ from openai.types.responses import (
     ResponseOutputMessage,
     ResponseOutputText,
 )
-from openai.types.responses.response_input_param import Message
-from pydantic import RootModel, TypeAdapter
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.openai_agents.invoke_model_activity import (
-    ActivityModelInput,
     ModelActivity,
 )
 from temporalio.contrib.openai_agents.temporal_openai_agents import (

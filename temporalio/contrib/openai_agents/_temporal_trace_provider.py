@@ -2,12 +2,11 @@ import uuid
 from typing import Any, Union, cast
 
 from agents import SpanData, Trace, TracingProcessor
-from agents.tracing import (  # TODO: TraceProvider is not declared in __all__
-    DefaultTraceProvider,  # pyright: ignore[reportPrivateImportUsage]
-    TraceProvider,  # pyright: ignore[reportPrivateImportUsage]
+from agents.tracing import (
     get_trace_provider,
 )
-from agents.tracing.spans import Span, TSpanData
+from agents.tracing.provider import DefaultTraceProvider
+from agents.tracing.spans import Span
 
 from temporalio import workflow
 from temporalio.workflow import ReadOnlyContextError
