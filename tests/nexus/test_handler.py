@@ -71,8 +71,8 @@ class MyService:
     # )
     hang: nexusrpc.Operation[Input, Output]
     log: nexusrpc.Operation[Input, Output]
-    async_operation: nexusrpc.Operation[Input, Output]
-    async_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
+    workflow_run_operation: nexusrpc.Operation[Input, Output]
+    workflow_run_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_with_non_async_def: nexusrpc.Operation[Input, Output]
     sync_operation_with_non_async_callable_instance: nexusrpc.Operation[Input, Output]
@@ -185,7 +185,7 @@ class MyServiceHandler:
         return Output(value=f"logged: {input.value}")
 
     @temporalio.nexus.handler.workflow_run_operation_handler
-    async def async_operation(
+    async def workflow_run_operation(
         self, ctx: StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
         assert "operation-timeout" in ctx.headers
@@ -231,7 +231,7 @@ class MyServiceHandler:
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
-    async def async_operation_without_type_annotations(self, ctx, input):
+    async def workflow_run_operation_without_type_annotations(self, ctx, input):
         return await ctx.client.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
@@ -469,7 +469,7 @@ class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
 
 
 class AsyncHandlerHappyPath(_TestCase):
-    operation = "async_operation"
+    operation = "workflow_run_operation"
     input = Input("hello")
     headers = {"Operation-Timeout": "777s"}
     expected = SuccessfulResponse(
@@ -478,7 +478,7 @@ class AsyncHandlerHappyPath(_TestCase):
 
 
 class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
-    operation = "async_operation_without_type_annotations"
+    operation = "workflow_run_operation_without_type_annotations"
     input = Input("hello")
     expected = SuccessfulResponse(
         status_code=201,
@@ -919,7 +919,7 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         cancel_response = await service_client.cancel_operation(
-            "async_operation",
+            "workflow_run_operation",
             token="this-is-not-a-valid-token",
         )
         assert cancel_response.status_code == 404
