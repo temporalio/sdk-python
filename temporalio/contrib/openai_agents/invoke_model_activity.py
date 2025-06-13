@@ -120,7 +120,7 @@ class ActivityModelInput(TypedDict, total=False):
 class ModelActivity:
     """Class wrapper for model invocation activities to allow model customization."""
 
-    def __init__(self, model_provider: Union[ModelProvider, None]):
+    def __init__(self, model_provider: Union[ModelProvider, None] = None):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider or MultiProvider()
 
