@@ -707,7 +707,7 @@ async def _test_start_operation(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        server_address=server_address(env),
         endpoint=endpoint,
         service=(
             test_case.service_defn
@@ -744,7 +744,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     resp = await create_nexus_endpoint(task_queue, env.client)
     endpoint = resp.endpoint.id
     service_client = ServiceClient(
-        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        server_address=server_address(env),
         endpoint=endpoint,
         service=service_name,
     )
@@ -904,7 +904,7 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        server_address=server_address(env),
         endpoint=endpoint,
         service=MyService.__name__,
     )
@@ -933,7 +933,7 @@ async def test_request_id_is_received_by_sync_operation_handler(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        server_address=server_address(env),
         endpoint=endpoint,
         service=MyService.__name__,
     )
@@ -953,3 +953,8 @@ async def test_request_id_is_received_by_sync_operation_handler(
         )
         assert resp.status_code == 200
         assert resp.json() == {"value": f"request_id: {request_id}"}
+
+
+def server_address(env: WorkflowEnvironment) -> str:
+    http_port = getattr(env, "_http_port", 7243)
+    return f"http://127.0.0.1:{http_port}"
