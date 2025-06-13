@@ -29,7 +29,6 @@ import nexusrpc
 import nexusrpc.handler
 import pytest
 from google.protobuf import json_format
-from nexusrpc.testing.client import ServiceClient
 
 import temporalio.api.failure.v1
 import temporalio.nexus
@@ -40,7 +39,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.nexus import CancelOperationContext, StartOperationContext, logger
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint
+from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
 
 HTTP_PORT = 7243
 
