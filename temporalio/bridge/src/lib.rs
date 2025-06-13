@@ -80,7 +80,7 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         envconfig::load_client_connect_config_from_file,
         m
     )?)?;
-    m.add_submodule(envconfig_module)?;
+    m.add_submodule(&envconfig_module)?;
 
     Ok(())
 }

@@ -20,7 +20,7 @@ fn data_source_to_dict(py: Python, ds: &DataSource) -> PyResult<PyObject> {
         DataSource::Path(p) => dict.set_item("path", p)?,
         DataSource::Data(d) => dict.set_item("data", PyBytes::new(py, d))?,
     };
-    Ok(dict.to_object(py))
+    Ok(dict.into())
 }
 
 fn tls_to_dict(py: Python, tls: &CoreClientConfigTLS) -> PyResult<PyObject> {
@@ -39,7 +39,7 @@ fn tls_to_dict(py: Python, tls: &CoreClientConfigTLS) -> PyResult<PyObject> {
         dict.set_item("server_name", v)?;
     }
     dict.set_item("disable_host_verification", tls.disable_host_verification)?;
-    Ok(dict.to_object(py))
+    Ok(dict.into())
 }
 
 fn codec_to_dict(py: Python, codec: &ClientConfigCodec) -> PyResult<PyObject> {
@@ -50,7 +50,7 @@ fn codec_to_dict(py: Python, codec: &ClientConfigCodec) -> PyResult<PyObject> {
     if let Some(v) = &codec.auth {
         dict.set_item("auth", v)?;
     }
-    Ok(dict.to_object(py))
+    Ok(dict.into())
 }
 
 fn profile_to_dict(py: Python, profile: &CoreClientConfigProfile) -> PyResult<PyObject> {
@@ -71,9 +71,9 @@ fn profile_to_dict(py: Python, profile: &CoreClientConfigProfile) -> PyResult<Py
         dict.set_item("codec", codec_to_dict(py, codec)?)?;
     }
     if !profile.grpc_meta.is_empty() {
-        dict.set_item("grpc_meta", profile.grpc_meta.to_object(py))?;
+        dict.set_item("grpc_meta", &profile.grpc_meta)?;
     }
-    Ok(dict.to_object(py))
+    Ok(dict.into())
 }
 
 fn core_config_to_dict(py: Python, core_config: &CoreClientConfig) -> PyResult<PyObject> {
@@ -82,7 +82,7 @@ fn core_config_to_dict(py: Python, core_config: &CoreClientConfig) -> PyResult<P
         let connect_dict = profile_to_dict(py, profile)?;
         profiles_dict.set_item(name, connect_dict)?;
     }
-    Ok(profiles_dict.to_object(py))
+    Ok(profiles_dict.into())
 }
 
 fn load_client_config_inner(
