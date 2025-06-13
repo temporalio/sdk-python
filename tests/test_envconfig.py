@@ -332,11 +332,11 @@ def test_load_profile_tls_options():
     assert profile_certs.tls is not None
     assert profile_certs.tls.server_name == "custom-server"
     assert profile_certs.tls.server_root_ca_cert is not None
-    assert profile_certs.tls.server_root_ca_cert.data == b"ca-pem-data"
+    assert profile_certs.tls.server_root_ca_cert == b"ca-pem-data"
     assert profile_certs.tls.client_cert is not None
-    assert profile_certs.tls.client_cert.data == b"client-crt-data"
+    assert profile_certs.tls.client_cert == b"client-crt-data"
     assert profile_certs.tls.client_private_key is not None
-    assert profile_certs.tls.client_private_key.data == b"client-key-data"
+    assert profile_certs.tls.client_private_key == b"client-key-data"
 
     config_certs = profile_certs.to_connect_config()
     assert isinstance(config_certs.tls, TLSConfig)
@@ -369,11 +369,11 @@ def test_load_profile_tls_from_paths(tmp_path: Path):
     assert profile.tls is not None
     assert profile.tls.server_name == "custom-server"
     assert profile.tls.server_root_ca_cert is not None
-    assert profile.tls.server_root_ca_cert.path == str(tmp_path / "ca.pem")
+    assert profile.tls.server_root_ca_cert == str(tmp_path / "ca.pem")
     assert profile.tls.client_cert is not None
-    assert profile.tls.client_cert.path == str(tmp_path / "client.crt")
+    assert profile.tls.client_cert == str(tmp_path / "client.crt")
     assert profile.tls.client_private_key is not None
-    assert profile.tls.client_private_key.path == str(tmp_path / "client.key")
+    assert profile.tls.client_private_key == str(tmp_path / "client.key")
 
     config = profile.to_connect_config()
     assert isinstance(config.tls, TLSConfig)
