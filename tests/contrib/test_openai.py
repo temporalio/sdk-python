@@ -3,7 +3,7 @@ import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Union
+from typing import Any, Union, Optional
 
 import pytest
 
@@ -641,10 +641,10 @@ async def test_agents_as_tools_workflow(client: Client):
 
 
 class AirlineAgentContext(BaseModel):
-    passenger_name: str | None = None
-    confirmation_number: str | None = None
-    seat_number: str | None = None
-    flight_number: str | None = None
+    passenger_name: Optional[str] = None
+    confirmation_number: Optional[str] = None
+    seat_number: Optional[str] = None
+    flight_number: Optional[str] = None
 
 
 @function_tool(
