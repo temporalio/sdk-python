@@ -73,7 +73,7 @@ class _NexusWorker:
         self._interceptors = interceptors
         # TODO(nexus-prerelease): metric_meter
         self._metric_meter = metric_meter
-        self._running_operations: dict[bytes, asyncio.Task[Any]] = {}
+        self._running_tasks: dict[bytes, asyncio.Task[Any]] = {}
 
     async def run(self) -> None:
         while True:
@@ -87,7 +87,7 @@ class _NexusWorker:
             if task.HasField("task"):
                 task = task.task
                 if task.request.HasField("start_operation"):
-                    self._running_operations[task.task_token] = asyncio.create_task(
+                    self._running_tasks[task.task_token] = asyncio.create_task(
                         self._run_nexus_operation(
                             task.task_token,
                             task.request.start_operation,
@@ -108,7 +108,7 @@ class _NexusWorker:
                     )
             elif task.HasField("cancel_task"):
                 task = task.cancel_task
-                if _task := self._running_operations.get(task.task_token):
+                if _task := self._running_tasks.get(task.task_token):
                     # TODO(nexus-prerelease): when do we remove the entry from _running_operations?
                     _task.cancel()
                 else:
@@ -134,9 +134,7 @@ class _NexusWorker:
                 return
 
     async def wait_all_completed(self) -> None:
-        await asyncio.gather(
-            *self._running_operations.values(), return_exceptions=False
-        )
+        await asyncio.gather(*self._running_tasks.values(), return_exceptions=False)
 
     # TODO(nexus-prerelease): stack trace pruning. See sdk-typescript NexusHandler.execute
     # "Any call up to this function and including this one will be trimmed out of stack traces.""
@@ -267,7 +265,7 @@ class _NexusWorker:
             temporalio.nexus.logger.exception("Failed to send Nexus task completion")
         finally:
             try:
-                del self._running_operations[task_token]
+                del self._running_tasks[task_token]
             except KeyError:
                 temporalio.nexus.logger.exception(
                     "Failed to remove completed Nexus operation"
