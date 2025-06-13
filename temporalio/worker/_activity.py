@@ -351,11 +351,15 @@ class _ActivityWorker:
                     ):
                         # Downgrade log level to DEBUG for BENIGN application errors.
                         temporalio.activity.logger.debug(
-                            "Completing activity as failed", exc_info=True
+                            "Completing activity as failed",
+                            exc_info=True,
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
                     else:
                         temporalio.activity.logger.warning(
-                            "Completing activity as failed", exc_info=True
+                            "Completing activity as failed",
+                            exc_info=True,
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
                     await self._data_converter.encode_failure(
                         err, completion.result.failed.failure

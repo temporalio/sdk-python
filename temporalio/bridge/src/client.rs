@@ -80,7 +80,7 @@ pub fn connect_client<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: ClientConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     let opts: ClientOptions = config.try_into()?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
@@ -126,7 +126,11 @@ impl ClientRef {
         self.retry_client.get_client().set_api_key(api_key);
     }
 
-    fn call_workflow_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+    fn call_workflow_service<'p>(
+        &self,
+        py: Python<'p>,
+        call: RpcCall,
+    ) -> PyResult<Bound<'p, PyAny>> {
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -361,12 +365,15 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
         })
     }
 
-    fn call_operator_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+    fn call_operator_service<'p>(
+        &self,
+        py: Python<'p>,
+        call: RpcCall,
+    ) -> PyResult<Bound<'p, PyAny>> {
         use temporal_client::OperatorService;
 
         let mut retry_client = self.retry_client.clone();
@@ -403,12 +410,11 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
         })
     }
 
-    fn call_cloud_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+    fn call_cloud_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
         use temporal_client::CloudService;
 
         let mut retry_client = self.retry_client.clone();
@@ -466,12 +472,11 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
         })
     }
 
-    fn call_test_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+    fn call_test_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -490,12 +495,11 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
         })
     }
 
-    fn call_health_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<&'p PyAny> {
+    fn call_health_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -507,8 +511,7 @@ impl ClientRef {
                     )))
                 }
             }?;
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
         })
     }
 }
@@ -539,13 +542,13 @@ where
     match res {
         Ok(resp) => Ok(resp.get_ref().encode_to_vec()),
         Err(err) => {
-            Err(Python::with_gil(move |py| {
+            Python::with_gil(move |py| {
                 // Create tuple of "status", "message", and optional "details"
                 let code = err.code() as u32;
                 let message = err.message().to_owned();
-                let details = err.details().into_py(py);
-                RPCError::new_err((code, message, details))
-            }))
+                let details = err.details().into_pyobject(py)?.unbind();
+                Err(RPCError::new_err((code, message, details)))
+            })
         }
     }
 }

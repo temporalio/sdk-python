@@ -25,9 +25,7 @@ starting a workflow with an `int` parameter when it accepts a `str` parameter wo
 
 **Different Activity Types**
 
-The activity worker has been developed to work with `async def`, threaded, and multiprocess activities. While
-`async def` activities are the easiest and recommended, care has been taken to make heartbeating and cancellation also
-work across threads/processes.
+The activity worker has been developed to work with `async def`, threaded, and multiprocess activities. Threaded activities are the initial recommendation, and further guidance can be found in [the docs](https://docs.temporal.io/develop/python/python-sdk-sync-vs-async).
 
 **Custom `asyncio` Event Loop**
 
@@ -316,10 +314,11 @@ The default data converter supports converting multiple types including:
   * Iterables including ones JSON dump may not support by default, e.g. `set`
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
+  * `datetime.datetime`
 
 To use pydantic model instances, see [Pydantic Support](#pydantic-support).
 
-`datetime.date`, `datetime.time`, and `datetime.datetime` can only be used with the Pydantic data converter.
+`datetime.date` and `datetime.time` can only be used with the Pydantic data converter.
 
 Although workflows, updates, signals, and queries can all be defined with multiple input parameters, users are strongly
 encouraged to use a single `dataclass` or Pydantic model parameter, so that fields with defaults can be easily added
