@@ -1,3 +1,4 @@
+import json
 import sys
 import uuid
 from dataclasses import dataclass
@@ -5,40 +6,6 @@ from datetime import timedelta
 from typing import Any, Union
 
 import pytest
-from agents import (
-    Agent,
-    AgentOutputSchemaBase,
-    Handoff,
-    ItemHelpers,
-    MessageOutputItem,
-    Model,
-    ModelProvider,
-    ModelResponse,
-    ModelSettings,
-    ModelTracing,
-    OpenAIResponsesModel,
-    RunContextWrapper,
-    Runner,
-    Tool,
-    TResponseInputItem,
-    Usage,
-    function_tool,
-    handoff,
-    trace,
-)
-from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-from agents.items import (
-    HandoffOutputItem,
-    ToolCallItem,
-    ToolCallOutputItem,
-)
-from openai import AsyncOpenAI, BaseModel
-from openai.types.responses import (
-    ResponseFunctionToolCall,
-    ResponseFunctionWebSearch,
-    ResponseOutputMessage,
-    ResponseOutputText,
-)
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
@@ -49,8 +16,45 @@ from temporalio.contrib.openai_agents.temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
 )
 from temporalio.contrib.openai_agents.temporal_tools import activity_as_tool
-from tests.contrib.research_agents.research_manager import ResearchManager
 from tests.helpers import new_worker
+
+with workflow.unsafe.imports_passed_through():
+    from agents import (
+        Agent,
+        AgentOutputSchemaBase,
+        Handoff,
+        ItemHelpers,
+        MessageOutputItem,
+        Model,
+        ModelProvider,
+        ModelResponse,
+        ModelSettings,
+        ModelTracing,
+        OpenAIResponsesModel,
+        RunContextWrapper,
+        Runner,
+        Tool,
+        TResponseInputItem,
+        Usage,
+        function_tool,
+        handoff,
+        trace,
+    )
+    from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+    from agents.items import (
+        HandoffOutputItem,
+        ToolCallItem,
+        ToolCallOutputItem,
+    )
+    from openai import AsyncOpenAI, BaseModel
+    from openai.types.responses import (
+        ResponseFunctionToolCall,
+        ResponseFunctionWebSearch,
+        ResponseOutputMessage,
+        ResponseOutputText,
+    )
+
+    from tests.contrib.research_agents.research_manager import ResearchManager
 
 
 class TestProvider(ModelProvider):
@@ -118,7 +122,7 @@ class TestHelloModel(TestModel):
     ]
 
 
-@workflow.defn(sandboxed=False)
+@workflow.defn
 class HelloWorldAgent:
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -208,7 +212,7 @@ class TestWeatherModel(TestModel):
     ]
 
 
-@workflow.defn(sandboxed=False)
+@workflow.defn
 class ToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
@@ -409,7 +413,7 @@ class TestResearchModel(TestModel):
     )
 
 
-@workflow.defn(sandboxed=False)
+@workflow.defn
 class ResearchWorkflow:
     @workflow.run
     async def run(self, query: str):
@@ -503,7 +507,7 @@ def synthesizer_agent() -> Agent:
     )
 
 
-@workflow.defn(sandboxed=False)
+@workflow.defn
 class AgentsAsToolsWorkflow:
     @workflow.run
     async def run(self, msg: str) -> str:
@@ -520,9 +524,9 @@ class AgentsAsToolsWorkflow:
                     if text:
                         print(f"  - Translation step: {text}")
 
-            x = orchestrator_result.to_input_list()
-            print(x)
-            synthesizer_result = await Runner.run(synthesizer, x)
+            synthesizer_result = await Runner.run(
+                synthesizer, orchestrator_result.to_input_list()
+            )
 
         return synthesizer_result.final_output
 
@@ -623,7 +627,7 @@ async def test_agents_as_tools_workflow(client: Client):
             workflow_handle = await client.start_workflow(
                 AgentsAsToolsWorkflow.run,
                 "Translate to Spanish: 'I am full'",
-                id=f"research-workflow-{uuid.uuid4()}",
+                id=f"agents-as-tools-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
             )
@@ -863,7 +867,7 @@ class CustomerServiceModel(TestModel):
     ]
 
 
-@workflow.defn(sandboxed=False)
+@workflow.defn
 class CustomerServiceWorkflow:
     def __init__(self, input_items: list[TResponseInputItem] = []):
         self.chat_history: list[str] = []

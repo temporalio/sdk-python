@@ -26,7 +26,7 @@ from agents import (
 from agents.models.multi_provider import MultiProvider
 from typing_extensions import Required
 
-from temporalio import activity
+from temporalio import activity, workflow
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
 
 
@@ -128,7 +128,8 @@ class ModelActivity:
     @_auto_heartbeater
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
-        model = self._model_provider.get_model(input.get("model_name"))
+        with workflow.unsafe.sandbox_unrestricted():
+            model = self._model_provider.get_model(input.get("model_name"))
 
         async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
             return ""

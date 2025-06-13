@@ -70,15 +70,16 @@ class TemporalOpenAIRunner(Runner):
         # tools = _activities_as_tools(starting_agent.tools) if starting_agent.tools else None
         # updated_starting_agent = replace(starting_agent, tools=tools)
 
-        return await self._runner._run_impl(
-            starting_agent=starting_agent,
-            input=input,
-            context=context,
-            max_turns=max_turns,
-            hooks=hooks,
-            run_config=updated_run_config,
-            previous_response_id=previous_response_id,
-        )
+        with workflow.unsafe.imports_passed_through():
+            return await self._runner._run_impl(
+                starting_agent=starting_agent,
+                input=input,
+                context=context,
+                max_turns=max_turns,
+                hooks=hooks,
+                run_config=updated_run_config,
+                previous_response_id=previous_response_id,
+            )
 
     def _run_sync_impl(
         self,
