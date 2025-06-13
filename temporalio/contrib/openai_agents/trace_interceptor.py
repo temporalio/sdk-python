@@ -105,19 +105,46 @@ def context_from_header(
 class OpenAIAgentsTracingInterceptor(
     temporalio.client.Interceptor, temporalio.worker.Interceptor
 ):
-    """Interceptor that can serialize/deserialize contexts."""
+    """Interceptor that propagates OpenAI agent tracing context through Temporal workflows and activities.
+
+    This interceptor enables tracing of OpenAI agent operations across Temporal workflows
+    and activities. It propagates trace context through workflow and activity boundaries,
+    allowing for end-to-end tracing of agent operations.
+
+    The interceptor handles:
+    1. Propagating trace context from client to workflow
+    2. Propagating trace context from workflow to activities
+    3. Maintaining trace context across workflow and activity boundaries
+
+    Example usage:
+        interceptor = OpenAIAgentsTracingInterceptor()
+        client = await Client.connect("localhost:7233", interceptors=[interceptor])
+        worker = Worker(client, task_queue="my-task-queue", interceptors=[interceptor])
+    """
 
     def __init__(
         self,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
     ) -> None:
-        """Initialize the interceptor with a payload converter."""
+        """Initialize the interceptor with a payload converter.
+
+        Args:
+            payload_converter: The payload converter to use for serializing/deserializing
+                trace context. Defaults to the default Temporal payload converter.
+        """
         self._payload_converter = payload_converter
 
     def intercept_client(
         self, next: temporalio.client.OutboundInterceptor
     ) -> temporalio.client.OutboundInterceptor:
-        """Intercepts client calls to propagate context."""
+        """Intercepts client calls to propagate trace context.
+
+        Args:
+            next: The next interceptor in the chain.
+
+        Returns:
+            An interceptor that propagates trace context for client operations.
+        """
         return _ContextPropagationClientOutboundInterceptor(
             next, self._payload_converter
         )
@@ -125,13 +152,27 @@ class OpenAIAgentsTracingInterceptor(
     def intercept_activity(
         self, next: temporalio.worker.ActivityInboundInterceptor
     ) -> temporalio.worker.ActivityInboundInterceptor:
-        """Intercepts activity calls to propagate context."""
+        """Intercepts activity calls to propagate trace context.
+
+        Args:
+            next: The next interceptor in the chain.
+
+        Returns:
+            An interceptor that propagates trace context for activity operations.
+        """
         return _ContextPropagationActivityInboundInterceptor(next)
 
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
     ) -> Type[_ContextPropagationWorkflowInboundInterceptor]:
-        """Returns the workflow interceptor class to propagate context."""
+        """Returns the workflow interceptor class to propagate trace context.
+
+        Args:
+            input: The input for creating the workflow interceptor.
+
+        Returns:
+            The class of the workflow interceptor that propagates trace context.
+        """
         return _ContextPropagationWorkflowInboundInterceptor
 
 

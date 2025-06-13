@@ -16,14 +16,30 @@ from temporalio.contrib.openai_agents._temporal_trace_provider import (
 
 @contextmanager
 def set_open_ai_agent_temporal_overrides():
-    """Should be called in the main entry point of the application.
+    """Configure Temporal-specific overrides for OpenAI agents.
 
-    The intended usage is:
+    This context manager sets up the necessary Temporal-specific runners and trace providers
+    for running OpenAI agents within Temporal workflows. It should be called in the main
+    entry point of your application before initializing the Temporal client and worker.
 
-    with set_open_ai_agent_temporal_overrides():
-      # Initialize the Temporal client and start the worker.
+    The context manager handles:
+    1. Setting up a Temporal-specific runner for OpenAI agents
+    2. Configuring a Temporal-aware trace provider
+    3. Restoring previous settings when the context exits
 
-    TODO: Consider wrapping the worker instead of this method.
+    Example usage:
+        with set_open_ai_agent_temporal_overrides():
+            # Initialize Temporal client and worker here
+            client = await Client.connect("localhost:7233")
+            worker = Worker(client, task_queue="my-task-queue")
+            await worker.run()
+
+    Returns:
+        A context manager that yields the configured TemporalTraceProvider.
+
+    Note:
+        This is a temporary solution. Future versions may wrap the worker directly
+        instead of requiring this context manager.
     """
     previous_runner: Optional[Runner] = None
     previous_trace_provider: Optional[TraceProvider] = None

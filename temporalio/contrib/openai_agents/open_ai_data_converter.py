@@ -31,26 +31,48 @@ class _WrapperModel(RootModel[T]):
 
 
 class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
-    """Pydantic JSON payload converter.
+    """Payload converter for OpenAI agent types that supports Pydantic models and standard Python types.
 
-    Supports conversion of all types supported by Pydantic to and from JSON.
+    This converter extends the standard JSON payload converter to handle OpenAI agent-specific
+    types, particularly Pydantic models. It supports:
 
-    In addition to Pydantic models, these include all `json.dump`-able types,
-    various non-`json.dump`-able standard library types such as dataclasses,
-    types from the datetime module, sets, UUID, etc, and custom types composed
-    of any of these.
+    1. All Pydantic models and their nested structures
+    2. Standard JSON-serializable types
+    3. Python standard library types like:
+       - dataclasses
+       - datetime objects
+       - sets
+       - UUIDs
+    4. Custom types composed of any of the above
 
-    See https://docs.pydantic.dev/latest/api/standard_library_types/
+    The converter uses Pydantic's serialization capabilities to ensure proper handling
+    of complex types while maintaining compatibility with Temporal's payload system.
+
+    See https://docs.pydantic.dev/latest/api/standard_library_types/ for details
+    on supported types.
     """
 
     @property
     def encoding(self) -> str:
-        """See base class."""
+        """Get the encoding identifier for this converter.
+
+        Returns:
+            The string "json/plain" indicating this is a plain JSON converter.
+        """
         return "json/plain"
 
     def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
-        """See base class.
-        Needs _WrapperModel configure arbitrary_types_allowed=True
+        """Convert a value to a Temporal payload.
+
+        This method wraps the value in a Pydantic RootModel to handle arbitrary types
+        and serializes it to JSON.
+
+        Args:
+            value: The value to convert to a payload.
+
+        Returns:
+            A Temporal payload containing the serialized value, or None if the value
+            cannot be converted.
         """
         wrapper = _WrapperModel[Any](root=value)
         data = wrapper.model_dump_json().encode()
@@ -64,6 +86,22 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
         payload: temporalio.api.common.v1.Payload,
         type_hint: Optional[Type] = None,
     ) -> Any:
+        """Convert a Temporal payload back to a Python value.
+
+        This method deserializes the JSON payload and validates it against the
+        provided type hint using Pydantic's validation system.
+
+        Args:
+            payload: The Temporal payload to convert.
+            type_hint: Optional type hint for validation.
+
+        Returns:
+            The deserialized and validated value.
+
+        Note:
+            The type hint is used for validation but the actual type returned
+            may be a Pydantic model instance.
+        """
         _type_hint = type_hint if type_hint is not None else Any
         wrapper = _WrapperModel[_type_hint]  # type: ignore[valid-type]
         # Needed due to
