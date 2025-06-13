@@ -18,6 +18,7 @@ import concurrent.futures
 import dataclasses
 import json
 import logging
+import pprint
 import uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -357,7 +358,8 @@ class _TestCase:
     ) -> None:
         assert response.status_code == cls.expected.status_code, (
             f"expected status code {cls.expected.status_code} "
-            f"but got {response.status_code} for response content {response.content.decode()}"
+            f"but got {response.status_code} for response content"
+            f"{pprint.pformat(response.content.decode())}"
         )
         if not with_service_definition and cls.expected_without_service_definition:
             expected = cls.expected_without_service_definition
