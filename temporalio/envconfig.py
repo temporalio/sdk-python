@@ -1,51 +1,61 @@
 """Environment and file-based configuration for Temporal clients.
 
 This module provides utilities to load Temporal client configuration from TOML files
-and environment variables, following the same patterns as the Go SDK.
+and environment variables.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Mapping, Optional, Union
+
+from typing_extensions import TypeAlias
 
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
 from temporalio.service import ConnectConfig, TLSConfig
 
+DataSource: TypeAlias = Union[
+    str, bytes
+]  # str represents a file path, bytes represents raw data
 
-@dataclass(frozen=True)
-class _DataSource:
-    path: Optional[str] = None
-    data: Optional[bytes] = None
 
-    @staticmethod
-    def from_dict(d: Optional[Mapping[str, Any]]) -> Optional[_DataSource]:
-        if not d:
-            return None
-        return _DataSource(path=d.get("path"), data=d.get("data"))
-
-    def read(self) -> Optional[bytes]:
-        if self.data:
-            return self.data
-        if self.path:
-            with open(self.path, "rb") as f:
-                return f.read()
+def _from_dict_to_source(d: Optional[Mapping[str, Any]]) -> Optional[DataSource]:
+    if not d:
         return None
+    if "data" in d:
+        return d["data"]
+    if "path" in d:
+        return d["path"]
+    return None
+
+
+def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
+    if not source:
+        return None
+    if isinstance(source, str):
+        with open(Path(source), "rb") as f:
+            return f.read()
+    return source
 
 
 @dataclass(frozen=True)
 class ClientConfigTls:
-    """TLS configuration as specified as part of client configuration"""
+    """TLS configuration as specified as part of client configuration
+
+    .. warning::
+        Experimental API.
+    """
 
     disabled: bool = False
     """If true, TLS is explicitly disabled."""
     server_name: Optional[str] = None
     """SNI override."""
-    server_root_ca_cert: Optional[_DataSource] = None
+    server_root_ca_cert: Optional[DataSource] = None
     """Server CA certificate source."""
-    client_cert: Optional[_DataSource] = None
+    client_cert: Optional[DataSource] = None
     """Client certificate source."""
-    client_private_key: Optional[_DataSource] = None
+    client_private_key: Optional[DataSource] = None
     """Client key source."""
 
     def to_connect_tls_config(self) -> Union[bool, TLSConfig]:
@@ -53,14 +63,11 @@ class ClientConfigTls:
         if self.disabled:
             return False
 
-        def _read(ds: Optional[_DataSource]) -> Optional[bytes]:
-            return ds.read() if ds else None
-
         return TLSConfig(
             domain=self.server_name,
-            server_root_ca_cert=_read(self.server_root_ca_cert),
-            client_cert=_read(self.client_cert),
-            client_private_key=_read(self.client_private_key),
+            server_root_ca_cert=_read_source(self.server_root_ca_cert),
+            client_cert=_read_source(self.client_cert),
+            client_private_key=_read_source(self.client_private_key),
         )
 
     @staticmethod
@@ -72,9 +79,9 @@ class ClientConfigTls:
             server_name=d.get("server_name"),
             # Note: Bridge uses snake_case, but TOML uses kebab-case which is
             # converted to snake_case. Core has server_ca_cert, client_key.
-            server_root_ca_cert=_DataSource.from_dict(d.get("server_ca_cert")),
-            client_cert=_DataSource.from_dict(d.get("client_cert")),
-            client_private_key=_DataSource.from_dict(d.get("client_key")),
+            server_root_ca_cert=_from_dict_to_source(d.get("server_ca_cert")),
+            client_cert=_from_dict_to_source(d.get("client_cert")),
+            client_private_key=_from_dict_to_source(d.get("client_key")),
         )
 
 
@@ -85,6 +92,9 @@ class ClientConfigProfile:
     This class holds the configuration as loaded from a file or environment.
     See `to_connect_config` to transform the profile to `temporalio.service.ConnectConfig`,
     which can be used to create a client.
+
+    .. warning::
+        Experimental API.
     """
 
     address: Optional[str] = None
@@ -114,18 +124,15 @@ class ClientConfigProfile:
         # Create a dictionary of kwargs for ConnectConfig
         kwargs: dict[str, Any] = {"api_key": self.api_key}
 
-        # Target host
         if self.address:
             kwargs["target_host"] = self.address
 
-        # Metadata
         rpc_metadata = dict(self.grpc_meta)
         if self.namespace:
             rpc_metadata["namespace"] = self.namespace
         if rpc_metadata:
             kwargs["rpc_metadata"] = rpc_metadata
 
-        # TLS
         if self.tls:
             kwargs["tls"] = self.tls.to_connect_tls_config()
 
@@ -139,6 +146,9 @@ class ClientConfig:
     This contains a mapping of profile names to client profiles. Use
     `ClientConfigProfile.to_connect_config` to create a `temporalio.service.ConnectConfig`
     from a profile. See `load_profile` to load an individual profile.
+
+    .. warning::
+        Experimental API.
     """
 
     profiles: Mapping[str, ClientConfigProfile]
