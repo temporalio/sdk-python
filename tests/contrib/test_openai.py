@@ -91,7 +91,6 @@ class TestModel(OpenAIResponsesModel):
         previous_response_id: Union[str, None],
     ) -> ModelResponse:
         global response_index
-        print("Response index:", response_index)
         response = self.responses[response_index]
         response_index += 1
         return response
