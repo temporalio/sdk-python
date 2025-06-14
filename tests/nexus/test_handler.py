@@ -57,6 +57,11 @@ class Output:
 
 
 @dataclass
+class NonSerializableOutput:
+    callable: Callable[[], Any] = lambda: None
+
+
+@dataclass
 class TestContext:
     workflow_id: Optional[str] = None
 
@@ -96,6 +101,7 @@ class MyService:
     handler_error_internal: nexusrpc.Operation[Input, Output]
     operation_error_failed: nexusrpc.Operation[Input, Output]
     idempotency_check: nexusrpc.Operation[None, Output]
+    non_serializable_output: nexusrpc.Operation[Input, NonSerializableOutput]
 
 
 @workflow.defn
@@ -291,6 +297,12 @@ class MyServiceHandler:
         self, ctx: nexusrpc.handler.StartOperationContext, input: None
     ) -> Output:
         return Output(value=f"request_id: {ctx.request_id}")
+
+    @nexusrpc.handler.sync_operation_handler
+    async def non_serializable_output(
+        self, ctx: StartOperationContext, input: Input
+    ) -> NonSerializableOutput:
+        return NonSerializableOutput()
 
 
 @dataclass
@@ -653,6 +665,15 @@ class UnknownOperation(_FailureTestCase):
     )
 
 
+class NonSerializableOutputFailure(_FailureTestCase):
+    operation = "non_serializable_output"
+    expected = UnsuccessfulResponse(
+        status_code=500,
+        retryable_header=False,
+        failure_message="Object of type function is not JSON serializable",
+    )
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -687,6 +708,7 @@ async def test_start_operation_happy_path(
         HandlerErrorInternal,
         UnknownService,
         UnknownOperation,
+        NonSerializableOutputFailure,
     ],
 )
 async def test_start_operation_protocol_level_failures(
