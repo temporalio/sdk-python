@@ -223,17 +223,7 @@ class _NexusWorker:
             handler_err = _exception_to_handler_error(err)
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                 task_token=task_token,
-                error=temporalio.api.nexus.v1.HandlerError(
-                    error_type=handler_err.type.value,
-                    failure=await self._exception_to_failure_proto(
-                        handler_err.__cause__
-                    ),
-                    retry_behavior=(
-                        temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-                        if handler_err.retryable
-                        else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-                    ),
-                ),
+                error=await self._handler_error_to_proto(handler_err),
             )
         else:
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -319,18 +309,6 @@ class _NexusWorker:
                         "or nexusrpc.handler.StartOperationResultAsync"
                     )
                 )
-
-        except (
-            nexusrpc.handler.UnknownServiceError,
-            nexusrpc.handler.UnknownOperationError,
-        ) as err:
-            # TODO(nexus-prerelease): error message
-            raise nexusrpc.handler.HandlerError(
-                "No matching operation handler",
-                type=nexusrpc.handler.HandlerErrorType.NOT_FOUND,
-                cause=err,
-                retryable=False,
-            ) from err
         except nexusrpc.handler.OperationError as err:
             return temporalio.api.nexus.v1.StartOperationResponse(
                 operation_error=await self._operation_error_to_proto(err),

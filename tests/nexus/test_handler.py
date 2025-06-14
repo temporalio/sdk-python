@@ -365,6 +365,8 @@ class UnsuccessfulResponse:
     # Expected value of Nexus-Request-Retryable header
     retryable_header: Optional[bool]
     failure_message: Union[str, Callable[[str], bool]]
+    # Is the Nexus Failure expected to have the details field populated?
+    failure_details: bool = True
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
     # TODO(nexus-prerelease): the body of a successful response need not be JSON; test non-JSON-parseable string
@@ -429,13 +431,25 @@ class _FailureTestCase(_TestCase):
         else:
             assert cls.expected.retryable_header is None
 
-        if failure.exception_from_details:
+        if cls.expected.failure_details:
+            assert (
+                failure.exception_from_details is not None
+            ), "Expected exception details, but found none."
             assert isinstance(failure.exception_from_details, ApplicationError)
-            assert failure.exception_from_details.non_retryable == (
+
+            exception_from_failure_details = failure.exception_from_details
+            if (
+                exception_from_failure_details.type == "HandlerError"
+                and exception_from_failure_details.__cause__
+            ):
+                exception_from_failure_details = (
+                    exception_from_failure_details.__cause__
+                )
+                assert isinstance(exception_from_failure_details, ApplicationError)
+
+            assert exception_from_failure_details.non_retryable == (
                 not cls.expected.retryable_exception
             )
-        else:
-            print(f"TODO(dan): {cls} did not yield a Failure with exception details")
 
 
 class SyncHandlerHappyPath(_TestCase):
@@ -573,6 +587,7 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
         retryable_header=None,
         # This error is returned by the server; it doesn't populate metadata or details, and it
         # doesn't set temporal-nexus-failure-source.
+        failure_details=False,
         failure_message="upstream timeout",
         headers={
             "content-type": "application/json",
@@ -597,11 +612,30 @@ class BadRequest(_FailureTestCase):
     expected = UnsuccessfulResponse(
         status_code=400,
         retryable_header=False,
-        failure_message=lambda s: s.startswith("Failed converting field"),
+        failure_message=lambda s: s.startswith(
+            "Data converter failed to decode Nexus operation input"
+        ),
     )
 
 
-class NonRetryableApplicationError(_FailureTestCase):
+class _ApplicationErrorTestCase(_FailureTestCase):
+    """Test cases in which the operation raises an ApplicationError."""
+
+    @classmethod
+    def check_response(
+        cls, response: httpx.Response, with_service_definition: bool
+    ) -> None:
+        super().check_response(response, with_service_definition)
+        failure = Failure(**response.json())
+        assert failure.exception_from_details
+        assert isinstance(failure.exception_from_details, ApplicationError)
+        err = failure.exception_from_details.__cause__
+        assert isinstance(err, ApplicationError)
+        assert err.type == "TestFailureType"
+        assert err.details == ("details arg",)
+
+
+class NonRetryableApplicationError(_ApplicationErrorTestCase):
     operation = "non_retryable_application_error"
     expected = UnsuccessfulResponse(
         status_code=500,
@@ -610,20 +644,8 @@ class NonRetryableApplicationError(_FailureTestCase):
         failure_message="non-retryable application error",
     )
 
-    @classmethod
-    def check_response(
-        cls, response: httpx.Response, with_service_definition: bool
-    ) -> None:
-        super().check_response(response, with_service_definition)
-        failure = Failure(**response.json())
-        err = failure.exception_from_details
-        assert isinstance(err, ApplicationError)
-        assert err.non_retryable
-        assert err.type == "TestFailureType"
-        assert err.details == ("details arg",)
 
-
-class RetryableApplicationError(_FailureTestCase):
+class RetryableApplicationError(_ApplicationErrorTestCase):
     operation = "retryable_application_error"
     expected = UnsuccessfulResponse(
         status_code=500,
@@ -638,7 +660,7 @@ class HandlerErrorInternal(_FailureTestCase):
         status_code=500,
         # TODO(nexus-prerelease): check this assertion
         retryable_header=False,
-        failure_message="cause message",
+        failure_message="deliberate internal handler error",
     )
 
 
