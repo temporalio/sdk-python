@@ -16,34 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.14.0-beta.2"]
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
-        include:
-          # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
-          # to a bug in CPython (https://github.com/python/cpython/issues/91351), so we avoid using
-          # the assert rewriter.
-          - python: "3.9"
-            pytestExtraArgs: "--assert=plain"
-          - os: ubuntu-latest
-            python: "3.13"
-            docsTarget: true
-            cloudTestTarget: true
-            clippyLinter: true
-          - os: ubuntu-latest
-            python: "3.9"
-            protoCheckTarget: true
-          - os: ubuntu-arm
-            runsOn: ubuntu-24.04-arm64-2-core
-          - os: macos-intel
-            runsOn: macos-13
-          # On 3.13.3 there is some issue with macOS intel where it hangs after pytest with some
-          # test that may have a worker that cannot properly shutdown, but it does not occur on
-          # other versions, platforms, etc. See https://github.com/temporalio/sdk-python/issues/834.
-          - os: macos-intel
-            python: "3.13"
-            pythonOverride: "3.13.2"
-          - os: macos-arm
-            runsOn: macos-latest
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +38,8 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install poethepoet
       - run: uv sync --all-extras
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
       - run: poe lint
