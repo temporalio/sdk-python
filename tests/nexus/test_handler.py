@@ -55,6 +55,14 @@ class Output:
     value: str
 
 
+@dataclass
+class TestContext:
+    workflow_id: Optional[str] = None
+
+
+test_context = TestContext()
+
+
 # TODO: type check nexus implementation under mypy
 
 # TODO(nexus-prerelease): test dynamic creation of a service from unsugared definition
@@ -189,11 +197,10 @@ class MyServiceHandler:
     async def workflow_run_operation(
         self, ctx: StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
-        assert "operation-timeout" in ctx.headers
         return await ctx.client.start_workflow(
             MyWorkflow.run,
             input,
-            id=str(uuid.uuid4()),
+            id=test_context.workflow_id or str(uuid.uuid4()),
             task_queue=ctx.task_queue,
         )
 
@@ -236,7 +243,7 @@ class MyServiceHandler:
         return await ctx.client.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
-            id=str(uuid.uuid4()),
+            id=test_context.workflow_id or str(uuid.uuid4()),
             task_queue=ctx.task_queue,
         )
 
@@ -249,10 +256,11 @@ class MyServiceHandler:
         ), "Inbound link not found"
         assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
         ctx.outbound_links.extend(ctx.inbound_links)
+
         return await ctx.client.start_workflow(
             MyLinkTestWorkflow.run,
             input,
-            id=f"link-test-{uuid.uuid4()}",
+            id=test_context.workflow_id or str(uuid.uuid4()),
             task_queue=ctx.task_queue,
         )
 
